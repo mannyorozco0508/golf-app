@@ -18,11 +18,25 @@
         
         .live-ticker-box {
             background: #1d3557; color: #ffffff; border-radius: 10px;
-            padding: 10px 14px; text-align: center; margin-bottom: 12px;
+            padding: 10px 14px; text-align: center; margin-bottom: 10px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         }
         .ticker-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #a8dadc; font-weight: bold; }
-        .ticker-status { font-size: 1.1rem; font-weight: bold; margin-top: 2px; color: #fff; }
+        .ticker-status { font-size: 1.05rem; font-weight: bold; margin-top: 2px; color: #fff; }
+
+        /* LIVE NASSAU PAYOUT SUMMARY BOX */
+        .nassau-payout-box {
+            background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px;
+            padding: 10px 14px; margin-bottom: 12px; display: none;
+        }
+        .nassau-payout-title { font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+        .nassau-payout-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+        .payout-item { background: #ffffff; padding: 6px; border-radius: 6px; border: 1px solid #d0e1db; }
+        .payout-label { font-size: 0.7rem; color: #555; font-weight: bold; }
+        .payout-val { font-size: 0.9rem; font-weight: bold; margin-top: 2px; }
+        .val-pos { color: #2a9d8f; }
+        .val-neg { color: #e63946; }
+        .val-even { color: #555; }
 
         .group-filter-bar {
             display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 12px;
@@ -79,6 +93,29 @@
     <div class="live-ticker-box">
         <div class="ticker-title" id="ticker-title-label">LIVE SITUATION</div>
         <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
+    </div>
+
+    <!-- LIVE NASSAU PAYOUT SUMMARY -->
+    <div class="nassau-payout-box" id="nassau-payout-container">
+        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Nassau Payouts ($10 Stake)</div>
+        <div class="nassau-payout-grid">
+            <div class="payout-item">
+                <div class="payout-label">Front 9</div>
+                <div class="payout-val" id="pay-front">$0</div>
+            </div>
+            <div class="payout-item">
+                <div class="payout-label">Back 9</div>
+                <div class="payout-val" id="pay-back">$0</div>
+            </div>
+            <div class="payout-item">
+                <div class="payout-label">Total 18</div>
+                <div class="payout-val" id="pay-total">$0</div>
+            </div>
+            <div class="payout-item" style="background:#e0f2ef;">
+                <div class="payout-label" style="color:#0f4c3a;">Total Net</div>
+                <div class="payout-val" id="pay-net">$0</div>
+            </div>
+        </div>
     </div>
 
     <!-- GROUP FILTER BAR -->
@@ -179,25 +216,28 @@
         renderScorecard();
     });
 
-    function updateLiveTicker(players, courseData, savedScores, gameFormat) {
+    function updateLiveTicker(players, courseData, savedScores, gameFormat, stake) {
         const titleEl = document.getElementById("ticker-title-label");
         const statusEl = document.getElementById("ticker-status-val");
+        const payoutBox = document.getElementById("nassau-payout-container");
 
         if (players.length < 2) {
             titleEl.textContent = "LIVE STATUS";
             statusEl.textContent = "Waiting for players...";
+            payoutBox.style.display = "none";
             return;
         }
 
         if (gameFormat === 'nassau') {
+            payoutBox.style.display = "block";
             const p1 = players[0];
             const p2 = players[1];
             titleEl.textContent = `🥊 NASSAU MATCH: ${p1.name} VS ${p2.name}`;
 
-            let matchStatus = 0;
-            let thru = 0;
+            let frontMatch = 0, backMatch = 0, totalMatch = 0;
+            let frontThru = 0, backThru = 0;
 
-            courseData.forEach(hole => {
+            courseData.forEach((hole, idx) => {
                 const v1 = savedScores[`p${p1.id}_h${hole.hole}`];
                 const v2 = savedScores[`p${p2.id}_h${hole.hole}`];
 
@@ -205,23 +245,54 @@
                     const n1 = parseInt(v1, 10) - getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
                     const n2 = parseInt(v2, 10) - getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
 
-                    if (n1 < n2) matchStatus += 1;
-                    if (n2 < n1) matchStatus -= 1;
-                    thru++;
+                    let diff = 0;
+                    if (n1 < n2) diff = 1;
+                    if (n2 < n1) diff = -1;
+
+                    if (idx < 9) { frontMatch += diff; frontThru++; }
+                    else { backMatch += diff; backThru++; }
+                    totalMatch += diff;
                 }
             });
 
-            if (thru === 0) {
+            // Calculate live dollar amounts
+            const frontVal = (frontThru === 9 || frontThru > 0) ? (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0)) : 0;
+            const backVal = (backThru === 9 || backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
+            const totalVal = ((frontThru + backThru) === 18 || (frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
+            const netVal = frontVal + backVal + totalVal;
+
+            document.getElementById("nassau-payout-header").textContent = `💵 Live Nassau Payouts (${p1.name} vs ${p2.name} @ $${stake})`;
+            
+            const fEl = document.getElementById("pay-front");
+            const bEl = document.getElementById("pay-back");
+            const tEl = document.getElementById("pay-total");
+            const netEl = document.getElementById("pay-net");
+
+            fEl.textContent = `${frontVal >= 0 ? '+' : ''}$${frontVal}`;
+            fEl.className = `payout-val ${frontVal > 0 ? 'val-pos' : (frontVal < 0 ? 'val-neg' : 'val-even')}`;
+
+            bEl.textContent = `${backVal >= 0 ? '+' : ''}$${backVal}`;
+            bEl.className = `payout-val ${backVal > 0 ? 'val-pos' : (backVal < 0 ? 'val-neg' : 'val-even')}`;
+
+            tEl.textContent = `${totalVal >= 0 ? '+' : ''}$${totalVal}`;
+            tEl.className = `payout-val ${totalVal > 0 ? 'val-pos' : (totalVal < 0 ? 'val-neg' : 'val-even')}`;
+
+            netEl.textContent = `${netVal >= 0 ? '+' : ''}$${netVal}`;
+            netEl.className = `payout-val ${netVal > 0 ? 'val-pos' : (netVal < 0 ? 'val-neg' : 'val-even')}`;
+
+            let matchStatus = frontThru < 9 ? frontMatch : (frontThru + backThru < 18 ? totalMatch : totalMatch);
+            if (frontThru === 0) {
                 statusEl.textContent = "ALL SQUARE (Match Not Started)";
             } else if (matchStatus === 0) {
-                statusEl.textContent = `ALL SQUARE (Thru ${thru})`;
+                statusEl.textContent = `ALL SQUARE (Thru ${frontThru + backThru})`;
             } else if (matchStatus > 0) {
-                statusEl.textContent = `🟢 ${p1.name} is ${matchStatus}UP (Thru ${thru})`;
+                statusEl.textContent = `🟢 ${p1.name} is ${matchStatus}UP (Thru ${frontThru + backThru})`;
             } else {
-                statusEl.textContent = `🟢 ${p2.name} is ${Math.abs(matchStatus)}UP (Thru ${thru})`;
+                statusEl.textContent = `🟢 ${p2.name} is ${Math.abs(matchStatus)}UP (Thru ${frontThru + backThru})`;
             }
 
         } else {
+            payoutBox.style.display = "none";
             titleEl.textContent = "🏆 LIVE LEADER (NET)";
             let leaderName = "-";
             let bestNet = 999;
@@ -260,11 +331,12 @@
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
         const gameFormat = currentData.gameFormat || "stroke";
+        const stake = currentData.nassauStake || 10;
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
         document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()}`;
 
-        updateLiveTicker(players, courseData, savedScores, gameFormat);
+        updateLiveTicker(players, courseData, savedScores, gameFormat, stake);
 
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
@@ -310,10 +382,8 @@
                     if (runningMatchStatus === 0) {
                         holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
                     } else if (runningMatchStatus > 0) {
-                        // Player 1 is winning -> Arrow points left towards Player 1
                         holeBadge = `<div class="match-cell-container"><span class="match-arrow">◀</span><span class="status-badge badge-up">${runningMatchStatus}UP</span></div>`;
                     } else {
-                        // Player 2 is winning -> Arrow points right towards Player 2
                         holeBadge = `<div class="match-cell-container"><span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP</span><span class="match-arrow">▶</span></div>`;
                     }
                 }
