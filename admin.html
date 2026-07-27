@@ -40,15 +40,15 @@
         .mode-btn.active-mode { background: #1d3557; color: #ffffff; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
-        input[type="text"], select {
+        input[type="text"], input[type="number"], select {
             width: 100%; padding: 10px; border: 1px solid #ccc;
             border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff;
         }
-        .nine-loop-box {
+        .extra-settings-box {
             background: #eef6f2; border: 1px solid #2a9d8f;
             border-radius: 8px; padding: 12px; margin-top: 10px; display: none;
         }
-        .nine-loop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .share-box {
             background: #eef6f2; border: 2px dashed #0f4c3a;
             border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px;
@@ -134,9 +134,9 @@
             <option value="manofwar">🌴 Man O' War Golf Club (Par 72)</option>
         </select>
 
-        <div id="nine-loop-selector" class="nine-loop-box">
+        <div id="nine-loop-selector" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🔄 Select Eagle's Pride 9-Hole Loops</label>
-            <div class="nine-loop-grid">
+            <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.8rem;">Front 9</label>
                     <select id="front-nine-select"></select>
@@ -151,14 +151,33 @@
 
     <div class="form-group">
         <label>Round Game Format</label>
-        <select id="game-format-select" onchange="updateTeamPairingDefaults()">
+        <select id="game-format-select" onchange="handleFormatChange()">
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
+            <option value="nassau">Nassau Bet Tracker (Front / Back / Total)</option>
             <option value="bestball">2-Man Best Ball (Four-Ball)</option>
             <option value="scramble">4-Man Scramble</option>
             <option value="stableford">Net Stableford Points</option>
             <option value="skins">Skins Game (Gross & Net)</option>
         </select>
+
+        <div id="nassau-settings" class="extra-settings-box">
+            <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
+            <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.8rem;">Base Bet ($)</label>
+                    <input type="number" id="nassau-stake" value="10" min="1">
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">Auto-Press When</label>
+                    <select id="nassau-press-rule">
+                        <option value="2down">2 Down</option>
+                        <option value="1down">1 Down</option>
+                        <option value="none">No Auto-Press</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </div>
 
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
@@ -253,6 +272,13 @@
         }
     }
 
+    function handleFormatChange() {
+        const format = document.getElementById("game-format-select").value;
+        const nassauBox = document.getElementById("nassau-settings");
+        nassauBox.style.display = (format === "nassau") ? "block" : "none";
+        updateTeamPairingDefaults();
+    }
+
     function buildMergedCourseData(courseKey) {
         if (nineHoleLoops[courseKey]) {
             const loops = nineHoleLoops[courseKey];
@@ -310,7 +336,13 @@
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
 
-            if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.gameFormat) {
+                document.getElementById("game-format-select").value = data.gameFormat;
+                handleFormatChange();
+            }
+
+            if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
+            if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
 
             const listContainer = document.getElementById("player-list");
             listContainer.innerHTML = "";
@@ -374,7 +406,6 @@
     function saveSettings() {
         const gameFormat = document.getElementById("game-format-select").value;
         
-        // POPUP VALIDATION: Ensure game format is selected before proceeding
         if (!gameFormat) {
             alert("⚠️ Please select a Round Game Format before saving!");
             return;
@@ -383,6 +414,9 @@
         const courseKey = document.getElementById("course-select").value;
         const baseEventName = document.getElementById("event-name").value;
         const selectedCourse = buildMergedCourseData(courseKey);
+
+        const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
+        const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
 
         const rows = document.querySelectorAll('.player-row');
         const playersList = [];
@@ -407,6 +441,8 @@
             activeCourseKey: courseKey,
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
+            nassauStake: nassauStake,
+            nassauPressRule: nassauPressRule,
             courseData: selectedCourse.data,
             players: playersList
         });

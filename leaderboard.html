@@ -19,6 +19,15 @@
         .leaderboard-table th { background: #f8f9fa; color: #444; font-size: 0.85rem; }
         .player-name-cell { text-align: left !important; font-weight: bold; }
         .rank-1 { background-color: #fff9db; font-weight: bold; }
+        
+        .nassau-card {
+            background: #f0f7f4; border: 2px solid #0f4c3a; border-radius: 10px; padding: 14px; margin-top: 12px;
+        }
+        .nassau-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold; }
+        .nassau-row:last-child { border-bottom: none; }
+        .win-green { color: #2a9d8f; }
+        .loss-red { color: #e63946; }
+
         .nav-bar {
             position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
             border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
@@ -34,7 +43,9 @@
     <div style="text-align: center;"><span class="format-badge" id="format-badge">Stroke Play</span></div>
     <h2 id="board-title">🏆 Live Leaderboard</h2>
 
-    <table class="leaderboard-table">
+    <div id="nassau-container" style="display:none;"></div>
+
+    <table class="leaderboard-table" id="main-table">
         <thead>
             <tr id="table-headers">
                 <th>Pos</th>
@@ -98,131 +109,224 @@
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         const gameFormat = data.gameFormat || "stroke";
+        const stake = data.nassauStake || 10;
 
         document.getElementById("board-title").textContent = `🏆 ${data.eventName || "Live Leaderboard"}`;
         
         let formatLabel = "Individual Stroke Play";
         if (gameFormat === 'bestball') formatLabel = "2-Man Best Ball (Four-Ball)";
         if (gameFormat === 'scramble') formatLabel = "4-Man Scramble";
+        if (gameFormat === 'nassau') formatLabel = `Nassau Bet Tracker ($${stake} Base Stake)`;
         document.getElementById("format-badge").textContent = formatLabel;
 
         const tbody = document.getElementById("leaderboard-body");
+        const nassauBox = document.getElementById("nassau-container");
+        const mainTable = document.getElementById("main-table");
+
         tbody.innerHTML = "";
 
-        if (gameFormat === 'bestball' || gameFormat === 'scramble') {
-            const teamsMap = {};
-            players.forEach(p => {
-                const teamKey = p.team || "Team 1";
-                if (!teamsMap[teamKey]) teamsMap[teamKey] = [];
-                teamsMap[teamKey].push(p);
-            });
+        if (gameFormat === 'nassau') {
+            mainTable.style.display = "none";
+            nassauBox.style.display = "block";
+            nassauBox.innerHTML = "";
 
-            let teamResults = Object.keys(teamsMap).map(teamKey => {
-                const teamPlayers = teamsMap[teamKey];
-                let teamNetTotal = 0;
-                let teamGrossTotal = 0;
-                let holesCompleted = 0;
+            // Group by Team 1 vs Team 2
+            const t1 = players.filter(p => (p.team || "Team 1") === "Team 1");
+            const t2 = players.filter(p => (p.team || "Team 2") === "Team 2");
 
-                if (gameFormat === 'scramble') {
-                    // Team scramble calculation (20% of sum of team handicaps)
-                    const totalHcp = teamPlayers.reduce((sum, p) => sum + parseHcp(p.hcp), 0);
-                    const scrambleHcp = Math.round(totalHcp * 0.20);
+            let frontMatch = 0, backMatch = 0, totalMatch = 0;
+            let frontThru = 0, backThru = 0;
 
-                    courseData.forEach(hole => {
-                        let holeScore = null;
-                        teamPlayers.forEach(p => {
-                            const val = savedScores[`p${p.id}_h${hole.hole}`];
-                            if (val && val > 0) holeScore = parseInt(val, 10);
-                        });
+            courseData.forEach((hole, idx) => {
+                let bestNet1 = 999, bestNet2 = 999;
 
-                        if (holeScore !== null) {
-                            teamGrossTotal += holeScore;
-                            holesCompleted++;
-                        }
-                    });
-
-                    const netDeduction = Math.round((scrambleHcp / 18) * holesCompleted);
-                    teamNetTotal = teamGrossTotal - netDeduction;
-
-                } else {
-                    // 2-Man Best Ball calculation
-                    courseData.forEach(hole => {
-                        let bestNetForHole = 999;
-                        let bestGrossForHole = 999;
-                        let holePlayedByTeam = false;
-
-                        teamPlayers.forEach(p => {
-                            const val = savedScores[`p${p.id}_h${hole.hole}`];
-                            if (val && val > 0) {
-                                holePlayedByTeam = true;
-                                const gross = parseInt(val, 10);
-                                const net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                                if (net < bestNetForHole) bestNetForHole = net;
-                                if (gross < bestGrossForHole) bestGrossForHole = gross;
-                            }
-                        });
-
-                        if (holePlayedByTeam && bestNetForHole !== 999) {
-                            teamNetTotal += bestNetForHole;
-                            teamGrossTotal += bestGrossForHole;
-                            holesCompleted++;
-                        }
-                    });
-                }
-
-                const teamNames = teamPlayers.map(p => `${p.name} (${p.hcp})`).join(", ");
-                return { teamName: teamKey, playersLabel: teamNames, net: teamNetTotal, gross: teamGrossTotal, thru: holesCompleted };
-            });
-
-            teamResults.sort((a, b) => (a.net || 999) - (b.net || 999));
-
-            teamResults.forEach((r, idx) => {
-                const row = document.createElement("tr");
-                if (idx === 0 && r.thru > 0) row.className = "rank-1";
-                row.innerHTML = `
-                    <td><strong>${idx + 1}</strong></td>
-                    <td class="player-name-cell"><strong>${r.teamName}</strong><br><span style="font-size:0.75rem; color:#666;">${r.playersLabel}</span></td>
-                    <td>${r.thru === 18 ? 'F' : r.thru}</td>
-                    <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
-                    <td>${r.thru > 0 ? r.gross : '-'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-
-        } else {
-            // Individual Stroke Play
-            let results = players.map(p => {
-                const numericHcp = parseHcp(p.hcp);
-                let grossTotal = 0, netTotal = 0, holesPlayed = 0;
-
-                courseData.forEach(hole => {
+                t1.forEach(p => {
                     const val = savedScores[`p${p.id}_h${hole.hole}`];
                     if (val && val > 0) {
-                        const gross = parseInt(val, 10);
-                        const net = gross - getStrokes(hole.hcpIndex, numericHcp);
-                        grossTotal += gross;
-                        netTotal += net;
-                        holesPlayed++;
+                        const net = parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        if (net < bestNet1) bestNet1 = net;
                     }
                 });
 
-                return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed };
+                t2.forEach(p => {
+                    const val = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (val && val > 0) {
+                        const net = parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        if (net < bestNet2) bestNet2 = net;
+                    }
+                });
+
+                if (bestNet1 !== 999 && bestNet2 !== 999) {
+                    let diff = 0;
+                    if (bestNet1 < bestNet2) diff = 1;      // Team 1 wins hole
+                    if (bestNet2 < bestNet1) diff = -1;     // Team 2 wins hole
+
+                    if (idx < 9) {
+                        frontMatch += diff;
+                        frontThru++;
+                    } else {
+                        backMatch += diff;
+                        backThru++;
+                    }
+                    totalMatch += diff;
+                }
             });
 
-            results.sort((a, b) => (a.net || 999) - (b.net || 999));
+            function formatMatchStatus(val, thru, maxHoles) {
+                if (thru === 0) return "Not Started";
+                const isFinal = thru === maxHoles;
+                if (val === 0) return isFinal ? "ALL SQUARE (Tied)" : "ALL SQUARE";
+                if (val > 0) return `Team 1 +${val} (${isFinal ? 'Won $' + stake : 'Up ' + val})`;
+                return `Team 2 +${Math.abs(val)} (${isFinal ? 'Won $' + stake : 'Up ' + Math.abs(val)})`;
+            }
 
-            results.forEach((r, idx) => {
-                const row = document.createElement("tr");
-                if (idx === 0 && r.thru > 0) row.className = "rank-1";
-                row.innerHTML = `
-                    <td><strong>${idx + 1}</strong></td>
-                    <td class="player-name-cell">${r.name} (${r.hcp})</td>
-                    <td>${r.thru === 18 ? 'F' : r.thru}</td>
-                    <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
-                    <td>${r.thru > 0 ? r.gross : '-'}</td>
-                `;
-                tbody.appendChild(row);
-            });
+            // Calculate live dollar totals
+            let t1Balance = 0;
+            if (frontThru === 9) t1Balance += (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0));
+            if (backThru === 9) t1Balance += (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0));
+            if (frontThru + backThru === 18) t1Balance += (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0));
+
+            nassauBox.innerHTML = `
+                <div class="nassau-card">
+                    <h3 style="margin-top:0; color:#0f4c3a; text-align:center;">💵 Live Nassau Summary</h3>
+                    
+                    <div class="nassau-row">
+                        <span>Front 9 Match (${frontThru}/9)</span>
+                        <span class="${frontMatch > 0 ? 'win-green' : (frontMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(frontMatch, frontThru, 9)}</span>
+                    </div>
+
+                    <div class="nassau-row">
+                        <span>Back 9 Match (${backThru}/9)</span>
+                        <span class="${backMatch > 0 ? 'win-green' : (backMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(backMatch, backThru, 9)}</span>
+                    </div>
+
+                    <div class="nassau-row">
+                        <span>Overall 18 Match (${frontThru + backThru}/18)</span>
+                        <span class="${totalMatch > 0 ? 'win-green' : (totalMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(totalMatch, frontThru + backThru, 18)}</span>
+                    </div>
+
+                    <div style="margin-top:14px; text-align:center; font-size:1.1rem;">
+                        <strong>Settlement Status:</strong><br>
+                        <span style="font-weight:bold; font-size:1.3rem; color:${t1Balance >= 0 ? '#2a9d8f' : '#e63946'};">
+                            ${t1Balance > 0 ? 'Team 1 +$' + t1Balance : (t1Balance < 0 ? 'Team 2 +$' + Math.abs(t1Balance) : 'ALL EVEN ($0)')}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+        } else {
+            mainTable.style.display = "table";
+            nassauBox.style.display = "none";
+
+            // Existing Best Ball / Scramble / Stroke Play logic
+            if (gameFormat === 'bestball' || gameFormat === 'scramble') {
+                const teamsMap = {};
+                players.forEach(p => {
+                    const teamKey = p.team || "Team 1";
+                    if (!teamsMap[teamKey]) teamsMap[teamKey] = [];
+                    teamsMap[teamKey].push(p);
+                });
+
+                let teamResults = Object.keys(teamsMap).map(teamKey => {
+                    const teamPlayers = teamsMap[teamKey];
+                    let teamNetTotal = 0, teamGrossTotal = 0, holesCompleted = 0;
+
+                    if (gameFormat === 'scramble') {
+                        const totalHcp = teamPlayers.reduce((sum, p) => sum + parseHcp(p.hcp), 0);
+                        const scrambleHcp = Math.round(totalHcp * 0.20);
+
+                        courseData.forEach(hole => {
+                            let holeScore = null;
+                            teamPlayers.forEach(p => {
+                                const val = savedScores[`p${p.id}_h${hole.hole}`];
+                                if (val && val > 0) holeScore = parseInt(val, 10);
+                            });
+
+                            if (holeScore !== null) {
+                                teamGrossTotal += holeScore;
+                                holesCompleted++;
+                            }
+                        });
+
+                        const netDeduction = Math.round((scrambleHcp / 18) * holesCompleted);
+                        teamNetTotal = teamGrossTotal - netDeduction;
+
+                    } else {
+                        courseData.forEach(hole => {
+                            let bestNetForHole = 999, bestGrossForHole = 999, holePlayedByTeam = false;
+
+                            teamPlayers.forEach(p => {
+                                const val = savedScores[`p${p.id}_h${hole.hole}`];
+                                if (val && val > 0) {
+                                    holePlayedByTeam = true;
+                                    const gross = parseInt(val, 10);
+                                    const net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                                    if (net < bestNetForHole) bestNetForHole = net;
+                                    if (gross < bestGrossForHole) bestGrossForHole = gross;
+                                }
+                            });
+
+                            if (holePlayedByTeam && bestNetForHole !== 999) {
+                                teamNetTotal += bestNetForHole;
+                                teamGrossTotal += bestGrossForHole;
+                                holesCompleted++;
+                            }
+                        });
+                    }
+
+                    const teamNames = teamPlayers.map(p => `${p.name} (${p.hcp})`).join(", ");
+                    return { teamName: teamKey, playersLabel: teamNames, net: teamNetTotal, gross: teamGrossTotal, thru: holesCompleted };
+                });
+
+                teamResults.sort((a, b) => (a.net || 999) - (b.net || 999));
+
+                teamResults.forEach((r, idx) => {
+                    const row = document.createElement("tr");
+                    if (idx === 0 && r.thru > 0) row.className = "rank-1";
+                    row.innerHTML = `
+                        <td><strong>${idx + 1}</strong></td>
+                        <td class="player-name-cell"><strong>${r.teamName}</strong><br><span style="font-size:0.75rem; color:#666;">${r.playersLabel}</span></td>
+                        <td>${r.thru === 18 ? 'F' : r.thru}</td>
+                        <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
+                        <td>${r.thru > 0 ? r.gross : '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+            } else {
+                let results = players.map(p => {
+                    const numericHcp = parseHcp(p.hcp);
+                    let grossTotal = 0, netTotal = 0, holesPlayed = 0;
+
+                    courseData.forEach(hole => {
+                        const val = savedScores[`p${p.id}_h${hole.hole}`];
+                        if (val && val > 0) {
+                            const gross = parseInt(val, 10);
+                            const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                            grossTotal += gross;
+                            netTotal += net;
+                            holesPlayed++;
+                        }
+                    });
+
+                    return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed };
+                });
+
+                results.sort((a, b) => (a.net || 999) - (b.net || 999));
+
+                results.forEach((r, idx) => {
+                    const row = document.createElement("tr");
+                    if (idx === 0 && r.thru > 0) row.className = "rank-1";
+                    row.innerHTML = `
+                        <td><strong>${idx + 1}</strong></td>
+                        <td class="player-name-cell">${r.name} (${r.hcp})</td>
+                        <td>${r.thru === 18 ? 'F' : r.thru}</td>
+                        <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
+                        <td>${r.thru > 0 ? r.gross : '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
         }
     });
 </script>
