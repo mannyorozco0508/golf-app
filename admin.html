@@ -58,7 +58,7 @@
         
         .player-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 38px;
+            grid-template-columns: 2fr 1fr 1.2fr 38px;
             gap: 6px;
             align-items: center;
             margin-bottom: 10px;
@@ -162,7 +162,7 @@
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
-    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 38px; gap:6px; font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555;">
+    <div style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 38px; gap:6px; font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555;">
         <span>Name</span><span>HCP</span><span>Team</span><span></span>
     </div>
     <div id="player-list"></div>
@@ -195,6 +195,8 @@
     const db = firebase.database();
 
     let currentMode = "regular";
+
+    const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     const nineHoleLoops = {
         eaglespride_27: {
@@ -298,14 +300,14 @@
             listContainer.innerHTML = "";
 
             const initialPlayers = (data.players && data.players.length > 0) ? data.players : [
-                { id: 101, name: "Player 1", hcp: "0", team: "A" },
-                { id: 102, name: "Player 2", hcp: "0", team: "A" },
-                { id: 103, name: "Player 3", hcp: "0", team: "B" },
-                { id: 104, name: "Player 4", hcp: "0", team: "B" }
+                { id: 101, name: "Player 1", hcp: "0", team: "Team 1" },
+                { id: 102, name: "Player 2", hcp: "0", team: "Team 1" },
+                { id: 103, name: "Player 3", hcp: "0", team: "Team 2" },
+                { id: 104, name: "Player 4", hcp: "0", team: "Team 2" }
             ];
 
             initialPlayers.forEach((p, idx) => {
-                addPlayerRow(p.name, p.hcp || "0", p.team || (idx < 2 ? "A" : "B"));
+                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / 2) + 1}`);
             });
         });
     }
@@ -321,20 +323,23 @@
         loadModeData(activeMode);
     });
 
-    function addPlayerRow(name = "", hcp = "0", team = "A") {
+    function addPlayerRow(name = "", hcp = "0", team = "") {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
+        const autoTeamIdx = Math.floor((currentCount - 1) / 2);
+        const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
+
+        let teamOptionsHtml = "";
+        teamOptions.forEach(t => {
+            teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`;
+        });
+
         const row = document.createElement("div");
         row.className = "player-row";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
-            <select class="p-team-input">
-                <option value="A" ${team === 'A' ? 'selected' : ''}>Team A</option>
-                <option value="B" ${team === 'B' ? 'selected' : ''}>Team B</option>
-                <option value="C" ${team === 'C' ? 'selected' : ''}>Team C</option>
-                <option value="D" ${team === 'D' ? 'selected' : ''}>Team D</option>
-            </select>
+            <select class="p-team-input">${teamOptionsHtml}</select>
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
@@ -357,7 +362,7 @@
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
-            const teamVal = row.querySelector('.p-team-input').value || "A";
+            const teamVal = row.querySelector('.p-team-input').value || "Team 1";
             
             if (!hcpVal.startsWith("+")) {
                 let numVal = parseFloat(hcpVal);
