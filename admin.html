@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Setup - Admin</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 16px 16px 80px 16px;
+            color: #1a1a1a;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 20px;
+        }
+        h2, h3 {
+            color: #0f4c3a;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .player-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        button.btn-primary {
+            width: 100%;
+            background-color: #0f4c3a;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.btn-danger {
+            width: 100%;
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .nav-item {
+            text-decoration: none;
+            color: #666;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .nav-item.active {
+            color: #0f4c3a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>⚙️ Event Setup & Config</h2>
+    
+    <div class="form-group">
+        <label for="event-name">Event Name</label>
+        <input type="text" id="event-name" placeholder="e.g. Myrtle Beach Trip">
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h3>👥 Players & Handicaps</h3>
+    <div id="player-inputs">
+        <!-- Dynamic Player Inputs -->
+    </div>
+
+    <button class="btn-primary" onclick="saveSettings()">💾 Save Event Settings</button>
+    <button class="btn-danger" onclick="resetScores()">🔄 Reset All Scores</button>
+</div>
+
+<div class="nav-bar">
+    <a href="index.html" class="nav-item">📝 Scorecard</a>
+    <a href="leaderboard.html" class="nav-item">🏆 Leaderboard</a>
+    <a href="admin.html" class="nav-item active">⚙️ Admin</a>
+</div>
+
+<script>
+    const defaultPlayers = [
+        { id: 1, name: "Manny", hcp: "+3" },
+        { id: 2, name: "Joey", hcp: "8" },
+        { id: 3, name: "Jake", hcp: "12" },
+        { id: 4, name: "Brian", hcp: "16" }
+    ];
+
+    function loadSettings() {
+        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
+        document.getElementById("event-name").value = eventName;
+
+        const savedPlayers = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const container = document.getElementById("player-inputs");
+        container.innerHTML = "";
+
+        savedPlayers.forEach((p, idx) => {
+            const row = document.createElement("div");
+            row.className = "player-row";
+            row.innerHTML = `
+                <div>
+                    <label>Player ${idx + 1} Name</label>
+                    <input type="text" id="p-name-${p.id}" value="${p.name}">
+                </div>
+                <div>
+                    <label>Handicap</label>
+                    <input type="text" id="p-hcp-${p.id}" value="${p.hcp}" placeholder="e.g. +3 or 12">
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    function saveSettings() {
+        const eventName = document.getElementById("event-name").value || "Myrtle Beach Trip";
+        localStorage.setItem("eventName", eventName);
+
+        const savedPlayers = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const updatedPlayers = savedPlayers.map(p => {
+            const nameVal = document.getElementById(`p-name-${p.id}`).value || `Player ${p.id}`;
+            const hcpVal = document.getElementById(`p-hcp-${p.id}`).value || "0";
+            return { id: p.id, name: nameVal, hcp: hcpVal };
+        });
+
+        localStorage.setItem("golfPlayers", JSON.stringify(updatedPlayers));
+        alert("Settings saved successfully!");
+    }
+
+    function resetScores() {
+        if (confirm("Are you sure you want to clear all entered scores for this round?")) {
+            localStorage.removeItem("golfScores");
+            localStorage.removeItem("leaderboardData");
+            alert("All scores reset!");
+        }
+    }
+
+    loadSettings();
+</script>
+
+</body>
+</html>

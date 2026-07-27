@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Myrtle Beach Trip - Group Scorecard</title>
+    <title>Group Scorecard</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -98,26 +98,13 @@
 <body>
 
 <div class="container">
-    <h2>⛳ Myrtle Beach Trip</h2>
+    <h2 id="event-title">⛳ Myrtle Beach Trip</h2>
     
-    <div class="group-header">
-        <div>Manny (HCP +3)</div>
-        <div>Joey (HCP 8)</div>
-        <div>Jake (HCP 12)</div>
-        <div>Brian (HCP 16)</div>
-    </div>
+    <div class="group-header" id="group-header-info"></div>
 
     <table>
         <thead>
-            <tr>
-                <th>Hole</th>
-                <th>Par</th>
-                <th>HCP</th>
-                <th>Manny (G/N)</th>
-                <th>Joey (G/N)</th>
-                <th>Jake (G/N)</th>
-                <th>Brian (G/N)</th>
-            </tr>
+            <tr id="table-head-row"></tr>
         </thead>
         <tbody id="scorecard-body"></tbody>
     </table>
@@ -126,6 +113,7 @@
 <div class="nav-bar">
     <a href="index.html" class="nav-item active">📝 Scorecard</a>
     <a href="leaderboard.html" class="nav-item">🏆 Leaderboard</a>
+    <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
 <script>
@@ -150,26 +138,59 @@
         { hole: 18, par: 4, hcpIndex: 14 }
     ];
 
-    const players = [
-        { id: 1, name: "Manny", hcp: -3, displayHcp: "+3" },
-        { id: 2, name: "Joey", hcp: 8, displayHcp: "8" },
-        { id: 3, name: "Jake", hcp: 12, displayHcp: "12" },
-        { id: 4, name: "Brian", hcp: 16, displayHcp: "16" }
+    const defaultPlayers = [
+        { id: 1, name: "Manny", hcp: "+3" },
+        { id: 2, name: "Joey", hcp: "8" },
+        { id: 3, name: "Jake", hcp: "12" },
+        { id: 4, name: "Brian", hcp: "16" }
     ];
 
-    function getStrokes(hcpIndex, playerHcp) {
-        if (playerHcp >= 0) {
-            let strokes = Math.floor(playerHcp / 18);
-            if (hcpIndex <= (playerHcp % 18)) strokes += 1;
+    let players = [];
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) {
+            return -Math.abs(parseFloat(str.substring(1)));
+        }
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
             return strokes;
         } else {
-            const plusVal = Math.abs(playerHcp);
+            const plusVal = Math.abs(numericHcp);
             if (hcpIndex > (18 - plusVal)) return -1;
             return 0;
         }
     }
 
+    function renderHeaderAndTableHead() {
+        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
+        document.getElementById("event-title").textContent = `⛳ ${eventName}`;
+
+        players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+
+        const headerDiv = document.getElementById("group-header-info");
+        headerDiv.innerHTML = "";
+        players.forEach(p => {
+            headerDiv.innerHTML += `<div>${p.name} (HCP ${p.hcp})</div>`;
+        });
+
+        const headRow = document.getElementById("table-head-row");
+        let ths = `<th>Hole</th><th>Par</th><th>HCP</th>`;
+        players.forEach(p => {
+            ths += `<th>${p.name} (G/N)</th>`;
+        });
+        headRow.innerHTML = ths;
+    }
+
     function renderScorecard() {
+        renderHeaderAndTableHead();
+
         const tbody = document.getElementById("scorecard-body");
         tbody.innerHTML = "";
 
@@ -225,6 +246,7 @@
         const leaderboardData = [];
 
         players.forEach(p => {
+            const numericHcp = parseHcp(p.hcp);
             let frontG = 0, frontN = 0;
             let backG = 0, backN = 0;
             let thruHoles = 0;
@@ -236,8 +258,8 @@
 
                 if (gInput && gInput > 0) {
                     const gross = parseInt(gInput, 10);
-                    const net = gross - getStrokes(hole.hcpIndex, p.hcp);
-                    nSpan.textContent = `(${net})`;
+                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                    if (nSpan) nSpan.textContent = `(${net})`;
                     savedScores[`p${p.id}_h${hole.hole}`] = gross;
                     thruHoles++;
 
@@ -265,11 +287,11 @@
 
             leaderboardData.push({
                 name: p.name,
-                hcp: p.displayHcp,
+                hcp: p.hcp,
                 gross: totG,
                 net: totN,
                 thru: thruHoles,
-                isCurrentPlayer: p.name === "Manny"
+                isCurrentPlayer: p.id === 1
             });
         });
 
