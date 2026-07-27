@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Group Scorecard</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f4f6f8;
             margin: 0;
-            padding: 12px 12px 80px 12px;
+            padding: 12px 12px 90px 12px;
             color: #1a1a1a;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .container {
             max-width: 850px;
@@ -52,22 +54,30 @@
             background-color: #f8f9fa;
             color: #444;
         }
-        input[type="number"] {
-            width: 32px;
-            height: 30px;
-            font-size: 0.95rem;
-            text-align: center;
+
+        /* --- Score Box Styles --- */
+        .score-cell {
+            width: 34px;
+            height: 32px;
+            line-height: 30px;
+            margin: 0 auto;
+            font-size: 1rem;
+            font-weight: bold;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-weight: bold;
+            background-color: #fff;
+            cursor: pointer;
             box-sizing: border-box;
-            transition: all 0.2s ease;
+            display: inline-block;
+            transition: all 0.15s ease;
+        }
+        .score-cell.active-target {
+            border: 2px solid #0f4c3a !important;
+            box-shadow: 0 0 6px rgba(15, 76, 58, 0.4);
         }
 
-        /* --- Score Formatting Styles --- */
-        
         /* Birdie or Better: Red Circle */
-        input.birdie-or-better {
+        .score-cell.birdie-or-better {
             border: 2px solid #e63946 !important;
             border-radius: 50% !important;
             color: #e63946 !important;
@@ -75,7 +85,7 @@
         }
 
         /* Par: Clean Black Text */
-        input.par-score {
+        .score-cell.par-score {
             border: 1px solid #ccc !important;
             border-radius: 4px !important;
             color: #1a1a1a !important;
@@ -83,7 +93,7 @@
         }
 
         /* Bogey: Blue Single Box */
-        input.bogey {
+        .score-cell.bogey {
             border: 2px solid #1d3557 !important;
             border-radius: 0px !important;
             color: #1d3557 !important;
@@ -91,7 +101,7 @@
         }
 
         /* Double Bogey: Blue Double Box */
-        input.double-bogey {
+        .score-cell.double-bogey {
             border: 2px solid #1d3557 !important;
             outline: 2px solid #1d3557 !important;
             outline-offset: 2px !important;
@@ -100,8 +110,8 @@
             background-color: #e6eef5;
         }
 
-        /* Triple Bogey or Worse: Blue Triple Box */
-        input.triple-bogey {
+        /* Triple Bogey+: Blue Triple Box */
+        .score-cell.triple-bogey {
             border: 2px solid #1d3557 !important;
             outline: 2px solid #1d3557 !important;
             outline-offset: 2px !important;
@@ -120,6 +130,8 @@
             color: white;
             font-weight: bold;
         }
+
+        /* Navigation Bar */
         .nav-bar {
             position: fixed;
             bottom: 0;
@@ -145,6 +157,57 @@
         .nav-item.active {
             color: #0f4c3a;
         }
+
+        /* --- Quick-Tap Floating Keypad Sheet --- */
+        .keypad-sheet {
+            position: fixed;
+            bottom: 55px;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            padding: 12px 16px 16px 16px;
+            display: none;
+            z-index: 90;
+            border-top: 2px solid #0f4c3a;
+        }
+        .keypad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #0f4c3a;
+        }
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 6px;
+        }
+        .key-btn {
+            background: #eef6f2;
+            border: 1px solid #0f4c3a;
+            color: #0f4c3a;
+            padding: 10px 0;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+        }
+        .key-btn:active {
+            background: #0f4c3a;
+            color: #fff;
+        }
+        .key-btn.clear-btn {
+            background: #fdf0f0;
+            border-color: #e63946;
+            color: #e63946;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
@@ -160,6 +223,24 @@
         </thead>
         <tbody id="scorecard-body"></tbody>
     </table>
+</div>
+
+<!-- Quick-Tap Keypad -->
+<div class="keypad-sheet" id="keypad">
+    <div class="keypad-header">
+        <span id="keypad-title">Enter Score</span>
+        <span style="cursor:pointer; padding: 2px 8px;" onclick="closeKeypad()">✕ Close</span>
+    </div>
+    <div class="keypad-grid">
+        <div class="key-btn" onclick="pressKey(1)">1</div>
+        <div class="key-btn" onclick="pressKey(2)">2</div>
+        <div class="key-btn" onclick="pressKey(3)">3</div>
+        <div class="key-btn" onclick="pressKey(4)">4</div>
+        <div class="key-btn" onclick="pressKey(5)">5</div>
+        <div class="key-btn" onclick="pressKey(6)">6</div>
+        <div class="key-btn" onclick="pressKey(7)">7</div>
+        <div class="key-btn clear-btn" onclick="pressKey('clr')">CLR</div>
+    </div>
 </div>
 
 <div class="nav-bar">
@@ -198,6 +279,7 @@
     ];
 
     let players = [];
+    let activeTarget = null; // Currently targeted cell { playerId, hole, par }
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
@@ -220,29 +302,23 @@
         }
     }
 
-    function applyScoreStyling(inputElem, grossScore, holePar) {
-        // Reset classes
-        inputElem.className = "";
+    function applyScoreStyling(elem, grossScore, holePar) {
+        elem.className = "score-cell";
 
         if (!grossScore || grossScore <= 0) return;
 
         const diff = grossScore - holePar;
 
         if (diff <= -1) {
-            // Birdie or better: Red circle
-            inputElem.classList.add("birdie-or-better");
+            elem.classList.add("birdie-or-better");
         } else if (diff === 0) {
-            // Par: Clean black text
-            inputElem.classList.add("par-score");
+            elem.classList.add("par-score");
         } else if (diff === 1) {
-            // Bogey: Blue 1 box
-            inputElem.classList.add("bogey");
+            elem.classList.add("bogey");
         } else if (diff === 2) {
-            // Double Bogey: Blue 2 boxes
-            inputElem.classList.add("double-bogey");
+            elem.classList.add("double-bogey");
         } else if (diff >= 3) {
-            // Triple Bogey+: Blue 3 boxes
-            inputElem.classList.add("triple-bogey");
+            elem.classList.add("triple-bogey");
         }
     }
 
@@ -279,11 +355,11 @@
             let playerInputs = "";
 
             players.forEach(p => {
-                const val = savedScores[`p${p.id}_h${hole.hole}`] || "";
+                const val = savedScores[`p${p.id}_h${hole.hole}`] || "-";
                 playerInputs += `
                     <td>
-                        <input type="number" min="1" max="15" id="p${p.id}-g-${hole.hole}" 
-                               value="${val}" oninput="updateAll()" placeholder="-">
+                        <div class="score-cell" id="cell-p${p.id}-h${hole.hole}" 
+                             onclick="openKeypad(${p.id}, ${hole.hole}, ${hole.par}, '${p.name}')">${val}</div>
                         <span id="p${p.id}-n-${hole.hole}">-</span>
                     </td>
                 `;
@@ -319,6 +395,56 @@
         return row;
     }
 
+    function openKeypad(playerId, hole, par, playerName) {
+        if (activeTarget) {
+            const prevCell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
+            if (prevCell) prevCell.classList.remove("active-target");
+        }
+
+        activeTarget = { playerId, hole, par, playerName };
+        const cell = document.getElementById(`cell-p${playerId}-h${hole}`);
+        if (cell) cell.classList.add("active-target");
+
+        document.getElementById("keypad-title").textContent = `${playerName} - Hole ${hole} (Par ${par})`;
+        document.getElementById("keypad").style.display = "block";
+    }
+
+    function closeKeypad() {
+        if (activeTarget) {
+            const cell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
+            if (cell) cell.classList.remove("active-target");
+        }
+        document.getElementById("keypad").style.display = "none";
+        activeTarget = null;
+    }
+
+    function pressKey(val) {
+        if (!activeTarget) return;
+
+        const cell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
+
+        if (val === 'clr') {
+            cell.textContent = "-";
+        } else {
+            cell.textContent = val;
+        }
+
+        updateAll();
+
+        // Auto-advance to next player or hole
+        let nextPlayerIdx = players.findIndex(p => p.id === activeTarget.playerId) + 1;
+        let nextHole = activeTarget.hole;
+
+        if (nextPlayerIdx < players.length) {
+            openKeypad(players[nextPlayerIdx].id, nextHole, courseData[nextHole - 1].par, players[nextPlayerIdx].name);
+        } else if (nextHole < 18) {
+            nextHole++;
+            openKeypad(players[0].id, nextHole, courseData[nextHole - 1].par, players[0].name);
+        } else {
+            closeKeypad();
+        }
+    }
+
     function updateAll() {
         const savedScores = {};
         const leaderboardData = [];
@@ -330,19 +456,18 @@
             let thruHoles = 0;
 
             courseData.forEach(hole => {
-                const inputElem = document.getElementById(`p${p.id}-g-${hole.hole}`);
-                const gInput = inputElem ? inputElem.value : "";
+                const cellElem = document.getElementById(`cell-p${p.id}-h${hole.hole}`);
+                const valText = cellElem ? cellElem.textContent.trim() : "-";
                 const nSpan = document.getElementById(`p${p.id}-n-${hole.hole}`);
 
-                if (gInput && gInput > 0) {
-                    const gross = parseInt(gInput, 10);
+                if (valText !== "-" && valText !== "" && !isNaN(valText)) {
+                    const gross = parseInt(valText, 10);
                     const net = gross - getStrokes(hole.hcpIndex, numericHcp);
                     if (nSpan) nSpan.textContent = `(${net})`;
                     savedScores[`p${p.id}_h${hole.hole}`] = gross;
                     thruHoles++;
 
-                    // Apply visual circles / squares
-                    if (inputElem) applyScoreStyling(inputElem, gross, hole.par);
+                    if (cellElem) applyScoreStyling(cellElem, gross, hole.par);
 
                     if (hole.hole <= 9) {
                         frontG += gross;
@@ -353,7 +478,7 @@
                     }
                 } else {
                     if (nSpan) nSpan.textContent = "-";
-                    if (inputElem) inputElem.className = "";
+                    if (cellElem) cellElem.className = "score-cell";
                 }
             });
 
