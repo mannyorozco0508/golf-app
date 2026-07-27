@@ -46,19 +46,71 @@
         th, td {
             padding: 6px 3px;
             border-bottom: 1px solid #e0e0e0;
+            vertical-align: middle;
         }
         th {
             background-color: #f8f9fa;
             color: #444;
         }
         input[type="number"] {
-            width: 36px;
-            height: 32px;
-            font-size: 1rem;
+            width: 32px;
+            height: 30px;
+            font-size: 0.95rem;
             text-align: center;
             border: 1px solid #ccc;
             border-radius: 4px;
+            font-weight: bold;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
         }
+
+        /* --- Score Formatting Styles --- */
+        
+        /* Birdie or Better: Red Circle */
+        input.birdie-or-better {
+            border: 2px solid #e63946 !important;
+            border-radius: 50% !important;
+            color: #e63946 !important;
+            background-color: #fdf0f0;
+        }
+
+        /* Par: Clean Black Text */
+        input.par-score {
+            border: 1px solid #ccc !important;
+            border-radius: 4px !important;
+            color: #1a1a1a !important;
+            background-color: #ffffff;
+        }
+
+        /* Bogey: Blue Single Box */
+        input.bogey {
+            border: 2px solid #1d3557 !important;
+            border-radius: 0px !important;
+            color: #1d3557 !important;
+            background-color: #f0f4f8;
+        }
+
+        /* Double Bogey: Blue Double Box */
+        input.double-bogey {
+            border: 2px solid #1d3557 !important;
+            outline: 2px solid #1d3557 !important;
+            outline-offset: 2px !important;
+            border-radius: 0px !important;
+            color: #1d3557 !important;
+            background-color: #e6eef5;
+        }
+
+        /* Triple Bogey or Worse: Blue Triple Box */
+        input.triple-bogey {
+            border: 2px solid #1d3557 !important;
+            outline: 2px solid #1d3557 !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 4px #1d3557 !important;
+            border-radius: 0px !important;
+            color: #1d3557 !important;
+            background-color: #d8e5f2;
+        }
+
         .summary-row {
             background-color: #eef6f2;
             font-weight: bold;
@@ -168,6 +220,32 @@
         }
     }
 
+    function applyScoreStyling(inputElem, grossScore, holePar) {
+        // Reset classes
+        inputElem.className = "";
+
+        if (!grossScore || grossScore <= 0) return;
+
+        const diff = grossScore - holePar;
+
+        if (diff <= -1) {
+            // Birdie or better: Red circle
+            inputElem.classList.add("birdie-or-better");
+        } else if (diff === 0) {
+            // Par: Clean black text
+            inputElem.classList.add("par-score");
+        } else if (diff === 1) {
+            // Bogey: Blue 1 box
+            inputElem.classList.add("bogey");
+        } else if (diff === 2) {
+            // Double Bogey: Blue 2 boxes
+            inputElem.classList.add("double-bogey");
+        } else if (diff >= 3) {
+            // Triple Bogey+: Blue 3 boxes
+            inputElem.classList.add("triple-bogey");
+        }
+    }
+
     function renderHeaderAndTableHead() {
         const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
         document.getElementById("event-title").textContent = `⛳ ${eventName}`;
@@ -263,6 +341,9 @@
                     savedScores[`p${p.id}_h${hole.hole}`] = gross;
                     thruHoles++;
 
+                    // Apply visual circles / squares
+                    if (inputElem) applyScoreStyling(inputElem, gross, hole.par);
+
                     if (hole.hole <= 9) {
                         frontG += gross;
                         frontN += net;
@@ -272,6 +353,7 @@
                     }
                 } else {
                     if (nSpan) nSpan.textContent = "-";
+                    if (inputElem) inputElem.className = "";
                 }
             });
 
