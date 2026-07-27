@@ -7,10 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         h2 { text-align: center; color: #0f4c3a; margin-top: 0; }
         .format-badge { text-align: center; font-size: 0.8rem; font-weight: bold; background: #eef6f2; color: #0f4c3a; padding: 4px 10px; border-radius: 12px; display: inline-block; margin-bottom: 10px; }
@@ -20,19 +17,12 @@
         .player-name-cell { text-align: left !important; font-weight: bold; }
         .rank-1 { background-color: #fff9db; font-weight: bold; }
         
-        .nassau-card {
-            background: #f0f7f4; border: 2px solid #0f4c3a; border-radius: 10px; padding: 14px; margin-top: 12px;
-        }
+        .nassau-card, .wolf-card { background: #f0f7f4; border: 2px solid #0f4c3a; border-radius: 10px; padding: 14px; margin-top: 12px; }
         .nassau-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold; }
-        .nassau-row:last-child { border-bottom: none; }
         .win-green { color: #2a9d8f; }
         .loss-red { color: #e63946; }
 
-        .nav-bar {
-            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
-            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
-        }
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
     </style>
@@ -43,7 +33,7 @@
     <div style="text-align: center;"><span class="format-badge" id="format-badge">Stroke Play</span></div>
     <h2 id="board-title">🏆 Live Leaderboard</h2>
 
-    <div id="nassau-container" style="display:none;"></div>
+    <div id="custom-format-container" style="display:none;"></div>
 
     <table class="leaderboard-table" id="main-table">
         <thead>
@@ -110,6 +100,7 @@
         const savedScores = data.scores || {};
         const gameFormat = data.gameFormat || "stroke";
         const stake = data.nassauStake || 10;
+        const wolfPointVal = data.wolfPointVal || 2;
 
         document.getElementById("board-title").textContent = `🏆 ${data.eventName || "Live Leaderboard"}`;
         
@@ -117,20 +108,83 @@
         if (gameFormat === 'bestball') formatLabel = "2-Man Best Ball (Four-Ball)";
         if (gameFormat === 'scramble') formatLabel = "4-Man Scramble";
         if (gameFormat === 'nassau') formatLabel = `Nassau Bet Tracker ($${stake} Base Stake)`;
+        if (gameFormat === 'wolf') formatLabel = `🐺 Wolf Game Tracker ($${wolfPointVal}/pt)`;
         document.getElementById("format-badge").textContent = formatLabel;
 
         const tbody = document.getElementById("leaderboard-body");
-        const nassauBox = document.getElementById("nassau-container");
+        const customBox = document.getElementById("custom-format-container");
         const mainTable = document.getElementById("main-table");
 
         tbody.innerHTML = "";
 
-        if (gameFormat === 'nassau') {
+        if (gameFormat === 'wolf') {
             mainTable.style.display = "none";
-            nassauBox.style.display = "block";
-            nassauBox.innerHTML = "";
+            customBox.style.display = "block";
+            customBox.innerHTML = "";
 
-            // Group by Team 1 vs Team 2
+            if (players.length !== 4) {
+                customBox.innerHTML = `<div style="text-align:center; padding:20px;">⚠️ Wolf requires exactly 4 active players in Admin!</div>`;
+                return;
+            }
+
+            const wolfScores = {};
+            players.forEach(p => wolfScores[p.id] = { name: p.name, points: 0 });
+
+            courseData.forEach((hole, idx) => {
+                const wolfPlayer = players[idx % 4];
+                const holeScores = {};
+                let allEntered = true;
+
+                players.forEach(p => {
+                    const val = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (val && val > 0) {
+                        holeScores[p.id] = parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                    } else {
+                        allEntered = false;
+                    }
+                });
+
+                if (allEntered) {
+                    const wolfNet = holeScores[wolfPlayer.id];
+                    let nonWolfMin = 999;
+                    players.filter(p => p.id !== wolfPlayer.id).forEach(p => {
+                        if (holeScores[p.id] < nonWolfMin) nonWolfMin = holeScores[p.id];
+                    });
+
+                    if (wolfNet < nonWolfMin) {
+                        wolfScores[wolfPlayer.id].points += 2;
+                    } else if (nonWolfMin < wolfNet) {
+                        players.filter(p => p.id !== wolfPlayer.id).forEach(p => {
+                            wolfScores[p.id].points += 1;
+                        });
+                    }
+                }
+            });
+
+            const sortedWolf = players.map(p => ({
+                id: p.id, name: p.name, points: wolfScores[p.id].points,
+                balance: wolfScores[p.id].points * wolfPointVal
+            })).sort((a, b) => b.points - a.points);
+
+            let rowsHtml = sortedWolf.map((p, idx) => `
+                <div class="nassau-row">
+                    <span>${idx + 1}. ${p.name}</span>
+                    <span><strong>${p.points} pts</strong> ($${p.balance})</span>
+                </div>
+            `).join("");
+
+            customBox.innerHTML = `
+                <div class="wolf-card">
+                    <h3 style="margin-top:0; color:#0f4c3a; text-align:center;">🐺 Wolf Standings</h3>
+                    ${rowsHtml}
+                </div>
+            `;
+
+        } else if (gameFormat === 'nassau') {
+            mainTable.style.display = "none";
+            customBox.style.display = "block";
+            customBox.innerHTML = "";
+
             const t1 = players.filter(p => (p.team || "Team 1") === "Team 1");
             const t2 = players.filter(p => (p.team || "Team 2") === "Team 2");
 
@@ -158,16 +212,11 @@
 
                 if (bestNet1 !== 999 && bestNet2 !== 999) {
                     let diff = 0;
-                    if (bestNet1 < bestNet2) diff = 1;      // Team 1 wins hole
-                    if (bestNet2 < bestNet1) diff = -1;     // Team 2 wins hole
+                    if (bestNet1 < bestNet2) diff = 1;
+                    if (bestNet2 < bestNet1) diff = -1;
 
-                    if (idx < 9) {
-                        frontMatch += diff;
-                        frontThru++;
-                    } else {
-                        backMatch += diff;
-                        backThru++;
-                    }
+                    if (idx < 9) { frontMatch += diff; frontThru++; }
+                    else { backMatch += diff; backThru++; }
                     totalMatch += diff;
                 }
             });
@@ -180,31 +229,17 @@
                 return `Team 2 +${Math.abs(val)} (${isFinal ? 'Won $' + stake : 'Up ' + Math.abs(val)})`;
             }
 
-            // Calculate live dollar totals
             let t1Balance = 0;
             if (frontThru === 9) t1Balance += (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0));
             if (backThru === 9) t1Balance += (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0));
             if (frontThru + backThru === 18) t1Balance += (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0));
 
-            nassauBox.innerHTML = `
+            customBox.innerHTML = `
                 <div class="nassau-card">
                     <h3 style="margin-top:0; color:#0f4c3a; text-align:center;">💵 Live Nassau Summary</h3>
-                    
-                    <div class="nassau-row">
-                        <span>Front 9 Match (${frontThru}/9)</span>
-                        <span class="${frontMatch > 0 ? 'win-green' : (frontMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(frontMatch, frontThru, 9)}</span>
-                    </div>
-
-                    <div class="nassau-row">
-                        <span>Back 9 Match (${backThru}/9)</span>
-                        <span class="${backMatch > 0 ? 'win-green' : (backMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(backMatch, backThru, 9)}</span>
-                    </div>
-
-                    <div class="nassau-row">
-                        <span>Overall 18 Match (${frontThru + backThru}/18)</span>
-                        <span class="${totalMatch > 0 ? 'win-green' : (totalMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(totalMatch, frontThru + backThru, 18)}</span>
-                    </div>
-
+                    <div class="nassau-row"><span>Front 9 Match (${frontThru}/9)</span><span class="${frontMatch > 0 ? 'win-green' : (frontMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(frontMatch, frontThru, 9)}</span></div>
+                    <div class="nassau-row"><span>Back 9 Match (${backThru}/9)</span><span class="${backMatch > 0 ? 'win-green' : (backMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(backMatch, backThru, 9)}</span></div>
+                    <div class="nassau-row"><span>Overall 18 Match (${frontThru + backThru}/18)</span><span class="${totalMatch > 0 ? 'win-green' : (totalMatch < 0 ? 'loss-red' : '')}">${formatMatchStatus(totalMatch, frontThru + backThru, 18)}</span></div>
                     <div style="margin-top:14px; text-align:center; font-size:1.1rem;">
                         <strong>Settlement Status:</strong><br>
                         <span style="font-weight:bold; font-size:1.3rem; color:${t1Balance >= 0 ? '#2a9d8f' : '#e63946'};">
@@ -216,9 +251,8 @@
 
         } else {
             mainTable.style.display = "table";
-            nassauBox.style.display = "none";
+            customBox.style.display = "none";
 
-            // Existing Best Ball / Scramble / Stroke Play logic
             if (gameFormat === 'bestball' || gameFormat === 'scramble') {
                 const teamsMap = {};
                 players.forEach(p => {

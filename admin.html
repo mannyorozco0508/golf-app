@@ -8,82 +8,28 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 16px 16px 90px 16px;
-            color: #1a1a1a;
-        }
-        .container {
-            max-width: 650px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 20px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; }
+        .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
         h2, h3 { color: #0f4c3a; margin-top: 0; }
-        .mode-box {
-            background: #f0f4f8;
-            border: 2px solid #1d3557;
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
+        .mode-box { background: #f0f4f8; border: 2px solid #1d3557; border-radius: 10px; padding: 14px; margin-bottom: 20px; text-align: center; }
         .mode-toggle-btns { display: flex; gap: 10px; margin-top: 10px; }
-        .mode-btn {
-            flex: 1; padding: 12px; border: 2px solid #1d3557; background: #ffffff;
-            color: #1d3557; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer;
-        }
+        .mode-btn { flex: 1; padding: 12px; border: 2px solid #1d3557; background: #ffffff; color: #1d3557; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; }
         .mode-btn.active-mode { background: #1d3557; color: #ffffff; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
-        input[type="text"], input[type="number"], select {
-            width: 100%; padding: 10px; border: 1px solid #ccc;
-            border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff;
-        }
-        .extra-settings-box {
-            background: #eef6f2; border: 1px solid #2a9d8f;
-            border-radius: 8px; padding: 12px; margin-top: 10px; display: none;
-        }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff; }
+        .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .share-box {
-            background: #eef6f2; border: 2px dashed #0f4c3a;
-            border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px;
-        }
+        .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
-        .player-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1.2fr 38px;
-            gap: 6px;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .btn-add {
-            background-color: #2a9d8f; color: white; border: none; padding: 10px;
-            font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px;
-        }
-        .btn-del {
-            background-color: #e63946; color: white; border: none; border-radius: 6px;
-            height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer;
-        }
-        .btn-primary {
-            width: 100%; background-color: #0f4c3a; color: white; border: none;
-            padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px;
-        }
-        .btn-danger {
-            width: 100%; background-color: #d9534f; color: white; border: none;
-            padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px;
-        }
-        .nav-bar {
-            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
-            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
-        }
+        .player-row { display: grid; grid-template-columns: 2fr 1fr 1.2fr 38px; gap: 6px; align-items: center; margin-bottom: 10px; }
+        .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
+        .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .btn-danger { width: 100%; background-color: #d9534f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; }
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
     </style>
@@ -155,6 +101,7 @@
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="nassau">Nassau Bet Tracker (Front / Back / Total)</option>
+            <option value="wolf">🐺 Wolf Game Tracker (4 Players)</option>
             <option value="bestball">2-Man Best Ball (Four-Ball)</option>
             <option value="scramble">4-Man Scramble</option>
             <option value="stableford">Net Stableford Points</option>
@@ -174,6 +121,23 @@
                         <option value="2down">2 Down</option>
                         <option value="1down">1 Down</option>
                         <option value="none">No Auto-Press</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="wolf-settings" class="extra-settings-box">
+            <label style="color:#0f4c3a; margin-bottom: 6px;">🐺 Wolf Game Options</label>
+            <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.8rem;">Point Value ($)</label>
+                    <input type="number" id="wolf-point-value" value="2" min="1">
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">Lone Wolf Win</label>
+                    <select id="wolf-lone-mult">
+                        <option value="2">2x Points</option>
+                        <option value="3">3x Points</option>
                     </select>
                 </div>
             </div>
@@ -248,24 +212,18 @@
     function handleCourseChange() {
         const courseKey = document.getElementById("course-select").value;
         const loopBox = document.getElementById("nine-loop-selector");
-        
         if (nineHoleLoops[courseKey]) {
             const loops = nineHoleLoops[courseKey];
             const frontSelect = document.getElementById("front-nine-select");
             const backSelect = document.getElementById("back-nine-select");
-            
-            frontSelect.innerHTML = "";
-            backSelect.innerHTML = "";
-            
+            frontSelect.innerHTML = ""; backSelect.innerHTML = "";
             Object.keys(loops).forEach((key) => {
                 frontSelect.innerHTML += `<option value="${key}">${loops[key].name}</option>`;
                 backSelect.innerHTML += `<option value="${key}">${loops[key].name}</option>`;
             });
-
             const loopKeys = Object.keys(loops);
             frontSelect.selectedIndex = 0;
             backSelect.selectedIndex = (loopKeys.length > 1) ? 1 : 0;
-            
             loopBox.style.display = "block";
         } else {
             loopBox.style.display = "none";
@@ -274,8 +232,8 @@
 
     function handleFormatChange() {
         const format = document.getElementById("game-format-select").value;
-        const nassauBox = document.getElementById("nassau-settings");
-        nassauBox.style.display = (format === "nassau") ? "block" : "none";
+        document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
+        document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
         updateTeamPairingDefaults();
     }
 
@@ -284,24 +242,12 @@
             const loops = nineHoleLoops[courseKey];
             const frontKey = document.getElementById("front-nine-select").value;
             const backKey = document.getElementById("back-nine-select").value;
-
             const frontLoop = loops[frontKey];
             const backLoop = loops[backKey];
-
             const combinedData = [];
-
-            frontLoop.data.forEach((item, idx) => {
-                combinedData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 });
-            });
-
-            backLoop.data.forEach((item, idx) => {
-                combinedData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 });
-            });
-
-            return {
-                name: `Eagle's Pride (${frontLoop.name} / ${backLoop.name})`,
-                data: combinedData
-            };
+            frontLoop.data.forEach((item, idx) => { combinedData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 }); });
+            backLoop.data.forEach((item, idx) => { combinedData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 }); });
+            return { name: `Eagle's Pride (${frontLoop.name} / ${backLoop.name})`, data: combinedData };
         } else {
             return coursePresets[courseKey];
         }
@@ -310,10 +256,8 @@
     function updateTeamPairingDefaults() {
         const format = document.getElementById("game-format-select").value;
         if (!format) return;
-        
         const rows = document.querySelectorAll('.player-row');
         const teamSize = (format === 'scramble') ? 4 : 2;
-
         rows.forEach((row, idx) => {
             const teamSelect = row.querySelector('.p-team-input');
             const autoTeamIdx = Math.floor(idx / teamSize);
@@ -323,15 +267,12 @@
 
     function loadModeData(modeKey) {
         currentMode = modeKey;
-        
         document.getElementById("mode-btn-regular").className = (modeKey === 'regular') ? "mode-btn active-mode" : "mode-btn";
         document.getElementById("mode-btn-trip").className = (modeKey === 'trip') ? "mode-btn active-mode" : "mode-btn";
 
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
-            
             document.getElementById("event-name").value = data.eventName || (modeKey === 'regular' ? 'Weekend Round' : 'Myrtle Beach Trip 2026');
-            
             const defaultCourseKey = (modeKey === 'regular') ? 'chambers' : 'caledonia';
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
@@ -343,6 +284,7 @@
 
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
+            if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
 
             const listContainer = document.getElementById("player-list");
             listContainer.innerHTML = "";
@@ -364,9 +306,7 @@
     }
 
     function switchMode(newMode) {
-        db.ref("active_event_mode").set(newMode).then(() => {
-            loadModeData(newMode);
-        });
+        db.ref("active_event_mode").set(newMode).then(() => { loadModeData(newMode); });
     }
 
     db.ref("active_event_mode").once('value').then((snapshot) => {
@@ -383,9 +323,7 @@
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
 
         let teamOptionsHtml = "";
-        teamOptions.forEach(t => {
-            teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`;
-        });
+        teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
 
         const row = document.createElement("div");
         row.className = "player-row";
@@ -399,15 +337,15 @@
         updateCount();
     }
 
-    function updateCount() {
-        document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length;
-    }
+    function updateCount() { document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; }
 
     function saveSettings() {
         const gameFormat = document.getElementById("game-format-select").value;
-        
-        if (!gameFormat) {
-            alert("⚠️ Please select a Round Game Format before saving!");
+        if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); return; }
+
+        const rows = document.querySelectorAll('.player-row');
+        if (gameFormat === 'wolf' && rows.length !== 4) {
+            alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
             return;
         }
 
@@ -417,10 +355,9 @@
 
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
         const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
+        const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
 
-        const rows = document.querySelectorAll('.player-row');
         const playersList = [];
-
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
@@ -443,20 +380,20 @@
             gameFormat: gameFormat,
             nassauStake: nassauStake,
             nassauPressRule: nassauPressRule,
+            wolfPointVal: wolfPointVal,
             courseData: selectedCourse.data,
             players: playersList
         });
 
         db.ref("active_event_mode").set(currentMode).then(() => {
             alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
-        }).catch((err) => {
-            alert(`Save error: ${err.message}`);
-        });
+        }).catch((err) => { alert(`Save error: ${err.message}`); });
     }
 
     function resetRoundData() {
         if (confirm(`Are you sure you want to clear all entered scores for the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}?`)) {
             db.ref(`events/${currentMode}/scores`).remove();
+            db.ref(`events/${currentMode}/wolfPicks`).remove();
             alert("Active round scores reset!");
         }
     }
@@ -465,10 +402,8 @@
         const currentUrl = window.location.href.replace('admin.html', 'index.html');
         document.getElementById("qrcode").innerHTML = "";
         new QRCode(document.getElementById("qrcode"), {
-            text: currentUrl,
-            width: 140, height: 140,
-            colorDark : "#0f4c3a", colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
+            text: currentUrl, width: 140, height: 140,
+            colorDark : "#0f4c3a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
         });
     }
 
