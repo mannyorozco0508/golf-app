@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Group Scorecard</title>
     
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
@@ -143,15 +142,8 @@
         { hole: 16, par: 4, hcpIndex: 10 }, { hole: 17, par: 3, hcpIndex: 16 }, { hole: 18, par: 4, hcpIndex: 4 }
     ];
 
-    const default4Players = [
-        { id: 1, name: "Player 1", hcp: "0" },
-        { id: 2, name: "Player 2", hcp: "0" },
-        { id: 3, name: "Player 3", hcp: "0" },
-        { id: 4, name: "Player 4", hcp: "0" }
-    ];
-
     let courseData = defaultCourseData;
-    let players = default4Players;
+    let players = [];
     let activeTarget = null;
 
     function parseHcp(hcpStr) {
@@ -188,13 +180,15 @@
         const data = snapshot.val() || {};
 
         document.getElementById("event-title").textContent = `⛳ ${data.eventName || "Group Scorecard"}`;
-        players = (data.players && data.players.length > 0) ? data.players : default4Players;
+        
+        // Render ONLY players currently active in Firebase
+        players = data.players || [];
         courseData = data.courseData || defaultCourseData;
         const savedScores = data.scores || {};
 
         const headerDiv = document.getElementById("group-header-info");
         headerDiv.innerHTML = "";
-        players.forEach(p => headerDiv.innerHTML += `<div>${p.name} (${p.hcp})</div>`);
+        players.forEach(p => headerDiv.innerHTML += `<div><strong>${p.name}</strong> (${p.hcp})</div>`);
 
         const headRow = document.getElementById("table-head-row");
         let ths = `<th>Hole</th><th>Par</th><th>HCP</th>`;
@@ -203,6 +197,11 @@
 
         const tbody = document.getElementById("scorecard-body");
         tbody.innerHTML = "";
+
+        if (players.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3">No active players. Please setup players in Admin tab.</td></tr>`;
+            return;
+        }
 
         courseData.forEach((hole) => {
             const row = document.createElement("tr");
@@ -214,7 +213,7 @@
                     <td>
                         <div class="score-cell" id="cell-p${p.id}-h${hole.hole}" 
                              onclick="openKeypad('${p.id}', ${hole.hole}, ${hole.par}, '${p.name}')">${val}</div>
-                        <span id="p${p.id}-n-${hole.hole}">-</span>
+                        <span id="p${p.id}-n-${hole.hole}" style="font-size:0.75rem; color:#666; display:block;">-</span>
                     </td>
                 `;
             });
@@ -272,12 +271,19 @@
                 }
             });
 
-            document.getElementById(`p${p.id}-front-gross`).textContent = frontG;
-            document.getElementById(`p${p.id}-front-net`).textContent = frontN;
-            document.getElementById(`p${p.id}-back-gross`).textContent = backG;
-            document.getElementById(`p${p.id}-back-net`).textContent = backN;
-            document.getElementById(`p${p.id}-total-gross`).textContent = frontG + backG;
-            document.getElementById(`p${p.id}-total-net`).textContent = frontN + backN;
+            const fgSpan = document.getElementById(`p${p.id}-front-gross`);
+            const fnSpan = document.getElementById(`p${p.id}-front-net`);
+            const bgSpan = document.getElementById(`p${p.id}-back-gross`);
+            const bnSpan = document.getElementById(`p${p.id}-back-net`);
+            const tgSpan = document.getElementById(`p${p.id}-total-gross`);
+            const tnSpan = document.getElementById(`p${p.id}-total-net`);
+
+            if (fgSpan) fgSpan.textContent = frontG;
+            if (fnSpan) fnSpan.textContent = frontN;
+            if (bgSpan) bgSpan.textContent = backG;
+            if (bnSpan) bnSpan.textContent = backN;
+            if (tgSpan) tgSpan.textContent = frontG + backG;
+            if (tnSpan) tnSpan.textContent = frontN + backN;
         });
     }
 

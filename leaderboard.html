@@ -110,7 +110,6 @@
                     netTotal += net;
                     holesPlayed++;
 
-                    // Stableford scoring logic (Double Eagle=5, Eagle=4, Birdie=3, Par=2, Bogey=1, Double+=0)
                     const netDiff = net - hole.par;
                     if (netDiff <= -3) stablefordPoints += 5;
                     else if (netDiff === -2) stablefordPoints += 4;
@@ -123,7 +122,6 @@
             return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed, pts: stablefordPoints };
         });
 
-        // Sort based on game format
         if (gameFormat === 'stableford') {
             results.sort((a, b) => b.pts - a.pts);
         } else {
@@ -132,6 +130,11 @@
 
         const tbody = document.getElementById("leaderboard-body");
         tbody.innerHTML = "";
+
+        if (results.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6">No players active.</td></tr>`;
+            return;
+        }
 
         results.forEach((r, idx) => {
             const row = document.createElement("tr");
