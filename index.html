@@ -274,15 +274,15 @@
         filteredPlayers.forEach(p => {
             headRow.innerHTML += `<th>${p.name}</th>`;
             if (gameFormat === 'nassau' && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
-                headRow.innerHTML += `<th style="width: 50px; font-size:0.75rem; color:#666;">Match</th>`;
+                headRow.innerHTML += `<th style="width: 60px; font-size:0.75rem; color:#666;">Match</th>`;
             }
         });
 
-        // Body with Hole-by-Hole Match Status Column
+        // Body with Arrow Match Status Column
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
-        let runningMatchStatus = 0; // Cumulative for hole-by-hole status
+        let runningMatchStatus = 0; 
 
         courseData.forEach(h => {
             let rowHtml = `<tr><td><strong>${h.hole}</strong></td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td>`;
@@ -305,9 +305,9 @@
                     if (runningMatchStatus === 0) {
                         holeBadge = `<span class="status-badge badge-even">AS</span>`;
                     } else if (runningMatchStatus > 0) {
-                        holeBadge = `<span class="status-badge badge-up">${runningMatchStatus}UP</span>`;
+                        holeBadge = `<span class="status-badge badge-up">◄ ${runningMatchStatus}UP</span>`;
                     } else {
-                        holeBadge = `<span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP</span>`;
+                        holeBadge = `<span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP ►</span>`;
                     }
                 }
 
