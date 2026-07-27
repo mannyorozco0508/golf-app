@@ -17,7 +17,8 @@
         .player-name-cell { text-align: left !important; font-weight: bold; }
         .rank-1 { background-color: #fff9db; font-weight: bold; }
         
-        .nassau-card, .wolf-card { background: #f0f7f4; border: 2px solid #0f4c3a; border-radius: 10px; padding: 14px; margin-top: 12px; }
+        .nassau-card, .wolf-card, .ryder-card { background: #f0f7f4; border: 2px solid #0f4c3a; border-radius: 10px; padding: 14px; margin-top: 12px; }
+        .ryder-banner { display: flex; justify-content: space-around; align-items: center; background: #1d3557; color: #fff; padding: 14px; border-radius: 10px; font-size: 1.2rem; font-weight: bold; margin-bottom: 14px; }
         .nassau-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold; }
         .win-green { color: #2a9d8f; }
         .loss-red { color: #e63946; }
@@ -109,6 +110,7 @@
         if (gameFormat === 'scramble') formatLabel = "4-Man Scramble";
         if (gameFormat === 'nassau') formatLabel = `Nassau Bet Tracker ($${stake} Base Stake)`;
         if (gameFormat === 'wolf') formatLabel = `🐺 Wolf Game Tracker ($${wolfPointVal}/pt)`;
+        if (gameFormat === 'ryder') formatLabel = `🏆 Ryder Cup Match Play (🔴 Red vs 🔵 Blue)`;
         document.getElementById("format-badge").textContent = formatLabel;
 
         const tbody = document.getElementById("leaderboard-body");
@@ -117,7 +119,82 @@
 
         tbody.innerHTML = "";
 
-        if (gameFormat === 'wolf') {
+        if (gameFormat === 'ryder') {
+            mainTable.style.display = "none";
+            customBox.style.display = "block";
+            customBox.innerHTML = "";
+
+            let redPts = 0, bluePts = 0;
+            const teamsMap = {};
+            players.forEach(p => {
+                const teamKey = p.team || "Team 1";
+                if (!teamsMap[teamKey]) teamsMap[teamKey] = [];
+                teamsMap[teamKey].push(p);
+            });
+
+            let matchesHtml = "";
+
+            Object.keys(teamsMap).forEach(teamKey => {
+                const teamPlayers = teamsMap[teamKey];
+                const redPlayer = teamPlayers.find(p => p.squad === 'red') || teamPlayers[0];
+                const bluePlayer = teamPlayers.find(p => p.squad === 'blue') || teamPlayers[1] || teamPlayers[0];
+
+                let matchStatus = 0; // positive = Red up, negative = Blue up
+                let thru = 0;
+
+                courseData.forEach(hole => {
+                    const rVal = savedScores[`p${redPlayer.id}_h${hole.hole}`];
+                    const bVal = savedScores[`p${bluePlayer.id}_h${hole.hole}`];
+
+                    if (rVal && bVal && rVal > 0 && bVal > 0) {
+                        const rNet = parseInt(rVal, 10) - getStrokes(hole.hcpIndex, parseHcp(redPlayer.hcp));
+                        const bNet = parseInt(bVal, 10) - getStrokes(hole.hcpIndex, parseHcp(bluePlayer.hcp));
+                        if (rNet < bNet) matchStatus += 1;
+                        if (bNet < rNet) matchStatus -= 1;
+                        thru++;
+                    }
+                });
+
+                let matchResultLabel = "ALL SQUARE";
+                if (thru === 0) {
+                    matchResultLabel = "Not Started";
+                } else if (matchStatus > 0) {
+                    matchResultLabel = `🔴 ${redPlayer.name} +${matchStatus}`;
+                } else if (matchStatus < 0) {
+                    matchResultLabel = `🔵 ${bluePlayer.name} +${Math.abs(matchStatus)}`;
+                }
+
+                if (thru === 18 || (thru > 0 && Math.abs(matchStatus) > (18 - thru))) {
+                    if (matchStatus > 0) redPts += 1.0;
+                    else if (matchStatus < 0) bluePts += 1.0;
+                    else { redPts += 0.5; bluePts += 0.5; }
+                } else if (thru > 0) {
+                    if (matchStatus > 0) { redPts += 0.5; }
+                    else if (matchStatus < 0) { bluePts += 0.5; }
+                    else { redPts += 0.5; bluePts += 0.5; }
+                }
+
+                matchesHtml += `
+                    <div class="nassau-row">
+                        <span>${teamKey}: 🔴 ${redPlayer.name} vs 🔵 ${bluePlayer.name}</span>
+                        <span><strong>${matchResultLabel}</strong> (${thru}/18)</span>
+                    </div>
+                `;
+            });
+
+            customBox.innerHTML = `
+                <div class="ryder-banner">
+                    <span style="color:#ff6b6b;">🔴 RED: ${redPts}</span>
+                    <span style="font-size:0.9rem; color:#ccc;">VS</span>
+                    <span style="color:#4ea8de;">🔵 BLUE: ${bluePts}</span>
+                </div>
+                <div class="ryder-card">
+                    <h3 style="margin-top:0; color:#0f4c3a; text-align:center;">🏆 Live Match Standings</h3>
+                    ${matchesHtml}
+                </div>
+            `;
+
+        } else if (gameFormat === 'wolf') {
             mainTable.style.display = "none";
             customBox.style.display = "block";
             customBox.innerHTML = "";

@@ -24,7 +24,7 @@
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
-        .player-row { display: grid; grid-template-columns: 2fr 1fr 1.2fr 38px; gap: 6px; align-items: center; margin-bottom: 10px; }
+        .player-row { display: grid; grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; gap: 4px; align-items: center; margin-bottom: 10px; }
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
@@ -100,6 +100,7 @@
         <select id="game-format-select" onchange="handleFormatChange()">
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
+            <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
             <option value="nassau">Nassau Bet Tracker (Front / Back / Total)</option>
             <option value="wolf">🐺 Wolf Game Tracker (4 Players)</option>
             <option value="bestball">2-Man Best Ball (Four-Ball)</option>
@@ -111,10 +112,7 @@
         <div id="nassau-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
             <div class="grid-2col">
-                <div>
-                    <label style="font-size: 0.8rem;">Base Bet ($)</label>
-                    <input type="number" id="nassau-stake" value="10" min="1">
-                </div>
+                <div><label style="font-size: 0.8rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
                 <div>
                     <label style="font-size: 0.8rem;">Auto-Press When</label>
                     <select id="nassau-press-rule">
@@ -129,10 +127,7 @@
         <div id="wolf-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🐺 Wolf Game Options</label>
             <div class="grid-2col">
-                <div>
-                    <label style="font-size: 0.8rem;">Point Value ($)</label>
-                    <input type="number" id="wolf-point-value" value="2" min="1">
-                </div>
+                <div><label style="font-size: 0.8rem;">Point Value ($)</label><input type="number" id="wolf-point-value" value="2" min="1"></div>
                 <div>
                     <label style="font-size: 0.8rem;">Lone Wolf Win</label>
                     <select id="wolf-lone-mult">
@@ -147,8 +142,8 @@
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
-    <div style="display:grid; grid-template-columns: 2fr 1fr 1.2fr 38px; gap:6px; font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555;">
-        <span>Name</span><span>HCP</span><span>Team</span><span></span>
+    <div style="display:grid; grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; gap:4px; font-weight:bold; font-size:0.75rem; margin-bottom:6px; color:#555;">
+        <span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>
     </div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add Player Slot</button>
@@ -180,7 +175,6 @@
     const db = firebase.database();
 
     let currentMode = "regular";
-
     const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     const nineHoleLoops = {
@@ -290,17 +284,17 @@
             listContainer.innerHTML = "";
 
             const initialPlayers = (data.players && data.players.length > 0) ? data.players : [
-                { id: 101, name: "Player 1", hcp: "0", team: "Team 1" },
-                { id: 102, name: "Player 2", hcp: "0", team: "Team 1" },
-                { id: 103, name: "Player 3", hcp: "0", team: "Team 2" },
-                { id: 104, name: "Player 4", hcp: "0", team: "Team 2" }
+                { id: 101, name: "Player 1", hcp: "0", team: "Team 1", squad: "red" },
+                { id: 102, name: "Player 2", hcp: "0", team: "Team 1", squad: "blue" },
+                { id: 103, name: "Player 3", hcp: "0", team: "Team 2", squad: "red" },
+                { id: 104, name: "Player 4", hcp: "0", team: "Team 2", squad: "blue" }
             ];
 
             const format = document.getElementById("game-format-select").value;
             const teamSize = (format === 'scramble') ? 4 : 2;
 
             initialPlayers.forEach((p, idx) => {
-                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / teamSize) + 1}`);
+                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / teamSize) + 1}`, p.squad || (idx % 2 === 0 ? "red" : "blue"));
             });
         });
     }
@@ -314,7 +308,7 @@
         loadModeData(activeMode);
     });
 
-    function addPlayerRow(name = "", hcp = "0", team = "") {
+    function addPlayerRow(name = "", hcp = "0", team = "", squad = "red") {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value;
@@ -331,6 +325,10 @@
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
             <select class="p-team-input">${teamOptionsHtml}</select>
+            <select class="p-squad-input">
+                <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
+                <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
+            </select>
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
@@ -362,6 +360,7 @@
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
             const teamVal = row.querySelector('.p-team-input').value || "Team 1";
+            const squadVal = row.querySelector('.p-squad-input').value || "red";
             
             if (!hcpVal.startsWith("+")) {
                 let numVal = parseFloat(hcpVal);
@@ -370,7 +369,7 @@
                 hcpVal = String(numVal);
             }
 
-            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal });
+            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
         });
 
         db.ref(`events/${currentMode}`).update({
