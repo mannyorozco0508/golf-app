@@ -1,18 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <init charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Action & Wolf Game Tracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a; box-sizing: border-box; }
+        *, *:before, *:after { box-sizing: inherit; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         h2 { color: #0f4c3a; text-align: center; margin-top: 0; }
         .action-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-        .hole-wolf-row { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; }
-        select { padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.9rem; }
+        
+        /* MOBILE OPTIMIZED WOLF ROW */
+        .hole-wolf-row { 
+            display: grid; 
+            grid-template-columns: 50px 1fr 1fr 1fr; 
+            gap: 6px; 
+            align-items: center; 
+            background: #fff; 
+            padding: 8px; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            border: 1px solid #d0e1db; 
+        }
+        @media (max-width: 480px) {
+            .hole-wolf-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+        }
+        
+        select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.85rem; box-sizing: border-box; }
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
@@ -89,7 +106,6 @@
         let html = `<div class="action-card"><h3 style="margin-top:0; color:#0f4c3a;">📋 Hole-by-Hole Wolf Rotation</h3>`;
 
         for (let h = 1; h <= 18; h++) {
-            // Default rotating Wolf order (1, 2, 3, 4, 1, 2...)
             const defaultWolfIdx = (h - 1) % 4;
             const holePick = wolfPicks[`h${h}`] || {};
             const selectedWolfId = holePick.wolfId || players[defaultWolfIdx].id;
@@ -100,9 +116,9 @@
             });
 
             let choiceOptions = `
-                <option value="partner" ${holePick.choice === 'partner' ? 'selected' : ''}>🤝 Pick Partner</option>
-                <option value="lone" ${holePick.choice === 'lone' ? 'selected' : ''}>🐺 Lone Wolf</option>
-                <option value="blind" ${holePick.choice === 'blind' ? 'selected' : ''}>🕶️ Blind Wolf</option>
+                <option value="partner" ${holePick.choice === 'partner' ? 'selected' : ''}>🤝 Partner</option>
+                <option value="lone" ${holePick.choice === 'lone' ? 'selected' : ''}>🐺 Lone</option>
+                <option value="blind" ${holePick.choice === 'blind' ? 'selected' : ''}>🕶️ Blind</option>
             `;
 
             let partnerSelectHtml = "";
@@ -112,21 +128,23 @@
                     partnerOptions += `<option value="${p.id}" ${p.id == holePick.partnerId ? 'selected' : ''}>${p.name}</option>`;
                 });
                 partnerSelectHtml = `<select onchange="saveWolfChoice(${h}, 'partnerId', this.value)"><option value="">-- Partner --</option>${partnerOptions}</select>`;
+            } else {
+                partnerSelectHtml = `<div style="font-size:0.75rem; color:#888; text-align:center;">N/A (Lone)</div>`;
             }
 
             html += `
                 <div class="hole-wolf-row">
-                    <div><strong>Hol ${h}</strong></div>
+                    <div><strong>Hk ${h}</strong></div>
                     <div>
-                        <span style="font-size:0.75rem; color:#555; display:block;">Wolf:</span>
+                        <span style="font-size:0.65rem; color:#555; display:block;">Wolf</span>
                         <select onchange="saveWolfChoice(${h}, 'wolfId', this.value)">${playerOptions}</select>
                     </div>
                     <div>
-                        <span style="font-size:0.75rem; color:#555; display:block;">Choice:</span>
+                        <span style="font-size:0.65rem; color:#555; display:block;">Choice</span>
                         <select onchange="saveWolfChoice(${h}, 'choice', this.value)">${choiceOptions}</select>
                     </div>
                     <div>
-                        <span style="font-size:0.75rem; color:#555; display:block;">Partner:</span>
+                        <span style="font-size:0.65rem; color:#555; display:block;">Partner</span>
                         ${partnerSelectHtml}
                     </div>
                 </div>
