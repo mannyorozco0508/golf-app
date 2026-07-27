@@ -1,24 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <init charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skins, Dots & Settlement</title>
+    <title>Action & Wolf Game Tracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        h2 { text-align: center; color: #0f4c3a; margin-top: 0; }
-        .tab-menu { display: flex; gap: 6px; margin-bottom: 16px; }
-        .tab-btn { flex: 1; padding: 10px 4px; border: 1px solid #0f4c3a; background: #fff; color: #0f4c3a; border-radius: 8px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
-        .tab-btn.active { background: #0f4c3a; color: #fff; }
-        .card-box { background: #f9fbf9; border: 1px solid #d8e2dc; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-        .skin-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.95rem; }
-        .dot-btn-grid { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-        .dot-chip { background: #eef6f2; border: 1px solid #2a9d8f; color: #0f4c3a; border-radius: 16px; padding: 4px 10px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-        .dot-chip.active { background: #2a9d8f; color: #fff; }
-        .payout-card { background: #fff8e7; border: 2px solid #e6a100; border-radius: 10px; padding: 12px; margin-bottom: 8px; font-weight: bold; }
+        h2 { color: #0f4c3a; text-align: center; margin-top: 0; }
+        .action-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+        .hole-wolf-row { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; }
+        select { padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.9rem; }
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
@@ -27,47 +21,12 @@
 <body>
 
 <div class="container">
-    <h2>💰 Side Action & Settlement</h2>
-
-    <div class="tab-menu">
-        <div id="btn-skins-tab" class="tab-btn active" onclick="switchSubTab('skins')">🥩 Skins</div>
-        <div id="btn-dots-tab" class="tab-btn" onclick="switchSubTab('dots')">🎯 Dots</div>
-        <div id="btn-settle-tab" class="tab-btn" onclick="switchSubTab('settle')">🧾 Who Owes Who</div>
+    <h2>🐺 Wolf Game Action Tracker</h2>
+    <div style="font-size: 0.85rem; color: #555; text-align: center; margin-bottom: 14px;">
+        Set the rotating Wolf and their choice (Partner or Lone Wolf) for each hole!
     </div>
 
-    <!-- SKINS TAB CONTENT -->
-    <div id="skins-view">
-        <div class="card-box">
-            <h3 style="margin-top:0; color:#0f4c3a;">💵 Live Skins Summary</h3>
-            <div id="skins-list"></div>
-        </div>
-    </div>
-
-    <!-- DOTS TAB CONTENT -->
-    <div id="dots-view" style="display:none;">
-        <div class="card-box">
-            <h3 style="margin-top:0; color:#0f4c3a;">🎯 Log Dots / Junk ($1 per Dot)</h3>
-            <div id="dots-entry-container"></div>
-        </div>
-
-        <div class="card-box">
-            <h3 style="margin-top:0; color:#0f4c3a;">📊 Total Dots Balance</h3>
-            <div id="dots-standings"></div>
-        </div>
-    </div>
-
-    <!-- SETTLEMENT TAB CONTENT -->
-    <div id="settle-view" style="display:none;">
-        <div class="card-box">
-            <h3 style="margin-top:0; color:#0f4c3a;">📊 Individual Net Balances</h3>
-            <div id="net-balances-list"></div>
-        </div>
-
-        <div class="card-box" style="background:#eef6f2;">
-            <h3 style="margin-top:0; color:#0f4c3a;">💸 Direct Venmo / Cash Transfers</h3>
-            <div id="optimized-payouts-list"></div>
-        </div>
-    </div>
+    <div id="wolf-commissioner-container"></div>
 </div>
 
 <div class="nav-bar">
@@ -92,171 +51,91 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let currentSubTab = "skins";
     let activeMode = "regular";
-
-    function switchSubTab(tab) {
-        currentSubTab = tab;
-        document.getElementById("btn-skins-tab").className = (tab === 'skins') ? "tab-btn active" : "tab-btn";
-        document.getElementById("btn-dots-tab").className = (tab === 'dots') ? "tab-btn active" : "tab-btn";
-        document.getElementById("btn-settle-tab").className = (tab === 'settle') ? "tab-btn active" : "tab-btn";
-
-        document.getElementById("skins-view").style.display = (tab === 'skins') ? "block" : "none";
-        document.getElementById("dots-view").style.display = (tab === 'dots') ? "block" : "none";
-        document.getElementById("settle-view").style.display = (tab === 'settle') ? "block" : "none";
-    }
-
-    function toggleDot(playerId, dotType) {
-        const dotRef = db.ref(`events/${activeMode}/dots/p${playerId}_${dotType}`);
-        dotRef.once('value').then(snap => {
-            const currentVal = snap.val() || 0;
-            dotRef.set(currentVal ? 0 : 1);
-        });
-    }
+    let currentData = {};
 
     db.ref().on('value', (snapshot) => {
         const rootData = snapshot.val() || {};
         activeMode = rootData.active_event_mode || "regular";
-        const data = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-
-        const players = data.players || [];
-        const courseData = data.courseData || [];
-        const savedScores = data.scores || {};
-        const savedDots = data.dots || {};
-
-        // 1. SKINS CALCULATIONS
-        const skinsList = document.getElementById("skins-list");
-        skinsList.innerHTML = "";
-        let skinsWon = {};
-        players.forEach(p => skinsWon[p.id] = { name: p.name, count: 0, holes: [] });
-
-        courseData.forEach(hole => {
-            let lowNet = 999, winners = [];
-            players.forEach(p => {
-                const val = savedScores[`p${p.id}_h${hole.hole}`];
-                if (val && val > 0) {
-                    const gross = parseInt(val, 10);
-                    if (gross < lowNet) { lowNet = gross; winners = [p]; }
-                    else if (gross === lowNet) { winners.push(p); }
-                }
-            });
-            if (winners.length === 1) {
-                skinsWon[winners[0].id].count += 1;
-                skinsWon[winners[0].id].holes.push(hole.hole);
-            }
-        });
-
-        players.forEach(p => {
-            const info = skinsWon[p.id];
-            const holeText = info.holes.length > 0 ? ` (Holes: ${info.holes.join(', ')})` : '';
-            skinsList.innerHTML += `
-                <div class="skin-row">
-                    <span><strong>${p.name}</strong>${holeText}</span>
-                    <span style="font-weight:bold; color:#0f4c3a;">${info.count} Skins</span>
-                </div>
-            `;
-        });
-
-        // 2. DOTS CALCULATIONS
-        const dotsContainer = document.getElementById("dots-entry-container");
-        const dotsStandings = document.getElementById("dots-standings");
-        dotsContainer.innerHTML = ""; dotsStandings.innerHTML = "";
-
-        const dotTypes = [
-            { id: "greenie", label: "🎯 Greenie" },
-            { id: "sandie", label: "🏖️ Sandie" },
-            { id: "polie", label: "⛳ Polie" },
-            { id: "eagle", label: "🦅 Eagle" }
-        ];
-
-        let playerDotTotals = {};
-
-        players.forEach(p => {
-            let pTotal = 0, chipsHtml = "";
-            dotTypes.forEach(d => {
-                const isSet = savedDots[`p${p.id}_${d.id}`] || 0;
-                if (isSet) pTotal += 1;
-                chipsHtml += `<button class="dot-chip ${isSet ? 'active' : ''}" onclick="toggleDot(${p.id}, '${d.id}')">${d.label}</button>`;
-            });
-
-            playerDotTotals[p.id] = pTotal;
-            dotsContainer.innerHTML += `<div style="margin-bottom:12px;"><strong>${p.name}</strong><div class="dot-btn-grid">${chipsHtml}</div></div>`;
-        });
-
-        players.forEach(p => {
-            const tot = playerDotTotals[p.id];
-            dotsStandings.innerHTML += `
-                <div class="skin-row">
-                    <span><strong>${p.name}</strong></span>
-                    <span style="font-weight:bold; color:#2a9d8f;">${tot} Dots ($${tot})</span>
-                </div>
-            `;
-        });
-
-        // 3. SETTLEMENT ENGINE ("WHO OWES WHO")
-        const netList = document.getElementById("net-balances-list");
-        const payoutList = document.getElementById("optimized-payouts-list");
-        netList.innerHTML = ""; payoutList.innerHTML = "";
-
-        let netBalances = {};
-        players.forEach(p => netBalances[p.id] = { name: p.name, balance: 0 });
-
-        // Calculate Dot Net Balances (Peer-to-Peer zero-sum)
-        const totalDotsAll = Object.values(playerDotTotals).reduce((a, b) => a + b, 0);
-        if (players.length > 0) {
-            const avgDots = totalDotsAll / players.length;
-            players.forEach(p => {
-                const dotDiff = playerDotTotals[p.id] - avgDots;
-                netBalances[p.id].balance += dotDiff;
-            });
-        }
-
-        players.forEach(p => {
-            const bal = Math.round(netBalances[p.id].balance);
-            const isPos = bal > 0;
-            const isNeg = bal < 0;
-            netList.innerHTML += `
-                <div class="skin-row">
-                    <span><strong>${p.name}</strong></span>
-                    <span style="font-weight:bold; color:${isPos ? '#2a9d8f' : (isNeg ? '#e63946' : '#555')};">
-                        ${isPos ? '+$' + bal : (isNeg ? '-$' + Math.abs(bal) : 'EVEN ($0)')}
-                    </span>
-                </div>
-            `;
-        });
-
-        // Optimize transfers algorithm
-        let debtors = [], creditors = [];
-        players.forEach(p => {
-            let b = Math.round(netBalances[p.id].balance);
-            if (b < 0) debtors.push({ name: p.name, amount: Math.abs(b) });
-            if (b > 0) creditors.push({ name: p.name, amount: b });
-        });
-
-        let transactions = [];
-        let i = 0, j = 0;
-
-        while (i < debtors.length && j < creditors.length) {
-            let d = debtors[i], c = creditors[j];
-            let minAmount = Math.min(d.amount, c.amount);
-
-            transactions.push(`${d.name} pays ${c.name} 💰 $${minAmount}`);
-
-            d.amount -= minAmount;
-            c.amount -= minAmount;
-
-            if (d.amount === 0) i++;
-            if (c.amount === 0) j++;
-        }
-
-        if (transactions.length === 0) {
-            payoutList.innerHTML = `<div style="text-align:center; padding:10px; color:#666;">Everyone is completely square! No transfers needed.</div>`;
-        } else {
-            transactions.forEach(t => {
-                payoutList.innerHTML += `<div class="payout-card">📲 ${t}</div>`;
-            });
-        }
+        currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
+        renderWolfCommissioner();
     });
+
+    function saveWolfChoice(holeNum, field, val) {
+        db.ref(`events/${activeMode}/wolfPicks/h${holeNum}/${field}`).set(val);
+    }
+
+    function renderWolfCommissioner() {
+        const container = document.getElementById("wolf-commissioner-container");
+        const players = currentData.players || [];
+        const gameFormat = currentData.gameFormat || "stroke";
+        const wolfPicks = currentData.wolfPicks || {};
+
+        if (gameFormat !== 'wolf') {
+            container.innerHTML = `
+                <div class="action-card" style="text-align:center; padding:30px;">
+                    <h3>⚠️ Active Format is not Wolf</h3>
+                    <p style="color:#666;">Switch your Round Game Format to <strong>Wolf Game Tracker</strong> in the Admin tab to use this commissioner panel.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (players.length !== 4) {
+            container.innerHTML = `<div class="action-card" style="text-align:center;">⚠️ Wolf requires exactly 4 active players in Admin!</div>`;
+            return;
+        }
+
+        let html = `<div class="action-card"><h3 style="margin-top:0; color:#0f4c3a;">📋 Hole-by-Hole Wolf Rotation</h3>`;
+
+        for (let h = 1; h <= 18; h++) {
+            // Default rotating Wolf order (1, 2, 3, 4, 1, 2...)
+            const defaultWolfIdx = (h - 1) % 4;
+            const holePick = wolfPicks[`h${h}`] || {};
+            const selectedWolfId = holePick.wolfId || players[defaultWolfIdx].id;
+
+            let playerOptions = "";
+            players.forEach(p => {
+                playerOptions += `<option value="${p.id}" ${p.id == selectedWolfId ? 'selected' : ''}>${p.name}</option>`;
+            });
+
+            let choiceOptions = `
+                <option value="partner" ${holePick.choice === 'partner' ? 'selected' : ''}>🤝 Pick Partner</option>
+                <option value="lone" ${holePick.choice === 'lone' ? 'selected' : ''}>🐺 Lone Wolf</option>
+                <option value="blind" ${holePick.choice === 'blind' ? 'selected' : ''}>🕶️ Blind Wolf</option>
+            `;
+
+            let partnerSelectHtml = "";
+            if (holePick.choice === 'partner') {
+                let partnerOptions = "";
+                players.filter(p => p.id != selectedWolfId).forEach(p => {
+                    partnerOptions += `<option value="${p.id}" ${p.id == holePick.partnerId ? 'selected' : ''}>${p.name}</option>`;
+                });
+                partnerSelectHtml = `<select onchange="saveWolfChoice(${h}, 'partnerId', this.value)"><option value="">-- Partner --</option>${partnerOptions}</select>`;
+            }
+
+            html += `
+                <div class="hole-wolf-row">
+                    <div><strong>Hol ${h}</strong></div>
+                    <div>
+                        <span style="font-size:0.75rem; color:#555; display:block;">Wolf:</span>
+                        <select onchange="saveWolfChoice(${h}, 'wolfId', this.value)">${playerOptions}</select>
+                    </div>
+                    <div>
+                        <span style="font-size:0.75rem; color:#555; display:block;">Choice:</span>
+                        <select onchange="saveWolfChoice(${h}, 'choice', this.value)">${choiceOptions}</select>
+                    </div>
+                    <div>
+                        <span style="font-size:0.75rem; color:#555; display:block;">Partner:</span>
+                        ${partnerSelectHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
 </script>
 
 </body>
