@@ -2,131 +2,85 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Group Scorecard</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 12px 12px 90px 12px;
-            color: #1a1a1a;
-            user-select: none;
-            -webkit-user-select: none;
+            background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a;
         }
-        .container {
-            max-width: 950px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 16px;
-            overflow-x: auto;
+        .container { max-width: 800px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 12px; }
+        .header-box { text-align: center; margin-bottom: 12px; }
+        .header-title { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin: 0; }
+        .header-sub { font-size: 0.85rem; color: #666; margin-top: 2px; }
+        
+        .group-filter-bar {
+            display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; margin-bottom: 12px;
+            -webkit-overflow-scrolling: touch;
         }
-        .mode-banner {
-            background-color: #1d3557;
-            color: white;
-            text-align: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-            padding: 4px 8px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 8px;
+        .group-btn {
+            flex: 0 0 auto; padding: 6px 12px; border: 1px solid #0f4c3a; background: #ffffff;
+            color: #0f4c3a; border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
         }
-        h2 { margin-top: 0; color: #0f4c3a; text-align: center; font-size: 1.3rem; }
-        .group-header {
-            display: flex;
-            justify-content: space-around;
-            background: #eef6f2;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.85rem; }
-        th, td { padding: 6px 3px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
-        th { background-color: #f8f9fa; color: #444; }
+        .group-btn.active { background: #0f4c3a; color: #ffffff; }
 
-        .score-cell {
-            width: 34px; height: 32px; line-height: 30px; margin: 0 auto;
-            font-size: 1rem; font-weight: bold; border: 1px solid #ccc;
-            border-radius: 4px; background-color: #fff; cursor: pointer;
-            box-sizing: border-box; display: inline-block; transition: all 0.15s ease;
-        }
-        .score-cell.active-target { border: 2px solid #0f4c3a !important; box-shadow: 0 0 6px rgba(15, 76, 58, 0.4); }
-        .score-cell.birdie-or-better { border: 2px solid #e63946 !important; border-radius: 50% !important; color: #e63946 !important; background-color: #fdf0f0; }
-        .score-cell.par-score { border: 1px solid #ccc !important; border-radius: 4px !important; color: #1a1a1a !important; background-color: #ffffff; }
-        .score-cell.bogey { border: 2px solid #1d3557 !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #f0f4f8; }
-        .score-cell.double-bogey { border: 2px solid #1d3557 !important; outline: 2px solid #1d3557 !important; outline-offset: 2px !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #e6eef5; }
-        .score-cell.triple-bogey { border: 2px solid #1d3557 !important; outline: 2px solid #1d3557 !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px #1d3557 !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #d8e5f2; }
+        .card-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .card-table { width: 100%; border-collapse: collapse; min-width: 320px; }
+        .card-table th, .card-table td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.85rem; }
+        .card-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
 
-        .summary-row { background-color: #eef6f2; font-weight: bold; }
-        .total-row { background-color: #0f4c3a; color: white; font-weight: bold; }
+        .score-input {
+            width: 38px; height: 34px; text-align: center; font-size: 1rem; font-weight: bold;
+            border: 1px solid #ccc; border-radius: 6px; background-color: #fff;
+        }
+        .score-input:focus { border-color: #2a9d8f; outline: none; background-color: #eef6f2; }
 
         .nav-bar {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: #ffffff; border-top: 1px solid #e0e0e0;
-            display: flex; justify-content: space-around; padding: 12px 0;
+            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
+            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
             box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
         }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
-
-        .keypad-sheet {
-            position: fixed; bottom: 55px; left: 0; right: 0;
-            background: #ffffff; border-top-left-radius: 16px; border-top-right-radius: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 16px 16px 16px;
-            display: none; z-index: 90; border-top: 2px solid #0f4c3a;
-        }
-        .keypad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 0.9rem; color: #0f4c3a; }
-        .keypad-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-        .key-btn { background: #eef6f2; border: 1px solid #0f4c3a; color: #0f4c3a; padding: 10px 0; border-radius: 8px; font-size: 1.1rem; font-weight: bold; text-align: center; cursor: pointer; }
-        .key-btn:active { background: #0f4c3a; color: #fff; }
-        .key-btn.clear-btn { background: #fdf0f0; border-color: #e63946; color: #e63946; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div style="text-align: center;"><span class="mode-banner" id="active-mode-tag">...</span></div>
-    <h2 id="event-title">⛳ Loading Event...</h2>
-    <div class="group-header" id="group-header-info"></div>
-
-    <table>
-        <thead><tr id="table-head-row"></tr></thead>
-        <tbody id="scorecard-body"></tbody>
-    </table>
-</div>
-
-<div class="keypad-sheet" id="keypad">
-    <div class="keypad-header">
-        <span id="keypad-title">Enter Score</span>
-        <span style="cursor:pointer; padding: 2px 8px;" onclick="closeKeypad()">✕ Close</span>
+    <div class="header-box">
+        <h1 class="header-title" id="course-title">Golf Scorecard</h1>
+        <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
     </div>
-    <div class="keypad-grid">
-        <div class="key-btn" onclick="pressKey(1)">1</div>
-        <div class="key-btn" onclick="pressKey(2)">2</div>
-        <div class="key-btn" onclick="pressKey(3)">3</div>
-        <div class="key-btn" onclick="pressKey(4)">4</div>
-        <div class="key-btn" onclick="pressKey(5)">5</div>
-        <div class="key-btn" onclick="pressKey(6)">6</div>
-        <div class="key-btn" onclick="pressKey(7)">7</div>
-        <div class="key-btn clear-btn" onclick="pressKey('clr')">CLR</div>
+
+    <!-- GROUP FILTER BAR FOR SCOREKEEPERS -->
+    <div class="group-filter-bar" id="group-filter-container">
+        <button class="group-btn active" onclick="filterGroup('all')">👥 All Players</button>
+        <button class="group-btn" onclick="filterGroup(1)">Group 1</button>
+        <button class="group-btn" onclick="filterGroup(2)">Group 2</button>
+        <button class="group-btn" onclick="filterGroup(3)">Group 3</button>
+        <button class="group-btn" onclick="filterGroup(4)">Group 4</button>
+    </div>
+
+    <div class="card-table-wrapper">
+        <table class="card-table">
+            <thead>
+                <tr id="table-head-row">
+                    <th style="width: 40px;">Hole</th>
+                    <th style="width: 35px;">Par</th>
+                    <th style="width: 35px;">HCP</th>
+                </tr>
+            </thead>
+            <tbody id="card-body"></tbody>
+        </table>
     </div>
 </div>
 
 <div class="nav-bar">
     <a href="index.html" class="nav-item active">📝 Card</a>
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
@@ -145,209 +99,83 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const defaultCourseData = [
-        { hole: 1, par: 4, hcpIndex: 9 }, { hole: 2, par: 4, hcpIndex: 11 }, { hole: 3, par: 3, hcpIndex: 17 },
-        { hole: 4, par: 4, hcpIndex: 3 }, { hole: 5, par: 4, hcpIndex: 13 }, { hole: 6, par: 3, hcpIndex: 15 },
-        { hole: 7, par: 4, hcpIndex: 1 }, { hole: 8, par: 5, hcpIndex: 7 }, { hole: 9, par: 3, hcpIndex: 5 },
-        { hole: 10, par: 5, hcpIndex: 8 }, { hole: 11, par: 3, hcpIndex: 18 }, { hole: 12, par: 4, hcpIndex: 14 },
-        { hole: 13, par: 4, hcpIndex: 2 }, { hole: 14, par: 4, hcpIndex: 12 }, { hole: 15, par: 5, hcpIndex: 6 },
-        { hole: 16, par: 4, hcpIndex: 10 }, { hole: 17, par: 3, hcpIndex: 16 }, { hole: 18, par: 4, hcpIndex: 4 }
-    ];
+    let selectedGroup = "all";
+    let activeMode = "regular";
+    let currentData = {};
 
-    let currentActiveMode = "regular";
-    let courseData = defaultCourseData;
-    let players = [];
-    let activeTarget = null;
+    function filterGroup(grp) {
+        selectedGroup = grp;
+        const btns = document.querySelectorAll('.group-btn');
+        btns.forEach(b => b.classList.remove('active'));
 
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
+        if (grp === 'all') btns[0].classList.add('active');
+        else if (grp === 1) btns[1].classList.add('active');
+        else if (grp === 2) btns[2].classList.add('active');
+        else if (grp === 3) btns[3].classList.add('active');
+        else if (grp === 4) btns[4].classList.add('active');
+
+        renderScorecard();
     }
 
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
+    function saveScore(playerId, holeNum, val) {
+        const intVal = parseInt(val, 10);
+        if (isNaN(intVal) || intVal <= 0) {
+            db.ref(`events/${activeMode}/scores/p${playerId}_h${holeNum}`).remove();
         } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
+            db.ref(`events/${activeMode}/scores/p${playerId}_h${holeNum}`).set(intVal);
         }
-    }
-
-    function applyScoreStyling(elem, grossScore, holePar) {
-        elem.className = "score-cell";
-        if (!grossScore || grossScore <= 0) return;
-        const diff = grossScore - holePar;
-        if (diff <= -1) elem.classList.add("birdie-or-better");
-        else if (diff === 0) elem.classList.add("par-score");
-        else if (diff === 1) elem.classList.add("bogey");
-        else if (diff === 2) elem.classList.add("double-bogey");
-        else if (diff >= 3) elem.classList.add("triple-bogey");
     }
 
     db.ref().on('value', (snapshot) => {
         const rootData = snapshot.val() || {};
-        currentActiveMode = rootData.active_event_mode || "regular";
-        
-        const modeTag = document.getElementById("active-mode-tag");
-        modeTag.textContent = currentActiveMode === 'regular' ? '🟢 Regular Round Mode' : '⛳ Myrtle Beach Trip Mode';
+        activeMode = rootData.active_event_mode || "regular";
+        currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
+        renderScorecard();
+    });
 
-        const data = (rootData.events && rootData.events[currentActiveMode]) ? rootData.events[currentActiveMode] : {};
+    function renderScorecard() {
+        const players = currentData.players || [];
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
 
-        document.getElementById("event-title").textContent = `⛳ ${data.eventName || "Group Scorecard"} - ${data.courseName || ''}`;
+        document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${currentData.gameFormat ? currentData.gameFormat.toUpperCase() : "STROKE PLAY"}`;
 
-        players = data.players || [];
-        courseData = data.courseData || defaultCourseData;
-        const savedScores = data.scores || {};
-
-        const headerDiv = document.getElementById("group-header-info");
-        headerDiv.innerHTML = "";
-        players.forEach(p => headerDiv.innerHTML += `<div><strong>${p.name}</strong> (${p.hcp})</div>`);
-
-        const headRow = document.getElementById("table-head-row");
-        let ths = `<th>Hole</th><th>Par</th><th>HCP</th>`;
-        players.forEach(p => ths += `<th>${p.name}</th>`);
-        headRow.innerHTML = ths;
-
-        const tbody = document.getElementById("scorecard-body");
-        tbody.innerHTML = "";
-
-        if (players.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3">No active players. Please setup players in Admin tab.</td></tr>`;
-            return;
+        // Filter players based on group selection (4 players per group)
+        let filteredPlayers = players;
+        if (selectedGroup !== "all") {
+            const startIdx = (selectedGroup - 1) * 4;
+            filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        courseData.forEach((hole) => {
-            const row = document.createElement("tr");
-            let playerInputs = "";
+        // 1. Build Header
+        const headRow = document.getElementById("table-head-row");
+        headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
-            players.forEach(p => {
-                const val = savedScores[`p${p.id}_h${hole.hole}`] || "-";
-                playerInputs += `
+        filteredPlayers.forEach(p => {
+            headRow.innerHTML += `<th>${p.name}<br><span style="font-size:0.7rem; font-weight:normal;">(${p.hcp})</span></th>`;
+        });
+
+        // 2. Build Body
+        const tbody = document.getElementById("card-body");
+        tbody.innerHTML = "";
+
+        courseData.forEach(h => {
+            let rowHtml = `<tr><strong><td>${h.hole}</td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td></strong>`;
+
+            filteredPlayers.forEach(p => {
+                const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
+                rowHtml += `
                     <td>
-                        <div class="score-cell" id="cell-p${p.id}-h${hole.hole}" 
-                             onclick="openKeypad('${p.id}', ${hole.hole}, ${hole.par}, '${p.name}')">${val}</div>
-                        <span id="p${p.id}-n-${hole.hole}" style="font-size:0.75rem; color:#666; display:block;">-</span>
+                        <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
+                               onchange="saveScore(${p.id}, ${h.hole}, this.value)">
                     </td>
                 `;
             });
 
-            row.innerHTML = `
-                <td><strong>${hole.hole}</strong></td>
-                <td>${hole.par}</td>
-                <td>${hole.hcpIndex}</td>
-                ${playerInputs}
-            `;
-            tbody.appendChild(row);
-
-            if (hole.hole === 9) tbody.appendChild(createSummaryRow("OUT", "front"));
-            if (hole.hole === 18) {
-                tbody.appendChild(createSummaryRow("IN", "back"));
-                tbody.appendChild(createSummaryRow("TOTAL", "total"));
-            }
+            rowHtml += `</tr>`;
+            tbody.innerHTML += rowHtml;
         });
-
-        calculateTotals(savedScores);
-    });
-
-    function createSummaryRow(label, type) {
-        const row = document.createElement("tr");
-        row.className = type === 'total' ? 'total-row' : 'summary-row';
-        let cols = `<td><strong>${label}</strong></td><td>-</td><td>-</td>`;
-        players.forEach(p => {
-            cols += `<td><span id="p${p.id}-${type}-gross">0</span> / <span id="p${p.id}-${type}-net">0</span></td>`;
-        });
-        row.innerHTML = cols;
-        return row;
-    }
-
-    function calculateTotals(savedScores) {
-        players.forEach(p => {
-            const numericHcp = parseHcp(p.hcp);
-            let frontG = 0, frontN = 0, backG = 0, backN = 0;
-
-            courseData.forEach(hole => {
-                const cellElem = document.getElementById(`cell-p${p.id}-h${hole.hole}`);
-                const valText = savedScores[`p${p.id}_h${hole.hole}`];
-                const nSpan = document.getElementById(`p${p.id}-n-${hole.hole}`);
-
-                if (valText && valText > 0) {
-                    const gross = parseInt(valText, 10);
-                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
-                    if (nSpan) nSpan.textContent = `(${net})`;
-                    if (cellElem) applyScoreStyling(cellElem, gross, hole.par);
-
-                    if (hole.hole <= 9) { frontG += gross; frontN += net; }
-                    else { backG += gross; backN += net; }
-                } else {
-                    if (nSpan) nSpan.textContent = "-";
-                    if (cellElem) cellElem.className = "score-cell";
-                }
-            });
-
-            const fgSpan = document.getElementById(`p${p.id}-front-gross`);
-            const fnSpan = document.getElementById(`p${p.id}-front-net`);
-            const bgSpan = document.getElementById(`p${p.id}-back-gross`);
-            const bnSpan = document.getElementById(`p${p.id}-back-net`);
-            const tgSpan = document.getElementById(`p${p.id}-total-gross`);
-            const tnSpan = document.getElementById(`p${p.id}-total-net`);
-
-            if (fgSpan) fgSpan.textContent = frontG;
-            if (fnSpan) fnSpan.textContent = frontN;
-            if (bgSpan) bgSpan.textContent = backG;
-            if (bnSpan) bnSpan.textContent = backN;
-            if (tgSpan) tgSpan.textContent = frontG + backG;
-            if (tnSpan) tnSpan.textContent = frontN + backN;
-        });
-    }
-
-    function openKeypad(playerId, hole, par, playerName) {
-        if (activeTarget) {
-            const prevCell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
-            if (prevCell) prevCell.classList.remove("active-target");
-        }
-        activeTarget = { playerId, hole, par, playerName };
-        const cell = document.getElementById(`cell-p${playerId}-h${hole}`);
-        if (cell) cell.classList.add("active-target");
-
-        document.getElementById("keypad-title").textContent = `${playerName} - Hole ${hole} (Par ${par})`;
-        document.getElementById("keypad").style.display = "block";
-    }
-
-    function closeKeypad() {
-        if (activeTarget) {
-            const cell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
-            if (cell) cell.classList.remove("active-target");
-        }
-        document.getElementById("keypad").style.display = "none";
-        activeTarget = null;
-    }
-
-    function pressKey(val) {
-        if (!activeTarget) return;
-
-        const scoreRef = db.ref(`events/${currentActiveMode}/scores/p${activeTarget.playerId}_h${activeTarget.hole}`);
-        if (val === 'clr') {
-            scoreRef.remove();
-        } else {
-            scoreRef.set(val);
-        }
-
-        let nextPlayerIdx = players.findIndex(p => String(p.id) === String(activeTarget.playerId)) + 1;
-        let nextHole = activeTarget.hole;
-
-        if (nextPlayerIdx < players.length) {
-            openKeypad(players[nextPlayerIdx].id, nextHole, courseData[nextHole - 1].par, players[nextPlayerIdx].name);
-        } else if (nextHole < 18) {
-            nextHole++;
-            openKeypad(players[0].id, nextHole, courseData[nextHole - 1].par, players[0].name);
-        } else {
-            closeKeypad();
-        }
     }
 </script>
 
