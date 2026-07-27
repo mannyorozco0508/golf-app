@@ -3,122 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaderboard</title>
+    <title>Live Leaderboard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 16px 16px 90px 16px;
-            color: #1a1a1a;
+            background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a;
         }
-        .container {
-            max-width: 650px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 20px;
-        }
-        h2 {
-            margin-top: 0;
-            color: #0f4c3a;
-            text-align: center;
-        }
-        .tabs {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .tab-btn {
-            background: #eef6f2;
-            border: 2px solid #0f4c3a;
-            color: #0f4c3a;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.85rem;
-            cursor: pointer;
-        }
-        .tab-btn.active {
-            background: #0f4c3a;
-            color: white;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-        th, td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        th {
-            background-color: #f8f9fa;
-            font-size: 0.85rem;
-            color: #555;
-            text-transform: uppercase;
-        }
-        .rank {
-            font-weight: bold;
-            width: 40px;
-            text-align: center;
-        }
-        .score {
-            font-weight: bold;
-            text-align: center;
-        }
-        .highlight {
-            background-color: #fffde7;
-        }
+        .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
+        h2 { text-align: center; color: #0f4c3a; margin-top: 0; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; }
+        .leaderboard-table th { background: #f8f9fa; color: #444; font-size: 0.85rem; }
+        .player-name-cell { text-align: left !important; font-weight: bold; }
+        .rank-1 { background-color: #fff9db; font-weight: bold; }
         .nav-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-around;
-            padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
-            z-index: 100;
+            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
+            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
         }
-        .nav-item {
-            text-decoration: none;
-            color: #666;
-            font-weight: 600;
-            font-size: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .nav-item.active {
-            color: #0f4c3a;
-        }
+        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
+        .nav-item.active { color: #0f4c3a; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 id="event-title">🏆 Leaderboard</h2>
-    
-    <div class="tabs">
-        <button class="tab-btn active" id="btn-net" onclick="showBoard('net')">Net Total</button>
-        <button class="tab-btn" id="btn-gross" onclick="showBoard('gross')">Gross Total</button>
-        <button class="tab-btn" id="btn-stableford" onclick="showBoard('stableford')">Stableford Pts</button>
-    </div>
+    <h2 id="board-title">🏆 Live Leaderboard</h2>
 
-    <table>
+    <table class="leaderboard-table">
         <thead>
             <tr>
-                <th class="rank">Pos</th>
-                <th>Player</th>
-                <th style="text-align:center;">HCP</th>
-                <th style="text-align:center;">Thru</th>
-                <th class="score" id="score-header">Net Total</th>
+                <th>Pos</th>
+                <th style="text-align:left;">Player</th>
+                <th>Thru</th>
+                <th>Net</th>
+                <th>Gross</th>
+                <th>Pts</th>
             </tr>
         </thead>
         <tbody id="leaderboard-body"></tbody>
@@ -126,49 +48,31 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item">📝 Scorecard</a>
+    <a href="index.html" class="nav-item">📝 Card</a>
     <a href="leaderboard.html" class="nav-item active">🏆 Board</a>
     <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="stats.html" class="nav-item">📊 Stats</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
 <script>
-    const defaultCourseData = [
-        { hole: 1, par: 4, hcpIndex: 7 },
-        { hole: 2, par: 5, hcpIndex: 1 },
-        { hole: 3, par: 3, hcpIndex: 15 },
-        { hole: 4, par: 4, hcpIndex: 5 },
-        { hole: 5, par: 4, hcpIndex: 11 },
-        { hole: 6, par: 3, hcpIndex: 17 },
-        { hole: 7, par: 4, hcpIndex: 3 },
-        { hole: 8, par: 5, hcpIndex: 9 },
-        { hole: 9, par: 4, hcpIndex: 13 },
-        { hole: 10, par: 4, hcpIndex: 8 },
-        { hole: 11, par: 4, hcpIndex: 2 },
-        { hole: 12, par: 3, hcpIndex: 16 },
-        { hole: 13, par: 5, hcpIndex: 6 },
-        { hole: 14, par: 4, hcpIndex: 12 },
-        { hole: 15, par: 4, hcpIndex: 10 },
-        { hole: 16, par: 3, hcpIndex: 18 },
-        { hole: 17, par: 5, hcpIndex: 4 },
-        { hole: 18, par: 4, hcpIndex: 14 }
-    ];
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
 
-    const defaultPlayers = [
-        { id: 1, name: "Manny", hcp: "+3" },
-        { id: 2, name: "Joey", hcp: "8" },
-        { id: 3, name: "Jake", hcp: "12" },
-        { id: 4, name: "Brian", hcp: "16" }
-    ];
-
-    let currentMode = 'net';
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
         const str = String(hcpStr).trim();
-        if (str.startsWith("+")) {
-            return -Math.abs(parseFloat(str.substring(1)));
-        }
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
         return parseFloat(str) || 0;
     }
 
@@ -184,98 +88,65 @@
         }
     }
 
-    function getStablefordPoints(netScore, par) {
-        const diff = netScore - par;
-        if (diff <= -3) return 10;
-        if (diff === -2) return 5;
-        if (diff === -1) return 3;
-        if (diff === 0) return 2;
-        if (diff === 1) return 1;
-        return 0;
-    }
+    db.ref().on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const players = data.players || [];
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const gameFormat = data.gameFormat || "stroke";
 
-    function renderBoard(mode) {
-        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
-        document.getElementById("event-title").textContent = `🏆 ${eventName} Leaderboard`;
+        document.getElementById("board-title").textContent = `🏆 ${data.eventName || "Live Leaderboard"}`;
 
-        const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
-        const courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
-        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+        let results = players.map(p => {
+            const numericHcp = parseHcp(p.hcp);
+            let grossTotal = 0, netTotal = 0, holesPlayed = 0, stablefordPoints = 0;
+
+            courseData.forEach(hole => {
+                const val = savedScores[`p${p.id}_h${hole.hole}`];
+                if (val && val > 0) {
+                    const gross = parseInt(val, 10);
+                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                    grossTotal += gross;
+                    netTotal += net;
+                    holesPlayed++;
+
+                    // Stableford scoring logic (Double Eagle=5, Eagle=4, Birdie=3, Par=2, Bogey=1, Double+=0)
+                    const netDiff = net - hole.par;
+                    if (netDiff <= -3) stablefordPoints += 5;
+                    else if (netDiff === -2) stablefordPoints += 4;
+                    else if (netDiff === -1) stablefordPoints += 3;
+                    else if (netDiff === 0) stablefordPoints += 2;
+                    else if (netDiff === 1) stablefordPoints += 1;
+                }
+            });
+
+            return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed, pts: stablefordPoints };
+        });
+
+        // Sort based on game format
+        if (gameFormat === 'stableford') {
+            results.sort((a, b) => b.pts - a.pts);
+        } else {
+            results.sort((a, b) => (a.net || 999) - (b.net || 999));
+        }
 
         const tbody = document.getElementById("leaderboard-body");
         tbody.innerHTML = "";
 
-        const boardData = [];
-
-        players.forEach(p => {
-            const numericHcp = parseHcp(p.hcp);
-            let totGross = 0;
-            let totNet = 0;
-            let totPoints = 0;
-            let thru = 0;
-
-            courseData.forEach(hole => {
-                const gross = savedScores[`p${p.id}_h${hole.hole}`];
-                if (gross && gross > 0) {
-                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
-                    totGross += gross;
-                    totNet += net;
-                    totPoints += getStablefordPoints(net, hole.par);
-                    thru++;
-                }
-            });
-
-            boardData.push({
-                name: p.name,
-                hcp: p.hcp,
-                gross: totGross,
-                net: totNet,
-                points: totPoints,
-                thru: thru,
-                isCurrentPlayer: p.id === 1
-            });
-        });
-
-        const sorted = [...boardData].sort((a, b) => {
-            if (mode === 'stableford') return b.points - a.points;
-            if (mode === 'gross') return a.gross - b.gross;
-            return a.net - b.net;
-        });
-
-        sorted.forEach((p, index) => {
+        results.forEach((r, idx) => {
             const row = document.createElement("tr");
-            if (p.isCurrentPlayer) row.classList.add("highlight");
-
-            let scoreDisplay = p.net;
-            if (mode === 'gross') scoreDisplay = p.gross;
-            if (mode === 'stableford') scoreDisplay = `${p.points} pts`;
-
+            if (idx === 0 && r.thru > 0) row.className = "rank-1";
             row.innerHTML = `
-                <td class="rank">${index + 1}</td>
-                <td><strong>${p.name}</strong> ${p.isCurrentPlayer ? '(You)' : ''}</td>
-                <td style="text-align:center;">${p.hcp}</td>
-                <td style="text-align:center;">${p.thru}</td>
-                <td class="score">${scoreDisplay}</td>
+                <td><strong>${idx + 1}</strong></td>
+                <td class="player-name-cell">${r.name} (${r.hcp})</td>
+                <td>${r.thru === 18 ? 'F' : r.thru}</td>
+                <td><strong>${r.net || '-'}</strong></td>
+                <td>${r.gross || '-'}</td>
+                <td><strong>${r.pts}</strong></td>
             `;
             tbody.appendChild(row);
         });
-    }
-
-    function showMode(mode) {
-        currentMode = mode;
-        document.getElementById("btn-net").classList.toggle("active", mode === 'net');
-        document.getElementById("btn-gross").classList.toggle("active", mode === 'gross');
-        document.getElementById("btn-stableford").classList.toggle("active", mode === 'stableford');
-        
-        let headerText = "Net Total";
-        if (mode === 'gross') headerText = "Gross Total";
-        if (mode === 'stableford') headerText = "Points";
-
-        document.getElementById("score-header").textContent = headerText;
-        renderBoard(mode);
-    }
-
-    showMode('net');
+    });
 </script>
 
 </body>
