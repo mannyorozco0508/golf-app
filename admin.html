@@ -400,7 +400,7 @@
         const playersList = [];
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
-            let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
+            let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "0";
             
             const teamSelect = row.querySelector('.p-team-input');
             const squadSelect = row.querySelector('.p-squad-input');
