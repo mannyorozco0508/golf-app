@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Round Stats</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 16px 16px 90px 16px;
+            color: #1a1a1a;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 20px;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #0f4c3a;
+            text-align: center;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #eef6f2;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card .val {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #0f4c3a;
+            margin-top: 4px;
+        }
+        .stat-card .lbl {
+            font-size: 0.8rem;
+            color: #555;
+            font-weight: 600;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 8px 4px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #555;
+            font-size: 0.8rem;
+        }
+        .birdie-count { color: #e63946; font-weight: bold; }
+        .par-count { color: #1a1a1a; font-weight: bold; }
+        .bogey-count { color: #1d3557; font-weight: bold; }
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .nav-item {
+            text-decoration: none;
+            color: #666;
+            font-weight: 600;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .nav-item.active {
+            color: #0f4c3a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 id="event-title">📊 Round Stats</h2>
+
+    <!-- High Level Overview -->
+    <div class="stats-grid" id="top-overview"></div>
+
+    <h3>👥 Player Scoring Breakdown</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="text-align:left;">Player</th>
+                <th>Birdie+</th>
+                <th>Pars</th>
+                <th>Bogeys</th>
+                <th>Double+</th>
+            </tr>
+        </thead>
+        <tbody id="player-breakdown-body"></tbody>
+    </table>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h3>⛳ Group Hole Performance</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>Group Avg</th>
+                <th>To Par</th>
+            </tr>
+        </thead>
+        <tbody id="hole-stats-body"></tbody>
+    </table>
+</div>
+
+<div class="nav-bar">
+    <a href="index.html" class="nav-item">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
+    <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="stats.html" class="nav-item active">📊 Stats</a>
+    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+</div>
+
+<script>
+    const defaultCourseData = [
+        { hole: 1, par: 4, hcpIndex: 7 },
+        { hole: 2, par: 5, hcpIndex: 1 },
+        { hole: 3, par: 3, hcpIndex: 15 },
+        { hole: 4, par: 4, hcpIndex: 5 },
+        { hole: 5, par: 4, hcpIndex: 11 },
+        { hole: 6, par: 3, hcpIndex: 17 },
+        { hole: 7, par: 4, hcpIndex: 3 },
+        { hole: 8, par: 5, hcpIndex: 9 },
+        { hole: 9, par: 4, hcpIndex: 13 },
+        { hole: 10, par: 4, hcpIndex: 8 },
+        { hole: 11, par: 4, hcpIndex: 2 },
+        { hole: 12, par: 3, hcpIndex: 16 },
+        { hole: 13, par: 5, hcpIndex: 6 },
+        { hole: 14, par: 4, hcpIndex: 12 },
+        { hole: 15, par: 4, hcpIndex: 10 },
+        { hole: 16, par: 3, hcpIndex: 18 },
+        { hole: 17, par: 5, hcpIndex: 4 },
+        { hole: 18, par: 4, hcpIndex: 14 }
+    ];
+
+    const defaultPlayers = [
+        { id: 1, name: "Manny", hcp: "+3" },
+        { id: 2, name: "Joey", hcp: "8" },
+        { id: 3, name: "Jake", hcp: "12" },
+        { id: 4, name: "Brian", hcp: "16" }
+    ];
+
+    function renderStats() {
+        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
+        document.getElementById("event-title").textContent = `📊 ${eventName} Stats`;
+
+        const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
+        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+
+        let totalGroupStrokes = 0;
+        let totalHolesPlayed = 0;
+        let totalGroupBirdies = 0;
+
+        const playerStats = players.map(p => ({
+            name: p.name,
+            birdies: 0,
+            pars: 0,
+            bogeys: 0,
+            doublesPlus: 0
+        }));
+
+        courseData.forEach(hole => {
+            players.forEach((p, idx) => {
+                const gross = savedScores[`p${p.id}_h${hole.hole}`];
+                if (gross && gross > 0) {
+                    totalGroupStrokes += gross;
+                    totalHolesPlayed++;
+
+                    const diff = gross - hole.par;
+                    if (diff <= -1) {
+                        playerStats[idx].birdies++;
+                        totalGroupBirdies++;
+                    } else if (diff === 0) {
+                        playerStats[idx].pars++;
+                    } else if (diff === 1) {
+                        playerStats[idx].bogeys++;
+                    } else {
+                        playerStats[idx].doublesPlus++;
+                    }
+                }
+            });
+        });
+
+        // Top Overview Cards
+        const overviewDiv = document.getElementById("top-overview");
+        const groupAvg = totalHolesPlayed > 0 ? (totalGroupStrokes / (totalHolesPlayed / players.length)).toFixed(1) : "0.0";
+        overviewDiv.innerHTML = `
+            <div class="stat-card">
+                <div class="lbl">Group Strokes</div>
+                <div class="val">${totalGroupStrokes}</div>
+            </div>
+            <div class="stat-card">
+                <div class="lbl">Group Avg / Player</div>
+                <div class="val">${groupAvg}</div>
+            </div>
+            <div class="stat-card">
+                <div class="lbl">Total Birdies+</div>
+                <div class="val" style="color:#e63946;">${totalGroupBirdies}</div>
+            </div>
+        `;
+
+        // Player Breakdown Table
+        const playerBody = document.getElementById("player-breakdown-body");
+        playerBody.innerHTML = "";
+        playerStats.forEach(p => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td style="text-align:left;"><strong>${p.name}</strong></td>
+                <td class="birdie-count">${p.birdies}</td>
+                <td class="par-count">${p.pars}</td>
+                <td class="bogey-count">${p.bogeys}</td>
+                <td>${p.doublesPlus}</td>
+            `;
+            playerBody.appendChild(row);
+        });
+
+        // Hole-by-Hole Group Averages Table
+        const holeBody = document.getElementById("hole-stats-body");
+        holeBody.innerHTML = "";
+
+        courseData.forEach(hole => {
+            let holeStrokes = 0;
+            let holeCount = 0;
+
+            players.forEach(p => {
+                const gross = savedScores[`p${p.id}_h${hole.hole}`];
+                if (gross && gross > 0) {
+                    holeStrokes += gross;
+                    holeCount++;
+                }
+            });
+
+            const row = document.createElement("tr");
+
+            if (holeCount === 0) {
+                row.innerHTML = `
+                    <td><strong>Hole ${hole.hole}</strong></td>
+                    <td>${hole.par}</td>
+                    <td>-</td>
+                    <td>-</td>
+                `;
+            } else {
+                const avg = (holeStrokes / holeCount).toFixed(2);
+                const toParVal = (avg - hole.par).toFixed(2);
+                const toParDisplay = toParVal > 0 ? `+${toParVal}` : (toParVal == 0 ? "E" : toParVal);
+
+                row.innerHTML = `
+                    <td><strong>Hole ${hole.hole}</strong></td>
+                    <td>${hole.par}</td>
+                    <td><strong>${avg}</strong></td>
+                    <td style="font-weight:bold; color:${toParVal > 0 ? '#1d3557' : (toParVal < 0 ? '#e63946' : '#1a1a1a')}">${toParDisplay}</td>
+                `;
+            }
+
+            holeBody.appendChild(row);
+        });
+    }
+
+    renderStats();
+</script>
+
+</body>
+</html>
