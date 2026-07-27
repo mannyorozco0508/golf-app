@@ -16,7 +16,6 @@
         .header-title { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin: 0; }
         .header-sub { font-size: 0.85rem; color: #666; margin-top: 2px; }
         
-        /* LIVE SITUATION BANNER */
         .live-ticker-box {
             background: #1d3557; color: #ffffff; border-radius: 10px;
             padding: 10px 14px; text-align: center; margin-bottom: 12px;
@@ -42,7 +41,7 @@
 
         .status-badge {
             display: inline-block; padding: 2px 6px; border-radius: 4px;
-            font-size: 0.75rem; font-weight: bold; margin-top: 2px;
+            font-size: 0.75rem; font-weight: bold;
         }
         .badge-up { background-color: #2a9d8f; color: #ffffff; }
         .badge-down { background-color: #e63946; color: #ffffff; }
@@ -175,42 +174,6 @@
         renderScorecard();
     });
 
-    function getPlayerMatchStatus(players, courseData, savedScores, targetPlayerId) {
-        if (players.length < 2) return "";
-        const p1 = players[0];
-        const p2 = players[1];
-
-        let matchStatus = 0; // Positive = p1 up, Negative = p2 up
-        let thru = 0;
-
-        courseData.forEach(hole => {
-            const v1 = savedScores[`p${p1.id}_h${hole.hole}`];
-            const v2 = savedScores[`p${p2.id}_h${hole.hole}`];
-
-            if (v1 && v2 && v1 > 0 && v2 > 0) {
-                const n1 = parseInt(v1, 10) - getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
-                const n2 = parseInt(v2, 10) - getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
-
-                if (n1 < n2) matchStatus += 1;
-                if (n2 < n1) matchStatus -= 1;
-                thru++;
-            }
-        });
-
-        if (thru === 0) return `<span class="status-badge badge-even">AS</span>`;
-
-        if (targetPlayerId === p1.id) {
-            if (matchStatus === 0) return `<span class="status-badge badge-even">AS</span>`;
-            if (matchStatus > 0) return `<span class="status-badge badge-up">${matchStatus}UP</span>`;
-            return `<span class="status-badge badge-down">${Math.abs(matchStatus)}DN</span>`;
-        } else if (targetPlayerId === p2.id) {
-            if (matchStatus === 0) return `<span class="status-badge badge-even">AS</span>`;
-            if (matchStatus < 0) return `<span class="status-badge badge-up">${Math.abs(matchStatus)}UP</span>`;
-            return `<span class="status-badge badge-down">${matchStatus}DN</span>`;
-        }
-        return `<span class="status-badge badge-even">AS</span>`;
-    }
-
     function updateLiveTicker(players, courseData, savedScores, gameFormat) {
         const titleEl = document.getElementById("ticker-title-label");
         const statusEl = document.getElementById("ticker-status-val");
@@ -304,46 +267,69 @@
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        // Header with Live Player Badges (e.g. 1UP, 2DN, AS)
+        // Header
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
         filteredPlayers.forEach(p => {
-            let statusBadgeHtml = "";
-            if (gameFormat === 'nassau' || gameFormat === 'ryder') {
-                statusBadgeHtml = `<br>${getPlayerMatchStatus(players, courseData, savedScores, p.id)}`;
-            } else {
-                // Stroke Play calculation
-                let netTotal = 0, thru = 0;
-                courseData.forEach(hole => {
-                    const val = savedScores[`p${p.id}_h${hole.hole}`];
-                    if (val && val > 0) {
-                        netTotal += parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                        thru++;
-                    }
-                });
-                statusBadgeHtml = `<br><span class="status-badge badge-even">${thru > 0 ? (netTotal >= 0 ? '+' + netTotal : netTotal) : 'E'}</span>`;
+            headRow.innerHTML += `<th>${p.name}</th>`;
+            if (gameFormat === 'nassau' && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
+                headRow.innerHTML += `<th style="width: 50px; font-size:0.75rem; color:#666;">Match</th>`;
             }
-
-            headRow.innerHTML += `<th>${p.name}${statusBadgeHtml}</th>`;
         });
 
-        // Body
+        // Body with Hole-by-Hole Match Status Column
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
+
+        let runningMatchStatus = 0; // Cumulative for hole-by-hole status
 
         courseData.forEach(h => {
             let rowHtml = `<tr><td><strong>${h.hole}</strong></td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td>`;
 
-            filteredPlayers.forEach(p => {
-                const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
+            if (gameFormat === 'nassau' && filteredPlayers.length === 2) {
+                const p1 = filteredPlayers[0];
+                const p2 = filteredPlayers[1];
+                const v1 = savedScores[`p${p1.id}_h${h.hole}`];
+                const v2 = savedScores[`p${p2.id}_h${h.hole}`];
+
+                let holeBadge = `<span class="status-badge badge-even">-</span>`;
+
+                if (v1 && v2 && v1 > 0 && v2 > 0) {
+                    const n1 = parseInt(v1, 10) - getStrokes(h.hcpIndex, parseHcp(p1.hcp));
+                    const n2 = parseInt(v2, 10) - getStrokes(h.hcpIndex, parseHcp(p2.hcp));
+
+                    if (n1 < n2) runningMatchStatus += 1;
+                    if (n2 < n1) runningMatchStatus -= 1;
+
+                    if (runningMatchStatus === 0) {
+                        holeBadge = `<span class="status-badge badge-even">AS</span>`;
+                    } else if (runningMatchStatus > 0) {
+                        holeBadge = `<span class="status-badge badge-up">${runningMatchStatus}UP</span>`;
+                    } else {
+                        holeBadge = `<span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP</span>`;
+                    }
+                }
+
+                const s1 = savedScores[`p${p1.id}_h${h.hole}`] || "";
+                const s2 = savedScores[`p${p2.id}_h${h.hole}`] || "";
+
                 rowHtml += `
-                    <td>
-                        <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
-                               onchange="saveScore(${p.id}, ${h.hole}, this.value)">
-                    </td>
+                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s1}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)"></td>
+                    <td>${holeBadge}</td>
+                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s2}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)"></td>
                 `;
-            });
+            } else {
+                filteredPlayers.forEach(p => {
+                    const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
+                    rowHtml += `
+                        <td>
+                            <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
+                                   onchange="saveScore(${p.id}, ${h.hole}, this.value)">
+                        </td>
+                    `;
+                });
+            }
 
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
