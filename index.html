@@ -88,13 +88,13 @@
 
     <!-- LIVE MATCH SITUATION BANNER -->
     <div class="live-ticker-box">
-        <div class="ticker-title" id="ticker-title-label">LIVE SITUATION</div>
+        <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
         <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
     </div>
 
     <!-- LIVE NASSAU PAYOUT SUMMARY -->
     <div class="nassau-payout-box" id="nassau-payout-container">
-        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Nassau Standings ($10 Stake)</div>
+        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Nassau Standings</div>
         <div id="payout-rows-wrapper"></div>
     </div>
 
@@ -196,7 +196,7 @@
         renderScorecard();
     });
 
-    function updateLiveTicker(players, courseData, savedScores, gameFormat, stake) {
+    function updateLiveTicker(players, courseData, savedScores, gameFormat, stake, scoringType) {
         const titleEl = document.getElementById("ticker-title-label");
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
@@ -213,7 +213,7 @@
             payoutBox.style.display = "block";
             const p1 = players[0];
             const p2 = players[1];
-            titleEl.textContent = `🥊 NASSAU MATCH: ${p1.name} VS ${p2.name}`;
+            titleEl.textContent = `🥊 NASSAU (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
 
             let frontMatch = 0, backMatch = 0, totalMatch = 0;
             let frontThru = 0, backThru = 0;
@@ -223,12 +223,17 @@
                 const v2 = savedScores[`p${p2.id}_h${hole.hole}`];
 
                 if (v1 && v2 && v1 > 0 && v2 > 0) {
-                    const n1 = parseInt(v1, 10) - getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
-                    const n2 = parseInt(v2, 10) - getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
+                    let score1 = parseInt(v1, 10);
+                    let score2 = parseInt(v2, 10);
+
+                    if (scoringType === 'net') {
+                        score1 -= getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
+                        score2 -= getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
+                    }
 
                     let diff = 0;
-                    if (n1 < n2) diff = 1;
-                    if (n2 < n1) diff = -1;
+                    if (score1 < score2) diff = 1;
+                    if (score2 < score1) diff = -1;
 
                     if (idx < 9) { frontMatch += diff; frontThru++; }
                     else { backMatch += diff; backThru++; }
@@ -236,7 +241,6 @@
                 }
             });
 
-            // Calculate dollar amounts for Player 1 (Player 2 is the exact inverse)
             const p1Front = (frontThru > 0) ? (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0)) : 0;
             const p1Back = (backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
             const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
@@ -307,11 +311,12 @@
         const savedScores = currentData.scores || {};
         const gameFormat = currentData.gameFormat || "stroke";
         const stake = currentData.nassauStake || 10;
+        const scoringType = currentData.nassauScoring || "net";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()}`;
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
 
-        updateLiveTicker(players, courseData, savedScores, gameFormat, stake);
+        updateLiveTicker(players, courseData, savedScores, gameFormat, stake, scoringType);
 
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
@@ -330,7 +335,7 @@
             }
         });
 
-        // Body with Large Outside Arrow Match Column
+        // Body with Hole-by-Hole Match Column (Gross vs Net aware)
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
@@ -348,11 +353,16 @@
                 let holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
 
                 if (v1 && v2 && v1 > 0 && v2 > 0) {
-                    const n1 = parseInt(v1, 10) - getStrokes(h.hcpIndex, parseHcp(p1.hcp));
-                    const n2 = parseInt(v2, 10) - getStrokes(h.hcpIndex, parseHcp(p2.hcp));
+                    let score1 = parseInt(v1, 10);
+                    let score2 = parseInt(v2, 10);
 
-                    if (n1 < n2) runningMatchStatus += 1;
-                    if (n2 < n1) runningMatchStatus -= 1;
+                    if (scoringType === 'net') {
+                        score1 -= getStrokes(h.hcpIndex, parseHcp(p1.hcp));
+                        score2 -= getStrokes(h.hcpIndex, parseHcp(p2.hcp));
+                    }
+
+                    if (score1 < score2) runningMatchStatus += 1;
+                    if (score2 < score1) runningMatchStatus -= 1;
 
                     if (runningMatchStatus === 0) {
                         holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
@@ -364,12 +374,12 @@
                 }
 
                 const s1 = savedScores[`p${p1.id}_h${h.hole}`] || "";
-                const s2 = savedScores[`p${p1.id}_h${h.hole}`] ? (savedScores[`p${p2.id}_h${h.hole}`] || "") : (savedScores[`p${p2.id}_h${h.hole}`] || "");
+                const s2 = savedScores[`p${p2.id}_h${h.hole}`] || "";
 
                 rowHtml += `
-                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${savedScores[`p${p1.id}_h${h.hole}`] || ''}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)"></td>
+                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s1}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)"></td>
                     <td>${holeBadge}</td>
-                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${savedScores[`p${p2.id}_h${h.hole}`] || ''}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)"></td>
+                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s2}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)"></td>
                 `;
             } else {
                 filteredPlayers.forEach(p => {

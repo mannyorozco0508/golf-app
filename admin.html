@@ -42,7 +42,7 @@
 <body>
 
 <div class="container">
-    <h2>⚙️ Trip & Round Setup</h2>
+    <h2>⚙️ Trip & Round Setup (Admin Controls)</h2>
 
     <div class="mode-box">
         <label style="margin-bottom: 2px;">🔀 Active App Event Mode</label>
@@ -54,9 +54,10 @@
     </div>
 
     <div class="share-box">
-        <h3>📲 Share App with Group</h3>
+        <h3>📲 Share App Link with Friends</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Send this link to your group so they can view leaderboards and enter cart scores safely:</span>
         <div id="qrcode"></div>
-        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy App Link</button>
+        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Friend App Link</button>
     </div>
 
     <div class="form-group">
@@ -112,10 +113,10 @@
             <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
             <div class="grid-3col">
                 <div>
-                    <label style="font-size: 0.75rem;">Match Type</label>
-                    <select id="nassau-type" onchange="renderPlayerList()">
-                        <option value="1v1">1v1 Individual</option>
-                        <option value="team">2v2 Team</option>
+                    <label style="font-size: 0.75rem;">Scoring Type</label>
+                    <select id="nassau-scoring">
+                        <option value="net">Net (HCP)</option>
+                        <option value="gross">Gross (Straight)</option>
                     </select>
                 </div>
                 <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
@@ -307,6 +308,7 @@
 
             if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
             if (data.nassauType) document.getElementById("nassau-type").value = data.nassauType;
+            if (data.nassauScoring) document.getElementById("nassau-scoring").value = data.nassauScoring;
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
@@ -390,6 +392,7 @@
         const selectedCourse = buildMergedCourseData(courseKey);
 
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
+        const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
         const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
         const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
@@ -421,6 +424,7 @@
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
             nassauType: nassauType,
+            nassauScoring: nassauScoring,
             nassauStake: nassauStake,
             nassauPressRule: nassauPressRule,
             wolfPointVal: wolfPointVal,
@@ -452,7 +456,7 @@
 
     function copyAppUrl() {
         const currentUrl = window.location.href.replace('admin.html', 'index.html');
-        navigator.clipboard.writeText(currentUrl).then(() => alert("Copied app link!"));
+        navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
     }
 
     generateQRCode();
