@@ -20,12 +20,12 @@
         input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff; }
         .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
         .player-row { display: grid; gap: 6px; align-items: center; margin-bottom: 10px; }
-        /* Dynamic Grid Layouts */
         .grid-stroke { grid-template-columns: 2fr 1fr 38px; }
         .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
         .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
@@ -110,15 +110,22 @@
 
         <div id="nassau-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
-            <div class="grid-2col">
-                <div><label style="font-size: 0.8rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
+            <div class="grid-3col">
                 <div>
-                    <label style="font-size: 0.8rem;">Press Rule</label>
+                    <label style="font-size: 0.75rem;">Match Type</label>
+                    <select id="nassau-type" onchange="renderPlayerList()">
+                        <option value="1v1">1v1 Individual</option>
+                        <option value="team">2v2 Team</option>
+                    </select>
+                </div>
+                <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
+                <div>
+                    <label style="font-size: 0.75rem;">Press Rule</label>
                     <select id="nassau-press-rule">
-                        <option value="2down">Auto-Press at 2 Down</option>
-                        <option value="1down">Auto-Press at 1 Down</option>
-                        <option value="anytime">Press Any Hole / Manual (e.g. 18th Hole)</option>
-                        <option value="none">No Press Allowed</option>
+                        <option value="2down">Auto @ 2 Down</option>
+                        <option value="1down">Auto @ 1 Down</option>
+                        <option value="anytime">Press Any Hole</option>
+                        <option value="none">No Press</option>
                     </select>
                 </div>
             </div>
@@ -238,6 +245,7 @@
 
     function renderPlayerList() {
         const format = document.getElementById("game-format-select").value;
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const headerRow = document.getElementById("player-header-row");
         const listContainer = document.getElementById("player-list");
         
@@ -249,7 +257,7 @@
         if (format === 'ryder') {
             headerRow.className = "grid-ryder";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
-        } else if (['bestball', 'scramble', 'nassau'].includes(format)) {
+        } else if (['bestball', 'scramble'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
             headerRow.className = "grid-team";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
         } else {
@@ -297,10 +305,8 @@
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
 
-            if (data.gameFormat) {
-                document.getElementById("game-format-select").value = data.gameFormat;
-            }
-
+            if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.nassauType) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
@@ -329,6 +335,7 @@
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value;
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const teamSize = (format === 'scramble') ? 4 : 2;
         const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
@@ -348,7 +355,7 @@
                     <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
                 </select>`;
-        } else if (['bestball', 'scramble', 'nassau'].includes(format)) {
+        } else if (['bestball', 'scramble'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
             gridClass = "grid-team";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
@@ -382,6 +389,7 @@
         const baseEventName = document.getElementById("event-name").value;
         const selectedCourse = buildMergedCourseData(courseKey);
 
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
         const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
         const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
@@ -412,6 +420,7 @@
             activeCourseKey: courseKey,
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
+            nassauType: nassauType,
             nassauStake: nassauStake,
             nassauPressRule: nassauPressRule,
             wolfPointVal: wolfPointVal,
