@@ -27,6 +27,17 @@
             padding: 16px;
             overflow-x: auto;
         }
+        .mode-banner {
+            background-color: #1d3557;
+            color: white;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
         h2 { margin-top: 0; color: #0f4c3a; text-align: center; font-size: 1.3rem; }
         .group-header {
             display: flex;
@@ -85,6 +96,7 @@
 <body>
 
 <div class="container">
+    <div style="text-align: center;"><span class="mode-banner" id="active-mode-tag">...</span></div>
     <h2 id="event-title">⛳ Loading Event...</h2>
     <div class="group-header" id="group-header-info"></div>
 
@@ -142,6 +154,7 @@
         { hole: 16, par: 4, hcpIndex: 10 }, { hole: 17, par: 3, hcpIndex: 16 }, { hole: 18, par: 4, hcpIndex: 4 }
     ];
 
+    let currentActiveMode = "regular";
     let courseData = defaultCourseData;
     let players = [];
     let activeTarget = null;
@@ -177,11 +190,16 @@
     }
 
     db.ref().on('value', (snapshot) => {
-        const data = snapshot.val() || {};
-
-        document.getElementById("event-title").textContent = `⛳ ${data.eventName || "Group Scorecard"}`;
+        const rootData = snapshot.val() || {};
+        currentActiveMode = rootData.active_event_mode || "regular";
         
-        // Render ONLY players currently active in Firebase
+        const modeTag = document.getElementById("active-mode-tag");
+        modeTag.textContent = currentActiveMode === 'regular' ? '🟢 Regular Round Mode' : '⛳ Myrtle Beach Trip Mode';
+
+        const data = (rootData.events && rootData.events[currentActiveMode]) ? rootData.events[currentActiveMode] : {};
+
+        document.getElementById("event-title").textContent = `⛳ ${data.eventName || "Group Scorecard"} - ${data.courseName || ''}`;
+
         players = data.players || [];
         courseData = data.courseData || defaultCourseData;
         const savedScores = data.scores || {};
@@ -312,7 +330,7 @@
     function pressKey(val) {
         if (!activeTarget) return;
 
-        const scoreRef = db.ref(`scores/p${activeTarget.playerId}_h${activeTarget.hole}`);
+        const scoreRef = db.ref(`events/${currentActiveMode}/scores/p${activeTarget.playerId}_h${activeTarget.hole}`);
         if (val === 'clr') {
             scoreRef.remove();
         } else {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trip Setup - Admin</title>
+    <title>Trip & Round Setup - Admin</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -24,6 +24,34 @@
             padding: 20px;
         }
         h2, h3 { color: #0f4c3a; margin-top: 0; }
+        .mode-box {
+            background: #f0f4f8;
+            border: 2px solid #1d3557;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .mode-toggle-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #1d3557;
+            background: #ffffff;
+            color: #1d3557;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .mode-btn.active-mode {
+            background: #1d3557;
+            color: #ffffff;
+        }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
         input[type="text"], select {
@@ -75,7 +103,6 @@
             font-size: 1.1rem;
             cursor: pointer;
         }
-
         .btn-primary {
             width: 100%;
             background-color: #0f4c3a;
@@ -115,6 +142,15 @@
 <div class="container">
     <h2>⚙️ Trip & Round Setup</h2>
 
+    <div class="mode-box">
+        <label style="margin-bottom: 2px;">🔀 Select Active App Event Mode</label>
+        <span style="font-size: 0.8rem; color: #555; display: block;">Choose which event live scorecards & leaderboards should track:</span>
+        <div class="mode-toggle-btns">
+            <button id="mode-btn-regular" class="mode-btn active-mode" onclick="switchMode('regular')">🟢 Regular Round</button>
+            <button id="mode-btn-trip" class="mode-btn" onclick="switchMode('trip')">⛳ Myrtle Beach 2026</button>
+        </div>
+    </div>
+
     <div class="share-box">
         <h3>📲 Share App with Group</h3>
         <div id="qrcode"></div>
@@ -123,20 +159,20 @@
 
     <div class="form-group">
         <label>Trip / Event Name</label>
-        <input type="text" id="event-name" value="Myrtle Beach Trip 2026">
+        <input type="text" id="event-name" value="Weekend Round">
     </div>
 
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
         <select id="course-select">
-            <option value="caledonia">Tue 10/13 AM: Caledonia Golf & Fish Club (Par 70)</option>
-            <option value="trueblue">Tue 10/13 PM: True Blue Golf Club (Par 72)</option>
-            <option value="pinelakes">Wed 10/14 AM: Pine Lakes Country Club (Par 70)</option>
-            <option value="pinehills">Wed 10/14 PM: Myrtlewood - Pine Hills (Par 72)</option>
-            <option value="thistle_cs">Thu 10/15 AM: Thistle - Cameron / Stewart (Par 71)</option>
-            <option value="thistle_mc">Thu 10/15 PM: Thistle - McKay / Cameron (Par 72)</option>
-            <option value="prestwick">Fri 10/16 AM: Prestwick Country Club (Par 72)</option>
-            <option value="manofwar">Fri 10/16 AM (Alt): Man O' War Golf Club (Par 72)</option>
+            <option value="caledonia">Caledonia Golf & Fish Club (Par 70)</option>
+            <option value="trueblue">True Blue Golf Club (Par 72)</option>
+            <option value="pinelakes">Pine Lakes Country Club (Par 70)</option>
+            <option value="pinehills">Myrtlewood - Pine Hills (Par 72)</option>
+            <option value="thistle_cs">Thistle - Cameron / Stewart (Par 71)</option>
+            <option value="thistle_mc">Thistle - McKay / Cameron (Par 72)</option>
+            <option value="prestwick">Prestwick Country Club (Par 72)</option>
+            <option value="manofwar">Man O' War Golf Club (Par 72)</option>
         </select>
     </div>
 
@@ -182,6 +218,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    let currentMode = "regular"; // 'regular' or 'trip'
+
     const coursePresets = {
         caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:3,hcpIndex:5},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
         trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:11},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:6},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
@@ -193,29 +231,45 @@
         manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:5,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:14}] }
     };
 
-    const default4Players = [
-        { id: 101, name: "Player 1", hcp: "0" },
-        { id: 102, name: "Player 2", hcp: "0" },
-        { id: 103, name: "Player 3", hcp: "0" },
-        { id: 104, name: "Player 4", hcp: "0" }
-    ];
+    function loadModeData(modeKey) {
+        currentMode = modeKey;
+        
+        // Highlight active toggle button
+        document.getElementById("mode-btn-regular").className = (modeKey === 'regular') ? "mode-btn active-mode" : "mode-btn";
+        document.getElementById("mode-btn-trip").className = (modeKey === 'trip') ? "mode-btn active-mode" : "mode-btn";
 
-    // Load initial data ONCE when Admin opens
-    db.ref().once('value').then((snapshot) => {
-        const data = snapshot.val() || {};
-        if (data.eventName) document.getElementById("event-name").value = data.eventName.split(" - ")[0] || "Myrtle Beach Trip 2026";
-        if (data.activeCourseKey) document.getElementById("course-select").value = data.activeCourseKey;
-        if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
+        db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            
+            document.getElementById("event-name").value = data.eventName || (modeKey === 'regular' ? 'Weekend Round' : 'Myrtle Beach Trip 2026');
+            if (data.activeCourseKey) document.getElementById("course-select").value = data.activeCourseKey;
+            if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
 
-        const listContainer = document.getElementById("player-list");
-        listContainer.innerHTML = "";
+            const listContainer = document.getElementById("player-list");
+            listContainer.innerHTML = "";
 
-        const initialPlayers = (data.players && data.players.length > 0) ? data.players : default4Players;
+            const initialPlayers = (data.players && data.players.length > 0) ? data.players : [
+                { id: 101, name: "Player 1", hcp: "0" },
+                { id: 102, name: "Player 2", hcp: "0" }
+            ];
 
-        // Force every player slot to load with "0" as the handicap baseline
-        initialPlayers.forEach((p, idx) => {
-            addPlayerRow(p.name || `Player ${idx + 1}`, "0");
+            initialPlayers.forEach((p, idx) => {
+                addPlayerRow(p.name, p.hcp || "0");
+            });
         });
+    }
+
+    function switchMode(newMode) {
+        // Save current active mode preference
+        db.ref("active_event_mode").set(newMode).then(() => {
+            loadModeData(newMode);
+        });
+    }
+
+    // Initialize on page load
+    db.ref("active_event_mode").once('value').then((snapshot) => {
+        const activeMode = snapshot.val() || "regular";
+        loadModeData(activeMode);
     });
 
     function addPlayerRow(name = "", hcp = "0") {
@@ -223,11 +277,9 @@
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const row = document.createElement("div");
         row.className = "player-row";
-        
-        // Strictly force "0" in the HTML input field
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
-            <input type="text" class="p-hcp-input" placeholder="HCP" value="0">
+            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
@@ -251,7 +303,6 @@
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
             
-            // Validate & cap handicap inputs at 36 max
             if (!hcpVal.startsWith("+")) {
                 let numVal = parseFloat(hcpVal);
                 if (isNaN(numVal)) numVal = 0;
@@ -262,22 +313,26 @@
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal });
         });
 
-        db.ref().update({
-            eventName: `${baseEventName} - ${selectedCourse.name}`,
+        // Write ONLY to the currently selected mode path
+        db.ref(`events/${currentMode}`).update({
+            eventName: baseEventName,
             activeCourseKey: courseKey,
+            courseName: selectedCourse.name,
             gameFormat: gameFormat,
             courseData: selectedCourse.data,
             players: playersList
-        }).then(() => {
-            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name}.`);
+        });
+
+        db.ref("active_event_mode").set(currentMode).then(() => {
+            alert(`✅ Saved! ${playersList.length} players activated under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
         }).catch((err) => {
             alert(`Save error: ${err.message}`);
         });
     }
 
     function resetRoundData() {
-        if (confirm("Are you sure you want to clear all entered scores for this active round?")) {
-            db.ref('scores').remove();
+        if (confirm(`Are you sure you want to clear all entered scores for the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}?`)) {
+            db.ref(`events/${currentMode}/scores`).remove();
             alert("Active round scores reset!");
         }
     }
