@@ -12,12 +12,21 @@
             background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a;
         }
         .container { max-width: 800px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 12px; }
-        .header-box { text-align: center; margin-bottom: 12px; }
+        .header-box { text-align: center; margin-bottom: 8px; }
         .header-title { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin: 0; }
         .header-sub { font-size: 0.85rem; color: #666; margin-top: 2px; }
         
+        /* LIVE SITUATION BANNER */
+        .live-ticker-box {
+            background: #1d3557; color: #ffffff; border-radius: 10px;
+            padding: 10px 14px; text-align: center; margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
+        .ticker-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #a8dadc; font-weight: bold; }
+        .ticker-status { font-size: 1.1rem; font-weight: bold; margin-top: 2px; color: #fff; }
+
         .group-filter-bar {
-            display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; margin-bottom: 12px;
+            display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 12px;
             -webkit-overflow-scrolling: touch;
         }
         .group-btn {
@@ -54,7 +63,13 @@
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
     </div>
 
-    <!-- GROUP FILTER BAR FOR SCOREKEEPERS -->
+    <!-- LIVE MATCH SITUATION BANNER -->
+    <div class="live-ticker-box">
+        <div class="ticker-title" id="ticker-title-label">LIVE SITUATION</div>
+        <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
+    </div>
+
+    <!-- GROUP FILTER BAR -->
     <div class="group-filter-bar" id="group-filter-container">
         <button class="group-btn active" onclick="filterGroup('all')">👥 All Players</button>
         <button class="group-btn" onclick="filterGroup(1)">Group 1</button>
@@ -103,6 +118,25 @@
     let activeMode = "regular";
     let currentData = {};
 
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
     function filterGroup(grp) {
         selectedGroup = grp;
         const btns = document.querySelectorAll('.group-btn');
@@ -133,22 +167,102 @@
         renderScorecard();
     });
 
+    function updateLiveTicker(players, courseData, savedScores, gameFormat) {
+        const titleEl = document.getElementById("ticker-title-label");
+        const statusEl = document.getElementById("ticker-status-val");
+
+        if (players.length < 2) {
+            titleEl.textContent = "LIVE STATUS";
+            statusEl.textContent = "Waiting for players...";
+            return;
+        }
+
+        if (gameFormat === 'nassau') {
+            const p1 = players[0];
+            const p2 = players[1];
+            titleEl.textContent = `🥊 NASSAU MATCH: ${p1.name} VS ${p2.name}`;
+
+            let matchStatus = 0;
+            let thru = 0;
+
+            courseData.forEach(hole => {
+                const v1 = savedScores[`p${p1.id}_h${hole.hole}`];
+                const v2 = savedScores[`p${p2.id}_h${hole.hole}`];
+
+                if (v1 && v2 && v1 > 0 && v2 > 0) {
+                    const n1 = parseInt(v1, 10) - getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
+                    const n2 = parseInt(v2, 10) - getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
+
+                    if (n1 < n2) matchStatus += 1;
+                    if (n2 < n1) matchStatus -= 1;
+                    thru++;
+                }
+            });
+
+            if (thru === 0) {
+                statusEl.textContent = "ALL SQUARE (Match Not Started)";
+            } else if (matchStatus === 0) {
+                statusEl.textContent = `ALL SQUARE (Thru ${thru})`;
+            } else if (matchStatus > 0) {
+                statusEl.textContent = `🟢 ${p1.name} is ${matchStatus} UP (Thru ${thru})`;
+            } else {
+                statusEl.textContent = `🟢 ${p2.name} is ${Math.abs(matchStatus)} UP (Thru ${thru})`;
+            }
+
+        } else {
+            // Default Stroke Play Leader
+            titleEl.textContent = "🏆 LIVE LEADER (NET)";
+            let leaderName = "-";
+            let bestNet = 999;
+            let maxThru = 0;
+
+            players.forEach(p => {
+                let netTotal = 0;
+                let thru = 0;
+
+                courseData.forEach(hole => {
+                    const val = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (val && val > 0) {
+                        netTotal += parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        thru++;
+                    }
+                });
+
+                if (thru > maxThru) maxThru = thru;
+
+                if (thru > 0 && netTotal < bestNet) {
+                    bestNet = netTotal;
+                    leaderName = p.name;
+                }
+            });
+
+            if (maxThru === 0) {
+                statusEl.textContent = "Enter Hole 1 Scores Below...";
+            } else {
+                statusEl.textContent = `🥇 ${leaderName} (${bestNet} Net • Thru ${maxThru})`;
+            }
+        }
+    }
+
     function renderScorecard() {
         const players = currentData.players || [];
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
+        const gameFormat = currentData.gameFormat || "stroke";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${currentData.gameFormat ? currentData.gameFormat.toUpperCase() : "STROKE PLAY"}`;
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()}`;
 
-        // Filter players based on group selection (4 players per group)
+        // Live Ticker Update
+        updateLiveTicker(players, courseData, savedScores, gameFormat);
+
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
             const startIdx = (selectedGroup - 1) * 4;
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        // 1. Build Header
+        // Header
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
@@ -156,12 +270,12 @@
             headRow.innerHTML += `<th>${p.name}<br><span style="font-size:0.7rem; font-weight:normal;">(${p.hcp})</span></th>`;
         });
 
-        // 2. Build Body
+        // Body
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
         courseData.forEach(h => {
-            let rowHtml = `<tr><strong><td>${h.hole}</td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td></strong>`;
+            let rowHtml = `<tr><td><strong>${h.hole}</strong></td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td>`;
 
             filteredPlayers.forEach(p => {
                 const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
