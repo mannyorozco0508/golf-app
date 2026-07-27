@@ -68,7 +68,6 @@
             color: white;
             font-weight: bold;
         }
-        /* Bottom Navigation Bar */
         .nav-bar {
             position: fixed;
             bottom: 0;
@@ -124,7 +123,6 @@
     </table>
 </div>
 
-<!-- Bottom Navigation Bar -->
 <div class="nav-bar">
     <a href="index.html" class="nav-item active">📝 Scorecard</a>
     <a href="leaderboard.html" class="nav-item">🏆 Leaderboard</a>
@@ -153,10 +151,10 @@
     ];
 
     const players = [
-        { id: 1, name: "Manny", hcp: -3 },   // Plus handicap stored as negative
-        { id: 2, name: "Joey", hcp: 8 },
-        { id: 3, name: "Jake", hcp: 12 },
-        { id: 4, name: "Brian", hcp: 16 }
+        { id: 1, name: "Manny", hcp: -3, displayHcp: "+3" },
+        { id: 2, name: "Joey", hcp: 8, displayHcp: "8" },
+        { id: 3, name: "Jake", hcp: 12, displayHcp: "12" },
+        { id: 4, name: "Brian", hcp: 16, displayHcp: "16" }
     ];
 
     function getStrokes(hcpIndex, playerHcp) {
@@ -175,14 +173,18 @@
         const tbody = document.getElementById("scorecard-body");
         tbody.innerHTML = "";
 
+        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+
         courseData.forEach((hole) => {
             const row = document.createElement("tr");
-            
             let playerInputs = "";
+
             players.forEach(p => {
+                const val = savedScores[`p${p.id}_h${hole.hole}`] || "";
                 playerInputs += `
                     <td>
-                        <input type="number" min="1" max="15" id="p${p.id}-g-${hole.hole}" oninput="updateAll()" placeholder="-">
+                        <input type="number" min="1" max="15" id="p${p.id}-g-${hole.hole}" 
+                               value="${val}" oninput="updateAll()" placeholder="-">
                         <span id="p${p.id}-n-${hole.hole}">-</span>
                     </td>
                 `;
@@ -202,6 +204,8 @@
                 tbody.appendChild(createSummaryRow("TOTAL", "total"));
             }
         });
+
+        updateAll();
     }
 
     function createSummaryRow(label, type) {
@@ -217,18 +221,25 @@
     }
 
     function updateAll() {
+        const savedScores = {};
+        const leaderboardData = [];
+
         players.forEach(p => {
             let frontG = 0, frontN = 0;
             let backG = 0, backN = 0;
+            let thruHoles = 0;
 
             courseData.forEach(hole => {
-                const gInput = document.getElementById(`p${p.id}-g-${hole.hole}`).value;
+                const inputElem = document.getElementById(`p${p.id}-g-${hole.hole}`);
+                const gInput = inputElem ? inputElem.value : "";
                 const nSpan = document.getElementById(`p${p.id}-n-${hole.hole}`);
 
                 if (gInput && gInput > 0) {
                     const gross = parseInt(gInput, 10);
                     const net = gross - getStrokes(hole.hcpIndex, p.hcp);
                     nSpan.textContent = `(${net})`;
+                    savedScores[`p${p.id}_h${hole.hole}`] = gross;
+                    thruHoles++;
 
                     if (hole.hole <= 9) {
                         frontG += gross;
@@ -238,17 +249,32 @@
                         backN += net;
                     }
                 } else {
-                    nSpan.textContent = "-";
+                    if (nSpan) nSpan.textContent = "-";
                 }
             });
+
+            const totG = frontG + backG;
+            const totN = frontN + backN;
 
             document.getElementById(`p${p.id}-front-gross`).textContent = frontG;
             document.getElementById(`p${p.id}-front-net`).textContent = frontN;
             document.getElementById(`p${p.id}-back-gross`).textContent = backG;
             document.getElementById(`p${p.id}-back-net`).textContent = backN;
-            document.getElementById(`p${p.id}-total-gross`).textContent = frontG + backG;
-            document.getElementById(`p${p.id}-total-net`).textContent = frontN + backN;
+            document.getElementById(`p${p.id}-total-gross`).textContent = totG;
+            document.getElementById(`p${p.id}-total-net`).textContent = totN;
+
+            leaderboardData.push({
+                name: p.name,
+                hcp: p.displayHcp,
+                gross: totG,
+                net: totN,
+                thru: thruHoles,
+                isCurrentPlayer: p.name === "Manny"
+            });
         });
+
+        localStorage.setItem("golfScores", JSON.stringify(savedScores));
+        localStorage.setItem("leaderboardData", JSON.stringify(leaderboardData));
     }
 
     renderScorecard();
