@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skins Tracker</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 16px 16px 90px 16px;
+            color: #1a1a1a;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #0f4c3a;
+            text-align: center;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            background: #eef6f2;
+            border: 2px solid #0f4c3a;
+            color: #0f4c3a;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: #0f4c3a;
+            color: white;
+        }
+        .summary-card {
+            display: flex;
+            justify-content: space-around;
+            background: #eef6f2;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .summary-card div {
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .summary-card span {
+            display: block;
+            font-size: 1.2rem;
+            color: #0f4c3a;
+            margin-top: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 10px 4px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #555;
+            font-size: 0.85rem;
+        }
+        .winner-cell {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .carryover-cell {
+            color: #888;
+            font-style: italic;
+        }
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .nav-item {
+            text-decoration: none;
+            color: #666;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .nav-item.active {
+            color: #0f4c3a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 id="event-title">💰 Skins Game</h2>
+    
+    <div class="tabs">
+        <button class="tab-btn active" id="btn-net" onclick="showMode('net')">Net Skins</button>
+        <button class="tab-btn" id="btn-gross" onclick="showMode('gross')">Gross Skins</button>
+    </div>
+
+    <div class="summary-card" id="skins-summary">
+        <!-- Totals rendered dynamically -->
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>Low Score</th>
+                <th>Skin Winner</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody id="skins-body"></tbody>
+    </table>
+</div>
+
+<div class="nav-bar">
+    <a href="index.html" class="nav-item">📝 Scorecard</a>
+    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
+    <a href="skins.html" class="nav-item active">💰 Skins</a>
+    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+</div>
+
+<script>
+    const courseData = [
+        { hole: 1, par: 4, hcpIndex: 7 },
+        { hole: 2, par: 5, hcpIndex: 1 },
+        { hole: 3, par: 3, hcpIndex: 15 },
+        { hole: 4, par: 4, hcpIndex: 5 },
+        { hole: 5, par: 4, hcpIndex: 11 },
+        { hole: 6, par: 3, hcpIndex: 17 },
+        { hole: 7, par: 4, hcpIndex: 3 },
+        { hole: 8, par: 5, hcpIndex: 9 },
+        { hole: 9, par: 4, hcpIndex: 13 },
+        { hole: 10, par: 4, hcpIndex: 8 },
+        { hole: 11, par: 4, hcpIndex: 2 },
+        { hole: 12, par: 3, hcpIndex: 16 },
+        { hole: 13, par: 5, hcpIndex: 6 },
+        { hole: 14, par: 4, hcpIndex: 12 },
+        { hole: 15, par: 4, hcpIndex: 10 },
+        { hole: 16, par: 3, hcpIndex: 18 },
+        { hole: 17, par: 5, hcpIndex: 4 },
+        { hole: 18, par: 4, hcpIndex: 14 }
+    ];
+
+    const defaultPlayers = [
+        { id: 1, name: "Manny", hcp: "+3" },
+        { id: 2, name: "Joey", hcp: "8" },
+        { id: 3, name: "Jake", hcp: "12" },
+        { id: 4, name: "Brian", hcp: "16" }
+    ];
+
+    let currentMode = 'net';
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) {
+            return -Math.abs(parseFloat(str.substring(1)));
+        }
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function renderSkins(mode) {
+        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
+        document.getElementById("event-title").textContent = `💰 ${eventName} Skins`;
+
+        const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+
+        const tbody = document.getElementById("skins-body");
+        tbody.innerHTML = "";
+
+        const skinTotals = {};
+        players.forEach(p => skinTotals[p.name] = 0);
+
+        let carryover = 0;
+
+        courseData.forEach((hole) => {
+            const scores = [];
+
+            players.forEach(p => {
+                const gross = savedScores[`p${p.id}_h${hole.hole}`];
+                if (gross && gross > 0) {
+                    const numericHcp = parseHcp(p.hcp);
+                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                    scores.push({
+                        player: p.name,
+                        score: mode === 'net' ? net : gross
+                    });
+                }
+            });
+
+            const row = document.createElement("tr");
+
+            // Check if all players in group played the hole
+            if (scores.length < players.length) {
+                row.innerHTML = `
+                    <td><strong>${hole.hole}</strong></td>
+                    <td>${hole.par}</td>
+                    <td class="carryover-cell">-</td>
+                    <td class="carryover-cell">Incomplete</td>
+                    <td>-</td>
+                `;
+            } else {
+                scores.sort((a, b) => a.score - b.score);
+                const lowScore = scores[0].score;
+                const isTie = scores.length > 1 && scores[0].score === scores[1].score;
+
+                if (isTie) {
+                    carryover++;
+                    row.innerHTML = `
+                        <td><strong>${hole.hole}</strong></td>
+                        <td>${hole.par}</td>
+                        <td>${lowScore}</td>
+                        <td class="carryover-cell">Tie (Pushed)</td>
+                        <td class="carryover-cell">--</td>
+                    `;
+                } else {
+                    const winner = scores[0].player;
+                    const skinsWon = 1 + carryover;
+                    skinTotals[winner] += skinsWon;
+                    carryover = 0;
+
+                    row.innerHTML = `
+                        <td><strong>${hole.hole}</strong></td>
+                        <td>${hole.par}</td>
+                        <td><strong>${lowScore}</strong></td>
+                        <td class="winner-cell">${winner}</td>
+                        <td class="winner-cell">+${skinsWon} ${skinsWon === 1 ? 'Skin' : 'Skins'}</td>
+                    `;
+                }
+            }
+
+            tbody.appendChild(row);
+        });
+
+        // Summary Card Top
+        const summaryDiv = document.getElementById("skins-summary");
+        summaryDiv.innerHTML = "";
+        players.forEach(p => {
+            summaryDiv.innerHTML += `
+                <div>
+                    ${p.name}
+                    <span>${skinTotals[p.name]} ⛳</span>
+                </div>
+            `;
+        });
+    }
+
+    function showMode(mode) {
+        currentMode = mode;
+        document.getElementById("btn-net").classList.toggle("active", mode === 'net');
+        document.getElementById("btn-gross").classList.toggle("active", mode === 'gross');
+        renderSkins(mode);
+    }
+
+    showMode('net');
+</script>
+
+</body>
+</html>
