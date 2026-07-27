@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- MOBILE LOCK: Prevents iOS auto-zoom on input tap -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trip & Round Setup - Admin</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
         h2, h3 { color: #0f4c3a; margin-top: 0; }
         .mode-box { background: #f0f4f8; border: 2px solid #1d3557; border-radius: 10px; padding: 14px; margin-bottom: 20px; text-align: center; }
@@ -17,10 +18,22 @@
         .mode-btn.active-mode { background: #1d3557; color: #ffffff; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff; }
+        
+        /* 16PX FONT REQUIREMENT FOR IOS FORMS */
+        input[type="text"], input[type="number"], select { 
+            width: 100%; padding: 10px; border: 1px solid #ccc; 
+            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: #fff; 
+        }
+
         .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
+        
+        /* MOBILE GRIDS */
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        @media (max-width: 480px) {
+            .grid-3col { grid-template-columns: 1fr; gap: 12px; } /* Stacks Nassau options nicely on mobile */
+        }
+
         .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
@@ -31,7 +44,7 @@
         .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
 
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
-        .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+        .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-danger { width: 100%; background-color: #d9534f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; }
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
