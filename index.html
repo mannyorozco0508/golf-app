@@ -39,8 +39,13 @@
         .card-table th, .card-table td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.85rem; }
         .card-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
 
+        .match-cell-container {
+            display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: bold; font-size: 0.85rem;
+        }
+        .match-arrow { font-size: 1.1rem; font-weight: bold; color: #1d3557; }
+
         .status-badge {
-            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            display: inline-block; padding: 3px 8px; border-radius: 4px;
             font-size: 0.75rem; font-weight: bold;
         }
         .badge-up { background-color: #2a9d8f; color: #ffffff; }
@@ -274,11 +279,11 @@
         filteredPlayers.forEach(p => {
             headRow.innerHTML += `<th>${p.name}</th>`;
             if (gameFormat === 'nassau' && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
-                headRow.innerHTML += `<th style="width: 60px; font-size:0.75rem; color:#666;">Match</th>`;
+                headRow.innerHTML += `<th style="width: 80px; font-size:0.75rem; color:#666;">Match</th>`;
             }
         });
 
-        // Body with Arrow Match Status Column
+        // Body with Large Outside Arrow Match Column
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
@@ -293,7 +298,7 @@
                 const v1 = savedScores[`p${p1.id}_h${h.hole}`];
                 const v2 = savedScores[`p${p2.id}_h${h.hole}`];
 
-                let holeBadge = `<span class="status-badge badge-even">-</span>`;
+                let holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
 
                 if (v1 && v2 && v1 > 0 && v2 > 0) {
                     const n1 = parseInt(v1, 10) - getStrokes(h.hcpIndex, parseHcp(p1.hcp));
@@ -303,11 +308,13 @@
                     if (n2 < n1) runningMatchStatus -= 1;
 
                     if (runningMatchStatus === 0) {
-                        holeBadge = `<span class="status-badge badge-even">AS</span>`;
+                        holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
                     } else if (runningMatchStatus > 0) {
-                        holeBadge = `<span class="status-badge badge-up">◄ ${runningMatchStatus}UP</span>`;
+                        // Player 1 is winning -> Arrow points left towards Player 1
+                        holeBadge = `<div class="match-cell-container"><span class="match-arrow">◀</span><span class="status-badge badge-up">${runningMatchStatus}UP</span></div>`;
                     } else {
-                        holeBadge = `<span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP ►</span>`;
+                        // Player 2 is winning -> Arrow points right towards Player 2
+                        holeBadge = `<div class="match-cell-container"><span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP</span><span class="match-arrow">▶</span></div>`;
                     }
                 }
 
