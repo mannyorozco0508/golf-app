@@ -32,118 +32,56 @@
             margin-bottom: 20px;
             text-align: center;
         }
-        .mode-toggle-btns {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
+        .mode-toggle-btns { display: flex; gap: 10px; margin-top: 10px; }
         .mode-btn {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #1d3557;
-            background: #ffffff;
-            color: #1d3557;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            cursor: pointer;
+            flex: 1; padding: 12px; border: 2px solid #1d3557; background: #ffffff;
+            color: #1d3557; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer;
         }
-        .mode-btn.active-mode {
-            background: #1d3557;
-            color: #ffffff;
-        }
+        .mode-btn.active-mode { background: #1d3557; color: #ffffff; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
         input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 1rem;
-            box-sizing: border-box;
-            background-color: #fff;
+            width: 100%; padding: 10px; border: 1px solid #ccc;
+            border-radius: 6px; font-size: 1rem; box-sizing: border-box; background-color: #fff;
         }
         .nine-loop-box {
-            background: #eef6f2;
-            border: 1px solid #2a9d8f;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 10px;
-            display: none;
+            background: #eef6f2; border: 1px solid #2a9d8f;
+            border-radius: 8px; padding: 12px; margin-top: 10px; display: none;
         }
-        .nine-loop-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
+        .nine-loop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .share-box {
-            background: #eef6f2;
-            border: 2px dashed #0f4c3a;
-            border-radius: 10px;
-            padding: 16px;
-            text-align: center;
-            margin-bottom: 20px;
+            background: #eef6f2; border: 2px dashed #0f4c3a;
+            border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px;
         }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
         .player-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 40px;
-            gap: 8px;
+            grid-template-columns: 2fr 1fr 1fr 38px;
+            gap: 6px;
             align-items: center;
             margin-bottom: 10px;
         }
         .btn-add {
-            background-color: #2a9d8f;
-            color: white;
-            border: none;
-            padding: 10px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 16px;
+            background-color: #2a9d8f; color: white; border: none; padding: 10px;
+            font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px;
         }
         .btn-del {
-            background-color: #e63946;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            height: 38px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            cursor: pointer;
+            background-color: #e63946; color: white; border: none; border-radius: 6px;
+            height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer;
         }
         .btn-primary {
-            width: 100%;
-            background-color: #0f4c3a;
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 1rem;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 10px;
+            width: 100%; background-color: #0f4c3a; color: white; border: none;
+            padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px;
         }
         .btn-danger {
-            width: 100%;
-            background-color: #d9534f;
-            color: white;
-            border: none;
-            padding: 10px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 12px;
+            width: 100%; background-color: #d9534f; color: white; border: none;
+            padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px;
         }
         .nav-bar {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: #ffffff; border-top: 1px solid #e0e0e0;
-            display: flex; justify-content: space-around; padding: 12px 0;
+            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
+            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
             box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
         }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
@@ -215,8 +153,8 @@
         <label>Round Game Format</label>
         <select id="game-format-select">
             <option value="stroke">Stroke Play (Gross & Net)</option>
+            <option value="bestball">2-Man Best Ball (Four-Ball)</option>
             <option value="stableford">Net Stableford Points</option>
-            <option value="match">Match Play (Individual / Four-Ball)</option>
             <option value="skins">Skins Game (Gross & Net)</option>
         </select>
     </div>
@@ -224,6 +162,9 @@
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
+    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 38px; gap:6px; font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555;">
+        <span>Name</span><span>HCP</span><span>Team</span><span></span>
+    </div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add Player Slot</button>
 
@@ -357,12 +298,14 @@
             listContainer.innerHTML = "";
 
             const initialPlayers = (data.players && data.players.length > 0) ? data.players : [
-                { id: 101, name: "Player 1", hcp: "0" },
-                { id: 102, name: "Player 2", hcp: "0" }
+                { id: 101, name: "Player 1", hcp: "0", team: "A" },
+                { id: 102, name: "Player 2", hcp: "0", team: "A" },
+                { id: 103, name: "Player 3", hcp: "0", team: "B" },
+                { id: 104, name: "Player 4", hcp: "0", team: "B" }
             ];
 
             initialPlayers.forEach((p, idx) => {
-                addPlayerRow(p.name, p.hcp || "0");
+                addPlayerRow(p.name, p.hcp || "0", p.team || (idx < 2 ? "A" : "B"));
             });
         });
     }
@@ -378,7 +321,7 @@
         loadModeData(activeMode);
     });
 
-    function addPlayerRow(name = "", hcp = "0") {
+    function addPlayerRow(name = "", hcp = "0", team = "A") {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const row = document.createElement("div");
@@ -386,6 +329,12 @@
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
+            <select class="p-team-input">
+                <option value="A" ${team === 'A' ? 'selected' : ''}>Team A</option>
+                <option value="B" ${team === 'B' ? 'selected' : ''}>Team B</option>
+                <option value="C" ${team === 'C' ? 'selected' : ''}>Team C</option>
+                <option value="D" ${team === 'D' ? 'selected' : ''}>Team D</option>
+            </select>
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
@@ -408,6 +357,7 @@
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
+            const teamVal = row.querySelector('.p-team-input').value || "A";
             
             if (!hcpVal.startsWith("+")) {
                 let numVal = parseFloat(hcpVal);
@@ -416,7 +366,7 @@
                 hcpVal = String(numVal);
             }
 
-            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal });
+            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal });
         });
 
         db.ref(`events/${currentMode}`).update({

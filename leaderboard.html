@@ -13,6 +13,7 @@
         }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         h2 { text-align: center; color: #0f4c3a; margin-top: 0; }
+        .format-badge { text-align: center; font-size: 0.8rem; font-weight: bold; background: #eef6f2; color: #0f4c3a; padding: 4px 10px; border-radius: 12px; display: inline-block; margin-bottom: 10px; }
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
         .leaderboard-table th, .leaderboard-table td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; }
         .leaderboard-table th { background: #f8f9fa; color: #444; font-size: 0.85rem; }
@@ -30,17 +31,17 @@
 <body>
 
 <div class="container">
+    <div style="text-align: center;"><span class="format-badge" id="format-badge">Stroke Play</span></div>
     <h2 id="board-title">🏆 Live Leaderboard</h2>
 
     <table class="leaderboard-table">
         <thead>
-            <tr>
+            <tr id="table-headers">
                 <th>Pos</th>
-                <th style="text-align:left;">Player</th>
+                <th style="text-align:left;">Player / Team</th>
                 <th>Thru</th>
                 <th>Net</th>
                 <th>Gross</th>
-                <th>Pts</th>
             </tr>
         </thead>
         <tbody id="leaderboard-body"></tbody>
@@ -89,66 +90,113 @@
     }
 
     db.ref().on('value', (snapshot) => {
-        const data = snapshot.val() || {};
+        const rootData = snapshot.val() || {};
+        const activeMode = rootData.active_event_mode || "regular";
+        const data = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
+
         const players = data.players || [];
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         const gameFormat = data.gameFormat || "stroke";
 
         document.getElementById("board-title").textContent = `🏆 ${data.eventName || "Live Leaderboard"}`;
-
-        let results = players.map(p => {
-            const numericHcp = parseHcp(p.hcp);
-            let grossTotal = 0, netTotal = 0, holesPlayed = 0, stablefordPoints = 0;
-
-            courseData.forEach(hole => {
-                const val = savedScores[`p${p.id}_h${hole.hole}`];
-                if (val && val > 0) {
-                    const gross = parseInt(val, 10);
-                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
-                    grossTotal += gross;
-                    netTotal += net;
-                    holesPlayed++;
-
-                    const netDiff = net - hole.par;
-                    if (netDiff <= -3) stablefordPoints += 5;
-                    else if (netDiff === -2) stablefordPoints += 4;
-                    else if (netDiff === -1) stablefordPoints += 3;
-                    else if (netDiff === 0) stablefordPoints += 2;
-                    else if (netDiff === 1) stablefordPoints += 1;
-                }
-            });
-
-            return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed, pts: stablefordPoints };
-        });
-
-        if (gameFormat === 'stableford') {
-            results.sort((a, b) => b.pts - a.pts);
-        } else {
-            results.sort((a, b) => (a.net || 999) - (b.net || 999));
-        }
+        document.getElementById("format-badge").textContent = gameFormat === 'bestball' ? '2-Man Best Ball (Four-Ball)' : 'Individual Stroke Play';
 
         const tbody = document.getElementById("leaderboard-body");
         tbody.innerHTML = "";
 
-        if (results.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6">No players active.</td></tr>`;
-            return;
-        }
+        if (gameFormat === 'bestball') {
+            // Group players by Team (Team A, Team B, etc.)
+            const teamsMap = {};
+            players.forEach(p => {
+                const teamKey = p.team || "A";
+                if (!teamsMap[teamKey]) teamsMap[teamKey] = [];
+                teamsMap[teamKey].push(p);
+            });
 
-        results.forEach((r, idx) => {
-            const row = document.createElement("tr");
-            if (idx === 0 && r.thru > 0) row.className = "rank-1";
-            row.innerHTML = `
-                <td><strong>${idx + 1}</strong></td>
-                <td class="player-name-cell">${r.name} (${r.hcp})</td>
-                <td>${r.thru === 18 ? 'F' : r.thru}</td>
-                <td><strong>${r.net || '-'}</strong></td>
-                <td>${r.gross || '-'}</td>
-                <td><strong>${r.pts}</strong></td>
-            `;
-            tbody.appendChild(row);
-        });
+            let teamResults = Object.keys(teamsMap).map(teamKey => {
+                const teamPlayers = teamsMap[teamKey];
+                let teamNetTotal = 0;
+                let teamGrossTotal = 0;
+                let holesCompleted = 0;
+
+                courseData.forEach(hole => {
+                    let bestNetForHole = 999;
+                    let bestGrossForHole = 999;
+                    let holePlayedByTeam = false;
+
+                    teamPlayers.forEach(p => {
+                        const val = savedScores[`p${p.id}_h${hole.hole}`];
+                        if (val && val > 0) {
+                            holePlayedByTeam = true;
+                            const gross = parseInt(val, 10);
+                            const net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                            if (net < bestNetForHole) bestNetForHole = net;
+                            if (gross < bestGrossForHole) bestGrossForHole = gross;
+                        }
+                    });
+
+                    if (holePlayedByTeam && bestNetForHole !== 999) {
+                        teamNetTotal += bestNetForHole;
+                        teamGrossTotal += bestGrossForHole;
+                        holesCompleted++;
+                    }
+                });
+
+                const teamNames = teamPlayers.map(p => `${p.name} (${p.hcp})`).join(" & ");
+                return { teamName: `Team ${teamKey}`, playersLabel: teamNames, net: teamNetTotal, gross: teamGrossTotal, thru: holesCompleted };
+            });
+
+            teamResults.sort((a, b) => (a.net || 999) - (b.net || 999));
+
+            teamResults.forEach((r, idx) => {
+                const row = document.createElement("tr");
+                if (idx === 0 && r.thru > 0) row.className = "rank-1";
+                row.innerHTML = `
+                    <td><strong>${idx + 1}</strong></td>
+                    <td class="player-name-cell"><strong>${r.teamName}</strong><br><span style="font-size:0.75rem; color:#666;">${r.playersLabel}</span></td>
+                    <td>${r.thru === 18 ? 'F' : r.thru}</td>
+                    <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
+                    <td>${r.thru > 0 ? r.gross : '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+        } else {
+            // Individual Stroke Play
+            let results = players.map(p => {
+                const numericHcp = parseHcp(p.hcp);
+                let grossTotal = 0, netTotal = 0, holesPlayed = 0;
+
+                courseData.forEach(hole => {
+                    const val = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (val && val > 0) {
+                        const gross = parseInt(val, 10);
+                        const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                        grossTotal += gross;
+                        netTotal += net;
+                        holesPlayed++;
+                    }
+                });
+
+                return { name: p.name, hcp: p.hcp, gross: grossTotal, net: netTotal, thru: holesPlayed };
+            });
+
+            results.sort((a, b) => (a.net || 999) - (b.net || 999));
+
+            results.forEach((r, idx) => {
+                const row = document.createElement("tr");
+                if (idx === 0 && r.thru > 0) row.className = "rank-1";
+                row.innerHTML = `
+                    <td><strong>${idx + 1}</strong></td>
+                    <td class="player-name-cell">${r.name} (${r.hcp})</td>
+                    <td>${r.thru === 18 ? 'F' : r.thru}</td>
+                    <td><strong>${r.thru > 0 ? r.net : '-'}</strong></td>
+                    <td>${r.thru > 0 ? r.gross : '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
     });
 </script>
 
