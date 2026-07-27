@@ -9,7 +9,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f4f6f8;
             margin: 0;
-            padding: 16px 16px 80px 16px;
+            padding: 16px 16px 90px 16px;
             color: #1a1a1a;
         }
         .container {
@@ -28,17 +28,18 @@
         .tabs {
             display: flex;
             justify-content: center;
-            gap: 12px;
+            gap: 8px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         .tab-btn {
             background: #eef6f2;
             border: 2px solid #0f4c3a;
             color: #0f4c3a;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 20px;
             font-weight: bold;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             cursor: pointer;
         }
         .tab-btn.active {
@@ -89,7 +90,7 @@
             text-decoration: none;
             color: #666;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -105,8 +106,9 @@
     <h2 id="event-title">🏆 Leaderboard</h2>
     
     <div class="tabs">
-        <button class="tab-btn active" id="btn-net" onclick="showBoard('net')">Net Standings</button>
-        <button class="tab-btn" id="btn-gross" onclick="showBoard('gross')">Gross Standings</button>
+        <button class="tab-btn active" id="btn-net" onclick="showBoard('net')">Net Total</button>
+        <button class="tab-btn" id="btn-gross" onclick="showBoard('gross')">Gross Total</button>
+        <button class="tab-btn" id="btn-stableford" onclick="showBoard('stableford')">Stableford Pts</button>
     </div>
 
     <table>
@@ -124,37 +126,129 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item active">📝 Scorecard</a>
-    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
+    <a href="index.html" class="nav-item">📝 Scorecard</a>
+    <a href="leaderboard.html" class="nav-item active">🏆 Board</a>
     <a href="skins.html" class="nav-item">💰 Skins</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
-
 <script>
+    const courseData = [
+        { hole: 1, par: 4, hcpIndex: 7 },
+        { hole: 2, par: 5, hcpIndex: 1 },
+        { hole: 3, par: 3, hcpIndex: 15 },
+        { hole: 4, par: 4, hcpIndex: 5 },
+        { hole: 5, par: 4, hcpIndex: 11 },
+        { hole: 6, par: 3, hcpIndex: 17 },
+        { hole: 7, par: 4, hcpIndex: 3 },
+        { hole: 8, par: 5, hcpIndex: 9 },
+        { hole: 9, par: 4, hcpIndex: 13 },
+        { hole: 10, par: 4, hcpIndex: 8 },
+        { hole: 11, par: 4, hcpIndex: 2 },
+        { hole: 12, par: 3, hcpIndex: 16 },
+        { hole: 13, par: 5, hcpIndex: 6 },
+        { hole: 14, par: 4, hcpIndex: 12 },
+        { hole: 15, par: 4, hcpIndex: 10 },
+        { hole: 16, par: 3, hcpIndex: 18 },
+        { hole: 17, par: 5, hcpIndex: 4 },
+        { hole: 18, par: 4, hcpIndex: 14 }
+    ];
+
+    const defaultPlayers = [
+        { id: 1, name: "Manny", hcp: "+3" },
+        { id: 2, name: "Joey", hcp: "8" },
+        { id: 3, name: "Jake", hcp: "12" },
+        { id: 4, name: "Brian", hcp: "16" }
+    ];
+
     let currentMode = 'net';
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) {
+            return -Math.abs(parseFloat(str.substring(1)));
+        }
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function getStablefordPoints(netScore, par) {
+        const diff = netScore - par;
+        if (diff <= -3) return 10; // Double Eagle / Albatross or better
+        if (diff === -2) return 5;  // Eagle
+        if (diff === -1) return 3;  // Birdie
+        if (diff === 0) return 2;   // Par
+        if (diff === 1) return 1;   // Bogey
+        return 0;                   // Double Bogey+
+    }
 
     function renderBoard(mode) {
         const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
         document.getElementById("event-title").textContent = `🏆 ${eventName} Leaderboard`;
 
+        const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+
         const tbody = document.getElementById("leaderboard-body");
         tbody.innerHTML = "";
 
-        const savedData = JSON.parse(localStorage.getItem("leaderboardData")) || [
-            { name: "Manny", hcp: "+3", gross: 0, net: 0, thru: 0, isCurrentPlayer: true },
-            { name: "Joey", hcp: "8", gross: 0, net: 0, thru: 0, isCurrentPlayer: false },
-            { name: "Jake", hcp: "12", gross: 0, net: 0, thru: 0, isCurrentPlayer: false },
-            { name: "Brian", hcp: "16", gross: 0, net: 0, thru: 0, isCurrentPlayer: false }
-        ];
+        const boardData = [];
 
-        const sorted = [...savedData].sort((a, b) => mode === 'net' ? a.net - b.net : a.gross - b.gross);
+        players.forEach(p => {
+            const numericHcp = parseHcp(p.hcp);
+            let totGross = 0;
+            let totNet = 0;
+            let totPoints = 0;
+            let thru = 0;
+
+            courseData.forEach(hole => {
+                const gross = savedScores[`p${p.id}_h${hole.hole}`];
+                if (gross && gross > 0) {
+                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                    totGross += gross;
+                    totNet += net;
+                    totPoints += getStablefordPoints(net, hole.par);
+                    thru++;
+                }
+            });
+
+            boardData.push({
+                name: p.name,
+                hcp: p.hcp,
+                gross: totGross,
+                net: totNet,
+                points: totPoints,
+                thru: thru,
+                isCurrentPlayer: p.id === 1
+            });
+        });
+
+        // Sorting: Stroke play (lowest first), Stableford (highest first)
+        const sorted = [...boardData].sort((a, b) => {
+            if (mode === 'stableford') return b.points - a.points;
+            if (mode === 'gross') return a.gross - b.gross;
+            return a.net - b.net;
+        });
 
         sorted.forEach((p, index) => {
             const row = document.createElement("tr");
             if (p.isCurrentPlayer) row.classList.add("highlight");
 
-            const scoreDisplay = mode === 'net' ? p.net : p.gross;
+            let scoreDisplay = p.net;
+            if (mode === 'gross') scoreDisplay = p.gross;
+            if (mode === 'stableford') scoreDisplay = `${p.points} pts`;
 
             row.innerHTML = `
                 <td class="rank">${index + 1}</td>
@@ -167,15 +261,21 @@
         });
     }
 
-    function showBoard(mode) {
+    function showMode(mode) {
         currentMode = mode;
         document.getElementById("btn-net").classList.toggle("active", mode === 'net');
         document.getElementById("btn-gross").classList.toggle("active", mode === 'gross');
-        document.getElementById("score-header").textContent = mode === 'net' ? "Net Total" : "Gross Total";
+        document.getElementById("btn-stableford").classList.toggle("active", mode === 'stableford');
+        
+        let headerText = "Net Total";
+        if (mode === 'gross') headerText = "Gross Total";
+        if (mode === 'stableford') headerText = "Points";
+
+        document.getElementById("score-header").textContent = headerText;
         renderBoard(mode);
     }
 
-    showBoard('net');
+    showMode('net');
 </script>
 
 </body>
