@@ -63,6 +63,7 @@
             box-sizing: border-box;
             background-color: #fff;
         }
+        optgroup { font-weight: bold; color: #0f4c3a; }
         .share-box {
             background: #eef6f2;
             border: 2px dashed #0f4c3a;
@@ -143,8 +144,8 @@
     <h2>⚙️ Trip & Round Setup</h2>
 
     <div class="mode-box">
-        <label style="margin-bottom: 2px;">🔀 Select Active App Event Mode</label>
-        <span style="font-size: 0.8rem; color: #555; display: block;">Choose which event live scorecards & leaderboards should track:</span>
+        <label style="margin-bottom: 2px;">🔀 Active App Event Mode</label>
+        <span style="font-size: 0.8rem; color: #555; display: block;">Select which event live scorecards & leaderboards should track:</span>
         <div class="mode-toggle-btns">
             <button id="mode-btn-regular" class="mode-btn active-mode" onclick="switchMode('regular')">🟢 Regular Round</button>
             <button id="mode-btn-trip" class="mode-btn" onclick="switchMode('trip')">⛳ Myrtle Beach 2026</button>
@@ -165,14 +166,27 @@
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
         <select id="course-select">
-            <option value="caledonia">Caledonia Golf & Fish Club (Par 70)</option>
-            <option value="trueblue">True Blue Golf Club (Par 72)</option>
-            <option value="pinelakes">Pine Lakes Country Club (Par 70)</option>
-            <option value="pinehills">Myrtlewood - Pine Hills (Par 72)</option>
-            <option value="thistle_cs">Thistle - Cameron / Stewart (Par 71)</option>
-            <option value="thistle_mc">Thistle - McKay / Cameron (Par 72)</option>
-            <option value="prestwick">Prestwick Country Club (Par 72)</option>
-            <option value="manofwar">Man O' War Golf Club (Par 72)</option>
+            <optgroup label="🌲 Puget Sound / Tacoma Area">
+                <option value="chambers">Chambers Bay (Par 72)</option>
+                <option value="homecourse">The Home Course (Par 72)</option>
+                <option value="spanaway">Lake Spanaway Golf Course (Par 72)</option>
+                <option value="eaglespride">Eagle's Pride - Blue/Green (Par 71)</option>
+                <option value="meadowpark">Meadow Park Championship (Par 71)</option>
+                <option value="gold_olympic">Gold Mountain - Olympic (Par 72)</option>
+                <option value="gold_cascade">Gold Mountain - Cascade (Par 72)</option>
+                <option value="trophylake">Trophy Lake Golf & Casting (Par 72)</option>
+                <option value="wanational">Washington National (Par 72)</option>
+            </optgroup>
+            <optgroup label="🌴 Myrtle Beach Trip Courses">
+                <option value="caledonia">Caledonia Golf & Fish Club (Par 70)</option>
+                <option value="trueblue">True Blue Golf Club (Par 72)</option>
+                <option value="pinelakes">Pine Lakes Country Club (Par 70)</option>
+                <option value="pinehills">Myrtlewood - Pine Hills (Par 72)</option>
+                <option value="thistle_cs">Thistle - Cameron / Stewart (Par 71)</option>
+                <option value="thistle_mc">Thistle - McKay / Cameron (Par 72)</option>
+                <option value="prestwick">Prestwick Country Club (Par 72)</option>
+                <option value="manofwar">Man O' War Golf Club (Par 72)</option>
+            </optgroup>
         </select>
     </div>
 
@@ -218,9 +232,21 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let currentMode = "regular"; // 'regular' or 'trip'
+    let currentMode = "regular";
 
     const coursePresets = {
+        // Puget Sound / Tacoma Area
+        chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:11},{hole:2,par:4,hcpIndex:13},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:1},{hole:5,par:4,hcpIndex:7},{hole:6,par:4,hcpIndex:5},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:3},{hole:9,par:3,hcpIndex:17},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:4},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:6}] },
+        homecourse: { name: "The Home Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:11},{hole:10,par:5,hcpIndex:6},{hole:11,par:4,hcpIndex:10},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:8}] },
+        spanaway: { name: "Lake Spanaway Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:3},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:12},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
+        eaglespride: { name: "Eagle's Pride (Blue/Green)", data: [{hole:1,par:4,hcpIndex:12},{hole:2,par:4,hcpIndex:14},{hole:3,par:3,hcpIndex:18},{hole:4,par:4,hcpIndex:2},{hole:5,par:3,hcpIndex:16},{hole:6,par:4,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:4},{hole:9,par:5,hcpIndex:6},{hole:10,par:4,hcpIndex:7},{hole:11,par:3,hcpIndex:9},{hole:12,par:4,hcpIndex:11},{hole:13,par:4,hcpIndex:3},{hole:14,par:5,hcpIndex:5},{hole:15,par:5,hcpIndex:1},{hole:16,par:3,hcpIndex:17},{hole:17,par:4,hcpIndex:15},{hole:18,par:4,hcpIndex:13}] },
+        meadowpark: { name: "Meadow Park Championship", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:15},{hole:3,par:4,hcpIndex:1},{hole:4,par:3,hcpIndex:11},{hole:5,par:4,hcpIndex:17},{hole:6,par:4,hcpIndex:7},{hole:7,par:5,hcpIndex:3},{hole:8,par:3,hcpIndex:13},{hole:9,par:4,hcpIndex:5},{hole:10,par:5,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:12},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        gold_olympic: { name: "Gold Mountain - Olympic", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:5},{hole:3,par:3,hcpIndex:15},{hole:4,par:4,hcpIndex:1},{hole:5,par:3,hcpIndex:17},{hole:6,par:5,hcpIndex:7},{hole:7,par:4,hcpIndex:11},{hole:8,par:4,hcpIndex:13},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:6},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:16},{hole:16,par:4,hcpIndex:8},{hole:17,par:4,hcpIndex:12},{hole:18,par:5,hcpIndex:4}] },
+        gold_cascade: { name: "Gold Mountain - Cascade", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:9},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
+        trophylake: { name: "Trophy Lake Golf & Casting", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:12},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:4},{hole:17,par:4,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
+        wanational: { name: "Washington National", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:7},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
+
+        // Myrtle Beach Trip Presets
         caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:3,hcpIndex:5},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
         trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:11},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:6},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
         pinelakes: { name: "Pine Lakes Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:4,hcpIndex:3},{hole:8,par:4,hcpIndex:9},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:2},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:4},{hole:15,par:5,hcpIndex:10},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
@@ -234,7 +260,6 @@
     function loadModeData(modeKey) {
         currentMode = modeKey;
         
-        // Highlight active toggle button
         document.getElementById("mode-btn-regular").className = (modeKey === 'regular') ? "mode-btn active-mode" : "mode-btn";
         document.getElementById("mode-btn-trip").className = (modeKey === 'trip') ? "mode-btn active-mode" : "mode-btn";
 
@@ -260,13 +285,11 @@
     }
 
     function switchMode(newMode) {
-        // Save current active mode preference
         db.ref("active_event_mode").set(newMode).then(() => {
             loadModeData(newMode);
         });
     }
 
-    // Initialize on page load
     db.ref("active_event_mode").once('value').then((snapshot) => {
         const activeMode = snapshot.val() || "regular";
         loadModeData(activeMode);
@@ -313,7 +336,6 @@
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal });
         });
 
-        // Write ONLY to the currently selected mode path
         db.ref(`events/${currentMode}`).update({
             eventName: baseEventName,
             activeCourseKey: courseKey,
@@ -324,7 +346,7 @@
         });
 
         db.ref("active_event_mode").set(currentMode).then(() => {
-            alert(`✅ Saved! ${playersList.length} players activated under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
+            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
         }).catch((err) => {
             alert(`Save error: ${err.message}`);
         });
