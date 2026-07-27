@@ -24,7 +24,12 @@
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
-        .player-row { display: grid; grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; gap: 4px; align-items: center; margin-bottom: 10px; }
+        .player-row { display: grid; gap: 6px; align-items: center; margin-bottom: 10px; }
+        /* Dynamic Grid Layouts based on format */
+        .grid-stroke { grid-template-columns: 2.2fr 1fr 38px; }
+        .grid-team { grid-template-columns: 2fr 1fr 1.2fr 38px; }
+        .grid-ryder { grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; }
+
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
@@ -83,14 +88,8 @@
         <div id="nine-loop-selector" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🔄 Select Eagle's Pride 9-Hole Loops</label>
             <div class="grid-2col">
-                <div>
-                    <label style="font-size: 0.8rem;">Front 9</label>
-                    <select id="front-nine-select"></select>
-                </div>
-                <div>
-                    <label style="font-size: 0.8rem;">Back 9</label>
-                    <select id="back-nine-select"></select>
-                </div>
+                <div><label style="font-size: 0.8rem;">Front 9</label><select id="front-nine-select"></select></div>
+                <div><label style="font-size: 0.8rem;">Back 9</label><select id="back-nine-select"></select></div>
             </div>
         </div>
     </div>
@@ -101,12 +100,12 @@
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
-            <option value="nassau">Nassau Bet Tracker (Front / Back / Total)</option>
-            <option value="wolf">🐺 Wolf Game Tracker (4 Players)</option>
+            <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
+            <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
             <option value="bestball">2-Man Best Ball (Four-Ball)</option>
             <option value="scramble">4-Man Scramble</option>
             <option value="stableford">Net Stableford Points</option>
-            <option value="skins">Skins Game (Gross & Net)</option>
+            <option value="skins">🥩 Skins Game (Gross & Net)</option>
         </select>
 
         <div id="nassau-settings" class="extra-settings-box">
@@ -142,9 +141,7 @@
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
-    <div style="display:grid; grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; gap:4px; font-weight:bold; font-size:0.75rem; margin-bottom:6px; color:#555;">
-        <span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>
-    </div>
+    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555; display:grid;"></div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add Player Slot</button>
 
@@ -155,7 +152,7 @@
 <div class="nav-bar">
     <a href="index.html" class="nav-item">📝 Card</a>
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
     <a href="admin.html" class="nav-item active">⚙️ Admin</a>
 </div>
@@ -228,6 +225,26 @@
         const format = document.getElementById("game-format-select").value;
         document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        
+        // Update header & row layouts dynamically
+        const headerRow = document.getElementById("player-header-row");
+        const rows = document.querySelectorAll('.player-row');
+
+        if (format === 'ryder') {
+            headerRow.className = "grid-ryder";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
+            rows.forEach(r => r.className = "player-row grid-ryder");
+        } else if (['bestball', 'scramble', 'nassau'].includes(format)) {
+            headerRow.className = "grid-team";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
+            rows.forEach(r => r.className = "player-row grid-team");
+        } else {
+            // Stroke, Wolf, Stableford, Skins
+            headerRow.className = "grid-stroke";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span></span>`;
+            rows.forEach(r => r.className = "player-row grid-stroke");
+        }
+
         updateTeamPairingDefaults();
     }
 
@@ -273,7 +290,6 @@
 
             if (data.gameFormat) {
                 document.getElementById("game-format-select").value = data.gameFormat;
-                handleFormatChange();
             }
 
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
@@ -290,12 +306,11 @@
                 { id: 104, name: "Player 4", hcp: "0", team: "Team 2", squad: "blue" }
             ];
 
-            const format = document.getElementById("game-format-select").value;
-            const teamSize = (format === 'scramble') ? 4 : 2;
-
             initialPlayers.forEach((p, idx) => {
-                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / teamSize) + 1}`, p.squad || (idx % 2 === 0 ? "red" : "blue"));
+                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / 2) + 1}`, p.squad || (idx % 2 === 0 ? "red" : "blue"));
             });
+
+            handleFormatChange();
         });
     }
 
@@ -319,8 +334,12 @@
         let teamOptionsHtml = "";
         teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
 
+        let gridClass = "grid-stroke";
+        if (format === 'ryder') gridClass = "grid-ryder";
+        else if (['bestball', 'scramble', 'nassau'].includes(format)) gridClass = "grid-team";
+
         const row = document.createElement("div");
-        row.className = "player-row";
+        row.className = `player-row ${gridClass}`;
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
@@ -359,8 +378,12 @@
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
-            const teamVal = row.querySelector('.p-team-input').value || "Team 1";
-            const squadVal = row.querySelector('.p-squad-input').value || "red";
+            
+            const teamSelect = row.querySelector('.p-team-input');
+            const squadSelect = row.querySelector('.p-squad-input');
+
+            const teamVal = teamSelect ? teamSelect.value : "Team 1";
+            const squadVal = squadSelect ? squadSelect.value : "red";
             
             if (!hcpVal.startsWith("+")) {
                 let numVal = parseFloat(hcpVal);
