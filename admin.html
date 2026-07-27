@@ -152,6 +152,7 @@
     <div class="form-group">
         <label>Round Game Format</label>
         <select id="game-format-select" onchange="updateTeamPairingDefaults()">
+            <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="bestball">2-Man Best Ball (Four-Ball)</option>
             <option value="scramble">4-Man Scramble</option>
@@ -282,6 +283,8 @@
 
     function updateTeamPairingDefaults() {
         const format = document.getElementById("game-format-select").value;
+        if (!format) return;
+        
         const rows = document.querySelectorAll('.player-row');
         const teamSize = (format === 'scramble') ? 4 : 2;
 
@@ -369,8 +372,15 @@
     }
 
     function saveSettings() {
-        const courseKey = document.getElementById("course-select").value;
         const gameFormat = document.getElementById("game-format-select").value;
+        
+        // POPUP VALIDATION: Ensure game format is selected before proceeding
+        if (!gameFormat) {
+            alert("⚠️ Please select a Round Game Format before saving!");
+            return;
+        }
+
+        const courseKey = document.getElementById("course-select").value;
         const baseEventName = document.getElementById("event-name").value;
         const selectedCourse = buildMergedCourseData(courseKey);
 
