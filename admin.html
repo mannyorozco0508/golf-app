@@ -25,10 +25,10 @@
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
         .player-row { display: grid; gap: 6px; align-items: center; margin-bottom: 10px; }
-        /* Dynamic Grid Layouts based on format */
-        .grid-stroke { grid-template-columns: 2.2fr 1fr 38px; }
-        .grid-team { grid-template-columns: 2fr 1fr 1.2fr 38px; }
-        .grid-ryder { grid-template-columns: 1.8fr 0.8fr 1.1fr 1fr 34px; }
+        /* Dynamic Grid Layouts */
+        .grid-stroke { grid-template-columns: 2fr 1fr 38px; }
+        .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
+        .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
 
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
@@ -113,11 +113,12 @@
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
                 <div>
-                    <label style="font-size: 0.8rem;">Auto-Press When</label>
+                    <label style="font-size: 0.8rem;">Press Rule</label>
                     <select id="nassau-press-rule">
-                        <option value="2down">2 Down</option>
-                        <option value="1down">1 Down</option>
-                        <option value="none">No Auto-Press</option>
+                        <option value="2down">Auto-Press at 2 Down</option>
+                        <option value="1down">Auto-Press at 1 Down</option>
+                        <option value="anytime">Press Any Hole / Manual (e.g. 18th Hole)</option>
+                        <option value="none">No Press Allowed</option>
                     </select>
                 </div>
             </div>
@@ -172,6 +173,7 @@
     const db = firebase.database();
 
     let currentMode = "regular";
+    let storedPlayersTemp = [];
     const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     const nineHoleLoops = {
@@ -221,31 +223,50 @@
         }
     }
 
-    function handleFormatChange() {
-        const format = document.getElementById("game-format-select").value;
-        document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
-        document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
-        
-        // Update header & row layouts dynamically
-        const headerRow = document.getElementById("player-header-row");
+    function captureCurrentPlayerInputs() {
         const rows = document.querySelectorAll('.player-row');
+        const list = [];
+        rows.forEach((row, idx) => {
+            const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : `Player ${idx + 1}`;
+            const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "0";
+            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `Team ${Math.floor(idx / 2) + 1}`;
+            const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
+            list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
+        });
+        return list;
+    }
+
+    function renderPlayerList() {
+        const format = document.getElementById("game-format-select").value;
+        const headerRow = document.getElementById("player-header-row");
+        const listContainer = document.getElementById("player-list");
+        
+        let existingData = captureCurrentPlayerInputs();
+        if (existingData.length === 0) existingData = storedPlayersTemp;
+
+        listContainer.innerHTML = "";
 
         if (format === 'ryder') {
             headerRow.className = "grid-ryder";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
-            rows.forEach(r => r.className = "player-row grid-ryder");
         } else if (['bestball', 'scramble', 'nassau'].includes(format)) {
             headerRow.className = "grid-team";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
-            rows.forEach(r => r.className = "player-row grid-team");
         } else {
-            // Stroke, Wolf, Stableford, Skins
             headerRow.className = "grid-stroke";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span></span>`;
-            rows.forEach(r => r.className = "player-row grid-stroke");
         }
 
-        updateTeamPairingDefaults();
+        existingData.forEach((p, idx) => {
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false);
+        });
+    }
+
+    function handleFormatChange() {
+        const format = document.getElementById("game-format-select").value;
+        document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
+        document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        renderPlayerList();
     }
 
     function buildMergedCourseData(courseKey) {
@@ -262,18 +283,6 @@
         } else {
             return coursePresets[courseKey];
         }
-    }
-
-    function updateTeamPairingDefaults() {
-        const format = document.getElementById("game-format-select").value;
-        if (!format) return;
-        const rows = document.querySelectorAll('.player-row');
-        const teamSize = (format === 'scramble') ? 4 : 2;
-        rows.forEach((row, idx) => {
-            const teamSelect = row.querySelector('.p-team-input');
-            const autoTeamIdx = Math.floor(idx / teamSize);
-            if (teamSelect) teamSelect.value = teamOptions[autoTeamIdx % teamOptions.length];
-        });
     }
 
     function loadModeData(modeKey) {
@@ -296,19 +305,12 @@
             if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
 
-            const listContainer = document.getElementById("player-list");
-            listContainer.innerHTML = "";
-
-            const initialPlayers = (data.players && data.players.length > 0) ? data.players : [
+            storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [
                 { id: 101, name: "Player 1", hcp: "0", team: "Team 1", squad: "red" },
                 { id: 102, name: "Player 2", hcp: "0", team: "Team 1", squad: "blue" },
                 { id: 103, name: "Player 3", hcp: "0", team: "Team 2", squad: "red" },
                 { id: 104, name: "Player 4", hcp: "0", team: "Team 2", squad: "blue" }
             ];
-
-            initialPlayers.forEach((p, idx) => {
-                addPlayerRow(p.name, p.hcp || "0", p.team || `Team ${Math.floor(idx / 2) + 1}`, p.squad || (idx % 2 === 0 ? "red" : "blue"));
-            });
 
             handleFormatChange();
         });
@@ -323,7 +325,7 @@
         loadModeData(activeMode);
     });
 
-    function addPlayerRow(name = "", hcp = "0", team = "", squad = "red") {
+    function addPlayerRow(name = "", hcp = "0", team = "", squad = "red", isNewBtnClick = true) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value;
@@ -335,19 +337,29 @@
         teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
 
         let gridClass = "grid-stroke";
-        if (format === 'ryder') gridClass = "grid-ryder";
-        else if (['bestball', 'scramble', 'nassau'].includes(format)) gridClass = "grid-team";
+        let teamFieldHtml = "";
+        let squadFieldHtml = "";
+
+        if (format === 'ryder') {
+            gridClass = "grid-ryder";
+            teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
+            squadFieldHtml = `
+                <select class="p-squad-input">
+                    <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
+                    <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
+                </select>`;
+        } else if (['bestball', 'scramble', 'nassau'].includes(format)) {
+            gridClass = "grid-team";
+            teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
+        }
 
         const row = document.createElement("div");
         row.className = `player-row ${gridClass}`;
         row.innerHTML = `
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${name || (isNewBtnClick ? 'Player ' + currentCount : '')}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
-            <select class="p-team-input">${teamOptionsHtml}</select>
-            <select class="p-squad-input">
-                <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
-                <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
-            </select>
+            ${teamFieldHtml}
+            ${squadFieldHtml}
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
