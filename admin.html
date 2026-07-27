@@ -76,30 +76,6 @@
             cursor: pointer;
         }
 
-        .custom-course-box {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 16px;
-            display: none;
-        }
-        .hole-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 6px;
-            margin-bottom: 10px;
-        }
-        .hole-input-box {
-            text-align: center;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 4px;
-        }
-        .hole-input-box label { font-size: 0.75rem; margin-bottom: 2px; }
-        .hole-input-box input { padding: 4px; font-size: 0.85rem; text-align: center; }
-
         .btn-primary {
             width: 100%;
             background-color: #0f4c3a;
@@ -152,7 +128,7 @@
 
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
-        <select id="course-select" onchange="toggleCustomCourseForm()">
+        <select id="course-select">
             <option value="caledonia">Tue 10/13 AM: Caledonia Golf & Fish Club (Par 70)</option>
             <option value="trueblue">Tue 10/13 PM: True Blue Golf Club (Par 72)</option>
             <option value="pinelakes">Wed 10/14 AM: Pine Lakes Country Club (Par 70)</option>
@@ -161,22 +137,7 @@
             <option value="thistle_mc">Thu 10/15 PM: Thistle - McKay / Cameron (Par 72)</option>
             <option value="prestwick">Fri 10/16 AM: Prestwick Country Club (Par 72)</option>
             <option value="manofwar">Fri 10/16 AM (Alt): Man O' War Golf Club (Par 72)</option>
-            <option value="custom">➕ Add New Custom Course...</option>
         </select>
-    </div>
-
-    <div class="custom-course-box" id="custom-course-panel">
-        <h3 style="font-size:1rem;">🛠️ Create Custom Course Layout</h3>
-        <div class="form-group">
-            <label>Custom Course Name</label>
-            <input type="text" id="custom-course-name" placeholder="e.g. Chambers Bay">
-        </div>
-        
-        <label>18-Hole Pars</label>
-        <div class="hole-grid" id="par-inputs"></div>
-
-        <label>18-Hole Handicap Indices (1-18 Difficulty)</label>
-        <div class="hole-grid" id="hcp-inputs"></div>
     </div>
 
     <div class="form-group">
@@ -221,13 +182,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const default4Players = [
-        { id: 101, name: "Player 1", hcp: "0" },
-        { id: 102, name: "Player 2", hcp: "0" },
-        { id: 103, name: "Player 3", hcp: "0" },
-        { id: 104, name: "Player 4", hcp: "0" }
-    ];
-
     const coursePresets = {
         caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:3,hcpIndex:5},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
         trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:11},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:6},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
@@ -239,111 +193,84 @@
         manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:5,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:14}] }
     };
 
-    let playersList = [];
+    // Default player list forced to 0 handicaps
+    const default4Players = [
+        { id: 101, name: "Player 1", hcp: "0" },
+        { id: 102, name: "Player 2", hcp: "0" },
+        { id: 103, name: "Player 3", hcp: "0" },
+        { id: 104, name: "Player 4", hcp: "0" }
+    ];
 
-    function initCustomCourseInputs() {
-        const parContainer = document.getElementById("par-inputs");
-        const hcpContainer = document.getElementById("hcp-inputs");
-        parContainer.innerHTML = "";
-        hcpContainer.innerHTML = "";
-
-        for (let i = 1; i <= 18; i++) {
-            parContainer.innerHTML += `
-                <div class="hole-input-box">
-                    <label>H${i}</label>
-                    <input type="number" id="custom-par-${i}" value="4" min="3" max="5">
-                </div>
-            `;
-            hcpContainer.innerHTML += `
-                <div class="hole-input-box">
-                    <label>H${i}</label>
-                    <input type="number" id="custom-hcp-${i}" value="${i}" min="1" max="18">
-                </div>
-            `;
-        }
-    }
-    initCustomCourseInputs();
-
-    function toggleCustomCourseForm() {
-        const selected = document.getElementById("course-select").value;
-        const panel = document.getElementById("custom-course-panel");
-        panel.style.display = (selected === "custom") ? "block" : "none";
-    }
-
-    // Load initial data ONCE on page open
+    // Load initial data ONCE when Admin opens
     db.ref().once('value').then((snapshot) => {
         const data = snapshot.val() || {};
         if (data.eventName) document.getElementById("event-name").value = data.eventName.split(" - ")[0] || "Myrtle Beach Trip 2026";
         if (data.activeCourseKey) document.getElementById("course-select").value = data.activeCourseKey;
         if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
 
-        playersList = (data.players && data.players.length > 0) ? data.players : JSON.parse(JSON.stringify(default4Players));
-        renderPlayerList();
-    });
-
-    function renderPlayerList() {
         const listContainer = document.getElementById("player-list");
         listContainer.innerHTML = "";
-        document.getElementById("player-count").textContent = playersList.length;
 
-        playersList.forEach((p, idx) => {
-            const row = document.createElement("div");
-            row.className = "player-row";
-            row.innerHTML = `
-                <input type="text" id="pname-${idx}" placeholder="Player Name" value="${p.name}" oninput="updatePlayer(${idx}, 'name', this.value)">
-                <input type="text" id="phcp-${idx}" placeholder="HCP" value="${p.hcp}" oninput="updatePlayer(${idx}, 'hcp', this.value)">
-                <button class="btn-del" onclick="removePlayer(${idx})">✕</button>
-            `;
-            listContainer.appendChild(row);
+        const initialPlayers = (data.players && data.players.length > 0) ? data.players : default4Players;
+
+        initialPlayers.forEach((p, idx) => {
+            // Force handicap display to 0 if empty/undefined
+            addPlayerRow(p.name || `Player ${idx + 1}`, "0");
         });
+    });
+
+    function addPlayerRow(name = "", hcp = "0") {
+        const listContainer = document.getElementById("player-list");
+        const currentCount = document.querySelectorAll('.player-row').length + 1;
+        const row = document.createElement("div");
+        row.className = "player-row";
+        row.innerHTML = `
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
+            <input type="text" class="p-hcp-input" placeholder="HCP" value="0">
+            <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
+        `;
+        listContainer.appendChild(row);
+        updateCount();
     }
 
-    function addPlayerRow() {
-        const newNum = playersList.length + 1;
-        playersList.push({ id: Date.now(), name: `Player ${newNum}`, hcp: "0" });
-        renderPlayerList();
-    }
-
-    function updatePlayer(index, field, value) {
-        playersList[index][field] = value;
-    }
-
-    function removePlayer(index) {
-        playersList.splice(index, 1);
-        renderPlayerList();
+    function updateCount() {
+        document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length;
     }
 
     function saveSettings() {
         const courseKey = document.getElementById("course-select").value;
         const gameFormat = document.getElementById("game-format-select").value;
         const baseEventName = document.getElementById("event-name").value;
-        
-        let courseName = "";
-        let courseHoleData = [];
+        const selectedCourse = coursePresets[courseKey];
 
-        if (courseKey === "custom") {
-            courseName = document.getElementById("custom-course-name").value || "Custom Golf Course";
-            for (let i = 1; i <= 18; i++) {
-                const pVal = parseInt(document.getElementById(`custom-par-${i}`).value, 10) || 4;
-                const hVal = parseInt(document.getElementById(`custom-hcp-${i}`).value, 10) || i;
-                courseHoleData.push({ hole: i, par: pVal, hcpIndex: hVal });
+        const rows = document.querySelectorAll('.player-row');
+        const playersList = [];
+
+        rows.forEach((row, idx) => {
+            const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
+            let hcpVal = row.querySelector('.p-hcp-input').value.trim() || "0";
+            
+            // Validate & cap handicap inputs at 36 max
+            if (!hcpVal.startsWith("+")) {
+                let numVal = parseFloat(hcpVal);
+                if (isNaN(numVal)) numVal = 0;
+                if (numVal > 36) numVal = 36;
+                hcpVal = String(numVal);
             }
-        } else {
-            const selectedCourse = coursePresets[courseKey];
-            courseName = selectedCourse.name;
-            courseHoleData = selectedCourse.data;
-        }
 
-        db.ref().set({
-            eventName: `${baseEventName} - ${courseName}`,
+            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal });
+        });
+
+        db.ref().update({
+            eventName: `${baseEventName} - ${selectedCourse.name}`,
             activeCourseKey: courseKey,
             gameFormat: gameFormat,
-            courseData: courseHoleData,
+            courseData: selectedCourse.data,
             players: playersList
         }).then(() => {
-            alert(`✅ Saved! ${playersList.length} players activated for ${courseName}.`);
-        }).catch((error) => {
-            alert(`Error saving: ${error.message}`);
+            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name}.`);
+        }).catch((err) => {
+            alert(`Save error: ${err.message}`);
         });
     }
 
