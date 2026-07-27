@@ -133,7 +133,7 @@
 </div>
 
 <script>
-    const courseData = [
+    const defaultCourseData = [
         { hole: 1, par: 4, hcpIndex: 7 },
         { hole: 2, par: 5, hcpIndex: 1 },
         { hole: 3, par: 3, hcpIndex: 15 },
@@ -186,12 +186,12 @@
 
     function getStablefordPoints(netScore, par) {
         const diff = netScore - par;
-        if (diff <= -3) return 10; // Double Eagle / Albatross or better
-        if (diff === -2) return 5;  // Eagle
-        if (diff === -1) return 3;  // Birdie
-        if (diff === 0) return 2;   // Par
-        if (diff === 1) return 1;   // Bogey
-        return 0;                   // Double Bogey+
+        if (diff <= -3) return 10;
+        if (diff === -2) return 5;
+        if (diff === -1) return 3;
+        if (diff === 0) return 2;
+        if (diff === 1) return 1;
+        return 0;
     }
 
     function renderBoard(mode) {
@@ -199,6 +199,7 @@
         document.getElementById("event-title").textContent = `🏆 ${eventName} Leaderboard`;
 
         const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
         const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
 
         const tbody = document.getElementById("leaderboard-body");
@@ -235,7 +236,6 @@
             });
         });
 
-        // Sorting: Stroke play (lowest first), Stableford (highest first)
         const sorted = [...boardData].sort((a, b) => {
             if (mode === 'stableford') return b.points - a.points;
             if (mode === 'gross') return a.gross - b.gross;

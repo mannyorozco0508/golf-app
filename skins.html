@@ -126,9 +126,7 @@
         <button class="tab-btn" id="btn-gross" onclick="showMode('gross')">Gross Skins</button>
     </div>
 
-    <div class="summary-card" id="skins-summary">
-        <!-- Totals rendered dynamically -->
-    </div>
+    <div class="summary-card" id="skins-summary"></div>
 
     <table>
         <thead>
@@ -152,7 +150,7 @@
 </div>
 
 <script>
-    const courseData = [
+    const defaultCourseData = [
         { hole: 1, par: 4, hcpIndex: 7 },
         { hole: 2, par: 5, hcpIndex: 1 },
         { hole: 3, par: 3, hcpIndex: 15 },
@@ -208,6 +206,7 @@
         document.getElementById("event-title").textContent = `💰 ${eventName} Skins`;
 
         const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
+        const courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
         const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
 
         const tbody = document.getElementById("skins-body");
@@ -235,7 +234,6 @@
 
             const row = document.createElement("tr");
 
-            // Check if all players in group played the hole
             if (scores.length < players.length) {
                 row.innerHTML = `
                     <td><strong>${hole.hole}</strong></td>
@@ -277,7 +275,6 @@
             tbody.appendChild(row);
         });
 
-        // Summary Card Top
         const summaryDiv = document.getElementById("skins-summary");
         summaryDiv.innerHTML = "";
         players.forEach(p => {
