@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Group Scorecard</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -15,7 +20,7 @@
             -webkit-user-select: none;
         }
         .container {
-            max-width: 850px;
+            max-width: 950px;
             margin: 0 auto;
             background: #ffffff;
             border-radius: 12px;
@@ -23,12 +28,7 @@
             padding: 16px;
             overflow-x: auto;
         }
-        h2 {
-            margin-top: 0;
-            color: #0f4c3a;
-            text-align: center;
-            font-size: 1.4rem;
-        }
+        h2 { margin-top: 0; color: #0f4c3a; text-align: center; font-size: 1.3rem; }
         .group-header {
             display: flex;
             justify-content: space-around;
@@ -38,188 +38,59 @@
             margin-bottom: 12px;
             font-size: 0.85rem;
             font-weight: bold;
+            flex-wrap: wrap;
+            gap: 8px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: center;
-            font-size: 0.85rem;
-        }
-        th, td {
-            padding: 6px 3px;
-            border-bottom: 1px solid #e0e0e0;
-            vertical-align: middle;
-        }
-        th {
-            background-color: #f8f9fa;
-            color: #444;
-        }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.85rem; }
+        th, td { padding: 6px 3px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+        th { background-color: #f8f9fa; color: #444; }
 
-        /* --- Score Box Styles --- */
         .score-cell {
-            width: 34px;
-            height: 32px;
-            line-height: 30px;
-            margin: 0 auto;
-            font-size: 1rem;
-            font-weight: bold;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: #fff;
-            cursor: pointer;
-            box-sizing: border-box;
-            display: inline-block;
-            transition: all 0.15s ease;
+            width: 34px; height: 32px; line-height: 30px; margin: 0 auto;
+            font-size: 1rem; font-weight: bold; border: 1px solid #ccc;
+            border-radius: 4px; background-color: #fff; cursor: pointer;
+            box-sizing: border-box; display: inline-block; transition: all 0.15s ease;
         }
-        .score-cell.active-target {
-            border: 2px solid #0f4c3a !important;
-            box-shadow: 0 0 6px rgba(15, 76, 58, 0.4);
-        }
+        .score-cell.active-target { border: 2px solid #0f4c3a !important; box-shadow: 0 0 6px rgba(15, 76, 58, 0.4); }
+        .score-cell.birdie-or-better { border: 2px solid #e63946 !important; border-radius: 50% !important; color: #e63946 !important; background-color: #fdf0f0; }
+        .score-cell.par-score { border: 1px solid #ccc !important; border-radius: 4px !important; color: #1a1a1a !important; background-color: #ffffff; }
+        .score-cell.bogey { border: 2px solid #1d3557 !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #f0f4f8; }
+        .score-cell.double-bogey { border: 2px solid #1d3557 !important; outline: 2px solid #1d3557 !important; outline-offset: 2px !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #e6eef5; }
+        .score-cell.triple-bogey { border: 2px solid #1d3557 !important; outline: 2px solid #1d3557 !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px #1d3557 !important; border-radius: 0px !important; color: #1d3557 !important; background-color: #d8e5f2; }
 
-        /* Birdie or Better: Red Circle */
-        .score-cell.birdie-or-better {
-            border: 2px solid #e63946 !important;
-            border-radius: 50% !important;
-            color: #e63946 !important;
-            background-color: #fdf0f0;
-        }
-
-        /* Par: Clean Black Text */
-        .score-cell.par-score {
-            border: 1px solid #ccc !important;
-            border-radius: 4px !important;
-            color: #1a1a1a !important;
-            background-color: #ffffff;
-        }
-
-        /* Bogey: Blue Single Box */
-        .score-cell.bogey {
-            border: 2px solid #1d3557 !important;
-            border-radius: 0px !important;
-            color: #1d3557 !important;
-            background-color: #f0f4f8;
-        }
-
-        /* Double Bogey: Blue Double Box */
-        .score-cell.double-bogey {
-            border: 2px solid #1d3557 !important;
-            outline: 2px solid #1d3557 !important;
-            outline-offset: 2px !important;
-            border-radius: 0px !important;
-            color: #1d3557 !important;
-            background-color: #e6eef5;
-        }
-
-        /* Triple Bogey+: Blue Triple Box */
-        .score-cell.triple-bogey {
-            border: 2px solid #1d3557 !important;
-            outline: 2px solid #1d3557 !important;
-            outline-offset: 2px !important;
-            box-shadow: 0 0 0 4px #1d3557 !important;
-            border-radius: 0px !important;
-            color: #1d3557 !important;
-            background-color: #d8e5f2;
-        }
-
-        .summary-row {
-            background-color: #eef6f2;
-            font-weight: bold;
-        }
-        .total-row {
-            background-color: #0f4c3a;
-            color: white;
-            font-weight: bold;
-        }
+        .summary-row { background-color: #eef6f2; font-weight: bold; }
+        .total-row { background-color: #0f4c3a; color: white; font-weight: bold; }
 
         .nav-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-around;
-            padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
-            z-index: 100;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #ffffff; border-top: 1px solid #e0e0e0;
+            display: flex; justify-content: space-around; padding: 12px 0;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
         }
-        .nav-item {
-            text-decoration: none;
-            color: #666;
-            font-weight: 600;
-            font-size: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .nav-item.active {
-            color: #0f4c3a;
-        }
+        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
+        .nav-item.active { color: #0f4c3a; }
 
-        /* Quick-Tap Floating Keypad Sheet */
         .keypad-sheet {
-            position: fixed;
-            bottom: 55px;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-            padding: 12px 16px 16px 16px;
-            display: none;
-            z-index: 90;
-            border-top: 2px solid #0f4c3a;
+            position: fixed; bottom: 55px; left: 0; right: 0;
+            background: #ffffff; border-top-left-radius: 16px; border-top-right-radius: 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 16px 16px 16px;
+            display: none; z-index: 90; border-top: 2px solid #0f4c3a;
         }
-        .keypad-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            color: #0f4c3a;
-        }
-        .keypad-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 6px;
-        }
-        .key-btn {
-            background: #eef6f2;
-            border: 1px solid #0f4c3a;
-            color: #0f4c3a;
-            padding: 10px 0;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            text-align: center;
-            cursor: pointer;
-        }
-        .key-btn:active {
-            background: #0f4c3a;
-            color: #fff;
-        }
-        .key-btn.clear-btn {
-            background: #fdf0f0;
-            border-color: #e63946;
-            color: #e63946;
-            font-size: 0.85rem;
-        }
+        .keypad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; font-size: 0.9rem; color: #0f4c3a; }
+        .keypad-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+        .key-btn { background: #eef6f2; border: 1px solid #0f4c3a; color: #0f4c3a; padding: 10px 0; border-radius: 8px; font-size: 1.1rem; font-weight: bold; text-align: center; cursor: pointer; }
+        .key-btn:active { background: #0f4c3a; color: #fff; }
+        .key-btn.clear-btn { background: #fdf0f0; border-color: #e63946; color: #e63946; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 id="event-title">⛳ Myrtle Beach Trip</h2>
-    
+    <h2 id="event-title">⛳ Loading Event...</h2>
     <div class="group-header" id="group-header-info"></div>
 
     <table>
-        <thead>
-            <tr id="table-head-row"></tr>
-        </thead>
+        <thead><tr id="table-head-row"></tr></thead>
         <tbody id="scorecard-body"></tbody>
     </table>
 </div>
@@ -242,51 +113,51 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item active">📝 Scorecard</a>
+    <a href="index.html" class="nav-item active">📝 Card</a>
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
     <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="stats.html" class="nav-item">📊 Stats</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
 <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     const defaultCourseData = [
-        { hole: 1, par: 4, hcpIndex: 7 },
-        { hole: 2, par: 5, hcpIndex: 1 },
-        { hole: 3, par: 3, hcpIndex: 15 },
-        { hole: 4, par: 4, hcpIndex: 5 },
-        { hole: 5, par: 4, hcpIndex: 11 },
-        { hole: 6, par: 3, hcpIndex: 17 },
-        { hole: 7, par: 4, hcpIndex: 3 },
-        { hole: 8, par: 5, hcpIndex: 9 },
-        { hole: 9, par: 4, hcpIndex: 13 },
-        { hole: 10, par: 4, hcpIndex: 8 },
-        { hole: 11, par: 4, hcpIndex: 2 },
-        { hole: 12, par: 3, hcpIndex: 16 },
-        { hole: 13, par: 5, hcpIndex: 6 },
-        { hole: 14, par: 4, hcpIndex: 12 },
-        { hole: 15, par: 4, hcpIndex: 10 },
-        { hole: 16, par: 3, hcpIndex: 18 },
-        { hole: 17, par: 5, hcpIndex: 4 },
-        { hole: 18, par: 4, hcpIndex: 14 }
+        { hole: 1, par: 4, hcpIndex: 9 }, { hole: 2, par: 4, hcpIndex: 11 }, { hole: 3, par: 3, hcpIndex: 17 },
+        { hole: 4, par: 4, hcpIndex: 3 }, { hole: 5, par: 4, hcpIndex: 13 }, { hole: 6, par: 3, hcpIndex: 15 },
+        { hole: 7, par: 4, hcpIndex: 1 }, { hole: 8, par: 5, hcpIndex: 7 }, { hole: 9, par: 3, hcpIndex: 5 },
+        { hole: 10, par: 5, hcpIndex: 8 }, { hole: 11, par: 3, hcpIndex: 18 }, { hole: 12, par: 4, hcpIndex: 14 },
+        { hole: 13, par: 4, hcpIndex: 2 }, { hole: 14, par: 4, hcpIndex: 12 }, { hole: 15, par: 5, hcpIndex: 6 },
+        { hole: 16, par: 4, hcpIndex: 10 }, { hole: 17, par: 3, hcpIndex: 16 }, { hole: 18, par: 4, hcpIndex: 4 }
     ];
 
-    const defaultPlayers = [
-        { id: 1, name: "Manny", hcp: "+3" },
-        { id: 2, name: "Joey", hcp: "8" },
-        { id: 3, name: "Jake", hcp: "12" },
-        { id: 4, name: "Brian", hcp: "16" }
+    const default4Players = [
+        { id: 1, name: "Player 1", hcp: "0" },
+        { id: 2, name: "Player 2", hcp: "0" },
+        { id: 3, name: "Player 3", hcp: "0" },
+        { id: 4, name: "Player 4", hcp: "0" }
     ];
 
-    let courseData = [];
-    let players = [];
+    let courseData = defaultCourseData;
+    let players = default4Players;
     let activeTarget = null;
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
         const str = String(hcpStr).trim();
-        if (str.startsWith("+")) {
-            return -Math.abs(parseFloat(str.substring(1)));
-        }
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
         return parseFloat(str) || 0;
     }
 
@@ -305,50 +176,33 @@
     function applyScoreStyling(elem, grossScore, holePar) {
         elem.className = "score-cell";
         if (!grossScore || grossScore <= 0) return;
-
         const diff = grossScore - holePar;
-
-        if (diff <= -1) {
-            elem.classList.add("birdie-or-better");
-        } else if (diff === 0) {
-            elem.classList.add("par-score");
-        } else if (diff === 1) {
-            elem.classList.add("bogey");
-        } else if (diff === 2) {
-            elem.classList.add("double-bogey");
-        } else if (diff >= 3) {
-            elem.classList.add("triple-bogey");
-        }
+        if (diff <= -1) elem.classList.add("birdie-or-better");
+        else if (diff === 0) elem.classList.add("par-score");
+        else if (diff === 1) elem.classList.add("bogey");
+        else if (diff === 2) elem.classList.add("double-bogey");
+        else if (diff >= 3) elem.classList.add("triple-bogey");
     }
 
-    function renderHeaderAndTableHead() {
-        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
-        document.getElementById("event-title").textContent = `⛳ ${eventName}`;
+    db.ref().on('value', (snapshot) => {
+        const data = snapshot.val() || {};
 
-        players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
-        courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
+        document.getElementById("event-title").textContent = `⛳ ${data.eventName || "Group Scorecard"}`;
+        players = (data.players && data.players.length > 0) ? data.players : default4Players;
+        courseData = data.courseData || defaultCourseData;
+        const savedScores = data.scores || {};
 
         const headerDiv = document.getElementById("group-header-info");
         headerDiv.innerHTML = "";
-        players.forEach(p => {
-            headerDiv.innerHTML += `<div>${p.name} (HCP ${p.hcp})</div>`;
-        });
+        players.forEach(p => headerDiv.innerHTML += `<div>${p.name} (${p.hcp})</div>`);
 
         const headRow = document.getElementById("table-head-row");
         let ths = `<th>Hole</th><th>Par</th><th>HCP</th>`;
-        players.forEach(p => {
-            ths += `<th>${p.name} (G/N)</th>`;
-        });
+        players.forEach(p => ths += `<th>${p.name}</th>`);
         headRow.innerHTML = ths;
-    }
-
-    function renderScorecard() {
-        renderHeaderAndTableHead();
 
         const tbody = document.getElementById("scorecard-body");
         tbody.innerHTML = "";
-
-        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
 
         courseData.forEach((hole) => {
             const row = document.createElement("tr");
@@ -359,7 +213,7 @@
                 playerInputs += `
                     <td>
                         <div class="score-cell" id="cell-p${p.id}-h${hole.hole}" 
-                             onclick="openKeypad(${p.id}, ${hole.hole}, ${hole.par}, '${p.name}')">${val}</div>
+                             onclick="openKeypad('${p.id}', ${hole.hole}, ${hole.par}, '${p.name}')">${val}</div>
                         <span id="p${p.id}-n-${hole.hole}">-</span>
                     </td>
                 `;
@@ -380,13 +234,12 @@
             }
         });
 
-        updateAll();
-    }
+        calculateTotals(savedScores);
+    });
 
     function createSummaryRow(label, type) {
         const row = document.createElement("tr");
         row.className = type === 'total' ? 'total-row' : 'summary-row';
-        
         let cols = `<td><strong>${label}</strong></td><td>-</td><td>-</td>`;
         players.forEach(p => {
             cols += `<td><span id="p${p.id}-${type}-gross">0</span> / <span id="p${p.id}-${type}-net">0</span></td>`;
@@ -395,12 +248,44 @@
         return row;
     }
 
+    function calculateTotals(savedScores) {
+        players.forEach(p => {
+            const numericHcp = parseHcp(p.hcp);
+            let frontG = 0, frontN = 0, backG = 0, backN = 0;
+
+            courseData.forEach(hole => {
+                const cellElem = document.getElementById(`cell-p${p.id}-h${hole.hole}`);
+                const valText = savedScores[`p${p.id}_h${hole.hole}`];
+                const nSpan = document.getElementById(`p${p.id}-n-${hole.hole}`);
+
+                if (valText && valText > 0) {
+                    const gross = parseInt(valText, 10);
+                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
+                    if (nSpan) nSpan.textContent = `(${net})`;
+                    if (cellElem) applyScoreStyling(cellElem, gross, hole.par);
+
+                    if (hole.hole <= 9) { frontG += gross; frontN += net; }
+                    else { backG += gross; backN += net; }
+                } else {
+                    if (nSpan) nSpan.textContent = "-";
+                    if (cellElem) cellElem.className = "score-cell";
+                }
+            });
+
+            document.getElementById(`p${p.id}-front-gross`).textContent = frontG;
+            document.getElementById(`p${p.id}-front-net`).textContent = frontN;
+            document.getElementById(`p${p.id}-back-gross`).textContent = backG;
+            document.getElementById(`p${p.id}-back-net`).textContent = backN;
+            document.getElementById(`p${p.id}-total-gross`).textContent = frontG + backG;
+            document.getElementById(`p${p.id}-total-net`).textContent = frontN + backN;
+        });
+    }
+
     function openKeypad(playerId, hole, par, playerName) {
         if (activeTarget) {
             const prevCell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
             if (prevCell) prevCell.classList.remove("active-target");
         }
-
         activeTarget = { playerId, hole, par, playerName };
         const cell = document.getElementById(`cell-p${playerId}-h${hole}`);
         if (cell) cell.classList.add("active-target");
@@ -421,17 +306,14 @@
     function pressKey(val) {
         if (!activeTarget) return;
 
-        const cell = document.getElementById(`cell-p${activeTarget.playerId}-h${activeTarget.hole}`);
-
+        const scoreRef = db.ref(`scores/p${activeTarget.playerId}_h${activeTarget.hole}`);
         if (val === 'clr') {
-            cell.textContent = "-";
+            scoreRef.remove();
         } else {
-            cell.textContent = val;
+            scoreRef.set(val);
         }
 
-        updateAll();
-
-        let nextPlayerIdx = players.findIndex(p => p.id === activeTarget.playerId) + 1;
+        let nextPlayerIdx = players.findIndex(p => String(p.id) === String(activeTarget.playerId)) + 1;
         let nextHole = activeTarget.hole;
 
         if (nextPlayerIdx < players.length) {
@@ -443,69 +325,6 @@
             closeKeypad();
         }
     }
-
-    function updateAll() {
-        const savedScores = {};
-        const leaderboardData = [];
-
-        players.forEach(p => {
-            const numericHcp = parseHcp(p.hcp);
-            let frontG = 0, frontN = 0;
-            let backG = 0, backN = 0;
-            let thruHoles = 0;
-
-            courseData.forEach(hole => {
-                const cellElem = document.getElementById(`cell-p${p.id}-h${hole.hole}`);
-                const valText = cellElem ? cellElem.textContent.trim() : "-";
-                const nSpan = document.getElementById(`p${p.id}-n-${hole.hole}`);
-
-                if (valText !== "-" && valText !== "" && !isNaN(valText)) {
-                    const gross = parseInt(valText, 10);
-                    const net = gross - getStrokes(hole.hcpIndex, numericHcp);
-                    if (nSpan) nSpan.textContent = `(${net})`;
-                    savedScores[`p${p.id}_h${hole.hole}`] = gross;
-                    thruHoles++;
-
-                    if (cellElem) applyScoreStyling(cellElem, gross, hole.par);
-
-                    if (hole.hole <= 9) {
-                        frontG += gross;
-                        frontN += net;
-                    } else {
-                        backG += gross;
-                        backN += net;
-                    }
-                } else {
-                    if (nSpan) nSpan.textContent = "-";
-                    if (cellElem) cellElem.className = "score-cell";
-                }
-            });
-
-            const totG = frontG + backG;
-            const totN = frontN + backN;
-
-            document.getElementById(`p${p.id}-front-gross`).textContent = frontG;
-            document.getElementById(`p${p.id}-front-net`).textContent = frontN;
-            document.getElementById(`p${p.id}-back-gross`).textContent = backG;
-            document.getElementById(`p${p.id}-back-net`).textContent = backN;
-            document.getElementById(`p${p.id}-total-gross`).textContent = totG;
-            document.getElementById(`p${p.id}-total-net`).textContent = totN;
-
-            leaderboardData.push({
-                name: p.name,
-                hcp: p.hcp,
-                gross: totG,
-                net: totN,
-                thru: thruHoles,
-                isCurrentPlayer: p.id === 1
-            });
-        });
-
-        localStorage.setItem("golfScores", JSON.stringify(savedScores));
-        localStorage.setItem("leaderboardData", JSON.stringify(leaderboardData));
-    }
-
-    renderScorecard();
 </script>
 
 </body>
