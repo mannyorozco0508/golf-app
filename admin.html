@@ -9,7 +9,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f4f6f8;
             margin: 0;
-            padding: 16px 16px 80px 16px;
+            padding: 16px 16px 90px 16px;
             color: #1a1a1a;
         }
         .container {
@@ -41,17 +41,37 @@
             font-size: 1rem;
             box-sizing: border-box;
         }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
         .player-row {
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 10px;
             margin-bottom: 10px;
         }
+        
+        /* Course Setup Table */
+        .course-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+        .course-table th, .course-table td {
+            padding: 6px 3px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .course-table th {
+            background-color: #f8f9fa;
+            color: #444;
+        }
+        .course-table input[type="number"] {
+            width: 42px;
+            height: 32px;
+            padding: 4px;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
         button.btn-primary {
             width: 100%;
             background-color: #0f4c3a;
@@ -74,7 +94,7 @@
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            margin-top: 20px;
+            margin-top: 12px;
         }
         .nav-bar {
             position: fixed;
@@ -93,7 +113,7 @@
             text-decoration: none;
             color: #666;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -109,19 +129,31 @@
     <h2>⚙️ Event Setup & Config</h2>
     
     <div class="form-group">
-        <label for="event-name">Event Name</label>
+        <label for="event-name">Event / Course Name</label>
         <input type="text" id="event-name" placeholder="e.g. Myrtle Beach Trip">
     </div>
 
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>👥 Players & Handicaps</h3>
-    <div id="player-inputs">
-        <!-- Dynamic Player Inputs -->
-    </div>
+    <div id="player-inputs"></div>
 
-    <button class="btn-primary" onclick="saveSettings()">💾 Save Event Settings</button>
-    <button class="btn-danger" onclick="resetScores()">🔄 Reset All Scores</button>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h3>⛳ Course Hole Setup (1–18)</h3>
+    <table class="course-table">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                <th>HCP Index</th>
+            </tr>
+        </thead>
+        <tbody id="course-setup-body"></tbody>
+    </table>
+
+    <button class="btn-primary" onclick="saveSettings()">💾 Save All Settings</button>
+    <button class="btn-danger" onclick="resetScores()">🔄 Reset All Round Scores</button>
 </div>
 
 <div class="nav-bar">
@@ -131,8 +163,28 @@
     <a href="admin.html" class="nav-item active">⚙️ Admin</a>
 </div>
 
-
 <script>
+    const defaultCourseData = [
+        { hole: 1, par: 4, hcpIndex: 7 },
+        { hole: 2, par: 5, hcpIndex: 1 },
+        { hole: 3, par: 3, hcpIndex: 15 },
+        { hole: 4, par: 4, hcpIndex: 5 },
+        { hole: 5, par: 4, hcpIndex: 11 },
+        { hole: 6, par: 3, hcpIndex: 17 },
+        { hole: 7, par: 4, hcpIndex: 3 },
+        { hole: 8, par: 5, hcpIndex: 9 },
+        { hole: 9, par: 4, hcpIndex: 13 },
+        { hole: 10, par: 4, hcpIndex: 8 },
+        { hole: 11, par: 4, hcpIndex: 2 },
+        { hole: 12, par: 3, hcpIndex: 16 },
+        { hole: 13, par: 5, hcpIndex: 6 },
+        { hole: 14, par: 4, hcpIndex: 12 },
+        { hole: 15, par: 4, hcpIndex: 10 },
+        { hole: 16, par: 3, hcpIndex: 18 },
+        { hole: 17, par: 5, hcpIndex: 4 },
+        { hole: 18, par: 4, hcpIndex: 14 }
+    ];
+
     const defaultPlayers = [
         { id: 1, name: "Manny", hcp: "+3" },
         { id: 2, name: "Joey", hcp: "8" },
@@ -141,12 +193,14 @@
     ];
 
     function loadSettings() {
+        // Event Name
         const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
         document.getElementById("event-name").value = eventName;
 
+        // Players
         const savedPlayers = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
-        const container = document.getElementById("player-inputs");
-        container.innerHTML = "";
+        const playerContainer = document.getElementById("player-inputs");
+        playerContainer.innerHTML = "";
 
         savedPlayers.forEach((p, idx) => {
             const row = document.createElement("div");
@@ -161,23 +215,53 @@
                     <input type="text" id="p-hcp-${p.id}" value="${p.hcp}" placeholder="e.g. +3 or 12">
                 </div>
             `;
-            container.appendChild(row);
+            playerContainer.appendChild(row);
+        });
+
+        // Course Setup
+        const savedCourse = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
+        const courseBody = document.getElementById("course-setup-body");
+        courseBody.innerHTML = "";
+
+        savedCourse.forEach(hole => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td><strong>Hole ${hole.hole}</strong></td>
+                <td>
+                    <input type="number" id="par-h${hole.hole}" min="3" max="6" value="${hole.par}">
+                </td>
+                <td>
+                    <input type="number" id="hcp-h${hole.hole}" min="1" max="18" value="${hole.hcpIndex}">
+                </td>
+            `;
+            courseBody.appendChild(row);
         });
     }
 
     function saveSettings() {
+        // Save Event Name
         const eventName = document.getElementById("event-name").value || "Myrtle Beach Trip";
         localStorage.setItem("eventName", eventName);
 
+        // Save Players
         const savedPlayers = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
         const updatedPlayers = savedPlayers.map(p => {
             const nameVal = document.getElementById(`p-name-${p.id}`).value || `Player ${p.id}`;
             const hcpVal = document.getElementById(`p-hcp-${p.id}`).value || "0";
             return { id: p.id, name: nameVal, hcp: hcpVal };
         });
-
         localStorage.setItem("golfPlayers", JSON.stringify(updatedPlayers));
-        alert("Settings saved successfully!");
+
+        // Save Course Data
+        const updatedCourse = [];
+        for (let h = 1; h <= 18; h++) {
+            const parVal = parseInt(document.getElementById(`par-h${h}`).value, 10) || 4;
+            const hcpVal = parseInt(document.getElementById(`hcp-h${h}`).value, 10) || h;
+            updatedCourse.push({ hole: h, par: parVal, hcpIndex: hcpVal });
+        }
+        localStorage.setItem("golfCourseData", JSON.stringify(updatedCourse));
+
+        alert("All settings and course details saved!");
     }
 
     function resetScores() {
