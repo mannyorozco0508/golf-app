@@ -165,7 +165,6 @@
         </select>
     </div>
 
-    <!-- Custom Course Builder Panel -->
     <div class="custom-course-box" id="custom-course-panel">
         <h3 style="font-size:1rem;">🛠️ Create Custom Course Layout</h3>
         <div class="form-group">
@@ -223,10 +222,10 @@
     const db = firebase.database();
 
     const default4Players = [
-        { id: 1, name: "Player 1", hcp: "0" },
-        { id: 2, name: "Player 2", hcp: "0" },
-        { id: 3, name: "Player 3", hcp: "0" },
-        { id: 4, name: "Player 4", hcp: "0" }
+        { id: 101, name: "Player 1", hcp: "0" },
+        { id: 102, name: "Player 2", hcp: "0" },
+        { id: 103, name: "Player 3", hcp: "0" },
+        { id: 104, name: "Player 4", hcp: "0" }
     ];
 
     const coursePresets = {
@@ -242,7 +241,6 @@
 
     let playersList = [];
 
-    // Render 18 hole grid inputs for custom course creator
     function initCustomCourseInputs() {
         const parContainer = document.getElementById("par-inputs");
         const hcpContainer = document.getElementById("hcp-inputs");
@@ -272,13 +270,14 @@
         panel.style.display = (selected === "custom") ? "block" : "none";
     }
 
-    db.ref().on('value', (snapshot) => {
+    // Load initial data ONCE on page open
+    db.ref().once('value').then((snapshot) => {
         const data = snapshot.val() || {};
         if (data.eventName) document.getElementById("event-name").value = data.eventName.split(" - ")[0] || "Myrtle Beach Trip 2026";
         if (data.activeCourseKey) document.getElementById("course-select").value = data.activeCourseKey;
         if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
 
-        playersList = (data.players && data.players.length > 0) ? data.players : default4Players;
+        playersList = (data.players && data.players.length > 0) ? data.players : JSON.parse(JSON.stringify(default4Players));
         renderPlayerList();
     });
 
@@ -291,8 +290,8 @@
             const row = document.createElement("div");
             row.className = "player-row";
             row.innerHTML = `
-                <input type="text" placeholder="Player Name" value="${p.name}" onchange="updatePlayer(${idx}, 'name', this.value)">
-                <input type="text" placeholder="HCP (0-36)" value="${p.hcp}" onchange="updatePlayer(${idx}, 'hcp', this.value)">
+                <input type="text" id="pname-${idx}" placeholder="Player Name" value="${p.name}" oninput="updatePlayer(${idx}, 'name', this.value)">
+                <input type="text" id="phcp-${idx}" placeholder="HCP" value="${p.hcp}" oninput="updatePlayer(${idx}, 'hcp', this.value)">
                 <button class="btn-del" onclick="removePlayer(${idx})">✕</button>
             `;
             listContainer.appendChild(row);
@@ -306,20 +305,7 @@
     }
 
     function updatePlayer(index, field, value) {
-        if (field === 'hcp') {
-            let strVal = String(value).trim();
-            if (strVal.startsWith("+")) {
-                playersList[index].hcp = strVal;
-            } else {
-                let numVal = parseFloat(strVal);
-                if (isNaN(numVal)) numVal = 0;
-                if (numVal > 36) numVal = 36;
-                playersList[index].hcp = String(numVal);
-            }
-            renderPlayerList();
-        } else {
-            playersList[index][field] = value;
-        }
+        playersList[index][field] = value;
     }
 
     function removePlayer(index) {
@@ -348,14 +334,16 @@
             courseHoleData = selectedCourse.data;
         }
 
-        db.ref().update({
+        db.ref().set({
             eventName: `${baseEventName} - ${courseName}`,
             activeCourseKey: courseKey,
             gameFormat: gameFormat,
             courseData: courseHoleData,
             players: playersList
         }).then(() => {
-            alert(`Saved! Setup updated with ${playersList.length} players for ${courseName}.`);
+            alert(`✅ Saved! ${playersList.length} players activated for ${courseName}.`);
+        }).catch((error) => {
+            alert(`Error saving: ${error.message}`);
         });
     }
 
