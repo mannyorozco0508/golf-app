@@ -193,7 +193,6 @@
         manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:5,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:14}] }
     };
 
-    // Default player list forced to 0 handicaps
     const default4Players = [
         { id: 101, name: "Player 1", hcp: "0" },
         { id: 102, name: "Player 2", hcp: "0" },
@@ -213,8 +212,8 @@
 
         const initialPlayers = (data.players && data.players.length > 0) ? data.players : default4Players;
 
+        // Force every player slot to load with "0" as the handicap baseline
         initialPlayers.forEach((p, idx) => {
-            // Force handicap display to 0 if empty/undefined
             addPlayerRow(p.name || `Player ${idx + 1}`, "0");
         });
     });
@@ -224,6 +223,8 @@
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const row = document.createElement("div");
         row.className = "player-row";
+        
+        // Strictly force "0" in the HTML input field
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || 'Player ' + currentCount}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="0">
