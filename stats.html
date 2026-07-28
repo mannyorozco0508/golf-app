@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Round Stats</title>
+    
+    <!-- Added Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -103,79 +108,89 @@
     <div class="stats-grid" id="top-overview"></div>
 
     <h3>👥 Player Scoring Breakdown</h3>
-    <table>
-        <thead>
-            <tr>
-                <th style="text-align:left;">Player</th>
-                <th>Birdie+</th>
-                <th>Pars</th>
-                <th>Bogeys</th>
-                <th>Double+</th>
-            </tr>
-        </thead>
-        <tbody id="player-breakdown-body"></tbody>
-    </table>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="text-align:left;">Player</th>
+                    <th>Birdie+</th>
+                    <th>Pars</th>
+                    <th>Bogeys</th>
+                    <th>Double+</th>
+                </tr>
+            </thead>
+            <tbody id="player-breakdown-body"></tbody>
+        </table>
+    </div>
 
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h3>⛳ Group Hole Performance</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Hole</th>
-                <th>Par</th>
-                <th>Group Avg</th>
-                <th>To Par</th>
-            </tr>
-        </thead>
-        <tbody id="hole-stats-body"></tbody>
-    </table>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Hole</th>
+                    <th>Par</th>
+                    <th>Group Avg</th>
+                    <th>To Par</th>
+                </tr>
+            </thead>
+            <tbody id="hole-stats-body"></tbody>
+        </table>
+    </div>
 </div>
 
 <div class="nav-bar">
     <a href="index.html" class="nav-item">📝 Card</a>
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Skins</a>
+    <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item active">📊 Stats</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
 <script>
-    const defaultCourseData = [
-        { hole: 1, par: 4, hcpIndex: 7 },
-        { hole: 2, par: 5, hcpIndex: 1 },
-        { hole: 3, par: 3, hcpIndex: 15 },
-        { hole: 4, par: 4, hcpIndex: 5 },
-        { hole: 5, par: 4, hcpIndex: 11 },
-        { hole: 6, par: 3, hcpIndex: 17 },
-        { hole: 7, par: 4, hcpIndex: 3 },
-        { hole: 8, par: 5, hcpIndex: 9 },
-        { hole: 9, par: 4, hcpIndex: 13 },
-        { hole: 10, par: 4, hcpIndex: 8 },
-        { hole: 11, par: 4, hcpIndex: 2 },
-        { hole: 12, par: 3, hcpIndex: 16 },
-        { hole: 13, par: 5, hcpIndex: 6 },
-        { hole: 14, par: 4, hcpIndex: 12 },
-        { hole: 15, par: 4, hcpIndex: 10 },
-        { hole: 16, par: 3, hcpIndex: 18 },
-        { hole: 17, par: 5, hcpIndex: 4 },
-        { hole: 18, par: 4, hcpIndex: 14 }
-    ];
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
 
-    const defaultPlayers = [
-        { id: 1, name: "Manny", hcp: "+3" },
-        { id: 2, name: "Joey", hcp: "8" },
-        { id: 3, name: "Jake", hcp: "12" },
-        { id: 4, name: "Brian", hcp: "16" }
-    ];
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentStatsData = {};
+
+    // Listen to Firebase instead of LocalStorage
+    db.ref().on('value', (snapshot) => {
+        const rootData = snapshot.val() || {};
+        const activeMode = rootData.active_event_mode || "regular";
+        currentStatsData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
+        renderStats();
+    });
 
     function renderStats() {
-        const eventName = localStorage.getItem("eventName") || "Myrtle Beach Trip";
+        const eventName = currentStatsData.eventName || "Live Round";
         document.getElementById("event-title").textContent = `📊 ${eventName} Stats`;
 
-        const players = JSON.parse(localStorage.getItem("golfPlayers")) || defaultPlayers;
-        const courseData = JSON.parse(localStorage.getItem("golfCourseData")) || defaultCourseData;
-        const savedScores = JSON.parse(localStorage.getItem("golfScores")) || {};
+        const players = currentStatsData.players || [];
+        const courseData = currentStatsData.courseData || [];
+        const savedScores = currentStatsData.scores || {};
+
+        const overviewDiv = document.getElementById("top-overview");
+        const playerBody = document.getElementById("player-breakdown-body");
+        const holeBody = document.getElementById("hole-stats-body");
+
+        if (players.length === 0 || courseData.length === 0) {
+            overviewDiv.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:#666;">No active round data found. Setup round in Admin.</div>`;
+            playerBody.innerHTML = "";
+            holeBody.innerHTML = "";
+            return;
+        }
 
         let totalGroupStrokes = 0;
         let totalHolesPlayed = 0;
@@ -191,8 +206,9 @@
 
         courseData.forEach(hole => {
             players.forEach((p, idx) => {
-                const gross = savedScores[`p${p.id}_h${hole.hole}`];
-                if (gross && gross > 0) {
+                const val = savedScores[`p${p.id}_h${hole.hole}`];
+                if (val && val > 0) {
+                    const gross = parseInt(val, 10);
                     totalGroupStrokes += gross;
                     totalHolesPlayed++;
 
@@ -212,7 +228,6 @@
         });
 
         // Top Overview Cards
-        const overviewDiv = document.getElementById("top-overview");
         const groupAvg = totalHolesPlayed > 0 ? (totalGroupStrokes / (totalHolesPlayed / players.length)).toFixed(1) : "0.0";
         overviewDiv.innerHTML = `
             <div class="stat-card">
@@ -230,7 +245,6 @@
         `;
 
         // Player Breakdown Table
-        const playerBody = document.getElementById("player-breakdown-body");
         playerBody.innerHTML = "";
         playerStats.forEach(p => {
             const row = document.createElement("tr");
@@ -245,17 +259,15 @@
         });
 
         // Hole-by-Hole Group Averages Table
-        const holeBody = document.getElementById("hole-stats-body");
         holeBody.innerHTML = "";
-
         courseData.forEach(hole => {
             let holeStrokes = 0;
             let holeCount = 0;
 
             players.forEach(p => {
-                const gross = savedScores[`p${p.id}_h${hole.hole}`];
-                if (gross && gross > 0) {
-                    holeStrokes += gross;
+                const val = savedScores[`p${p.id}_h${hole.hole}`];
+                if (val && val > 0) {
+                    holeStrokes += parseInt(val, 10);
                     holeCount++;
                 }
             });
@@ -285,8 +297,6 @@
             holeBody.appendChild(row);
         });
     }
-
-    renderStats();
 </script>
 
 </body>
