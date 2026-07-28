@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- MOBILE LOCK: Prevents iOS auto-zoom on input tap -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trip & Round Setup - Admin</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -27,9 +26,7 @@
         .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-        @media (max-width: 480px) {
-            .grid-3col { grid-template-columns: 1fr; gap: 12px; }
-        }
+        @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
 
         .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
@@ -130,6 +127,7 @@
         <select id="game-format-select" onchange="handleFormatChange()">
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
+            <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
             <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
             <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
             <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
@@ -138,6 +136,17 @@
             <option value="stableford">Net Stableford Points</option>
             <option value="skins">🥩 Skins Game (Gross & Net)</option>
         </select>
+
+        <div id="match-settings" class="extra-settings-box">
+            <label style="color:#0f4c3a; margin-bottom: 6px;">🥊 Match Play Options</label>
+            <div>
+                <label style="font-size: 0.75rem;">Scoring Type</label>
+                <select id="match-scoring">
+                    <option value="net">Net (HCP)</option>
+                    <option value="gross">Gross (Straight)</option>
+                </select>
+            </div>
+        </div>
 
         <div id="nassau-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
@@ -324,6 +333,7 @@
         const format = document.getElementById("game-format-select").value;
         document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
         renderPlayerList();
     }
 
@@ -356,6 +366,7 @@
             handleCourseChange();
 
             if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.matchScoring) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.nassauType) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring) document.getElementById("nassau-scoring").value = data.nassauScoring;
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
@@ -440,6 +451,7 @@
         const baseEventName = document.getElementById("event-name").value;
         const selectedCourse = buildMergedCourseData(courseKey);
 
+        const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
@@ -472,6 +484,7 @@
             activeCourseKey: courseKey,
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
+            matchScoring: matchScoring,
             nassauType: nassauType,
             nassauScoring: nassauScoring,
             nassauStake: nassauStake,
