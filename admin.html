@@ -8,10 +8,16 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
         h2, h3 { color: #0f4c3a; margin-top: 0; }
         
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 40px 20px; }
         .lobby-logo { font-size: 3rem; margin-bottom: 10px; }
@@ -30,7 +36,6 @@
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: #fff; 
         }
 
-        /* Searchable Select Styles */
         .custom-select-wrapper { position: relative; }
         .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: #333; pointer-events: none; }
         #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; background-color: #fff; box-sizing: border-box; cursor: text; }
@@ -61,10 +66,6 @@
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-outline { width: 100%; background-color: transparent; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        
-        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; display: none; }
-        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
-        .nav-item.active { color: #0f4c3a; }
     </style>
 </head>
 <body>
@@ -72,19 +73,25 @@
 <div class="container" id="lobby-screen">
     <div class="lobby-logo">⛳</div>
     <div class="lobby-title">GolfApp</div>
-    
     <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Create a private room for your foursome or trip, or join an existing one.</p>
-    
     <button class="btn-primary" onclick="createRoom()">➕ Create New Private Room</button>
-    
     <div class="lobby-divider"><span>OR</span></div>
-    
     <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
-    <div style="text-align: center;">
+    <!-- Top Navigation Bar -->
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
+        <a href="admin.html" class="top-nav-item active nav-link">⚙️ Admin</a>
+    </div>
+
+    <div style="text-align: center; margin-top: 10px;">
         <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Room Code</span>
         <div class="room-badge" id="display-room-code">----</div>
     </div>
@@ -201,18 +208,9 @@
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh. (Archiving is disabled for testing).</span>
+        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh.</span>
         <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
     </div>
-</div>
-
-<div class="nav-bar" id="app-nav-bar">
-    <a href="index.html" class="nav-item nav-link">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
-    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
-    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
-    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
-    <a href="admin.html" class="nav-item nav-link active">⚙️ Admin</a>
 </div>
 
 <script>
@@ -238,12 +236,10 @@
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
-        document.getElementById("app-nav-bar").style.display = "none";
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("admin-screen").style.display = "block";
-        document.getElementById("app-nav-bar").style.display = "flex";
         document.getElementById("display-room-code").textContent = currentMode;
         
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -318,7 +314,6 @@
 
         courseDirectory.forEach(group => {
             const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
-            
             if (filteredItems.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
@@ -327,7 +322,6 @@
                     groupDiv.textContent = group.group;
                     courseDropdown.appendChild(groupDiv);
                 }
-                
                 filteredItems.forEach(item => {
                     const optionDiv = document.createElement("div");
                     optionDiv.className = "custom-select-option";
@@ -535,7 +529,6 @@
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
             } else {
-                // If this is a fresh room, look in local storage for a previously saved trip roster
                 const savedRoster = localStorage.getItem('golfAppRoster');
                 if (savedRoster) {
                     storedPlayersTemp = JSON.parse(savedRoster);
@@ -640,7 +633,6 @@
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
         });
 
-        // Save the active roster to the Admin's phone memory for the next round
         localStorage.setItem('golfAppRoster', JSON.stringify(playersList));
 
         db.ref(`events/${currentMode}`).update({

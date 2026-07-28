@@ -7,10 +7,16 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
         
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+
         .view-toggle-container { display: flex; background: #e0e0e0; border-radius: 8px; padding: 4px; margin-bottom: 12px; }
         .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #555; background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
         .view-toggle-btn.active { background: #ffffff; color: #0f4c3a; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -31,19 +37,24 @@
         .badge-down { background-color: #e63946; color: #ffffff; }
         .badge-even { background-color: #e0e0e0; color: #333333; }
         
-        /* Updated To Par Colors */
-        .to-par-under { color: #e63946; font-weight: bold; } /* Red for Under Par */
-        .to-par-over { color: #1a1a1a; font-weight: bold; }  /* Black for Over Par */
-        .to-par-even { color: #1a1a1a; font-weight: bold; }  /* Black for Even Par */
-
-        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
-        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
-        .nav-item.active { color: #0f4c3a; }
+        .to-par-under { color: #e63946; font-weight: bold; }
+        .to-par-over { color: #1a1a1a; font-weight: bold; }
+        .to-par-even { color: #1a1a1a; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container" id="main-content" style="display: none;">
+    <!-- Top Navigation Bar -->
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item active nav-link">🏆 Board</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Admin</a>
+    </div>
+
     <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
     
     <div class="view-toggle-container" id="format-toggle">
@@ -51,7 +62,6 @@
         <button class="view-toggle-btn" id="btn-team" onclick="switchView('team')">Match (Team/Cart)</button>
     </div>
 
-    <!-- New Gross vs Net Toggle (Only visible in Individual View) -->
     <div class="view-toggle-container" id="scoring-toggle" style="display: flex;">
         <button class="view-toggle-btn active" id="btn-net" onclick="switchScoring('net')">Net (HCP)</button>
         <button class="view-toggle-btn" id="btn-gross" onclick="switchScoring('gross')">Gross</button>
@@ -60,15 +70,6 @@
     <div id="board-content">
         <div style="text-align:center; padding:40px; color:#666;">Loading Leaderboard...</div>
     </div>
-</div>
-
-<div class="nav-bar">
-    <a href="index.html" class="nav-item nav-link">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item nav-link active">🏆 Board</a>
-    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
-    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
-    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
-    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -90,7 +91,7 @@
     let currentBoardData = {};
     
     let activeView = "individual"; 
-    let activeScoring = "net"; // Default individual scoring to Net
+    let activeScoring = "net";
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -163,7 +164,6 @@
         document.getElementById('btn-team').classList.remove('active');
         document.getElementById(`btn-${view}`).classList.add('active');
         
-        // Hide Gross/Net toggle if switching to Team Match Play (Team matches use Admin settings)
         if (view === 'individual') {
             document.getElementById('scoring-toggle').style.display = 'flex';
         } else {
@@ -188,7 +188,6 @@
         const gameFormat = currentBoardData.gameFormat || "stroke";
         const container = document.getElementById("board-content");
         
-        // Match scoring type defaults to admin settings
         let matchScoringType = "net";
         if (gameFormat === 'nassau') matchScoringType = currentBoardData.nassauScoring || "net";
         if (gameFormat === 'match' || gameFormat === 'bestball') matchScoringType = currentBoardData.matchScoring || "net";
@@ -217,14 +216,12 @@
                 let toParGross = gross - parPlayed;
                 let toParNet = net - parPlayed;
                 
-                // Set the display and sorting value based on the user's toggle selection
                 let toParDisplay = activeScoring === 'net' ? toParNet : toParGross;
                 let sortVal = activeScoring === 'net' ? toParNet : toParGross;
                 
                 results.push({ name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru, toPar: toParDisplay, sortVal: sortVal });
             });
 
-            // Sort by the selected scoring format
             results.sort((a, b) => {
                 if (a.thru === 0 && b.thru > 0) return 1;
                 if (b.thru === 0 && a.thru > 0) return -1;

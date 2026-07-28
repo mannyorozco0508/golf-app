@@ -7,48 +7,38 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
-        .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
-        h2 { color: #0f4c3a; margin-top: 0; text-align: center; }
-        .subtitle { font-size: 0.85rem; color: #666; text-align: center; margin-bottom: 20px; margin-top: -10px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
+        .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
         
-        .payout-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-        .payout-title { font-size: 1.1rem; font-weight: bold; color: #0f4c3a; margin-bottom: 12px; text-align: center; border-bottom: 1px solid #d0e1db; padding-bottom: 8px;}
-        
-        .balance-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #ffffff; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; font-weight: bold; }
-        .balance-name { font-size: 1rem; color: #1d3557; }
-        .balance-val { font-size: 1.1rem; }
-        .val-pos { color: #2a9d8f; }
-        .val-neg { color: #e63946; }
-        .val-even { color: #555; }
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
-        .venmo-matrix { margin-top: 20px; background: #fff9e6; border: 2px dashed #f4a261; border-radius: 10px; padding: 16px; }
-        .venmo-title { font-weight: bold; color: #d62828; margin-bottom: 10px; text-align: center; }
-        .venmo-row { display: flex; justify-content: center; font-size: 0.9rem; margin-bottom: 6px; color: #333; }
-
-        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
-        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.7rem; display: flex; flex-direction: column; align-items: center; }
-        .nav-item.active { color: #0f4c3a; }
+        .settle-card { background: #fff0f0; border: 1px solid #e63946; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 16px; }
     </style>
 </head>
 <body>
 
 <div class="container" id="main-content" style="display: none;">
-    <h2>💸 The 19th Hole</h2>
-    <div class="subtitle" id="settlement-subtitle">Calculating payouts...</div>
-
-    <div id="payout-container">
-        <!-- Balances injected here -->
+    <!-- Top Navigation Bar -->
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="settlement.html" class="top-nav-item active nav-link">💸 Settle</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Admin</a>
     </div>
-</div>
 
-<div class="nav-bar">
-    <a href="index.html" class="nav-item nav-link">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
-    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
-    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
-    <a href="settlement.html" class="nav-item nav-link active">💸 Settle</a>
-    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
+    <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
+
+    <div class="settle-card">
+        <h3 style="color: #e63946; margin-top: 0;">Final Ledger</h3>
+        <p style="color: #555; font-size: 0.9rem; margin-bottom: 0;">Debt resolution and payout breakdowns will appear here at the end of the round.</p>
+    </div>
 </div>
 
 <script>
@@ -67,7 +57,6 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
-    let currentData = {};
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -81,155 +70,9 @@
         });
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
-            currentData = snapshot.val() || {};
-            renderSettlement();
+            const data = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `💸 Settle (${data.eventName || "Weekend Round"})`;
         });
-    }
-
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
-    }
-
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
-        } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
-        }
-    }
-
-    function formatMoney(amount) {
-        if (amount > 0) return `<span class="balance-val val-pos">+$${amount}</span>`;
-        if (amount < 0) return `<span class="balance-val val-neg">-$${Math.abs(amount)}</span>`;
-        return `<span class="balance-val val-even">$0</span>`;
-    }
-
-    function renderSettlement() {
-        const players = currentData.players || [];
-        const format = currentData.gameFormat || "stroke";
-        const container = document.getElementById("payout-container");
-        document.getElementById("settlement-subtitle").textContent = `Final Ledger: ${format.toUpperCase()}`;
-
-        if (players.length < 2) {
-            container.innerHTML = `<div style="text-align:center; color:#666;">Need more players to calculate payouts.</div>`;
-            return;
-        }
-
-        let balances = {};
-        players.forEach(p => balances[p.id] = { name: p.name, net: 0 });
-
-        if (format === 'dots') {
-            const dotVal = currentData.dotPointVal || 1;
-            const dotData = currentData.dots || {};
-            let playerDots = {};
-            
-            players.forEach(p => { playerDots[p.id] = parseInt(dotData[`p${p.id}`] || 0, 10); });
-
-            players.forEach(p1 => {
-                players.forEach(p2 => {
-                    if (p1.id !== p2.id) {
-                        balances[p1.id].net += (playerDots[p1.id] * dotVal);
-                        balances[p1.id].net -= (playerDots[p2.id] * dotVal);
-                    }
-                });
-            });
-        } 
-        else if (format === 'nassau') {
-            const stake = currentData.nassauStake || 10;
-            const scoringType = currentData.nassauScoring || "net";
-            const scores = currentData.scores || {};
-            const courseData = currentData.courseData || [];
-            
-            let teams = {};
-            players.forEach(p => {
-                if(!teams[p.team]) teams[p.team] = [];
-                teams[p.team].push(p);
-            });
-            const tKeys = Object.keys(teams);
-
-            if (tKeys.length === 2) {
-                let frontMatch = 0, backMatch = 0, totalMatch = 0;
-                
-                courseData.forEach((hole, idx) => {
-                    let team1Best = 999, team2Best = 999;
-                    let t1Valid = false, t2Valid = false;
-
-                    teams[tKeys[0]].forEach(p => {
-                        let v = scores[`p${p.id}_h${hole.hole}`];
-                        if (v && v > 0) {
-                            let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                            if (s < team1Best) team1Best = s;
-                            t1Valid = true;
-                        }
-                    });
-                    teams[tKeys[1]].forEach(p => {
-                        let v = scores[`p${p.id}_h${hole.hole}`];
-                        if (v && v > 0) {
-                            let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                            if (s < team2Best) team2Best = s;
-                            t2Valid = true;
-                        }
-                    });
-
-                    if (t1Valid && t2Valid) {
-                        let diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
-                        if (idx < 9) frontMatch += diff; else backMatch += diff;
-                        totalMatch += diff;
-                    }
-                });
-
-                let t1Winnings = 0;
-                if (frontMatch > 0) t1Winnings += stake; else if (frontMatch < 0) t1Winnings -= stake;
-                if (backMatch > 0) t1Winnings += stake; else if (backMatch < 0) t1Winnings -= stake;
-                if (totalMatch > 0) t1Winnings += stake; else if (totalMatch < 0) t1Winnings -= stake;
-
-                teams[tKeys[0]].forEach(p => balances[p.id].net += t1Winnings);
-                teams[tKeys[1]].forEach(p => balances[p.id].net -= t1Winnings);
-            }
-        }
-
-        let html = `<div class="payout-card"><div class="payout-title">Player Net Balances</div>`;
-        Object.values(balances).sort((a,b) => b.net - a.net).forEach(b => {
-            html += `<div class="balance-row"><span class="balance-name">${b.name}</span>${formatMoney(b.net)}</div>`;
-        });
-        html += `</div>`;
-
-        let debtors = Object.values(balances).filter(b => b.net < 0).sort((a,b) => a.net - b.net);
-        let creditors = Object.values(balances).filter(b => b.net > 0).sort((a,b) => b.net - a.net);
-        
-        if (debtors.length > 0 && creditors.length > 0) {
-            html += `<div class="venmo-matrix"><div class="venmo-title">🧾 Who Owes Who</div>`;
-            
-            let cIdx = 0;
-            for (let i = 0; i < debtors.length; i++) {
-                let oweAmount = Math.abs(debtors[i].net);
-                while (oweAmount > 0 && cIdx < creditors.length) {
-                    let canTake = creditors[cIdx].net;
-                    if (canTake === 0) { cIdx++; continue; }
-                    
-                    let payAmount = Math.min(oweAmount, canTake);
-                    html += `<div class="venmo-row"><strong>${debtors[i].name}</strong> &nbsp;pays&nbsp; <strong>${creditors[cIdx].name}</strong> &nbsp;$${payAmount}</div>`;
-                    
-                    oweAmount -= payAmount;
-                    creditors[cIdx].net -= payAmount;
-                    if (creditors[cIdx].net === 0) cIdx++;
-                }
-            }
-            html += `</div>`;
-        } else if (format === 'stroke' || format === 'stableford' || format === 'scramble') {
-            html = `<div style="text-align:center; color:#666; padding: 20px;">No betting action configured for ${format.toUpperCase()}.</div>`;
-        } else {
-            html += `<div style="text-align:center; color:#666; margin-top:10px;">All Square! No debts to settle.</div>`;
-        }
-
-        container.innerHTML = html;
     }
 </script>
 
