@@ -210,7 +210,7 @@
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
     <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
-    <a href="admin.html" class="nav-item active">⚙️ Admin</a>
+    <a href="settlement.html" class="nav-item">💸 Settle</a>
 </div>
 
 <script>
@@ -367,14 +367,15 @@
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
 
-            if (data.gameFormat) document.getElementById("game-format-select").value = data.gameFormat;
-            if (data.matchScoring) document.getElementById("match-scoring").value = data.matchScoring;
-            if (data.nassauType) document.getElementById("nassau-type").value = data.nassauType;
-            if (data.nassauScoring) document.getElementById("nassau-scoring").value = data.nassauScoring;
-            if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
-            if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
-            if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
-            if (data.dotPointVal) document.getElementById("dot-point-value").value = data.dotPointVal;
+            // Added safe checks to prevent UI crashes if a setting doesn't exist
+            if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
+            if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
+            if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
+            if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
+            if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
+            if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
+            if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
 
             storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [
                 { id: 101, name: "Player 1", hcp: "0", team: "T-1", squad: "red" },
@@ -458,7 +459,7 @@
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
-        const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
+        const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
         const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
         const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 1;
 
