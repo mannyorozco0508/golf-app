@@ -95,6 +95,7 @@
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
         <select id="course-select" onchange="handleCourseChange()">
+            <option value="" disabled selected>-- Select Golf Course --</option>
             <optgroup label="🌴 Florida (Miami / Hollywood)">
                 <option value="emerald_hills">The Club at Emerald Hills (Par 72)</option>
                 <option value="hollywood_beach">Hollywood Beach Golf Club (Par 70)</option>
@@ -434,8 +435,14 @@
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             document.getElementById("event-name").value = data.eventName || 'Weekend Round';
-            const defaultCourseKey = 'greatriver';
-            document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
+            
+            // Set course to empty if no saved data, else use saved data
+            if (data.activeCourseKey && document.getElementById("course-select").querySelector(`option[value="${data.activeCourseKey}"]`)) {
+                document.getElementById("course-select").value = data.activeCourseKey;
+            } else {
+                document.getElementById("course-select").value = "";
+            }
+            
             handleCourseChange();
 
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
@@ -500,6 +507,9 @@
     function updateCount() { document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; }
 
     function saveSettings() {
+        const courseKey = document.getElementById("course-select").value;
+        if (!courseKey) { alert("⚠️ Please select a Golf Course before saving!"); return; }
+        
         const gameFormat = document.getElementById("game-format-select").value;
         if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); return; }
 
@@ -509,7 +519,6 @@
             return;
         }
 
-        const courseKey = document.getElementById("course-select").value;
         const baseEventName = document.getElementById("event-name").value;
         const selectedCourse = buildMergedCourseData(courseKey);
 
