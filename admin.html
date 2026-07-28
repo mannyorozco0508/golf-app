@@ -226,8 +226,8 @@
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Clear the scorecard for this room to start a new game.</span>
-        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Clear Scores</button>
+        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh. (Archiving is disabled for testing).</span>
+        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
     </div>
 </div>
 
@@ -436,6 +436,7 @@
             const data = snapshot.val() || {};
             document.getElementById("event-name").value = data.eventName || 'Weekend Round';
             
+            // Set course to empty if no saved data, else use saved data
             if (data.activeCourseKey && document.getElementById("course-select").querySelector(`option[value="${data.activeCourseKey}"]`)) {
                 document.getElementById("course-select").value = data.activeCourseKey;
             } else {
@@ -572,11 +573,13 @@
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently clear the live scorecard.`)) {
-            db.ref(`events/${currentMode}/scores`).remove();
-            db.ref(`events/${currentMode}/wolfPicks`).remove();
-            db.ref(`events/${currentMode}/dots`).remove();
-            alert("Scores cleared! Ready for a new game.");
+        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
+            db.ref(`events/${currentMode}`).remove().then(() => {
+                alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
+                window.location.reload(); 
+            }).catch((err) => {
+                alert(`Error clearing room: ${err.message}`);
+            });
         }
     }
 
