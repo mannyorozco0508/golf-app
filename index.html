@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- MOBILE LOCK: Prevents iOS auto-zoom on input tap -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Live Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -11,7 +10,7 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a;
-            -webkit-text-size-adjust: 100%; /* Fixes iOS landscape text resizing */
+            -webkit-text-size-adjust: 100%;
         }
         .container { max-width: 800px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 12px; }
         .header-box { text-align: center; margin-bottom: 8px; }
@@ -32,7 +31,6 @@
         }
         .nassau-payout-title { font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
         
-        /* MOBILE OPTIMIZATION: Wrap payout rows nicely */
         .payout-row { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 6px 10px; background: #ffffff; border-radius: 6px; margin-bottom: 4px; border: 1px solid #d0e1db; font-size: 0.85rem; font-weight: bold; }
         @media (max-width: 400px) { .payout-row { flex-direction: column; text-align: center; gap: 4px; } }
 
@@ -71,7 +69,7 @@
         .score-input {
             width: 38px; height: 34px; text-align: center; font-weight: bold;
             border: 1px solid #ccc; border-radius: 6px; background-color: #fff;
-            font-size: 16px; /* MUST BE 16PX TO PREVENT IOS ZOOM */
+            font-size: 16px; 
         }
         .score-input:focus { border-color: #2a9d8f; outline: none; background-color: #eef6f2; }
 
@@ -215,11 +213,17 @@
             return;
         }
 
-        if (gameFormat === 'nassau') {
-            payoutBox.style.display = "block";
+        if (gameFormat === 'nassau' || gameFormat === 'match') {
             const p1 = players[0];
             const p2 = players[1];
-            titleEl.textContent = `🥊 NASSAU (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
+
+            if (gameFormat === 'nassau') {
+                payoutBox.style.display = "block";
+                titleEl.textContent = `🥊 NASSAU (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
+            } else {
+                payoutBox.style.display = "none";
+                titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
+            }
 
             let frontMatch = 0, backMatch = 0, totalMatch = 0;
             let frontThru = 0, backThru = 0;
@@ -247,23 +251,25 @@
                 }
             });
 
-            const p1Front = (frontThru > 0) ? (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0)) : 0;
-            const p1Back = (backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
-            const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
-            const p1Net = p1Front + p1Back + p1Total;
+            if (gameFormat === 'nassau') {
+                const p1Front = (frontThru > 0) ? (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0)) : 0;
+                const p1Back = (backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
+                const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
+                const p1Net = p1Front + p1Back + p1Total;
 
-            function formatMoney(amount) {
-                if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
-                if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
-                return `<span class="val-even">$0</span>`;
+                function formatMoney(amount) {
+                    if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
+                    if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
+                    return `<span class="val-even">$0</span>`;
+                }
+
+                payoutRowsWrapper.innerHTML = `
+                    <div class="payout-row"><span>Front 9 (${p1.name} vs ${p2.name}):</span><span>${p1.name}: ${formatMoney(p1Front)} | ${p2.name}: ${formatMoney(-p1Front)}</span></div>
+                    <div class="payout-row"><span>Back 9 (${frontThru >= 9 ? 'Thru 9' : 'Pending'}):</span><span>${p1.name}: ${formatMoney(p1Back)} | ${p2.name}: ${formatMoney(-p1Back)}</span></div>
+                    <div class="payout-row"><span>Total 18:</span><span>${p1.name}: ${formatMoney(p1Total)} | ${p2.name}: ${formatMoney(-p1Total)}</span></div>
+                    <div class="payout-row" style="background:#e0f2ef; border-color:#2a9d8f;"><span>Grand Total Net:</span><span>${p1.name}: ${formatMoney(p1Net)} | ${p2.name}: ${formatMoney(-p1Net)}</span></div>
+                `;
             }
-
-            payoutRowsWrapper.innerHTML = `
-                <div class="payout-row"><span>Front 9 (${p1.name} vs ${p2.name}):</span><span>${p1.name}: ${formatMoney(p1Front)} | ${p2.name}: ${formatMoney(-p1Front)}</span></div>
-                <div class="payout-row"><span>Back 9 (${frontThru >= 9 ? 'Thru 9' : 'Pending'}):</span><span>${p1.name}: ${formatMoney(p1Back)} | ${p2.name}: ${formatMoney(-p1Back)}</span></div>
-                <div class="payout-row"><span>Total 18:</span><span>${p1.name}: ${formatMoney(p1Total)} | ${p2.name}: ${formatMoney(-p1Total)}</span></div>
-                <div class="payout-row" style="background:#e0f2ef; border-color:#2a9d8f;"><span>Grand Total Net:</span><span>${p1.name}: ${formatMoney(p1Net)} | ${p2.name}: ${formatMoney(-p1Net)}</span></div>
-            `;
 
             let matchStatus = frontThru < 9 ? frontMatch : (frontThru + backThru < 18 ? totalMatch : totalMatch);
             if (frontThru === 0) {
@@ -317,10 +323,19 @@
         const savedScores = currentData.scores || {};
         const gameFormat = currentData.gameFormat || "stroke";
         const stake = currentData.nassauStake || 10;
-        const scoringType = currentData.nassauScoring || "net";
+        
+        let scoringType = "net";
+        if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
+        if (gameFormat === 'match') scoringType = currentData.matchScoring || "net";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        
+        // Show proper subtitle formatting
+        if (gameFormat === 'match' || gameFormat === 'nassau') {
+            document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        } else {
+            document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()}`;
+        }
 
         updateLiveTicker(players, courseData, savedScores, gameFormat, stake, scoringType);
 
@@ -336,7 +351,7 @@
 
         filteredPlayers.forEach(p => {
             headRow.innerHTML += `<th>${p.name}</th>`;
-            if (gameFormat === 'nassau' && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
+            if ((gameFormat === 'nassau' || gameFormat === 'match') && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
                 headRow.innerHTML += `<th style="width: 80px; font-size:0.75rem; color:#666;">Match</th>`;
             }
         });
@@ -350,7 +365,7 @@
         courseData.forEach(h => {
             let rowHtml = `<tr><td><strong>${h.hole}</strong></td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td>`;
 
-            if (gameFormat === 'nassau' && filteredPlayers.length === 2) {
+            if ((gameFormat === 'nassau' || gameFormat === 'match') && filteredPlayers.length === 2) {
                 const p1 = filteredPlayers[0];
                 const p2 = filteredPlayers[1];
                 const v1 = savedScores[`p${p1.id}_h${h.hole}`];
