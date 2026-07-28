@@ -41,8 +41,9 @@
 
         .group-filter-bar {
             display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 12px;
-            -webkit-overflow-scrolling: touch;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
+        .group-filter-bar::-webkit-scrollbar { display: none; }
         .group-btn {
             flex: 0 0 auto; padding: 6px 12px; border: 1px solid #0f4c3a; background: #ffffff;
             color: #0f4c3a; border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
@@ -108,13 +109,8 @@
         <div id="payout-rows-wrapper"></div>
     </div>
 
-    <div class="group-filter-bar" id="group-filter-container">
-        <button class="group-btn active" onclick="filterGroup('all')">👥 All Players</button>
-        <button class="group-btn" onclick="filterGroup(1)">Group 1</button>
-        <button class="group-btn" onclick="filterGroup(2)">Group 2</button>
-        <button class="group-btn" onclick="filterGroup(3)">Group 3</button>
-        <button class="group-btn" onclick="filterGroup(4)">Group 4</button>
-    </div>
+    <!-- Group filters will be injected here dynamically based on player count -->
+    <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="card-table-wrapper">
         <table class="card-table">
@@ -176,17 +172,23 @@
         }
     }
 
+    function renderGroupFilters(playersCount) {
+        const container = document.getElementById("group-filter-container");
+        const numGroups = Math.ceil(playersCount / 4);
+        
+        let html = `<button class="group-btn ${selectedGroup === 'all' ? 'active' : ''}" onclick="filterGroup('all')">👥 All Players</button>`;
+        
+        if (numGroups > 1) {
+            for(let i = 1; i <= numGroups; i++) {
+                html += `<button class="group-btn ${selectedGroup === i ? 'active' : ''}" onclick="filterGroup(${i})">Group ${i}</button>`;
+            }
+        }
+        
+        container.innerHTML = html;
+    }
+
     function filterGroup(grp) {
         selectedGroup = grp;
-        const btns = document.querySelectorAll('.group-btn');
-        btns.forEach(b => b.classList.remove('active'));
-
-        if (grp === 'all') btns[0].classList.add('active');
-        else if (grp === 1) btns[1].classList.add('active');
-        else if (grp === 2) btns[2].classList.add('active');
-        else if (grp === 3) btns[3].classList.add('active');
-        else if (grp === 4) btns[4].classList.add('active');
-
         renderScorecard();
     }
 
@@ -233,7 +235,6 @@
             
             titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${t1Name} VS ${t2Name}`;
 
-            // Initialize Auto-Press Match Arrays
             const pressRule = currentData.nassauPressRule || "none";
             let pressThreshold = 99;
             if (pressRule === "2down") pressThreshold = 2;
@@ -270,7 +271,6 @@
                     totalThru++;
                     let diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
 
-                    // Update Front 9 Matches + Check Presses
                     if (idx < 9) {
                         frontMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
                         let lastFront = frontMatches[frontMatches.length - 1];
@@ -279,7 +279,6 @@
                         }
                     }
                     
-                    // Update Back 9 Matches + Check Presses
                     if (idx >= 9) {
                         backMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
                         let lastBack = backMatches[backMatches.length - 1];
@@ -288,7 +287,6 @@
                         }
                     }
 
-                    // Update Overall Match(es)
                     overallMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
                     let lastOverall = overallMatches[overallMatches.length - 1];
                     if (pressRule !== "none" && hole.hole < 18 && Math.abs(lastOverall.status) >= pressThreshold) {
@@ -297,7 +295,6 @@
                 }
             });
 
-            // Status display (based on primary overall match)
             let mainMatchStatus = overallMatches[0].status;
             if (totalThru === 0) {
                 statusEl.textContent = "ALL SQUARE (Match Not Started)";
@@ -382,6 +379,9 @@
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
         document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+
+        // Dynamically build the group filters based on the total player count
+        renderGroupFilters(players.length);
 
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
