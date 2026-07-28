@@ -13,7 +13,6 @@
         h2 { color: #0f4c3a; text-align: center; margin-top: 0; }
         .action-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
         
-        /* Wolf & Dots CSS */
         .hole-wolf-row { display: grid; grid-template-columns: 50px 1fr 1fr 1fr; gap: 6px; align-items: center; background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; }
         @media (max-width: 480px) { .hole-wolf-row { grid-template-columns: 1fr 1fr; gap: 8px; } }
         select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.85rem; box-sizing: border-box; }
@@ -21,7 +20,6 @@
         .btn-minus { background: #e63946; color: white; }
         .btn-plus { background: #2a9d8f; color: white; }
 
-        /* Skins CSS */
         .skins-summary { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
         .skins-card { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #d0e1db; display: flex; justify-content: space-between; align-items: center;}
         .skins-player { font-weight: bold; font-size: 1.05rem; color: #1d3557; }
@@ -44,17 +42,17 @@
 </head>
 <body>
 
-<div class="container" id="main-container">
+<div class="container" id="main-container" style="display: none;">
     <!-- UI INJECTED BY JAVASCRIPT BASED ON SELECTED FORMAT -->
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item active">💰 Action</a>
-    <a href="stats.html" class="nav-item">📊 Stats</a>
-    <a href="settlement.html" class="nav-item">💸 Settle</a>
-    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+    <a href="index.html" class="nav-item nav-link">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
+    <a href="skins.html" class="nav-item nav-link active">💰 Action</a>
+    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
+    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
+    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -71,8 +69,26 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let activeMode = "regular";
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
     let currentData = {};
+
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-container").style.display = "block";
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            link.href = base + '?game=' + currentMode;
+        });
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentData = snapshot.val() || {};
+            renderActionTab();
+        });
+    }
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
@@ -93,22 +109,15 @@
         }
     }
 
-    db.ref().on('value', (snapshot) => {
-        const rootData = snapshot.val() || {};
-        activeMode = rootData.active_event_mode || "regular";
-        currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        renderActionTab();
-    });
-
     function saveWolfChoice(holeNum, field, val) {
-        db.ref(`events/${activeMode}/wolfPicks/h${holeNum}/${field}`).set(val);
+        db.ref(`events/${currentMode}/wolfPicks/h${holeNum}/${field}`).set(val);
     }
 
     function changeDots(playerId, amount) {
         const currentDots = (currentData.dots && currentData.dots[`p${playerId}`]) ? parseInt(currentData.dots[`p${playerId}`], 10) : 0;
         let newDots = currentDots + amount;
         if (newDots < 0) newDots = 0; 
-        db.ref(`events/${activeMode}/dots/p${playerId}`).set(newDots);
+        db.ref(`events/${currentMode}/dots/p${playerId}`).set(newDots);
     }
 
     function renderActionTab() {

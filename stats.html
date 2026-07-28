@@ -5,106 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Round Stats</title>
     
-    <!-- Added Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 16px 16px 90px 16px;
-            color: #1a1a1a;
-        }
-        .container {
-            max-width: 650px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 20px;
-        }
-        h2, h3 {
-            margin-top: 0;
-            color: #0f4c3a;
-            text-align: center;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: #eef6f2;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .stat-card .val {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #0f4c3a;
-            margin-top: 4px;
-        }
-        .stat-card .lbl {
-            font-size: 0.8rem;
-            color: #555;
-            font-weight: 600;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: center;
-            font-size: 0.85rem;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 8px 4px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        th {
-            background-color: #f8f9fa;
-            color: #555;
-            font-size: 0.8rem;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; }
+        .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
+        h2, h3 { margin-top: 0; color: #0f4c3a; text-align: center; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .stat-card { background: #eef6f2; padding: 12px; border-radius: 8px; text-align: center; }
+        .stat-card .val { font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 4px; }
+        .stat-card .lbl { font-size: 0.8rem; color: #555; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.85rem; margin-bottom: 20px; }
+        th, td { padding: 8px 4px; border-bottom: 1px solid #e0e0e0; }
+        th { background-color: #f8f9fa; color: #555; font-size: 0.8rem; }
         .birdie-count { color: #e63946; font-weight: bold; }
         .par-count { color: #1a1a1a; font-weight: bold; }
         .bogey-count { color: #1d3557; font-weight: bold; }
-        .nav-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-around;
-            padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
-            z-index: 100;
-        }
-        .nav-item {
-            text-decoration: none;
-            color: #666;
-            font-weight: 600;
-            font-size: 0.75rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .nav-item.active {
-            color: #0f4c3a;
-        }
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
+        .nav-item.active { color: #0f4c3a; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-content" style="display: none;">
     <h2 id="event-title">📊 Round Stats</h2>
 
-    <!-- High Level Overview -->
     <div class="stats-grid" id="top-overview"></div>
 
     <h3>👥 Player Scoring Breakdown</h3>
@@ -142,11 +69,12 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Action</a>
-    <a href="stats.html" class="nav-item active">📊 Stats</a>
-    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+    <a href="index.html" class="nav-item nav-link">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
+    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
+    <a href="stats.html" class="nav-item nav-link active">📊 Stats</a>
+    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
+    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -163,15 +91,26 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
     let currentStatsData = {};
 
-    // Listen to Firebase instead of LocalStorage
-    db.ref().on('value', (snapshot) => {
-        const rootData = snapshot.val() || {};
-        const activeMode = rootData.active_event_mode || "regular";
-        currentStatsData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        renderStats();
-    });
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            link.href = base + '?game=' + currentMode;
+        });
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentStatsData = snapshot.val() || {};
+            renderStats();
+        });
+    }
 
     function renderStats() {
         const eventName = currentStatsData.eventName || "Live Round";
@@ -186,7 +125,7 @@
         const holeBody = document.getElementById("hole-stats-body");
 
         if (players.length === 0 || courseData.length === 0) {
-            overviewDiv.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:#666;">No active round data found. Setup round in Admin.</div>`;
+            overviewDiv.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:#666;">No active round data found. Admin needs to set up this room.</div>`;
             playerBody.innerHTML = "";
             holeBody.innerHTML = "";
             return;
@@ -227,7 +166,6 @@
             });
         });
 
-        // Top Overview Cards
         const groupAvg = totalHolesPlayed > 0 ? (totalGroupStrokes / (totalHolesPlayed / players.length)).toFixed(1) : "0.0";
         overviewDiv.innerHTML = `
             <div class="stat-card">
@@ -244,7 +182,6 @@
             </div>
         `;
 
-        // Player Breakdown Table
         playerBody.innerHTML = "";
         playerStats.forEach(p => {
             const row = document.createElement("tr");
@@ -258,7 +195,6 @@
             playerBody.appendChild(row);
         });
 
-        // Hole-by-Hole Group Averages Table
         holeBody.innerHTML = "";
         courseData.forEach(hole => {
             let holeStrokes = 0;
