@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Action & Wolf Game Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Action Tracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -13,7 +13,6 @@
         h2 { color: #0f4c3a; text-align: center; margin-top: 0; }
         .action-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
         
-        /* MOBILE OPTIMIZED WOLF ROW */
         .hole-wolf-row { 
             display: grid; 
             grid-template-columns: 50px 1fr 1fr 1fr; 
@@ -25,11 +24,14 @@
             margin-bottom: 8px; 
             border: 1px solid #d0e1db; 
         }
-        @media (max-width: 480px) {
-            .hole-wolf-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-        }
+        @media (max-width: 480px) { .hole-wolf-row { grid-template-columns: 1fr 1fr; gap: 8px; } }
         
         select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.85rem; box-sizing: border-box; }
+        
+        .dot-btn { width: 40px; height: 40px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; }
+        .btn-minus { background: #e63946; color: white; }
+        .btn-plus { background: #2a9d8f; color: white; }
+
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
@@ -37,13 +39,8 @@
 </head>
 <body>
 
-<div class="container">
-    <h2>🐺 Wolf Game Action Tracker</h2>
-    <div style="font-size: 0.85rem; color: #555; text-align: center; margin-bottom: 14px;">
-        Set the rotating Wolf and their choice (Partner or Lone Wolf) for each hole!
-    </div>
-
-    <div id="wolf-commissioner-container"></div>
+<div class="container" id="main-container">
+    <!-- UI INJECTED BY JAVASCRIPT BASED ON SELECTED FORMAT -->
 </div>
 
 <div class="nav-bar">
@@ -75,84 +72,107 @@
         const rootData = snapshot.val() || {};
         activeMode = rootData.active_event_mode || "regular";
         currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        renderWolfCommissioner();
+        renderActionTab();
     });
 
     function saveWolfChoice(holeNum, field, val) {
         db.ref(`events/${activeMode}/wolfPicks/h${holeNum}/${field}`).set(val);
     }
 
-    function renderWolfCommissioner() {
-        const container = document.getElementById("wolf-commissioner-container");
+    function changeDots(playerId, amount) {
+        const currentDots = (currentData.dots && currentData.dots[`p${playerId}`]) ? parseInt(currentData.dots[`p${playerId}`], 10) : 0;
+        let newDots = currentDots + amount;
+        if (newDots < 0) newDots = 0; // Prevent negative dots
+        db.ref(`events/${activeMode}/dots/p${playerId}`).set(newDots);
+    }
+
+    function renderActionTab() {
+        const container = document.getElementById("main-container");
         const players = currentData.players || [];
         const gameFormat = currentData.gameFormat || "stroke";
-        const wolfPicks = currentData.wolfPicks || {};
 
-        if (gameFormat !== 'wolf') {
-            container.innerHTML = `
-                <div class="action-card" style="text-align:center; padding:30px;">
-                    <h3>⚠️ Active Format is not Wolf</h3>
-                    <p style="color:#666;">Switch your Round Game Format to <strong>Wolf Game Tracker</strong> in the Admin tab to use this commissioner panel.</p>
-                </div>
-            `;
-            return;
-        }
-
-        if (players.length !== 4) {
-            container.innerHTML = `<div class="action-card" style="text-align:center;">⚠️ Wolf requires exactly 4 active players in Admin!</div>`;
-            return;
-        }
-
-        let html = `<div class="action-card"><h3 style="margin-top:0; color:#0f4c3a;">📋 Hole-by-Hole Wolf Rotation</h3>`;
-
-        for (let h = 1; h <= 18; h++) {
-            const defaultWolfIdx = (h - 1) % 4;
-            const holePick = wolfPicks[`h${h}`] || {};
-            const selectedWolfId = holePick.wolfId || players[defaultWolfIdx].id;
-
-            let playerOptions = "";
-            players.forEach(p => {
-                playerOptions += `<option value="${p.id}" ${p.id == selectedWolfId ? 'selected' : ''}>${p.name}</option>`;
-            });
-
-            let choiceOptions = `
-                <option value="partner" ${holePick.choice === 'partner' ? 'selected' : ''}>🤝 Partner</option>
-                <option value="lone" ${holePick.choice === 'lone' ? 'selected' : ''}>🐺 Lone</option>
-                <option value="blind" ${holePick.choice === 'blind' ? 'selected' : ''}>🕶️ Blind</option>
-            `;
-
-            let partnerSelectHtml = "";
-            if (holePick.choice === 'partner') {
-                let partnerOptions = "";
-                players.filter(p => p.id != selectedWolfId).forEach(p => {
-                    partnerOptions += `<option value="${p.id}" ${p.id == holePick.partnerId ? 'selected' : ''}>${p.name}</option>`;
-                });
-                partnerSelectHtml = `<select onchange="saveWolfChoice(${h}, 'partnerId', this.value)"><option value="">-- Partner --</option>${partnerOptions}</select>`;
-            } else {
-                partnerSelectHtml = `<div style="font-size:0.75rem; color:#888; text-align:center;">N/A (Lone)</div>`;
+        if (gameFormat === 'wolf') {
+            const wolfPicks = currentData.wolfPicks || {};
+            if (players.length !== 4) {
+                container.innerHTML = `<h2>🐺 Wolf Tracker</h2><div class="action-card" style="text-align:center;">⚠️ Wolf requires exactly 4 active players!</div>`;
+                return;
             }
 
-            html += `
-                <div class="hole-wolf-row">
-                    <div><strong>Hk ${h}</strong></div>
-                    <div>
-                        <span style="font-size:0.65rem; color:#555; display:block;">Wolf</span>
-                        <select onchange="saveWolfChoice(${h}, 'wolfId', this.value)">${playerOptions}</select>
+            let html = `<h2>🐺 Wolf Game Action Tracker</h2>`;
+            html += `<div style="font-size: 0.85rem; color: #555; text-align: center; margin-bottom: 14px;">Set the rotating Wolf and their choice (Partner or Lone Wolf) for each hole!</div>`;
+            html += `<div class="action-card"><h3 style="margin-top:0; color:#0f4c3a;">📋 Hole-by-Hole Wolf Rotation</h3>`;
+
+            for (let h = 1; h <= 18; h++) {
+                const defaultWolfIdx = (h - 1) % 4;
+                const holePick = wolfPicks[`h${h}`] || {};
+                const selectedWolfId = holePick.wolfId || players[defaultWolfIdx].id;
+
+                let playerOptions = "";
+                players.forEach(p => { playerOptions += `<option value="${p.id}" ${p.id == selectedWolfId ? 'selected' : ''}>${p.name}</option>`; });
+
+                let choiceOptions = `
+                    <option value="partner" ${holePick.choice === 'partner' ? 'selected' : ''}>🤝 Partner</option>
+                    <option value="lone" ${holePick.choice === 'lone' ? 'selected' : ''}>🐺 Lone</option>
+                    <option value="blind" ${holePick.choice === 'blind' ? 'selected' : ''}>🕶️ Blind</option>
+                `;
+
+                let partnerSelectHtml = "";
+                if (holePick.choice === 'partner') {
+                    let partnerOptions = "";
+                    players.filter(p => p.id != selectedWolfId).forEach(p => { partnerOptions += `<option value="${p.id}" ${p.id == holePick.partnerId ? 'selected' : ''}>${p.name}</option>`; });
+                    partnerSelectHtml = `<select onchange="saveWolfChoice(${h}, 'partnerId', this.value)"><option value="">-- Partner --</option>${partnerOptions}</select>`;
+                } else {
+                    partnerSelectHtml = `<div style="font-size:0.75rem; color:#888; text-align:center;">N/A (Lone)</div>`;
+                }
+
+                html += `
+                    <div class="hole-wolf-row">
+                        <div><strong>Hk ${h}</strong></div>
+                        <div><span style="font-size:0.65rem; color:#555; display:block;">Wolf</span><select onchange="saveWolfChoice(${h}, 'wolfId', this.value)">${playerOptions}</select></div>
+                        <div><span style="font-size:0.65rem; color:#555; display:block;">Choice</span><select onchange="saveWolfChoice(${h}, 'choice', this.value)">${choiceOptions}</select></div>
+                        <div><span style="font-size:0.65rem; color:#555; display:block;">Partner</span>${partnerSelectHtml}</div>
                     </div>
-                    <div>
-                        <span style="font-size:0.65rem; color:#555; display:block;">Choice</span>
-                        <select onchange="saveWolfChoice(${h}, 'choice', this.value)">${choiceOptions}</select>
+                `;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+
+        } else if (gameFormat === 'dots') {
+            const dotVal = currentData.dotPointVal || 1;
+            let html = `<h2>🎯 Live Dot Tracker</h2>`;
+            html += `<div style="font-size: 0.85rem; color: #555; text-align: center; margin-bottom: 14px;">Track Sandies, Greenies, Snakes, etc. ($${dotVal} per dot)</div>`;
+            html += `<div class="action-card">`;
+
+            players.forEach(p => {
+                const dots = (currentData.dots && currentData.dots[`p${p.id}`]) ? currentData.dots[`p${p.id}`] : 0;
+                const payout = dots * dotVal;
+                html += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid #d0e1db;">
+                        <div>
+                            <div style="font-weight:bold; font-size:1.1rem; color:#1d3557;">${p.name}</div>
+                            <div style="color:#2a9d8f; font-weight:bold; font-size:0.9rem;">Payout: +$${payout}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="dot-btn btn-minus" onclick="changeDots(${p.id}, -1)">-</button>
+                            <span style="font-size:1.4rem; font-weight:bold; width:30px; text-align:center;">${dots}</span>
+                            <button class="dot-btn btn-plus" onclick="changeDots(${p.id}, 1)">+</button>
+                        </div>
                     </div>
-                    <div>
-                        <span style="font-size:0.65rem; color:#555; display:block;">Partner</span>
-                        ${partnerSelectHtml}
-                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            container.innerHTML = html;
+
+        } else {
+            container.innerHTML = `
+                <h2>💰 Action Tab</h2>
+                <div class="action-card" style="text-align:center; padding:30px;">
+                    <h3>No Active Action Game</h3>
+                    <p style="color:#666;">Switch your Round Format in Admin to <strong>Wolf Game</strong> or <strong>Dot Game</strong> to use the tracker tools here.</p>
                 </div>
             `;
         }
-
-        html += `</div>`;
-        container.innerHTML = html;
     }
 </script>
 

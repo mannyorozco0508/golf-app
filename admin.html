@@ -128,6 +128,7 @@
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
+            <option value="dots">🎯 Dot Game (Garbage/Junk)</option>
             <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
             <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
             <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
@@ -184,6 +185,13 @@
                 </div>
             </div>
         </div>
+
+        <div id="dot-settings" class="extra-settings-box">
+            <label style="color:#0f4c3a; margin-bottom: 6px;">🎯 Dot Game Options</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="1" min="1"></div>
+            </div>
+        </div>
     </div>
 
     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
@@ -232,11 +240,8 @@
     };
 
     const coursePresets = {
-        // FL COURSES
         emerald_hills: { name: "The Club at Emerald Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:8},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
         hollywood_beach: { name: "Hollywood Beach Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
-        
-        // CT COURSES
         yale: { name: "The Course at Yale", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
         greatriver: { name: "Great River Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:5},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:18},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:6}] },
         grassyhill: { name: "Grassy Hill Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:3,hcpIndex:15},{hole:3,par:4,hcpIndex:9},{hole:4,par:4,hcpIndex:1},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:11},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:8},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
@@ -247,8 +252,6 @@
         tashuaknolls: { name: "Tashua Knolls Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
         whitneyfarms: { name: "Whitney Farms Golf Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:11},{hole:3,par:5,hcpIndex:3},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:9},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:4},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:2},{hole:18,par:4,hcpIndex:14}] },
         oaklane: { name: "Tradition at Oak Lane", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:3,hcpIndex:17},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        
-        // PNW COURSES
         chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:11},{hole:2,par:4,hcpIndex:13},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:1},{hole:5,par:4,hcpIndex:7},{hole:6,par:4,hcpIndex:5},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:3},{hole:9,par:3,hcpIndex:17},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:4},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:6}] },
         homecourse: { name: "The Home Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:11},{hole:10,par:5,hcpIndex:6},{hole:11,par:4,hcpIndex:10},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:8}] },
         spanaway: { name: "Lake Spanaway Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:3},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:12},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
@@ -257,8 +260,6 @@
         gold_cascade: { name: "Gold Mountain - Cascade", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:9},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
         trophylake: { name: "Trophy Lake Golf & Casting", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:12},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:4},{hole:17,par:4,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
         wanational: { name: "Washington National", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:7},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        
-        // MYRTLE BEACH COURSES
         caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:3,hcpIndex:5},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
         trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:11},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:6},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
         pinelakes: { name: "Pine Lakes Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:4,hcpIndex:3},{hole:8,par:4,hcpIndex:9},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:2},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:4},{hole:15,par:5,hcpIndex:10},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
@@ -334,6 +335,7 @@
         document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
         document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
+        document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
         renderPlayerList();
     }
 
@@ -372,6 +374,7 @@
             if (data.nassauStake) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal) document.getElementById("wolf-point-value").value = data.wolfPointVal;
+            if (data.dotPointVal) document.getElementById("dot-point-value").value = data.dotPointVal;
 
             storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [
                 { id: 101, name: "Player 1", hcp: "0", team: "T-1", squad: "red" },
@@ -457,6 +460,7 @@
         const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
         const nassauPressRule = document.getElementById("nassau-press-rule").value || "2down";
         const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
+        const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 1;
 
         const playersList = [];
         rows.forEach((row, idx) => {
@@ -490,6 +494,7 @@
             nassauStake: nassauStake,
             nassauPressRule: nassauPressRule,
             wolfPointVal: wolfPointVal,
+            dotPointVal: dotPointVal,
             courseData: selectedCourse.data,
             players: playersList
         });
@@ -503,6 +508,7 @@
         if (confirm(`Are you sure you want to clear all entered scores for the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}?`)) {
             db.ref(`events/${currentMode}/scores`).remove();
             db.ref(`events/${currentMode}/wolfPicks`).remove();
+            db.ref(`events/${currentMode}/dots`).remove();
             alert("Active round scores reset!");
         }
     }
