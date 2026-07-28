@@ -304,14 +304,18 @@
         return list;
     }
 
-    function renderPlayerList() {
+    function renderPlayerList(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const headerRow = document.getElementById("player-header-row");
         const listContainer = document.getElementById("player-list");
         
-        let existingData = captureCurrentPlayerInputs();
-        if (existingData.length === 0) existingData = storedPlayersTemp;
+        let existingData = [];
+        if (forceLoad) {
+            existingData = storedPlayersTemp; 
+        } else {
+            existingData = captureCurrentPlayerInputs(); 
+        }
 
         listContainer.innerHTML = "";
 
@@ -331,13 +335,14 @@
         });
     }
 
-    function handleFormatChange() {
+    function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
-        document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
-        document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
-        document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
-        document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
-        renderPlayerList();
+        if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
+        if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
+        if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
+        
+        renderPlayerList(forceLoad);
     }
 
     function buildMergedCourseData(courseKey) {
@@ -368,7 +373,6 @@
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
 
-            // Added safe checks to prevent UI crashes if a setting doesn't exist
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
@@ -378,17 +382,11 @@
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
 
-            storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [
-                { id: 101, name: "Player 1", hcp: "0", team: "T-1", squad: "red" },
-                { id: 102, name: "Player 2", hcp: "0", team: "T-1", squad: "blue" },
-                { id: 103, name: "Player 3", hcp: "0", team: "T-2", squad: "red" },
-                { id: 104, name: "Player 4", hcp: "0", team: "T-2", squad: "blue" }
-            ];
+            storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [];
 
-            // 💥 THE FIX: Clear the visual rows so the app doesn't accidentally keep the old names
             document.getElementById("player-list").innerHTML = "";
 
-            handleFormatChange();
+            handleFormatChange(true);
         });
     }
 
