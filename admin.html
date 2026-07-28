@@ -29,6 +29,7 @@
         @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
 
         .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
+        .end-box { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
@@ -40,7 +41,7 @@
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .btn-danger { width: 100%; background-color: #d9534f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; }
+        .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
@@ -202,7 +203,12 @@
     <button class="btn-add" onclick="addPlayerRow()">➕ Add Player Slot</button>
 
     <button class="btn-primary" onclick="saveSettings()">💾 Save & Activate Setup</button>
-    <button class="btn-danger" onclick="resetRoundData()">🔄 Reset Active Round Scores</button>
+
+    <div class="end-box">
+        <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
+        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Clear the scorecard to start a new game. (Archiving disabled for testing mode)</span>
+        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Clear Scores</button>
+    </div>
 </div>
 
 <div class="nav-bar">
@@ -505,6 +511,15 @@
         db.ref("active_event_mode").set(currentMode).then(() => {
             alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
         }).catch((err) => { alert(`Save error: ${err.message}`); });
+    }
+
+    function endAndClearRound() {
+        if (confirm(`Are you sure you want to END the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}? This will clear the live scorecard. (Archiving is currently disabled for testing).`)) {
+            db.ref(`events/${currentMode}/scores`).remove();
+            db.ref(`events/${currentMode}/wolfPicks`).remove();
+            db.ref(`events/${currentMode}/dots`).remove();
+            alert("Scores cleared! Ready for a new game.");
+        }
     }
 
     function resetRoundData() {
