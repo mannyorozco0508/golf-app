@@ -9,14 +9,18 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        .format-label { text-align: center; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #2a9d8f; font-weight: bold; margin-bottom: 4px; }
-        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
         
+        /* Segmented Control Toggle */
+        .view-toggle-container { display: flex; background: #e0e0e0; border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+        .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #555; background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
+        .view-toggle-btn.active { background: #ffffff; color: #0f4c3a; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
         .h2h-banner { background: #1d3557; color: white; padding: 16px; border-radius: 10px; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .h2h-status { font-size: 1.4rem; font-weight: bold; margin-bottom: 4px; }
         .h2h-sub { font-size: 0.9rem; color: #a8dadc; }
 
-        .board-table { width: 100%; border-collapse: collapse; }
+        .board-table { width: 100%; border-collapse: collapse; margin-bottom: 20px;}
         .board-table th, .board-table td { padding: 12px 8px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         .board-table th { color: #666; font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid #ddd; }
         .row-leader { background-color: #fff9e6; font-weight: bold; }
@@ -30,8 +34,17 @@
 </head>
 <body>
 
-<div class="container" id="board-container">
-    <div style="text-align:center; padding:40px; color:#666;">Loading Leaderboard...</div>
+<div class="container">
+    <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
+    
+    <div class="view-toggle-container">
+        <button class="view-toggle-btn active" id="btn-individual" onclick="switchView('individual')">Stroke (Individual)</button>
+        <button class="view-toggle-btn" id="btn-team" onclick="switchView('team')">Match (Team/Cart)</button>
+    </div>
+
+    <div id="board-content">
+        <div style="text-align:center; padding:40px; color:#666;">Loading Leaderboard...</div>
+    </div>
 </div>
 
 <div class="nav-bar">
@@ -56,6 +69,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    let currentBoardData = {};
+    let activeView = "individual"; 
+
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
         const str = String(hcpStr).trim();
@@ -75,166 +91,179 @@
         }
     }
 
+    function switchView(view) {
+        activeView = view;
+        document.getElementById('btn-individual').classList.remove('active');
+        document.getElementById('btn-team').classList.remove('active');
+        document.getElementById(`btn-${view}`).classList.add('active');
+        renderBoard();
+    }
+
     db.ref().on('value', (snapshot) => {
         const rootData = snapshot.val() || {};
         const activeMode = rootData.active_event_mode || "regular";
-        const currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        
-        const players = currentData.players || [];
-        const courseData = currentData.courseData || [];
-        const savedScores = currentData.scores || {};
-        const gameFormat = currentData.gameFormat || "stroke";
-        let scoringType = "net";
-        if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
-        if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
+        currentBoardData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
+        document.getElementById("main-title").textContent = `🏆 ${currentBoardData.eventName || "Live Leaderboard"}`;
+        renderBoard();
+    });
 
-        const container = document.getElementById("board-container");
-        let html = `<div class="format-label">${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})</div>`;
-        html += `<h2 class="event-title">🏆 ${currentData.eventName || "Live Leaderboard"}</h2>`;
+    function renderBoard() {
+        const players = currentBoardData.players || [];
+        const courseData = currentBoardData.courseData || [];
+        const savedScores = currentBoardData.scores || {};
+        const container = document.getElementById("board-content");
 
         if (players.length === 0) {
-            container.innerHTML = html + `<div style="text-align:center; color:#666;">No players active.</div>`;
+            container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">No players active.</div>`;
             return;
         }
 
-        // Check for team vs team
-        let teams = {};
-        players.forEach(p => {
-            if(!teams[p.team]) teams[p.team] = [];
-            teams[p.team].push(p);
-        });
-        const teamKeys = Object.keys(teams);
-
-        if (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat) && teamKeys.length === 2) {
-            // HEAD TO HEAD MATCH PLAY VIEW
-            const t1Name = teamKeys[0];
-            const t2Name = teamKeys[1];
-            let frontMatch = 0, backMatch = 0, totalMatch = 0;
-            let thruCount = 0;
-
-            let t1TotalNet = 0, t1TotalGross = 0;
-            let t2TotalNet = 0, t2TotalGross = 0;
-
-            courseData.forEach((hole, idx) => {
-                let team1BestNet = 999, team1BestGross = 999;
-                let team2BestNet = 999, team2BestGross = 999;
-                let t1Valid = false, t2Valid = false;
-
-                teams[t1Name].forEach(p => {
-                    let v = savedScores[`p${p.id}_h${hole.hole}`];
+        if (activeView === "individual") {
+            // STANDARD STROKE PLAY RANKING
+            let results = [];
+            players.forEach(p => {
+                let net = 0, gross = 0, thru = 0;
+                courseData.forEach(h => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
                     if (v && v > 0) {
-                        let gross = parseInt(v, 10);
-                        let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                        if (net < team1BestNet) team1BestNet = net;
-                        if (gross < team1BestGross) team1BestGross = gross;
-                        t1Valid = true;
+                        let score = parseInt(v, 10);
+                        gross += score;
+                        net += (score - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
+                        thru++;
                     }
                 });
-
-                teams[t2Name].forEach(p => {
-                    let v = savedScores[`p${p.id}_h${hole.hole}`];
-                    if (v && v > 0) {
-                        let gross = parseInt(v, 10);
-                        let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                        if (net < team2BestNet) team2BestNet = net;
-                        if (gross < team2BestGross) team2BestGross = gross;
-                        t2Valid = true;
-                    }
-                });
-
-                if (t1Valid && t2Valid) {
-                    thruCount++;
-                    t1TotalNet += team1BestNet; t1TotalGross += team1BestGross;
-                    t2TotalNet += team2BestNet; t2TotalGross += team2BestGross;
-                    
-                    let compare1 = scoringType === 'net' ? team1BestNet : team1BestGross;
-                    let compare2 = scoringType === 'net' ? team2BestNet : team2BestGross;
-
-                    let diff = 0;
-                    if (compare1 < compare2) diff = 1;
-                    if (compare2 < compare1) diff = -1;
-                    totalMatch += diff;
-                }
+                results.push({ name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru });
             });
 
-            let statusText = "";
-            if (thruCount === 0) {
-                statusText = "ALL SQUARE";
-            } else if (totalMatch === 0) {
-                statusText = "ALL SQUARE";
-            } else if (totalMatch > 0) {
-                statusText = `🟢 ${t1Name} IS ${totalMatch} UP`;
-            } else {
-                statusText = `🟢 ${t2Name} IS ${Math.abs(totalMatch)} UP`;
-            }
+            results.sort((a, b) => {
+                if (a.thru === 0 && b.thru > 0) return 1;
+                if (b.thru === 0 && a.thru > 0) return -1;
+                return a.net - b.net; 
+            });
 
-            html += `
-                <div class="h2h-banner">
-                    <div class="h2h-status">${statusText}</div>
-                    <div class="h2h-sub">Thru ${thruCount} Holes</div>
-                </div>
+            let html = `
                 <table class="board-table">
-                    <thead><tr><th style="text-align:left;">Matchup</th><th>Thru</th><th>Net</th><th>Gross</th></tr></thead>
+                    <thead><tr><th>Pos</th><th style="text-align:left;">Player</th><th>Thru</th><th>Net</th><th>Gross</th></tr></thead>
                     <tbody>
-                        <tr>
-                            <td class="player-name">${t1Name}<span class="player-hcp">${teams[t1Name].map(p=>p.name).join(", ")}</span></td>
-                            <td>${thruCount}</td><td>${t1TotalNet || '-'}</td><td>${t1TotalGross || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td class="player-name">${t2Name}<span class="player-hcp">${teams[t2Name].map(p=>p.name).join(", ")}</span></td>
-                            <td>${thruCount}</td><td>${t2TotalNet || '-'}</td><td>${t2TotalGross || '-'}</td>
-                        </tr>
-                    </tbody>
-                </table>
             `;
-            container.innerHTML = html;
-            return;
-        }
 
-        // STANDARD LEADERBOARD FOR STROKE / INDIVIDUAL / 3+ TEAMS
-        let results = [];
-        players.forEach(p => {
-            let net = 0, gross = 0, thru = 0;
-            courseData.forEach(h => {
-                let v = savedScores[`p${p.id}_h${h.hole}`];
-                if (v && v > 0) {
-                    let score = parseInt(v, 10);
-                    gross += score;
-                    net += (score - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
-                    thru++;
+            results.forEach((r, idx) => {
+                if (r.thru === 0) {
+                    html += `<tr><td>-</td><td class="player-name">${r.name}</td><td>0</td><td>-</td><td>-</td></tr>`;
+                } else {
+                    let posClass = idx === 0 ? 'row-leader' : '';
+                    html += `<tr class="${posClass}">
+                        <td>${idx + 1}</td>
+                        <td class="player-name">${r.name}<span class="player-hcp">HCP: ${r.hcp}</span></td>
+                        <td>${r.thru}</td><td>${r.net}</td><td>${r.gross}</td>
+                    </tr>`;
                 }
             });
-            results.push({ name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru });
-        });
 
-        results.sort((a, b) => {
-            if (a.thru === 0 && b.thru > 0) return 1;
-            if (b.thru === 0 && a.thru > 0) return -1;
-            return scoringType === 'net' ? (a.net - b.net) : (a.gross - b.gross);
-        });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
 
-        html += `
-            <table class="board-table">
-                <thead><tr><th>Pos</th><th style="text-align:left;">Player</th><th>Thru</th><th>Net</th><th>Gross</th></tr></thead>
-                <tbody>
-        `;
+        } else if (activeView === "team") {
+            // TEAM / CART BEST BALL MATCHUPS
+            let teams = {};
+            players.forEach(p => {
+                if(!teams[p.team]) teams[p.team] = [];
+                teams[p.team].push(p);
+            });
+            const teamKeys = Object.keys(teams);
 
-        results.forEach((r, idx) => {
-            if (r.thru === 0) {
-                html += `<tr><td>-</td><td class="player-name">${r.name}</td><td>0</td><td>-</td><td>-</td></tr>`;
-            } else {
-                let posClass = idx === 0 ? 'row-leader' : '';
-                html += `<tr class="${posClass}">
-                    <td>${idx + 1}</td>
-                    <td class="player-name">${r.name}<span class="player-hcp">HCP: ${r.hcp}</span></td>
-                    <td>${r.thru}</td><td>${r.net}</td><td>${r.gross}</td>
-                </tr>`;
+            if (teamKeys.length < 2) {
+                container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">Not enough teams assigned for Match Play. Assign players to T-1, T-2, etc. in Admin.</div>`;
+                return;
             }
-        });
 
-        html += `</tbody></table>`;
-        container.innerHTML = html;
-    });
+            let html = "";
+
+            // Group teams into pairs (T-1 vs T-2), (T-3 vs T-4), etc.
+            for (let i = 0; i < teamKeys.length; i += 2) {
+                if (i + 1 >= teamKeys.length) break; 
+                
+                const t1Name = teamKeys[i];
+                const t2Name = teamKeys[i+1];
+                let totalMatch = 0;
+                let thruCount = 0;
+
+                let t1TotalNet = 0, t1TotalGross = 0;
+                let t2TotalNet = 0, t2TotalGross = 0;
+
+                courseData.forEach((hole) => {
+                    let team1BestNet = 999, team1BestGross = 999;
+                    let team2BestNet = 999, team2BestGross = 999;
+                    let t1Valid = false, t2Valid = false;
+
+                    teams[t1Name].forEach(p => {
+                        let v = savedScores[`p${p.id}_h${hole.hole}`];
+                        if (v && v > 0) {
+                            let gross = parseInt(v, 10);
+                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                            if (net < team1BestNet) team1BestNet = net;
+                            if (gross < team1BestGross) team1BestGross = gross;
+                            t1Valid = true;
+                        }
+                    });
+
+                    teams[t2Name].forEach(p => {
+                        let v = savedScores[`p${p.id}_h${hole.hole}`];
+                        if (v && v > 0) {
+                            let gross = parseInt(v, 10);
+                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                            if (net < team2BestNet) team2BestNet = net;
+                            if (gross < team2BestGross) team2BestGross = gross;
+                            t2Valid = true;
+                        }
+                    });
+
+                    if (t1Valid && t2Valid) {
+                        thruCount++;
+                        t1TotalNet += team1BestNet; t1TotalGross += team1BestGross;
+                        t2TotalNet += team2BestNet; t2TotalGross += team2BestGross;
+
+                        let diff = 0;
+                        if (team1BestNet < team2BestNet) diff = 1;
+                        if (team2BestNet < team1BestNet) diff = -1;
+                        totalMatch += diff;
+                    }
+                });
+
+                let statusText = "";
+                if (thruCount === 0) {
+                    statusText = "ALL SQUARE";
+                } else if (totalMatch === 0) {
+                    statusText = "ALL SQUARE";
+                } else if (totalMatch > 0) {
+                    statusText = `🟢 ${t1Name} IS ${totalMatch} UP`;
+                } else {
+                    statusText = `🟢 ${t2Name} IS ${Math.abs(totalMatch)} UP`;
+                }
+
+                html += `
+                    <div class="h2h-banner" style="margin-top: 20px;">
+                        <div class="h2h-status">${statusText}</div>
+                        <div class="h2h-sub">${t1Name} vs ${t2Name} • Thru ${thruCount}</div>
+                    </div>
+                    <table class="board-table">
+                        <thead><tr><th style="text-align:left;">Matchup</th><th>Thru</th><th>Net</th><th>Gross</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td class="player-name">${t1Name}<span class="player-hcp">${teams[t1Name].map(p=>p.name).join(", ")}</span></td>
+                                <td>${thruCount}</td><td>${t1TotalNet || '-'}</td><td>${t1TotalGross || '-'}</td>
+                            </tr>
+                            <tr>
+                                <td class="player-name">${t2Name}<span class="player-hcp">${teams[t2Name].map(p=>p.name).join(", ")}</span></td>
+                                <td>${thruCount}</td><td>${t2TotalNet || '-'}</td><td>${t2TotalGross || '-'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+            }
+            container.innerHTML = html;
+        }
+    }
 </script>
 
 </body>
