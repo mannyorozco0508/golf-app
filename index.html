@@ -224,7 +224,6 @@
         });
         const teamKeys = Object.keys(teams);
 
-        // Treat BestBall, Scramble, Match, and Ryder as Match Play if exactly 2 teams exist
         if (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat) && teamKeys.length === 2) {
             const t1Name = teamKeys[0];
             const t2Name = teamKeys[1];
@@ -278,6 +277,12 @@
                 const p1Back = (backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
                 const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
                 const p1Net = p1Front + p1Back + p1Total;
+
+                function formatMoney(amount) {
+                    if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
+                    if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
+                    return `<span class="val-even">$0</span>`;
+                }
 
                 document.getElementById("payout-rows-wrapper").innerHTML = `
                     <div class="payout-row"><span>Front 9:</span><span>${t1Name}: ${p1Front > 0 ? '+$'+p1Front : (p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')} | ${t2Name}: ${-p1Front > 0 ? '+$'+(-p1Front) : (-p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')}</span></div>
@@ -352,7 +357,6 @@
         
         updateLiveTicker(filteredPlayers, courseData, savedScores, gameFormat, stake, scoringType);
 
-        // Group filtered players by team to see if we can do a Match column
         let teamsInGroup = {};
         filteredPlayers.forEach(p => {
             if(!teamsInGroup[p.team]) teamsInGroup[p.team] = [];
@@ -360,11 +364,9 @@
         });
         const teamKeys = Object.keys(teamsInGroup);
         
-        // Show middle match column if exactly 2 teams and it's a team game
         const showTeamMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat)) && (teamKeys.length === 2);
         
         if (showTeamMatchColumn) {
-            // Re-order players so Team 1 is on the left, Team 2 on the right
             filteredPlayers = [...teamsInGroup[teamKeys[0]], ...teamsInGroup[teamKeys[1]]];
         }
 
@@ -421,7 +423,7 @@
 
             filteredPlayers.forEach((p, idx) => {
                 if (showTeamMatchColumn && idx === matchColIndex) {
-                    let holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
+                    let holeBadge = "";
                     if (t1Valid && t2Valid) {
                         if (runningTeamMatch === 0) {
                             holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
