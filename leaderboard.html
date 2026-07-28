@@ -11,7 +11,7 @@
         .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
         
-        .view-toggle-container { display: flex; background: #e0e0e0; border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+        .view-toggle-container { display: flex; background: #e0e0e0; border-radius: 8px; padding: 4px; margin-bottom: 12px; }
         .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #555; background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
         .view-toggle-btn.active { background: #ffffff; color: #0f4c3a; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
@@ -46,9 +46,15 @@
 <div class="container" id="main-content" style="display: none;">
     <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
     
-    <div class="view-toggle-container">
+    <div class="view-toggle-container" id="format-toggle">
         <button class="view-toggle-btn active" id="btn-individual" onclick="switchView('individual')">Stroke (Individual)</button>
         <button class="view-toggle-btn" id="btn-team" onclick="switchView('team')">Match (Team/Cart)</button>
+    </div>
+
+    <!-- New Gross vs Net Toggle (Only visible in Individual View) -->
+    <div class="view-toggle-container" id="scoring-toggle" style="display: flex;">
+        <button class="view-toggle-btn active" id="btn-net" onclick="switchScoring('net')">Net (HCP)</button>
+        <button class="view-toggle-btn" id="btn-gross" onclick="switchScoring('gross')">Gross</button>
     </div>
 
     <div id="board-content">
@@ -82,7 +88,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
     let currentBoardData = {};
+    
     let activeView = "individual"; 
+    let activeScoring = "net"; // Default individual scoring to Net
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -154,6 +162,22 @@
         document.getElementById('btn-individual').classList.remove('active');
         document.getElementById('btn-team').classList.remove('active');
         document.getElementById(`btn-${view}`).classList.add('active');
+        
+        // Hide Gross/Net toggle if switching to Team Match Play (Team matches use Admin settings)
+        if (view === 'individual') {
+            document.getElementById('scoring-toggle').style.display = 'flex';
+        } else {
+            document.getElementById('scoring-toggle').style.display = 'none';
+        }
+
+        renderBoard();
+    }
+
+    function switchScoring(scoring) {
+        activeScoring = scoring;
+        document.getElementById('btn-net').classList.remove('active');
+        document.getElementById('btn-gross').classList.remove('active');
+        document.getElementById(`btn-${scoring}`).classList.add('active');
         renderBoard();
     }
 
@@ -164,9 +188,10 @@
         const gameFormat = currentBoardData.gameFormat || "stroke";
         const container = document.getElementById("board-content");
         
-        let scoringType = "net";
-        if (gameFormat === 'nassau') scoringType = currentBoardData.nassauScoring || "net";
-        if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentBoardData.matchScoring || "net";
+        // Match scoring type defaults to admin settings
+        let matchScoringType = "net";
+        if (gameFormat === 'nassau') matchScoringType = currentBoardData.nassauScoring || "net";
+        if (gameFormat === 'match' || gameFormat === 'bestball') matchScoringType = currentBoardData.matchScoring || "net";
 
         if (players.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">No players active. Admin needs to set up this room.</div>`;
@@ -191,15 +216,19 @@
                 
                 let toParGross = gross - parPlayed;
                 let toParNet = net - parPlayed;
-                let toParDisplay = scoringType === 'net' ? toParNet : toParGross;
                 
-                results.push({ name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru, toPar: toParDisplay });
+                // Set the display and sorting value based on the user's toggle selection
+                let toParDisplay = activeScoring === 'net' ? toParNet : toParGross;
+                let sortVal = activeScoring === 'net' ? toParNet : toParGross;
+                
+                results.push({ name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru, toPar: toParDisplay, sortVal: sortVal });
             });
 
+            // Sort by the selected scoring format
             results.sort((a, b) => {
                 if (a.thru === 0 && b.thru > 0) return 1;
                 if (b.thru === 0 && a.thru > 0) return -1;
-                return a.toPar - b.toPar; 
+                return a.sortVal - b.sortVal; 
             });
 
             let html = `
@@ -281,8 +310,8 @@
                     if (t1Valid && t2Valid) {
                         thruCount++;
                         let diff = 0;
-                        let compare1 = scoringType === 'net' ? team1BestNet : team1BestGross;
-                        let compare2 = scoringType === 'net' ? team2BestNet : team2BestGross;
+                        let compare1 = matchScoringType === 'net' ? team1BestNet : team1BestGross;
+                        let compare2 = matchScoringType === 'net' ? team2BestNet : team2BestGross;
                         
                         if (compare1 < compare2) diff = 1;
                         if (compare2 < compare1) diff = -1;
