@@ -366,7 +366,7 @@
         const list = [];
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : `Player ${idx + 1}`;
-            const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "0";
+            const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
             const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / 2) + 1}`;
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
             list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
@@ -436,7 +436,6 @@
             const data = snapshot.val() || {};
             document.getElementById("event-name").value = data.eventName || 'Weekend Round';
             
-            // Set course to empty if no saved data, else use saved data
             if (data.activeCourseKey && document.getElementById("course-select").querySelector(`option[value="${data.activeCourseKey}"]`)) {
                 document.getElementById("course-select").value = data.activeCourseKey;
             } else {
@@ -462,7 +461,7 @@
         });
     }
 
-    function addPlayerRow(name = "", hcp = "0", team = "", squad = "red", isNewBtnClick = true) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value || 'stroke';
@@ -495,7 +494,7 @@
         row.className = `player-row ${gridClass}`;
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name || (isNewBtnClick ? 'Player ' + currentCount : '')}">
-            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp || '0'}">
+            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
             ${teamFieldHtml}
             ${squadFieldHtml}
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
@@ -533,7 +532,7 @@
         const playersList = [];
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
-            let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "0";
+            let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
             
             const teamSelect = row.querySelector('.p-team-input');
             const squadSelect = row.querySelector('.p-squad-input');
@@ -541,11 +540,13 @@
             const teamVal = teamSelect ? teamSelect.value : "T-1";
             const squadVal = squadSelect ? squadSelect.value : "red";
             
-            if (!hcpVal.startsWith("+")) {
-                let numVal = parseFloat(hcpVal);
-                if (isNaN(numVal)) numVal = 0;
-                if (numVal > 36) numVal = 36;
-                hcpVal = String(numVal);
+            if (hcpVal !== "") {
+                if (!hcpVal.startsWith("+")) {
+                    let numVal = parseFloat(hcpVal);
+                    if (isNaN(numVal)) numVal = 0;
+                    if (numVal > 36) numVal = 36;
+                    hcpVal = String(numVal);
+                }
             }
 
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
