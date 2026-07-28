@@ -41,7 +41,7 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-content" style="display: none;">
     <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
     
     <div class="view-toggle-container">
@@ -55,11 +55,12 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item active">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Action</a>
-    <a href="stats.html" class="nav-item">📊 Stats</a>
-    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+    <a href="index.html" class="nav-item nav-link">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item nav-link active">🏆 Board</a>
+    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
+    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
+    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
+    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -76,8 +77,28 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
     let currentBoardData = {};
     let activeView = "individual"; 
+
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            link.href = base + '?game=' + currentMode;
+        });
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentBoardData = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `🏆 ${currentBoardData.eventName || "Live Leaderboard"}`;
+            renderBoard();
+        });
+    }
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
@@ -104,24 +125,17 @@
         return `<span class="to-par-under">${val}</span>`;
     }
 
-    // SMART NAME RESOLVER FOR TEAM MATCH PLAY
     function getSmartDisplayName(player, allPlayers) {
         let parts = player.name.trim().split(/\s+/);
         let first = parts[0];
-        
-        if (parts.length === 1) return first; // No last name provided
+        if (parts.length === 1) return first; 
 
         let last = parts.slice(1).join(" ");
         let lastInitial = last.charAt(0).toUpperCase();
 
-        // Find how many players share this exact first name
         let sameFirstName = allPlayers.filter(p => p.name.trim().split(/\s+/)[0].toLowerCase() === first.toLowerCase());
-        
-        if (sameFirstName.length === 1) {
-            return first; // Unique first name, we can just use "Manny"
-        }
+        if (sameFirstName.length === 1) return first; 
 
-        // Multiple share first name, let's check if the last initial is unique
         let sameFirstAndInitial = sameFirstName.filter(p => {
             let pParts = p.name.trim().split(/\s+/);
             if (pParts.length === 1) return false;
@@ -129,11 +143,7 @@
             return pLastInitial === lastInitial;
         });
 
-        if (sameFirstAndInitial.length === 1) {
-            return `${first} ${lastInitial}.`; // Unique first name + initial
-        }
-
-        // Duplicate first name and duplicate last initial, must use full name
+        if (sameFirstAndInitial.length === 1) return `${first} ${lastInitial}.`; 
         return `${first} ${last}`;
     }
 
@@ -144,14 +154,6 @@
         document.getElementById(`btn-${view}`).classList.add('active');
         renderBoard();
     }
-
-    db.ref().on('value', (snapshot) => {
-        const rootData = snapshot.val() || {};
-        const activeMode = rootData.active_event_mode || "regular";
-        currentBoardData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        document.getElementById("main-title").textContent = `🏆 ${currentBoardData.eventName || "Live Leaderboard"}`;
-        renderBoard();
-    });
 
     function renderBoard() {
         const players = currentBoardData.players || [];
@@ -165,7 +167,7 @@
         if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentBoardData.matchScoring || "net";
 
         if (players.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">No players active.</div>`;
+            container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">No players active. Admin needs to set up this room.</div>`;
             return;
         }
 
@@ -244,7 +246,6 @@
                 let totalMatch = 0;
                 let thruCount = 0;
 
-                // Smart format the teams dynamically based on the full active player list
                 const t1Display = teams[t1Name].map(p => getSmartDisplayName(p, players)).join(" / ");
                 const t2Display = teams[t2Name].map(p => getSmartDisplayName(p, players)).join(" / ");
 
@@ -257,7 +258,7 @@
                         let v = savedScores[`p${p.id}_h${hole.hole}`];
                         if (v && v > 0) {
                             let gross = parseInt(v, 10);
-                            let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
                             if (net < team1BestNet) team1BestNet = net;
                             if (gross < team1BestGross) team1BestGross = gross;
                             t1Valid = true;
@@ -268,7 +269,7 @@
                         let v = savedScores[`p${p.id}_h${hole.hole}`];
                         if (v && v > 0) {
                             let gross = parseInt(v, 10);
-                            let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
                             if (net < team2BestNet) team2BestNet = net;
                             if (gross < team2BestGross) team2BestGross = gross;
                             t2Valid = true;
