@@ -93,7 +93,7 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-content" style="display: none;">
     <div class="header-box">
         <h1 class="header-title" id="course-title">Golf Scorecard</h1>
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
@@ -109,7 +109,6 @@
         <div id="payout-rows-wrapper"></div>
     </div>
 
-    <!-- Group filters will be injected here dynamically based on player count -->
     <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="card-table-wrapper">
@@ -127,12 +126,12 @@
 </div>
 
 <div class="nav-bar">
-    <a href="index.html" class="nav-item active">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Action</a>
-    <a href="stats.html" class="nav-item">📊 Stats</a>
-    <a href="settlement.html" class="nav-item">💸 Settle</a>
-    <a href="admin.html" class="nav-item">⚙️ Admin</a>
+    <a href="index.html" class="nav-item nav-link active">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
+    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
+    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
+    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
+    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -149,9 +148,31 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Look for Room Code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
     let selectedGroup = "all";
-    let activeMode = "regular";
     let currentData = {};
+
+    // If no room code, boot them to the lobby
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        // Append room code to all navigation links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            link.href = base + '?game=' + currentMode;
+        });
+
+        // Listen only to this specific room's data
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentData = snapshot.val() || {};
+            renderScorecard();
+        });
+    }
 
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
@@ -195,18 +216,11 @@
     function saveScore(playerId, holeNum, val) {
         const intVal = parseInt(val, 10);
         if (isNaN(intVal) || intVal <= 0) {
-            db.ref(`events/${activeMode}/scores/p${playerId}_h${holeNum}`).remove();
+            db.ref(`events/${currentMode}/scores/p${playerId}_h${holeNum}`).remove();
         } else {
-            db.ref(`events/${activeMode}/scores/p${playerId}_h${holeNum}`).set(intVal);
+            db.ref(`events/${currentMode}/scores/p${playerId}_h${holeNum}`).set(intVal);
         }
     }
-
-    db.ref().on('value', (snapshot) => {
-        const rootData = snapshot.val() || {};
-        activeMode = rootData.active_event_mode || "regular";
-        currentData = (rootData.events && rootData.events[activeMode]) ? rootData.events[activeMode] : {};
-        renderScorecard();
-    });
 
     function updateLiveTicker(players, courseData, savedScores, gameFormat, stake, scoringType) {
         const titleEl = document.getElementById("ticker-title-label");
@@ -367,6 +381,11 @@
     }
 
     function renderScorecard() {
+        if (!currentData || Object.keys(currentData).length === 0) {
+            document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: #666;">No data found for this room. Waiting for Admin to save settings...</td></tr>`;
+            return;
+        }
+
         const players = currentData.players || [];
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
@@ -380,7 +399,6 @@
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
         document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
 
-        // Dynamically build the group filters based on the total player count
         renderGroupFilters(players.length);
 
         let filteredPlayers = players;

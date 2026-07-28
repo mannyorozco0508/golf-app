@@ -11,10 +11,17 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px 16px 90px 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
         h2, h3 { color: #0f4c3a; margin-top: 0; }
-        .mode-box { background: #f0f4f8; border: 2px solid #1d3557; border-radius: 10px; padding: 14px; margin-bottom: 20px; text-align: center; }
-        .mode-toggle-btns { display: flex; gap: 10px; margin-top: 10px; }
-        .mode-btn { flex: 1; padding: 12px; border: 2px solid #1d3557; background: #ffffff; color: #1d3557; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; }
-        .mode-btn.active-mode { background: #1d3557; color: #ffffff; }
+        
+        /* Lobby Styles */
+        #lobby-screen { text-align: center; padding: 40px 20px; }
+        .lobby-logo { font-size: 3rem; margin-bottom: 10px; }
+        .lobby-title { font-size: 1.8rem; color: #0f4c3a; margin-bottom: 30px; font-weight: bold; }
+        .lobby-divider { margin: 30px 0; border-top: 1px solid #ddd; position: relative; }
+        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 10px; color: #888; font-size: 0.85rem; font-weight: bold; }
+        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 10px; }
+
+        /* Admin Styles */
+        .room-badge { display: inline-block; background: #1d3557; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
         
@@ -42,30 +49,42 @@
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
+        .btn-outline { width: 100%; background-color: transparent; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; display: none; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
         .nav-item.active { color: #0f4c3a; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>⚙️ Trip & Round Setup (Admin Controls)</h2>
+<!-- LOBBY SCREEN (Shown if no room code in URL) -->
+<div class="container" id="lobby-screen">
+    <div class="lobby-logo">⛳</div>
+    <div class="lobby-title">GolfApp</div>
+    
+    <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Create a private room for your foursome or trip, or join an existing one.</p>
+    
+    <button class="btn-primary" onclick="createRoom()">➕ Create New Private Room</button>
+    
+    <div class="lobby-divider"><span>OR</span></div>
+    
+    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE">
+    <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
+</div>
 
-    <div class="mode-box">
-        <label style="margin-bottom: 2px;">🔀 Active App Event Mode</label>
-        <span style="font-size: 0.8rem; color: #555; display: block;">Select which event live scorecards & leaderboards should track:</span>
-        <div class="mode-toggle-btns">
-            <button id="mode-btn-regular" class="mode-btn active-mode" onclick="switchMode('regular')">🟢 Regular Round</button>
-            <button id="mode-btn-trip" class="mode-btn" onclick="switchMode('trip')">⛳ Myrtle Beach 2026</button>
-        </div>
+<!-- ADMIN SCREEN (Shown if room code exists in URL) -->
+<div class="container" id="admin-screen" style="display: none;">
+    <div style="text-align: center;">
+        <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Room Code</span>
+        <div class="room-badge" id="display-room-code">----</div>
     </div>
 
     <div class="share-box">
-        <h3>📲 Share App Link with Friends</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Send this link to your group so they can view leaderboards and enter cart scores safely:</span>
+        <h3>📲 Share Link with Group</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Players will automatically join this specific private room:</span>
         <div id="qrcode"></div>
-        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Friend App Link</button>
+        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
     </div>
 
     <div class="form-group">
@@ -206,18 +225,19 @@
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Clear the scorecard to start a new game. (Archiving disabled for testing mode)</span>
+        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Clear the scorecard for this room to start a new game.</span>
         <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Clear Scores</button>
     </div>
 </div>
 
-<div class="nav-bar">
-    <a href="index.html" class="nav-item">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item">🏆 Board</a>
-    <a href="skins.html" class="nav-item">💰 Action</a>
-    <a href="stats.html" class="nav-item">📊 Stats</a>
-    <a href="settlement.html" class="nav-item">💸 Settle</a>
-    <a href="admin.html" class="nav-item active">⚙️ Admin</a>
+<!-- Nav bar hidden until a room is joined -->
+<div class="nav-bar" id="app-nav-bar">
+    <a href="index.html" class="nav-item nav-link">📝 Card</a>
+    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
+    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
+    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
+    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
+    <a href="admin.html" class="nav-item nav-link active">⚙️ Admin</a>
 </div>
 
 <script>
@@ -234,10 +254,53 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let currentMode = "regular";
+    // Look for Room Code in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+    
     let storedPlayersTemp = [];
     const teamOptions = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8", "T-9", "T-10", "T-11", "T-12", "T-13", "T-14", "T-15", "T-16"];
 
+    // Initialize Page View
+    if (!currentMode) {
+        // Show Lobby
+        document.getElementById("lobby-screen").style.display = "block";
+        document.getElementById("admin-screen").style.display = "none";
+        document.getElementById("app-nav-bar").style.display = "none";
+    } else {
+        // Show Admin Setup for specific room
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("lobby-screen").style.display = "none";
+        document.getElementById("admin-screen").style.display = "block";
+        document.getElementById("app-nav-bar").style.display = "flex";
+        document.getElementById("display-room-code").textContent = currentMode;
+        
+        // Ensure all navigation links carry the room code forward
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            link.href = base + '?game=' + currentMode;
+        });
+
+        loadModeData(currentMode);
+    }
+
+    // --- LOBBY FUNCTIONS ---
+    function createRoom() {
+        // Generate a random 5-character alphanumeric code
+        const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+        window.location.href = `?game=${newCode}`;
+    }
+
+    function joinRoom() {
+        const inputCode = document.getElementById("join-room-input").value.trim().toUpperCase();
+        if (inputCode.length > 0) {
+            window.location.href = `?game=${inputCode}`;
+        } else {
+            alert("Please enter a valid room code.");
+        }
+    }
+
+    // --- ADMIN FUNCTIONS ---
     const nineHoleLoops = {
         eaglespride_27: {
             red: { name: "Red Loop (Par 37)", data: [{par:5,hcp:7},{par:3,hcp:13},{par:5,hcp:3},{par:4,hcp:11},{par:4,hcp:1},{par:5,hcp:9},{par:4,hcp:5},{par:3,hcp:15},{par:4,hcp:17}] },
@@ -368,14 +431,10 @@
     }
 
     function loadModeData(modeKey) {
-        currentMode = modeKey;
-        document.getElementById("mode-btn-regular").className = (modeKey === 'regular') ? "mode-btn active-mode" : "mode-btn";
-        document.getElementById("mode-btn-trip").className = (modeKey === 'trip') ? "mode-btn active-mode" : "mode-btn";
-
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
-            document.getElementById("event-name").value = data.eventName || (modeKey === 'regular' ? 'Weekend Round' : 'Myrtle Beach Trip 2026');
-            const defaultCourseKey = (modeKey === 'regular') ? 'greatriver' : 'caledonia';
+            document.getElementById("event-name").value = data.eventName || 'Weekend Round';
+            const defaultCourseKey = 'greatriver';
             document.getElementById("course-select").value = data.activeCourseKey || defaultCourseKey;
             handleCourseChange();
 
@@ -396,19 +455,10 @@
         });
     }
 
-    function switchMode(newMode) {
-        db.ref("active_event_mode").set(newMode).then(() => { loadModeData(newMode); });
-    }
-
-    db.ref("active_event_mode").once('value').then((snapshot) => {
-        const activeMode = snapshot.val() || "regular";
-        loadModeData(activeMode);
-    });
-
     function addPlayerRow(name = "", hcp = "0", team = "", squad = "red", isNewBtnClick = true) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
-        const format = document.getElementById("game-format-select").value;
+        const format = document.getElementById("game-format-select").value || 'stroke';
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const teamSize = (format === 'scramble') ? 4 : 2;
         const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
@@ -506,15 +556,13 @@
             dotPointVal: dotPointVal,
             courseData: selectedCourse.data,
             players: playersList
-        });
-
-        db.ref("active_event_mode").set(currentMode).then(() => {
-            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} under [${currentMode === 'regular' ? '🟢 Regular Round' : '⛳ Myrtle Beach Trip'}].`);
+        }).then(() => {
+            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} in Room ${currentMode}.`);
         }).catch((err) => { alert(`Save error: ${err.message}`); });
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}? This will clear the live scorecard. (Archiving is currently disabled for testing).`)) {
+        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently clear the live scorecard.`)) {
             db.ref(`events/${currentMode}/scores`).remove();
             db.ref(`events/${currentMode}/wolfPicks`).remove();
             db.ref(`events/${currentMode}/dots`).remove();
@@ -522,17 +570,9 @@
         }
     }
 
-    function resetRoundData() {
-        if (confirm(`Are you sure you want to clear all entered scores for the current ${currentMode === 'regular' ? 'Regular Round' : 'Myrtle Beach Trip'}?`)) {
-            db.ref(`events/${currentMode}/scores`).remove();
-            db.ref(`events/${currentMode}/wolfPicks`).remove();
-            db.ref(`events/${currentMode}/dots`).remove();
-            alert("Active round scores reset!");
-        }
-    }
-
     function generateQRCode() {
-        const currentUrl = window.location.href.replace('admin.html', 'index.html');
+        const baseHref = window.location.href.split('?')[0];
+        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
         document.getElementById("qrcode").innerHTML = "";
         new QRCode(document.getElementById("qrcode"), {
             text: currentUrl, width: 140, height: 140,
@@ -541,11 +581,14 @@
     }
 
     function copyAppUrl() {
-        const currentUrl = window.location.href.replace('admin.html', 'index.html');
+        const baseHref = window.location.href.split('?')[0];
+        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
         navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
     }
 
-    generateQRCode();
+    if (currentMode) {
+        generateQRCode();
+    }
 </script>
 
 </body>
