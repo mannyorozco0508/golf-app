@@ -67,7 +67,6 @@
             margin-top: 4px; font-weight: bold; letter-spacing: 1px;
         }
 
-        /* Nassau & Match Status Column Styling */
         .match-status-cell {
             display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; padding: 4px; min-width: 90px;
         }
@@ -237,7 +236,6 @@
         let t1Name, t2Name;
         let t1Players = [], t2Players = [];
 
-        // Smart detect: If only 2 players exist, force 1v1 match play regardless of team settings
         if (players.length === 2) {
             t1Name = players[0].name.split(" ")[0];
             t2Name = players[1].name.split(" ")[0];
@@ -257,7 +255,6 @@
                 t1Players = teams[t1Name];
                 t2Players = teams[t2Name];
             } else {
-                // Fallback if multiple players but no distinct teams are defined
                 t1Name = "Team 1";
                 t2Name = "Team 2";
                 let mid = Math.ceil(players.length / 2);
@@ -269,7 +266,6 @@
         const pressRule = currentData.nassauPressRule || "none";
         const manualPresses = currentData.manualPresses || {};
 
-        // Track Front 9, Back 9, and Overall 18
         let activeMatches = [
             { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front' },
             { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back' },
@@ -282,10 +278,9 @@
         courseData.forEach((hole) => {
             const hNum = hole.hole;
 
-            // Did someone press on THIS hole? Create a new bet.
             if (manualPresses[`h${hNum}`]) {
                 pressCount++;
-                let endH = hNum <= 9 ? 9 : 18; // Apply to the current 9
+                let endH = hNum <= 9 ? 9 : 18;
                 activeMatches.push({ id: `P${pressCount}`, startHole: hNum, endHole: endH, status: 0, label: `Press ${pressCount}` });
             }
 
@@ -315,12 +310,9 @@
                 diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
                 
                 activeMatches.forEach(m => {
-                    if (hNum >= m.startHole && hNum <= m.endHole) {
-                        m.status += diff;
-                    }
+                    if (hNum >= m.startHole && hNum <= m.endHole) m.status += diff;
                 });
 
-                // Check for Auto Presses
                 let pressThreshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : 99);
                 activeMatches.forEach(m => {
                     if (pressRule !== 'none' && pressRule !== 'anytime' && Math.abs(m.status) >= pressThreshold && hNum < m.endHole) {
@@ -332,11 +324,9 @@
                 });
             }
 
-            // Save the state of all matches active on this hole for the right-side column
             let matchesOnThisHole = activeMatches.filter(m => hNum >= m.startHole && hNum <= m.endHole);
-            
             holeMatchLog[hNum] = {
-                valid: t1Valid && t2Valid, // Ensures we only print status if the hole was actually played
+                valid: t1Valid && t2Valid,
                 matches: matchesOnThisHole.map(m => ({...m}))
             };
         });
@@ -382,9 +372,7 @@
             headRow.innerHTML += `<th>${p.name.split(" ")[0]}</th>`;
         });
 
-        if (showMatchColumn) {
-            headRow.innerHTML += `<th style="width: 100px;">Match & Bets</th>`;
-        }
+        if (showMatchColumn) headRow.innerHTML += `<th style="width: 100px;">Match & Bets</th>`;
 
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
@@ -413,14 +401,11 @@
 
             if (showMatchColumn) {
                 let matchCellHtml = `<div class="match-status-cell">`;
-                
-                // Add the manual Press button at the top of the cell
                 const isPressed = !!manualPresses[`h${h.hole}`];
                 const pressBtnClass = isPressed ? "press-btn active-press" : "press-btn";
                 const pressBtnLabel = isPressed ? "🔥 Pressed" : "+ Press";
                 matchCellHtml += `<button class="${pressBtnClass}" onclick="togglePress(${h.hole})">${pressBtnLabel}</button>`;
 
-                // Build the active match/press status pills below the button
                 if (matchCalculations && matchCalculations.holeMatchLog[h.hole]) {
                     const log = matchCalculations.holeMatchLog[h.hole];
                     const t1 = matchCalculations.t1Name;
@@ -437,13 +422,58 @@
                         });
                     }
                 }
-
                 matchCellHtml += `</div>`;
                 rowHtml += `<td>${matchCellHtml}</td>`;
             }
 
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
+
+            // --- INSERT OUT / IN / TOTAL SUMMARY ROWS ---
+            if (h.hole === 9 || h.hole === 18) {
+                let isOut = h.hole === 9;
+                let label = isOut ? "OUT (Front 9)" : "IN (Back 9)";
+                let subRowHtml = `<tr style="background-color: #eef6f2;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; color:#0f4c3a; font-size:0.8rem;">${label}</td>`;
+
+                filteredPlayers.forEach(p => {
+                    let gross = 0, net = 0;
+                    courseData.forEach(ch => {
+                        if ((isOut && ch.hole <= 9) || (!isOut && ch.hole > 9 && ch.hole <= 18)) {
+                            let v = savedScores[`p${p.id}_h${ch.hole}`];
+                            if (v > 0) { 
+                                gross += parseInt(v, 10); 
+                                net += (parseInt(v, 10) - getStrokes(ch.hcpIndex, parseHcp(p.hcp))); 
+                            }
+                        }
+                    });
+                    let display = gross > 0 ? `<span style="font-weight:bold; font-size:1rem; color:#1a1a1a;">${gross}</span><br><span style="font-size:0.7rem;color:#2a9d8f;">Net: ${net}</span>` : `<span style="color:#aaa;">-</span>`;
+                    subRowHtml += `<td style="padding:6px;">${display}</td>`;
+                });
+
+                if (showMatchColumn) subRowHtml += `<td></td>`;
+                subRowHtml += `</tr>`;
+                tbody.innerHTML += subRowHtml;
+
+                // If hole 18, also add the Grand Total row
+                if (h.hole === 18) {
+                    let totRowHtml = `<tr style="background-color: #1d3557; color: white;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; font-size:0.8rem;">TOTAL</td>`;
+                    filteredPlayers.forEach(p => {
+                        let gross = 0, net = 0;
+                        courseData.forEach(ch => {
+                            let v = savedScores[`p${p.id}_h${ch.hole}`];
+                            if (v > 0) { 
+                                gross += parseInt(v, 10); 
+                                net += (parseInt(v, 10) - getStrokes(ch.hcpIndex, parseHcp(p.hcp))); 
+                            }
+                        });
+                        let display = gross > 0 ? `<span style="font-weight:bold; font-size:1.1rem; color:#fff;">${gross}</span><br><span style="font-size:0.7rem;color:#a8dadc;">Net: ${net}</span>` : `<span style="color:#aaa;">-</span>`;
+                        totRowHtml += `<td style="padding:6px;">${display}</td>`;
+                    });
+                    if (showMatchColumn) totRowHtml += `<td></td>`;
+                    totRowHtml += `</tr>`;
+                    tbody.innerHTML += totRowHtml;
+                }
+            }
         });
 
         // Top Ticker update
@@ -489,7 +519,6 @@
             payoutBox.style.display = "none";
             titleEl.textContent = "🏆 LIVE LEADERBOARD";
             
-            // Standard Stroke Play Leaderboard ticker
             let leaderName = "-";
             let bestNet = 999;
             let maxThru = 0;

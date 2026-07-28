@@ -69,7 +69,6 @@
 </head>
 <body>
 
-<!-- LOBBY SCREEN (Shown if no room code in URL) -->
 <div class="container" id="lobby-screen">
     <div class="lobby-logo">⛳</div>
     <div class="lobby-title">GolfApp</div>
@@ -84,7 +83,6 @@
     <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
 </div>
 
-<!-- ADMIN SCREEN (Shown if room code exists in URL) -->
 <div class="container" id="admin-screen" style="display: none;">
     <div style="text-align: center;">
         <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Room Code</span>
@@ -107,7 +105,6 @@
         <label>Select Golf Course for Active Round</label>
         <div class="custom-select-wrapper" id="course-wrapper">
             <input type="text" id="course-search-input" placeholder="-- Search / Select Golf Course --" autocomplete="off">
-            <!-- Hidden input stores the actual ID like "chambers" for the database -->
             <input type="hidden" id="course-select" value="">
             <div class="custom-select-dropdown" id="course-dropdown"></div>
         </div>
@@ -209,7 +206,6 @@
     </div>
 </div>
 
-<!-- Nav bar hidden until a room is joined -->
 <div class="nav-bar" id="app-nav-bar">
     <a href="index.html" class="nav-item nav-link">📝 Card</a>
     <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
@@ -233,14 +229,12 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Look for Room Code in the URL
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
     
     let storedPlayersTemp = [];
     const teamOptions = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8", "T-9", "T-10", "T-11", "T-12", "T-13", "T-14", "T-15", "T-16"];
 
-    // Initialize Page View
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
@@ -260,7 +254,6 @@
         loadModeData(currentMode);
     }
 
-    // --- LOBBY FUNCTIONS ---
     function createRoom() {
         const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
         window.location.href = `?game=${newCode}`;
@@ -275,7 +268,6 @@
         }
     }
 
-    // --- COURSE DIRECTORY FOR SEARCHABLE DROPDOWN ---
     const courseDirectory = [
         { group: "🌴 Florida (Miami / Hollywood)", items: [
             { id: "emerald_hills", name: "The Club at Emerald Hills (Par 72)" },
@@ -329,7 +321,6 @@
             
             if (filteredItems.length > 0) {
                 hasResults = true;
-                // Only show the region headers if we aren't heavily searching
                 if (filterText === "") {
                     const groupDiv = document.createElement("div");
                     groupDiv.className = "custom-select-group";
@@ -359,7 +350,6 @@
         handleCourseChange(); 
     }
 
-    // Search input listeners
     courseSearchInput.addEventListener('focus', () => {
         populateCourseDropdown(courseSearchInput.value);
         courseDropdown.style.display = "block";
@@ -372,7 +362,6 @@
     document.addEventListener('click', (e) => {
         if (!document.getElementById('course-wrapper').contains(e.target)) {
             courseDropdown.style.display = 'none';
-            // If they click away after typing garbage, revert to the currently selected course name
             const currentSelectedName = getCourseNameById(courseHiddenSelect.value);
             if (courseSearchInput.value !== currentSelectedName) {
                 courseSearchInput.value = currentSelectedName; 
@@ -543,10 +532,19 @@
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
 
-            storedPlayersTemp = (data.players && data.players.length > 0) ? data.players : [];
+            if (data.players && data.players.length > 0) {
+                storedPlayersTemp = data.players;
+            } else {
+                // If this is a fresh room, look in local storage for a previously saved trip roster
+                const savedRoster = localStorage.getItem('golfAppRoster');
+                if (savedRoster) {
+                    storedPlayersTemp = JSON.parse(savedRoster);
+                } else {
+                    storedPlayersTemp = [];
+                }
+            }
 
             document.getElementById("player-list").innerHTML = "";
-
             handleFormatChange(true);
         });
     }
@@ -641,6 +639,9 @@
 
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
         });
+
+        // Save the active roster to the Admin's phone memory for the next round
+        localStorage.setItem('golfAppRoster', JSON.stringify(playersList));
 
         db.ref(`events/${currentMode}`).update({
             eventName: baseEventName,
