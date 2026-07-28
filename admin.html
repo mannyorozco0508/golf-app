@@ -30,6 +30,17 @@
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: #fff; 
         }
 
+        /* Searchable Select Styles */
+        .custom-select-wrapper { position: relative; }
+        .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: #333; pointer-events: none; }
+        #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; background-color: #fff; box-sizing: border-box; cursor: text; }
+        #course-search-input:focus { border-color: #2a9d8f; outline: none; background-color: #eef6f2; border-bottom-left-radius: 0; border-bottom-right-radius: 0;}
+        .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #2a9d8f; border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.95rem; }
+        .custom-select-option:last-child { border-bottom: none; }
+        .custom-select-option:hover { background-color: #f0f4f2; color: #0f4c3a; font-weight: bold; }
+        .custom-select-group { background: #f4f6f8; font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: #555; text-transform: uppercase; border-bottom: 1px solid #eee; }
+
         .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -94,45 +105,12 @@
 
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
-        <select id="course-select" onchange="handleCourseChange()">
-            <option value="" disabled selected>-- Select Golf Course --</option>
-            <optgroup label="🌴 Florida (Miami / Hollywood)">
-                <option value="emerald_hills">The Club at Emerald Hills (Par 72)</option>
-                <option value="hollywood_beach">Hollywood Beach Golf Club (Par 70)</option>
-            </optgroup>
-            <optgroup label="🌲 Connecticut / Local (Milford Area)">
-                <option value="greatriver">Great River Golf Club (Par 72)</option>
-                <option value="yale">The Course at Yale (Par 70)</option>
-                <option value="grassyhill">Grassy Hill Country Club (Par 70)</option>
-                <option value="orangehills">Orange Hills Country Club (Par 71)</option>
-                <option value="millriver">Mill River Country Club (Par 72)</option>
-                <option value="fairchild_black">Fairchild Wheeler - Black (Par 71)</option>
-                <option value="fairchild_red">Fairchild Wheeler - Red (Par 72)</option>
-                <option value="tashuaknolls">Tashua Knolls Golf Course (Par 72)</option>
-                <option value="whitneyfarms">Whitney Farms Golf Course (Par 72)</option>
-                <option value="oaklane">Tradition at Oak Lane (Par 72)</option>
-            </optgroup>
-            <optgroup label="🌲 Washington (PNW)">
-                <option value="chambers">Chambers Bay (Par 72)</option>
-                <option value="homecourse">The Home Course (Par 72)</option>
-                <option value="spanaway">Lake Spanaway Golf Course (Par 72)</option>
-                <option value="eaglespride_27">Eagle's Pride (Pick 2 Nines)</option>
-                <option value="meadowpark">Meadow Park Championship (Par 71)</option>
-                <option value="gold_olympic">Gold Mountain - Olympic (Par 72)</option>
-                <option value="gold_cascade">Gold Mountain - Cascade (Par 72)</option>
-                <option value="trophylake">Trophy Lake Golf & Casting (Par 72)</option>
-                <option value="wanational">Washington National (Par 72)</option>
-            </optgroup>
-            <optgroup label="🌴 South Carolina (Myrtle Beach)">
-                <option value="caledonia">Caledonia Golf & Fish Club (Par 70)</option>
-                <option value="trueblue">True Blue Golf Club (Par 72)</option>
-                <option value="pinelakes">Pine Lakes Country Club (Par 70)</option>
-                <option value="pinehills">Myrtlewood - Pine Hills (Par 72)</option>
-                <option value="thistle_pending">Thistle Golf Club (NC - 27 Hole Marathon)</option>
-                <option value="prestwick">Prestwick Country Club (Par 72)</option>
-                <option value="manofwar">Man O' War Golf Club (Par 72)</option>
-            </optgroup>
-        </select>
+        <div class="custom-select-wrapper" id="course-wrapper">
+            <input type="text" id="course-search-input" placeholder="-- Search / Select Golf Course --" autocomplete="off">
+            <!-- Hidden input stores the actual ID like "chambers" for the database -->
+            <input type="hidden" id="course-select" value="">
+            <div class="custom-select-dropdown" id="course-dropdown"></div>
+        </div>
 
         <div id="nine-loop-selector" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🔄 Select Eagle's Pride 9-Hole Loops</label>
@@ -264,19 +242,16 @@
 
     // Initialize Page View
     if (!currentMode) {
-        // Show Lobby
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
         document.getElementById("app-nav-bar").style.display = "none";
     } else {
-        // Show Admin Setup for specific room
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("admin-screen").style.display = "block";
         document.getElementById("app-nav-bar").style.display = "flex";
         document.getElementById("display-room-code").textContent = currentMode;
         
-        // Ensure all navigation links carry the room code forward
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
             link.href = base + '?game=' + currentMode;
@@ -287,7 +262,6 @@
 
     // --- LOBBY FUNCTIONS ---
     function createRoom() {
-        // Generate a random 5-character alphanumeric code
         const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
         window.location.href = `?game=${newCode}`;
     }
@@ -301,7 +275,121 @@
         }
     }
 
-    // --- ADMIN FUNCTIONS ---
+    // --- COURSE DIRECTORY FOR SEARCHABLE DROPDOWN ---
+    const courseDirectory = [
+        { group: "🌴 Florida (Miami / Hollywood)", items: [
+            { id: "emerald_hills", name: "The Club at Emerald Hills (Par 72)" },
+            { id: "hollywood_beach", name: "Hollywood Beach Golf Club (Par 70)" }
+        ]},
+        { group: "🌲 Connecticut / Local (Milford Area)", items: [
+            { id: "greatriver", name: "Great River Golf Club (Par 72)" },
+            { id: "yale", name: "The Course at Yale (Par 70)" },
+            { id: "grassyhill", name: "Grassy Hill Country Club (Par 70)" },
+            { id: "orangehills", name: "Orange Hills Country Club (Par 71)" },
+            { id: "millriver", name: "Mill River Country Club (Par 72)" },
+            { id: "fairchild_black", name: "Fairchild Wheeler - Black (Par 71)" },
+            { id: "fairchild_red", name: "Fairchild Wheeler - Red (Par 72)" },
+            { id: "tashuaknolls", name: "Tashua Knolls Golf Course (Par 72)" },
+            { id: "whitneyfarms", name: "Whitney Farms Golf Course (Par 72)" },
+            { id: "oaklane", name: "Tradition at Oak Lane (Par 72)" }
+        ]},
+        { group: "🌲 Washington (PNW)", items: [
+            { id: "chambers", name: "Chambers Bay (Par 72)" },
+            { id: "homecourse", name: "The Home Course (Par 72)" },
+            { id: "spanaway", name: "Lake Spanaway Golf Course (Par 72)" },
+            { id: "eaglespride_27", name: "Eagle's Pride (Pick 2 Nines)" },
+            { id: "meadowpark", name: "Meadow Park Championship (Par 71)" },
+            { id: "gold_olympic", name: "Gold Mountain - Olympic (Par 72)" },
+            { id: "gold_cascade", name: "Gold Mountain - Cascade (Par 72)" },
+            { id: "trophylake", name: "Trophy Lake Golf & Casting (Par 72)" },
+            { id: "wanational", name: "Washington National (Par 72)" }
+        ]},
+        { group: "🌴 South Carolina (Myrtle Beach)", items: [
+            { id: "caledonia", name: "Caledonia Golf & Fish Club (Par 70)" },
+            { id: "trueblue", name: "True Blue Golf Club (Par 72)" },
+            { id: "pinelakes", name: "Pine Lakes Country Club (Par 70)" },
+            { id: "pinehills", name: "Myrtlewood - Pine Hills (Par 72)" },
+            { id: "thistle_pending", name: "Thistle Golf Club (NC - 27 Hole Marathon)" },
+            { id: "prestwick", name: "Prestwick Country Club (Par 72)" },
+            { id: "manofwar", name: "Man O' War Golf Club (Par 72)" }
+        ]}
+    ];
+
+    const courseSearchInput = document.getElementById('course-search-input');
+    const courseDropdown = document.getElementById('course-dropdown');
+    const courseHiddenSelect = document.getElementById('course-select');
+
+    function populateCourseDropdown(filterText = "") {
+        courseDropdown.innerHTML = "";
+        const lowerFilter = filterText.toLowerCase();
+        let hasResults = false;
+
+        courseDirectory.forEach(group => {
+            const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
+            
+            if (filteredItems.length > 0) {
+                hasResults = true;
+                // Only show the region headers if we aren't heavily searching
+                if (filterText === "") {
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "custom-select-group";
+                    groupDiv.textContent = group.group;
+                    courseDropdown.appendChild(groupDiv);
+                }
+                
+                filteredItems.forEach(item => {
+                    const optionDiv = document.createElement("div");
+                    optionDiv.className = "custom-select-option";
+                    optionDiv.textContent = item.name;
+                    optionDiv.onclick = () => { selectCourse(item.id, item.name); };
+                    courseDropdown.appendChild(optionDiv);
+                });
+            }
+        });
+
+        if (!hasResults) {
+            courseDropdown.innerHTML = `<div style="padding:12px; color:#888; text-align:center;">No courses found.</div>`;
+        }
+    }
+
+    function selectCourse(id, name) {
+        courseHiddenSelect.value = id;
+        courseSearchInput.value = name;
+        courseDropdown.style.display = "none";
+        handleCourseChange(); 
+    }
+
+    // Search input listeners
+    courseSearchInput.addEventListener('focus', () => {
+        populateCourseDropdown(courseSearchInput.value);
+        courseDropdown.style.display = "block";
+    });
+
+    courseSearchInput.addEventListener('input', (e) => {
+        populateCourseDropdown(e.target.value);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('course-wrapper').contains(e.target)) {
+            courseDropdown.style.display = 'none';
+            // If they click away after typing garbage, revert to the currently selected course name
+            const currentSelectedName = getCourseNameById(courseHiddenSelect.value);
+            if (courseSearchInput.value !== currentSelectedName) {
+                courseSearchInput.value = currentSelectedName; 
+            }
+        }
+    });
+
+    function getCourseNameById(id) {
+        if (!id) return "";
+        for (let g of courseDirectory) {
+            for (let i of g.items) {
+                if (i.id === id) return i.name;
+            }
+        }
+        return "";
+    }
+
     const nineHoleLoops = {
         eaglespride_27: {
             red: { name: "Red Loop (Par 37)", data: [{par:5,hcp:7},{par:3,hcp:13},{par:5,hcp:3},{par:4,hcp:11},{par:4,hcp:1},{par:5,hcp:9},{par:4,hcp:5},{par:3,hcp:15},{par:4,hcp:17}] },
@@ -341,7 +429,7 @@
     };
 
     function handleCourseChange() {
-        const courseKey = document.getElementById("course-select").value;
+        const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
         if (nineHoleLoops[courseKey]) {
             const loops = nineHoleLoops[courseKey];
@@ -436,11 +524,12 @@
             const data = snapshot.val() || {};
             document.getElementById("event-name").value = data.eventName || 'Weekend Round';
             
-            // Set course to empty if no saved data, else use saved data
-            if (data.activeCourseKey && document.getElementById("course-select").querySelector(`option[value="${data.activeCourseKey}"]`)) {
-                document.getElementById("course-select").value = data.activeCourseKey;
+            if (data.activeCourseKey) {
+                courseHiddenSelect.value = data.activeCourseKey;
+                courseSearchInput.value = getCourseNameById(data.activeCourseKey);
             } else {
-                document.getElementById("course-select").value = "";
+                courseHiddenSelect.value = "";
+                courseSearchInput.value = "";
             }
             
             handleCourseChange();
@@ -507,7 +596,7 @@
     function updateCount() { document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; }
 
     function saveSettings() {
-        const courseKey = document.getElementById("course-select").value;
+        const courseKey = courseHiddenSelect.value;
         if (!courseKey) { alert("⚠️ Please select a Golf Course before saving!"); return; }
         
         const gameFormat = document.getElementById("game-format-select").value;
