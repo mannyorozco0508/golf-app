@@ -97,19 +97,16 @@
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
     </div>
 
-    <!-- LIVE MATCH SITUATION BANNER -->
     <div class="live-ticker-box">
         <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
         <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
     </div>
 
-    <!-- LIVE NASSAU PAYOUT SUMMARY -->
     <div class="nassau-payout-box" id="nassau-payout-container">
         <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Nassau Standings</div>
         <div id="payout-rows-wrapper"></div>
     </div>
 
-    <!-- GROUP FILTER BAR -->
     <div class="group-filter-bar" id="group-filter-container">
         <button class="group-btn active" onclick="filterGroup('all')">👥 All Players</button>
         <button class="group-btn" onclick="filterGroup(1)">Group 1</button>
@@ -211,46 +208,64 @@
         const titleEl = document.getElementById("ticker-title-label");
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
-        const payoutRowsWrapper = document.getElementById("payout-rows-wrapper");
+        payoutBox.style.display = "none";
 
         if (players.length < 2) {
             titleEl.textContent = "LIVE STATUS";
             statusEl.textContent = "Waiting for players...";
-            payoutBox.style.display = "none";
             return;
         }
 
-        if (gameFormat === 'nassau' || gameFormat === 'match') {
-            const p1 = players[0];
-            const p2 = players[1];
+        // Group by team
+        let teams = {};
+        players.forEach(p => {
+            if(!teams[p.team]) teams[p.team] = [];
+            teams[p.team].push(p);
+        });
+        const teamKeys = Object.keys(teams);
 
-            if (gameFormat === 'nassau') {
-                payoutBox.style.display = "block";
-                titleEl.textContent = `🥊 NASSAU (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
-            } else {
-                payoutBox.style.display = "none";
-                titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${p1.name} VS ${p2.name}`;
-            }
+        // Treat BestBall, Scramble, Match, and Ryder as Match Play if exactly 2 teams exist
+        if (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat) && teamKeys.length === 2) {
+            const t1Name = teamKeys[0];
+            const t2Name = teamKeys[1];
+            
+            if (gameFormat === 'nassau') payoutBox.style.display = "block";
+            
+            titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${t1Name} VS ${t2Name}`;
 
             let frontMatch = 0, backMatch = 0, totalMatch = 0;
             let frontThru = 0, backThru = 0;
 
             courseData.forEach((hole, idx) => {
-                const v1 = savedScores[`p${p1.id}_h${hole.hole}`];
-                const v2 = savedScores[`p${p2.id}_h${hole.hole}`];
+                let team1Best = 999;
+                let team2Best = 999;
+                let t1Valid = false;
+                let t2Valid = false;
 
-                if (v1 && v2 && v1 > 0 && v2 > 0) {
-                    let score1 = parseInt(v1, 10);
-                    let score2 = parseInt(v2, 10);
-
-                    if (scoringType === 'net') {
-                        score1 -= getStrokes(hole.hcpIndex, parseHcp(p1.hcp));
-                        score2 -= getStrokes(hole.hcpIndex, parseHcp(p2.hcp));
+                teams[t1Name].forEach(p => {
+                    let v = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (v && v > 0) {
+                        let s = parseInt(v, 10);
+                        if (scoringType === 'net') s -= getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        if (s < team1Best) team1Best = s;
+                        t1Valid = true;
                     }
+                });
 
+                teams[t2Name].forEach(p => {
+                    let v = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (v && v > 0) {
+                        let s = parseInt(v, 10);
+                        if (scoringType === 'net') s -= getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        if (s < team2Best) team2Best = s;
+                        t2Valid = true;
+                    }
+                });
+
+                if (t1Valid && t2Valid) {
                     let diff = 0;
-                    if (score1 < score2) diff = 1;
-                    if (score2 < score1) diff = -1;
+                    if (team1Best < team2Best) diff = 1;
+                    if (team2Best < team1Best) diff = -1;
 
                     if (idx < 9) { frontMatch += diff; frontThru++; }
                     else { backMatch += diff; backThru++; }
@@ -264,33 +279,27 @@
                 const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
                 const p1Net = p1Front + p1Back + p1Total;
 
-                function formatMoney(amount) {
-                    if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
-                    if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
-                    return `<span class="val-even">$0</span>`;
-                }
-
-                payoutRowsWrapper.innerHTML = `
-                    <div class="payout-row"><span>Front 9 (${p1.name} vs ${p2.name}):</span><span>${p1.name}: ${formatMoney(p1Front)} | ${p2.name}: ${formatMoney(-p1Front)}</span></div>
-                    <div class="payout-row"><span>Back 9 (${frontThru >= 9 ? 'Thru 9' : 'Pending'}):</span><span>${p1.name}: ${formatMoney(p1Back)} | ${p2.name}: ${formatMoney(-p1Back)}</span></div>
-                    <div class="payout-row"><span>Total 18:</span><span>${p1.name}: ${formatMoney(p1Total)} | ${p2.name}: ${formatMoney(-p1Total)}</span></div>
-                    <div class="payout-row" style="background:#e0f2ef; border-color:#2a9d8f;"><span>Grand Total Net:</span><span>${p1.name}: ${formatMoney(p1Net)} | ${p2.name}: ${formatMoney(-p1Net)}</span></div>
+                document.getElementById("payout-rows-wrapper").innerHTML = `
+                    <div class="payout-row"><span>Front 9:</span><span>${t1Name}: ${p1Front > 0 ? '+$'+p1Front : (p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')} | ${t2Name}: ${-p1Front > 0 ? '+$'+(-p1Front) : (-p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')}</span></div>
+                    <div class="payout-row"><span>Back 9:</span><span>${t1Name}: ${p1Back > 0 ? '+$'+p1Back : (p1Back < 0 ? '-$'+Math.abs(p1Back) : '$0')} | ${t2Name}: ${-p1Back > 0 ? '+$'+(-p1Back) : (-p1Back < 0 ? '-$'+Math.abs(p1Back) : '$0')}</span></div>
+                    <div class="payout-row"><span>Total 18:</span><span>${t1Name}: ${p1Total > 0 ? '+$'+p1Total : (p1Total < 0 ? '-$'+Math.abs(p1Total) : '$0')} | ${t2Name}: ${-p1Total > 0 ? '+$'+(-p1Total) : (-p1Total < 0 ? '-$'+Math.abs(p1Total) : '$0')}</span></div>
                 `;
             }
 
-            let matchStatus = frontThru < 9 ? frontMatch : (frontThru + backThru < 18 ? totalMatch : totalMatch);
-            if (frontThru === 0) {
+            let matchStatus = frontThru < 9 ? frontMatch : totalMatch;
+            let thruCount = frontThru + backThru;
+            
+            if (thruCount === 0) {
                 statusEl.textContent = "ALL SQUARE (Match Not Started)";
             } else if (matchStatus === 0) {
-                statusEl.textContent = `ALL SQUARE (Thru ${frontThru + backThru})`;
+                statusEl.textContent = `ALL SQUARE (Thru ${thruCount})`;
             } else if (matchStatus > 0) {
-                statusEl.textContent = `🟢 ${p1.name} is ${matchStatus}UP (Thru ${frontThru + backThru})`;
+                statusEl.textContent = `🟢 ${t1Name} is ${matchStatus}UP (Thru ${thruCount})`;
             } else {
-                statusEl.textContent = `🟢 ${p2.name} is ${Math.abs(matchStatus)}UP (Thru ${frontThru + backThru})`;
+                statusEl.textContent = `🟢 ${t2Name} is ${Math.abs(matchStatus)}UP (Thru ${thruCount})`;
             }
 
         } else {
-            payoutBox.style.display = "none";
             titleEl.textContent = "🏆 LIVE LEADER (NET)";
             let leaderName = "-";
             let bestNet = 999;
@@ -299,7 +308,6 @@
             players.forEach(p => {
                 let netTotal = 0;
                 let thru = 0;
-
                 courseData.forEach(hole => {
                     const val = savedScores[`p${p.id}_h${hole.hole}`];
                     if (val && val > 0) {
@@ -307,9 +315,7 @@
                         thru++;
                     }
                 });
-
                 if (thru > maxThru) maxThru = thru;
-
                 if (thru > 0 && netTotal < bestNet) {
                     bestNet = netTotal;
                     leaderName = p.name;
@@ -333,112 +339,115 @@
         
         let scoringType = "net";
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
-        if (gameFormat === 'match') scoringType = currentData.matchScoring || "net";
+        if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        
-        if (gameFormat === 'match' || gameFormat === 'nassau') {
-            document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
-        } else {
-            document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()}`;
-        }
-
-        updateLiveTicker(players, courseData, savedScores, gameFormat, stake, scoringType);
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
 
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
             const startIdx = (selectedGroup - 1) * 4;
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
+        
+        updateLiveTicker(filteredPlayers, courseData, savedScores, gameFormat, stake, scoringType);
+
+        // Group filtered players by team to see if we can do a Match column
+        let teamsInGroup = {};
+        filteredPlayers.forEach(p => {
+            if(!teamsInGroup[p.team]) teamsInGroup[p.team] = [];
+            teamsInGroup[p.team].push(p);
+        });
+        const teamKeys = Object.keys(teamsInGroup);
+        
+        // Show middle match column if exactly 2 teams and it's a team game
+        const showTeamMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat)) && (teamKeys.length === 2);
+        
+        if (showTeamMatchColumn) {
+            // Re-order players so Team 1 is on the left, Team 2 on the right
+            filteredPlayers = [...teamsInGroup[teamKeys[0]], ...teamsInGroup[teamKeys[1]]];
+        }
 
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
-        filteredPlayers.forEach(p => {
-            headRow.innerHTML += `<th>${p.name}</th>`;
-            if ((gameFormat === 'nassau' || gameFormat === 'match') && filteredPlayers.length === 2 && p.id === filteredPlayers[0].id) {
-                headRow.innerHTML += `<th style="width: 80px; font-size:0.75rem; color:#666;">Match</th>`;
+        let matchColIndex = showTeamMatchColumn ? teamsInGroup[teamKeys[0]].length : -1;
+
+        filteredPlayers.forEach((p, idx) => {
+            if (showTeamMatchColumn && idx === matchColIndex) {
+                headRow.innerHTML += `<th style="width: 70px; font-size:0.75rem; color:#666;">Match</th>`;
             }
+            headRow.innerHTML += `<th>${p.name}</th>`;
         });
 
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
-        let runningMatchStatus = 0; 
+        let runningTeamMatch = 0; 
 
         courseData.forEach(h => {
             let rowHtml = `<tr><td style="padding-top:14px;"><strong>${h.hole}</strong></td><td style="padding-top:14px;">${h.par}</td><td style="color:#666; padding-top:14px;">${h.hcpIndex}</td>`;
 
-            if ((gameFormat === 'nassau' || gameFormat === 'match') && filteredPlayers.length === 2) {
-                const p1 = filteredPlayers[0];
-                const p2 = filteredPlayers[1];
-                const v1 = savedScores[`p${p1.id}_h${h.hole}`];
-                const v2 = savedScores[`p${p2.id}_h${h.hole}`];
+            let team1Best = 999;
+            let team2Best = 999;
+            let t1Valid = false;
+            let t2Valid = false;
 
-                let holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
-
-                if (v1 && v2 && v1 > 0 && v2 > 0) {
-                    let score1 = parseInt(v1, 10);
-                    let score2 = parseInt(v2, 10);
-
-                    if (scoringType === 'net') {
-                        score1 -= getStrokes(h.hcpIndex, parseHcp(p1.hcp));
-                        score2 -= getStrokes(h.hcpIndex, parseHcp(p2.hcp));
+            if (showTeamMatchColumn) {
+                teamsInGroup[teamKeys[0]].forEach(p => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v && v > 0) {
+                        let s = parseInt(v, 10);
+                        if (scoringType === 'net') s -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        if (s < team1Best) team1Best = s;
+                        t1Valid = true;
                     }
-
-                    if (score1 < score2) runningMatchStatus += 1;
-                    if (score2 < score1) runningMatchStatus -= 1;
-
-                    if (runningMatchStatus === 0) {
-                        holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
-                    } else if (runningMatchStatus > 0) {
-                        holeBadge = `<div class="match-cell-container"><span class="match-arrow">◀</span><span class="status-badge badge-up">${runningMatchStatus}UP</span></div>`;
-                    } else {
-                        holeBadge = `<div class="match-cell-container"><span class="status-badge badge-down">${Math.abs(runningMatchStatus)}UP</span><span class="match-arrow">▶</span></div>`;
+                });
+                teamsInGroup[teamKeys[1]].forEach(p => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v && v > 0) {
+                        let s = parseInt(v, 10);
+                        if (scoringType === 'net') s -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        if (s < team2Best) team2Best = s;
+                        t2Valid = true;
                     }
+                });
+
+                if (t1Valid && t2Valid) {
+                    if (team1Best < team2Best) runningTeamMatch += 1;
+                    if (team2Best < team1Best) runningTeamMatch -= 1;
+                }
+            }
+
+            filteredPlayers.forEach((p, idx) => {
+                if (showTeamMatchColumn && idx === matchColIndex) {
+                    let holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
+                    if (t1Valid && t2Valid) {
+                        if (runningTeamMatch === 0) {
+                            holeBadge = `<div class="match-cell-container"><span class="status-badge badge-even">AS</span></div>`;
+                        } else if (runningTeamMatch > 0) {
+                            holeBadge = `<div class="match-cell-container"><span class="match-arrow">◀</span><span class="status-badge badge-up">${runningTeamMatch}UP</span></div>`;
+                        } else {
+                            holeBadge = `<div class="match-cell-container"><span class="status-badge badge-down">${Math.abs(runningTeamMatch)}UP</span><span class="match-arrow">▶</span></div>`;
+                        }
+                    }
+                    rowHtml += `<td>${holeBadge}</td>`;
                 }
 
-                const s1 = savedScores[`p${p1.id}_h${h.hole}`] || "";
-                const s2 = savedScores[`p${p2.id}_h${h.hole}`] || "";
-
-                // Calculate strokes for dots
-                const strokes1 = getStrokes(h.hcpIndex, parseHcp(p1.hcp));
-                const strokes2 = getStrokes(h.hcpIndex, parseHcp(p2.hcp));
-                const dots1 = strokes1 > 0 ? "•".repeat(strokes1) : (strokes1 < 0 ? "+" : "");
-                const dots2 = strokes2 > 0 ? "•".repeat(strokes2) : (strokes2 < 0 ? "+" : "");
+                const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
+                const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const dots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
 
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                            <input type="number" pattern="[0-9]*" class="score-input" value="${s1}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)">
-                            <div class="stroke-dots">${dots1}</div>
-                        </div>
-                    </td>
-                    <td>${holeBadge}</td>
-                    <td>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                            <input type="number" pattern="[0-9]*" class="score-input" value="${s2}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)">
-                            <div class="stroke-dots">${dots2}</div>
+                            <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
+                                   onchange="saveScore(${p.id}, ${h.hole}, this.value)">
+                            <div class="stroke-dots">${dots}</div>
                         </div>
                     </td>
                 `;
-            } else {
-                filteredPlayers.forEach(p => {
-                    const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
-                    const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                    const dots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
-                    
-                    rowHtml += `
-                        <td>
-                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                                <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
-                                       onchange="saveScore(${p.id}, ${h.hole}, this.value)">
-                                <div class="stroke-dots">${dots}</div>
-                            </div>
-                        </td>
-                    `;
-                });
-            }
+            });
 
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
