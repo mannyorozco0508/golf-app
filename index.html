@@ -37,6 +37,7 @@
         .val-pos { color: #2a9d8f; }
         .val-neg { color: #e63946; }
         .val-even { color: #555; }
+        .press-note { font-size: 0.7rem; color: #888; font-weight: normal; margin-left: 4px; }
 
         .group-filter-bar {
             display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 12px;
@@ -134,6 +135,7 @@
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
     <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
+    <a href="settlement.html" class="nav-item">💸 Settle</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
@@ -216,7 +218,6 @@
             return;
         }
 
-        // Group by team
         let teams = {};
         players.forEach(p => {
             if(!teams[p.team]) teams[p.team] = [];
@@ -232,51 +233,94 @@
             
             titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${t1Name} VS ${t2Name}`;
 
-            let frontMatch = 0, backMatch = 0, totalMatch = 0;
-            let frontThru = 0, backThru = 0;
+            // Initialize Auto-Press Match Arrays
+            const pressRule = currentData.nassauPressRule || "none";
+            let pressThreshold = 99;
+            if (pressRule === "2down") pressThreshold = 2;
+            if (pressRule === "1down") pressThreshold = 1;
+
+            let frontMatches = [{ startHole: 1, endHole: 9, status: 0 }];
+            let backMatches = [{ startHole: 10, endHole: 18, status: 0 }];
+            let overallMatches = [{ startHole: 1, endHole: 18, status: 0 }];
+
+            let totalThru = 0;
 
             courseData.forEach((hole, idx) => {
-                let team1Best = 999;
-                let team2Best = 999;
-                let t1Valid = false;
-                let t2Valid = false;
+                let team1Best = 999, team2Best = 999;
+                let t1Valid = false, t2Valid = false;
 
                 teams[t1Name].forEach(p => {
                     let v = savedScores[`p${p.id}_h${hole.hole}`];
                     if (v && v > 0) {
-                        let s = parseInt(v, 10);
-                        if (scoringType === 'net') s -= getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
                         if (s < team1Best) team1Best = s;
                         t1Valid = true;
                     }
                 });
-
                 teams[t2Name].forEach(p => {
                     let v = savedScores[`p${p.id}_h${hole.hole}`];
                     if (v && v > 0) {
-                        let s = parseInt(v, 10);
-                        if (scoringType === 'net') s -= getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
                         if (s < team2Best) team2Best = s;
                         t2Valid = true;
                     }
                 });
 
                 if (t1Valid && t2Valid) {
-                    let diff = 0;
-                    if (team1Best < team2Best) diff = 1;
-                    if (team2Best < team1Best) diff = -1;
+                    totalThru++;
+                    let diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
 
-                    if (idx < 9) { frontMatch += diff; frontThru++; }
-                    else { backMatch += diff; backThru++; }
-                    totalMatch += diff;
+                    // Update Front 9 Matches + Check Presses
+                    if (idx < 9) {
+                        frontMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
+                        let lastFront = frontMatches[frontMatches.length - 1];
+                        if (pressRule !== "none" && hole.hole < 9 && Math.abs(lastFront.status) >= pressThreshold) {
+                            frontMatches.push({ startHole: hole.hole + 1, endHole: 9, status: 0 });
+                        }
+                    }
+                    
+                    // Update Back 9 Matches + Check Presses
+                    if (idx >= 9) {
+                        backMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
+                        let lastBack = backMatches[backMatches.length - 1];
+                        if (pressRule !== "none" && hole.hole < 18 && Math.abs(lastBack.status) >= pressThreshold) {
+                            backMatches.push({ startHole: hole.hole + 1, endHole: 18, status: 0 });
+                        }
+                    }
+
+                    // Update Overall Match(es)
+                    overallMatches.forEach(m => { if (hole.hole >= m.startHole) m.status += diff; });
+                    let lastOverall = overallMatches[overallMatches.length - 1];
+                    if (pressRule !== "none" && hole.hole < 18 && Math.abs(lastOverall.status) >= pressThreshold) {
+                        overallMatches.push({ startHole: hole.hole + 1, endHole: 18, status: 0 });
+                    }
                 }
             });
 
+            // Status display (based on primary overall match)
+            let mainMatchStatus = overallMatches[0].status;
+            if (totalThru === 0) {
+                statusEl.textContent = "ALL SQUARE (Match Not Started)";
+            } else if (mainMatchStatus === 0) {
+                statusEl.textContent = `ALL SQUARE (Thru ${totalThru})`;
+            } else if (mainMatchStatus > 0) {
+                statusEl.textContent = `🟢 ${t1Name} is ${mainMatchStatus}UP (Thru ${totalThru})`;
+            } else {
+                statusEl.textContent = `🟢 ${t2Name} is ${Math.abs(mainMatchStatus)}UP (Thru ${totalThru})`;
+            }
+
             if (gameFormat === 'nassau') {
-                const p1Front = (frontThru > 0) ? (frontMatch > 0 ? stake : (frontMatch < 0 ? -stake : 0)) : 0;
-                const p1Back = (backThru > 0) ? (backMatch > 0 ? stake : (backMatch < 0 ? -stake : 0)) : 0;
-                const p1Total = ((frontThru + backThru) > 0) ? (totalMatch > 0 ? stake : (totalMatch < 0 ? -stake : 0)) : 0;
-                const p1Net = p1Front + p1Back + p1Total;
+                function calcPayout(matchesArray) {
+                    return matchesArray.reduce((sum, m) => {
+                        if (m.status > 0) return sum + stake;
+                        if (m.status < 0) return sum - stake;
+                        return sum;
+                    }, 0);
+                }
+
+                const p1Front = calcPayout(frontMatches);
+                const p1Back = calcPayout(backMatches);
+                const p1Total = calcPayout(overallMatches);
 
                 function formatMoney(amount) {
                     if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
@@ -284,24 +328,15 @@
                     return `<span class="val-even">$0</span>`;
                 }
 
-                document.getElementById("payout-rows-wrapper").innerHTML = `
-                    <div class="payout-row"><span>Front 9:</span><span>${t1Name}: ${p1Front > 0 ? '+$'+p1Front : (p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')} | ${t2Name}: ${-p1Front > 0 ? '+$'+(-p1Front) : (-p1Front < 0 ? '-$'+Math.abs(p1Front) : '$0')}</span></div>
-                    <div class="payout-row"><span>Back 9:</span><span>${t1Name}: ${p1Back > 0 ? '+$'+p1Back : (p1Back < 0 ? '-$'+Math.abs(p1Back) : '$0')} | ${t2Name}: ${-p1Back > 0 ? '+$'+(-p1Back) : (-p1Back < 0 ? '-$'+Math.abs(p1Back) : '$0')}</span></div>
-                    <div class="payout-row"><span>Total 18:</span><span>${t1Name}: ${p1Total > 0 ? '+$'+p1Total : (p1Total < 0 ? '-$'+Math.abs(p1Total) : '$0')} | ${t2Name}: ${-p1Total > 0 ? '+$'+(-p1Total) : (-p1Total < 0 ? '-$'+Math.abs(p1Total) : '$0')}</span></div>
-                `;
-            }
+                function formatPressNote(matchesArray) {
+                    return matchesArray.length > 1 ? `<span class="press-note">(w/ ${matchesArray.length - 1} Presses)</span>` : "";
+                }
 
-            let matchStatus = frontThru < 9 ? frontMatch : totalMatch;
-            let thruCount = frontThru + backThru;
-            
-            if (thruCount === 0) {
-                statusEl.textContent = "ALL SQUARE (Match Not Started)";
-            } else if (matchStatus === 0) {
-                statusEl.textContent = `ALL SQUARE (Thru ${thruCount})`;
-            } else if (matchStatus > 0) {
-                statusEl.textContent = `🟢 ${t1Name} is ${matchStatus}UP (Thru ${thruCount})`;
-            } else {
-                statusEl.textContent = `🟢 ${t2Name} is ${Math.abs(matchStatus)}UP (Thru ${thruCount})`;
+                document.getElementById("payout-rows-wrapper").innerHTML = `
+                    <div class="payout-row"><span>Front 9 ${formatPressNote(frontMatches)}:</span><span>${t1Name}: ${formatMoney(p1Front)} | ${t2Name}: ${formatMoney(-p1Front)}</span></div>
+                    <div class="payout-row"><span>Back 9 ${formatPressNote(backMatches)}:</span><span>${t1Name}: ${formatMoney(p1Back)} | ${t2Name}: ${formatMoney(-p1Back)}</span></div>
+                    <div class="payout-row"><span>Total 18 ${formatPressNote(overallMatches)}:</span><span>${t1Name}: ${formatMoney(p1Total)} | ${t2Name}: ${formatMoney(-p1Total)}</span></div>
+                `;
             }
 
         } else {
@@ -311,8 +346,7 @@
             let maxThru = 0;
 
             players.forEach(p => {
-                let netTotal = 0;
-                let thru = 0;
+                let netTotal = 0, thru = 0;
                 courseData.forEach(hole => {
                     const val = savedScores[`p${p.id}_h${hole.hole}`];
                     if (val && val > 0) {
@@ -390,17 +424,14 @@
         courseData.forEach(h => {
             let rowHtml = `<tr><td style="padding-top:14px;"><strong>${h.hole}</strong></td><td style="padding-top:14px;">${h.par}</td><td style="color:#666; padding-top:14px;">${h.hcpIndex}</td>`;
 
-            let team1Best = 999;
-            let team2Best = 999;
-            let t1Valid = false;
-            let t2Valid = false;
+            let team1Best = 999, team2Best = 999;
+            let t1Valid = false, t2Valid = false;
 
             if (showTeamMatchColumn) {
                 teamsInGroup[teamKeys[0]].forEach(p => {
                     let v = savedScores[`p${p.id}_h${h.hole}`];
                     if (v && v > 0) {
-                        let s = parseInt(v, 10);
-                        if (scoringType === 'net') s -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(h.hcpIndex, parseHcp(p.hcp)) : 0);
                         if (s < team1Best) team1Best = s;
                         t1Valid = true;
                     }
@@ -408,8 +439,7 @@
                 teamsInGroup[teamKeys[1]].forEach(p => {
                     let v = savedScores[`p${p.id}_h${h.hole}`];
                     if (v && v > 0) {
-                        let s = parseInt(v, 10);
-                        if (scoringType === 'net') s -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(h.hcpIndex, parseHcp(p.hcp)) : 0);
                         if (s < team2Best) team2Best = s;
                         t2Valid = true;
                     }
