@@ -211,6 +211,7 @@
     <a href="skins.html" class="nav-item">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
     <a href="settlement.html" class="nav-item">💸 Settle</a>
+    <a href="admin.html" class="nav-item active">⚙️ Admin</a>
 </div>
 
 <script>
@@ -383,6 +384,9 @@
                 { id: 103, name: "Player 3", hcp: "0", team: "T-2", squad: "red" },
                 { id: 104, name: "Player 4", hcp: "0", team: "T-2", squad: "blue" }
             ];
+
+            // 💥 THE FIX: Clear the visual rows so the app doesn't accidentally keep the old names
+            document.getElementById("player-list").innerHTML = "";
 
             handleFormatChange();
         });
