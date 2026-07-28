@@ -365,7 +365,7 @@
         const rows = document.querySelectorAll('.player-row');
         const list = [];
         rows.forEach((row, idx) => {
-            const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : `Player ${idx + 1}`;
+            const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : "";
             const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
             const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / 2) + 1}`;
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
@@ -493,7 +493,7 @@
         const row = document.createElement("div");
         row.className = `player-row ${gridClass}`;
         row.innerHTML = `
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${name || (isNewBtnClick ? 'Player ' + currentCount : '')}">
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
             ${teamFieldHtml}
             ${squadFieldHtml}
@@ -531,7 +531,7 @@
 
         const playersList = [];
         rows.forEach((row, idx) => {
-            const nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
+            let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
             let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
             
             const teamSelect = row.querySelector('.p-team-input');
