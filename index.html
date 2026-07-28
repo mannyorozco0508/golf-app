@@ -9,13 +9,26 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f6f8; margin: 0; padding: 12px 12px 90px 12px; color: #1a1a1a;
+            background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a;
             -webkit-text-size-adjust: 100%;
         }
         .container { max-width: 850px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 12px; }
         .header-box { text-align: center; margin-bottom: 8px; }
         .header-title { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin: 0; }
         .header-sub { font-size: 0.85rem; color: #666; margin-top: 2px; }
+
+        /* Upgraded Large Top Navigation Bar for Easy Tapping */
+        .top-nav-bar {
+            display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item {
+            flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a;
+            border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem;
+            text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+        }
+        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
         
         .live-ticker-box {
             background: #1d3557; color: #ffffff; border-radius: 10px;
@@ -104,14 +117,6 @@
         .press-btn.active-press {
             background-color: #e63946; color: #ffffff; border-color: #e63946;
         }
-
-        .nav-bar {
-            position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
-            border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100;
-        }
-        .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
-        .nav-item.active { color: #0f4c3a; }
     </style>
 </head>
 <body>
@@ -120,6 +125,16 @@
     <div class="header-box">
         <h1 class="header-title" id="course-title">Golf Scorecard</h1>
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
+    </div>
+
+    <!-- Top Navigation Bar for Effortless Tapping -->
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item active nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Admin</a>
     </div>
 
     <div class="live-ticker-box">
@@ -146,15 +161,6 @@
             <tbody id="card-body"></tbody>
         </table>
     </div>
-</div>
-
-<div class="nav-bar">
-    <a href="index.html" class="nav-item nav-link active">📝 Card</a>
-    <a href="leaderboard.html" class="nav-item nav-link">🏆 Board</a>
-    <a href="skins.html" class="nav-item nav-link">💰 Action</a>
-    <a href="stats.html" class="nav-item nav-link">📊 Stats</a>
-    <a href="settlement.html" class="nav-item nav-link">💸 Settle</a>
-    <a href="admin.html" class="nav-item nav-link">⚙️ Admin</a>
 </div>
 
 <script>
@@ -436,7 +442,6 @@
                     let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
                     let toParColor = runningStats[p.id] === 0 ? "#1a1a1a" : (runningStats[p.id] > 0 ? "#1a1a1a" : "#e63946");
                     
-                    // Displayed cleanly underneath the score box
                     currentToParHtml = `<div style="font-size: 0.7rem; font-weight: bold; color: ${toParColor}; margin-top: 2px; text-align: center;">${toParText}</div>`;
                 }
 
