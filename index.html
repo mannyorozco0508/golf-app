@@ -17,7 +17,7 @@
         .header-title { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin: 0; }
         .header-sub { font-size: 0.85rem; color: #666; margin-top: 2px; }
 
-        /* Upgraded Large Top Navigation Bar for Easy Tapping */
+        /* Top Navigation Bar */
         .top-nav-bar {
             display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 12px;
             border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -117,6 +117,10 @@
         .press-btn.active-press {
             background-color: #e63946; color: #ffffff; border-color: #e63946;
         }
+
+        /* End Game Button Box on Card Page */
+        .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
+        .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -127,7 +131,7 @@
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
     </div>
 
-    <!-- Top Navigation Bar for Effortless Tapping -->
+    <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link">📝 Card</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
@@ -160,6 +164,13 @@
             </thead>
             <tbody id="card-body"></tbody>
         </table>
+    </div>
+
+    <!-- End Game & Wipe Option on Card Page -->
+    <div class="end-box-card">
+        <h3 style="color: #e63946; margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 10px;">Finished playing? Completely wipe this room to start fresh.</span>
+        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
     </div>
 </div>
 
@@ -255,6 +266,17 @@
             db.ref(`events/${currentMode}/manualPresses/h${holeNum}`).remove();
         } else {
             db.ref(`events/${currentMode}/manualPresses/h${holeNum}`).set(true);
+        }
+    }
+
+    function endAndClearRound() {
+        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
+            db.ref(`events/${currentMode}`).remove().then(() => {
+                alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
+                window.location.reload(); 
+            }).catch((err) => {
+                alert(`Error clearing room: ${err.message}`);
+            });
         }
     }
 
@@ -378,7 +400,7 @@
         if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Weekend Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
 
         renderGroupFilters(players.length);
 
