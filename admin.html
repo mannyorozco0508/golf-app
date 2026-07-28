@@ -78,6 +78,10 @@
     <div class="form-group">
         <label>Select Golf Course for Active Round</label>
         <select id="course-select" onchange="handleCourseChange()">
+            <optgroup label="🌴 Florida (Miami / Hollywood)">
+                <option value="emerald_hills">The Club at Emerald Hills (Par 72)</option>
+                <option value="hollywood_beach">Hollywood Beach Golf Club (Par 70)</option>
+            </optgroup>
             <optgroup label="🌲 Connecticut / Local (Milford Area)">
                 <option value="greatriver">Great River Golf Club (Par 72)</option>
                 <option value="yale">The Course at Yale (Par 70)</option>
@@ -219,6 +223,10 @@
     };
 
     const coursePresets = {
+        // FL COURSES
+        emerald_hills: { name: "The Club at Emerald Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:8},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
+        hollywood_beach: { name: "Hollywood Beach Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
+        
         // CT COURSES
         yale: { name: "The Course at Yale", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
         greatriver: { name: "Great River Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:5},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:18},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:6}] },
