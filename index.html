@@ -50,11 +50,12 @@
 
         .card-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .card-table { width: 100%; border-collapse: collapse; min-width: 320px; }
-        .card-table th, .card-table td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.85rem; }
-        .card-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
+        .card-table th, .card-table td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: top; }
+        .card-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; vertical-align: middle; }
 
         .match-cell-container {
             display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: bold; font-size: 0.85rem;
+            margin-top: 8px;
         }
         .match-arrow { font-size: 1.1rem; font-weight: bold; color: #1d3557; }
 
@@ -70,8 +71,14 @@
             width: 38px; height: 34px; text-align: center; font-weight: bold;
             border: 1px solid #ccc; border-radius: 6px; background-color: #fff;
             font-size: 16px; 
+            margin-top: 2px;
         }
         .score-input:focus { border-color: #2a9d8f; outline: none; background-color: #eef6f2; }
+
+        .stroke-dots {
+            color: #2a9d8f; font-size: 1.3rem; line-height: 0.5; height: 8px; 
+            margin-top: 4px; font-weight: bold; letter-spacing: 1px;
+        }
 
         .nav-bar {
             position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff;
@@ -330,7 +337,6 @@
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
         
-        // Show proper subtitle formatting
         if (gameFormat === 'match' || gameFormat === 'nassau') {
             document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
         } else {
@@ -345,7 +351,6 @@
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        // Header
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
@@ -356,14 +361,13 @@
             }
         });
 
-        // Body with Hole-by-Hole Match Column
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
 
         let runningMatchStatus = 0; 
 
         courseData.forEach(h => {
-            let rowHtml = `<tr><td><strong>${h.hole}</strong></td><td>${h.par}</td><td style="color:#666;">${h.hcpIndex}</td>`;
+            let rowHtml = `<tr><td style="padding-top:14px;"><strong>${h.hole}</strong></td><td style="padding-top:14px;">${h.par}</td><td style="color:#666; padding-top:14px;">${h.hcpIndex}</td>`;
 
             if ((gameFormat === 'nassau' || gameFormat === 'match') && filteredPlayers.length === 2) {
                 const p1 = filteredPlayers[0];
@@ -397,18 +401,40 @@
                 const s1 = savedScores[`p${p1.id}_h${h.hole}`] || "";
                 const s2 = savedScores[`p${p2.id}_h${h.hole}`] || "";
 
+                // Calculate strokes for dots
+                const strokes1 = getStrokes(h.hcpIndex, parseHcp(p1.hcp));
+                const strokes2 = getStrokes(h.hcpIndex, parseHcp(p2.hcp));
+                const dots1 = strokes1 > 0 ? "•".repeat(strokes1) : (strokes1 < 0 ? "+" : "");
+                const dots2 = strokes2 > 0 ? "•".repeat(strokes2) : (strokes2 < 0 ? "+" : "");
+
                 rowHtml += `
-                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s1}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)"></td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <input type="number" pattern="[0-9]*" class="score-input" value="${s1}" onchange="saveScore(${p1.id}, ${h.hole}, this.value)">
+                            <div class="stroke-dots">${dots1}</div>
+                        </div>
+                    </td>
                     <td>${holeBadge}</td>
-                    <td><input type="number" pattern="[0-9]*" class="score-input" value="${s2}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)"></td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <input type="number" pattern="[0-9]*" class="score-input" value="${s2}" onchange="saveScore(${p2.id}, ${h.hole}, this.value)">
+                            <div class="stroke-dots">${dots2}</div>
+                        </div>
+                    </td>
                 `;
             } else {
                 filteredPlayers.forEach(p => {
                     const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
+                    const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                    const dots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
+                    
                     rowHtml += `
                         <td>
-                            <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
-                                   onchange="saveScore(${p.id}, ${h.hole}, this.value)">
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
+                                       onchange="saveScore(${p.id}, ${h.hole}, this.value)">
+                                <div class="stroke-dots">${dots}</div>
+                            </div>
                         </td>
                     `;
                 });
