@@ -13,24 +13,29 @@
         h2 { color: #0f4c3a; text-align: center; margin-top: 0; }
         .action-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
         
-        .hole-wolf-row { 
-            display: grid; 
-            grid-template-columns: 50px 1fr 1fr 1fr; 
-            gap: 6px; 
-            align-items: center; 
-            background: #fff; 
-            padding: 8px; 
-            border-radius: 8px; 
-            margin-bottom: 8px; 
-            border: 1px solid #d0e1db; 
-        }
+        /* Wolf & Dots CSS */
+        .hole-wolf-row { display: grid; grid-template-columns: 50px 1fr 1fr 1fr; gap: 6px; align-items: center; background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; }
         @media (max-width: 480px) { .hole-wolf-row { grid-template-columns: 1fr 1fr; gap: 8px; } }
-        
         select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.85rem; box-sizing: border-box; }
-        
         .dot-btn { width: 40px; height: 40px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; }
         .btn-minus { background: #e63946; color: white; }
         .btn-plus { background: #2a9d8f; color: white; }
+
+        /* Skins CSS */
+        .skins-summary { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+        .skins-card { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #d0e1db; display: flex; justify-content: space-between; align-items: center;}
+        .skins-player { font-weight: bold; font-size: 1.05rem; color: #1d3557; }
+        .skins-badges { display: flex; gap: 8px; }
+        .skin-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
+        .badge-gross { background: #2a9d8f; color: #fff; }
+        .badge-net { background: #1d3557; color: #fff; }
+
+        .skins-table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid #d0e1db; }
+        .skins-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8rem; text-align: center; min-width: 400px; }
+        .skins-table th { background: #f0f4f2; color: #0f4c3a; padding: 10px 6px; border-bottom: 2px solid #d0e1db; }
+        .skins-table td { padding: 8px 6px; border-bottom: 1px solid #eee; }
+        .skin-win { font-weight: bold; color: #2a9d8f; }
+        .skin-push { color: #888; font-style: italic; }
 
         .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); z-index: 100; }
         .nav-item { text-decoration: none; color: #666; font-weight: 600; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; }
@@ -48,6 +53,7 @@
     <a href="leaderboard.html" class="nav-item">🏆 Board</a>
     <a href="skins.html" class="nav-item active">💰 Action</a>
     <a href="stats.html" class="nav-item">📊 Stats</a>
+    <a href="settlement.html" class="nav-item">💸 Settle</a>
     <a href="admin.html" class="nav-item">⚙️ Admin</a>
 </div>
 
@@ -68,6 +74,25 @@
     let activeMode = "regular";
     let currentData = {};
 
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
     db.ref().on('value', (snapshot) => {
         const rootData = snapshot.val() || {};
         activeMode = rootData.active_event_mode || "regular";
@@ -82,7 +107,7 @@
     function changeDots(playerId, amount) {
         const currentDots = (currentData.dots && currentData.dots[`p${playerId}`]) ? parseInt(currentData.dots[`p${playerId}`], 10) : 0;
         let newDots = currentDots + amount;
-        if (newDots < 0) newDots = 0; // Prevent negative dots
+        if (newDots < 0) newDots = 0; 
         db.ref(`events/${activeMode}/dots/p${playerId}`).set(newDots);
     }
 
@@ -90,6 +115,8 @@
         const container = document.getElementById("main-container");
         const players = currentData.players || [];
         const gameFormat = currentData.gameFormat || "stroke";
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
 
         if (gameFormat === 'wolf') {
             const wolfPicks = currentData.wolfPicks || {};
@@ -164,12 +191,121 @@
             html += `</div>`;
             container.innerHTML = html;
 
+        } else if (gameFormat === 'skins') {
+            let grossSkins = {};
+            let netSkins = {};
+            players.forEach(p => { grossSkins[p.id] = 0; netSkins[p.id] = 0; });
+            
+            let grossCarry = 0;
+            let netCarry = 0;
+            let skinsDetails = [];
+
+            courseData.forEach((hole) => {
+                let holeScores = [];
+                
+                players.forEach(p => {
+                    const v = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (v && v > 0) {
+                        let gross = parseInt(v, 10);
+                        let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        holeScores.push({ id: p.id, name: p.name, gross, net });
+                    }
+                });
+
+                if (holeScores.length > 0) {
+                    let minGross = Math.min(...holeScores.map(s => s.gross));
+                    let minNet = Math.min(...holeScores.map(s => s.net));
+                    
+                    let grossWinners = holeScores.filter(s => s.gross === minGross);
+                    let netWinners = holeScores.filter(s => s.net === minNet);
+                    
+                    let gWinName = "Push", nWinName = "Push";
+                    let gSkinsWon = 0, nSkinsWon = 0;
+
+                    if (grossWinners.length === 1) {
+                        gWinName = grossWinners[0].name;
+                        gSkinsWon = grossCarry + 1;
+                        grossSkins[grossWinners[0].id] += gSkinsWon;
+                        grossCarry = 0;
+                    } else {
+                        grossCarry++;
+                    }
+
+                    if (netWinners.length === 1) {
+                        nWinName = netWinners[0].name;
+                        nSkinsWon = netCarry + 1;
+                        netSkins[netWinners[0].id] += nSkinsWon;
+                        netCarry = 0;
+                    } else {
+                        netCarry++;
+                    }
+                    
+                    skinsDetails.push({
+                        hole: hole.hole,
+                        gWinName, gSkinsWon, minGross, grossCarryNow: grossCarry,
+                        nWinName, nSkinsWon, minNet, netCarryNow: netCarry
+                    });
+                }
+            });
+
+            let html = `<h2>🥩 Live Skins Game</h2>`;
+            html += `<div style="font-size: 0.85rem; color: #555; text-align: center; margin-bottom: 14px;">Total Gross & Net Skins Won</div>`;
+            
+            html += `<div class="skins-summary">`;
+            players.forEach(p => {
+                if (grossSkins[p.id] > 0 || netSkins[p.id] > 0) {
+                    html += `
+                        <div class="skins-card">
+                            <span class="skins-player">${p.name}</span>
+                            <div class="skins-badges">
+                                ${grossSkins[p.id] > 0 ? `<span class="skin-badge badge-gross">${grossSkins[p.id]} Gross</span>` : ''}
+                                ${netSkins[p.id] > 0 ? `<span class="skin-badge badge-net">${netSkins[p.id]} Net</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            html += `</div>`;
+
+            if (skinsDetails.length === 0) {
+                html += `<div class="action-card" style="text-align:center;">Awaiting hole scores...</div>`;
+            } else {
+                html += `
+                    <div class="skins-table-wrapper">
+                        <table class="skins-table">
+                            <thead>
+                                <tr>
+                                    <th>Hole</th>
+                                    <th>Gross Winner</th>
+                                    <th>Net Winner</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                skinsDetails.forEach(sd => {
+                    let gText = sd.gWinName === "Push" ? `<span class="skin-push">Push (Carry: ${sd.grossCarryNow})</span>` : `<span class="skin-win">${sd.gWinName} (${sd.minGross})<br><small>Won ${sd.gSkinsWon}</small></span>`;
+                    let nText = sd.nWinName === "Push" ? `<span class="skin-push">Push (Carry: ${sd.netCarryNow})</span>` : `<span class="skin-win">${sd.nWinName} (${sd.minNet})<br><small>Won ${sd.nSkinsWon}</small></span>`;
+                    
+                    html += `
+                        <tr>
+                            <td><strong>${sd.hole}</strong></td>
+                            <td>${gText}</td>
+                            <td>${nText}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `</tbody></table></div>`;
+            }
+            container.innerHTML = html;
+
         } else {
             container.innerHTML = `
                 <h2>💰 Action Tab</h2>
                 <div class="action-card" style="text-align:center; padding:30px;">
                     <h3>No Active Action Game</h3>
-                    <p style="color:#666;">Switch your Round Format in Admin to <strong>Wolf Game</strong> or <strong>Dot Game</strong> to use the tracker tools here.</p>
+                    <p style="color:#666;">Switch your Round Format in Admin to <strong>Wolf, Dots, or Skins</strong> to use the tracker tools here.</p>
                 </div>
             `;
         }
