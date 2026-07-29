@@ -184,17 +184,21 @@
     }
 
     function shareResults() {
-        const currentUrl = window.location.href;
-        const textMsg = `Check out the live leaderboard results for Room ${currentMode}! ⛳`;
+        // Bulletproof URL builder - works perfectly regardless of GitHub Pages hiding the .html
+        const rawUrl = window.location.href.split('?')[0];
+        const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
+        const sharedUrl = dirUrl + `/shared.html?game=${currentMode}`;
+        
+        const textMsg = `Check out the live scorecard for Room ${currentMode}! ⛳`;
         
         if (navigator.share) {
             navigator.share({
-                title: 'Golf Leaderboard',
+                title: 'Live Scorecard',
                 text: textMsg,
-                url: currentUrl
+                url: sharedUrl
             }).catch(console.error);
         } else {
-            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + currentUrl)}`;
+            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + sharedUrl)}`;
             window.location.href = smsUrl;
         }
     }
@@ -267,7 +271,7 @@
             });
 
             html += `</tbody></table>`;
-            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Leaderboard</button>`;
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Live Scorecard</button>`;
             container.innerHTML = html;
 
         } else if (activeView === "team") {
@@ -375,7 +379,7 @@
                     </table>
                 `;
             }
-            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Match Results</button>`;
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Live Scorecard</button>`;
             container.innerHTML = html;
         }
     }
