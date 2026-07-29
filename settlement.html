@@ -27,6 +27,8 @@
         
         .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: #555; border-top: 1px solid #d0e1db; padding-top: 8px; }
         .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
+
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
     </style>
 </head>
 <body>
@@ -103,6 +105,22 @@
         }
     }
 
+    function shareResults() {
+        const currentUrl = window.location.href;
+        const textMsg = `Check out the final payout ledger for Room ${currentMode}! 💸⛳`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'Golf Settlement',
+                text: textMsg,
+                url: currentUrl
+            }).catch(console.error);
+        } else {
+            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + currentUrl)}`;
+            window.location.href = smsUrl;
+        }
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, currentData) {
         if (!players || players.length < 2) return null;
         let t1Name = players[0].name.split(" ")[0];
@@ -170,10 +188,54 @@
         const gameFormat = data.gameFormat || "stroke";
         const stake = data.nassauStake || 10;
 
+        if (gameFormat === 'dots') {
+            let playerDots = {};
+            players.forEach(p => playerDots[p.id] = 0);
+            
+            if (data.dots) {
+                Object.values(data.dots).forEach(holeDots => {
+                    Object.keys(holeDots).forEach(pKey => {
+                        let pid = pKey.replace('p', '');
+                        if (playerDots[pid] !== undefined) {
+                            holeDots[pKey].forEach(dotType => {
+                                if (dotType === 'snake') playerDots[pid] -= 1;
+                                else playerDots[pid] += 1;
+                            });
+                        }
+                    });
+                });
+            }
+
+            let dotVal = data.dotPointVal || 1;
+            let ledgerHtml = "";
+            
+            players.forEach(p => {
+                let pts = playerDots[p.id];
+                let money = pts * dotVal;
+                let moneyClass = pts >= 0 ? "val-pos" : "val-neg";
+                let moneyText = pts >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
+                
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} Dots):</span>
+                        <span class="${moneyClass}">${moneyText}</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="settle-header">🎯 Final Dot Game Settlement</div>
+                ${ledgerHtml}
+                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Payouts</button>
+            `;
+            return;
+        }
+
         if (gameFormat !== 'nassau' && gameFormat !== 'match') {
             container.innerHTML = `
                 <div class="settle-header">Final Ledger</div>
-                <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau and Match Play formats.</div>
+                <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
+                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Share Link</button>
             `;
             return;
         }
@@ -236,6 +298,8 @@
                 <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
                 ${breakdownHtml}
             </div>
+
+            <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Payouts</button>
         `;
     }
 </script>
