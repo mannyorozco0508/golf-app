@@ -49,7 +49,7 @@
 </head>
 <body>
 
-<!-- LOBBY VIEW -->
+<!-- LOBBY VIEW (Scrubbed of public game list) -->
 <div class="container" id="lobby-view" style="display: none;">
     <div class="logo-box">
         <div class="logo-icon">⛳</div>
@@ -88,7 +88,15 @@
         <div class="section-title">Event Info</div>
         <div class="form-group">
             <label>Golf Course Name</label>
-            <input type="text" id="course-name" placeholder="e.g. Pebble Beach">
+            <!-- Dropdown List Restored Here -->
+            <input type="text" id="course-name" list="course-options" placeholder="Select or type a course...">
+            <datalist id="course-options">
+                <option value="Chambers Bay">
+                <option value="Pebble Beach">
+                <option value="Bandon Dunes">
+                <option value="Pinehurst No. 2">
+                <option value="Local Muni Course">
+            </datalist>
         </div>
         <div class="form-group">
             <label>Event / Trip Name</label>
@@ -272,11 +280,13 @@
     function loadAdminData() {
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val();
+            
+            // IF NEW GAME: Leave players empty! Do not auto-generate rows.
             if(!data) {
-                addPlayerRow(); addPlayerRow(); addPlayerRow(); addPlayerRow();
-                return;
+                return; 
             }
 
+            // IF EXISTING GAME: Load all the data normally.
             document.getElementById("course-name").value = data.courseName || "";
             document.getElementById("event-name").value = data.eventName || "";
             document.getElementById("game-format").value = data.gameFormat || "stroke";
@@ -290,10 +300,8 @@
 
             toggleFormatOptions();
 
-            if (data.players) {
+            if (data.players && data.players.length > 0) {
                 data.players.forEach(p => addPlayerRow(p.name, p.hcp, p.team || ""));
-            } else {
-                addPlayerRow();
             }
 
             if (data.courseData) {
