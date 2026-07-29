@@ -36,7 +36,8 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         }
         .ticker-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #a8dadc; font-weight: bold; }
-        .ticker-status { font-size: 1.05rem; font-weight: bold; margin-top: 2px; color: #fff; }
+        .ticker-status { font-size: 0.95rem; font-weight: bold; margin-top: 4px; color: #fff; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+        .ticker-part { background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 6px; }
 
         .nassau-payout-box {
             background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px;
@@ -118,7 +119,6 @@
             background-color: #e63946; color: #ffffff; border-color: #e63946;
         }
 
-        /* End Game Button Box on Card Page */
         .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
     </style>
@@ -166,7 +166,6 @@
         </table>
     </div>
 
-    <!-- End Game & Wipe Option on Card Page -->
     <div class="end-box-card">
         <h3 style="color: #e63946; margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 10px;">Finished playing? Completely wipe this room to start fresh.</span>
@@ -382,6 +381,12 @@
         return { t1Name, t2Name, activeMatches, holeMatchLog };
     }
 
+    function formatMatchStatus(status, t1, t2) {
+        if (status === 0) return "AS";
+        if (status > 0) return `${t1} ${status}UP`;
+        return `${t2} ${Math.abs(status)}UP`;
+    }
+
     function renderScorecard() {
         if (!currentData || Object.keys(currentData).length === 0) {
             document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: #666;">No data found for this room. Waiting for Admin to save settings...</td></tr>`;
@@ -400,7 +405,7 @@
         if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Weekend Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
 
         renderGroupFilters(players.length);
 
@@ -496,10 +501,7 @@
 
                     if (log.valid) {
                         log.matches.forEach(m => {
-                            let statusText = "AS";
-                            if (m.status > 0) statusText = `${t1} ${m.status}UP`;
-                            if (m.status < 0) statusText = `${t2} ${Math.abs(m.status)}UP`;
-
+                            let statusText = formatMatchStatus(m.status, t1, t2);
                             let pillClass = m.id.startsWith('P') ? 'pill-press' : 'pill-main';
                             matchCellHtml += `<span class="status-pill ${pillClass}">${m.label}: ${statusText}</span>`;
                         });
@@ -565,12 +567,19 @@
         if (showMatchColumn && matchCalculations) {
             titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${matchCalculations.t1Name} VS ${matchCalculations.t2Name}`;
             
-            let mainMatch = matchCalculations.activeMatches.find(m => m.id === '18');
-            let mainStatus = mainMatch ? mainMatch.status : 0;
+            let f9Match = matchCalculations.activeMatches.find(m => m.id === 'F9');
+            let b9Match = matchCalculations.activeMatches.find(m => m.id === 'B9');
+            let o18Match = matchCalculations.activeMatches.find(m => m.id === '18');
 
-            if (mainStatus === 0) statusEl.textContent = `ALL SQUARE`;
-            else if (mainStatus > 0) statusEl.textContent = `🟢 ${matchCalculations.t1Name} IS ${mainStatus} UP`;
-            else statusEl.textContent = `🟢 ${matchCalculations.t2Name} IS ${Math.abs(mainStatus)} UP`;
+            let f9Text = f9Match ? formatMatchStatus(f9Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
+            let b9Text = b9Match ? formatMatchStatus(b9Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
+            let o18Text = o18Match ? formatMatchStatus(o18Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
+
+            statusEl.innerHTML = `
+                <span class="ticker-part">Front: <strong>${f9Text}</strong></span>
+                <span class="ticker-part">Back: <strong>${b9Text}</strong></span>
+                <span class="ticker-part">Overall: <strong>${o18Text}</strong></span>
+            `;
 
             if (gameFormat === 'nassau') {
                 payoutBox.style.display = "block";
