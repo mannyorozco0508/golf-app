@@ -676,6 +676,22 @@
     if (currentMode) {
         generateQRCode();
     }
+
+    // --- POPULATE COURSE DROPDOWN IMMEDIATELY ON FOCUS OR CLICK ---
+    courseSearchInput.addEventListener('focus', () => {
+        populateCourseDropdown("");
+        courseDropdown.style.display = "block";
+    });
+
+    courseSearchInput.addEventListener('click', () => {
+        populateCourseDropdown("");
+        courseDropdown.style.display = "block";
+    });
+
+    courseSearchInput.addEventListener('input', (e) => {
+        populateCourseDropdown(e.target.value);
+        courseDropdown.style.display = "block";
+    });
 </script>
 
 </body>
