@@ -11,7 +11,7 @@
         .container { max-width: 1000px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
         .header-box { text-align: center; margin-bottom: 16px; }
         .header-title { font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin: 0 0 4px 0; }
-        .header-sub { font-size: 0.9rem; color: #666; }
+        .header-sub { font-size: 0.9rem; color: #666; font-weight: bold; }
         
         .scorecard-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #e0e0e0; }
         .scorecard-table { border-collapse: collapse; min-width: 750px; width: 100%; font-size: 0.85rem; }
@@ -81,8 +81,15 @@
             return;
         }
 
-        document.getElementById("course-title").textContent = data.eventName || "Live Round";
-        document.getElementById("format-subtitle").textContent = data.courseName || "Golf Course";
+        const courseName = data.courseName || "Golf Course";
+        const eventName = data.eventName || "Live Round";
+        
+        // Dynamically format today's date for the spectator
+        const dateObj = new Date();
+        const dateString = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+
+        document.getElementById("course-title").textContent = courseName;
+        document.getElementById("format-subtitle").textContent = `${eventName} • ${dateString}`;
 
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
@@ -133,9 +140,9 @@
 
                     let shape = "";
                     if (diff === -1) {
-                        shape = `<div class="circle-1"></div>`;
+                        shape = `<div class="circle-1"></div>`; // Birdie
                     } else if (diff <= -2) {
-                        shape = `<div class="circle-1"></div><div class="circle-2"></div>`;
+                        shape = `<div class="circle-1"></div><div class="circle-2"></div>`; // Eagle or better
                     } 
 
                     display = `<div class="score-cell">${score}${shape}</div>`;
