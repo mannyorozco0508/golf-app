@@ -120,9 +120,10 @@
         .dots-btn { background-color: #ffffff; color: #0f4c3a; border: 1px solid #0f4c3a; padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
         .dots-btn.has-dots { background-color: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
-        .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
-        .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .save-exit-box { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
+        .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 10px; }
+        .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 
         /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; padding: 12px; }
@@ -180,10 +181,16 @@
         </table>
     </div>
 
+    <div class="save-exit-box">
+        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">🚪 Save & Return to Lobby</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Scores sync automatically. You can safely leave and resume this game anytime from the home page.</span>
+        <button class="btn-primary" style="margin-top: 0;" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Lobby</button>
+    </div>
+
     <div class="end-box-card">
         <h3 style="color: #e63946; margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 10px;">Finished playing? Completely wipe this room to start fresh.</span>
-        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh.</span>
+        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
     </div>
 </div>
 
@@ -367,7 +374,7 @@
         if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
                 alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
-                window.location.reload(); 
+                window.location.href = "admin.html"; 
             }).catch((err) => {
                 alert(`Error clearing room: ${err.message}`);
             });
