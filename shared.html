@@ -82,14 +82,14 @@
         }
 
         const courseName = data.courseName || "Golf Course";
-        const eventName = data.eventName || "Live Round";
         
         // Dynamically format today's date for the spectator
         const dateObj = new Date();
         const dateString = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
+        // Set the title strictly to Course Name and Date
         document.getElementById("course-title").textContent = courseName;
-        document.getElementById("format-subtitle").textContent = `${eventName} • ${dateString}`;
+        document.getElementById("format-subtitle").textContent = dateString;
 
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
