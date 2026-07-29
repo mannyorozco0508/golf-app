@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Live Scorecard</title>
-    <!-- PDF Generation Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -15,14 +13,9 @@
         .header-box { text-align: center; margin-bottom: 20px; }
         .header-title { font-size: 1.6rem; font-weight: bold; color: #0f4c3a; margin: 0 0 6px 0; text-transform: uppercase; }
         .header-sub { font-size: 0.95rem; color: #555; font-weight: bold; }
-        
-        .pdf-controls { display: flex; justify-content: flex-end; margin-bottom: 12px; }
-        .btn-pdf { background-color: #2a9d8f; color: white; border: none; padding: 10px 16px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-pdf:hover { background-color: #21867a; }
 
         .scorecard-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
         
-        /* Grid Borders for Print */
         .scorecard-table { border-collapse: collapse; min-width: 750px; width: 100%; font-size: 0.85rem; border: 2px solid #0f4c3a; background: #fff; }
         .scorecard-table th, .scorecard-table td { border: 1px solid #d0e1db; padding: 10px 4px; text-align: center; vertical-align: middle; }
         .scorecard-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
@@ -43,21 +36,15 @@
 <body>
 
 <div class="container" id="main-content" style="display: none;">
-    <div class="pdf-controls" id="pdf-btn-container">
-        <button class="btn-pdf" onclick="downloadPDF()">📄 Download PDF Scorecard</button>
+    <div class="header-box">
+        <h1 class="header-title" id="course-title">Live Scorecard</h1>
+        <div class="header-sub" id="format-subtitle">Loading scores...</div>
     </div>
-
-    <div id="pdf-capture-area" style="background: white; padding: 10px;">
-        <div class="header-box">
-            <h1 class="header-title" id="course-title">Live Scorecard</h1>
-            <div class="header-sub" id="format-subtitle">Loading scores...</div>
-        </div>
-        <div class="scorecard-wrapper" id="print-wrapper">
-            <table class="scorecard-table">
-                <thead id="scorecard-head"></thead>
-                <tbody id="scorecard-body"></tbody>
-            </table>
-        </div>
+    <div class="scorecard-wrapper">
+        <table class="scorecard-table">
+            <thead id="scorecard-head"></thead>
+            <tbody id="scorecard-body"></tbody>
+        </table>
     </div>
 </div>
 
@@ -175,63 +162,6 @@
         });
 
         tbody.innerHTML = bodyHtml;
-    }
-
-    // BULLETPROOF PDF GENERATION SCRIPT
-    function downloadPDF() {
-        const btnContainer = document.getElementById('pdf-btn-container');
-        const printWrapper = document.getElementById('print-wrapper');
-        const captureArea = document.getElementById('pdf-capture-area');
-        
-        // Hide button during capture
-        btnContainer.style.display = 'none';
-        
-        // 1. Reset any horizontal scrolling (Fixes the cut-off left side)
-        window.scrollTo(0, 0);
-        printWrapper.scrollLeft = 0;
-        
-        // 2. Save original styles so we can revert them
-        const origWrapperOverflow = printWrapper.style.overflowX;
-        const origAreaWidth = captureArea.style.width;
-        
-        // 3. Force the app into a massive flat desktop view
-        printWrapper.style.overflowX = 'visible'; 
-        captureArea.style.width = '1100px'; 
-        
-        // 4. Temporarily disable sticky columns (html2canvas hates sticky positioning)
-        const stickyCols = document.querySelectorAll('.sticky-col');
-        stickyCols.forEach(el => el.style.position = 'static');
-        
-        const dateStr = new Date().toISOString().split('T')[0];
-        
-        const opt = {
-            margin:       0.3,
-            filename:     `Scorecard_${dateStr}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { 
-                scale: 2, 
-                useCORS: true, 
-                scrollX: 0, 
-                scrollY: 0,
-                windowWidth: 1100 
-            }, 
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
-        };
-
-        html2pdf().set(opt).from(captureArea).save().then(() => {
-            // Snap the layout back to mobile instantly
-            btnContainer.style.display = 'flex';
-            printWrapper.style.overflowX = origWrapperOverflow;
-            captureArea.style.width = origAreaWidth;
-            stickyCols.forEach(el => el.style.position = 'sticky');
-        }).catch(err => {
-            console.error("PDF generation error: ", err);
-            btnContainer.style.display = 'flex';
-            printWrapper.style.overflowX = origWrapperOverflow;
-            captureArea.style.width = origAreaWidth;
-            stickyCols.forEach(el => el.style.position = 'sticky');
-            alert("Something went wrong generating the PDF. Please try again.");
-        });
     }
 </script>
 

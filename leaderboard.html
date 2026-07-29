@@ -41,11 +41,7 @@
         .to-par-over { color: #1a1a1a; font-weight: bold; }
         .to-par-even { color: #1a1a1a; font-weight: bold; }
 
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-        .btn-outline { width: 100%; background-color: transparent; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-        
-        .action-buttons { display: flex; gap: 10px; margin-top: 16px; }
-        @media (max-width: 480px) { .action-buttons { flex-direction: column; } }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
     </style>
 </head>
 <body>
@@ -188,7 +184,6 @@
     }
 
     function shareResults() {
-        // Bulletproof URL builder
         const rawUrl = window.location.href.split('?')[0];
         const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
         const sharedUrl = dirUrl + `/shared.html?game=${currentMode}`;
@@ -205,12 +200,6 @@
             const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + sharedUrl)}`;
             window.location.href = smsUrl;
         }
-    }
-
-    function openPDFView() {
-        const rawUrl = window.location.href.split('?')[0];
-        const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
-        window.location.href = dirUrl + `/shared.html?game=${currentMode}`;
     }
 
     function renderBoard() {
@@ -281,11 +270,7 @@
             });
 
             html += `</tbody></table>`;
-            html += `
-                <div class="action-buttons">
-                    <button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>
-                    <button class="btn-outline" onclick="openPDFView()">📄 View/Save PDF</button>
-                </div>`;
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
             container.innerHTML = html;
 
         } else if (activeView === "team") {
@@ -393,11 +378,7 @@
                     </table>
                 `;
             }
-            html += `
-                <div class="action-buttons">
-                    <button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>
-                    <button class="btn-outline" onclick="openPDFView()">📄 View/Save PDF</button>
-                </div>`;
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
             container.innerHTML = html;
         }
     }
