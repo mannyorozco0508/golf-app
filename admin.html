@@ -19,12 +19,19 @@
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
         /* Lobby Styles */
-        #lobby-screen { text-align: center; padding: 40px 20px; }
+        #lobby-screen { text-align: center; padding: 20px 10px; }
         .lobby-logo { font-size: 3rem; margin-bottom: 10px; }
-        .lobby-title { font-size: 1.8rem; color: #0f4c3a; margin-bottom: 30px; font-weight: bold; }
-        .lobby-divider { margin: 30px 0; border-top: 1px solid #ddd; position: relative; }
+        .lobby-title { font-size: 1.8rem; color: #0f4c3a; margin-bottom: 20px; font-weight: bold; }
+        .lobby-divider { margin: 25px 0; border-top: 1px solid #ddd; position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 10px; color: #888; font-size: 0.85rem; font-weight: bold; }
         .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 10px; }
+
+        /* Active Rooms List Styles */
+        .active-rooms-box { margin-top: 25px; text-align: left; background: #f4f6f8; border-radius: 10px; padding: 14px; border: 1px solid #e0e0e0; }
+        .active-room-item { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; text-decoration: none; color: inherit; transition: all 0.2s; }
+        .active-room-item:hover { background: #eef6f2; border-color: #2a9d8f; }
+        .room-meta { font-size: 0.75rem; color: #666; margin-top: 2px; }
+        .room-code-tag { background: #1d3557; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
 
         /* Admin Styles */
         .room-badge { display: inline-block; background: #1d3557; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
@@ -74,10 +81,21 @@
     <div class="lobby-logo">⛳</div>
     <div class="lobby-title">GolfApp</div>
     <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Create a private room for your foursome or trip, or join an existing one.</p>
+    
     <button class="btn-primary" onclick="createRoom()">➕ Create New Private Room</button>
+    
     <div class="lobby-divider"><span>OR</span></div>
+    
     <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
+
+    <!-- Active Games / Recent Rooms Section -->
+    <div class="active-rooms-box">
+        <div style="font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 8px;">🔥 Active Games on Server</div>
+        <div id="active-rooms-list">
+            <div style="font-size: 0.85rem; color: #888; text-align: center; padding: 6px;">Scanning for active games...</div>
+        </div>
+    </div>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -236,6 +254,7 @@
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
+        loadActiveRooms();
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
@@ -248,6 +267,39 @@
         });
 
         loadModeData(currentMode);
+    }
+
+    function loadActiveRooms() {
+        db.ref('events').once('value').then((snapshot) => {
+            const events = snapshot.val() || {};
+            const listEl = document.getElementById("active-rooms-list");
+            const roomKeys = Object.keys(events);
+
+            if (roomKeys.length === 0) {
+                listEl.innerHTML = `<div style="font-size: 0.85rem; color: #888; text-align: center; padding: 6px;">No active games found. Create one above!</div>`;
+                return;
+            }
+
+            let html = "";
+            roomKeys.forEach(code => {
+                const ev = events[code];
+                const eventName = ev.eventName || "Weekend Round";
+                const courseName = ev.courseName || "Golf Course";
+                const format = (ev.gameFormat || "stroke").toUpperCase();
+                const playerCount = ev.players ? ev.players.length : 0;
+
+                html += `
+                    <a href="index.html?game=${code}" class="active-room-item">
+                        <div>
+                            <div style="font-weight: bold; color: #0f4c3a; font-size: 0.95rem;">${eventName}</div>
+                            <div class="room-meta">${courseName} • ${format} • ${playerCount} Players</div>
+                        </div>
+                        <span class="room-code-tag">${code}</span>
+                    </a>
+                `;
+            });
+            listEl.innerHTML = html;
+        });
     }
 
     function createRoom() {
