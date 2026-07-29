@@ -11,17 +11,20 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
         .container { max-width: 1000px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        .header-box { text-align: center; margin-bottom: 16px; }
-        .header-title { font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin: 0 0 4px 0; }
-        .header-sub { font-size: 0.9rem; color: #666; font-weight: bold; }
+        
+        .header-box { text-align: center; margin-bottom: 20px; }
+        .header-title { font-size: 1.6rem; font-weight: bold; color: #0f4c3a; margin: 0 0 6px 0; text-transform: uppercase; }
+        .header-sub { font-size: 0.95rem; color: #555; font-weight: bold; }
         
         .pdf-controls { display: flex; justify-content: flex-end; margin-bottom: 12px; }
         .btn-pdf { background-color: #2a9d8f; color: white; border: none; padding: 10px 16px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .btn-pdf:hover { background-color: #21867a; }
 
-        .scorecard-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #e0e0e0; }
-        .scorecard-table { border-collapse: collapse; min-width: 750px; width: 100%; font-size: 0.85rem; }
-        .scorecard-table th, .scorecard-table td { border-bottom: 1px solid #ddd; border-right: 1px solid #eee; padding: 8px 4px; text-align: center; vertical-align: middle; }
+        .scorecard-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
+        
+        /* Updated Grid Borders for Print */
+        .scorecard-table { border-collapse: collapse; min-width: 750px; width: 100%; font-size: 0.85rem; border: 2px solid #0f4c3a; background: #fff; }
+        .scorecard-table th, .scorecard-table td { border: 1px solid #d0e1db; padding: 10px 4px; text-align: center; vertical-align: middle; }
         .scorecard-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
         
         .sticky-col { position: sticky; left: 0; background: #f9fbf9; z-index: 2; font-weight: bold; text-align: left !important; min-width: 65px; box-shadow: 2px 0 4px rgba(0,0,0,0.05); padding-left: 10px !important; }
@@ -44,7 +47,7 @@
         <button class="btn-pdf" onclick="downloadPDF()">📄 Download PDF Scorecard</button>
     </div>
 
-    <div id="pdf-capture-area" style="background: white; padding-bottom: 10px;">
+    <div id="pdf-capture-area" style="background: white; padding: 10px;">
         <div class="header-box">
             <h1 class="header-title" id="course-title">Live Scorecard</h1>
             <div class="header-sub" id="format-subtitle">Loading scores...</div>
@@ -174,7 +177,7 @@
         tbody.innerHTML = bodyHtml;
     }
 
-    // PDF GENERATION SCRIPT
+    // BULLETPROOF PDF GENERATION SCRIPT
     function downloadPDF() {
         const btnContainer = document.getElementById('pdf-btn-container');
         const printWrapper = document.getElementById('print-wrapper');
@@ -183,29 +186,38 @@
         // Hide button during capture
         btnContainer.style.display = 'none';
         
-        // Force the table wrapper to show everything (bypass mobile scrolling cutoff)
-        const origOverflow = printWrapper.style.overflowX;
-        printWrapper.style.overflowX = 'visible';
+        // Save original styles so we can revert them
+        const origWrapperOverflow = printWrapper.style.overflowX;
+        const origAreaWidth = captureArea.style.width;
+        const origBodyWidth = document.body.style.width;
         
-        // Generate filename based on date
+        // Force the app into a "Desktop" layout for the screenshot
+        printWrapper.style.overflowX = 'visible'; 
+        captureArea.style.width = '1050px'; 
+        document.body.style.width = '1050px'; 
+        
         const dateStr = new Date().toISOString().split('T')[0];
         
         const opt = {
-            margin:       0.3,
+            margin:       0.4,
             filename:     `Scorecard_${dateStr}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1200 }, // Forces wide capture for 18 holes
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1050 }, 
             jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
         };
 
         html2pdf().set(opt).from(captureArea).save().then(() => {
-            // Restore UI after download triggers
+            // Snap the layout back to mobile instantly
             btnContainer.style.display = 'flex';
-            printWrapper.style.overflowX = origOverflow;
+            printWrapper.style.overflowX = origWrapperOverflow;
+            captureArea.style.width = origAreaWidth;
+            document.body.style.width = origBodyWidth;
         }).catch(err => {
             console.error("PDF generation error: ", err);
             btnContainer.style.display = 'flex';
-            printWrapper.style.overflowX = origOverflow;
+            printWrapper.style.overflowX = origWrapperOverflow;
+            captureArea.style.width = origAreaWidth;
+            document.body.style.width = origBodyWidth;
             alert("Something went wrong generating the PDF. Please try again.");
         });
     }
