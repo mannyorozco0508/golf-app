@@ -18,6 +18,13 @@
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
+        /* Category Presets Bar */
+        .category-presets-title { font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 8px; }
+        .category-presets-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px; scrollbar-width: none; }
+        .category-presets-bar::-webkit-scrollbar { display: none; }
+        .preset-btn { flex: 0 0 auto; padding: 10px 14px; border: 2px solid #d0e1db; background: #f9fbf9; color: #0f4c3a; border-radius: 10px; font-weight: bold; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+        .preset-btn:hover, .preset-btn.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; box-shadow: 0 2px 6px rgba(15,76,58,0.2); }
+
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 20px 10px; }
         .lobby-logo { font-size: 3rem; margin-bottom: 10px; }
@@ -114,6 +121,15 @@
         <div class="room-badge" id="display-room-code">----</div>
     </div>
 
+    <!-- Quick Category Presets -->
+    <div class="category-presets-title">⚡ Quick Game Presets</div>
+    <div class="category-presets-bar">
+        <button class="preset-btn" onclick="selectCategoryPreset('marty')">🎰 Marty's Game</button>
+        <button class="preset-btn" onclick="selectCategoryPreset('myrtle')">🏖️ Myrtle Beach Trip</button>
+        <button class="preset-btn" onclick="selectCategoryPreset('weekday')">🏌️‍♂️ Regular Weekday</button>
+        <button class="preset-btn" onclick="selectCategoryPreset('weekend')">🏆 Weekend Tourney</button>
+    </div>
+
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Players will automatically join this specific private room:</span>
@@ -121,9 +137,23 @@
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
     </div>
 
-    <div class="form-group">
-        <label>Trip / Event Name</label>
-        <input type="text" id="event-name" value="Weekend Round">
+    <div class="grid-2col" style="margin-bottom: 16px;">
+        <div>
+            <label>Trip / Event Name</label>
+            <input type="text" id="event-name" value="Weekend Round">
+        </div>
+        <div>
+            <label>Round / Day #</label>
+            <select id="round-day-select">
+                <option value="Single Round">Single Round</option>
+                <option value="Day 1 - Round 1">Day 1 - Round 1</option>
+                <option value="Day 1 - Round 2">Day 1 - Round 2</option>
+                <option value="Day 2 - Round 1">Day 2 - Round 1</option>
+                <option value="Day 2 - Round 2">Day 2 - Round 2</option>
+                <option value="Day 3 - Round 1">Day 3 - Round 1</option>
+                <option value="Day 4 - Final Round">Day 4 - Final Round</option>
+            </select>
+        </div>
     </div>
 
     <div class="form-group">
@@ -247,6 +277,7 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
     const teamOptions = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8", "T-9", "T-10", "T-11", "T-12", "T-13", "T-14", "T-15", "T-16"];
@@ -269,6 +300,29 @@
         loadModeData(currentMode);
     }
 
+    function selectCategoryPreset(type) {
+        currentCategory = type;
+        const eventInput = document.getElementById("event-name");
+        const formatSelect = document.getElementById("game-format-select");
+
+        if (type === 'marty') {
+            eventInput.value = "🎰 Marty's Game";
+            formatSelect.value = "nassau";
+            selectCourse("az_talking_oodham", "Talking Stick (O'odham)");
+        } else if (type === 'myrtle') {
+            eventInput.value = "🏖️ Myrtle Beach Trip";
+            formatSelect.value = "stroke";
+            selectCourse("caledonia", "Caledonia Golf & Fish Club");
+        } else if (type === 'weekday') {
+            eventInput.value = "🏌️‍♂️ Weekday Round";
+            formatSelect.value = "stroke";
+        } else if (type === 'weekend') {
+            eventInput.value = "🏆 Weekend Tournament";
+            formatSelect.value = "nassau";
+        }
+        handleFormatChange();
+    }
+
     function loadActiveRooms() {
         db.ref('events').once('value').then((snapshot) => {
             const events = snapshot.val() || {};
@@ -283,6 +337,7 @@
             let html = "";
             roomKeys.forEach(code => {
                 const ev = events[code];
+                const categoryIcon = ev.categoryIcon || "⛳";
                 const eventName = ev.eventName || "Weekend Round";
                 const courseName = ev.courseName || "Golf Course";
                 const format = (ev.gameFormat || "stroke").toUpperCase();
@@ -291,7 +346,7 @@
                 html += `
                     <a href="index.html?game=${code}" class="active-room-item">
                         <div>
-                            <div style="font-weight: bold; color: #0f4c3a; font-size: 0.95rem;">${eventName}</div>
+                            <div style="font-weight: bold; color: #0f4c3a; font-size: 0.95rem;">${categoryIcon} ${eventName}</div>
                             <div class="room-meta">${courseName} • ${format} • ${playerCount} Players</div>
                         </div>
                         <span class="room-code-tag">${code}</span>
@@ -303,12 +358,21 @@
     }
 
     const courseDirectory = [
-        { group: "🎰 Marty's Monday Game", items: [
+        { group: "🎰 Marty's Game", items: [
             { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
             { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
             { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
             { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
             { id: "az_papago", name: "Papago Golf Club" }
+        ]},
+        { group: "🏖️ Myrtle Beach Trip", items: [
+            { id: "caledonia", name: "Caledonia Golf & Fish Club" },
+            { id: "trueblue", name: "True Blue Golf Club" },
+            { id: "pinelakes", name: "Pine Lakes Country Club" },
+            { id: "pinehills", name: "Myrtlewood - Pine Hills" },
+            { id: "thistle_pending", name: "Thistle Golf Club (NC - 27 Hole Marathon)" },
+            { id: "prestwick", name: "Prestwick Country Club" },
+            { id: "manofwar", name: "Man O' War Golf Club" }
         ]},
         { group: "🌵 Arizona (Phoenix / Scottsdale)", items: [
             { id: "az_tpc_stadium", name: "TPC Scottsdale (Stadium)" },
@@ -394,29 +458,20 @@
             { id: "eaglespride_27", name: "Eagle's Pride (Pick 2 Nines)" }
         ]},
         { group: "🌴 Florida (Miami / Hollywood)", items: [
-            { id: "emerald_hills", name: "The Club at Emerald Hills (Par 72)" },
-            { id: "hollywood_beach", name: "Hollywood Beach Golf Club (Par 70)" }
+            { id: "emerald_hills", name: "The Club at Emerald Hills" },
+            { id: "hollywood_beach", name: "Hollywood Beach Golf Club" }
         ]},
         { group: "🌲 Connecticut / Local (Milford Area)", items: [
-            { id: "greatriver", name: "Great River Golf Club (Par 72)" },
-            { id: "yale", name: "The Course at Yale (Par 70)" },
-            { id: "grassyhill", name: "Grassy Hill Country Club (Par 70)" },
-            { id: "orangehills", name: "Orange Hills Country Club (Par 71)" },
-            { id: "millriver", name: "Mill River Country Club (Par 72)" },
-            { id: "fairchild_black", name: "Fairchild Wheeler - Black (Par 71)" },
-            { id: "fairchild_red", name: "Fairchild Wheeler - Red (Par 72)" },
-            { id: "tashuaknolls", name: "Tashua Knolls Golf Course (Par 72)" },
-            { id: "whitneyfarms", name: "Whitney Farms Golf Course (Par 72)" },
-            { id: "oaklane", name: "Tradition at Oak Lane (Par 72)" }
-        ]},
-        { group: "🌴 South Carolina (Myrtle Beach)", items: [
-            { id: "caledonia", name: "Caledonia Golf & Fish Club (Par 70)" },
-            { id: "trueblue", name: "True Blue Golf Club (Par 72)" },
-            { id: "pinelakes", name: "Pine Lakes Country Club (Par 70)" },
-            { id: "pinehills", name: "Myrtlewood - Pine Hills (Par 72)" },
-            { id: "thistle_pending", name: "Thistle Golf Club (NC - 27 Hole Marathon)" },
-            { id: "prestwick", name: "Prestwick Country Club (Par 72)" },
-            { id: "manofwar", name: "Man O' War Golf Club (Par 72)" }
+            { id: "greatriver", name: "Great River Golf Club" },
+            { id: "yale", name: "The Course at Yale" },
+            { id: "grassyhill", name: "Grassy Hill Country Club" },
+            { id: "orangehills", name: "Orange Hills Country Club" },
+            { id: "millriver", name: "Mill River Country Club" },
+            { id: "fairchild_black", name: "Fairchild Wheeler - Black" },
+            { id: "fairchild_red", name: "Fairchild Wheeler - Red" },
+            { id: "tashuaknolls", name: "Tashua Knolls Golf Course" },
+            { id: "whitneyfarms", name: "Whitney Farms Golf Course" },
+            { id: "oaklane", name: "Tradition at Oak Lane" }
         ]}
     ];
 
@@ -616,7 +671,7 @@
         } else if (coursePresets[courseKey]) {
             return coursePresets[courseKey];
         } else {
-            // Generic 18-hole blank slate fallback for new courses that don't have par/hcp loaded into 'coursePresets' yet
+            // Generic 18-hole blank slate fallback for new courses
             const genericData = [];
             for (let i = 1; i <= 18; i++) {
                 genericData.push({ hole: i, par: 4, hcpIndex: i }); 
@@ -629,7 +684,9 @@
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             document.getElementById("event-name").value = data.eventName || 'Weekend Round';
-            
+            if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
+            if (data.eventCategory) currentCategory = data.eventCategory;
+
             if (data.activeCourseKey) {
                 courseHiddenSelect.value = data.activeCourseKey;
                 courseSearchInput.value = getCourseNameById(data.activeCourseKey);
@@ -709,6 +766,13 @@
 
     function updateCount() { document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; }
 
+    function getCategoryIcon(type) {
+        if (type === 'marty') return '🎰';
+        if (type === 'myrtle') return '🏖️';
+        if (type === 'weekday') return '🏌️‍♂️';
+        return '🏆';
+    }
+
     function saveSettings() {
         const courseKey = courseHiddenSelect.value;
         if (!courseKey) { alert("⚠️ Please select a Golf Course before saving!"); return; }
@@ -723,8 +787,10 @@
         }
 
         const baseEventName = document.getElementById("event-name").value;
+        const roundDay = document.getElementById("round-day-select").value;
         const selectedCourseName = courseSearchInput.value || getCourseNameById(courseKey);
         const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
+        const categoryIcon = getCategoryIcon(currentCategory);
 
         const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
@@ -761,6 +827,9 @@
 
         db.ref(`events/${currentMode}`).update({
             eventName: baseEventName,
+            roundDay: roundDay,
+            eventCategory: currentCategory,
+            categoryIcon: categoryIcon,
             activeCourseKey: courseKey,
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
@@ -774,7 +843,7 @@
             courseData: selectedCourse.data,
             players: playersList
         }).then(() => {
-            alert(`✅ Saved! ${playersList.length} players activated for ${selectedCourse.name} in Room ${currentMode}.`);
+            alert(`✅ Saved! ${categoryIcon} ${baseEventName} (${roundDay}) activated for ${selectedCourse.name} in Room ${currentMode}.`);
         }).catch((err) => { alert(`Save error: ${err.message}`); });
     }
 
