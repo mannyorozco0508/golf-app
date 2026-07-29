@@ -188,16 +188,20 @@
         const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
         const sharedUrl = dirUrl + `/shared.html?game=${currentMode}`;
         
-        const textMsg = `Check out the live scorecard for Room ${currentMode}! ⛳`;
+        const courseName = currentBoardData.courseName || "Live Round";
+        const dateObj = new Date();
+        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const textMsg = `${courseName} Scorecard - ${dateString}`;
         
         if (navigator.share) {
             navigator.share({
-                title: 'Live Scorecard',
+                title: `${courseName} Scorecard`,
                 text: textMsg,
                 url: sharedUrl
             }).catch(console.error);
         } else {
-            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + sharedUrl)}`;
+            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + '\n\n' + sharedUrl)}`;
             window.location.href = smsUrl;
         }
     }
