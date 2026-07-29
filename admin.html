@@ -49,7 +49,7 @@
 </head>
 <body>
 
-<!-- LOBBY VIEW (Scrubbed of public game list) -->
+<!-- LOBBY VIEW -->
 <div class="container" id="lobby-view" style="display: none;">
     <div class="logo-box">
         <div class="logo-icon">⛳</div>
@@ -88,15 +88,13 @@
         <div class="section-title">Event Info</div>
         <div class="form-group">
             <label>Golf Course Name</label>
-            <!-- Dropdown List Restored Here -->
-            <input type="text" id="course-name" list="course-options" placeholder="Select or type a course...">
-            <datalist id="course-options">
-                <option value="Chambers Bay">
-                <option value="Pebble Beach">
-                <option value="Bandon Dunes">
-                <option value="Pinehurst No. 2">
-                <option value="Local Muni Course">
-            </datalist>
+            <select id="course-name">
+                <option value="Chambers Bay">Chambers Bay</option>
+                <option value="Pebble Beach">Pebble Beach</option>
+                <option value="Bandon Dunes">Bandon Dunes</option>
+                <option value="Pinehurst No. 2">Pinehurst No. 2</option>
+                <option value="Local Muni Course">Local Muni Course</option>
+            </select>
         </div>
         <div class="form-group">
             <label>Event / Trip Name</label>
@@ -112,6 +110,8 @@
                 <option value="stroke">Stroke Play (Standard)</option>
                 <option value="match">Match Play (Ryder Cup)</option>
                 <option value="nassau">Nassau (Front, Back, Overall)</option>
+                <option value="bestball">Best Ball (2v2)</option>
+                <option value="wolf">Wolf</option>
                 <option value="dots">Dot Game (Garbage/Junk)</option>
             </select>
         </div>
@@ -197,15 +197,12 @@
     let currentMode = urlParams.get('game');
 
     if (!currentMode) {
-        // Show Lobby
         document.getElementById("lobby-view").style.display = "block";
     } else {
-        // Show Admin Setup
         currentMode = currentMode.toUpperCase();
         document.getElementById("admin-view").style.display = "block";
         document.getElementById("display-room-code").textContent = currentMode;
         
-        // Fix Nav Links
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
             link.href = base + '?game=' + currentMode;
@@ -214,8 +211,6 @@
         initCourseGrids();
         loadAdminData();
     }
-
-    // --- LOBBY FUNCTIONS ---
 
     function generateNewGame() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -234,8 +229,6 @@
             alert("Please enter a room code.");
         }
     }
-
-    // --- ADMIN SETUP FUNCTIONS ---
 
     function toggleFormatOptions() {
         const fmt = document.getElementById('game-format').value;
@@ -281,13 +274,11 @@
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val();
             
-            // IF NEW GAME: Leave players empty! Do not auto-generate rows.
             if(!data) {
                 return; 
             }
 
-            // IF EXISTING GAME: Load all the data normally.
-            document.getElementById("course-name").value = data.courseName || "";
+            document.getElementById("course-name").value = data.courseName || "Chambers Bay";
             document.getElementById("event-name").value = data.eventName || "";
             document.getElementById("game-format").value = data.gameFormat || "stroke";
             
@@ -316,7 +307,7 @@
     }
 
     function saveAdminSettings() {
-        const courseName = document.getElementById("course-name").value.trim() || "Golf Course";
+        const courseName = document.getElementById("course-name").value.trim() || "Chambers Bay";
         const eventName = document.getElementById("event-name").value.trim() || "Live Round";
         const gameFormat = document.getElementById("game-format").value;
 
