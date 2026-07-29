@@ -67,6 +67,7 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    let currentData = {}; // Store data globally for the share button
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -80,9 +81,9 @@
         });
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
-            const data = snapshot.val() || {};
-            document.getElementById("main-title").textContent = `💸 Settle (${data.eventName || "Weekend Round"})`;
-            renderSettlement(data);
+            currentData = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
+            renderSettlement(currentData);
         });
     }
 
@@ -106,17 +107,23 @@
     }
 
     function shareResults() {
-        const currentUrl = window.location.href;
-        const textMsg = `Check out the final payout ledger for Room ${currentMode}! 💸⛳`;
+        const rawUrl = window.location.href.split('?')[0];
+        const sharedUrl = rawUrl + `?game=${currentMode}`;
+        
+        const courseName = currentData.courseName || "Live Round";
+        const dateObj = new Date();
+        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const textMsg = `${courseName} Payouts - ${dateString}`;
         
         if (navigator.share) {
             navigator.share({
-                title: 'Golf Settlement',
+                title: `${courseName} Payouts`,
                 text: textMsg,
-                url: currentUrl
+                url: sharedUrl
             }).catch(console.error);
         } else {
-            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + currentUrl)}`;
+            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + '\n\n' + sharedUrl)}`;
             window.location.href = smsUrl;
         }
     }
@@ -235,7 +242,7 @@
             container.innerHTML = `
                 <div class="settle-header">Final Ledger</div>
                 <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
-                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Share Link</button>
+                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Results</button>
             `;
             return;
         }
