@@ -589,7 +589,7 @@
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                            <div style="font-size: 0.6rem; color: #888; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
+                            <div style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
                             <div class="score-input-wrapper">
                                 <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
                                        onchange="saveScore(${p.id}, ${h.hole}, this.value)">
@@ -769,7 +769,7 @@
             }
         } else {
             payoutBox.style.display = "none";
-            titleEl.textContent = "🏆 LIVE LEADERBOARD";
+            titleEl.textContent = "🏆 LIVE PLAYER SCORES";
             
             let scoresList = [];
             let maxThru = 0;
@@ -788,11 +788,10 @@
                 });
                 
                 if (thru > maxThru) maxThru = thru;
-                let toPar = (scoringType === 'net' ? netTotal : grossTotal) - parPlayed;
-                let toParStr = thru === 0 ? "-" : (toPar === 0 ? "E" : (toPar > 0 ? `+${toPar}` : `${toPar}`));
+                let currentScore = scoringType === 'net' ? netTotal : grossTotal;
                 let shortName = p.name.split(" ")[0]; // First name
                 
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: ${toParStr}</span>`);
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${thru === 0 ? '-' : currentScore}</strong></span>`);
             });
 
             if (maxThru === 0) {
