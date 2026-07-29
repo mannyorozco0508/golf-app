@@ -115,12 +115,26 @@
             padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold;
             cursor: pointer; transition: all 0.2s ease; margin-bottom: 4px; width: 100%;
         }
-        .press-btn.active-press {
-            background-color: #e63946; color: #ffffff; border-color: #e63946;
-        }
+        .press-btn.active-press { background-color: #e63946; color: #ffffff; border-color: #e63946; }
+
+        .dots-btn { background-color: #ffffff; color: #0f4c3a; border: 1px solid #0f4c3a; padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
+        .dots-btn.has-dots { background-color: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
         .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+
+        /* Modal Styles */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; padding: 12px; }
+        .modal-content { background: #fff; border-radius: 12px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-header { font-size: 1.2rem; font-weight: bold; color: #0f4c3a; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+        .dot-player-block { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eee; text-align: left; }
+        .dot-player-name { font-weight: bold; margin-bottom: 8px; font-size: 0.95rem; color: #1d3557; }
+        .dot-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+        .dot-badge { padding: 6px 10px; border-radius: 20px; border: 1px solid #ccc; background: #f9fbf9; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .dot-badge.active { background: #2a9d8f; color: #fff; border-color: #2a9d8f; }
+        .dot-badge.active-snake { background: #e63946; color: #fff; border-color: #e63946; }
     </style>
 </head>
 <body>
@@ -173,6 +187,18 @@
     </div>
 </div>
 
+<!-- Dot Game Modal -->
+<div class="modal-overlay" id="dots-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="dots-modal-title">🎯 Hole Dots</span>
+            <button class="close-modal" onclick="closeDotsModal()">&times;</button>
+        </div>
+        <div id="dots-modal-body"></div>
+        <button class="btn-primary" onclick="saveDots()">💾 Save Dots</button>
+    </div>
+</div>
+
 <script>
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
@@ -191,6 +217,19 @@
     let currentMode = urlParams.get('game');
     let selectedGroup = "all";
     let currentData = {};
+    
+    // Dot Game Logic
+    let currentDotHole = 1;
+    let tempDots = {}; 
+    const DOT_TYPES = [
+        { id: 'greenie', label: '⛳ Greenie' },
+        { id: 'sandy', label: '🏖️ Sandy' },
+        { id: 'barkie', label: '🌳 Barkie' },
+        { id: 'polie', label: '📏 Polie' },
+        { id: 'birdie', label: '🐦 Birdie' },
+        { id: 'eagle', label: '🦅 Eagle' },
+        { id: 'snake', label: '🐍 Snake (-1)' }
+    ];
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -266,6 +305,62 @@
         } else {
             db.ref(`events/${currentMode}/manualPresses/h${holeNum}`).set(true);
         }
+    }
+
+    function openDotsModal(holeNum) {
+        currentDotHole = holeNum;
+        document.getElementById("dots-modal-title").textContent = `🎯 Hole ${holeNum} Dots`;
+        
+        const existingDots = currentData.dots && currentData.dots[`h${holeNum}`] ? currentData.dots[`h${holeNum}`] : {};
+        tempDots = JSON.parse(JSON.stringify(existingDots)); 
+
+        let players = currentData.players || [];
+        let filteredPlayers = players;
+        if (selectedGroup !== "all") {
+            const startIdx = (selectedGroup - 1) * 4;
+            filteredPlayers = players.slice(startIdx, startIdx + 4);
+        }
+
+        let html = "";
+        filteredPlayers.forEach(p => {
+            let pDots = tempDots[`p${p.id}`] || [];
+            html += `<div class="dot-player-block">
+                <div class="dot-player-name">${p.name}</div>
+                <div class="dot-badges">`;
+            
+            DOT_TYPES.forEach(dt => {
+                const isActive = pDots.includes(dt.id);
+                const activeClass = isActive ? (dt.id === 'snake' ? 'active-snake' : 'active') : "";
+                html += `<div class="dot-badge ${activeClass}" onclick="toggleDot(this, ${p.id}, '${dt.id}')">${dt.label}</div>`;
+            });
+            
+            html += `</div></div>`;
+        });
+
+        document.getElementById("dots-modal-body").innerHTML = html;
+        document.getElementById("dots-modal").style.display = "flex";
+    }
+
+    function toggleDot(el, playerId, dotId) {
+        if (!tempDots[`p${playerId}`]) tempDots[`p${playerId}`] = [];
+        const idx = tempDots[`p${playerId}`].indexOf(dotId);
+        if (idx > -1) {
+            tempDots[`p${playerId}`].splice(idx, 1);
+            el.classList.remove("active");
+            el.classList.remove("active-snake");
+        } else {
+            tempDots[`p${playerId}`].push(dotId);
+            if (dotId === 'snake') el.classList.add("active-snake");
+            else el.classList.add("active");
+        }
+    }
+
+    function closeDotsModal() { document.getElementById("dots-modal").style.display = "none"; }
+
+    function saveDots() {
+        db.ref(`events/${currentMode}/dots/h${currentDotHole}`).set(tempDots).then(() => {
+            closeDotsModal();
+        });
     }
 
     function endAndClearRound() {
@@ -415,8 +510,12 @@
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        const matchCalculations = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType);
-        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat));
+        let matchCalculations = null;
+        if (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat)) {
+            matchCalculations = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType);
+        }
+        
+        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots'].includes(gameFormat));
 
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
@@ -425,7 +524,10 @@
             headRow.innerHTML += `<th>${p.name.split(" ")[0]}</th>`;
         });
 
-        if (showMatchColumn) headRow.innerHTML += `<th style="width: 100px;">Match & Bets</th>`;
+        if (showMatchColumn) {
+            let colLabel = gameFormat === 'dots' ? "Dots/Action" : "Match & Bets";
+            headRow.innerHTML += `<th style="width: 100px;">${colLabel}</th>`;
+        }
 
         const tbody = document.getElementById("card-body");
         tbody.innerHTML = "";
@@ -489,22 +591,32 @@
 
             if (showMatchColumn) {
                 let matchCellHtml = `<div class="match-status-cell">`;
-                const isPressed = !!manualPresses[`h${h.hole}`];
-                const pressBtnClass = isPressed ? "press-btn active-press" : "press-btn";
-                const pressBtnLabel = isPressed ? "🔥 Pressed" : "+ Press";
-                matchCellHtml += `<button class="${pressBtnClass}" onclick="togglePress(${h.hole})">${pressBtnLabel}</button>`;
+                
+                if (gameFormat === 'dots') {
+                    const holeDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
+                    let dotCount = 0;
+                    Object.values(holeDots).forEach(arr => dotCount += arr.length);
+                    const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
+                    const dotBtnLabel = dotCount > 0 ? `🎯 Dots (${dotCount})` : "🎯 Add Dots";
+                    matchCellHtml += `<button class="${dotBtnClass}" onclick="openDotsModal(${h.hole})">${dotBtnLabel}</button>`;
+                } else {
+                    const isPressed = !!manualPresses[`h${h.hole}`];
+                    const pressBtnClass = isPressed ? "press-btn active-press" : "press-btn";
+                    const pressBtnLabel = isPressed ? "🔥 Pressed" : "+ Press";
+                    matchCellHtml += `<button class="${pressBtnClass}" onclick="togglePress(${h.hole})">${pressBtnLabel}</button>`;
 
-                if (matchCalculations && matchCalculations.holeMatchLog[h.hole]) {
-                    const log = matchCalculations.holeMatchLog[h.hole];
-                    const t1 = matchCalculations.t1Name;
-                    const t2 = matchCalculations.t2Name;
+                    if (matchCalculations && matchCalculations.holeMatchLog[h.hole]) {
+                        const log = matchCalculations.holeMatchLog[h.hole];
+                        const t1 = matchCalculations.t1Name;
+                        const t2 = matchCalculations.t2Name;
 
-                    if (log.valid) {
-                        log.matches.forEach(m => {
-                            let statusText = formatMatchStatus(m.status, t1, t2);
-                            let pillClass = m.id.startsWith('P') ? 'pill-press' : 'pill-main';
-                            matchCellHtml += `<span class="status-pill ${pillClass}">${m.label}: ${statusText}</span>`;
-                        });
+                        if (log.valid) {
+                            log.matches.forEach(m => {
+                                let statusText = formatMatchStatus(m.status, t1, t2);
+                                let pillClass = m.id.startsWith('P') ? 'pill-press' : 'pill-main';
+                                matchCellHtml += `<span class="status-pill ${pillClass}">${m.label}: ${statusText}</span>`;
+                            });
+                        }
                     }
                 }
                 matchCellHtml += `</div>`;
@@ -564,7 +676,44 @@
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
 
-        if (showMatchColumn && matchCalculations) {
+        if (gameFormat === 'dots') {
+            payoutBox.style.display = "block";
+            document.getElementById("nassau-payout-header").textContent = "🎯 Live Dot Totals";
+            
+            let playerDots = {};
+            players.forEach(p => playerDots[p.id] = 0);
+            
+            if (currentData.dots) {
+                Object.values(currentData.dots).forEach(holeDots => {
+                    Object.keys(holeDots).forEach(pKey => {
+                        let pid = pKey.replace('p', '');
+                        if (playerDots[pid] !== undefined) {
+                            holeDots[pKey].forEach(dotType => {
+                                if (dotType === 'snake') {
+                                    playerDots[pid] -= 1; // Snake costs 1 dot
+                                } else {
+                                    playerDots[pid] += 1;
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+            
+            let dotRowsHtml = "";
+            let dotVal = currentData.dotPointVal || 1;
+            players.forEach(p => {
+                let pts = playerDots[p.id];
+                let money = pts * dotVal;
+                let formatMoney = pts >= 0 ? `<span class="val-pos">+$${money}</span>` : `<span class="val-neg">-$${Math.abs(money)}</span>`;
+                dotRowsHtml += `<div class="payout-row"><span>${p.name}</span><span><strong>${pts} Dots</strong> (${formatMoney})</span></div>`;
+            });
+            
+            document.getElementById("payout-rows-wrapper").innerHTML = dotRowsHtml;
+            titleEl.textContent = "🎯 DOT GAME STANDINGS";
+            statusEl.textContent = "Assign dots hole-by-hole using the buttons below!";
+
+        } else if (showMatchColumn && matchCalculations) {
             titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${matchCalculations.t1Name} VS ${matchCalculations.t2Name}`;
             
             let f9Match = matchCalculations.activeMatches.find(m => m.id === 'F9');
@@ -583,7 +732,7 @@
 
             if (gameFormat === 'nassau') {
                 payoutBox.style.display = "block";
-                
+                document.getElementById("nassau-payout-header").textContent = "💵 Live Nassau Standings";
                 let t1Total = 0;
                 matchCalculations.activeMatches.forEach(m => {
                     if (m.status > 0) t1Total += stake;
