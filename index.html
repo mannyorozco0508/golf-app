@@ -274,6 +274,10 @@
         }
     }
 
+    function getInitials(name) {
+        return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    }
+
     function renderGroupFilters(playersCount) {
         const container = document.getElementById("group-filter-container");
         const numGroups = Math.ceil(playersCount / 4);
@@ -552,6 +556,7 @@
                 const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
                 const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
                 const dots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
+                const initials = getInitials(p.name);
 
                 let shapeHtml = "";
                 let currentToParHtml = "";
@@ -584,6 +589,7 @@
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <div style="font-size: 0.6rem; color: #888; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
                             <div class="score-input-wrapper">
                                 <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
                                        onchange="saveScore(${p.id}, ${h.hole}, this.value)">
@@ -765,30 +771,34 @@
             payoutBox.style.display = "none";
             titleEl.textContent = "🏆 LIVE LEADERBOARD";
             
-            let leaderName = "-";
-            let bestNet = 999;
+            let scoresList = [];
             let maxThru = 0;
 
-            players.forEach(p => {
-                let netTotal = 0, thru = 0;
+            filteredPlayers.forEach(p => {
+                let netTotal = 0, grossTotal = 0, parPlayed = 0, thru = 0;
                 courseData.forEach(hole => {
                     const val = savedScores[`p${p.id}_h${hole.hole}`];
                     if (val && val > 0) {
-                        netTotal += parseInt(val, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                        let score = parseInt(val, 10);
+                        grossTotal += score;
+                        netTotal += (score - getStrokes(hole.hcpIndex, parseHcp(p.hcp)));
+                        parPlayed += parseInt(hole.par, 10);
                         thru++;
                     }
                 });
+                
                 if (thru > maxThru) maxThru = thru;
-                if (thru > 0 && netTotal < bestNet) {
-                    bestNet = netTotal;
-                    leaderName = p.name.split(" ")[0];
-                }
+                let toPar = (scoringType === 'net' ? netTotal : grossTotal) - parPlayed;
+                let toParStr = thru === 0 ? "-" : (toPar === 0 ? "E" : (toPar > 0 ? `+${toPar}` : `${toPar}`));
+                let shortName = p.name.split(" ")[0]; // First name
+                
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: ${toParStr}</span>`);
             });
 
             if (maxThru === 0) {
                 statusEl.textContent = "Enter Hole 1 Scores Below...";
             } else {
-                statusEl.textContent = `🥇 ${leaderName} (${bestNet} Net • Thru ${maxThru})`;
+                statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
             }
         }
     }
