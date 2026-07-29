@@ -41,10 +41,6 @@
         .player-row input { flex: 1; margin-bottom: 0; }
         .player-row input.hcp-input { width: 70px; flex: none; }
         .player-row input.team-input { width: 80px; flex: none; }
-
-        .course-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-bottom: 10px; text-align: center; }
-        .course-grid label { font-size: 0.7rem; color: #666; margin-bottom: 2px; }
-        .course-grid input { padding: 4px; font-size: 0.9rem; text-align: center; }
     </style>
 </head>
 <body>
@@ -161,21 +157,6 @@
         <button type="button" class="btn-outline" onclick="addPlayerRow()" style="margin-top: 10px; padding: 8px;">➕ Add Player</button>
     </div>
 
-    <div class="card-section">
-        <div class="section-title">Course Data (Pars & HCPs)</div>
-        <label>Front 9 Pars</label>
-        <div class="course-grid" id="out-pars"></div>
-        <label>Front 9 HCP Indexes</label>
-        <div class="course-grid" id="out-hcps"></div>
-        
-        <div style="height: 16px;"></div>
-        
-        <label>Back 9 Pars</label>
-        <div class="course-grid" id="in-pars"></div>
-        <label>Back 9 HCP Indexes</label>
-        <div class="course-grid" id="in-hcps"></div>
-    </div>
-
     <button type="button" class="btn-primary" onclick="saveAdminSettings()">💾 Save Settings & Go To Scorecard</button>
 </div>
 
@@ -208,7 +189,6 @@
             link.href = base + '?game=' + currentMode;
         });
 
-        initCourseGrids();
         loadAdminData();
     }
 
@@ -235,22 +215,6 @@
         document.getElementById('format-nassau-options').style.display = (fmt === 'nassau') ? 'block' : 'none';
         document.getElementById('format-match-options').style.display = (fmt === 'match' || fmt === 'bestball') ? 'block' : 'none';
         document.getElementById('format-dot-options').style.display = (fmt === 'dots') ? 'block' : 'none';
-    }
-
-    function initCourseGrids() {
-        let outPars = "", outHcps = "", inPars = "", inHcps = "";
-        for(let i=1; i<=9; i++) {
-            outPars += `<div><label>${i}</label><input type="number" id="par-${i}" value="4"></div>`;
-            outHcps += `<div><label>${i}</label><input type="number" id="hcp-${i}" value="${i}"></div>`;
-        }
-        for(let i=10; i<=18; i++) {
-            inPars += `<div><label>${i}</label><input type="number" id="par-${i}" value="4"></div>`;
-            inHcps += `<div><label>${i}</label><input type="number" id="hcp-${i}" value="${i}"></div>`;
-        }
-        document.getElementById("out-pars").innerHTML = outPars;
-        document.getElementById("out-hcps").innerHTML = outHcps;
-        document.getElementById("in-pars").innerHTML = inPars;
-        document.getElementById("in-hcps").innerHTML = inHcps;
     }
 
     function addPlayerRow(name = "", hcp = "0", team = "") {
@@ -294,15 +258,6 @@
             if (data.players && data.players.length > 0) {
                 data.players.forEach(p => addPlayerRow(p.name, p.hcp, p.team || ""));
             }
-
-            if (data.courseData) {
-                data.courseData.forEach(h => {
-                    if (document.getElementById(`par-${h.hole}`)) {
-                        document.getElementById(`par-${h.hole}`).value = h.par;
-                        document.getElementById(`hcp-${h.hole}`).value = h.hcpIndex;
-                    }
-                });
-            }
         });
     }
 
@@ -326,13 +281,10 @@
             return;
         }
 
+        // Standard default course data (Par 4s, sequential handicaps) since manual grid was removed
         const courseData = [];
         for (let i = 1; i <= 18; i++) {
-            courseData.push({
-                hole: i,
-                par: document.getElementById(`par-${i}`).value || "4",
-                hcpIndex: document.getElementById(`hcp-${i}`).value || i
-            });
+            courseData.push({ hole: i, par: 4, hcpIndex: i });
         }
 
         const payload = {
