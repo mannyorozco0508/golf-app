@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Scorecard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 16px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
+        .container { max-width: 1000px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
+        .header-box { text-align: center; margin-bottom: 16px; }
+        .header-title { font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin: 0 0 4px 0; }
+        .header-sub { font-size: 0.9rem; color: #666; }
+        
+        .scorecard-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #e0e0e0; }
+        .scorecard-table { border-collapse: collapse; min-width: 750px; width: 100%; font-size: 0.85rem; }
+        .scorecard-table th, .scorecard-table td { border-bottom: 1px solid #ddd; border-right: 1px solid #eee; padding: 8px 4px; text-align: center; vertical-align: middle; }
+        .scorecard-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; }
+        
+        .sticky-col { position: sticky; left: 0; background: #f9fbf9; z-index: 2; font-weight: bold; text-align: left !important; min-width: 65px; box-shadow: 2px 0 4px rgba(0,0,0,0.05); padding-left: 10px !important; }
+        .scorecard-table thead th.sticky-col { background: #e0e8e4; z-index: 3; }
+        
+        .divider-col { background: #eef6f2 !important; font-weight: bold; }
+        .tot-col { background: #1d3557 !important; color: white !important; font-weight: bold; }
+        
+        .score-cell { position: relative; width: 28px; height: 28px; line-height: 28px; margin: 0 auto; display: block; font-weight: bold; }
+        .circle-1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #e63946; border-radius: 50%; pointer-events: none; z-index: 1; }
+        .circle-2 { position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid #e63946; border-radius: 50%; pointer-events: none; z-index: 1; }
+        
+        .empty-state { text-align: center; padding: 40px; color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-content" style="display: none;">
+    <div class="header-box">
+        <h1 class="header-title" id="course-title">Live Scorecard</h1>
+        <div class="header-sub" id="format-subtitle">Loading scores...</div>
+    </div>
+    <div class="scorecard-wrapper">
+        <table class="scorecard-table">
+            <thead id="scorecard-head"></thead>
+            <tbody id="scorecard-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+
+    if (!currentMode) {
+        document.body.innerHTML = "<div style='text-align:center; padding: 40px; font-family:sans-serif;'>No active room code provided.</div>";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            renderSharedScorecard(data);
+        });
+    }
+
+    function renderSharedScorecard(data) {
+        if (!data || !data.players || data.players.length === 0) {
+            document.getElementById("scorecard-body").innerHTML = `<tr><td colspan="22" class="empty-state">No players found in this room yet.</td></tr>`;
+            return;
+        }
+
+        document.getElementById("course-title").textContent = data.eventName || "Live Round";
+        document.getElementById("format-subtitle").textContent = data.courseName || "Golf Course";
+
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const players = data.players || [];
+
+        let headHtml = `<tr><th class="sticky-col">Hole</th>`;
+        for(let i=1; i<=9; i++) headHtml += `<th>${i}</th>`;
+        headHtml += `<th class="divider-col">OUT</th>`;
+        for(let i=10; i<=18; i++) headHtml += `<th>${i}</th>`;
+        headHtml += `<th class="divider-col">IN</th><th class="tot-col">TOT</th></tr>`;
+        document.getElementById("scorecard-head").innerHTML = headHtml;
+
+        const tbody = document.getElementById("scorecard-body");
+        let bodyHtml = "";
+
+        let outPar = 0, inPar = 0;
+        bodyHtml += `<tr><td class="sticky-col" style="font-size:0.75rem; color:#666;">Par</td>`;
+        for(let i=1; i<=18; i++) {
+            let hData = courseData.find(h => h.hole === i) || {par: 4};
+            let par = parseInt(hData.par, 10);
+            bodyHtml += `<td style="font-size:0.75rem; color:#666;">${par}</td>`;
+            if(i <= 9) outPar += par; else inPar += par;
+
+            if(i === 9) bodyHtml += `<td class="divider-col" style="font-size:0.75rem; color:#666;">${outPar}</td>`;
+            if(i === 18) {
+                bodyHtml += `<td class="divider-col" style="font-size:0.75rem; color:#666;">${inPar}</td>`;
+                bodyHtml += `<td class="tot-col" style="font-size:0.75rem; color:#fff !important;">${outPar + inPar}</td>`;
+            }
+        }
+        bodyHtml += `</tr>`;
+
+        players.forEach(p => {
+            let pOut = 0, pIn = 0;
+            let shortName = p.name.split(" ")[0]; 
+            let rowHtml = `<tr><td class="sticky-col">${shortName}</td>`;
+            
+            for(let i=1; i<=18; i++) {
+                let hData = courseData.find(h => h.hole === i) || {par: 4};
+                let val = savedScores[`p${p.id}_h${i}`];
+                let display = "";
+                
+                if (val && val > 0) {
+                    let score = parseInt(val, 10);
+                    let par = parseInt(hData.par, 10);
+                    let diff = score - par;
+                    
+                    if (i <= 9) pOut += score; else pIn += score;
+
+                    let shape = "";
+                    if (diff === -1) {
+                        shape = `<div class="circle-1"></div>`;
+                    } else if (diff <= -2) {
+                        shape = `<div class="circle-1"></div><div class="circle-2"></div>`;
+                    } 
+
+                    display = `<div class="score-cell">${score}${shape}</div>`;
+                }
+                
+                rowHtml += `<td>${display}</td>`;
+
+                if(i === 9) rowHtml += `<td class="divider-col">${pOut > 0 ? pOut : ''}</td>`;
+                if(i === 18) {
+                    let tot = pOut + pIn;
+                    rowHtml += `<td class="divider-col">${pIn > 0 ? pIn : ''}</td>`;
+                    rowHtml += `<td class="tot-col">${tot > 0 ? tot : ''}</td>`;
+                }
+            }
+            rowHtml += `</tr>`;
+            bodyHtml += rowHtml;
+        });
+
+        tbody.innerHTML = bodyHtml;
+    }
+</script>
+
+</body>
+</html>
