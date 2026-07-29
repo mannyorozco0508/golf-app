@@ -17,7 +17,16 @@
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
-        .settle-card { background: #fff0f0; border: 1px solid #e63946; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 16px; }
+        .settle-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #ffffff; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; font-weight: bold; font-size: 0.95rem; }
+        .val-pos { color: #2a9d8f; }
+        .val-neg { color: #e63946; }
+        .val-even { color: #555; }
+        
+        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: #555; border-top: 1px solid #d0e1db; padding-top: 8px; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
     </style>
 </head>
 <body>
@@ -35,9 +44,8 @@
 
     <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
 
-    <div class="settle-card">
-        <h3 style="color: #e63946; margin-top: 0;">Final Ledger</h3>
-        <p style="color: #555; font-size: 0.9rem; margin-bottom: 0;">Debt resolution and payout breakdowns will appear here at the end of the round.</p>
+    <div class="settle-card" id="settle-content">
+        <div style="text-align:center; padding:20px; color:#666;">Calculating final payouts...</div>
     </div>
 </div>
 
@@ -72,7 +80,163 @@
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             const data = snapshot.val() || {};
             document.getElementById("main-title").textContent = `💸 Settle (${data.eventName || "Weekend Round"})`;
+            renderSettlement(data);
         });
+    }
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, currentData) {
+        if (!players || players.length < 2) return null;
+        let t1Name = players[0].name.split(" ")[0];
+        let t2Name = players[1].name.split(" ")[0];
+        let t1Players = [players[0]];
+        let t2Players = [players[1]];
+
+        const pressRule = currentData.nassauPressRule || "none";
+        const manualPresses = currentData.manualPresses || {};
+
+        let activeMatches = [
+            { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9' },
+            { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9' },
+            { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Overall 18' }
+        ];
+
+        let pressCount = 0;
+
+        courseData.forEach((hole) => {
+            const hNum = hole.hole;
+
+            if (manualPresses[`h${hNum}`]) {
+                pressCount++;
+                let endH = hNum <= 9 ? 9 : 18;
+                activeMatches.push({ id: `P${pressCount}`, startHole: hNum, endHole: endH, status: 0, label: `Press #${pressCount}` });
+            }
+
+            let team1Best = 999, team2Best = 999;
+            let t1Valid = false, t2Valid = false;
+
+            t1Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < team1Best) team1Best = s;
+                    t1Valid = true;
+                }
+            });
+
+            t2Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < team2Best) team2Best = s;
+                    t2Valid = true;
+                }
+            });
+
+            if (t1Valid && t2Valid) {
+                let diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
+                activeMatches.forEach(m => {
+                    if (hNum >= m.startHole && hNum <= m.endHole) m.status += diff;
+                });
+            }
+        });
+
+        return { t1Name, t2Name, activeMatches };
+    }
+
+    function renderSettlement(data) {
+        const container = document.getElementById("settle-content");
+        const players = data.players || [];
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const gameFormat = data.gameFormat || "stroke";
+        const stake = data.nassauStake || 10;
+
+        if (gameFormat !== 'nassau' && gameFormat !== 'match') {
+            container.innerHTML = `
+                <div class="settle-header">Final Ledger</div>
+                <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau and Match Play formats.</div>
+            `;
+            return;
+        }
+
+        let scoringType = data.nassauScoring || data.matchScoring || "net";
+        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, data);
+
+        if (!matchData) {
+            container.innerHTML = `
+                <div class="settle-header">Final Ledger</div>
+                <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
+            `;
+            return;
+        }
+
+        let t1Total = 0;
+        let breakdownHtml = "";
+
+        matchData.activeMatches.forEach(m => {
+            let betVal = 0;
+            let statusDesc = "All Square ($0)";
+            if (m.status > 0) {
+                betVal = stake;
+                t1Total += stake;
+                statusDesc = `${matchData.t1Name} Won (+${stake})`;
+            } else if (m.status < 0) {
+                betVal = -stake;
+                t1Total -= stake;
+                statusDesc = `${matchData.t2Name} Won (-${stake})`;
+            }
+
+            breakdownHtml += `
+                <div class="breakdown-item">
+                    <span>${m.label}:</span>
+                    <span><strong>${statusDesc}</strong></span>
+                </div>
+            `;
+        });
+
+        function formatMoney(amount) {
+            if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
+            if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
+            return `<span class="val-even">$0</span>`;
+        }
+
+        container.innerHTML = `
+            <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
+            
+            <div class="ledger-row">
+                <span>${matchData.t1Name}:</span>
+                <span>${formatMoney(t1Total)}</span>
+            </div>
+            
+            <div class="ledger-row">
+                <span>${matchData.t2Name}:</span>
+                <span>${formatMoney(-t1Total)}</span>
+            </div>
+
+            <div class="match-breakdown-list">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
+                ${breakdownHtml}
+            </div>
+        `;
     }
 </script>
 
