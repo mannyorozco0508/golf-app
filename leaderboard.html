@@ -40,6 +40,8 @@
         .to-par-under { color: #e63946; font-weight: bold; }
         .to-par-over { color: #1a1a1a; font-weight: bold; }
         .to-par-even { color: #1a1a1a; font-weight: bold; }
+
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
     </style>
 </head>
 <body>
@@ -181,6 +183,22 @@
         renderBoard();
     }
 
+    function shareResults() {
+        const currentUrl = window.location.href;
+        const textMsg = `Check out the live leaderboard results for Room ${currentMode}! ⛳`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'Golf Leaderboard',
+                text: textMsg,
+                url: currentUrl
+            }).catch(console.error);
+        } else {
+            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + ' ' + currentUrl)}`;
+            window.location.href = smsUrl;
+        }
+    }
+
     function renderBoard() {
         const players = currentBoardData.players || [];
         const courseData = currentBoardData.courseData || [];
@@ -249,6 +267,7 @@
             });
 
             html += `</tbody></table>`;
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Leaderboard</button>`;
             container.innerHTML = html;
 
         } else if (activeView === "team") {
@@ -356,6 +375,7 @@
                     </table>
                 `;
             }
+            html += `<button class="btn-primary" onclick="shareResults()">📲 Text / Share Match Results</button>`;
             container.innerHTML = html;
         }
     }
