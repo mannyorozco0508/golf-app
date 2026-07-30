@@ -178,6 +178,13 @@
             <option value="skins">🥩 Skins Game (Gross & Net)</option>
         </select>
 
+        <div id="hole-bet-settings" class="extra-settings-box">
+            <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Per-Hole Bet Option</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="0"></div>
+            </div>
+        </div>
+
         <div id="match-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🥊 Match Play Options</label>
             <div>
@@ -597,6 +604,11 @@
 
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
+        const formatsWithHoleBets = ['stroke', 'match', 'hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
+        
+        if (document.getElementById("hole-bet-settings")) {
+            document.getElementById("hole-bet-settings").style.display = formatsWithHoleBets.includes(format) ? "block" : "none";
+        }
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
         if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
@@ -645,6 +657,7 @@
             handleCourseChange();
 
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.holeBetStake && document.getElementById("hole-bet-stake")) document.getElementById("hole-bet-stake").value = data.holeBetStake;
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
@@ -739,6 +752,7 @@
         const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
         const categoryIcon = getCategoryIcon(currentCategory);
 
+        const holeBetStake = parseFloat(document.getElementById("hole-bet-stake").value) || 0;
         const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
         const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
@@ -780,6 +794,7 @@
             activeCourseKey: courseKey,
             courseName: selectedCourse.name,
             gameFormat: gameFormat,
+            holeBetStake: holeBetStake,
             matchScoring: matchScoring,
             nassauType: nassauType,
             nassauScoring: nassauScoring,
