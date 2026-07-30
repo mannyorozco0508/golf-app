@@ -82,6 +82,12 @@
     <div class="lobby-title">GolfApp</div>
     <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private room for your foursome or trip, or join an existing one.</p>
     
+    <!-- NEW RESUME GAME BOX -->
+    <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #ddd;">
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
+        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="resumeGame()">▶️ Resume Game (Room <span id="resume-room-badge"></span>)</button>
+    </div>
+
     <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
     <button class="btn-outline" style="margin-top: 12px; background: #eef6f2;" onclick="shareMainApp()">📤 Share App</button>
     
@@ -352,11 +358,18 @@
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
+        
+        const lastRoom = localStorage.getItem('lastRoomCode');
+        if (lastRoom) {
+            document.getElementById("resume-container").style.display = "block";
+            document.getElementById("resume-room-badge").textContent = lastRoom;
+        }
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("admin-screen").style.display = "block";
         document.getElementById("display-room-code").textContent = currentMode;
+        localStorage.setItem('lastRoomCode', currentMode);
         
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
@@ -364,6 +377,13 @@
         });
 
         loadModeData(currentMode);
+    }
+
+    function resumeGame() {
+        const lastRoom = localStorage.getItem('lastRoomCode');
+        if (lastRoom) {
+            window.location.href = `index.html?game=${lastRoom}`;
+        }
     }
 
     function shareMainApp() {
@@ -1030,8 +1050,9 @@
     function endAndClearRound() {
         if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
+                localStorage.removeItem('lastRoomCode');
                 alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
-                window.location.reload(); 
+                window.location.href = "admin.html"; 
             }).catch((err) => {
                 alert(`Error clearing room: ${err.message}`);
             });
