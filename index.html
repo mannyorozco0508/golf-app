@@ -583,7 +583,7 @@
 
                     runningStats[p.id] += diff;
 
-                    // RESTORED BOGEY BOXES FOR LIVE VIEW ONLY
+                    // LIVE SCORECARD SHOWS BOGEY BOXES
                     if (diff === -1) {
                         shapeHtml = `<div class="shape-circle-1"></div>`;
                     } else if (diff <= -2) {
@@ -812,7 +812,7 @@
         for(let i=1; i<=9; i++) printHtml += `<th>${i}</th>`;
         printHtml += `<th class="section-col">OUT</th>`;
         for(let i=10; i<=18; i++) printHtml += `<th>${i}</th>`;
-        printHtml += `<th class="section-col">IN</th><th class="section-col">TOT</th></tr>`;
+        printHtml += `<th class="section-col">IN</th><th class="section-col">TOTAL</th></tr>`;
         
         // PAR ROW
         let outPar = 0, inPar = 0;
@@ -829,7 +829,7 @@
         }
         printHtml += `<th class="section-col">${inPar}</th><th class="section-col">${outPar+inPar}</th></tr>`;
 
-        // PLAYER ROWS (Only names and scores with birdie/eagle circles)
+        // PLAYER ROWS (Only names and scores with birdie/eagle circles - NO BOXES)
         filteredPlayers.forEach(p => {
             let outScore = 0, inScore = 0;
             printHtml += `<tr><td style="text-align:left; font-weight:bold; font-size: 16px;">${p.name.split(" ")[0]}</td>`;
@@ -843,8 +843,11 @@
                     outScore += score;
                     let diff = score - (ch ? parseInt(ch.par) : 4);
                     let shape = '';
+                    
+                    // PDF ONLY GETS CIRCLES
                     if (diff === -1) shape = `<div class="pcircle1"></div>`;
                     else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
+                    
                     printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
                 } else {
                     printHtml += `<td></td>`;
@@ -861,8 +864,11 @@
                     inScore += score;
                     let diff = score - (ch ? parseInt(ch.par) : 4);
                     let shape = '';
+                    
+                    // PDF ONLY GETS CIRCLES
                     if (diff === -1) shape = `<div class="pcircle1"></div>`;
                     else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
+                    
                     printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
                 } else {
                     printHtml += `<td></td>`;
