@@ -246,7 +246,7 @@
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555; display:grid;"></div>
     <div id="player-list"></div>
-    <button class="btn-add" onclick="addPlayerRow()">➕ Add Player Slot</button>
+    <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
     <button class="btn-primary" onclick="saveSettings()">💾 Save & Activate Setup</button>
 
@@ -669,16 +669,15 @@
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
             } else {
-                const savedRoster = localStorage.getItem('golfAppRoster');
-                if (savedRoster) {
-                    storedPlayersTemp = JSON.parse(savedRoster);
-                } else {
-                    storedPlayersTemp = [];
-                }
+                storedPlayersTemp = []; // Start completely empty for new rooms
             }
 
             document.getElementById("player-list").innerHTML = "";
-            handleFormatChange(true);
+            if (storedPlayersTemp.length > 0) {
+                handleFormatChange(true);
+            } else {
+                addPlayerRow(); // Start with 1 empty slot for a fresh room
+            }
         });
     }
 
@@ -741,6 +740,11 @@
         if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); return; }
 
         const rows = document.querySelectorAll('.player-row');
+        if (rows.length === 0) {
+            alert("⚠️ Please add at least one player to start the game!");
+            return;
+        }
+
         if (gameFormat === 'wolf' && rows.length !== 4) {
             alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
             return;
@@ -783,8 +787,6 @@
 
             playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
         });
-
-        localStorage.setItem('golfAppRoster', JSON.stringify(playersList));
 
         db.ref(`events/${currentMode}`).update({
             eventName: baseEventName,
@@ -838,6 +840,14 @@
 
     if (currentMode) {
         generateQRCode();
+        db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            if (!data.players || data.players.length === 0) {
+                addPlayerRow(); // Start brand new room with 1 empty player slot
+            } else {
+                loadModeData(currentMode);
+            }
+        });
     }
 </script>
 
