@@ -28,7 +28,16 @@
         .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: #555; border-top: 1px solid #d0e1db; padding-top: 8px; }
         .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
 
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
+        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+
+        /* MAGIC PDF HIDING CSS */
+        @media print {
+            body { background-color: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; padding: 0; }
+            .top-nav-bar, .btn-primary, .btn-outline, .event-title { display: none !important; }
+            .settle-card { border: 1px solid #ccc; background: #fff; }
+        }
     </style>
 </head>
 <body>
@@ -46,12 +55,25 @@
 
     <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
 
-    <div class="settle-card" id="settle-content">
+    <div id="settle-content">
         <div style="text-align:center; padding:20px; color:#666;">Calculating final payouts...</div>
     </div>
 </div>
 
 <script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
+    if (new Date() > BETA_END_DATE) {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+            </div>`;
+        throw new Error("Beta period expired.");
+    }
+    // ---------------------------------
+
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",
@@ -64,26 +86,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- DYNAMIC BETA TIME BOMB ---
-    db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
-        const expDateStr = snapshot.val();
-        const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
-        
-        if (new Date() > cutoffDate) {
-            document.body.innerHTML = `
-                <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
-                    <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
-                    <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                    <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
-                </div>`;
-            throw new Error("Beta period expired.");
-        }
-    });
-    // ---------------------------------
-
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
-    let currentData = {}; // Store data globally for the share button
+    let currentData = {};
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -122,22 +127,17 @@
         }
     }
 
-    function shareResults() {
+    function shareResultsLink() {
         const rawUrl = window.location.href.split('?')[0];
         const sharedUrl = rawUrl + `?game=${currentMode}`;
         
         const courseName = currentData.courseName || "Live Round";
         const dateObj = new Date();
         const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        
         const textMsg = `${courseName} Payouts - ${dateString}`;
         
         if (navigator.share) {
-            navigator.share({
-                title: `${courseName} Payouts`,
-                text: textMsg,
-                url: sharedUrl
-            }).catch(console.error);
+            navigator.share({ title: `${courseName} Payouts`, text: textMsg, url: sharedUrl }).catch(console.error);
         } else {
             const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + '\n\n' + sharedUrl)}`;
             window.location.href = smsUrl;
@@ -247,18 +247,24 @@
             });
 
             container.innerHTML = `
-                <div class="settle-header">🎯 Final Dot Game Settlement</div>
-                ${ledgerHtml}
-                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Payouts</button>
+                <div class="settle-card">
+                    <div class="settle-header">🎯 Final Dot Game Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
             `;
             return;
         }
 
         if (gameFormat !== 'nassau' && gameFormat !== 'match') {
             container.innerHTML = `
-                <div class="settle-header">Final Ledger</div>
-                <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
-                <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Results</button>
+                <div class="settle-card">
+                    <div class="settle-header">Final Ledger</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
+                </div>
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
             `;
             return;
         }
@@ -268,8 +274,10 @@
 
         if (!matchData) {
             container.innerHTML = `
-                <div class="settle-header">Final Ledger</div>
-                <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
+                <div class="settle-card">
+                    <div class="settle-header">Final Ledger</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
+                </div>
             `;
             return;
         }
@@ -305,24 +313,27 @@
         }
 
         container.innerHTML = `
-            <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
-            
-            <div class="ledger-row">
-                <span>${matchData.t1Name}:</span>
-                <span>${formatMoney(t1Total)}</span>
-            </div>
-            
-            <div class="ledger-row">
-                <span>${matchData.t2Name}:</span>
-                <span>${formatMoney(-t1Total)}</span>
+            <div class="settle-card">
+                <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
+                
+                <div class="ledger-row">
+                    <span>${matchData.t1Name}:</span>
+                    <span>${formatMoney(t1Total)}</span>
+                </div>
+                
+                <div class="ledger-row">
+                    <span>${matchData.t2Name}:</span>
+                    <span>${formatMoney(-t1Total)}</span>
+                </div>
+
+                <div class="match-breakdown-list">
+                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
+                    ${breakdownHtml}
+                </div>
             </div>
 
-            <div class="match-breakdown-list">
-                <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
-                ${breakdownHtml}
-            </div>
-
-            <button class="btn-primary" onclick="shareResults()" style="margin-top: 16px;">📲 Text / Share Payouts</button>
+            <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
         `;
     }
 </script>
