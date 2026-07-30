@@ -208,12 +208,9 @@
     </div>
 
     <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
-        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">📤 Share & Export Scorecard</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Share the live link or generate a traditional horizontal PDF scorecard.</span>
-        <div style="display:flex; gap: 8px;">
-            <button class="btn-outline" style="margin-top: 0;" onclick="shareResultsLink()">🔗 Text Live Link</button>
-            <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Save Clean PDF</button>
-        </div>
+        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">📤 Export Scorecard</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Generate a traditional horizontal PDF scorecard to save or text out.</span>
+        <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Save Clean PDF</button>
     </div>
 
     <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
@@ -301,22 +298,6 @@
             currentData = snapshot.val() || {};
             renderScorecard();
         });
-    }
-
-    function shareResultsLink() {
-        const rawUrl = window.location.href.split('?')[0];
-        const sharedUrl = rawUrl + `?game=${currentMode}`;
-        
-        const courseName = currentData.courseName || "Live Scorecard";
-        const dateObj = new Date();
-        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const textMsg = `${courseName} Scorecard - ${dateString}`;
-        
-        if (navigator.share) {
-            navigator.share({ title: `${courseName} Scorecard`, text: textMsg, url: sharedUrl }).catch(console.error);
-        } else {
-            navigator.clipboard.writeText(sharedUrl).then(() => alert("Scorecard link copied to clipboard!"));
-        }
     }
 
     function parseHcp(hcpStr) {

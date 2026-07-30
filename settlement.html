@@ -29,13 +29,12 @@
         .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
 
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
-        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
-
+        
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .btn-outline, .event-title { display: none !important; }
+            .top-nav-bar, .btn-primary, .event-title { display: none !important; }
             .settle-card { border: 1px solid #ccc; background: #fff; }
         }
     </style>
@@ -124,23 +123,6 @@
             const plusVal = Math.abs(numericHcp);
             if (hcpIndex > (18 - plusVal)) return -1;
             return 0;
-        }
-    }
-
-    function shareResultsLink() {
-        const rawUrl = window.location.href.split('?')[0];
-        const sharedUrl = rawUrl + `?game=${currentMode}`;
-        
-        const courseName = currentData.courseName || "Live Round";
-        const dateObj = new Date();
-        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const textMsg = `${courseName} Payouts - ${dateString}`;
-        
-        if (navigator.share) {
-            navigator.share({ title: `${courseName} Payouts`, text: textMsg, url: sharedUrl }).catch(console.error);
-        } else {
-            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + '\n\n' + sharedUrl)}`;
-            window.location.href = smsUrl;
         }
     }
 
@@ -252,7 +234,6 @@
                     ${ledgerHtml}
                 </div>
                 <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
-                <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
             `;
             return;
         }
@@ -264,7 +245,6 @@
                     <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
                 </div>
                 <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
-                <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
             `;
             return;
         }
@@ -333,7 +313,6 @@
             </div>
 
             <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
-            <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
         `;
     }
 </script>

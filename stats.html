@@ -39,13 +39,12 @@
         .total-row td { border: none !important; color: white !important; }
 
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); margin-top: 16px; }
-        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-top: 10px; }
         
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .btn-outline, .event-title { display: none !important; }
+            .top-nav-bar, .btn-primary, .event-title { display: none !important; }
             .clean-scorecard { box-shadow: none; border: 1px solid #ccc; margin-top: 0; padding: 10px; }
         }
     </style>
@@ -116,24 +115,6 @@
             currentData = snapshot.val() || {};
             renderCleanCard(currentData);
         });
-    }
-
-    function shareResultsLink() {
-        const rawUrl = window.location.href.split('?')[0];
-        const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
-        const sharedUrl = dirUrl + `/index.html?game=${currentMode}`;
-        
-        const courseName = currentData.courseName || "Live Round";
-        const dateObj = new Date();
-        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const textMsg = `${courseName} Scorecard - ${dateString}`;
-        
-        if (navigator.share) {
-            navigator.share({ title: `${courseName} Scorecard`, text: textMsg, url: sharedUrl }).catch(console.error);
-        } else {
-            const smsUrl = `sms:?&body=${encodeURIComponent(textMsg + '\n\n' + sharedUrl)}`;
-            window.location.href = smsUrl;
-        }
     }
 
     function renderCleanCard(data) {
@@ -219,7 +200,7 @@
                 html += `</tr>`;
 
                 if (h.hole === 18) {
-                    html += `<tr class="total-row"><td>TOT</td><td>-</td>`;
+                    html += `<tr class="total-row"><td>TOTAL</td><td>-</td>`;
                     players.forEach(p => { 
                         html += `<td>${totGross[p.id] > 0 ? totGross[p.id] : '-'}</td>`; 
                     });
@@ -234,7 +215,6 @@
                 </div>
             </div>
             <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
-            <button class="btn-outline" onclick="shareResultsLink()">🔗 Text Live Link</button>
         `;
 
         container.innerHTML = html;
