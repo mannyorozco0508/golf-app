@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Master Beta Control</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #1d3557; margin: 0; padding: 20px; color: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { width: 100%; max-width: 400px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); padding: 24px; text-align: center; }
+        h2 { color: #0f4c3a; margin-top: 0; }
+        .status-box { background: #eef6f2; border: 1px solid #2a9d8f; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+        input[type="date"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; margin-bottom: 20px; text-align: center; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
+        .btn-primary:hover { background-color: #125d48; }
+        .note { font-size: 0.8rem; color: #666; margin-top: 16px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>⏱️ Beta Time Bomb</h2>
+        
+        <div class="status-box">
+            <div style="font-size: 0.8rem; color: #555; text-transform: uppercase; margin-bottom: 4px;">Current Expiration Date</div>
+            <div id="current-date-display" style="font-size: 1.2rem; color: #e63946;">Loading...</div>
+        </div>
+
+        <label style="display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.9rem; text-align: left;">Set New Expiration Date:</label>
+        <input type="date" id="new-date-input">
+
+        <button class="btn-primary" onclick="saveExpiration()">💾 Update Master Timeline</button>
+
+        <div class="note">Keep this page hidden. Whenever you update this date, every caddie's app will automatically extend or lock out based on the new timeline.</div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+          authDomain: "golfapp-9fb21.firebaseapp.com",
+          databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+          projectId: "golfapp-9fb21",
+          storageBucket: "golfapp-9fb21.firebasestorage.app",
+          messagingSenderId: "761739328763",
+          appId: "1:761739328763:web:08ac41351578565c94045e"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function loadCurrentDate() {
+            db.ref('app_settings/beta_expiration').on('value', (snapshot) => {
+                const dateStr = snapshot.val();
+                if (dateStr) {
+                    document.getElementById("current-date-display").textContent = dateStr.split("T")[0];
+                    document.getElementById("new-date-input").value = dateStr.split("T")[0];
+                } else {
+                    document.getElementById("current-date-display").textContent = "2026-09-01 (Default)";
+                    document.getElementById("new-date-input").value = "2026-09-01";
+                }
+            });
+        }
+
+        function saveExpiration() {
+            const newDate = document.getElementById("new-date-input").value;
+            if (!newDate) { alert("Please select a date!"); return; }
+            
+            // Add time to make it end-of-day
+            const fullDateString = newDate + "T23:59:59";
+            
+            db.ref('app_settings/beta_expiration').set(fullDateString)
+              .then(() => alert("✅ Beta timeline updated successfully!"))
+              .catch(err => alert("Error: " + err.message));
+        }
+
+        loadCurrentDate();
+    </script>
+</body>
+</html>

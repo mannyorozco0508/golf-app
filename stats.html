@@ -51,9 +51,25 @@
       messagingSenderId: "761739328763",
       appId: "1:761739328763:web:08ac41351578565c94045e"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // --- DYNAMIC BETA TIME BOMB ---
+    db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
+        const expDateStr = snapshot.val();
+        const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
+        
+        if (new Date() > cutoffDate) {
+            document.body.innerHTML = `
+                <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                    <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                    <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                    <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+                </div>`;
+            throw new Error("Beta period expired.");
+        }
+    });
+    // ---------------------------------
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
