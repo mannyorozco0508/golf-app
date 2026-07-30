@@ -32,7 +32,7 @@
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
         
-        input[type="text"], input[type="number"], select { 
+        input[type="text"], input[type="number"], input[type="tel"], select { 
             width: 100%; padding: 10px; border: 1px solid #ccc; 
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: #fff; 
         }
@@ -69,6 +69,10 @@
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .btn-outline:hover { background-color: #f0f4f2; }
+
+        /* Custom Course Grid Inputs */
+        .grid-input { width: 34px !important; padding: 6px 2px !important; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem !important; box-sizing: border-box; }
+        .grid-input:focus { border-color: #0f4c3a; outline: none; background: #eef6f2; }
     </style>
 </head>
 <body>
@@ -136,6 +140,73 @@
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Front 9</label><select id="front-nine-select"></select></div>
                 <div><label style="font-size: 0.8rem;">Back 9</label><select id="back-nine-select"></select></div>
+            </div>
+        </div>
+        
+        <!-- NEW DYNAMIC COURSE EDITOR -->
+        <div class="extra-settings-box" style="display: block; margin-top: 12px; padding: 12px 10px;">
+            <label style="color:#0f4c3a; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-custom-course" onchange="document.getElementById('custom-course-container').style.display = this.checked ? 'block' : 'none';" style="width: 18px; height: 18px; margin: 0;">
+                <strong>✏️ Review / Edit Course Pars & Handicaps</strong>
+            </label>
+            <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid #d0e1db; padding-top: 12px; overflow-x: auto;">
+                <p style="font-size: 0.75rem; color: #555; margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Front 9 -->
+                    <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
+                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()"></td>
+                        </tr>
+                        <tr><th style="padding:6px; text-align:left;">HCP</th>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-1" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-2" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-3" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-4" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-5" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-6" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-7" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-8" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-9" class="grid-input" onfocus="this.select()"></td>
+                        </tr>
+                    </table>
+
+                    <!-- Back 9 -->
+                    <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
+                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()"></td>
+                        </tr>
+                        <tr><th style="padding:6px; text-align:left;">HCP</th>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-10" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-11" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-12" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-13" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-14" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-15" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-16" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-17" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-18" class="grid-input" onfocus="this.select()"></td>
+                        </tr>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -300,11 +371,7 @@
         const textMsg = "Check out this live golf scoring & betting app I'm building! Start a room, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
-            navigator.share({
-                title: `GolfApp Beta`,
-                text: textMsg,
-                url: baseUrl
-            }).catch(console.error);
+            navigator.share({ title: `GolfApp Beta`, text: textMsg, url: baseUrl }).catch(console.error);
         } else {
             navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
         }
@@ -317,9 +384,7 @@
     function generateRoomCode() {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let code = "";
-        for (let i = 0; i < 4; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
+        for (let i = 0; i < 4; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
         return code;
     }
 
@@ -578,7 +643,8 @@
     };
 
     const coursePresets = {
-        swwa_tahoma_valley: { name: "Tahoma Valley Golf Course", data: [{hole:1,par:5,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:6},{hole:4,par:3,hcpIndex:18},{hole:5,par:3,hcpIndex:14},{hole:6,par:4,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:12},{hole:9,par:3,hcpIndex:16},{hole:10,par:4,hcpIndex:11},{hole:11,par:4,hcpIndex:7},{hole:12,par:5,hcpIndex:5},{hole:13,par:3,hcpIndex:13},{hole:14,par:4,hcpIndex:9},{hole:15,par:3,hcpIndex:15},{hole:16,par:5,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:5,hcpIndex:3}] },
+        swwa_tahoma_valley: { name: "Tahoma Valley Golf Course (Yelm)", data: [{hole:1,par:5,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:6},{hole:4,par:3,hcpIndex:18},{hole:5,par:4,hcpIndex:14},{hole:6,par:3,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:12},{hole:9,par:3,hcpIndex:16},{hole:10,par:4,hcpIndex:11},{hole:11,par:4,hcpIndex:7},{hole:12,par:5,hcpIndex:5},{hole:13,par:3,hcpIndex:13},{hole:14,par:4,hcpIndex:9},{hole:15,par:3,hcpIndex:15},{hole:16,par:5,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:5,hcpIndex:3}] },
+        wa_chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:9},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:13},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:17},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:4},{hole:11,par:4,hcpIndex:8},{hole:12,par:4,hcpIndex:18},{hole:13,par:5,hcpIndex:14},{hole:14,par:4,hcpIndex:2},{hole:15,par:3,hcpIndex:16},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:6},{hole:18,par:5,hcpIndex:12}] },
         emerald_hills: { name: "The Club at Emerald Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:8},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
         hollywood_beach: { name: "Hollywood Beach Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
         yale: { name: "The Course at Yale", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
@@ -591,7 +657,6 @@
         tashuaknolls: { name: "Tashua Knolls Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
         whitneyfarms: { name: "Whitney Farms Golf Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:11},{hole:3,par:5,hcpIndex:3},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:9},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:4},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:2},{hole:18,par:4,hcpIndex:14}] },
         oaklane: { name: "Tradition at Oak Lane", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:3,hcpIndex:17},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        wa_chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:13},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:9},{hole:6,par:4,hcpIndex:11},{hole:7,par:4,hcpIndex:5},{hole:8,par:5,hcpIndex:1},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:12}] },
         wa_homecourse: { name: "The Home Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:11},{hole:10,par:5,hcpIndex:6},{hole:11,par:4,hcpIndex:10},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:8}] },
         wa_spanaway: { name: "Lake Spanaway Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:3},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:12},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
         wa_meadow_park: { name: "Meadow Park Championship", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:15},{hole:3,par:4,hcpIndex:1},{hole:4,par:3,hcpIndex:11},{hole:5,par:4,hcpIndex:17},{hole:6,par:4,hcpIndex:7},{hole:7,par:5,hcpIndex:3},{hole:8,par:3,hcpIndex:13},{hole:9,par:4,hcpIndex:5},{hole:10,par:5,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:12},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
@@ -626,6 +691,31 @@
         } else {
             loopBox.style.display = "none";
         }
+        
+        // Auto-fill Custom Course Grid
+        let baseData = [];
+        if (nineHoleLoops[courseKey]) {
+            // Skipping loop logic for custom grid auto-fill
+        } else if (coursePresets[courseKey]) {
+            baseData = coursePresets[courseKey].data;
+        } else {
+            for(let i=1; i<=18; i++) baseData.push({hole: i, par: 4, hcpIndex: i});
+        }
+        
+        baseData.forEach(h => {
+            if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
+            if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+        });
+    }
+
+    function captureCourseDataGrid() {
+        let customData = [];
+        for(let i=1; i<=18; i++) {
+            let p = parseInt(document.getElementById(`c-par-${i}`).value) || 4;
+            let h = parseInt(document.getElementById(`c-hcp-${i}`).value) || i;
+            customData.push({ hole: i, par: p, hcpIndex: h });
+        }
+        return customData;
     }
 
     function captureCurrentPlayerInputs() {
@@ -688,6 +778,10 @@
     }
 
     function buildMergedCourseData(courseKey, courseName) {
+        if (document.getElementById('enable-custom-course').checked) {
+            return { name: courseName || "Custom Golf Course", data: captureCourseDataGrid() };
+        }
+
         if (nineHoleLoops[courseKey]) {
             const loops = nineHoleLoops[courseKey];
             const frontKey = document.getElementById("front-nine-select").value;
@@ -701,11 +795,7 @@
         } else if (coursePresets[courseKey]) {
             return coursePresets[courseKey];
         } else {
-            const genericData = [];
-            for (let i = 1; i <= 18; i++) {
-                genericData.push({ hole: i, par: 4, hcpIndex: i }); 
-            }
-            return { name: courseName || "Custom Golf Course", data: genericData };
+            return { name: courseName || "Custom Golf Course", data: captureCourseDataGrid() };
         }
     }
 
@@ -717,13 +807,21 @@
 
             if (data.activeCourseKey) {
                 courseHiddenSelect.value = data.activeCourseKey;
-                courseSearchInput.value = getCourseNameById(data.activeCourseKey);
+                courseSearchInput.value = getCourseNameById(data.activeCourseKey) || data.courseName;
             } else {
                 courseHiddenSelect.value = "";
                 courseSearchInput.value = "";
             }
             
             handleCourseChange();
+
+            // Populate Grid with saved data if it exists
+            if (data.courseData && data.courseData.length > 0) {
+                data.courseData.forEach(h => {
+                    if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
+                    if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+                });
+            }
 
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
             
@@ -852,7 +950,7 @@
             }
 
             const roundDay = document.getElementById("round-day-select").value;
-            const baseEventName = roundDay; // Using the generic round day for consistent subheaders
+            const baseEventName = roundDay; 
             const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
             const categoryIcon = getCategoryIcon(currentCategory);
 
@@ -915,7 +1013,6 @@
             }).then(() => {
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
-                alert(`✅ Saved! ${categoryIcon} ${baseEventName} (${roundDay}) activated for ${selectedCourse.name} in Room ${currentMode}.`);
                 window.location.href = `index.html?game=${currentMode}`;
             }).catch((err) => { 
                 saveBtn.innerText = originalText;
