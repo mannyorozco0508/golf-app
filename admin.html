@@ -26,19 +26,13 @@
         .preset-btn:hover, .preset-btn.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; box-shadow: 0 2px 6px rgba(15,76,58,0.2); }
 
         /* Lobby Styles */
-        #lobby-screen { text-align: center; padding: 20px 10px; }
-        .lobby-logo { font-size: 3rem; margin-bottom: 10px; }
-        .lobby-title { font-size: 1.8rem; color: #0f4c3a; margin-bottom: 20px; font-weight: bold; }
-        .lobby-divider { margin: 25px 0; border-top: 1px solid #ddd; position: relative; }
-        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 10px; color: #888; font-size: 0.85rem; font-weight: bold; }
-        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 10px; }
-
-        /* Active Rooms List Styles */
-        .active-rooms-box { margin-top: 25px; text-align: left; background: #f4f6f8; border-radius: 10px; padding: 14px; border: 1px solid #e0e0e0; }
-        .active-room-item { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; text-decoration: none; color: inherit; transition: all 0.2s; }
-        .active-room-item:hover { background: #eef6f2; border-color: #2a9d8f; }
-        .room-meta { font-size: 0.75rem; color: #666; margin-top: 2px; }
-        .room-code-tag { background: #1d3557; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
+        #lobby-screen { text-align: center; padding: 30px 15px; }
+        .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; }
+        .lobby-title { font-size: 2rem; color: #0f4c3a; margin-bottom: 10px; font-weight: bold; }
+        .lobby-divider { margin: 30px 0; border-top: 1px solid #ddd; position: relative; }
+        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 12px; color: #888; font-size: 0.85rem; font-weight: bold; }
+        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid #d0e1db !important; border-radius: 10px !important; padding: 14px !important; background: #f9fbf9 !important; }
+        .join-input:focus { border-color: #0f4c3a !important; outline: none; background: #fff !important; }
 
         /* Admin Styles */
         .room-badge { display: inline-block; background: #1d3557; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
@@ -77,9 +71,11 @@
 
         .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
+        .btn-primary:hover { background-color: #125d48; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .btn-outline { width: 100%; background-color: transparent; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .btn-outline:hover { background-color: #f0f4f2; }
     </style>
 </head>
 <body>
@@ -87,22 +83,14 @@
 <div class="container" id="lobby-screen">
     <div class="lobby-logo">⛳</div>
     <div class="lobby-title">GolfApp</div>
-    <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Create a private room for your foursome or trip, or join an existing one.</p>
+    <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private room for your foursome or trip, or join an existing one.</p>
     
     <button class="btn-primary" onclick="createRoom()">➕ Create New Private Room</button>
     
     <div class="lobby-divider"><span>OR</span></div>
     
-    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE">
+    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE" maxlength="6">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
-
-    <!-- Active Games / Recent Rooms Section -->
-    <div class="active-rooms-box">
-        <div style="font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 8px;">🔥 Active Games on Server</div>
-        <div id="active-rooms-list">
-            <div style="font-size: 0.85rem; color: #888; text-align: center; padding: 6px;">Scanning for active games...</div>
-        </div>
-    </div>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -285,7 +273,6 @@
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
-        loadActiveRooms();
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
@@ -298,6 +285,29 @@
         });
 
         loadModeData(currentMode);
+    }
+
+    function generateRoomCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let code = "";
+        for (let i = 0; i < 4; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    function createRoom() {
+        const newCode = generateRoomCode();
+        window.location.href = `admin.html?game=${newCode}`;
+    }
+
+    function joinRoom() {
+        const inputCode = document.getElementById("join-room-input").value.trim().toUpperCase();
+        if (inputCode.length < 2) {
+            alert("⚠️ Please enter a valid room code.");
+            return;
+        }
+        window.location.href = `admin.html?game=${inputCode}`;
     }
 
     function selectCategoryPreset(type) {
@@ -321,40 +331,6 @@
             formatSelect.value = "nassau";
         }
         handleFormatChange();
-    }
-
-    function loadActiveRooms() {
-        db.ref('events').once('value').then((snapshot) => {
-            const events = snapshot.val() || {};
-            const listEl = document.getElementById("active-rooms-list");
-            const roomKeys = Object.keys(events);
-
-            if (roomKeys.length === 0) {
-                listEl.innerHTML = `<div style="font-size: 0.85rem; color: #888; text-align: center; padding: 6px;">No active games found. Create one above!</div>`;
-                return;
-            }
-
-            let html = "";
-            roomKeys.forEach(code => {
-                const ev = events[code];
-                const categoryIcon = ev.categoryIcon || "⛳";
-                const eventName = ev.eventName || "Weekend Round";
-                const courseName = ev.courseName || "Golf Course";
-                const format = (ev.gameFormat || "stroke").toUpperCase();
-                const playerCount = ev.players ? ev.players.length : 0;
-
-                html += `
-                    <a href="index.html?game=${code}" class="active-room-item">
-                        <div>
-                            <div style="font-weight: bold; color: #0f4c3a; font-size: 0.95rem;">${categoryIcon} ${eventName}</div>
-                            <div class="room-meta">${courseName} • ${format} • ${playerCount} Players</div>
-                        </div>
-                        <span class="room-code-tag">${code}</span>
-                    </a>
-                `;
-            });
-            listEl.innerHTML = html;
-        });
     }
 
     const courseDirectory = [
@@ -582,6 +558,84 @@
         manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:5,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:14}] }
     };
 
+    const courseSearchInput = document.getElementById('course-search-input');
+    const courseDropdown = document.getElementById('course-dropdown');
+    const courseHiddenSelect = document.getElementById('course-select');
+
+    function populateCourseDropdown(filterText = "") {
+        courseDropdown.innerHTML = "";
+        const lowerFilter = filterText.toLowerCase();
+        let hasResults = false;
+
+        courseDirectory.forEach(group => {
+            const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
+            if (filteredItems.length > 0) {
+                hasResults = true;
+                if (filterText === "") {
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "custom-select-group";
+                    groupDiv.textContent = group.group;
+                    courseDropdown.appendChild(groupDiv);
+                }
+                filteredItems.forEach(item => {
+                    const optionDiv = document.createElement("div");
+                    optionDiv.className = "custom-select-option";
+                    optionDiv.textContent = item.name;
+                    optionDiv.onclick = () => { selectCourse(item.id, item.name); };
+                    courseDropdown.appendChild(optionDiv);
+                });
+            }
+        });
+
+        if (!hasResults) {
+            courseDropdown.innerHTML = `<div style="padding:12px; color:#888; text-align:center;">No courses found.</div>`;
+        }
+    }
+
+    function selectCourse(id, name) {
+        courseHiddenSelect.value = id;
+        courseSearchInput.value = name;
+        courseDropdown.style.display = "none";
+        handleCourseChange(); 
+    }
+
+    courseSearchInput.addEventListener('focus', () => {
+        populateCourseDropdown(courseSearchInput.value);
+        courseDropdown.style.display = "block";
+    });
+
+    courseSearchInput.addEventListener('input', (e) => {
+        populateCourseDropdown(e.target.value);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('course-wrapper').contains(e.target)) {
+            courseDropdown.style.display = 'none';
+            const currentSelectedName = getCourseNameById(courseHiddenSelect.value);
+            if (courseSearchInput.value !== currentSelectedName) {
+                courseSearchInput.value = currentSelectedName; 
+            }
+        }
+    });
+
+    function getCourseNameById(id) {
+        if (!id) return "";
+        for (let g of courseDirectory) {
+            for (let i of g.items) {
+                if (i.id === id) return i.name;
+            }
+        }
+        return "";
+    }
+
+    const nineHoleLoops = {
+        eaglespride_27: {
+            red: { name: "Red Loop (Par 37)", data: [{par:5,hcp:7},{par:3,hcp:13},{par:5,hcp:3},{par:4,hcp:11},{par:4,hcp:1},{par:5,hcp:9},{par:4,hcp:5},{par:3,hcp:15},{par:4,hcp:17}] },
+            blue: { name: "Blue Loop (Par 35)", data: [{par:4,hcp:12},{par:4,hcp:14},{par:3,hcp:18},{par:4,hcp:2},{par:3,hcp:16},{par:4,hcp:8},{par:4,hcp:10},{par:4,hcp:4},{par:5,hcp:6}] },
+            green: { name: "Green Loop (Par 36)", data: [{par:4,hcp:7},{par:3,hcp:9},{par:4,hcp:11},{par:4,hcp:3},{par:5,hcp:5},{par:5,hcp:1},{par:3,hcp:17},{par:4,hcp:15},{par:4,hcp:13}] }
+        }
+    };
+
     function handleCourseChange() {
         const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
@@ -671,7 +725,6 @@
         } else if (coursePresets[courseKey]) {
             return coursePresets[courseKey];
         } else {
-            // Generic 18-hole blank slate fallback for new courses
             const genericData = [];
             for (let i = 1; i <= 18; i++) {
                 genericData.push({ hole: i, par: 4, hcpIndex: i }); 
