@@ -167,6 +167,7 @@
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
+            <option value="hilo">♠️ Hi-Lo (Low Ball / High Ball)</option>
             <option value="dots">🎯 Dot Game (Garbage/Junk)</option>
             <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
             <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
@@ -581,7 +582,7 @@
         if (format === 'ryder') {
             headerRow.className = "grid-ryder";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
-        } else if (['bestball', 'scramble'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
             headerRow.className = "grid-team";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
         } else {
@@ -692,7 +693,7 @@
                     <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
                 </select>`;
-        } else if (['bestball', 'scramble'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
             gridClass = "grid-team";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
