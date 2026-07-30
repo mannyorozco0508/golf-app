@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Round Stats</title>
+    <title>Clean Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -17,7 +17,28 @@
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
-        .stats-card { background: #f4f6f8; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 16px; }
+        /* Clean Scorecard Styles */
+        .clean-scorecard { background: #fff; border: 2px solid #0f4c3a; border-radius: 12px; padding: 20px; margin-top: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+        .course-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f4c3a; padding-bottom: 12px; }
+        .course-name { font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+        .round-date { font-size: 0.9rem; color: #666; margin-top: 4px; font-weight: bold; }
+        
+        .card-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -10px; padding: 0 10px;}
+        .card-table { width: 100%; border-collapse: collapse; min-width: 340px; }
+        .card-table th, .card-table td { padding: 12px 6px; text-align: center; border-bottom: 1px solid #eee; font-size: 1rem; vertical-align: middle; }
+        .card-table th { background: #f0f4f2; color: #0f4c3a; font-weight: bold; font-size: 0.85rem; text-transform: uppercase; }
+        .card-table td:first-child { font-weight: bold; color: #555; }
+        
+        .score-display-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-weight: bold; color: #1a1a1a; font-size: 1.1rem; }
+        .shape-circle-1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #e63946; border-radius: 50%; pointer-events: none; }
+        .shape-circle-2 { position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border: 1px solid #e63946; border-radius: 50%; pointer-events: none; }
+        
+        .subtotal-row { background-color: #f9fbf9; font-weight: bold; }
+        .subtotal-row td { color: #0f4c3a; border-bottom: 2px solid #d0e1db !important; }
+        .total-row { background-color: #1d3557; color: white; font-weight: bold; font-size: 1.1rem; }
+        .total-row td { border: none !important; color: white !important; }
+
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); margin-top: 16px; }
     </style>
 </head>
 <body>
@@ -33,15 +54,27 @@
         <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
     </div>
 
-    <h2 class="event-title" id="main-title">📊 Round Stats</h2>
+    <h2 class="event-title" id="main-title">📊 Final Scorecard</h2>
 
-    <div class="stats-card">
-        <h3 style="color: #0f4c3a; margin-top: 0;">Analytics & Breakdown</h3>
-        <p style="color: #555; font-size: 0.9rem; margin-bottom: 0;">Birdie counts, pars, and hole-by-hole analytics will populate here as scores are logged.</p>
+    <div id="stats-content">
+        <div style="text-align:center; padding:40px; color:#666;">Loading Clean Scorecard...</div>
     </div>
 </div>
 
 <script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
+    if (new Date() > BETA_END_DATE) {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+            </div>`;
+        throw new Error("Beta period expired.");
+    }
+    // ---------------------------------
+
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",
@@ -51,25 +84,9 @@
       messagingSenderId: "761739328763",
       appId: "1:761739328763:web:08ac41351578565c94045e"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
-    // --- DYNAMIC BETA TIME BOMB ---
-    db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
-        const expDateStr = snapshot.val();
-        const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
-        
-        if (new Date() > cutoffDate) {
-            document.body.innerHTML = `
-                <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
-                    <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
-                    <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                    <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
-                </div>`;
-            throw new Error("Beta period expired.");
-        }
-    });
-    // ---------------------------------
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
@@ -87,8 +104,112 @@
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             const data = snapshot.val() || {};
-            document.getElementById("main-title").textContent = `📊 Stats (${data.eventName || "Weekend Round"})`;
+            renderCleanCard(data);
         });
+    }
+
+    function renderCleanCard(data) {
+        const container = document.getElementById("stats-content");
+        const players = data.players || [];
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        
+        if (players.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">Waiting for round setup...</div>`;
+            return;
+        }
+
+        const courseName = data.courseName || "Golf Course";
+        const dateObj = new Date();
+        const dateString = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+        let html = `
+            <div class="clean-scorecard" id="capture-area">
+                <div class="course-header">
+                    <h2 class="course-name">${courseName}</h2>
+                    <div class="round-date">${dateString}</div>
+                </div>
+                <div class="card-table-wrapper">
+                    <table class="card-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">Hole</th>
+                                <th style="width: 35px;">Par</th>
+                                ${players.map(p => `<th>${p.name.split(" ")[0]}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        let f9Gross = {}, b9Gross = {}, totGross = {};
+        players.forEach(p => { f9Gross[p.id]=0; b9Gross[p.id]=0; totGross[p.id]=0; });
+
+        courseData.forEach(h => {
+            html += `<tr><td>${h.hole}</td><td style="color:#888;">${h.par}</td>`;
+            players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${h.hole}`];
+                if (v && v > 0) {
+                    let score = parseInt(v, 10);
+                    let par = parseInt(h.par, 10);
+                    let diff = score - par;
+                    
+                    if (h.hole <= 9) f9Gross[p.id] += score;
+                    else b9Gross[p.id] += score;
+                    totGross[p.id] += score;
+
+                    let shapeHtml = "";
+                    
+                    // STRICTLY NO BOXES: Only rendering circles for birdies (-1) and eagles (-2 or better)
+                    if (diff === -1) {
+                        shapeHtml = `<div class="shape-circle-1"></div>`;
+                    } else if (diff <= -2) {
+                        shapeHtml = `<div class="shape-circle-1"></div><div class="shape-circle-2"></div>`;
+                    }
+
+                    html += `
+                        <td>
+                            <div class="score-display-wrapper">
+                                ${score}
+                                ${shapeHtml}
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    html += `<td style="color:#ccc;">-</td>`;
+                }
+            });
+            html += `</tr>`;
+
+            if (h.hole === 9 || h.hole === 18) {
+                let isOut = h.hole === 9;
+                let label = isOut ? "OUT" : "IN";
+                
+                html += `<tr class="subtotal-row"><td>${label}</td><td>-</td>`;
+                players.forEach(p => { 
+                    let val = isOut ? f9Gross[p.id] : b9Gross[p.id];
+                    html += `<td>${val > 0 ? val : '-'}</td>`; 
+                });
+                html += `</tr>`;
+
+                if (h.hole === 18) {
+                    html += `<tr class="total-row"><td>TOT</td><td>-</td>`;
+                    players.forEach(p => { 
+                        html += `<td>${totGross[p.id] > 0 ? totGross[p.id] : '-'}</td>`; 
+                    });
+                    html += `</tr>`;
+                }
+            }
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="alert('Screenshot this clean scorecard to text to the group!')">📸 Take Screenshot to Share</button>
+        `;
+
+        container.innerHTML = html;
     }
 </script>
 
