@@ -162,7 +162,7 @@
     </div>
 
     <div class="nassau-payout-box" id="nassau-payout-container">
-        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Nassau Standings</div>
+        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Standings</div>
         <div id="payout-rows-wrapper"></div>
     </div>
 
@@ -225,7 +225,6 @@
     let selectedGroup = "all";
     let currentData = {};
     
-    // Dot Game Logic
     let currentDotHole = 1;
     let tempDots = {}; 
     const DOT_TYPES = [
@@ -385,116 +384,73 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType) {
-        let t1Name, t2Name;
-        let t1Players = [], t2Players = [];
+    function calculateHiLoEngine(players, courseData, savedScores) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "T-1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
 
-        if (players.length === 2) {
-            t1Name = players[0].name.split(" ")[0];
-            t2Name = players[1].name.split(" ")[0];
-            t1Players = [players[0]];
-            t2Players = [players[1]];
-        } else {
-            let teams = {};
-            players.forEach(p => {
-                let key = p.team || p.name;
-                if(!teams[key]) teams[key] = [];
-                teams[key].push(p);
-            });
-            const teamKeys = Object.keys(teams);
-            if (teamKeys.length >= 2) {
-                t1Name = teamKeys[0];
-                t2Name = teamKeys[1];
-                t1Players = teams[t1Name];
-                t2Players = teams[t2Name];
-            } else {
-                t1Name = "Team 1";
-                t2Name = "Team 2";
-                let mid = Math.ceil(players.length / 2);
-                t1Players = players.slice(0, mid);
-                t2Players = players.slice(mid);
-            }
-        }
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
 
-        const pressRule = currentData.nassauPressRule || "none";
-        const manualPresses = currentData.manualPresses || {};
+        let t1Name = teamKeys[0];
+        let t2Name = teamKeys[1];
+        let t1Players = teams[t1Name];
+        let t2Players = teams[t2Name];
 
-        let activeMatches = [
-            { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front' },
-            { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back' },
-            { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Overall' }
-        ];
+        let t1Points = 0;
+        let t2Points = 0;
+        let holeLog = {};
 
-        let pressCount = 0;
-        let holeMatchLog = {};
-
-        courseData.forEach((hole) => {
-            const hNum = hole.hole;
-
-            if (manualPresses[`h${hNum}`]) {
-                pressCount++;
-                let endH = hNum <= 9 ? 9 : 18;
-                activeMatches.push({ id: `P${pressCount}`, startHole: hNum, endHole: endH, status: 0, label: `Press ${pressCount}` });
-            }
-
-            let team1Best = 999, team2Best = 999;
-            let t1Valid = false, t2Valid = false;
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1NetScores = [];
+            let t2NetScores = [];
 
             t1Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
-                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                    if (s < team1Best) team1Best = s;
-                    t1Valid = true;
+                    let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                    t1NetScores.push(s);
                 }
             });
 
             t2Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
-                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                    if (s < team2Best) team2Best = s;
-                    t2Valid = true;
+                    let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
+                    t2NetScores.push(s);
                 }
             });
 
-            let diff = 0;
-            if (t1Valid && t2Valid) {
-                diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
-                
-                activeMatches.forEach(m => {
-                    if (hNum >= m.startHole && hNum <= m.endHole) m.status += diff;
-                });
+            if (t1NetScores.length > 0 && t2NetScores.length > 0) {
+                t1NetScores.sort((a, b) => a - b);
+                t2NetScores.sort((a, b) => a - b);
 
-                let pressThreshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : 99);
-                activeMatches.forEach(m => {
-                    if (pressRule !== 'none' && pressRule !== 'anytime' && Math.abs(m.status) >= pressThreshold && hNum < m.endHole) {
-                        if (!activeMatches.some(p => p.startHole === hNum + 1 && p.parent === m.id)) {
-                            pressCount++;
-                            activeMatches.push({ id: `P${pressCount}`, startHole: hNum + 1, endHole: m.endHole, status: 0, label: `Auto Press`, parent: m.id });
-                        }
-                    }
-                });
+                let t1Low = t1NetScores[0];
+                let t2Low = t2NetScores[0];
+                let t1High = t1NetScores[t1NetScores.length - 1];
+                let t2High = t2NetScores[t2NetScores.length - 1];
+
+                let h1Won = null; // Low ball
+                if (t1Low < t2Low) { t1Points += 0.5; h1Won = t1Name; }
+                else if (t2Low < t1Low) { t2Points += 0.5; h1Won = t2Name; }
+
+                let h2Won = null; // High ball
+                if (t1High < t2High) { t1Points += 0.5; h2Won = t1Name; }
+                else if (t2High < t1High) { t2Points += 0.5; h2Won = t2Name; }
+
+                holeLog[hNum] = { lowWinner: h1Won, highWinner: h2Won };
             }
-
-            let matchesOnThisHole = activeMatches.filter(m => hNum >= m.startHole && hNum <= m.endHole);
-            holeMatchLog[hNum] = {
-                valid: t1Valid && t2Valid,
-                matches: matchesOnThisHole.map(m => ({...m}))
-            };
         });
 
-        return { t1Name, t2Name, activeMatches, holeMatchLog };
-    }
-
-    function formatMatchStatus(status, t1, t2) {
-        if (status === 0) return "AS";
-        if (status > 0) return `${t1} ${status}UP`;
-        return `${t2} ${Math.abs(status)}UP`;
+        return { t1Name, t2Name, t1Points, t2Points, holeLog };
     }
 
     function renderScorecard() {
-        if (!currentData || Object.keys(currentData).length === 0) {
+        if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) {
             document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: #666;">No data found for this room. Waiting for Admin to save settings...</td></tr>`;
             return;
         }
@@ -503,8 +459,7 @@
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
         const gameFormat = currentData.gameFormat || "stroke";
-        const stake = currentData.nassauStake || 10;
-        const manualPresses = currentData.manualPresses || {};
+        const holeBet = currentData.holeBetStake || 0;
         
         let scoringType = "net";
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
@@ -521,12 +476,12 @@
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
-        let matchCalculations = null;
-        if (['bestball', 'match', 'ryder', 'scramble', 'nassau'].includes(gameFormat)) {
-            matchCalculations = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType);
+        let hiloCalc = null;
+        if (gameFormat === 'hilo') {
+            hiloCalc = calculateHiLoEngine(filteredPlayers, courseData, savedScores);
         }
-        
-        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots'].includes(gameFormat));
+
+        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
 
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
@@ -536,7 +491,7 @@
         });
 
         if (showMatchColumn) {
-            let colLabel = gameFormat === 'dots' ? "Dots/Action" : "Match & Bets";
+            let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : "Match & Bets");
             headRow.innerHTML += `<th style="width: 100px;">${colLabel}</th>`;
         }
 
@@ -605,32 +560,17 @@
             if (showMatchColumn) {
                 let matchCellHtml = `<div class="match-status-cell">`;
                 
-                if (gameFormat === 'dots') {
+                if (gameFormat === 'hilo' && hiloCalc && hiloCalc.holeLog[h.hole]) {
+                    const log = hiloCalc.holeLog[h.hole];
+                    matchCellHtml += `<span class="status-pill pill-main">Low: ${log.lowWinner || 'Halved'}</span>`;
+                    matchCellHtml += `<span class="status-pill pill-press">High: ${log.highWinner || 'Halved'}</span>`;
+                } else if (gameFormat === 'dots') {
                     const holeDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
                     let dotCount = 0;
                     Object.values(holeDots).forEach(arr => dotCount += arr.length);
                     const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
                     const dotBtnLabel = dotCount > 0 ? `🎯 Dots (${dotCount})` : "🎯 Add Dots";
                     matchCellHtml += `<button class="${dotBtnClass}" onclick="openDotsModal(${h.hole})">${dotBtnLabel}</button>`;
-                } else {
-                    const isPressed = !!manualPresses[`h${h.hole}`];
-                    const pressBtnClass = isPressed ? "press-btn active-press" : "press-btn";
-                    const pressBtnLabel = isPressed ? "🔥 Pressed" : "+ Press";
-                    matchCellHtml += `<button class="${pressBtnClass}" onclick="togglePress(${h.hole})">${pressBtnLabel}</button>`;
-
-                    if (matchCalculations && matchCalculations.holeMatchLog[h.hole]) {
-                        const log = matchCalculations.holeMatchLog[h.hole];
-                        const t1 = matchCalculations.t1Name;
-                        const t2 = matchCalculations.t2Name;
-
-                        if (log.valid) {
-                            log.matches.forEach(m => {
-                                let statusText = formatMatchStatus(m.status, t1, t2);
-                                let pillClass = m.id.startsWith('P') ? 'pill-press' : 'pill-main';
-                                matchCellHtml += `<span class="status-pill ${pillClass}">${m.label}: ${statusText}</span>`;
-                            });
-                        }
-                    }
                 }
                 matchCellHtml += `</div>`;
                 rowHtml += `<td>${matchCellHtml}</td>`;
@@ -639,7 +579,6 @@
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
 
-            // --- INSERT OUT / IN / TOTAL SUMMARY ROWS ---
             if (h.hole === 9 || h.hole === 18) {
                 let isOut = h.hole === 9;
                 let label = isOut ? "OUT (Front 9)" : "IN (Back 9)";
@@ -689,116 +628,36 @@
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
 
-        if (gameFormat === 'dots') {
+        if (gameFormat === 'hilo' && hiloCalc) {
             payoutBox.style.display = "block";
-            document.getElementById("nassau-payout-header").textContent = "🎯 Live Dot Totals";
+            document.getElementById("nassau-payout-header").textContent = `♠️ Hi-Lo Standings (${hiloCalc.t1Name} vs ${hiloCalc.t2Name})`;
             
-            let playerDots = {};
-            players.forEach(p => playerDots[p.id] = 0);
-            
-            if (currentData.dots) {
-                Object.values(currentData.dots).forEach(holeDots => {
-                    Object.keys(holeDots).forEach(pKey => {
-                        let pid = pKey.replace('p', '');
-                        if (playerDots[pid] !== undefined) {
-                            holeDots[pKey].forEach(dotType => {
-                                if (dotType === 'snake') {
-                                    playerDots[pid] -= 1; // Snake costs 1 dot
-                                } else {
-                                    playerDots[pid] += 1;
-                                }
-                            });
-                        }
-                    });
-                });
+            let t1Money = (hiloCalc.t1Points - hiloCalc.t2Points) * (holeBet > 0 ? holeBet : 10);
+            function fmtM(amt) {
+                if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
+                if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
+                return `<span class="val-even">$0</span>`;
             }
-            
-            let dotRowsHtml = "";
-            let dotVal = currentData.dotPointVal || 1;
-            players.forEach(p => {
-                let pts = playerDots[p.id];
-                let money = pts * dotVal;
-                let formatMoney = pts >= 0 ? `<span class="val-pos">+$${money}</span>` : `<span class="val-neg">-$${Math.abs(money)}</span>`;
-                dotRowsHtml += `<div class="payout-row"><span>${p.name}</span><span><strong>${pts} Dots</strong> (${formatMoney})</span></div>`;
-            });
-            
-            document.getElementById("payout-rows-wrapper").innerHTML = dotRowsHtml;
-            titleEl.textContent = "🎯 DOT GAME STANDINGS";
-            statusEl.textContent = "Assign dots hole-by-hole using the buttons below!";
 
-        } else if (showMatchColumn && matchCalculations) {
-            titleEl.textContent = `🥊 MATCH PLAY (${scoringType.toUpperCase()}) : ${matchCalculations.t1Name} VS ${matchCalculations.t2Name}`;
-            
-            let f9Match = matchCalculations.activeMatches.find(m => m.id === 'F9');
-            let b9Match = matchCalculations.activeMatches.find(m => m.id === 'B9');
-            let o18Match = matchCalculations.activeMatches.find(m => m.id === '18');
-
-            let f9Text = f9Match ? formatMatchStatus(f9Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
-            let b9Text = b9Match ? formatMatchStatus(b9Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
-            let o18Text = o18Match ? formatMatchStatus(o18Match.status, matchCalculations.t1Name, matchCalculations.t2Name) : "AS";
-
-            statusEl.innerHTML = `
-                <span class="ticker-part">Front: <strong>${f9Text}</strong></span>
-                <span class="ticker-part">Back: <strong>${b9Text}</strong></span>
-                <span class="ticker-part">Overall: <strong>${o18Text}</strong></span>
+            document.getElementById("payout-rows-wrapper").innerHTML = `
+                <div class="payout-row">
+                    <span>Team Points:</span>
+                    <span>${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong> | ${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+                </div>
+                <div class="payout-row">
+                    <span>Financial Ledger:</span>
+                    <span>${hiloCalc.t1Name}: ${fmtM(t1Money)} | ${hiloCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                </div>
             `;
-
-            if (gameFormat === 'nassau') {
-                payoutBox.style.display = "block";
-                document.getElementById("nassau-payout-header").textContent = "💵 Live Nassau Standings";
-                let t1Total = 0;
-                matchCalculations.activeMatches.forEach(m => {
-                    if (m.status > 0) t1Total += stake;
-                    if (m.status < 0) t1Total -= stake;
-                });
-
-                function formatMoney(amount) {
-                    if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
-                    if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
-                    return `<span class="val-even">$0</span>`;
-                }
-
-                document.getElementById("payout-rows-wrapper").innerHTML = `
-                    <div class="payout-row">
-                        <span>Active Bets Total (${matchCalculations.activeMatches.length}):</span>
-                        <span>${matchCalculations.t1Name}: ${formatMoney(t1Total)} | ${matchCalculations.t2Name}: ${formatMoney(-t1Total)}</span>
-                    </div>
-                `;
-            } else {
-                payoutBox.style.display = "none";
-            }
+            titleEl.textContent = `♠️ HI-LO (LOW BALL / HIGH BALL)`;
+            statusEl.innerHTML = `
+                <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
+                <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+            `;
         } else {
             payoutBox.style.display = "none";
             titleEl.textContent = "🏆 LIVE PLAYER SCORES";
-            
-            let scoresList = [];
-            let maxThru = 0;
-
-            filteredPlayers.forEach(p => {
-                let netTotal = 0, grossTotal = 0, parPlayed = 0, thru = 0;
-                courseData.forEach(hole => {
-                    const val = savedScores[`p${p.id}_h${hole.hole}`];
-                    if (val && val > 0) {
-                        let score = parseInt(val, 10);
-                        grossTotal += score;
-                        netTotal += (score - getStrokes(hole.hcpIndex, parseHcp(p.hcp)));
-                        parPlayed += parseInt(hole.par, 10);
-                        thru++;
-                    }
-                });
-                
-                if (thru > maxThru) maxThru = thru;
-                let currentScore = scoringType === 'net' ? netTotal : grossTotal;
-                let shortName = p.name.split(" ")[0]; // First name
-                
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${thru === 0 ? '-' : currentScore}</strong></span>`);
-            });
-
-            if (maxThru === 0) {
-                statusEl.textContent = "Enter Hole 1 Scores Below...";
-            } else {
-                statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
-            }
+            statusEl.textContent = "Enter scores below to track live standings!";
         }
     }
 </script>
