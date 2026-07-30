@@ -127,6 +127,7 @@
         .end-box-card { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 10px; }
         .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 
         /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; padding: 12px; }
@@ -139,9 +140,29 @@
         .dot-badge { padding: 6px 10px; border-radius: 20px; border: 1px solid #ccc; background: #f9fbf9; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; transition: all 0.2s; user-select: none; }
         .dot-badge.active { background: #2a9d8f; color: #fff; border-color: #2a9d8f; }
         .dot-badge.active-snake { background: #e63946; color: #fff; border-color: #e63946; }
+
+        /* MAGIC HORIZONTAL PDF PRINT STYLES */
+        #print-area { display: none; }
+        @media print {
+            body { background-color: white; padding: 0; margin: 0; }
+            #main-content { display: none !important; }
+            #print-area { display: block !important; width: 100%; }
+            @page { size: landscape; margin: 0.5in; }
+            
+            .ptable { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; text-align: center; margin-top: 15px; }
+            .ptable th, .ptable td { border: 1px solid #444; padding: 10px 4px; vertical-align: middle; }
+            .ptable th { background-color: #f0f0f0 !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .ptable td.section-col, .ptable th.section-col { background-color: #f9f9f9 !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            .pscore { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: bold; font-size: 16px; margin: 0 auto; }
+            .pcircle1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #e63946; border-radius: 50%; pointer-events: none; }
+            .pcircle2 { position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border: 1px solid #e63946; border-radius: 50%; pointer-events: none; }
+        }
     </style>
 </head>
 <body>
+
+<div id="print-area"></div>
 
 <div class="container" id="main-content" style="display: none;">
     <div class="header-box">
@@ -184,10 +205,19 @@
         </table>
     </div>
 
-    <div class="save-exit-box">
+    <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
+        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">📤 Share & Export Scorecard</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Share the live link or generate a traditional horizontal PDF scorecard.</span>
+        <div style="display:flex; gap: 8px;">
+            <button class="btn-outline" style="margin-top: 0;" onclick="shareResultsLink()">🔗 Text Live Link</button>
+            <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Save Clean PDF</button>
+        </div>
+    </div>
+
+    <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
         <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">🚪 Save & Return to Home</h3>
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Scores sync automatically. You can safely leave and resume this game anytime from the home page.</span>
-        <button class="btn-primary" style="margin-top: 0;" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
+        <button class="btn-primary" style="margin-top: 0; background-color: #1d3557;" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
     </div>
 
     <div class="end-box-card">
@@ -270,6 +300,22 @@
         });
     }
 
+    function shareResultsLink() {
+        const rawUrl = window.location.href.split('?')[0];
+        const sharedUrl = rawUrl + `?game=${currentMode}`;
+        
+        const courseName = currentData.courseName || "Live Scorecard";
+        const dateObj = new Date();
+        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const textMsg = `${courseName} Scorecard - ${dateString}`;
+        
+        if (navigator.share) {
+            navigator.share({ title: `${courseName} Scorecard`, text: textMsg, url: sharedUrl }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(sharedUrl).then(() => alert("Scorecard link copied to clipboard!"));
+        }
+    }
+
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
         const str = String(hcpStr).trim();
@@ -319,17 +365,6 @@
             db.ref(`events/${currentMode}/scores/p${playerId}_h${holeNum}`).remove();
         } else {
             db.ref(`events/${currentMode}/scores/p${playerId}_h${holeNum}`).set(intVal);
-        }
-    }
-
-    function togglePress(holeNum) {
-        const currentPresses = currentData.manualPresses || {};
-        const isPressed = !!currentPresses[`h${holeNum}`];
-        
-        if (isPressed) {
-            db.ref(`events/${currentMode}/manualPresses/h${holeNum}`).remove();
-        } else {
-            db.ref(`events/${currentMode}/manualPresses/h${holeNum}`).set(true);
         }
     }
 
@@ -545,6 +580,7 @@
 
                     runningStats[p.id] += diff;
 
+                    // RESTORED BOGEY BOXES FOR LIVE VIEW ONLY
                     if (diff === -1) {
                         shapeHtml = `<div class="shape-circle-1"></div>`;
                     } else if (diff <= -2) {
@@ -751,6 +787,89 @@
                 statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
             }
         }
+        
+        buildPrintScorecard(filteredPlayers, courseData, savedScores);
+    }
+
+    // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
+    function buildPrintScorecard(filteredPlayers, courseData, savedScores) {
+        const courseName = currentData.courseName || "Golf Scorecard";
+        const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        
+        let printHtml = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="margin: 0; font-size: 24px; color: #0f4c3a; text-transform: uppercase; letter-spacing: 1px;">${courseName}</h1>
+                <p style="margin: 5px 0 0 0; font-size: 16px; color: #555; font-weight: bold;">${dateString}</p>
+            </div>
+            <table class="ptable">
+        `;
+
+        // HOLE ROW
+        printHtml += `<tr><th style="text-align:left; width: 140px; font-size: 16px;">HOLE</th>`;
+        for(let i=1; i<=9; i++) printHtml += `<th>${i}</th>`;
+        printHtml += `<th class="section-col">OUT</th>`;
+        for(let i=10; i<=18; i++) printHtml += `<th>${i}</th>`;
+        printHtml += `<th class="section-col">IN</th><th class="section-col">TOT</th></tr>`;
+        
+        // PAR ROW
+        let outPar = 0, inPar = 0;
+        courseData.forEach(h => { if(h.hole<=9) outPar+=parseInt(h.par); else if(h.hole<=18) inPar+=parseInt(h.par); });
+        printHtml += `<tr><th style="text-align:left; font-size: 16px;">PAR</th>`;
+        for(let i=1; i<=9; i++) {
+            let ch = courseData.find(c => c.hole === i);
+            printHtml += `<th>${ch ? ch.par : '-'}</th>`;
+        }
+        printHtml += `<th class="section-col">${outPar}</th>`;
+        for(let i=10; i<=18; i++) {
+            let ch = courseData.find(c => c.hole === i);
+            printHtml += `<th>${ch ? ch.par : '-'}</th>`;
+        }
+        printHtml += `<th class="section-col">${inPar}</th><th class="section-col">${outPar+inPar}</th></tr>`;
+
+        // PLAYER ROWS (Only names and scores with birdie/eagle circles)
+        filteredPlayers.forEach(p => {
+            let outScore = 0, inScore = 0;
+            printHtml += `<tr><td style="text-align:left; font-weight:bold; font-size: 16px;">${p.name.split(" ")[0]}</td>`;
+            
+            // Front 9
+            for(let i=1; i<=9; i++) {
+                let v = savedScores[`p${p.id}_h${i}`];
+                let ch = courseData.find(c => c.hole === i);
+                if (v && v > 0) {
+                    let score = parseInt(v, 10);
+                    outScore += score;
+                    let diff = score - (ch ? parseInt(ch.par) : 4);
+                    let shape = '';
+                    if (diff === -1) shape = `<div class="pcircle1"></div>`;
+                    else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
+                    printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
+                } else {
+                    printHtml += `<td></td>`;
+                }
+            }
+            printHtml += `<td class="section-col">${outScore > 0 ? outScore : ''}</td>`;
+            
+            // Back 9
+            for(let i=10; i<=18; i++) {
+                let v = savedScores[`p${p.id}_h${i}`];
+                let ch = courseData.find(c => c.hole === i);
+                if (v && v > 0) {
+                    let score = parseInt(v, 10);
+                    inScore += score;
+                    let diff = score - (ch ? parseInt(ch.par) : 4);
+                    let shape = '';
+                    if (diff === -1) shape = `<div class="pcircle1"></div>`;
+                    else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
+                    printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
+                } else {
+                    printHtml += `<td></td>`;
+                }
+            }
+            printHtml += `<td class="section-col">${inScore > 0 ? inScore : ''}</td><td class="section-col">${(outScore+inScore) > 0 ? (outScore+inScore) : ''}</td></tr>`;
+        });
+        
+        printHtml += `</table>`;
+        document.getElementById("print-area").innerHTML = printHtml;
     }
 </script>
 
