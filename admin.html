@@ -110,23 +110,17 @@
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
     </div>
 
-    <div class="grid-2col" style="margin-bottom: 16px;">
-        <div>
-            <label>Trip / Event Name</label>
-            <input type="text" id="event-name" value="Weekend Round">
-        </div>
-        <div>
-            <label>Round / Day #</label>
-            <select id="round-day-select">
-                <option value="Single Round">Single Round</option>
-                <option value="Day 1 - Round 1">Day 1 - Round 1</option>
-                <option value="Day 1 - Round 2">Day 1 - Round 2</option>
-                <option value="Day 2 - Round 1">Day 2 - Round 1</option>
-                <option value="Day 2 - Round 2">Day 2 - Round 2</option>
-                <option value="Day 3 - Round 1">Day 3 - Round 1</option>
-                <option value="Day 4 - Final Round">Day 4 - Final Round</option>
-            </select>
-        </div>
+    <div class="form-group">
+        <label>Round / Day #</label>
+        <select id="round-day-select">
+            <option value="Single Round">Single Round</option>
+            <option value="Day 1 - Round 1">Day 1 - Round 1</option>
+            <option value="Day 1 - Round 2">Day 1 - Round 2</option>
+            <option value="Day 2 - Round 1">Day 2 - Round 1</option>
+            <option value="Day 2 - Round 2">Day 2 - Round 2</option>
+            <option value="Day 3 - Round 1">Day 3 - Round 1</option>
+            <option value="Day 4 - Final Round">Day 4 - Final Round</option>
+        </select>
     </div>
 
     <div class="form-group">
@@ -164,9 +158,14 @@
         </select>
 
         <div id="hole-bet-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Per-Hole Bet Option</label>
-            <div class="grid-2col">
-                <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="0"></div>
+            <label style="color:#0f4c3a; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
+                <strong>💵 Enable Per-Hole Bet Option</strong>
+            </label>
+            <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid #d0e1db; padding-top: 12px;">
+                <div class="grid-2col">
+                    <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1"></div>
+                </div>
             </div>
         </div>
 
@@ -309,6 +308,10 @@
         } else {
             navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
         }
+    }
+
+    function toggleHoleBet() {
+        document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
     }
 
     function generateRoomCode() {
@@ -709,7 +712,6 @@
     function loadModeData(modeKey) {
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
-            document.getElementById("event-name").value = data.eventName || 'Weekend Round';
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
             if (data.eventCategory) currentCategory = data.eventCategory;
 
@@ -724,7 +726,15 @@
             handleCourseChange();
 
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
-            if (data.holeBetStake && document.getElementById("hole-bet-stake")) document.getElementById("hole-bet-stake").value = data.holeBetStake;
+            
+            if (data.holeBetStake && document.getElementById("hole-bet-stake")) {
+                document.getElementById("hole-bet-stake").value = data.holeBetStake;
+                if (data.holeBetStake > 0) {
+                    document.getElementById("enable-hole-bet").checked = true;
+                    document.getElementById("hole-bet-stake-container").style.display = "block";
+                }
+            }
+
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
@@ -841,12 +851,12 @@
                 return;
             }
 
-            const baseEventName = document.getElementById("event-name").value;
             const roundDay = document.getElementById("round-day-select").value;
+            const baseEventName = roundDay; // Using the generic round day for consistent subheaders
             const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
             const categoryIcon = getCategoryIcon(currentCategory);
 
-            const holeBetStake = parseFloat(document.getElementById("hole-bet-stake").value) || 0;
+            const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
