@@ -676,7 +676,7 @@
             if (storedPlayersTemp.length > 0) {
                 handleFormatChange(true);
             } else {
-                addPlayerRow(); // Start with 1 empty slot for a fresh room
+                addPlayerRow(); // Start with 1 empty player slot for a fresh room
             }
         });
     }
@@ -733,8 +733,17 @@
     }
 
     function saveSettings() {
-        const courseKey = courseHiddenSelect.value;
-        if (!courseKey) { alert("⚠️ Please select a Golf Course before saving!"); return; }
+        let courseKey = courseHiddenSelect.value;
+        let selectedCourseName = courseSearchInput.value.trim();
+
+        if (!courseKey && selectedCourseName) {
+            courseKey = "custom_course"; 
+        }
+
+        if (!courseKey && !selectedCourseName) { 
+            alert("⚠️ Please select or type a Golf Course name before saving!"); 
+            return; 
+        }
         
         const gameFormat = document.getElementById("game-format-select").value;
         if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); return; }
@@ -752,7 +761,6 @@
 
         const baseEventName = document.getElementById("event-name").value;
         const roundDay = document.getElementById("round-day-select").value;
-        const selectedCourseName = courseSearchInput.value || getCourseNameById(courseKey);
         const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
         const categoryIcon = getCategoryIcon(currentCategory);
 
