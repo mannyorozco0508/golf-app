@@ -243,6 +243,7 @@
 </div>
 
 <script>
+    // --- DYNAMIC BETA TIME BOMB ---
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",
@@ -255,7 +256,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- DYNAMIC BETA TIME BOMB ---
     db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
         const expDateStr = snapshot.val();
         const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
@@ -342,6 +342,7 @@
             { id: "swwa_mintvalley", name: "Mint Valley Golf Course" },
             { id: "swwa_threerivers", name: "Three Rivers Golf Course" },
             { id: "swwa_elkridge", name: "Elk Ridge Golf Course" },
+            { id: "swwa_tahoma_valley", name: "Tahoma Valley Golf Course (Yelm)" },
             { id: "swwa_skamania", name: "Skamania Lodge Golf Course" },
             { id: "swwa_beaconrock", name: "Beacon Rock Golf Course" },
             { id: "swwa_cedars", name: "The Cedars at Salmon Creek" },
@@ -574,6 +575,7 @@
     };
 
     const coursePresets = {
+        wa_tahoma_valley: { name: "Tahoma Valley Golf Course", data: [{hole:1,par:5,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:6},{hole:4,par:3,hcpIndex:18},{hole:5,par:3,hcpIndex:14},{hole:6,par:4,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:12},{hole:9,par:3,hcpIndex:16},{hole:10,par:4,hcpIndex:11},{hole:11,par:4,hcpIndex:7},{hole:12,par:5,hcpIndex:5},{hole:13,par:3,hcpIndex:13},{hole:14,par:4,hcpIndex:9},{hole:15,par:3,hcpIndex:15},{hole:16,par:5,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:5,hcpIndex:3}] },
         emerald_hills: { name: "The Club at Emerald Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:8},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
         hollywood_beach: { name: "Hollywood Beach Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
         yale: { name: "The Course at Yale", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
