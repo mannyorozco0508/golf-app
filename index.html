@@ -510,11 +510,12 @@
             filteredPlayers.forEach(p => {
                 const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
                 const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                const dots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
+                const handicapDots = strokes > 0 ? "•".repeat(strokes) : (strokes < 0 ? "+" : "");
                 const initials = getInitials(p.name);
 
                 let shapeHtml = "";
                 let currentToParHtml = "";
+                let earnedDotsHtml = "";
 
                 if (scoreVal !== "") {
                     let gross = parseInt(scoreVal, 10);
@@ -540,10 +541,27 @@
                     
                     currentToParHtml = `<div style="font-size: 0.7rem; font-weight: bold; color: ${toParColor}; margin-top: 2px; text-align: center;">${toParText}</div>`;
                 }
+                
+                if (gameFormat === 'dots') {
+                    const hDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
+                    const myDots = hDots[`p${p.id}`] || [];
+                    let positiveDots = 0;
+                    let hasSnake = false;
+                    myDots.forEach(d => {
+                        if (d === 'snake') hasSnake = true;
+                        else positiveDots++;
+                    });
+                    
+                    if (positiveDots > 0 || hasSnake) {
+                        let dotStr = '🔴'.repeat(positiveDots);
+                        if (hasSnake) dotStr += '🐍';
+                        earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; letter-spacing: 1px;">${dotStr}</div>`;
+                    }
+                }
 
                 rowHtml += `
                     <td>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
                             <div style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
                             <div class="score-input-wrapper">
                                 <input type="number" pattern="[0-9]*" class="score-input" value="${scoreVal}"
@@ -551,7 +569,8 @@
                                 ${shapeHtml}
                             </div>
                             ${currentToParHtml}
-                            <div class="stroke-dots">${dots}</div>
+                            <div class="stroke-dots">${handicapDots}</div>
+                            ${earnedDotsHtml}
                         </div>
                     </td>
                 `;
@@ -654,6 +673,37 @@
                 <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
                 <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
             `;
+        } else if (gameFormat === 'dots') {
+            payoutBox.style.display = "none";
+            titleEl.textContent = "🎯 LIVE DOT TOTALS";
+            
+            let playerDots = {};
+            filteredPlayers.forEach(p => playerDots[p.id] = 0);
+            
+            if (currentData.dots) {
+                Object.values(currentData.dots).forEach(holeDots => {
+                    Object.keys(holeDots).forEach(pKey => {
+                        let pid = pKey.replace('p', '');
+                        if (playerDots[pid] !== undefined) {
+                            holeDots[pKey].forEach(dotType => {
+                                if (dotType === 'snake') {
+                                    playerDots[pid] -= 1; 
+                                } else {
+                                    playerDots[pid] += 1;
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+            
+            let scoresList = [];
+            filteredPlayers.forEach(p => {
+                let shortName = p.name.split(" ")[0];
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${playerDots[p.id]}</strong></span>`);
+            });
+            
+            statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else {
             payoutBox.style.display = "none";
             titleEl.textContent = "🏆 CURRENT GROUP SCORES";
