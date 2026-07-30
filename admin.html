@@ -75,11 +75,7 @@
         .grid-input:focus { border-color: #0f4c3a; outline: none; background: #eef6f2; }
 
         /* Secret Panel Styles */
-        #secret-master-panel {
-            display: none; background: #1d3557; color: white; padding: 20px; 
-            border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            text-align: left;
-        }
+        #secret-master-panel { display: none; background: #1d3557; color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
         #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
@@ -101,7 +97,7 @@
         </div>
     </div>
 
-    <!-- NEW RESUME GAME BOX -->
+    <!-- RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #ddd;">
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
         <button class="btn-primary" style="background-color: #2a9d8f;" onclick="resumeGame()">▶️ Resume Game (Room <span id="resume-room-badge"></span>)</button>
@@ -168,14 +164,14 @@
             </div>
         </div>
         
-        <!-- NEW DYNAMIC COURSE EDITOR -->
+        <!-- DYNAMIC COURSE EDITOR -->
         <div class="extra-settings-box" style="display: block; margin-top: 12px; padding: 12px 10px;">
             <label style="color:#0f4c3a; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-custom-course" onchange="document.getElementById('custom-course-container').style.display = this.checked ? 'block' : 'none';" style="width: 18px; height: 18px; margin: 0;">
                 <strong>✏️ Review / Edit Course Pars & Handicaps</strong>
             </label>
             <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid #d0e1db; padding-top: 12px; overflow-x: auto;">
-                <p style="font-size: 0.75rem; color: #555; margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+                <p id="custom-course-warning" style="font-size: 0.75rem; color: #555; margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
                 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
@@ -351,6 +347,16 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // Fetch Global Courses immediately
+    let globalCourses = {};
+    db.ref('global_courses').on('value', (snap) => {
+        globalCourses = snap.val() || {};
+        // Re-populate dropdown if the user is typing
+        if(document.getElementById('course-search-input').value.length > 0) {
+            populateCourseDropdown(document.getElementById('course-search-input').value);
+        }
+    });
+
     db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
         const expDateStr = snapshot.val();
         const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
@@ -374,12 +380,9 @@
         if (tapCount >= 5) {
             document.getElementById('secret-master-panel').style.display = 'block';
             tapCount = 0;
-            
             db.ref('app_settings/beta_expiration').once('value').then(snap => {
                 const current = snap.val();
-                if(current) {
-                    document.getElementById('secret-exp-date').value = current.split('T')[0];
-                }
+                if(current) document.getElementById('secret-exp-date').value = current.split('T')[0];
             });
         }
     }
@@ -387,15 +390,11 @@
     function updateBetaExpiration() {
         const dateVal = document.getElementById('secret-exp-date').value;
         if(!dateVal) return alert('Select a valid date!');
-        
         const fullDateStr = dateVal + "T00:00:00";
-        
         db.ref('app_settings/beta_expiration').set(fullDateStr).then(() => {
             alert("✅ Beta expiration successfully updated to " + dateVal);
             document.getElementById('secret-master-panel').style.display = 'none';
-        }).catch(err => {
-            alert("Error: " + err.message);
-        });
+        }).catch(err => alert("Error: " + err.message));
     }
     // -------------------------
 
@@ -664,6 +663,28 @@
             }
         });
 
+        // Add Community Mapped Courses from Firebase
+        const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
+        if (globalKeys.length > 0) {
+            const filteredGlobals = globalKeys.filter(k => globalCourses[k].name.toLowerCase().includes(lowerFilter));
+            if (filteredGlobals.length > 0) {
+                hasResults = true;
+                if (filterText === "") {
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "custom-select-group";
+                    groupDiv.textContent = "🌎 Community Mapped Courses";
+                    courseDropdown.appendChild(groupDiv);
+                }
+                filteredGlobals.forEach(k => {
+                    const optionDiv = document.createElement("div");
+                    optionDiv.className = "custom-select-option";
+                    optionDiv.textContent = globalCourses[k].name;
+                    optionDiv.onclick = () => { selectCourse(k, globalCourses[k].name); };
+                    courseDropdown.appendChild(optionDiv);
+                });
+            }
+        }
+
         if (!hasResults) {
             courseDropdown.innerHTML = `<div style="padding:12px; color:#888; text-align:center;">No courses found.</div>`;
         }
@@ -702,6 +723,7 @@
                 if (i.id === id) return i.name;
             }
         }
+        if (globalCourses[id]) return globalCourses[id].name;
         return "";
     }
 
@@ -746,7 +768,12 @@
     function handleCourseChange() {
         const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
+        
+        let isMapped = false;
+        let baseData = [];
+
         if (nineHoleLoops[courseKey]) {
+            isMapped = true;
             const loops = nineHoleLoops[courseKey];
             const frontSelect = document.getElementById("front-nine-select");
             const backSelect = document.getElementById("back-nine-select");
@@ -761,22 +788,40 @@
             loopBox.style.display = "block";
         } else {
             loopBox.style.display = "none";
+            if (globalCourses[courseKey]) {
+                isMapped = true;
+                baseData = globalCourses[courseKey].data;
+            } else if (coursePresets[courseKey]) {
+                isMapped = true;
+                baseData = coursePresets[courseKey].data;
+            } else {
+                isMapped = false;
+                for(let i=1; i<=18; i++) baseData.push({hole: i, par: 4, hcpIndex: i});
+            }
         }
         
         // Auto-fill Custom Course Grid
-        let baseData = [];
-        if (nineHoleLoops[courseKey]) {
-            // Skipping loop logic for custom grid auto-fill
-        } else if (coursePresets[courseKey]) {
-            baseData = coursePresets[courseKey].data;
-        } else {
-            for(let i=1; i<=18; i++) baseData.push({hole: i, par: 4, hcpIndex: i});
-        }
-        
         baseData.forEach(h => {
             if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
             if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
         });
+
+        // Smart Mapping Warning
+        const customContainer = document.getElementById('custom-course-container');
+        const customCheckbox = document.getElementById('enable-custom-course');
+        const warningText = document.getElementById('custom-course-warning');
+
+        if (!isMapped && courseKey !== "eaglespride_27" && courseSearchInput.value.trim() !== "") {
+            customCheckbox.checked = true;
+            customContainer.style.display = 'block';
+            warningText.innerHTML = "⚠️ <strong>COURSE NOT MAPPED!</strong><br>Please enter the Pars and Handicaps from your scorecard. We will save it to the global database so you never have to do it again.";
+            warningText.style.color = "#e63946";
+        } else {
+            customCheckbox.checked = false;
+            customContainer.style.display = 'none';
+            warningText.innerHTML = "Make quick adjustments from your phone if the course isn't mapped accurately.";
+            warningText.style.color = "#555";
+        }
     }
 
     function captureCourseDataGrid() {
@@ -846,28 +891,6 @@
         if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
         
         renderPlayerList(forceLoad);
-    }
-
-    function buildMergedCourseData(courseKey, courseName) {
-        if (document.getElementById('enable-custom-course').checked) {
-            return { name: courseName || "Custom Golf Course", data: captureCourseDataGrid() };
-        }
-
-        if (nineHoleLoops[courseKey]) {
-            const loops = nineHoleLoops[courseKey];
-            const frontKey = document.getElementById("front-nine-select").value;
-            const backKey = document.getElementById("back-nine-select").value;
-            const frontLoop = loops[frontKey];
-            const backLoop = loops[backKey];
-            const combinedData = [];
-            frontLoop.data.forEach((item, idx) => { combinedData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 }); });
-            backLoop.data.forEach((item, idx) => { combinedData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 }); });
-            return { name: `Eagle's Pride (${frontLoop.name} / ${backLoop.name})`, data: combinedData };
-        } else if (coursePresets[courseKey]) {
-            return coursePresets[courseKey];
-        } else {
-            return { name: courseName || "Custom Golf Course", data: captureCourseDataGrid() };
-        }
     }
 
     function loadModeData(modeKey) {
@@ -995,7 +1018,12 @@
                         if(i.name.toLowerCase() === selectedCourseName.toLowerCase()) foundId = i.id;
                     });
                 });
-                courseKey = foundId || "custom_course";
+                
+                Object.keys(globalCourses).forEach(k => {
+                    if(globalCourses[k].name.toLowerCase() === selectedCourseName.toLowerCase()) foundId = k;
+                });
+
+                courseKey = foundId || "comm_" + selectedCourseName.toLowerCase().replace(/[^a-z0-9]/g, '');
             }
 
             if (!courseKey && !selectedCourseName) { 
@@ -1020,9 +1048,35 @@
                 return;
             }
 
+            const isEditing = document.getElementById('enable-custom-course').checked;
+            let finalCourseData = [];
+
+            if (isEditing) {
+                finalCourseData = captureCourseDataGrid();
+                // SMART CROWDSOURCE SAVE TO FIREBASE!
+                db.ref(`global_courses/${courseKey}`).set({
+                    name: selectedCourseName,
+                    data: finalCourseData
+                });
+            } else {
+                if (nineHoleLoops[courseKey]) {
+                    const loops = nineHoleLoops[courseKey];
+                    const frontKey = document.getElementById("front-nine-select").value;
+                    const backKey = document.getElementById("back-nine-select").value;
+                    loops[frontKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 }); });
+                    loops[backKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 }); });
+                    selectedCourseName = `Eagle's Pride (${loops[frontKey].name} / ${loops[backKey].name})`;
+                } else if (globalCourses[courseKey]) {
+                    finalCourseData = globalCourses[courseKey].data;
+                } else if (coursePresets[courseKey]) {
+                    finalCourseData = coursePresets[courseKey].data;
+                } else {
+                    finalCourseData = captureCourseDataGrid();
+                }
+            }
+
             const roundDay = document.getElementById("round-day-select").value;
             const baseEventName = roundDay; 
-            const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
             const categoryIcon = getCategoryIcon(currentCategory);
 
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
@@ -1069,7 +1123,7 @@
                 eventCategory: currentCategory,
                 categoryIcon: categoryIcon,
                 activeCourseKey: courseKey,
-                courseName: selectedCourse.name,
+                courseName: selectedCourseName,
                 gameFormat: gameFormat,
                 holeBetStake: holeBetStake,
                 matchScoring: matchScoring,
@@ -1079,7 +1133,7 @@
                 nassauPressRule: nassauPressRule,
                 wolfPointVal: wolfPointVal,
                 dotPointVal: dotPointVal,
-                courseData: selectedCourse.data,
+                courseData: finalCourseData,
                 players: playersList
             }).then(() => {
                 saveBtn.innerText = originalText;
