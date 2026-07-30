@@ -81,7 +81,6 @@
         }
         .score-input:focus { border-color: #2a9d8f; outline: none; background-color: rgba(238, 246, 242, 0.9); }
 
-        /* Traditional Golf Scorecard Shapes */
         .shape-circle-1 {
             position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px;
             border: 2px solid #e63946; border-radius: 50%; pointer-events: none; z-index: 5;
@@ -166,6 +165,9 @@
 
 <div class="container" id="main-content" style="display: none;">
     <div class="header-box">
+        <div style="margin-bottom: 6px;">
+            <span id="room-code-badge" style="background: #1d3557; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">ROOM: ----</span>
+        </div>
         <h1 class="header-title" id="course-title">Golf Scorecard</h1>
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
     </div>
@@ -288,6 +290,7 @@
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("main-content").style.display = "block";
+        document.getElementById("room-code-badge").textContent = "ROOM: " + currentMode;
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
