@@ -85,7 +85,7 @@
     <div class="lobby-title">GolfApp</div>
     <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private room for your foursome or trip, or join an existing one.</p>
     
-    <button class="btn-primary" onclick="createRoom()">➕ Create New Private Room</button>
+    <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
     
     <div class="lobby-divider"><span>OR</span></div>
     
@@ -450,113 +450,6 @@
             { id: "oaklane", name: "Tradition at Oak Lane" }
         ]}
     ];
-
-    const courseSearchInput = document.getElementById('course-search-input');
-    const courseDropdown = document.getElementById('course-dropdown');
-    const courseHiddenSelect = document.getElementById('course-select');
-
-    function populateCourseDropdown(filterText = "") {
-        courseDropdown.innerHTML = "";
-        const lowerFilter = filterText.toLowerCase();
-        let hasResults = false;
-
-        courseDirectory.forEach(group => {
-            const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
-            if (filteredItems.length > 0) {
-                hasResults = true;
-                if (filterText === "") {
-                    const groupDiv = document.createElement("div");
-                    groupDiv.className = "custom-select-group";
-                    groupDiv.textContent = group.group;
-                    courseDropdown.appendChild(groupDiv);
-                }
-                filteredItems.forEach(item => {
-                    const optionDiv = document.createElement("div");
-                    optionDiv.className = "custom-select-option";
-                    optionDiv.textContent = item.name;
-                    optionDiv.onclick = () => { selectCourse(item.id, item.name); };
-                    courseDropdown.appendChild(optionDiv);
-                });
-            }
-        });
-
-        if (!hasResults) {
-            courseDropdown.innerHTML = `<div style="padding:12px; color:#888; text-align:center;">No courses found.</div>`;
-        }
-    }
-
-    function selectCourse(id, name) {
-        courseHiddenSelect.value = id;
-        courseSearchInput.value = name;
-        courseDropdown.style.display = "none";
-        handleCourseChange(); 
-    }
-
-    courseSearchInput.addEventListener('focus', () => {
-        populateCourseDropdown(courseSearchInput.value);
-        courseDropdown.style.display = "block";
-    });
-
-    courseSearchInput.addEventListener('input', (e) => {
-        populateCourseDropdown(e.target.value);
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!document.getElementById('course-wrapper').contains(e.target)) {
-            courseDropdown.style.display = 'none';
-            const currentSelectedName = getCourseNameById(courseHiddenSelect.value);
-            if (courseSearchInput.value !== currentSelectedName) {
-                courseSearchInput.value = currentSelectedName; 
-            }
-        }
-    });
-
-    function getCourseNameById(id) {
-        if (!id) return "";
-        for (let g of courseDirectory) {
-            for (let i of g.items) {
-                if (i.id === id) return i.name;
-            }
-        }
-        return "";
-    }
-
-    const nineHoleLoops = {
-        eaglespride_27: {
-            red: { name: "Red Loop (Par 37)", data: [{par:5,hcp:7},{par:3,hcp:13},{par:5,hcp:3},{par:4,hcp:11},{par:4,hcp:1},{par:5,hcp:9},{par:4,hcp:5},{par:3,hcp:15},{par:4,hcp:17}] },
-            blue: { name: "Blue Loop (Par 35)", data: [{par:4,hcp:12},{par:4,hcp:14},{par:3,hcp:18},{par:4,hcp:2},{par:3,hcp:16},{par:4,hcp:8},{par:4,hcp:10},{par:4,hcp:4},{par:5,hcp:6}] },
-            green: { name: "Green Loop (Par 36)", data: [{par:4,hcp:7},{par:3,hcp:9},{par:4,hcp:11},{par:4,hcp:3},{par:5,hcp:5},{par:5,hcp:1},{par:3,hcp:17},{par:4,hcp:15},{par:4,hcp:13}] }
-        }
-    };
-
-    const coursePresets = {
-        emerald_hills: { name: "The Club at Emerald Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:8},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
-        hollywood_beach: { name: "Hollywood Beach Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
-        yale: { name: "The Course at Yale", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:11},{hole:4,par:4,hcpIndex:5},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:4,hcpIndex:3},{hole:9,par:3,hcpIndex:15},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:10},{hole:12,par:4,hcpIndex:4},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:5,hcpIndex:16}] },
-        greatriver: { name: "Great River Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:5},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:18},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:6}] },
-        grassyhill: { name: "Grassy Hill Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:3,hcpIndex:15},{hole:3,par:4,hcpIndex:9},{hole:4,par:4,hcpIndex:1},{hole:5,par:3,hcpIndex:17},{hole:6,par:4,hcpIndex:11},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:8},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
-        orangehills: { name: "Orange Hills Country Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:3,hcpIndex:15},{hole:3,par:5,hcpIndex:5},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:17},{hole:9,par:4,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:16},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:4,hcpIndex:12},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:14},{hole:18,par:5,hcpIndex:2}] },
-        millriver: { name: "Mill River Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:3},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:4,hcpIndex:1},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:9},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:8},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
-        fairchild_black: { name: "Fairchild Wheeler - Black", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:5,hcpIndex:7},{hole:5,par:3,hcpIndex:15},{hole:6,par:4,hcpIndex:5},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:17},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:4},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:2}] },
-        fairchild_red: { name: "Fairchild Wheeler - Red", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:15},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:13},{hole:6,par:4,hcpIndex:9},{hole:7,par:5,hcpIndex:5},{hole:8,par:3,hcpIndex:17},{hole:9,par:4,hcpIndex:11},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:4},{hole:13,par:4,hcpIndex:10},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:2},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
-        tashuaknolls: { name: "Tashua Knolls Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        whitneyfarms: { name: "Whitney Farms Golf Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:11},{hole:3,par:5,hcpIndex:3},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:9},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:6},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:4},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:2},{hole:18,par:4,hcpIndex:14}] },
-        oaklane: { name: "Tradition at Oak Lane", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:3,hcpIndex:17},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:5,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:1},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:6},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        wa_chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:11},{hole:2,par:4,hcpIndex:13},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:1},{hole:5,par:4,hcpIndex:7},{hole:6,par:4,hcpIndex:5},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:3},{hole:9,par:3,hcpIndex:17},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:4},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:6}] },
-        wa_homecourse: { name: "The Home Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:9},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:11},{hole:10,par:5,hcpIndex:6},{hole:11,par:4,hcpIndex:10},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:8}] },
-        wa_spanaway: { name: "Lake Spanaway Golf Course", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:3},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:12},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
-        wa_meadow_park: { name: "Meadow Park Championship", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:15},{hole:3,par:4,hcpIndex:1},{hole:4,par:3,hcpIndex:11},{hole:5,par:4,hcpIndex:17},{hole:6,par:4,hcpIndex:7},{hole:7,par:5,hcpIndex:3},{hole:8,par:3,hcpIndex:13},{hole:9,par:4,hcpIndex:5},{hole:10,par:5,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:12},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:5,hcpIndex:4},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
-        wa_gold_olympic: { name: "Gold Mountain - Olympic", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:5},{hole:3,par:3,hcpIndex:15},{hole:4,par:4,hcpIndex:1},{hole:5,par:3,hcpIndex:17},{hole:6,par:5,hcpIndex:7},{hole:7,par:4,hcpIndex:11},{hole:8,par:4,hcpIndex:13},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:5,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:6},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:16},{hole:16,par:4,hcpIndex:8},{hole:17,par:4,hcpIndex:12},{hole:18,par:5,hcpIndex:4}] },
-        wa_gold_cascade: { name: "Gold Mountain - Cascade", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:5,hcpIndex:1},{hole:3,par:4,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:13},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:9},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        wa_wanational: { name: "Washington National", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:1},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:7},{hole:8,par:5,hcpIndex:5},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:13},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:7},{hole:9,par:3,hcpIndex:5},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:2},{hole:14,par:4,hcpIndex:12},{hole:15,par:5,hcpIndex:6},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:4}] },
-        trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:11},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:17},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:15},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:2},{hole:12,par:4,hcpIndex:8},{hole:13,par:5,hcpIndex:6},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
-        pinelakes: { name: "Pine Lakes Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:4,hcpIndex:3},{hole:8,par:4,hcpIndex:9},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:2},{hole:13,par:4,hcpIndex:12},{hole:14,par:4,hcpIndex:4},{hole:15,par:5,hcpIndex:10},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
-        pinehills: { name: "Myrtlewood - Pine Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:3,hcpIndex:17},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:1},{hole:6,par:5,hcpIndex:13},{hole:7,par:4,hcpIndex:7},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:5},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:18},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:8},{hole:16,par:3,hcpIndex:16},{hole:17,par:5,hcpIndex:14},{hole:18,par:4,hcpIndex:4}] },
-        thistle_pending: { name: "Thistle Golf Club (27-Hole Marathon Pending)", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:3},{hole:3,par:4,hcpIndex:1},{hole:4,par:3,hcpIndex:17},{hole:5,par:5,hcpIndex:9},{hole:6,par:4,hcpIndex:11},{hole:7,par:4,hcpIndex:5},{hole:8,par:3,hcpIndex:15},{hole:9,par:5,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:16},{hole:13,par:5,hcpIndex:6},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:10},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:4},{hole:18,par:4,hcpIndex:14}] },
-        prestwick: { name: "Prestwick Country Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:9},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:3},{hole:7,par:4,hcpIndex:5},{hole:8,par:3,hcpIndex:17},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:2},{hole:12,par:5,hcpIndex:8},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:4},{hole:16,par:3,hcpIndex:18},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
-        manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:1},{hole:3,par:5,hcpIndex:11},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:13},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:5,hcpIndex:2},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:4},{hole:15,par:3,hcpIndex:16},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:14}] }
-    };
 
     const courseSearchInput = document.getElementById('course-search-input');
     const courseDropdown = document.getElementById('course-dropdown');
