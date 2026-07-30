@@ -20,7 +20,7 @@
 
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
-        .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; }
+        .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
         .lobby-title { font-size: 2rem; color: #0f4c3a; margin-bottom: 10px; font-weight: bold; }
         .lobby-divider { margin: 30px 0; border-top: 1px solid #ddd; position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 12px; color: #888; font-size: 0.85rem; font-weight: bold; }
@@ -73,15 +73,34 @@
         /* Custom Course Grid Inputs */
         .grid-input { width: 34px !important; padding: 6px 2px !important; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem !important; box-sizing: border-box; }
         .grid-input:focus { border-color: #0f4c3a; outline: none; background: #eef6f2; }
+
+        /* Secret Panel Styles */
+        #secret-master-panel {
+            display: none; background: #1d3557; color: white; padding: 20px; 
+            border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            text-align: left;
+        }
+        #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="container" id="lobby-screen">
-    <div class="lobby-logo">⛳</div>
+    <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
     <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private room for your foursome or trip, or join an existing one.</p>
     
+    <!-- SECRET BETA CONTROL PANEL -->
+    <div id="secret-master-panel">
+        <h3>🔐 Master Beta Switch</h3>
+        <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Set the global expiration date. Anyone opening the app after this date gets locked out.</p>
+        <input type="date" id="secret-exp-date" style="margin-bottom: 12px;">
+        <button class="btn-primary" style="background-color: #e63946;" onclick="updateBetaExpiration()">💾 Force Update Date</button>
+        <div style="text-align: center; margin-top: 10px;">
+            <span style="font-size: 0.75rem; color: #aaa; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
+        </div>
+    </div>
+
     <!-- NEW RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #ddd;">
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
@@ -347,6 +366,38 @@
         }
     });
     // ---------------------------------
+
+    // --- SECRET TAP LOGIC ---
+    let tapCount = 0;
+    function handleSecretTap() {
+        tapCount++;
+        if (tapCount >= 5) {
+            document.getElementById('secret-master-panel').style.display = 'block';
+            tapCount = 0;
+            
+            db.ref('app_settings/beta_expiration').once('value').then(snap => {
+                const current = snap.val();
+                if(current) {
+                    document.getElementById('secret-exp-date').value = current.split('T')[0];
+                }
+            });
+        }
+    }
+
+    function updateBetaExpiration() {
+        const dateVal = document.getElementById('secret-exp-date').value;
+        if(!dateVal) return alert('Select a valid date!');
+        
+        const fullDateStr = dateVal + "T00:00:00";
+        
+        db.ref('app_settings/beta_expiration').set(fullDateStr).then(() => {
+            alert("✅ Beta expiration successfully updated to " + dateVal);
+            document.getElementById('secret-master-panel').style.display = 'none';
+        }).catch(err => {
+            alert("Error: " + err.message);
+        });
+    }
+    // -------------------------
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
