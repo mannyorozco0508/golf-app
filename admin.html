@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trip & Round Setup - Admin</title>
+    <title>Trip & Round Setup - Home</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -17,13 +17,6 @@
         .top-nav-bar::-webkit-scrollbar { display: none; }
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
-
-        /* Category Presets Bar */
-        .category-presets-title { font-size: 0.8rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 8px; }
-        .category-presets-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px; scrollbar-width: none; }
-        .category-presets-bar::-webkit-scrollbar { display: none; }
-        .preset-btn { flex: 0 0 auto; padding: 10px 14px; border: 2px solid #d0e1db; background: #f9fbf9; color: #0f4c3a; border-radius: 10px; font-weight: bold; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
-        .preset-btn:hover, .preset-btn.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; box-shadow: 0 2px 6px rgba(15,76,58,0.2); }
 
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
@@ -96,26 +89,17 @@
 <div class="container" id="admin-screen" style="display: none;">
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
-        <a href="admin.html" class="top-nav-item active nav-link">⚙️ Admin</a>
+        <a href="admin.html" class="top-nav-item active nav-link">⚙️ Home</a>
     </div>
 
     <div style="text-align: center; margin-top: 10px;">
         <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Room Code</span>
         <div class="room-badge" id="display-room-code">----</div>
-    </div>
-
-    <!-- Quick Category Presets -->
-    <div class="category-presets-title">⚡ Quick Game Presets</div>
-    <div class="category-presets-bar">
-        <button class="preset-btn" onclick="selectCategoryPreset('marty')">🎰 Marty's Game</button>
-        <button class="preset-btn" onclick="selectCategoryPreset('myrtle')">🏖️ Myrtle Beach Trip</button>
-        <button class="preset-btn" onclick="selectCategoryPreset('weekday')">🏌️‍♂️ Regular Weekday</button>
-        <button class="preset-btn" onclick="selectCategoryPreset('weekend')">🏆 Weekend Tourney</button>
     </div>
 
     <div class="share-box">
@@ -316,29 +300,6 @@
             return;
         }
         window.location.href = `admin.html?game=${inputCode}`;
-    }
-
-    function selectCategoryPreset(type) {
-        currentCategory = type;
-        const eventInput = document.getElementById("event-name");
-        const formatSelect = document.getElementById("game-format-select");
-
-        if (type === 'marty') {
-            eventInput.value = "🎰 Marty's Game";
-            formatSelect.value = "nassau";
-            selectCourse("az_talking_oodham", "Talking Stick (O'odham)");
-        } else if (type === 'myrtle') {
-            eventInput.value = "🏖️ Myrtle Beach Trip";
-            formatSelect.value = "stroke";
-            selectCourse("caledonia", "Caledonia Golf & Fish Club");
-        } else if (type === 'weekday') {
-            eventInput.value = "🏌️‍♂️ Weekday Round";
-            formatSelect.value = "stroke";
-        } else if (type === 'weekend') {
-            eventInput.value = "🏆 Weekend Tournament";
-            formatSelect.value = "nassau";
-        }
-        handleFormatChange();
     }
 
     const courseDirectory = [

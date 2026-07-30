@@ -148,12 +148,12 @@
 
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item active nav-link">📝 Card</a>
+        <a href="index.html" class="top-nav-item active nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
-        <a href="admin.html" class="top-nav-item nav-link">⚙️ Admin</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
     </div>
 
     <div class="live-ticker-box">
@@ -182,9 +182,9 @@
     </div>
 
     <div class="save-exit-box">
-        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">🚪 Save & Return to Lobby</h3>
+        <h3 style="color: #0f4c3a; margin-top: 0; font-size: 1rem;">🚪 Save & Return to Home</h3>
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Scores sync automatically. You can safely leave and resume this game anytime from the home page.</span>
-        <button class="btn-primary" style="margin-top: 0;" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Lobby</button>
+        <button class="btn-primary" style="margin-top: 0;" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
     </div>
 
     <div class="end-box-card">
@@ -656,8 +656,31 @@
             `;
         } else {
             payoutBox.style.display = "none";
-            titleEl.textContent = "🏆 LIVE PLAYER SCORES";
-            statusEl.textContent = "Enter scores below to track live standings!";
+            titleEl.textContent = "🏆 CURRENT GROUP SCORES";
+            
+            let scoresList = [];
+            let maxThru = 0;
+
+            filteredPlayers.forEach(p => {
+                let thru = 0;
+                courseData.forEach(hole => {
+                    const val = savedScores[`p${p.id}_h${hole.hole}`];
+                    if (val && val > 0) thru++;
+                });
+                
+                if (thru > maxThru) maxThru = thru;
+                
+                let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
+                let shortName = p.name.split(" ")[0]; 
+                
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
+            });
+
+            if (maxThru === 0) {
+                statusEl.textContent = "Enter Hole 1 Scores Below...";
+            } else {
+                statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
+            }
         }
     }
 </script>
