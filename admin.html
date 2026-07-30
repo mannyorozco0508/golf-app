@@ -248,7 +248,7 @@
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
-    <button class="btn-primary" onclick="saveSettings()">💾 Save & Activate Setup</button>
+    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Activate Setup</button>
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
@@ -669,14 +669,14 @@
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
             } else {
-                storedPlayersTemp = []; // Start completely empty for new rooms
+                storedPlayersTemp = []; 
             }
 
             document.getElementById("player-list").innerHTML = "";
             if (storedPlayersTemp.length > 0) {
                 handleFormatChange(true);
             } else {
-                addPlayerRow(); // Start with 1 empty player slot for a fresh room
+                addPlayerRow(); 
             }
         });
     }
@@ -733,90 +733,123 @@
     }
 
     function saveSettings() {
-        let courseKey = courseHiddenSelect.value;
-        let selectedCourseName = courseSearchInput.value.trim();
+        try {
+            const saveBtn = document.getElementById("main-save-btn");
+            const originalText = saveBtn.innerText;
+            saveBtn.innerText = "⏳ Saving...";
+            saveBtn.disabled = true;
 
-        if (!courseKey && selectedCourseName) {
-            courseKey = "custom_course"; 
-        }
+            let courseKey = courseHiddenSelect.value;
+            let selectedCourseName = courseSearchInput.value.trim();
 
-        if (!courseKey && !selectedCourseName) { 
-            alert("⚠️ Please select or type a Golf Course name before saving!"); 
-            return; 
-        }
-        
-        const gameFormat = document.getElementById("game-format-select").value;
-        if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); return; }
-
-        const rows = document.querySelectorAll('.player-row');
-        if (rows.length === 0) {
-            alert("⚠️ Please add at least one player to start the game!");
-            return;
-        }
-
-        if (gameFormat === 'wolf' && rows.length !== 4) {
-            alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
-            return;
-        }
-
-        const baseEventName = document.getElementById("event-name").value;
-        const roundDay = document.getElementById("round-day-select").value;
-        const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
-        const categoryIcon = getCategoryIcon(currentCategory);
-
-        const holeBetStake = parseFloat(document.getElementById("hole-bet-stake").value) || 0;
-        const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
-        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
-        const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
-        const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
-        const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
-        const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
-        const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 1;
-
-        const playersList = [];
-        rows.forEach((row, idx) => {
-            let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
-            let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
-            
-            const teamSelect = row.querySelector('.p-team-input');
-            const squadSelect = row.querySelector('.p-squad-input');
-
-            const teamVal = teamSelect ? teamSelect.value : "T-1";
-            const squadVal = squadSelect ? squadSelect.value : "red";
-            
-            if (hcpVal !== "") {
-                if (!hcpVal.startsWith("+")) {
-                    let numVal = parseFloat(hcpVal);
-                    if (isNaN(numVal)) numVal = 0;
-                    if (numVal > 36) numVal = 36;
-                    hcpVal = String(numVal);
-                }
+            if (!courseKey && selectedCourseName) {
+                let foundId = null;
+                courseDirectory.forEach(g => {
+                    g.items.forEach(i => {
+                        if(i.name.toLowerCase() === selectedCourseName.toLowerCase()) foundId = i.id;
+                    });
+                });
+                courseKey = foundId || "custom_course";
             }
 
-            playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
-        });
+            if (!courseKey && !selectedCourseName) { 
+                alert("⚠️ Please select or type a Golf Course name before saving!"); 
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return; 
+            }
+            
+            const gameFormat = document.getElementById("game-format-select").value;
+            if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
 
-        db.ref(`events/${currentMode}`).update({
-            eventName: baseEventName,
-            roundDay: roundDay,
-            eventCategory: currentCategory,
-            categoryIcon: categoryIcon,
-            activeCourseKey: courseKey,
-            courseName: selectedCourse.name,
-            gameFormat: gameFormat,
-            holeBetStake: holeBetStake,
-            matchScoring: matchScoring,
-            nassauType: nassauType,
-            nassauScoring: nassauScoring,
-            nassauStake: nassauStake,
-            nassauPressRule: nassauPressRule,
-            wolfPointVal: wolfPointVal,
-            dotPointVal: dotPointVal,
-            courseData: selectedCourse.data,
-            players: playersList
-        }).then(() => {
-            alert(`✅ Saved! ${categoryIcon} ${baseEventName} (${roundDay}) activated for ${selectedCourse.name} in Room ${currentMode}.`);
-        }).catch((err) => { alert(`Save error: ${err.message}`); });
+            const rows = document.querySelectorAll('.player-row');
+            if (rows.length === 0) {
+                alert("⚠️ Please add at least one player to start the game!");
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return;
+            }
+
+            if (gameFormat === 'wolf' && rows.length !== 4) {
+                alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return;
+            }
+
+            const baseEventName = document.getElementById("event-name").value;
+            const roundDay = document.getElementById("round-day-select").value;
+            const selectedCourse = buildMergedCourseData(courseKey, selectedCourseName);
+            const categoryIcon = getCategoryIcon(currentCategory);
+
+            const holeBetStake = parseFloat(document.getElementById("hole-bet-stake").value) || 0;
+            const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
+            const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
+            const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
+            const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
+            const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
+            const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
+            const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 1;
+
+            const playersList = [];
+            rows.forEach((row, idx) => {
+                let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
+                let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
+                
+                const teamSelect = row.querySelector('.p-team-input');
+                const squadSelect = row.querySelector('.p-squad-input');
+
+                const teamVal = teamSelect ? teamSelect.value : "T-1";
+                const squadVal = squadSelect ? squadSelect.value : "red";
+                
+                if (hcpVal !== "") {
+                    if (!hcpVal.startsWith("+")) {
+                        let numVal = parseFloat(hcpVal);
+                        if (isNaN(numVal)) numVal = 0;
+                        if (numVal > 36) numVal = 36;
+                        hcpVal = String(numVal);
+                    }
+                }
+
+                playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
+            });
+
+            try {
+                localStorage.setItem('golfAppRoster', JSON.stringify(playersList));
+            } catch(e) {
+                console.warn("Could not save to local storage (likely Private Browsing)", e);
+            }
+
+            db.ref(`events/${currentMode}`).update({
+                eventName: baseEventName,
+                roundDay: roundDay,
+                eventCategory: currentCategory,
+                categoryIcon: categoryIcon,
+                activeCourseKey: courseKey,
+                courseName: selectedCourse.name,
+                gameFormat: gameFormat,
+                holeBetStake: holeBetStake,
+                matchScoring: matchScoring,
+                nassauType: nassauType,
+                nassauScoring: nassauScoring,
+                nassauStake: nassauStake,
+                nassauPressRule: nassauPressRule,
+                wolfPointVal: wolfPointVal,
+                dotPointVal: dotPointVal,
+                courseData: selectedCourse.data,
+                players: playersList
+            }).then(() => {
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+                alert(`✅ Saved! ${categoryIcon} ${baseEventName} (${roundDay}) activated for ${selectedCourse.name} in Room ${currentMode}.`);
+            }).catch((err) => { 
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+                alert(`Save error: ${err.message}`); 
+            });
+
+        } catch (e) {
+            alert(`JavaScript Error: ${e.message}`);
+            const saveBtn = document.getElementById("main-save-btn");
+            if(saveBtn) { saveBtn.innerText = "💾 Save & Activate Setup"; saveBtn.disabled = false; }
+        }
     }
 
     function endAndClearRound() {
@@ -851,7 +884,7 @@
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
-                addPlayerRow(); // Start brand new room with 1 empty player slot
+                addPlayerRow(); 
             } else {
                 loadModeData(currentMode);
             }
