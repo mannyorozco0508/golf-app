@@ -281,6 +281,13 @@
             <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
             <div class="grid-3col">
                 <div>
+                    <label style="font-size: 0.75rem;">Match Type</label>
+                    <select id="nassau-type" onchange="renderPlayerList(false)">
+                        <option value="team">2-Man Team (Best Ball)</option>
+                        <option value="1v1">1v1 Match</option>
+                    </select>
+                </div>
+                <div>
                     <label style="font-size: 0.75rem;">Scoring Type</label>
                     <select id="nassau-scoring">
                         <option value="net">Net (HCP)</option>
@@ -288,15 +295,15 @@
                     </select>
                 </div>
                 <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
-                <div>
-                    <label style="font-size: 0.75rem;">Press Rule</label>
-                    <select id="nassau-press-rule">
-                        <option value="2down">Auto @ 2 Down</option>
-                        <option value="1down">Auto @ 1 Down</option>
-                        <option value="anytime">Press Any Hole</option>
-                        <option value="none">No Press</option>
-                    </select>
-                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                <label style="font-size: 0.75rem;">Press Rule</label>
+                <select id="nassau-press-rule">
+                    <option value="2down">Auto @ 2 Down</option>
+                    <option value="1down">Auto @ 1 Down</option>
+                    <option value="anytime">Press Any Hole</option>
+                    <option value="none">No Press</option>
+                </select>
             </div>
         </div>
 
@@ -857,7 +864,7 @@
 
     function renderPlayerList(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
-        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const headerRow = document.getElementById("player-header-row");
         const listContainer = document.getElementById("player-list");
         
@@ -873,7 +880,7 @@
         if (format === 'ryder') {
             headerRow.className = "grid-ryder";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
             headerRow.className = "grid-team";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
         } else {
@@ -962,7 +969,7 @@
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value || 'stroke';
-        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const teamSize = (format === 'scramble') ? 4 : 2;
         const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
@@ -982,7 +989,7 @@
                     <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
                 </select>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team')) {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
             gridClass = "grid-team";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
@@ -1088,7 +1095,7 @@
 
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
-            const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "1v1";
+            const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
             const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
             const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";

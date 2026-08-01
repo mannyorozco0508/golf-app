@@ -416,12 +416,102 @@
     function endAndClearRound() {
         if (confirm(`Are you sure you want to END the current game for Game ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
+                localStorage.removeItem('lastRoomCode');
                 alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
                 window.location.href = "admin.html"; 
             }).catch((err) => {
                 alert(`Error clearing game: ${err.message}`);
             });
         }
+    }
+
+    function calculate2ManMatchEngine(players, courseData, savedScores, scoringType) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "T-1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
+
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
+
+        let t1Key = teamKeys[0];
+        let t2Key = teamKeys[1];
+        let t1Players = teams[t1Key];
+        let t2Players = teams[t2Key];
+
+        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
+        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
+
+        let runningMatch = 0; 
+        let f9Match = 0;
+        let b9Match = 0;
+        let maxThru = 0;
+        let holeLog = {};
+
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1Best = 999;
+            let t2Best = 999;
+            let t1Valid = false;
+            let t2Valid = false;
+
+            t1Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < t1Best) t1Best = s;
+                    t1Valid = true;
+                }
+            });
+
+            t2Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < t2Best) t2Best = s;
+                    t2Valid = true;
+                }
+            });
+
+            if (t1Valid && t2Valid) {
+                maxThru++;
+                let holeWinner = null;
+                if (t1Best < t2Best) {
+                    runningMatch += 1;
+                    if (hNum <= 9) f9Match += 1; else b9Match += 1;
+                    holeWinner = t1Name;
+                } else if (t2Best < t1Best) {
+                    runningMatch -= 1;
+                    if (hNum <= 9) f9Match -= 1; else b9Match -= 1;
+                    holeWinner = t2Name;
+                } else {
+                    holeWinner = "Halved";
+                }
+
+                holeLog[hNum] = {
+                    t1Best, t2Best, holeWinner,
+                    cumMatch: runningMatch,
+                    cumF9: f9Match,
+                    cumB9: b9Match
+                };
+            }
+        });
+
+        return { t1Name, t2Name, runningMatch, f9Match, b9Match, maxThru, holeLog };
+    }
+
+    function formatMatchPill(score, t1Name, t2Name) {
+        if (score === 0) return "AS";
+        if (score > 0) return `${t1Name} ${score}UP`;
+        return `${t2Name} ${Math.abs(score)}UP`;
+    }
+
+    function formatMatchStatusText(score, t1Name, t2Name) {
+        if (score === 0) return "ALL SQUARE";
+        if (score > 0) return `${t1Name} IS ${score} UP`;
+        return `${t2Name} IS ${Math.abs(score)} UP`;
     }
 
     function calculateHiLoEngine(players, courseData, savedScores) {
@@ -479,7 +569,7 @@
 
                 let h1Won = null; // Low ball
                 if (t1Low < t2Low) { t1Points += 0.5; h1Won = t1Name; }
-                else if (t2Low < t1Low) { t2Points += 0.5; h1Won = t2Name; }
+                else if (t2Low < t1Low) { t2Points += 0.5; h2Won = t2Name; }
 
                 let h2Won = null; // High ball
                 if (t1High < t2High) { t1Points += 0.5; h2Won = t1Name; }
@@ -520,8 +610,12 @@
         }
 
         let hiloCalc = null;
+        let matchCalc = null;
+
         if (gameFormat === 'hilo') {
             hiloCalc = calculateHiLoEngine(filteredPlayers, courseData, savedScores);
+        } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
+            matchCalc = calculate2ManMatchEngine(filteredPlayers, courseData, savedScores, scoringType);
         }
 
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
@@ -569,7 +663,6 @@
 
                     runningStats[p.id] += diff;
 
-                    // LIVE SCORECARD SHOWS BOGEY BOXES
                     if (diff === -1) {
                         shapeHtml = `<div class="shape-circle-1"></div>`;
                     } else if (diff <= -2) {
@@ -634,7 +727,20 @@
                     const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
                     const dotBtnLabel = dotCount > 0 ? `🎯 Dots (${dotCount})` : "🎯 Add Dots";
                     matchCellHtml += `<button class="${dotBtnClass}" onclick="openDotsModal(${h.hole})">${dotBtnLabel}</button>`;
+                } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
+                    const log = matchCalc.holeLog[h.hole];
+                    const statusPillText = formatMatchPill(log.cumMatch, matchCalc.t1Name, matchCalc.t2Name);
+                    matchCellHtml += `<span class="status-pill pill-main">${statusPillText}</span>`;
+                    matchCellHtml += `<span class="status-pill pill-press">${log.holeWinner}</span>`;
+                } else if (gameFormat === 'nassau' && matchCalc && matchCalc.holeLog[h.hole]) {
+                    const log = matchCalc.holeLog[h.hole];
+                    const segMatch = h.hole <= 9 ? log.cumF9 : log.cumB9;
+                    const segLabel = h.hole <= 9 ? "F9" : "B9";
+                    const statusPillText = formatMatchPill(segMatch, matchCalc.t1Name, matchCalc.t2Name);
+                    matchCellHtml += `<span class="status-pill pill-main">${segLabel}: ${statusPillText}</span>`;
+                    matchCellHtml += `<span class="status-pill pill-press">${log.holeWinner}</span>`;
                 }
+
                 matchCellHtml += `</div>`;
                 rowHtml += `<td>${matchCellHtml}</td>`;
             }
@@ -691,7 +797,23 @@
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
 
-        if (gameFormat === 'hilo' && hiloCalc) {
+        if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.maxThru > 0) {
+            payoutBox.style.display = "none";
+            titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
+            const matchStatusStr = formatMatchStatusText(matchCalc.runningMatch, matchCalc.t1Name, matchCalc.t2Name);
+            statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong> (Thru ${matchCalc.maxThru})</span>`;
+        } else if (gameFormat === 'nassau' && matchCalc && matchCalc.maxThru > 0) {
+            payoutBox.style.display = "none";
+            titleEl.textContent = "💵 LIVE NASSAU MATCH STATUS";
+            const f9Str = formatMatchPill(matchCalc.f9Match, matchCalc.t1Name, matchCalc.t2Name);
+            const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(matchCalc.b9Match, matchCalc.t1Name, matchCalc.t2Name) : "AS";
+            const ovStr = formatMatchPill(matchCalc.runningMatch, matchCalc.t1Name, matchCalc.t2Name);
+            statusEl.innerHTML = `
+                <span class="ticker-part">F9: <strong>${f9Str}</strong></span>
+                <span class="ticker-part">B9: <strong>${b9Str}</strong></span>
+                <span class="ticker-part">18: <strong>${ovStr}</strong></span>
+            `;
+        } else if (gameFormat === 'hilo' && hiloCalc) {
             payoutBox.style.display = "block";
             document.getElementById("nassau-payout-header").textContent = `♠️ Hi-Lo Standings (${hiloCalc.t1Name} vs ${hiloCalc.t2Name})`;
             
@@ -830,7 +952,6 @@
                     let diff = score - (ch ? parseInt(ch.par) : 4);
                     let shape = '';
                     
-                    // PDF ONLY GETS CIRCLES
                     if (diff === -1) shape = `<div class="pcircle1"></div>`;
                     else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
                     
@@ -851,7 +972,6 @@
                     let diff = score - (ch ? parseInt(ch.par) : 4);
                     let shape = '';
                     
-                    // PDF ONLY GETS CIRCLES
                     if (diff === -1) shape = `<div class="pcircle1"></div>`;
                     else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
                     
@@ -865,7 +985,7 @@
         
         printHtml += `</table>`;
 
-        // --- NEW: DYNAMIC PAYOUT LEDGER ---
+        // --- DYNAMIC PAYOUT LEDGER ---
         const format = currentData.gameFormat;
         
         if (format === 'dots' || format === 'hilo') {
@@ -893,7 +1013,6 @@
                     printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts (${moneyStr})</strong></div>`;
                 });
             } 
-            // We use the hiloCalc object already generated globally by renderScorecard
             else if (format === 'hilo' && typeof hiloCalc !== 'undefined' && hiloCalc) {
                 let t1Money = (hiloCalc.t1Points - hiloCalc.t2Points) * stake;
                 let t1Str = t1Money >= 0 ? `+$${t1Money}` : `-$${Math.abs(t1Money)}`;
