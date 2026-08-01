@@ -148,13 +148,13 @@
         let activeMatches = [];
         if (gameFormat === 'nassau') {
             activeMatches = [
-                { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false },
-                { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false },
-                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false }
+                { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
             ];
         } else {
             activeMatches = [
-                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false }
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
 
@@ -205,8 +205,20 @@
                             if (expectedTriggers > m.triggers) {
                                 m.triggers = expectedTriggers;
                                 pressCount++;
+                                
+                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length;
+                                let nextPressNum = existingPresses + 1;
+                                
                                 activeMatches.push({
-                                    id: `P${pressCount}`, startHole: hNum + 1, endHole: m.endHole, status: 0, label: `Press (${m.label})`, triggers: 0, closed: false
+                                    id: `P${pressCount}`, 
+                                    baseId: m.baseId, 
+                                    startHole: hNum + 1, 
+                                    endHole: m.endHole, 
+                                    status: 0, 
+                                    label: `Press ${nextPressNum}`, 
+                                    triggers: 0, 
+                                    closed: false, 
+                                    pressNum: nextPressNum
                                 });
                             }
                         }
@@ -302,25 +314,27 @@
             return;
         }
 
-        let t1Total = matchData.t1TotalMoney;
         let breakdownHtml = "";
-
-        matchData.activeMatches.forEach(m => {
-            let statusDesc = "All Square ($0)";
-            if (m.status > 0) {
-                statusDesc = `${matchData.t1Name} Won (+${stake})`;
-            } else if (m.status < 0) {
-                statusDesc = `${matchData.t2Name} Won (-${stake})`;
+        
+        ['F9', 'B9', '18'].forEach(bId => {
+            let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
+            if(groupMatches.length > 0) {
+                let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
+                
+                groupMatches.forEach(m => {
+                    let statusDesc = "All Square ($0)";
+                    if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stake}`;
+                    else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stake}`;
+                    
+                    let lockIcon = m.closed ? "🔒 " : "";
+                    let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
+                    breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+                });
             }
-
-            breakdownHtml += `
-                <div class="breakdown-item">
-                    <span>${m.label}:</span>
-                    <span><strong>${statusDesc}</strong></span>
-                </div>
-            `;
         });
 
+        let t1Total = matchData.t1TotalMoney;
         function formatMoney(amount) {
             if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
             if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
@@ -331,19 +345,19 @@
             <div class="settle-card">
                 <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
                 
-                <div class="ledger-row">
+                <div class="match-breakdown-list" style="margin-bottom: 16px;">
+                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
+                    ${breakdownHtml}
+                </div>
+
+                <div class="ledger-row" style="background:#f9fbf9;">
                     <span>${matchData.t1Name}:</span>
                     <span>${formatMoney(t1Total)}</span>
                 </div>
                 
-                <div class="ledger-row">
+                <div class="ledger-row" style="background:#f9fbf9;">
                     <span>${matchData.t2Name}:</span>
                     <span>${formatMoney(-t1Total)}</span>
-                </div>
-
-                <div class="match-breakdown-list">
-                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
-                    ${breakdownHtml}
                 </div>
             </div>
 

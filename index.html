@@ -446,13 +446,13 @@
         let activeMatches = [];
         if (gameFormat === 'nassau') {
             activeMatches = [
-                { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false },
-                { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false },
-                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false }
+                { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
             ];
         } else {
             activeMatches = [
-                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false }
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
 
@@ -508,8 +508,20 @@
                             if (expectedTriggers > m.triggers) {
                                 m.triggers = expectedTriggers;
                                 pressCount++;
+                                
+                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length;
+                                let nextPressNum = existingPresses + 1;
+                                
                                 activeMatches.push({
-                                    id: `P${pressCount}`, startHole: hNum + 1, endHole: m.endHole, status: 0, label: `Press (${m.label})`, triggers: 0, closed: false
+                                    id: `P${pressCount}`, 
+                                    baseId: m.baseId, 
+                                    startHole: hNum + 1, 
+                                    endHole: m.endHole, 
+                                    status: 0, 
+                                    label: `Press ${nextPressNum}`, 
+                                    triggers: 0, 
+                                    closed: false, 
+                                    pressNum: nextPressNum
                                 });
                             }
                         }
@@ -882,13 +894,22 @@
             let matchesListHtml = "";
             let stake = currentData.nassauStake || 10;
             
-            matchCalc.activeMatches.forEach(m => {
-                let statusDesc = "All Square ($0)";
-                if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
-                else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
-                
-                let lockIcon = m.closed ? "🔒 " : "";
-                matchesListHtml += `<div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid #eee; padding: 4px 0;"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+            ['F9', 'B9', '18'].forEach(bId => {
+                let groupMatches = matchCalc.activeMatches.filter(m => m.baseId === bId);
+                if(groupMatches.length > 0) {
+                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    matchesListHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
+                    
+                    groupMatches.forEach(m => {
+                        let statusDesc = "All Square ($0)";
+                        if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
+                        else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
+                        
+                        let lockIcon = m.closed ? "🔒 " : "";
+                        let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
+                        matchesListHtml += `<div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}</span> <strong>${statusDesc}</strong></div>`;
+                    });
+                }
             });
 
             document.getElementById("payout-rows-wrapper").innerHTML = `
@@ -1110,6 +1131,42 @@
             }
             
             printHtml += `</div>`;
+        } else if (format === 'nassau' && typeof matchCalc !== 'undefined' && matchCalc) {
+            printHtml += `<div class="pledger"><h3>💵 Game Ledger (NASSAU)</h3>`;
+            
+            let matchesListHtml = "";
+            let stake = currentData.nassauStake || 10;
+            
+            ['F9', 'B9', '18'].forEach(bId => {
+                let groupMatches = matchCalc.activeMatches.filter(m => m.baseId === bId);
+                if(groupMatches.length > 0) {
+                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    matchesListHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:12px; text-transform:uppercase; margin-top:8px;">${groupLabel} Bets</div>`;
+                    
+                    groupMatches.forEach(m => {
+                        let statusDesc = "All Square ($0)";
+                        if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
+                        else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
+                        
+                        let lockIcon = m.closed ? "🔒 " : "";
+                        let indent = m.pressNum > 0 ? "margin-left: 12px; padding-left: 8px;" : "padding-left: 4px;";
+                        matchesListHtml += `<div class="pledger-row" style="${indent}"><span>${lockIcon}${m.label}</span> <strong>${statusDesc}</strong></div>`;
+                    });
+                }
+            });
+            
+            let t1Money = matchCalc.t1TotalMoney;
+            function fmtM(amt) {
+                if (amt > 0) return `+$${amt}`;
+                if (amt < 0) return `-$${Math.abs(amt)}`;
+                return `$0`;
+            }
+
+            printHtml += matchesListHtml;
+            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
+                <span><strong>Total Ledger:</strong></span>
+                <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
+            </div></div>`;
         }
 
         document.getElementById("print-area").innerHTML = printHtml;
