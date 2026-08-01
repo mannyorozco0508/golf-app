@@ -443,16 +443,31 @@
         let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
         let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
 
+        let hasFront = courseData.some(h => h.hole <= 9);
+        let hasBack = courseData.some(h => h.hole > 9);
+
         let activeMatches = [];
         if (gameFormat === 'nassau') {
-            activeMatches = [
-                { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
-                { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
-                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
-            ];
+            if (hasFront && hasBack) {
+                activeMatches = [
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
+                    { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            } else if (hasFront) {
+                activeMatches = [
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            } else if (hasBack) {
+                activeMatches = [
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            }
         } else {
+            let startH = hasFront ? 1 : 10;
+            let endH = hasBack ? 18 : 9;
             activeMatches = [
-                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Overall Match', triggers: 0, closed: false, pressNum: 0 }
+                { id: '18', baseId: '18', startHole: startH, endHole: endH, status: 0, label: 'Overall Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
 
@@ -707,6 +722,11 @@
         let runningStats = {};
         filteredPlayers.forEach(p => runningStats[p.id] = 0);
         
+        let hasFront = courseData.some(h => h.hole <= 9);
+        let hasBack = courseData.some(h => h.hole > 9);
+        let lastFrontHole = hasFront ? Math.max(...courseData.filter(h => h.hole <= 9).map(h => h.hole)) : null;
+        let lastBackHole = hasBack ? Math.max(...courseData.filter(h => h.hole > 9).map(h => h.hole)) : null;
+        
         let frontPar = 0, backPar = 0, totalPar = 0;
         courseData.forEach(h => {
             let p = parseInt(h.par, 10) || 0;
@@ -813,7 +833,9 @@
                     const log = matchCalc.holeLog[h.hole];
                     const isF9 = h.hole <= 9;
                     const segMatch = isF9 ? log.f9Match : log.b9Match;
-                    const segLabel = isF9 ? "F9" : "B9";
+                    let segLabel = isF9 ? "F9" : "B9";
+                    if (!hasBack) segLabel = "Match";
+                    if (!hasFront) segLabel = "Match";
                     const isClosed = isF9 ? log.f9Closed : log.b9Closed;
                     const finalRes = isF9 ? log.f9Res : log.b9Res;
                     
@@ -829,15 +851,15 @@
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
 
-            if (h.hole === 9 || h.hole === 18) {
-                let isOut = h.hole === 9;
-                let label = isOut ? `OUT (Front 9) &bull; Par ${frontPar}` : `IN (Back 9) &bull; Par ${backPar}`;
+            // Render Subtotals for Out/In if it's an 18 hole round
+            if (h.hole === lastFrontHole && hasBack) {
+                let label = `OUT (Front 9) &bull; Par ${frontPar}`;
                 let subRowHtml = `<tr style="background-color: #eef6f2;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; color:#0f4c3a; font-size:0.8rem;">${label}</td>`;
 
                 filteredPlayers.forEach(p => {
                     let gross = 0, net = 0;
                     courseData.forEach(ch => {
-                        if ((isOut && ch.hole <= 9) || (!isOut && ch.hole > 9 && ch.hole <= 18)) {
+                        if (ch.hole <= 9) {
                             let v = savedScores[`p${p.id}_h${ch.hole}`];
                             if (v > 0) { 
                                 gross += parseInt(v, 10); 
@@ -848,29 +870,34 @@
                     let display = gross > 0 ? `<span style="font-weight:bold; font-size:1rem; color:#1a1a1a;">${gross}</span><br><span style="font-size:0.7rem;color:#2a9d8f;">Net: ${net}</span>` : `<span style="color:#aaa;">-</span>`;
                     subRowHtml += `<td style="padding:6px;">${display}</td>`;
                 });
-
                 if (showMatchColumn) subRowHtml += `<td></td>`;
                 subRowHtml += `</tr>`;
                 tbody.innerHTML += subRowHtml;
+            }
 
-                if (h.hole === 18) {
-                    let totRowHtml = `<tr style="background-color: #1d3557; color: white;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; font-size:0.8rem;">TOTAL &bull; Par ${totalPar}</td>`;
-                    filteredPlayers.forEach(p => {
-                        let gross = 0, net = 0;
-                        courseData.forEach(ch => {
-                            let v = savedScores[`p${p.id}_h${ch.hole}`];
-                            if (v > 0) { 
-                                gross += parseInt(v, 10); 
-                                net += (parseInt(v, 10) - getStrokes(ch.hcpIndex, parseHcp(p.hcp))); 
-                            }
-                        });
-                        let display = gross > 0 ? `<span style="font-weight:bold; font-size:1.1rem; color:#fff;">${gross}</span><br><span style="font-size:0.7rem;color:#a8dadc;">Net: ${net}</span>` : `<span style="color:#aaa;">-</span>`;
-                        totRowHtml += `<td style="padding:6px;">${display}</td>`;
+            // Render Total Row at the very end
+            if (h.hole === (lastBackHole || lastFrontHole)) {
+                let totalLabel = `TOTAL &bull; Par ${totalPar}`;
+                if (!hasBack) totalLabel = `TOTAL (Front 9) &bull; Par ${frontPar}`;
+                if (!hasFront) totalLabel = `TOTAL (Back 9) &bull; Par ${backPar}`;
+                
+                let totRowHtml = `<tr style="background-color: #1d3557; color: white;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; font-size:0.8rem;">${totalLabel}</td>`;
+                
+                filteredPlayers.forEach(p => {
+                    let gross = 0, net = 0;
+                    courseData.forEach(ch => {
+                        let v = savedScores[`p${p.id}_h${ch.hole}`];
+                        if (v > 0) { 
+                            gross += parseInt(v, 10); 
+                            net += (parseInt(v, 10) - getStrokes(ch.hcpIndex, parseHcp(p.hcp))); 
+                        }
                     });
-                    if (showMatchColumn) totRowHtml += `<td></td>`;
-                    totRowHtml += `</tr>`;
-                    tbody.innerHTML += totRowHtml;
-                }
+                    let display = gross > 0 ? `<span style="font-weight:bold; font-size:1.1rem; color:#fff;">${gross}</span><br><span style="font-size:0.7rem;color:#a8dadc;">Net: ${net}</span>` : `<span style="color:#aaa;">-</span>`;
+                    totRowHtml += `<td style="padding:6px;">${display}</td>`;
+                });
+                if (showMatchColumn) totRowHtml += `<td></td>`;
+                totRowHtml += `</tr>`;
+                tbody.innerHTML += totRowHtml;
             }
         });
 
@@ -914,19 +941,19 @@
             let f9 = matchCalc.activeMatches.find(m => m.id === 'F9');
             let b9 = matchCalc.activeMatches.find(m => m.id === 'B9');
 
-            const f9Str = formatMatchPill(f9.status, matchCalc.t1Name, matchCalc.t2Name, f9.closed, f9.finalResult);
-            const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(b9.status, matchCalc.t1Name, matchCalc.t2Name, b9.closed, b9.finalResult) : "AS";
-            const ovStr = formatMatchPill(t18.status, matchCalc.t1Name, matchCalc.t2Name, t18.closed, t18.finalResult);
-            
             let activePresses = matchCalc.activeMatches.filter(m => m.pressNum > 0).length;
             let pressText = activePresses > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${activePresses} Active Presses</div>` : "";
 
-            statusEl.innerHTML = `
-                <span class="ticker-part">F9: <strong>${f9Str}</strong></span>
-                <span class="ticker-part">B9: <strong>${b9Str}</strong></span>
-                <span class="ticker-part">Total: <strong>${ovStr}</strong></span>
-                ${pressText}
-            `;
+            if (hasFront && hasBack) {
+                const f9Str = formatMatchPill(f9.status, matchCalc.t1Name, matchCalc.t2Name, f9.closed, f9.finalResult);
+                const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(b9.status, matchCalc.t1Name, matchCalc.t2Name, b9.closed, b9.finalResult) : "AS";
+                const ovStr = formatMatchPill(t18.status, matchCalc.t1Name, matchCalc.t2Name, t18.closed, t18.finalResult);
+                statusEl.innerHTML = `<span class="ticker-part">F9: <strong>${f9Str}</strong></span><span class="ticker-part">B9: <strong>${b9Str}</strong></span><span class="ticker-part">Total: <strong>${ovStr}</strong></span>${pressText}`;
+            } else {
+                let singleMatch = hasFront ? f9 : b9;
+                const singleStr = formatMatchPill(singleMatch.status, matchCalc.t1Name, matchCalc.t2Name, singleMatch.closed, singleMatch.finalResult);
+                statusEl.innerHTML = `<span class="ticker-part">Match: <strong>${singleStr}</strong></span>${pressText}`;
+            }
 
             document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
             
@@ -944,6 +971,7 @@
                 let groupMatches = matchCalc.activeMatches.filter(m => m.baseId === bId);
                 if(groupMatches.length > 0) {
                     let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    if (!hasBack || !hasFront) groupLabel = 'Match';
                     matchesListHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
                     
                     groupMatches.forEach(m => {
@@ -1062,6 +1090,9 @@
         const courseName = currentData.courseName || "Golf Scorecard";
         const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         
+        let hasFront = courseData.some(h => h.hole <= 9);
+        let hasBack = courseData.some(h => h.hole > 9);
+
         let printHtml = `
             <div style="text-align: center; margin-bottom: 20px;">
                 <h1 style="margin: 0; font-size: 24px; color: #0f4c3a; text-transform: uppercase; letter-spacing: 1px;">${courseName}</h1>
@@ -1072,70 +1103,63 @@
 
         // HOLE ROW
         printHtml += `<tr><th style="text-align:left; width: 140px; font-size: 16px;">HOLE</th>`;
-        for(let i=1; i<=9; i++) printHtml += `<th>${i}</th>`;
-        printHtml += `<th class="section-col">OUT</th>`;
-        for(let i=10; i<=18; i++) printHtml += `<th>${i}</th>`;
-        printHtml += `<th class="section-col">IN</th><th class="section-col">TOTAL</th></tr>`;
+        if (hasFront) {
+            courseData.filter(h=>h.hole<=9).forEach(h => printHtml += `<th>${h.hole}</th>`);
+            if (hasBack) printHtml += `<th class="section-col">OUT</th>`;
+        }
+        if (hasBack) {
+            courseData.filter(h=>h.hole>9).forEach(h => printHtml += `<th>${h.hole}</th>`);
+            if (hasFront) printHtml += `<th class="section-col">IN</th>`;
+        }
+        printHtml += `<th class="section-col">TOTAL</th></tr>`;
         
         // PAR ROW
         let outPar = 0, inPar = 0;
         courseData.forEach(h => { if(h.hole<=9) outPar+=parseInt(h.par); else if(h.hole<=18) inPar+=parseInt(h.par); });
+        
         printHtml += `<tr><th style="text-align:left; font-size: 16px;">PAR</th>`;
-        for(let i=1; i<=9; i++) {
-            let ch = courseData.find(c => c.hole === i);
-            printHtml += `<th>${ch ? ch.par : '-'}</th>`;
+        if (hasFront) {
+            courseData.filter(h=>h.hole<=9).forEach(h => printHtml += `<th>${h.par}</th>`);
+            if (hasBack) printHtml += `<th class="section-col">${outPar}</th>`;
         }
-        printHtml += `<th class="section-col">${outPar}</th>`;
-        for(let i=10; i<=18; i++) {
-            let ch = courseData.find(c => c.hole === i);
-            printHtml += `<th>${ch ? ch.par : '-'}</th>`;
+        if (hasBack) {
+            courseData.filter(h=>h.hole>9).forEach(h => printHtml += `<th>${h.par}</th>`);
+            if (hasFront) printHtml += `<th class="section-col">${inPar}</th>`;
         }
-        printHtml += `<th class="section-col">${inPar}</th><th class="section-col">${outPar+inPar}</th></tr>`;
+        printHtml += `<th class="section-col">${outPar+inPar}</th></tr>`;
 
         // PLAYER ROWS
         filteredPlayers.forEach(p => {
             let outScore = 0, inScore = 0;
             printHtml += `<tr><td style="text-align:left; font-weight:bold; font-size: 16px;">${p.name.split(" ")[0]}</td>`;
             
-            // Front 9
-            for(let i=1; i<=9; i++) {
-                let v = savedScores[`p${p.id}_h${i}`];
-                let ch = courseData.find(c => c.hole === i);
-                if (v && v > 0) {
-                    let score = parseInt(v, 10);
-                    outScore += score;
-                    let diff = score - (ch ? parseInt(ch.par) : 4);
-                    let shape = '';
-                    
-                    if (diff === -1) shape = `<div class="pcircle1"></div>`;
-                    else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
-                    
-                    printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
-                } else {
-                    printHtml += `<td></td>`;
-                }
+            if (hasFront) {
+                courseData.filter(h=>h.hole<=9).forEach(h => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v && v > 0) {
+                        let score = parseInt(v, 10);
+                        outScore += score;
+                        let diff = score - parseInt(h.par);
+                        let shape = diff === -1 ? `<div class="pcircle1"></div>` : (diff <= -2 ? `<div class="pcircle1"></div><div class="pcircle2"></div>` : '');
+                        printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
+                    } else printHtml += `<td></td>`;
+                });
+                if (hasBack) printHtml += `<td class="section-col">${outScore > 0 ? outScore : ''}</td>`;
             }
-            printHtml += `<td class="section-col">${outScore > 0 ? outScore : ''}</td>`;
-            
-            // Back 9
-            for(let i=10; i<=18; i++) {
-                let v = savedScores[`p${p.id}_h${i}`];
-                let ch = courseData.find(c => c.hole === i);
-                if (v && v > 0) {
-                    let score = parseInt(v, 10);
-                    inScore += score;
-                    let diff = score - (ch ? parseInt(ch.par) : 4);
-                    let shape = '';
-                    
-                    if (diff === -1) shape = `<div class="pcircle1"></div>`;
-                    else if (diff <= -2) shape = `<div class="pcircle1"></div><div class="pcircle2"></div>`;
-                    
-                    printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
-                } else {
-                    printHtml += `<td></td>`;
-                }
+            if (hasBack) {
+                courseData.filter(h=>h.hole>9).forEach(h => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v && v > 0) {
+                        let score = parseInt(v, 10);
+                        inScore += score;
+                        let diff = score - parseInt(h.par);
+                        let shape = diff === -1 ? `<div class="pcircle1"></div>` : (diff <= -2 ? `<div class="pcircle1"></div><div class="pcircle2"></div>` : '');
+                        printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
+                    } else printHtml += `<td></td>`;
+                });
+                if (hasFront) printHtml += `<td class="section-col">${inScore > 0 ? inScore : ''}</td>`;
             }
-            printHtml += `<td class="section-col">${inScore > 0 ? inScore : ''}</td><td class="section-col">${(outScore+inScore) > 0 ? (outScore+inScore) : ''}</td></tr>`;
+            printHtml += `<td class="section-col">${(outScore+inScore) > 0 ? (outScore+inScore) : ''}</td></tr>`;
         });
         
         printHtml += `</table>`;
@@ -1187,6 +1211,7 @@
                 let groupMatches = matchCalc.activeMatches.filter(m => m.baseId === bId);
                 if(groupMatches.length > 0) {
                     let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    if (!hasBack || !hasFront) groupLabel = 'Match';
                     matchesListHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:12px; text-transform:uppercase; margin-top:8px;">${groupLabel} Bets</div>`;
                     
                     groupMatches.forEach(m => {
