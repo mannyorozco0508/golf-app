@@ -126,41 +126,50 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, currentData) {
-        if (!players || players.length < 2) return null;
-        let t1Name = players[0].name.split(" ")[0];
-        let t2Name = players[1].name.split(" ")[0];
-        let t1Players = [players[0]];
-        let t2Players = [players[1]];
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "T-1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
 
-        const pressRule = currentData.nassauPressRule || "none";
-        const manualPresses = currentData.manualPresses || {};
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
 
-        let activeMatches = [
-            { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9' },
-            { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9' },
-            { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Total' }
-        ];
+        let t1Key = teamKeys[0];
+        let t2Key = teamKeys[1];
+        let t1Players = teams[t1Key];
+        let t2Players = teams[t2Key];
+
+        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
+        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
+
+        let activeMatches = [];
+        if (gameFormat === 'nassau') {
+            activeMatches = [
+                { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false },
+                { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false },
+                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false }
+            ];
+        } else {
+            activeMatches = [
+                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false }
+            ];
+        }
 
         let pressCount = 0;
 
-        courseData.forEach((hole) => {
-            const hNum = hole.hole;
-
-            if (manualPresses[`h${hNum}`]) {
-                pressCount++;
-                let endH = hNum <= 9 ? 9 : 18;
-                activeMatches.push({ id: `P${pressCount}`, startHole: hNum, endHole: endH, status: 0, label: `Press #${pressCount}` });
-            }
-
-            let team1Best = 999, team2Best = 999;
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1Best = 999, t2Best = 999;
             let t1Valid = false, t2Valid = false;
 
             t1Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
                     let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                    if (s < team1Best) team1Best = s;
+                    if (s < t1Best) t1Best = s;
                     t1Valid = true;
                 }
             });
@@ -169,20 +178,50 @@
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
                     let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
-                    if (s < team2Best) team2Best = s;
+                    if (s < t2Best) t2Best = s;
                     t2Valid = true;
                 }
             });
 
             if (t1Valid && t2Valid) {
-                let diff = team1Best < team2Best ? 1 : (team2Best < team1Best ? -1 : 0);
+                let diff = 0;
+                if (t1Best < t2Best) diff = 1;
+                else if (t2Best < t1Best) diff = -1;
+
                 activeMatches.forEach(m => {
-                    if (hNum >= m.startHole && hNum <= m.endHole) m.status += diff;
+                    if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
+                        m.status += diff;
+
+                        let hLeft = m.endHole - hNum;
+                        if (Math.abs(m.status) > hLeft) {
+                            m.closed = true;
+                            let winnerName = m.status > 0 ? t1Name : t2Name;
+                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                        }
+
+                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole && !m.closed) {
+                            const threshold = pressRule === '2down' ? 2 : 1;
+                            let expectedTriggers = Math.floor(Math.abs(m.status) / threshold);
+                            if (expectedTriggers > m.triggers) {
+                                m.triggers = expectedTriggers;
+                                pressCount++;
+                                activeMatches.push({
+                                    id: `P${pressCount}`, startHole: hNum + 1, endHole: m.endHole, status: 0, label: `Press (${m.label})`, triggers: 0, closed: false
+                                });
+                            }
+                        }
+                    }
                 });
             }
         });
 
-        return { t1Name, t2Name, activeMatches };
+        let t1TotalMoney = 0;
+        activeMatches.forEach(m => {
+            if (m.status > 0) t1TotalMoney += stake;
+            else if (m.status < 0) t1TotalMoney -= stake;
+        });
+
+        return { t1Name, t2Name, activeMatches, t1TotalMoney };
     }
 
     function renderSettlement(data) {
@@ -192,6 +231,7 @@
         const savedScores = data.scores || {};
         const gameFormat = data.gameFormat || "stroke";
         const stake = data.nassauStake || 10;
+        const pressRule = data.nassauPressRule || "none";
 
         if (gameFormat === 'dots') {
             let playerDots = {};
@@ -250,7 +290,7 @@
         }
 
         let scoringType = data.nassauScoring || data.matchScoring || "net";
-        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, data);
+        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake);
 
         if (!matchData) {
             container.innerHTML = `
@@ -262,19 +302,14 @@
             return;
         }
 
-        let t1Total = 0;
+        let t1Total = matchData.t1TotalMoney;
         let breakdownHtml = "";
 
         matchData.activeMatches.forEach(m => {
-            let betVal = 0;
             let statusDesc = "All Square ($0)";
             if (m.status > 0) {
-                betVal = stake;
-                t1Total += stake;
                 statusDesc = `${matchData.t1Name} Won (+${stake})`;
             } else if (m.status < 0) {
-                betVal = -stake;
-                t1Total -= stake;
                 statusDesc = `${matchData.t2Name} Won (-${stake})`;
             }
 

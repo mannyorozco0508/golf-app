@@ -424,7 +424,7 @@
         }
     }
 
-    function calculate2ManMatchEngine(players, courseData, savedScores, scoringType) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake) {
         let teams = {};
         players.forEach(p => {
             let key = p.team || "T-1";
@@ -443,25 +443,27 @@
         let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
         let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
 
-        let runningMatch = 0; 
-        let f9Match = 0;
-        let b9Match = 0;
+        let activeMatches = [];
+        if (gameFormat === 'nassau') {
+            activeMatches = [
+                { id: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false },
+                { id: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false },
+                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false }
+            ];
+        } else {
+            activeMatches = [
+                { id: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false }
+            ];
+        }
+
+        let pressCount = 0;
         let maxThru = 0;
         let holeLog = {};
 
-        let totalClosed = false;
-        let totalResult = "";
-        let f9Closed = false;
-        let f9Result = "";
-        let b9Closed = false;
-        let b9Result = "";
-
         courseData.forEach(hole => {
             let hNum = hole.hole;
-            let t1Best = 999;
-            let t2Best = 999;
-            let t1Valid = false;
-            let t2Valid = false;
+            let t1Best = 999, t2Best = 999;
+            let t1Valid = false, t2Valid = false;
 
             t1Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
@@ -483,67 +485,57 @@
 
             if (t1Valid && t2Valid) {
                 maxThru++;
-                let holeWinner = null;
-                
-                // Only accumulate if not mathematically closed
-                if (!totalClosed) {
-                    if (t1Best < t2Best) runningMatch += 1;
-                    else if (t2Best < t1Best) runningMatch -= 1;
-                }
-                
-                if (hNum <= 9 && !f9Closed) {
-                    if (t1Best < t2Best) f9Match += 1;
-                    else if (t2Best < t1Best) f9Match -= 1;
-                }
-                
-                if (hNum > 9 && !b9Closed) {
-                    if (t1Best < t2Best) b9Match += 1;
-                    else if (t2Best < t1Best) b9Match -= 1;
-                }
+                let diff = 0;
+                if (t1Best < t2Best) diff = 1;
+                else if (t2Best < t1Best) diff = -1;
 
-                if (t1Best < t2Best) holeWinner = t1Name;
-                else if (t2Best < t1Best) holeWinner = t2Name;
-                else holeWinner = "Halved";
+                let holeWinner = diff === 1 ? t1Name : (diff === -1 ? t2Name : "Halved");
 
-                // Check Math Closures (Dormie / Over)
-                let hLeftTotal = 18 - hNum;
-                if (!totalClosed && Math.abs(runningMatch) > hLeftTotal) {
-                    totalClosed = true;
-                    let winner = runningMatch > 0 ? t1Name : t2Name;
-                    totalResult = `${winner} ${Math.abs(runningMatch)}&${hLeftTotal}`;
-                }
+                activeMatches.forEach(m => {
+                    if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
+                        m.status += diff;
 
-                if (hNum <= 9) {
-                    let hLeftF9 = 9 - hNum;
-                    if (!f9Closed && Math.abs(f9Match) > hLeftF9) {
-                        f9Closed = true;
-                        let winner = f9Match > 0 ? t1Name : t2Name;
-                        f9Result = `${winner} ${Math.abs(f9Match)}&${hLeftF9}`;
+                        let hLeft = m.endHole - hNum;
+                        if (Math.abs(m.status) > hLeft) {
+                            m.closed = true;
+                            let winnerName = m.status > 0 ? t1Name : t2Name;
+                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                        }
+
+                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole && !m.closed) {
+                            const threshold = pressRule === '2down' ? 2 : 1;
+                            let expectedTriggers = Math.floor(Math.abs(m.status) / threshold);
+                            if (expectedTriggers > m.triggers) {
+                                m.triggers = expectedTriggers;
+                                pressCount++;
+                                activeMatches.push({
+                                    id: `P${pressCount}`, startHole: hNum + 1, endHole: m.endHole, status: 0, label: `Press (${m.label})`, triggers: 0, closed: false
+                                });
+                            }
+                        }
                     }
-                }
+                });
 
-                if (hNum > 9) {
-                    let hLeftB9 = 18 - hNum;
-                    if (!b9Closed && Math.abs(b9Match) > hLeftB9) {
-                        b9Closed = true;
-                        let winner = b9Match > 0 ? t1Name : t2Name;
-                        b9Result = `${winner} ${Math.abs(b9Match)}&${hLeftB9}`;
-                    }
-                }
+                let f9 = activeMatches.find(m => m.id === 'F9');
+                let b9 = activeMatches.find(m => m.id === 'B9');
+                let t18 = activeMatches.find(m => m.id === '18');
 
                 holeLog[hNum] = {
-                    t1Best, t2Best, holeWinner,
-                    cumMatch: runningMatch,
-                    cumF9: f9Match,
-                    cumB9: b9Match,
-                    totalClosed, totalResult,
-                    f9Closed, f9Result,
-                    b9Closed, b9Result
+                    holeWinner: holeWinner,
+                    f9Match: f9 ? f9.status : 0, f9Closed: f9 ? f9.closed : false, f9Res: f9 ? f9.finalResult : "",
+                    b9Match: b9 ? b9.status : 0, b9Closed: b9 ? b9.closed : false, b9Res: b9 ? b9.finalResult : "",
+                    totMatch: t18 ? t18.status : 0, totClosed: t18 ? t18.closed : false, totRes: t18 ? t18.finalResult : ""
                 };
             }
         });
 
-        return { t1Name, t2Name, runningMatch, f9Match, b9Match, maxThru, holeLog, totalClosed, totalResult };
+        let t1TotalMoney = 0;
+        activeMatches.forEach(m => {
+            if (m.status > 0) t1TotalMoney += stake;
+            else if (m.status < 0) t1TotalMoney -= stake;
+        });
+
+        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
     }
 
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
@@ -660,7 +652,9 @@
         if (gameFormat === 'hilo') {
             hiloCalc = calculateHiLoEngine(filteredPlayers, courseData, savedScores);
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
-            matchCalc = calculate2ManMatchEngine(filteredPlayers, courseData, savedScores, scoringType);
+            let pressRule = currentData.nassauPressRule || "none";
+            let stake = currentData.nassauStake || 10;
+            matchCalc = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stake);
         }
 
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
@@ -774,16 +768,16 @@
                     matchCellHtml += `<button class="${dotBtnClass}" onclick="openDotsModal(${h.hole})">${dotBtnLabel}</button>`;
                 } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
-                    const statusPillText = formatMatchPill(log.cumMatch, matchCalc.t1Name, matchCalc.t2Name, log.totalClosed, log.totalResult);
+                    const statusPillText = formatMatchPill(log.totMatch, matchCalc.t1Name, matchCalc.t2Name, log.totClosed, log.totRes);
                     matchCellHtml += `<span class="status-pill pill-main">${statusPillText}</span>`;
                     matchCellHtml += `<span class="status-pill pill-press">${log.holeWinner}</span>`;
                 } else if (gameFormat === 'nassau' && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
                     const isF9 = h.hole <= 9;
-                    const segMatch = isF9 ? log.cumF9 : log.cumB9;
+                    const segMatch = isF9 ? log.f9Match : log.b9Match;
                     const segLabel = isF9 ? "F9" : "B9";
                     const isClosed = isF9 ? log.f9Closed : log.b9Closed;
-                    const finalRes = isF9 ? log.f9Result : log.b9Result;
+                    const finalRes = isF9 ? log.f9Res : log.b9Res;
                     
                     const statusPillText = formatMatchPill(segMatch, matchCalc.t1Name, matchCalc.t2Name, isClosed, finalRes);
                     matchCellHtml += `<span class="status-pill pill-main">${segLabel}: ${statusPillText}</span>`;
@@ -849,19 +843,63 @@
         if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.maxThru > 0) {
             payoutBox.style.display = "none";
             titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
-            const matchStatusStr = matchCalc.totalClosed ? `FINAL: ${matchCalc.totalResult}` : formatMatchStatusText(matchCalc.runningMatch, matchCalc.t1Name, matchCalc.t2Name);
-            const thruText = matchCalc.totalClosed ? "" : ` (Thru ${matchCalc.maxThru})`;
+            
+            let t18 = matchCalc.activeMatches.find(m => m.id === '18');
+            const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
+            const thruText = t18.closed ? "" : ` (Thru ${matchCalc.maxThru})`;
             statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>`;
+            
         } else if (gameFormat === 'nassau' && matchCalc && matchCalc.maxThru > 0) {
-            payoutBox.style.display = "none";
+            payoutBox.style.display = "block";
             titleEl.textContent = "💵 LIVE NASSAU MATCH STATUS";
-            const f9Str = formatMatchPill(matchCalc.f9Match, matchCalc.t1Name, matchCalc.t2Name, matchCalc.f9Closed, matchCalc.f9Result);
-            const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(matchCalc.b9Match, matchCalc.t1Name, matchCalc.t2Name, matchCalc.b9Closed, matchCalc.b9Result) : "AS";
-            const ovStr = formatMatchPill(matchCalc.runningMatch, matchCalc.t1Name, matchCalc.t2Name, matchCalc.totalClosed, matchCalc.totalResult);
+            
+            let t18 = matchCalc.activeMatches.find(m => m.id === '18');
+            let f9 = matchCalc.activeMatches.find(m => m.id === 'F9');
+            let b9 = matchCalc.activeMatches.find(m => m.id === 'B9');
+
+            const f9Str = formatMatchPill(f9.status, matchCalc.t1Name, matchCalc.t2Name, f9.closed, f9.finalResult);
+            const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(b9.status, matchCalc.t1Name, matchCalc.t2Name, b9.closed, b9.finalResult) : "AS";
+            const ovStr = formatMatchPill(t18.status, matchCalc.t1Name, matchCalc.t2Name, t18.closed, t18.finalResult);
+            
+            let pressText = matchCalc.pressCount > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${matchCalc.pressCount} Active Presses</div>` : "";
+
             statusEl.innerHTML = `
                 <span class="ticker-part">F9: <strong>${f9Str}</strong></span>
                 <span class="ticker-part">B9: <strong>${b9Str}</strong></span>
                 <span class="ticker-part">Total: <strong>${ovStr}</strong></span>
+                ${pressText}
+            `;
+
+            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
+            
+            let t1Money = matchCalc.t1TotalMoney;
+            function fmtM(amt) {
+                if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
+                if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
+                return `<span class="val-even">$0</span>`;
+            }
+
+            let matchesListHtml = "";
+            let stake = currentData.nassauStake || 10;
+            
+            matchCalc.activeMatches.forEach(m => {
+                let statusDesc = "All Square ($0)";
+                if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
+                else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
+                
+                let lockIcon = m.closed ? "🔒 " : "";
+                matchesListHtml += `<div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid #eee; padding: 4px 0;"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+            });
+
+            document.getElementById("payout-rows-wrapper").innerHTML = `
+                <div class="payout-row" style="flex-direction:column; align-items: stretch;">
+                    <div style="font-weight:bold; color:#0f4c3a; margin-bottom:4px; border-bottom: 2px solid #2a9d8f; padding-bottom:4px;">Bet-by-Bet Breakdown</div>
+                    ${matchesListHtml}
+                </div>
+                <div class="payout-row" style="margin-top:8px;">
+                    <span>Total Ledger:</span>
+                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                </div>
             `;
         } else if (gameFormat === 'hilo' && hiloCalc) {
             payoutBox.style.display = "block";
