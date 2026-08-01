@@ -17,8 +17,36 @@
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
 
-        .action-card { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 16px; }
-        .action-card h3 { color: #0f4c3a; margin-top: 0; margin-bottom: 8px; }
+        .action-card { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .action-card h3 { color: #0f4c3a; margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
+        
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .control-group label { display: block; font-size: 0.75rem; font-weight: bold; color: #0f4c3a; margin-bottom: 4px; }
+        .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid #2a9d8f; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+
+        .pot-summary { display: flex; justify-content: space-around; background: #1d3557; color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+        .pot-box { display: flex; flex-direction: column; }
+        .pot-label { font-size: 0.7rem; text-transform: uppercase; color: #a8dadc; font-weight: bold; margin-bottom: 4px; }
+        .pot-val { font-size: 1.1rem; font-weight: bold; }
+
+        .skin-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .skin-table th, .skin-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #eee; }
+        .skin-table th { background: #f0f4f2; color: #0f4c3a; text-transform: uppercase; font-size: 0.75rem; }
+        .winner-name { font-weight: bold; color: #1d3557; text-align: left; }
+        .score-circle { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; border: 2px solid #e63946; color: #e63946; font-weight: bold; font-size: 0.8rem; }
+        
+        .ledger-table th { background: #1d3557; color: white; }
+        .val-pos { color: #2a9d8f; font-weight: bold; }
+
+        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+        
+        /* MAGIC PDF HIDING CSS */
+        @media print {
+            body { background-color: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; padding: 0; }
+            .top-nav-bar, .btn-primary, .control-grid { display: none !important; }
+            .action-card { border: 1px solid #ccc; background: #fff; }
+        }
     </style>
 </head>
 <body>
@@ -27,26 +55,51 @@
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item active nav-link">💰 Action</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
         <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
     </div>
 
-    <h2 class="event-title" id="main-title">💰 Skins & Action Tracker</h2>
+    <h2 class="event-title" id="main-title">💰 Skins Tracker</h2>
 
     <div class="action-card">
-        <h3>🥩 Skins Game Status</h3>
-        <p style="color: #555; font-size: 0.9rem; margin-bottom: 0;">Skins and Dot tracking metrics will aggregate here based on your live scorecard scores.</p>
-    </div>
+        <div class="control-grid">
+            <div class="control-group">
+                <label>Pot Format</label>
+                <select id="skins-pot-format" onchange="renderSkinsEngine()">
+                    <option value="split">Gross & Net (Split Pot)</option>
+                    <option value="gross">Gross Skins Only</option>
+                    <option value="net">Net Skins Only</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Buy-In Per Player ($)</label>
+                <input type="number" id="skins-buyin" value="20" min="0" onchange="renderSkinsEngine()">
+            </div>
+        </div>
 
-    <div id="skins-content">
-        <div style="text-align:center; padding:30px; color:#666;">Calculating live action...</div>
+        <div id="skins-content">
+            <div style="text-align:center; padding:30px; color:#666;">Calculating live skins...</div>
+        </div>
     </div>
 </div>
 
 <script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
+    if (new Date() > BETA_END_DATE) {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+            </div>`;
+        throw new Error("Beta period expired.");
+    }
+    // ---------------------------------
+
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",
@@ -59,25 +112,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- DYNAMIC BETA TIME BOMB ---
-    db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
-        const expDateStr = snapshot.val();
-        const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
-        
-        if (new Date() > cutoffDate) {
-            document.body.innerHTML = `
-                <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
-                    <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
-                    <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                    <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
-                </div>`;
-            throw new Error("Beta period expired.");
-        }
-    });
-    // ---------------------------------
-
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    let currentData = {};
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -91,9 +128,200 @@
         });
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
-            const data = snapshot.val() || {};
-            document.getElementById("main-title").textContent = `💰 Action (${data.eventName || "Weekend Round"})`;
+            currentData = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `💰 Skins (${currentData.eventName || "Live Round"})`;
+            renderSkinsEngine();
         });
+    }
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function renderSkinsEngine() {
+        if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) return;
+
+        const players = currentData.players || [];
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
+        const container = document.getElementById("skins-content");
+
+        let potFormat = document.getElementById("skins-pot-format").value;
+        let buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
+        let totalPot = buyIn * players.length;
+
+        let grossPot = 0;
+        let netPot = 0;
+
+        if (potFormat === 'split') {
+            grossPot = totalPot / 2;
+            netPot = totalPot / 2;
+        } else if (potFormat === 'gross') {
+            grossPot = totalPot;
+        } else if (potFormat === 'net') {
+            netPot = totalPot;
+        }
+
+        let grossSkins = [];
+        let netSkins = [];
+
+        courseData.forEach(h => {
+            let holeScores = [];
+            players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${h.hole}`];
+                if (v && v > 0) {
+                    let gross = parseInt(v, 10);
+                    let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                    holeScores.push({ id: p.id, name: p.name, gross, net });
+                }
+            });
+
+            if (holeScores.length > 0) {
+                if (potFormat === 'split' || potFormat === 'gross') {
+                    let minGross = Math.min(...holeScores.map(s => s.gross));
+                    let grossWinners = holeScores.filter(s => s.gross === minGross);
+                    if (grossWinners.length === 1) {
+                        grossSkins.push({ hole: h.hole, par: h.par, player: grossWinners[0], score: minGross });
+                    }
+                }
+
+                if (potFormat === 'split' || potFormat === 'net') {
+                    let minNet = Math.min(...holeScores.map(s => s.net));
+                    let netWinners = holeScores.filter(s => s.net === minNet);
+                    if (netWinners.length === 1) {
+                        netSkins.push({ hole: h.hole, par: h.par, player: netWinners[0], score: minNet });
+                    }
+                }
+            }
+        });
+
+        let grossSkinValue = grossSkins.length > 0 ? (grossPot / grossSkins.length) : 0;
+        let netSkinValue = netSkins.length > 0 ? (netPot / netSkins.length) : 0;
+
+        let playerStats = {};
+        players.forEach(p => {
+            playerStats[p.id] = { name: p.name, grossCount: 0, netCount: 0, payout: 0 };
+        });
+
+        grossSkins.forEach(s => {
+            playerStats[s.player.id].grossCount += 1;
+            playerStats[s.player.id].payout += grossSkinValue;
+        });
+
+        netSkins.forEach(s => {
+            playerStats[s.player.id].netCount += 1;
+            playerStats[s.player.id].payout += netSkinValue;
+        });
+
+        let html = `
+            <div class="pot-summary">
+                <div class="pot-box">
+                    <span class="pot-label">Total Pot</span>
+                    <span class="pot-val">$${totalPot.toFixed(2)}</span>
+                </div>
+        `;
+
+        if (potFormat === 'split' || potFormat === 'gross') {
+            html += `
+                <div class="pot-box">
+                    <span class="pot-label">Gross Value</span>
+                    <span class="pot-val">$${grossSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ skin</span></span>
+                </div>
+            `;
+        }
+        if (potFormat === 'split' || potFormat === 'net') {
+            html += `
+                <div class="pot-box">
+                    <span class="pot-label">Net Value</span>
+                    <span class="pot-val">$${netSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ skin</span></span>
+                </div>
+            `;
+        }
+        
+        html += `</div>`; // End pot-summary
+
+        // Render Gross Skins Table
+        if (potFormat === 'split' || potFormat === 'gross') {
+            html += `<h3>Gross Skins Won (${grossSkins.length})</h3>`;
+            if (grossSkins.length === 0) {
+                html += `<div style="text-align:center; padding:10px; color:#666; font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
+            } else {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th></tr></thead><tbody>`;
+                grossSkins.forEach(s => {
+                    html += `<tr>
+                        <td>${s.hole}</td>
+                        <td style="color:#888;">${s.par}</td>
+                        <td class="winner-name">${s.player.name}</td>
+                        <td><span class="score-circle">${s.score}</span></td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        }
+
+        // Render Net Skins Table
+        if (potFormat === 'split' || potFormat === 'net') {
+            html += `<h3>Net Skins Won (${netSkins.length})</h3>`;
+            if (netSkins.length === 0) {
+                html += `<div style="text-align:center; padding:10px; color:#666; font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
+            } else {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th></tr></thead><tbody>`;
+                netSkins.forEach(s => {
+                    html += `<tr>
+                        <td>${s.hole}</td>
+                        <td style="color:#888;">${s.par}</td>
+                        <td class="winner-name">${s.player.name}</td>
+                        <td><span class="score-circle">${s.score}</span></td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        }
+
+        // Render Financial Ledger
+        let sortedPlayers = Object.values(playerStats).sort((a, b) => b.payout - a.payout);
+        
+        html += `<h3>💵 Final Payout Ledger</h3>
+            <table class="skin-table ledger-table">
+                <thead><tr>
+                    <th style="text-align:left;">Player</th>
+                    ${potFormat === 'split' || potFormat === 'gross' ? `<th>Gross</th>` : ''}
+                    ${potFormat === 'split' || potFormat === 'net' ? `<th>Net</th>` : ''}
+                    <th>Total Won</th>
+                </tr></thead>
+                <tbody>
+        `;
+
+        sortedPlayers.forEach(p => {
+            let moneyClass = p.payout > 0 ? 'val-pos' : '';
+            html += `<tr>
+                <td class="winner-name">${p.name}</td>
+                ${potFormat === 'split' || potFormat === 'gross' ? `<td>${p.grossCount}</td>` : ''}
+                ${potFormat === 'split' || potFormat === 'net' ? `<td>${p.netCount}</td>` : ''}
+                <td class="${moneyClass}">$${p.payout.toFixed(2)}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>
+            <button class="btn-primary" onclick="window.print()">📄 Save Payout as PDF</button>
+        `;
+
+        container.innerHTML = html;
     }
 </script>
 
