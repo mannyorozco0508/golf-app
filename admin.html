@@ -343,7 +343,7 @@
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
-    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Activate Game</button>
+    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
@@ -1170,7 +1170,7 @@
         } catch (e) {
             alert(`JavaScript Error: ${e.message}`);
             const saveBtn = document.getElementById("main-save-btn");
-            if(saveBtn) { saveBtn.innerText = "💾 Save & Activate Game"; saveBtn.disabled = false; }
+            if(saveBtn) { saveBtn.innerText = "💾 Save & Start Round"; saveBtn.disabled = false; }
         }
     }
 
