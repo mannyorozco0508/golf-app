@@ -126,7 +126,7 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet) {
         let teams = {};
         players.forEach(p => {
             let key = p.team || "T-1";
@@ -157,8 +157,6 @@
                 { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
-
-        let pressCount = 0;
 
         courseData.forEach(hole => {
             let hNum = hole.hole;
@@ -204,16 +202,14 @@
                         if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
                             const threshold = pressRule === '2down' ? 2 : 1;
                             
-                            // EXACT FIX: A specific bet can only trigger ONE auto-press
                             if (Math.abs(m.status) >= threshold && m.triggers === 0) {
                                 m.triggers = 1;
-                                pressCount++;
                                 
                                 let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
                                 let nextPressNum = existingPresses + 1;
                                 
                                 newPresses.push({
-                                    id: `P${pressCount}`, 
+                                    id: `P_${m.baseId}_${nextPressNum}`, 
                                     baseId: m.baseId, 
                                     startHole: hNum + 1, 
                                     endHole: m.endHole, 
@@ -233,10 +229,22 @@
         });
 
         let t1TotalMoney = 0;
-        activeMatches.forEach(m => {
-            if (m.status > 0) t1TotalMoney += stake;
-            else if (m.status < 0) t1TotalMoney -= stake;
-        });
+        if (gameFormat === 'nassau') {
+            activeMatches.forEach(m => {
+                if (m.status > 0) t1TotalMoney += stake;
+                else if (m.status < 0) t1TotalMoney -= stake;
+            });
+        } else {
+            let t18 = activeMatches.find(m => m.id === '18');
+            if (t18) {
+                if (holeBet > 0) {
+                    t1TotalMoney = t18.status * holeBet;
+                } else {
+                    if (t18.status > 0) t1TotalMoney = stake;
+                    else if (t18.status < 0) t1TotalMoney = -stake;
+                }
+            }
+        }
 
         return { t1Name, t2Name, activeMatches, t1TotalMoney };
     }
@@ -247,8 +255,7 @@
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         const gameFormat = data.gameFormat || "stroke";
-        const stake = data.nassauStake || 10;
-        const pressRule = data.nassauPressRule || "none";
+        const holeBet = data.holeBetStake || 0;
 
         if (gameFormat === 'dots') {
             let playerDots = {};
@@ -295,11 +302,11 @@
             return;
         }
 
-        if (gameFormat !== 'nassau' && gameFormat !== 'match') {
+        if (gameFormat !== 'nassau' && !['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) {
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">Final Ledger</div>
-                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Nassau, Match Play, and Dot formats.</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, and Dot formats.</div>
                 </div>
                 <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
             `;
@@ -307,7 +314,12 @@
         }
 
         let scoringType = data.nassauScoring || data.matchScoring || "net";
-        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake);
+        let pressRule = data.nassauPressRule || "none";
+        let nassauStake = data.nassauStake || 10;
+        let matchStake = data.matchStake || 50;
+        let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
+
+        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
 
         if (!matchData) {
             container.innerHTML = `
@@ -321,23 +333,43 @@
 
         let breakdownHtml = "";
         
-        ['F9', 'B9', '18'].forEach(bId => {
-            let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
-            if(groupMatches.length > 0) {
-                let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
-                breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
-                
-                groupMatches.forEach(m => {
-                    let statusDesc = "All Square ($0)";
-                    if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stake}`;
-                    else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stake}`;
+        if (gameFormat === 'nassau') {
+            ['F9', 'B9', '18'].forEach(bId => {
+                let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
+                if(groupMatches.length > 0) {
+                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
                     
-                    let lockIcon = m.closed ? "🔒 " : "";
-                    let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
-                    breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
-                });
+                    groupMatches.forEach(m => {
+                        let statusDesc = "All Square ($0)";
+                        if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stakeToUse}`;
+                        else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stakeToUse}`;
+                        
+                        let lockIcon = m.closed ? "🔒 " : "";
+                        let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
+                        breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+                    });
+                }
+            });
+        } else {
+            let t18 = matchData.activeMatches.find(m => m.id === '18');
+            let statusDesc = "All Square ($0)";
+            if (holeBet > 0) {
+                let amt = Math.abs(t18.status * holeBet);
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+            } else {
+                let amt = matchStake;
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
             }
-        });
+            breakdownHtml += `
+                <div class="breakdown-item">
+                    <span>Overall Match:</span>
+                    <span><strong>${statusDesc}</strong></span>
+                </div>
+            `;
+        }
 
         let t1Total = matchData.t1TotalMoney;
         function formatMoney(amount) {
@@ -351,7 +383,7 @@
                 <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
                 
                 <div class="match-breakdown-list" style="margin-bottom: 16px;">
-                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet-by-Bet Breakdown ($${stake} per bet):</div>
+                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet Breakdown:</div>
                     ${breakdownHtml}
                 </div>
 

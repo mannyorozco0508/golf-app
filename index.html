@@ -424,7 +424,7 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet) {
         let teams = {};
         players.forEach(p => {
             let key = p.team || "T-1";
@@ -452,7 +452,7 @@
             ];
         } else {
             activeMatches = [
-                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Overall Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
 
@@ -545,10 +545,22 @@
         });
 
         let t1TotalMoney = 0;
-        activeMatches.forEach(m => {
-            if (m.status > 0) t1TotalMoney += stake;
-            else if (m.status < 0) t1TotalMoney -= stake;
-        });
+        if (gameFormat === 'nassau') {
+            activeMatches.forEach(m => {
+                if (m.status > 0) t1TotalMoney += stake;
+                else if (m.status < 0) t1TotalMoney -= stake;
+            });
+        } else {
+            let t18 = activeMatches.find(m => m.id === '18');
+            if (t18) {
+                if (holeBet > 0) {
+                    t1TotalMoney = t18.status * holeBet;
+                } else {
+                    if (t18.status > 0) t1TotalMoney = stake;
+                    else if (t18.status < 0) t1TotalMoney = -stake;
+                }
+            }
+        }
 
         return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
     }
@@ -668,8 +680,11 @@
             hiloCalc = calculateHiLoEngine(filteredPlayers, courseData, savedScores);
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
             let pressRule = currentData.nassauPressRule || "none";
-            let stake = currentData.nassauStake || 10;
-            matchCalc = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stake);
+            let nassauStake = currentData.nassauStake || 10;
+            let matchStake = currentData.matchStake || 50;
+            let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
+            
+            matchCalc = calculateMatchEngine(filteredPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
         }
 
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
@@ -856,13 +871,32 @@
         const payoutBox = document.getElementById("nassau-payout-container");
 
         if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.maxThru > 0) {
-            payoutBox.style.display = "none";
+            payoutBox.style.display = "block";
             titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
             
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
             const thruText = t18.closed ? "" : ` (Thru ${matchCalc.maxThru})`;
             statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>`;
+            
+            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
+            let t1Money = matchCalc.t1TotalMoney;
+            function fmtM(amt) {
+                if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
+                if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
+                return `<span class="val-even">$0</span>`;
+            }
+            let betTypeStr = holeBet > 0 ? `$${holeBet} Per Hole` : `$${currentData.matchStake || 50} Flat Match`;
+            document.getElementById("payout-rows-wrapper").innerHTML = `
+                <div class="payout-row">
+                    <span>Bet Type:</span>
+                    <span>${betTypeStr}</span>
+                </div>
+                <div class="payout-row">
+                    <span>Financial Ledger:</span>
+                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                </div>
+            `;
             
         } else if (gameFormat === 'nassau' && matchCalc && matchCalc.maxThru > 0) {
             payoutBox.style.display = "block";
@@ -1167,6 +1201,23 @@
             }
 
             printHtml += matchesListHtml;
+            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
+                <span><strong>Total Ledger:</strong></span>
+                <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
+            </div></div>`;
+        } else if (['match', 'bestball', 'scramble', 'ryder'].includes(format) && typeof matchCalc !== 'undefined' && matchCalc) {
+            printHtml += `<div class="pledger"><h3>💵 Game Ledger (${format.toUpperCase()})</h3>`;
+            
+            let t1Money = matchCalc.t1TotalMoney;
+            function fmtM(amt) {
+                if (amt > 0) return `+$${amt}`;
+                if (amt < 0) return `-$${Math.abs(amt)}`;
+                return `$0`;
+            }
+            
+            let betTypeStr = currentData.holeBetStake > 0 ? `$${currentData.holeBetStake} Per Hole` : `$${currentData.matchStake || 50} Flat Match`;
+            
+            printHtml += `<div class="pledger-row"><span><strong>Bet Type:</strong></span> <span>${betTypeStr}</span></div>`;
             printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
                 <span><strong>Total Ledger:</strong></span>
                 <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>

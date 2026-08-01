@@ -266,15 +266,23 @@
             </div>
         </div>
 
+        <!-- UPDATED MATCH SETTINGS (ADDED FLAT MATCH STAKE) -->
         <div id="match-settings" class="extra-settings-box">
             <label style="color:#0f4c3a; margin-bottom: 6px;">🥊 Match Play Options</label>
-            <div>
-                <label style="font-size: 0.75rem;">Scoring Type</label>
-                <select id="match-scoring">
-                    <option value="net">Net (HCP)</option>
-                    <option value="gross">Gross (Straight)</option>
-                </select>
+            <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.75rem;">Scoring Type</label>
+                    <select id="match-scoring">
+                        <option value="net">Net (HCP)</option>
+                        <option value="gross">Gross (Straight)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
+                    <input type="number" id="match-stake" value="50" min="0">
+                </div>
             </div>
+            <div style="font-size: 0.7rem; color: #555; margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
         </div>
 
         <div id="nassau-settings" class="extra-settings-box">
@@ -895,7 +903,7 @@
         }
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
-        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (format === "match") ? "block" : "none";
+        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (['match', 'bestball', 'scramble', 'ryder'].includes(format)) ? "block" : "none";
         if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
         
         renderPlayerList(forceLoad);
@@ -936,6 +944,8 @@
             }
 
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
+            if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
+            
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
             if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
@@ -1088,6 +1098,7 @@
 
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
+            const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
             const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
@@ -1134,6 +1145,7 @@
                 gameFormat: gameFormat,
                 holeBetStake: holeBetStake,
                 matchScoring: matchScoring,
+                matchStake: matchStake,
                 nassauType: nassauType,
                 nassauScoring: nassauScoring,
                 nassauStake: nassauStake,
@@ -1160,7 +1172,7 @@
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current game for Game ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
+        if (confirm(`Are you sure you want to END the current game for Room ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
                 localStorage.removeItem('lastRoomCode');
                 alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
