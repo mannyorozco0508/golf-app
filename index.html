@@ -506,7 +506,6 @@
                         if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
                             const threshold = pressRule === '2down' ? 2 : 1;
                             
-                            // EXACT FIX: A specific bet can only trigger ONE auto-press
                             if (Math.abs(m.status) >= threshold && m.triggers === 0) {
                                 m.triggers = 1;
                                 pressCount++;
@@ -551,7 +550,7 @@
             else if (m.status < 0) t1TotalMoney -= stake;
         });
 
-        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney };
+        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
     }
 
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
@@ -1172,6 +1171,57 @@
                 <span><strong>Total Ledger:</strong></span>
                 <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
             </div></div>`;
+        } else if (format === 'skins') {
+            printHtml += `<div class="pledger"><h3>🥩 Skins Ledger</h3>`;
+            let grossSkins = [];
+            let netSkins = [];
+            courseData.forEach(h => {
+                let holeScores = [];
+                filteredPlayers.forEach(p => {
+                    let v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v && v > 0) {
+                        let gross = parseInt(v, 10);
+                        let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        holeScores.push({ id: p.id, name: p.name, gross, net });
+                    }
+                });
+                if (holeScores.length > 0) {
+                    let minGross = Math.min(...holeScores.map(s => s.gross));
+                    let gWinners = holeScores.filter(s => s.gross === minGross);
+                    if (gWinners.length === 1) grossSkins.push({ hole: h.hole, name: gWinners[0].name.split(" ")[0], score: minGross });
+
+                    let minNet = Math.min(...holeScores.map(s => s.net));
+                    let nWinners = holeScores.filter(s => s.net === minNet);
+                    if (nWinners.length === 1) netSkins.push({ hole: h.hole, name: nWinners[0].name.split(" ")[0], score: minNet });
+                }
+            });
+
+            let pSkins = {};
+            filteredPlayers.forEach(p => pSkins[p.name.split(" ")[0]] = { gross: 0, net: 0, gHoles: [], nHoles: [] });
+            grossSkins.forEach(s => { pSkins[s.name].gross++; pSkins[s.name].gHoles.push(s.hole); });
+            netSkins.forEach(s => { pSkins[s.name].net++; pSkins[s.name].nHoles.push(s.hole); });
+
+            let anySkins = false;
+            filteredPlayers.forEach(p => {
+                let shortName = p.name.split(" ")[0];
+                let s = pSkins[shortName];
+                if (s.gross > 0 || s.net > 0) {
+                    anySkins = true;
+                    let details = [];
+                    if (s.gross > 0) details.push(`<strong>${s.gross} Gross</strong> (Holes: ${s.gHoles.join(', ')})`);
+                    if (s.net > 0) details.push(`<strong>${s.net} Net</strong> (Holes: ${s.nHoles.join(', ')})`);
+                    printHtml += `<div class="pledger-row" style="flex-direction: column; margin-bottom: 8px;">
+                        <span style="font-weight: bold; color: #1d3557; margin-bottom: 4px;">${shortName}</span>
+                        <span style="font-size: 13px; color: #555;">${details.join(' <br> ')}</span>
+                    </div>`;
+                }
+            });
+
+            if (!anySkins) {
+                printHtml += `<div class="pledger-row"><span>No skins won yet.</span></div>`;
+            }
+            
+            printHtml += `</div>`;
         }
 
         document.getElementById("print-area").innerHTML = printHtml;
