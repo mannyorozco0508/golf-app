@@ -544,13 +544,6 @@
             { id: "or_quailvalley", name: "Quail Valley Golf Course" },
             { id: "or_mtview_boring", name: "Mountain View Golf Course (Boring)" }
         ]},
-        { group: "🎰 Marty's Game", items: [
-            { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
-            { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
-            { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
-            { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
-            { id: "az_papago", name: "Papago Golf Club" }
-        ]},
         { group: "🏖️ Myrtle Beach Trip", items: [
             { id: "caledonia", name: "Caledonia Golf & Fish Club" },
             { id: "trueblue", name: "True Blue Golf Club" },
@@ -570,8 +563,8 @@
             { id: "az_grayhawk_raptor", name: "Grayhawk (Raptor)" },
             { id: "az_grayhawk_talon", name: "Grayhawk (Talon)" },
             { id: "az_papago", name: "Papago Golf Club" },
-            { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
-            { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
+            { id: "az_talking_oodham", name: "Talking Stick Golf Club (O'odham)" },
+            { id: "az_talking_piipaash", name: "Talking Stick Golf Club (Piipaash)" },
             { id: "az_quintero", name: "Quintero Golf Club" },
             { id: "az_camelback_ambiente", name: "Camelback (Ambiente)" },
             { id: "az_camelback_padre", name: "Camelback (Padre)" },
@@ -1167,7 +1160,7 @@
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current game for Room ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
+        if (confirm(`Are you sure you want to END the current game for Game ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
                 localStorage.removeItem('lastRoomCode');
                 alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
