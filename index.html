@@ -156,6 +156,11 @@
             .pscore { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: bold; font-size: 16px; margin: 0 auto; }
             .pcircle1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #e63946; border-radius: 50%; pointer-events: none; }
             .pcircle2 { position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border: 1px solid #e63946; border-radius: 50%; pointer-events: none; }
+            
+            /* NEW LEDGER CSS FOR PRINT */
+            .pledger { margin-top: 20px; font-family: sans-serif; border-top: 2px solid #444; padding-top: 10px; page-break-inside: avoid; }
+            .pledger h3 { margin: 0 0 10px 0; font-size: 16px; color: #0f4c3a; text-transform: uppercase; }
+            .pledger-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-bottom: 1px dashed #ccc; }
         }
     </style>
 </head>
@@ -166,7 +171,7 @@
 <div class="container" id="main-content" style="display: none;">
     <div class="header-box">
         <div style="margin-bottom: 6px;">
-            <span id="room-code-badge" style="background: #1d3557; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">ROOM: ----</span>
+            <span id="room-code-badge" style="background: #1d3557; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">GAME: ----</span>
         </div>
         <h1 class="header-title" id="course-title">Golf Scorecard</h1>
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
@@ -175,7 +180,7 @@
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
@@ -221,8 +226,8 @@
 
     <div class="end-box-card">
         <h3 style="color: #e63946; margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh.</span>
-        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
+        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End & Wipe Game</button>
     </div>
 </div>
 
@@ -287,7 +292,7 @@
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("main-content").style.display = "block";
-        document.getElementById("room-code-badge").textContent = "ROOM: " + currentMode;
+        document.getElementById("room-code-badge").textContent = "GAME: " + currentMode;
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
@@ -409,12 +414,12 @@
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
+        if (confirm(`Are you sure you want to END the current game for Game ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
-                alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
+                alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
                 window.location.href = "admin.html"; 
             }).catch((err) => {
-                alert(`Error clearing room: ${err.message}`);
+                alert(`Error clearing game: ${err.message}`);
             });
         }
     }
@@ -810,7 +815,7 @@
         }
         printHtml += `<th class="section-col">${inPar}</th><th class="section-col">${outPar+inPar}</th></tr>`;
 
-        // PLAYER ROWS (Only names and scores with birdie/eagle circles - NO BOXES)
+        // PLAYER ROWS
         filteredPlayers.forEach(p => {
             let outScore = 0, inScore = 0;
             printHtml += `<tr><td style="text-align:left; font-weight:bold; font-size: 16px;">${p.name.split(" ")[0]}</td>`;
@@ -859,6 +864,47 @@
         });
         
         printHtml += `</table>`;
+
+        // --- NEW: DYNAMIC PAYOUT LEDGER ---
+        const format = currentData.gameFormat;
+        
+        if (format === 'dots' || format === 'hilo') {
+            const stake = currentData.dotPointVal || currentData.holeBetStake || 0;
+            printHtml += `<div class="pledger"><h3>💰 Game Ledger (${format.toUpperCase()})</h3>`;
+            
+            if (format === 'dots' && currentData.dots) {
+                let pDots = {};
+                filteredPlayers.forEach(p => pDots[p.id] = 0);
+                Object.values(currentData.dots).forEach(holeDots => {
+                    Object.keys(holeDots).forEach(pKey => {
+                        let pid = pKey.replace('p', '');
+                        if (pDots[pid] !== undefined) {
+                            holeDots[pKey].forEach(dotType => {
+                                pDots[pid] += (dotType === 'snake' ? -1 : 1);
+                            });
+                        }
+                    });
+                });
+                
+                filteredPlayers.forEach(p => {
+                    let pts = pDots[p.id] || 0;
+                    let money = pts * stake;
+                    let moneyStr = money >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
+                    printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts (${moneyStr})</strong></div>`;
+                });
+            } 
+            // We use the hiloCalc object already generated globally by renderScorecard
+            else if (format === 'hilo' && typeof hiloCalc !== 'undefined' && hiloCalc) {
+                let t1Money = (hiloCalc.t1Points - hiloCalc.t2Points) * stake;
+                let t1Str = t1Money >= 0 ? `+$${t1Money}` : `-$${Math.abs(t1Money)}`;
+                let t2Str = -t1Money >= 0 ? `+$${-t1Money}` : `-$${Math.abs(-t1Money)}`;
+                printHtml += `<div class="pledger-row"><span>${hiloCalc.t1Name}</span><strong>${hiloCalc.t1Points} pts (${t1Str})</strong></div>`;
+                printHtml += `<div class="pledger-row"><span>${hiloCalc.t2Name}</span><strong>${hiloCalc.t2Points} pts (${t2Str})</strong></div>`;
+            }
+            
+            printHtml += `</div>`;
+        }
+
         document.getElementById("print-area").innerHTML = printHtml;
     }
 </script>

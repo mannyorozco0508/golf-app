@@ -84,7 +84,7 @@
 <div class="container" id="lobby-screen">
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
-    <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private room for your foursome or trip, or join an existing one.</p>
+    <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
     
     <!-- SECRET BETA CONTROL PANEL -->
     <div id="secret-master-panel">
@@ -92,6 +92,10 @@
         <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Set the global expiration date. Anyone opening the app after this date gets locked out.</p>
         <input type="date" id="secret-exp-date" style="margin-bottom: 12px;">
         <button class="btn-primary" style="background-color: #e63946;" onclick="updateBetaExpiration()">💾 Force Update Date</button>
+        
+        <h3 style="margin-top: 20px;">☁️ Sync Courses to Firebase</h3>
+        <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Push all pre-coded local courses to the global database.</p>
+        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="syncPresetsToFirebase()">📤 Push to Global Database</button>
 
         <div style="text-align: center; margin-top: 10px;">
             <span style="font-size: 0.75rem; color: #aaa; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
@@ -101,7 +105,7 @@
     <!-- RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #ddd;">
         <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
-        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="resumeGame()">▶️ Resume Game (Room <span id="resume-room-badge"></span>)</button>
+        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
     </div>
 
     <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
@@ -109,15 +113,15 @@
     
     <div class="lobby-divider"><span>OR</span></div>
     
-    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER ROOM CODE" maxlength="6">
-    <button class="btn-outline" onclick="joinRoom()">📥 Join Room</button>
+    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
+    <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
@@ -125,13 +129,13 @@
     </div>
 
     <div style="text-align: center; margin-top: 10px;">
-        <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Room Code</span>
+        <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Game Code</span>
         <div class="room-badge" id="display-room-code">----</div>
     </div>
 
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Players will automatically join this specific private room:</span>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Players will automatically join this specific private game:</span>
         <div id="qrcode"></div>
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
     </div>
@@ -150,7 +154,7 @@
     </div>
 
     <div class="form-group">
-        <label>Select Golf Course for Active Round</label>
+        <label>Select Golf Course for Active Game</label>
         <div class="custom-select-wrapper" id="course-wrapper">
             <input type="text" id="course-search-input" placeholder="-- Search / Select Golf Course --" autocomplete="off">
             <input type="hidden" id="course-select" value="">
@@ -234,7 +238,7 @@
     </div>
 
     <div class="form-group">
-        <label>Round Game Format</label>
+        <label>Game Format</label>
         <select id="game-format-select" onchange="handleFormatChange()">
             <option value="" disabled selected>-- Select Game Format --</option>
             <option value="stroke">Stroke Play (Gross & Net)</option>
@@ -325,12 +329,12 @@
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
-    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Activate Setup</button>
+    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Activate Game</button>
 
     <div class="end-box">
         <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this room to start fresh.</span>
-        <button class="btn-danger" onclick="endAndClearRound()">📥 End Game & Wipe Room</button>
+        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
+        <button class="btn-danger" onclick="endAndClearRound()">📥 End & Wipe Game</button>
     </div>
 </div>
 
@@ -349,33 +353,9 @@
     const db = firebase.database();
 
     // Fetch Global Courses immediately
-    let globalCourses = {
-        "fl_streamsong_red": {
-            name: "Streamsong Resort (Red)",
-            data: [
-                {hole:1,par:4,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:14},{hole:4,par:4,hcpIndex:16},{hole:5,par:4,hcpIndex:6},{hole:6,par:3,hcpIndex:18},{hole:7,par:5,hcpIndex:12},{hole:8,par:3,hcpIndex:10},{hole:9,par:4,hcpIndex:8},
-                {hole:10,par:4,hcpIndex:9},{hole:11,par:4,hcpIndex:5},{hole:12,par:4,hcpIndex:3},{hole:13,par:5,hcpIndex:15},{hole:14,par:3,hcpIndex:11},{hole:15,par:4,hcpIndex:1},{hole:16,par:3,hcpIndex:7},{hole:17,par:4,hcpIndex:13},{hole:18,par:5,hcpIndex:17}
-            ]
-        },
-        "fl_streamsong_blue": {
-            name: "Streamsong Resort (Blue)",
-            data: [
-                {hole:1,par:4,hcpIndex:14},{hole:2,par:5,hcpIndex:10},{hole:3,par:4,hcpIndex:8},{hole:4,par:4,hcpIndex:4},{hole:5,par:3,hcpIndex:16},{hole:6,par:4,hcpIndex:18},{hole:7,par:3,hcpIndex:12},{hole:8,par:4,hcpIndex:2},{hole:9,par:5,hcpIndex:6},
-                {hole:10,par:3,hcpIndex:15},{hole:11,par:4,hcpIndex:1},{hole:12,par:4,hcpIndex:11},{hole:13,par:4,hcpIndex:17},{hole:14,par:5,hcpIndex:9},{hole:15,par:4,hcpIndex:7},{hole:16,par:3,hcpIndex:13},{hole:17,par:5,hcpIndex:5},{hole:18,par:4,hcpIndex:3}
-            ]
-        },
-        "fl_streamsong_black": {
-            name: "Streamsong Resort (Black)",
-            data: [
-                {hole:1,par:5,hcpIndex:12},{hole:2,par:4,hcpIndex:16},{hole:3,par:4,hcpIndex:4},{hole:4,par:5,hcpIndex:2},{hole:5,par:3,hcpIndex:6},{hole:6,par:4,hcpIndex:18},{hole:7,par:3,hcpIndex:14},{hole:8,par:4,hcpIndex:8},{hole:9,par:4,hcpIndex:10},
-                {hole:10,par:5,hcpIndex:11},{hole:11,par:4,hcpIndex:3},{hole:12,par:5,hcpIndex:7},{hole:13,par:4,hcpIndex:9},{hole:14,par:4,hcpIndex:15},{hole:15,par:3,hcpIndex:17},{hole:16,par:4,hcpIndex:1},{hole:17,par:3,hcpIndex:13},{hole:18,par:5,hcpIndex:5}
-            ]
-        }
-    };
-
+    let globalCourses = {};
     db.ref('global_courses').on('value', (snap) => {
-        const fetched = snap.val() || {};
-        globalCourses = { ...globalCourses, ...fetched };
+        globalCourses = snap.val() || {};
         if(document.getElementById('course-search-input').value.length > 0) {
             populateCourseDropdown(document.getElementById('course-search-input').value);
         }
@@ -419,6 +399,23 @@
             document.getElementById('secret-master-panel').style.display = 'none';
         }).catch(err => alert("Error: " + err.message));
     }
+
+    function syncPresetsToFirebase() {
+        const updates = {};
+        Object.keys(coursePresets).forEach(key => {
+            updates[key] = {
+                name: coursePresets[key].name,
+                data: coursePresets[key].data
+            };
+        });
+        
+        db.ref('global_courses').update(updates).then(() => {
+            alert("✅ All preset courses successfully synced to Firebase global database!");
+            document.getElementById('secret-master-panel').style.display = 'none';
+        }).catch(err => {
+            alert("Error: " + err.message);
+        });
+    }
     // -------------------------
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -461,7 +458,7 @@
 
     function shareMainApp() {
         const baseUrl = window.location.href.split('?')[0];
-        const textMsg = "Check out this live golf scoring & betting app I'm building! Start a room, test it out on the course, and let me know if you find any bugs.";
+        const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
             navigator.share({ title: `GolfApp Beta`, text: textMsg, url: baseUrl }).catch(console.error);
@@ -489,137 +486,63 @@
     function joinRoom() {
         const inputCode = document.getElementById("join-room-input").value.trim().toUpperCase();
         if (inputCode.length < 2) {
-            alert("⚠️ Please enter a valid room code.");
+            alert("⚠️ Please enter a valid game code.");
             return;
         }
         window.location.href = `admin.html?game=${inputCode}`;
     }
 
     const courseDirectory = [
-        { group: "🌴 Florida - Streamsong Resort", items: [
-            { id: "fl_streamsong_red", name: "Streamsong Resort (Red)" },
-            { id: "fl_streamsong_blue", name: "Streamsong Resort (Blue)" },
-            { id: "fl_streamsong_black", name: "Streamsong Resort (Black)" }
-        ]},
-        { group: "🌵 Arizona - Scottsdale", items: [
-            { id: "az_tpc_stadium", name: "TPC Scottsdale (Stadium)" },
-            { id: "az_tpc_champions", name: "TPC Scottsdale (Champions)" },
-            { id: "az_troon_monument", name: "Troon North (Monument)" },
-            { id: "az_troon_pinnacle", name: "Troon North (Pinnacle)" },
-            { id: "az_grayhawk_raptor", name: "Grayhawk (Raptor)" },
-            { id: "az_grayhawk_talon", name: "Grayhawk (Talon)" },
-            { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
-            { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
-            { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
-            { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
-            { id: "az_kierland", name: "Kierland Golf Club" },
-            { id: "az_starfire", name: "Starfire Golf Club" },
-            { id: "az_whisper_rock", name: "Whisper Rock Golf Club" },
-            { id: "az_estancia", name: "The Estancia Club" },
-            { id: "az_silverleaf", name: "Silverleaf Club" },
-            { id: "az_desert_highlands", name: "Desert Highlands" },
-            { id: "az_desert_mountain", name: "Desert Mountain Club" }
-        ]},
-        { group: "🌵 Arizona - Phoenix / West Valley", items: [
-            { id: "az_papago", name: "Papago Golf Club" },
-            { id: "az_quintero", name: "Quintero Golf Club" },
-            { id: "az_raven", name: "Raven Golf Club" },
-            { id: "az_biltmore_adobe", name: "Arizona Biltmore (Adobe)" },
-            { id: "az_biltmore_links", name: "Arizona Biltmore (Links)" },
-            { id: "az_phoenician", name: "The Phoenician" },
-            { id: "az_wickenburg", name: "Wickenburg Ranch" },
-            { id: "az_vbc", name: "Verrado Golf Club" },
-            { id: "az_grand", name: "The Grand Golf Club" },
-            { id: "az_encanto", name: "Encanto 18" },
-            { id: "az_aguila", name: "Aguila Golf Course" }
-        ]},
-        { group: "🌵 Arizona - East Valley & Tucson", items: [
-            { id: "az_wekopa_cholla", name: "We-Ko-Pa (Cholla)" },
-            { id: "az_wekopa_saguaro", name: "We-Ko-Pa (Saguaro)" },
-            { id: "az_boulders_north", name: "The Boulders (North)" },
-            { id: "az_boulders_south", name: "The Boulders (South)" },
-            { id: "az_eagle_mountain", name: "Eagle Mountain Golf Club" },
-            { id: "az_sunridge", name: "SunRidge Canyon Golf Club" },
-            { id: "az_goldcanyon_dinosaur", name: "Gold Canyon (Dinosaur Mountain)" },
-            { id: "az_goldcanyon_sidewinder", name: "Gold Canyon (Sidewinder)" },
-            { id: "az_superstition", name: "Superstition Mountain" },
-            { id: "az_akchin", name: "Ak-Chin Southern Dunes" },
-            { id: "az_whirlwind_cattail", name: "Whirlwind (Cattail)" },
-            { id: "az_gallery", name: "The Gallery Golf Club" },
-            { id: "az_dove_mountain", name: "The Golf Club at Dove Mountain" },
-            { id: "az_ventana_canyon", name: "Ventana Canyon" },
-            { id: "az_omni_tucson", name: "Omni Tucson National" }
-        ]},
-        { group: "🌲 Washington - Seattle / Tacoma", items: [
-            { id: "wa_chambers", name: "Chambers Bay" },
-            { id: "wa_gold_olympic", name: "Gold Mountain (Olympic)" },
-            { id: "wa_gold_cascade", name: "Gold Mountain (Cascade)" },
-            { id: "wa_sahalee", name: "Sahalee Country Club" },
-            { id: "wa_seattle_gc", name: "Seattle Golf Club" },
-            { id: "wa_broadmoor", name: "Broadmoor Golf Club" },
-            { id: "wa_aldarra", name: "Aldarra Golf Club" },
-            { id: "wa_inglewood", name: "Inglewood Golf Club" },
-            { id: "wa_tacoma_cgc", name: "Tacoma Country & Golf Club" },
-            { id: "wa_fircrest", name: "Fircrest Golf Club" },
-            { id: "wa_homecourse", name: "The Home Course" },
-            { id: "wa_wanational", name: "Washington National" },
-            { id: "wa_salish", name: "Salish Cliffs" },
-            { id: "wa_newcastle_coal", name: "Newcastle (Coal Creek)" },
-            { id: "wa_newcastle_china", name: "Newcastle (China Creek)" },
-            { id: "eaglespride_27", name: "Eagle's Pride (Pick 2 Nines)" }
-        ]},
-        { group: "🌲 Washington - SW, Eastern & North", items: [
+        { group: "🌲 SW Washington, Gorge & Portland (Camas Area)", items: [
             { id: "swwa_camasmeadows", name: "Camas Meadows Golf Club" },
             { id: "swwa_trimountain", name: "Tri-Mountain Golf Course" },
             { id: "swwa_lewisriver", name: "Lewis River Golf Course" },
             { id: "swwa_mintvalley", name: "Mint Valley Golf Course" },
+            { id: "swwa_threerivers", name: "Three Rivers Golf Course" },
             { id: "swwa_elkridge", name: "Elk Ridge Golf Course" },
             { id: "swwa_tahoma_valley", name: "Tahoma Valley Golf Course (Yelm)" },
+            { id: "swwa_skamania", name: "Skamania Lodge Golf Course" },
+            { id: "swwa_beaconrock", name: "Beacon Rock Golf Course" },
+            { id: "swwa_cedars", name: "The Cedars at Salmon Creek" },
+            { id: "swwa_fairwayvillage", name: "Fairway Village Golf Course" },
+            { id: "swwa_orchardhills", name: "Orchard Hills Country Club" },
             { id: "swwa_royaloaks", name: "Royal Oaks Country Club" },
-            { id: "wa_palouse", name: "Palouse Ridge" },
-            { id: "wa_wine_valley", name: "Wine Valley Golf Club" },
-            { id: "wa_gamble_sands", name: "Gamble Sands" },
-            { id: "wa_desert_canyon", name: "Desert Canyon Golf Resort" },
-            { id: "wa_suncadia", name: "Suncadia Resort" },
-            { id: "wa_manito", name: "Manito Golf & Country Club" },
-            { id: "wa_indian_canyon", name: "Indian Canyon Golf Course" },
-            { id: "wa_kalispel", name: "Kalispel Golf and Country Club" },
-            { id: "wa_semiahmoo", name: "Semiahmoo Golf & Country Club" },
-            { id: "wa_loomis", name: "Loomis Trail Golf Club" },
-            { id: "wa_bellingham_gcc", name: "Bellingham G&CC" }
-        ]},
-        { group: "🌲 Oregon - Portland & Surrounding", items: [
-            { id: "or_portlandgc", name: "Portland Golf Club" },
-            { id: "or_columbiaedgewater", name: "Columbia Edgewater Country Club" },
-            { id: "or_waverley", name: "Waverley Country Club" },
-            { id: "or_pumpkin_ghost", name: "Pumpkin Ridge (Ghost Creek)" },
-            { id: "or_pumpkin_witch", name: "Pumpkin Ridge (Witch Hollow)" },
-            { id: "or_reserve_north", name: "The Reserve Vineyards (North)" },
-            { id: "or_reserve_south", name: "The Reserve Vineyards (South)" },
-            { id: "or_langdonfarms", name: "Langdon Farms Golf Club" },
+            { id: "or_indiancreek", name: "Indian Creek Golf Course (Hood River)" },
+            { id: "or_hoodriver", name: "Hood River Golf Course" },
             { id: "or_stonecreek", name: "Stone Creek Golf Club (Oregon City)" },
+            { id: "or_wildwood", name: "Wildwood Golf Course" },
             { id: "or_glendoveer_east", name: "Glendoveer Golf Course (East)" },
             { id: "or_glendoveer_west", name: "Glendoveer Golf Course (West)" },
-            { id: "or_wildwood", name: "Wildwood Golf Course" },
-            { id: "or_indiancreek", name: "Indian Creek Golf Course (Hood River)" },
             { id: "or_heronlakes_blue", name: "Heron Lakes (Great Blue)" },
-            { id: "or_tualatincc", name: "Tualatin Country Club" }
+            { id: "or_heronlakes_greenback", name: "Heron Lakes (Greenback)" },
+            { id: "or_broadmoor_pdx", name: "Broadmoor Golf Course (Portland)" },
+            { id: "or_colwood", name: "Colwood Golf Center" },
+            { id: "or_rosecity", name: "Rose City Golf Course" },
+            { id: "or_eastmoreland", name: "Eastmoreland Golf Course" },
+            { id: "or_columbiaedgewater", name: "Columbia Edgewater Country Club" },
+            { id: "or_riverside", name: "Riverside Golf & Country Club" },
+            { id: "or_pumpkin_ghost", name: "Pumpkin Ridge (Ghost Creek)" },
+            { id: "or_pumpkin_witch", name: "Pumpkin Ridge (Witch Hollow)" },
+            { id: "or_langdonfarms", name: "Langdon Farms Golf Club" },
+            { id: "or_reserve_north", name: "The Reserve Vineyards (North)" },
+            { id: "or_reserve_south", name: "The Reserve Vineyards (South)" },
+            { id: "or_ogagolf", name: "OGA Golf Course (Woodburn)" },
+            { id: "or_chehalem", name: "Chehalem Glenn Golf Course" },
+            { id: "or_redtail", name: "RedTail Golf Center" },
+            { id: "or_oregoncitygc", name: "Oregon City Golf Club" },
+            { id: "or_waverley", name: "Waverley Country Club" },
+            { id: "or_portlandgc", name: "Portland Golf Club" },
+            { id: "or_tualatincc", name: "Tualatin Country Club" },
+            { id: "or_meriwether", name: "Meriwether National Golf Club" },
+            { id: "or_quailvalley", name: "Quail Valley Golf Course" },
+            { id: "or_mtview_boring", name: "Mountain View Golf Course (Boring)" }
         ]},
-        { group: "🌲 Oregon - Bandon, Bend & Eugene", items: [
-            { id: "or_bandon_dunes", name: "Bandon Dunes" },
-            { id: "or_pacific_dunes", name: "Pacific Dunes" },
-            { id: "or_bandon_trails", name: "Bandon Trails" },
-            { id: "or_old_macdonald", name: "Old Macdonald" },
-            { id: "or_sheep_ranch", name: "Sheep Ranch" },
-            { id: "or_eugene", name: "Eugene Country Club" },
-            { id: "or_crosswater", name: "Crosswater Club" },
-            { id: "or_pronghorn_nicklaus", name: "Pronghorn (Nicklaus)" },
-            { id: "or_pronghorn_fazio", name: "Pronghorn (Fazio)" },
-            { id: "or_tetherow", name: "Tetherow Golf Club" },
-            { id: "or_sunriver", name: "Sunriver Resort" },
-            { id: "or_black_butte", name: "Black Butte Ranch" },
-            { id: "or_silvies", name: "Silvies Valley Ranch" },
-            { id: "or_astoria", name: "Astoria Golf & Country Club" }
+        { group: "🎰 Marty's Game", items: [
+            { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
+            { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
+            { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
+            { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
+            { id: "az_papago", name: "Papago Golf Club" }
         ]},
         { group: "🏖️ Myrtle Beach Trip", items: [
             { id: "caledonia", name: "Caledonia Golf & Fish Club" },
@@ -629,6 +552,105 @@
             { id: "thistle_pending", name: "Thistle Golf Club (NC - 27 Hole Marathon)" },
             { id: "prestwick", name: "Prestwick Country Club" },
             { id: "manofwar", name: "Man O' War Golf Club" }
+        ]},
+        { group: "🌵 Arizona (Phoenix / Scottsdale)", items: [
+            { id: "az_tpc_stadium", name: "TPC Scottsdale (Stadium)" },
+            { id: "az_tpc_champions", name: "TPC Scottsdale (Champions)" },
+            { id: "az_troon_monument", name: "Troon North (Monument)" },
+            { id: "az_troon_pinnacle", name: "Troon North (Pinnacle)" },
+            { id: "az_wekopa_cholla", name: "We-Ko-Pa (Cholla)" },
+            { id: "az_wekopa_saguaro", name: "We-Ko-Pa (Saguaro)" },
+            { id: "az_grayhawk_raptor", name: "Grayhawk (Raptor)" },
+            { id: "az_grayhawk_talon", name: "Grayhawk (Talon)" },
+            { id: "az_papago", name: "Papago Golf Club" },
+            { id: "az_talking_oodham", name: "Talking Stick (O'odham)" },
+            { id: "az_talking_piipaash", name: "Talking Stick (Piipaash)" },
+            { id: "az_quintero", name: "Quintero Golf Club" },
+            { id: "az_camelback_ambiente", name: "Camelback (Ambiente)" },
+            { id: "az_camelback_padre", name: "Camelback (Padre)" },
+            { id: "az_boulders_north", name: "The Boulders (North)" },
+            { id: "az_boulders_south", name: "The Boulders (South)" },
+            { id: "az_wickenburg", name: "Wickenburg Ranch" },
+            { id: "az_akchin", name: "Ak-Chin Southern Dunes" },
+            { id: "az_raven", name: "Raven Golf Club" },
+            { id: "az_goldcanyon_dinosaur", name: "Gold Canyon (Dinosaur Mountain)" },
+            { id: "az_goldcanyon_sidewinder", name: "Gold Canyon (Sidewinder)" },
+            { id: "az_starfire", name: "Starfire Golf Club" },
+            { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
+            { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
+            { id: "az_biltmore_adobe", name: "Arizona Biltmore (Adobe)" },
+            { id: "az_biltmore_links", name: "Arizona Biltmore (Links)" },
+            { id: "az_wildfire_palmer", name: "Wildfire (Palmer)" },
+            { id: "az_wildfire_faldo", name: "Wildfire (Faldo)" },
+            { id: "az_phoenician", name: "The Phoenician" },
+            { id: "az_superstition", name: "Superstition Mountain" }
+        ]},
+        { group: "🌲 Washington (Seattle / Tacoma Top 50)", items: [
+            { id: "wa_chambers", name: "Chambers Bay" },
+            { id: "wa_gold_olympic", name: "Gold Mountain (Olympic)" },
+            { id: "wa_gold_cascade", name: "Gold Mountain (Cascade)" },
+            { id: "wa_homecourse", name: "The Home Course" },
+            { id: "wa_salish", name: "Salish Cliffs" },
+            { id: "wa_newcastle_coal", name: "Newcastle (Coal Creek)" },
+            { id: "wa_newcastle_china", name: "Newcastle (China Creek)" },
+            { id: "wa_wanational", name: "Washington National" },
+            { id: "wa_tpc_snoqualmie", name: "TPC Snoqualmie Ridge" },
+            { id: "wa_sahalee", name: "Sahalee Country Club" },
+            { id: "wa_broadmoor", name: "Broadmoor Golf Club" },
+            { id: "wa_seattle_gc", name: "Seattle Golf Club" },
+            { id: "wa_meridian", name: "Meridian Valley Country Club" },
+            { id: "wa_tacoma_cgc", name: "Tacoma Country & Golf Club" },
+            { id: "wa_redmond_ridge", name: "The Golf Club at Redmond Ridge" },
+            { id: "wa_harbour_pointe", name: "Harbour Pointe Golf Club" },
+            { id: "wa_druids_glen", name: "Druids Glen" },
+            { id: "wa_port_ludlow", name: "Port Ludlow" },
+            { id: "wa_white_horse", name: "White Horse Golf Club" },
+            { id: "wa_jefferson_park", name: "Jefferson Park" },
+            { id: "wa_west_seattle", name: "West Seattle Golf Course" },
+            { id: "wa_jackson_park", name: "Jackson Park" },
+            { id: "wa_interbay", name: "Interbay Golf Center" },
+            { id: "wa_foster", name: "Foster Golf Links" },
+            { id: "wa_high_cedars", name: "High Cedars Golf Club" },
+            { id: "wa_madrona", name: "Madrona Links" },
+            { id: "wa_spanaway", name: "Lake Spanaway" },
+            { id: "wa_meadow_park", name: "Meadow Park" },
+            { id: "wa_oakbrook", name: "Oakbrook Golf Club" },
+            { id: "wa_allenmore", name: "Allenmore Golf Course" },
+            { id: "wa_riverbend", name: "Riverbend Golf Complex" },
+            { id: "wa_maplewood", name: "Maplewood Golf Course" },
+            { id: "wa_cedarcrest", name: "Cedarcrest Golf Course" },
+            { id: "wa_eaglemont", name: "Eaglemont Golf Course" },
+            { id: "wa_semiahmoo", name: "Semiahmoo" },
+            { id: "wa_loomis", name: "Loomis Trail" },
+            { id: "wa_bellingham_gcc", name: "Bellingham G&CC" },
+            { id: "wa_north_bellingham", name: "North Bellingham" },
+            { id: "wa_twin_lakes", name: "Twin Lakes G&CC" },
+            { id: "wa_enumclaw", name: "Enumclaw Golf Course" },
+            { id: "wa_twin_rivers", name: "Twin Rivers" },
+            { id: "wa_mount_si", name: "Mount Si Golf Course" },
+            { id: "wa_snohomish", name: "Snohomish Golf Course" },
+            { id: "wa_willows_coyote", name: "Willows Run (Coyote Creek)" },
+            { id: "wa_willows_eagle", name: "Willows Run (Eagle's Talon)" },
+            { id: "wa_bellevue", name: "Bellevue Golf Course" },
+            { id: "wa_overlake", name: "Overlake G&CC" },
+            { id: "wa_fairwood", name: "Fairwood G&CC" },
+            { id: "eaglespride_27", name: "Eagle's Pride (Pick 2 Nines)" }
+        ]},
+        { group: "🌴 Florida (Miami / Hollywood)", items: [
+            { id: "emerald_hills", name: "The Club at Emerald Hills" },
+            { id: "hollywood_beach", name: "Hollywood Beach Golf Club" }
+        ]},
+        { group: "🌲 Connecticut / Local (Milford Area)", items: [
+            { id: "greatriver", name: "Great River Golf Club" },
+            { id: "yale", name: "The Course at Yale" },
+            { id: "grassyhill", name: "Grassy Hill Country Club" },
+            { id: "orangehills", name: "Orange Hills Country Club" },
+            { id: "millriver", name: "Mill River Country Club" },
+            { id: "fairchild_black", name: "Fairchild Wheeler - Black" },
+            { id: "fairchild_red", name: "Fairchild Wheeler - Red" },
+            { id: "tashuaknolls", name: "Tashua Knolls Golf Course" },
+            { id: "whitneyfarms", name: "Whitney Farms Golf Course" },
+            { id: "oaklane", name: "Tradition at Oak Lane" }
         ]}
     ];
 
@@ -726,10 +748,29 @@
 
     const nineHoleLoops = {
         eaglespride_27: {
-            red: { name: "Red Loop (Par 37)" },
-            blue: { name: "Blue Loop (Par 35)" },
-            green: { name: "Green Loop (Par 36)" }
+            red: { name: "Red Loop (Par 37)", data: [{par:5,hcp:7},{par:3,hcp:13},{par:5,hcp:3},{par:4,hcp:11},{par:4,hcp:1},{par:5,hcp:9},{par:4,hcp:5},{par:3,hcp:15},{par:4,hcp:17}] },
+            blue: { name: "Blue Loop (Par 35)", data: [{par:4,hcp:12},{par:4,hcp:14},{par:3,hcp:18},{par:4,hcp:2},{par:3,hcp:16},{par:4,hcp:8},{par:4,hcp:10},{par:4,hcp:4},{par:5,hcp:6}] },
+            green: { name: "Green Loop (Par 36)", data: [{par:4,hcp:7},{par:3,hcp:9},{par:4,hcp:11},{par:4,hcp:3},{par:5,hcp:5},{par:5,hcp:1},{par:3,hcp:17},{par:4,hcp:15},{par:4,hcp:13}] }
         }
+    };
+
+    const coursePresets = {
+        swwa_tahoma_valley: { name: "Tahoma Valley Golf Course (Yelm)", data: [{hole:1,par:5,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:6},{hole:4,par:3,hcpIndex:18},{hole:5,par:4,hcpIndex:14},{hole:6,par:3,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:12},{hole:9,par:3,hcpIndex:16},{hole:10,par:4,hcpIndex:11},{hole:11,par:4,hcpIndex:7},{hole:12,par:5,hcpIndex:5},{hole:13,par:3,hcpIndex:13},{hole:14,par:4,hcpIndex:9},{hole:15,par:3,hcpIndex:15},{hole:16,par:5,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:5,hcpIndex:3}] },
+        swwa_camasmeadows: { name: "Camas Meadows Golf Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:3,hcpIndex:13},{hole:3,par:4,hcpIndex:9},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:15},{hole:6,par:4,hcpIndex:1},{hole:7,par:5,hcpIndex:11},{hole:8,par:3,hcpIndex:17},{hole:9,par:5,hcpIndex:5},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:6},{hole:12,par:5,hcpIndex:2},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:4,hcpIndex:4},{hole:17,par:3,hcpIndex:18},{hole:18,par:5,hcpIndex:10}] },
+        wa_chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:9},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:13},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:17},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:4},{hole:11,par:4,hcpIndex:8},{hole:12,par:4,hcpIndex:18},{hole:13,par:5,hcpIndex:14},{hole:14,par:4,hcpIndex:2},{hole:15,par:3,hcpIndex:16},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:6},{hole:18,par:5,hcpIndex:12}] },
+        swwa_lewisriver: { name: "Lewis River Golf Course", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:4,hcpIndex:5},{hole:3,par:3,hcpIndex:13},{hole:4,par:4,hcpIndex:9},{hole:5,par:5,hcpIndex:1},{hole:6,par:4,hcpIndex:7},{hole:7,par:3,hcpIndex:3},{hole:8,par:4,hcpIndex:11},{hole:9,par:4,hcpIndex:17},{hole:10,par:5,hcpIndex:10},{hole:11,par:3,hcpIndex:16},{hole:12,par:5,hcpIndex:4},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:2},{hole:15,par:5,hcpIndex:12},{hole:16,par:4,hcpIndex:14},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        swwa_elkridge: { name: "Elk Ridge Golf Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:17},{hole:5,par:4,hcpIndex:1},{hole:6,par:3,hcpIndex:13},{hole:7,par:4,hcpIndex:5},{hole:8,par:4,hcpIndex:9},{hole:9,par:5,hcpIndex:11},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:14},{hole:12,par:4,hcpIndex:6},{hole:13,par:3,hcpIndex:10},{hole:14,par:4,hcpIndex:18},{hole:15,par:4,hcpIndex:2},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:4},{hole:18,par:4,hcpIndex:8}] },
+        or_indiancreek: { name: "Indian Creek Golf Course", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:13},{hole:3,par:4,hcpIndex:11},{hole:4,par:5,hcpIndex:5},{hole:5,par:3,hcpIndex:9},{hole:6,par:4,hcpIndex:15},{hole:7,par:4,hcpIndex:17},{hole:8,par:3,hcpIndex:7},{hole:9,par:5,hcpIndex:1},{hole:10,par:3,hcpIndex:18},{hole:11,par:5,hcpIndex:8},{hole:12,par:4,hcpIndex:4},{hole:13,par:4,hcpIndex:10},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:12},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:4,hcpIndex:16}] },
+        or_stonecreek: { name: "Stone Creek Golf Club", data: [{hole:1,par:4,hcpIndex:8},{hole:2,par:3,hcpIndex:18},{hole:3,par:4,hcpIndex:10},{hole:4,par:5,hcpIndex:2},{hole:5,par:4,hcpIndex:12},{hole:6,par:3,hcpIndex:16},{hole:7,par:4,hcpIndex:6},{hole:8,par:5,hcpIndex:4},{hole:9,par:4,hcpIndex:14},{hole:10,par:4,hcpIndex:9},{hole:11,par:5,hcpIndex:1},{hole:12,par:4,hcpIndex:11},{hole:13,par:4,hcpIndex:3},{hole:14,par:3,hcpIndex:15},{hole:15,par:4,hcpIndex:7},{hole:16,par:3,hcpIndex:17},{hole:17,par:4,hcpIndex:13},{hole:18,par:5,hcpIndex:5}] },
+        or_wildwood: { name: "Wildwood Golf Course", data: [{hole:1,par:5,hcpIndex:1},{hole:2,par:4,hcpIndex:7},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:13},{hole:7,par:4,hcpIndex:9},{hole:8,par:3,hcpIndex:3},{hole:9,par:5,hcpIndex:17},{hole:10,par:4,hcpIndex:16},{hole:11,par:4,hcpIndex:4},{hole:12,par:3,hcpIndex:12},{hole:13,par:4,hcpIndex:2},{hole:14,par:3,hcpIndex:10},{hole:15,par:5,hcpIndex:14},{hole:16,par:5,hcpIndex:8},{hole:17,par:4,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        or_glendoveer_east: { name: "Glendoveer Golf Course (East)", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:5,hcpIndex:13},{hole:3,par:3,hcpIndex:9},{hole:4,par:5,hcpIndex:7},{hole:5,par:3,hcpIndex:1},{hole:6,par:4,hcpIndex:17},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:15},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:4},{hole:12,par:4,hcpIndex:10},{hole:13,par:3,hcpIndex:12},{hole:14,par:4,hcpIndex:16},{hole:15,par:5,hcpIndex:2},{hole:16,par:4,hcpIndex:18},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
+        swwa_trimountain: { name: "Tri-Mountain Golf Course", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:13},{hole:3,par:4,hcpIndex:1},{hole:4,par:4,hcpIndex:15},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:5,hcpIndex:9},{hole:8,par:4,hcpIndex:5},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:4},{hole:13,par:5,hcpIndex:12},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:14},{hole:18,par:5,hcpIndex:6}] },
+        or_glendoveer_west: { name: "Glendoveer Golf Course (West)", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:4,hcpIndex:17},{hole:3,par:4,hcpIndex:5},{hole:4,par:3,hcpIndex:11},{hole:5,par:4,hcpIndex:13},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:9},{hole:8,par:4,hcpIndex:7},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:18},{hole:11,par:4,hcpIndex:4},{hole:12,par:3,hcpIndex:16},{hole:13,par:4,hcpIndex:10},{hole:14,par:4,hcpIndex:6},{hole:15,par:5,hcpIndex:14},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:8},{hole:18,par:4,hcpIndex:12}] },
+        
+        az_tpc_stadium: { name: "TPC Scottsdale (Stadium)", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:5},{hole:3,par:5,hcpIndex:1},{hole:4,par:3,hcpIndex:15},{hole:5,par:4,hcpIndex:7},{hole:6,par:4,hcpIndex:11},{hole:7,par:3,hcpIndex:17},{hole:8,par:4,hcpIndex:3},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:16},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:10},{hole:15,par:5,hcpIndex:6},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:12}] },
+        az_talking_oodham: { name: "Talking Stick Golf Club (O'odham)", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:5,hcpIndex:13},{hole:3,par:4,hcpIndex:1},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:5},{hole:7,par:4,hcpIndex:9},{hole:8,par:3,hcpIndex:17},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:12},{hole:11,par:3,hcpIndex:6},{hole:12,par:4,hcpIndex:2},{hole:13,par:4,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:3,hcpIndex:18},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:10}] },
+        az_wekopa_cholla: { name: "We-Ko-Pa Golf Club (Cholla)", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:9},{hole:5,par:3,hcpIndex:15},{hole:6,par:4,hcpIndex:11},{hole:7,par:4,hcpIndex:7},{hole:8,par:5,hcpIndex:3},{hole:9,par:4,hcpIndex:13},{hole:10,par:5,hcpIndex:4},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:8},{hole:13,par:4,hcpIndex:12},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:14},{hole:17,par:5,hcpIndex:2},{hole:18,par:4,hcpIndex:10}] },
+        az_talking_piipaash: { name: "Talking Stick Golf Club (Piipaash)", data: [{hole:1,par:4,hcpIndex:13},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:7},{hole:4,par:4,hcpIndex:17},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:15},{hole:7,par:5,hcpIndex:9},{hole:8,par:4,hcpIndex:5},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:8},{hole:12,par:4,hcpIndex:2},{hole:13,par:3,hcpIndex:16},{hole:14,par:5,hcpIndex:6},{hole:15,par:4,hcpIndex:4},{hole:16,par:5,hcpIndex:14},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:12}] }
     };
 
     function handleCourseChange() {
@@ -758,17 +799,22 @@
             if (globalCourses[courseKey]) {
                 isMapped = true;
                 baseData = globalCourses[courseKey].data;
+            } else if (coursePresets[courseKey]) {
+                isMapped = true;
+                baseData = coursePresets[courseKey].data;
             } else {
                 isMapped = false;
                 for(let i=1; i<=18; i++) baseData.push({hole: i, par: 4, hcpIndex: i});
             }
         }
         
+        // Auto-fill Custom Course Grid
         baseData.forEach(h => {
             if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
             if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
         });
 
+        // Smart Mapping Warning
         const customContainer = document.getElementById('custom-course-container');
         const customCheckbox = document.getElementById('enable-custom-course');
         const warningText = document.getElementById('custom-course-warning');
@@ -871,6 +917,7 @@
             
             handleCourseChange();
 
+            // Populate Grid with saved data if it exists
             if (data.courseData && data.courseData.length > 0) {
                 data.courseData.forEach(h => {
                     if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
@@ -994,7 +1041,7 @@
             }
             
             const gameFormat = document.getElementById("game-format-select").value;
-            if (!gameFormat) { alert("⚠️ Please select a Round Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
+            if (!gameFormat) { alert("⚠️ Please select a Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
 
             const rows = document.querySelectorAll('.player-row');
             if (rows.length === 0) {
@@ -1023,10 +1070,13 @@
                     const loops = nineHoleLoops[courseKey];
                     const frontKey = document.getElementById("front-nine-select").value;
                     const backKey = document.getElementById("back-nine-select").value;
-                    finalCourseData = captureCourseDataGrid(); 
+                    loops[frontKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 }); });
+                    loops[backKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 }); });
                     selectedCourseName = `Eagle's Pride (${loops[frontKey].name} / ${loops[backKey].name})`;
                 } else if (globalCourses[courseKey]) {
                     finalCourseData = globalCourses[courseKey].data;
+                } else if (coursePresets[courseKey]) {
+                    finalCourseData = coursePresets[courseKey].data;
                 } else {
                     finalCourseData = captureCourseDataGrid();
                 }
@@ -1105,18 +1155,18 @@
         } catch (e) {
             alert(`JavaScript Error: ${e.message}`);
             const saveBtn = document.getElementById("main-save-btn");
-            if(saveBtn) { saveBtn.innerText = "💾 Save & Activate Setup"; saveBtn.disabled = false; }
+            if(saveBtn) { saveBtn.innerText = "💾 Save & Activate Game"; saveBtn.disabled = false; }
         }
     }
 
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current round for Room ${currentMode}? This will permanently wipe the room clean for a fresh start.`)) {
+        if (confirm(`Are you sure you want to END the current game for Room ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
                 localStorage.removeItem('lastRoomCode');
-                alert("Room reset successfully! The scorecard is now clear and ready for a new game.");
+                alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
                 window.location.href = "admin.html"; 
             }).catch((err) => {
-                alert(`Error clearing room: ${err.message}`);
+                alert(`Error clearing game: ${err.message}`);
             });
         }
     }
