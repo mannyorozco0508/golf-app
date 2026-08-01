@@ -181,17 +181,18 @@
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
                     <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
-                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr>
+                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>OUT</th></tr>
                         <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-out-val">36</td>
                         </tr>
                         <tr><th style="padding:6px; text-align:left;">HCP</th>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-1" class="grid-input" onfocus="this.select()"></td>
@@ -203,22 +204,25 @@
                             <td><input type="tel" inputmode="numeric" id="c-hcp-7" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-8" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-9" class="grid-input" onfocus="this.select()"></td>
+                            <td style="background:#f4f6f8;"></td>
                         </tr>
                     </table>
 
                     <!-- Back 9 -->
                     <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
-                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th></tr>
+                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>IN</th><th>TOT</th></tr>
                         <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-in-val">36</td>
+                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-tot-val">72</td>
                         </tr>
                         <tr><th style="padding:6px; text-align:left;">HCP</th>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-10" class="grid-input" onfocus="this.select()"></td>
@@ -230,6 +234,8 @@
                             <td><input type="tel" inputmode="numeric" id="c-hcp-16" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-17" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-18" class="grid-input" onfocus="this.select()"></td>
+                            <td style="background:#f4f6f8;"></td>
+                            <td style="background:#f4f6f8;"></td>
                         </tr>
                     </table>
                 </div>
@@ -784,6 +790,25 @@
         grassyhill: { name: "Grassy Hill Country Club", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:13},{hole:5,par:5,hcpIndex:3},{hole:6,par:3,hcpIndex:9},{hole:7,par:4,hcpIndex:11},{hole:8,par:4,hcpIndex:7},{hole:9,par:5,hcpIndex:15},{hole:10,par:3,hcpIndex:10},{hole:11,par:4,hcpIndex:6},{hole:12,par:4,hcpIndex:16},{hole:13,par:3,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:4,hcpIndex:2},{hole:16,par:5,hcpIndex:8},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:4}] }
     };
 
+    function updateCustomCoursePars() {
+        let outPar = 0;
+        for(let i=1; i<=9; i++) {
+            let val = parseInt(document.getElementById(`c-par-${i}`).value);
+            if(!isNaN(val)) outPar += val;
+        }
+        let inPar = 0;
+        for(let i=10; i<=18; i++) {
+            let val = parseInt(document.getElementById(`c-par-${i}`).value);
+            if(!isNaN(val)) inPar += val;
+        }
+        const outEl = document.getElementById('c-par-out-val');
+        const inEl = document.getElementById('c-par-in-val');
+        const totEl = document.getElementById('c-par-tot-val');
+        if(outEl) outEl.textContent = outPar;
+        if(inEl) inEl.textContent = inPar;
+        if(totEl) totEl.textContent = outPar + inPar;
+    }
+
     function handleCourseChange() {
         const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
@@ -824,6 +849,8 @@
             if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
             if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
         });
+
+        updateCustomCoursePars();
 
         // Smart Mapping Warning
         const customContainer = document.getElementById('custom-course-container');
@@ -934,6 +961,7 @@
                     if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
                     if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
                 });
+                updateCustomCoursePars();
             }
 
             if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;

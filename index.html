@@ -706,6 +706,14 @@
 
         let runningStats = {};
         filteredPlayers.forEach(p => runningStats[p.id] = 0);
+        
+        let frontPar = 0, backPar = 0, totalPar = 0;
+        courseData.forEach(h => {
+            let p = parseInt(h.par, 10) || 0;
+            totalPar += p;
+            if (h.hole <= 9) frontPar += p;
+            else if (h.hole > 9 && h.hole <= 18) backPar += p;
+        });
 
         courseData.forEach(h => {
             let rowHtml = `<tr>
@@ -823,7 +831,7 @@
 
             if (h.hole === 9 || h.hole === 18) {
                 let isOut = h.hole === 9;
-                let label = isOut ? "OUT (Front 9)" : "IN (Back 9)";
+                let label = isOut ? `OUT (Front 9) &bull; Par ${frontPar}` : `IN (Back 9) &bull; Par ${backPar}`;
                 let subRowHtml = `<tr style="background-color: #eef6f2;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; color:#0f4c3a; font-size:0.8rem;">${label}</td>`;
 
                 filteredPlayers.forEach(p => {
@@ -846,7 +854,7 @@
                 tbody.innerHTML += subRowHtml;
 
                 if (h.hole === 18) {
-                    let totRowHtml = `<tr style="background-color: #1d3557; color: white;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; font-size:0.8rem;">TOTAL</td>`;
+                    let totRowHtml = `<tr style="background-color: #1d3557; color: white;"><td colspan="3" style="padding:10px; font-weight:bold; text-align:right; font-size:0.8rem;">TOTAL &bull; Par ${totalPar}</td>`;
                     filteredPlayers.forEach(p => {
                         let gross = 0, net = 0;
                         courseData.forEach(ch => {
