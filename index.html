@@ -490,6 +490,7 @@
                 else if (t2Best < t1Best) diff = -1;
 
                 let holeWinner = diff === 1 ? t1Name : (diff === -1 ? t2Name : "Halved");
+                let newPresses = [];
 
                 activeMatches.forEach(m => {
                     if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
@@ -502,17 +503,18 @@
                             m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
-                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole && !m.closed) {
+                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
                             const threshold = pressRule === '2down' ? 2 : 1;
-                            let expectedTriggers = Math.floor(Math.abs(m.status) / threshold);
-                            if (expectedTriggers > m.triggers) {
-                                m.triggers = expectedTriggers;
+                            
+                            // EXACT FIX: A specific bet can only trigger ONE auto-press
+                            if (Math.abs(m.status) >= threshold && m.triggers === 0) {
+                                m.triggers = 1;
                                 pressCount++;
                                 
-                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length;
+                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
                                 let nextPressNum = existingPresses + 1;
                                 
-                                activeMatches.push({
+                                newPresses.push({
                                     id: `P${pressCount}`, 
                                     baseId: m.baseId, 
                                     startHole: hNum + 1, 
@@ -527,6 +529,8 @@
                         }
                     }
                 });
+                
+                activeMatches = activeMatches.concat(newPresses);
 
                 let f9 = activeMatches.find(m => m.id === 'F9');
                 let b9 = activeMatches.find(m => m.id === 'B9');
@@ -547,7 +551,7 @@
             else if (m.status < 0) t1TotalMoney -= stake;
         });
 
-        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
+        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney };
     }
 
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
@@ -873,7 +877,8 @@
             const b9Str = matchCalc.maxThru > 9 ? formatMatchPill(b9.status, matchCalc.t1Name, matchCalc.t2Name, b9.closed, b9.finalResult) : "AS";
             const ovStr = formatMatchPill(t18.status, matchCalc.t1Name, matchCalc.t2Name, t18.closed, t18.finalResult);
             
-            let pressText = matchCalc.pressCount > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${matchCalc.pressCount} Active Presses</div>` : "";
+            let activePresses = matchCalc.activeMatches.filter(m => m.pressNum > 0).length;
+            let pressText = activePresses > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${activePresses} Active Presses</div>` : "";
 
             statusEl.innerHTML = `
                 <span class="ticker-part">F9: <strong>${f9Str}</strong></span>
