@@ -8,55 +8,101 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
-        .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; }
-        h2, h3 { color: #0f4c3a; margin-top: 0; }
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 650px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h2, h3 { color: var(--brand-green); margin-top: 0; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
         
         /* Top Navigation Bar */
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
         .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .lobby-title { font-size: 2rem; color: #0f4c3a; margin-bottom: 10px; font-weight: bold; }
-        .lobby-divider { margin: 30px 0; border-top: 1px solid #ddd; position: relative; }
-        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 12px; color: #888; font-size: 0.85rem; font-weight: bold; }
-        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid #d0e1db !important; border-radius: 10px !important; padding: 14px !important; background: #f9fbf9 !important; }
-        .join-input:focus { border-color: #0f4c3a !important; outline: none; background: #fff !important; }
+        .lobby-title { font-size: 2rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; }
+        .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
+        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
+        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid var(--border-mid) !important; border-radius: 10px !important; padding: 14px !important; background: var(--nav-bg) !important; color: var(--text-main) !important; }
+        .join-input:focus { border-color: var(--brand-green) !important; outline: none; background: var(--bg-card) !important; }
 
         /* Admin Styles */
-        .room-badge { display: inline-block; background: #1d3557; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
+        .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
         .form-group { margin-bottom: 16px; }
-        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
         
         input[type="text"], input[type="number"], input[type="tel"], select { 
-            width: 100%; padding: 10px; border: 1px solid #ccc; 
-            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: #fff; 
+            width: 100%; padding: 10px; border: 1px solid var(--input-disabled-border); 
+            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
 
         .custom-select-wrapper { position: relative; }
-        .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: #333; pointer-events: none; }
-        #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; background-color: #fff; box-sizing: border-box; cursor: text; }
-        #course-search-input:focus { border-color: #2a9d8f; outline: none; background-color: #eef6f2; border-bottom-left-radius: 0; border-bottom-right-radius: 0;}
-        .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #2a9d8f; border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.95rem; }
+        .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
+        #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid var(--input-disabled-border); border-radius: 6px; font-size: 16px; background-color: var(--bg-card); color: var(--text-main); box-sizing: border-box; cursor: text; }
+        #course-search-input:focus { border-color: var(--accent-teal); outline: none; background-color: var(--nassau-box-bg); border-bottom-left-radius: 0; border-bottom-right-radius: 0;}
+        .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal); border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px var(--shadow-color); }
+        .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; color: var(--text-main); }
         .custom-select-option:last-child { border-bottom: none; }
-        .custom-select-option:hover { background-color: #f0f4f2; color: #0f4c3a; font-weight: bold; }
-        .custom-select-group { background: #f4f6f8; font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: #555; text-transform: uppercase; border-bottom: 1px solid #eee; }
+        .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .custom-select-group { background: var(--bg-page); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
 
-        .extra-settings-box { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
+        .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
 
-        .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
-        .group-link-row { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #e0b3b6; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
-        .group-link-row span { font-weight: bold; color: #0f4c3a; font-size: 0.85rem; }
+        .share-box { background: var(--nassau-box-bg); border: 2px dashed var(--brand-green); border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
+        .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
         .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
-        .end-box { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
+        .end-box { background: var(--danger-box-bg); border: 2px dashed var(--accent-red); border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
@@ -65,54 +111,55 @@
         .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
         .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
 
-        .btn-add { background-color: #2a9d8f; color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
-        .btn-del { background-color: #e63946; color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
+        .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
+        .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
         .btn-primary:hover { background-color: #125d48; }
-        .btn-danger { width: 100%; background-color: #e63946; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        .btn-outline { width: 100%; background-color: #ffffff; color: #0f4c3a; border: 2px solid #0f4c3a; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
-        .btn-outline:hover { background-color: #f0f4f2; }
+        .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .btn-outline:hover { background-color: var(--nav-bg); }
 
         /* Custom Course Grid Inputs */
-        .grid-input { width: 34px !important; padding: 6px 2px !important; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem !important; box-sizing: border-box; }
-        .grid-input:focus { border-color: #0f4c3a; outline: none; background: #eef6f2; }
+        .grid-input { width: 34px !important; padding: 6px 2px !important; text-align: center; border: 1px solid var(--input-disabled-border); border-radius: 4px; font-size: 0.85rem !important; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main); }
+        .grid-input:focus { border-color: var(--brand-green); outline: none; background: var(--nassau-box-bg); }
 
         /* Secret Panel Styles */
-        #secret-master-panel { display: none; background: #1d3557; color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
+        #secret-master-panel { display: none; background: var(--brand-navy); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
         #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="container" id="lobby-screen">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
-    <p style="color: #666; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
     
     <!-- SECRET BETA CONTROL PANEL -->
     <div id="secret-master-panel">
         <h3>🔐 Master Beta Switch</h3>
-        <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Set the global expiration date. Anyone opening the app after this date gets locked out.</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Set the global expiration date. Anyone opening the app after this date gets locked out.</p>
         <input type="date" id="secret-exp-date" style="margin-bottom: 12px;">
-        <button class="btn-primary" style="background-color: #e63946;" onclick="updateBetaExpiration()">💾 Force Update Date</button>
+        <button class="btn-primary" style="background-color: var(--accent-red);" onclick="updateBetaExpiration()">💾 Force Update Date</button>
         
         <h3 style="margin-top: 20px;">☁️ Sync Courses to Firebase</h3>
-        <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Push all pre-coded local courses to the global database.</p>
-        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="syncPresetsToFirebase()">📤 Push to Global Database</button>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Push all pre-coded local courses to the global database.</p>
+        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="syncPresetsToFirebase()">📤 Push to Global Database</button>
 
         <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
-        <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
-        <button class="btn-primary" style="background-color: #ffffff; color: #1d3557;" onclick="shareMainApp()">📤 Share App Link</button>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
+        <button class="btn-primary" style="background-color: var(--bg-card); color: var(--brand-navy);" onclick="shareMainApp()">📤 Share App Link</button>
 
         <div style="text-align: center; margin-top: 20px;">
-            <span style="font-size: 0.75rem; color: #aaa; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
+            <span style="font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
         </div>
     </div>
 
     <!-- RESUME GAME BOX -->
-    <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #ddd;">
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
-        <button class="btn-primary" style="background-color: #2a9d8f;" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
+    <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid var(--border-light);">
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
+        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
     </div>
 
     <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
@@ -124,6 +171,7 @@
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -135,20 +183,20 @@
     </div>
 
     <div style="text-align: center; margin-top: 10px;">
-        <span style="font-size: 0.8rem; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Game Code</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Game Code</span>
         <div class="room-badge" id="display-room-code">----</div>
     </div>
 
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
         <div id="qrcode"></div>
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
     </div>
 
-    <div class="share-box" id="group-links-box" style="display:none; border-color:#e63946;">
+    <div class="share-box" id="group-links-box" style="display:none; border-color:var(--accent-red);">
         <h3>🔒 Group Scorekeeper Links</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
         <div id="group-links-list"></div>
     </div>
 
@@ -174,8 +222,8 @@
         </div>
 
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
-            <label style="color:#0f4c3a; font-size: 0.8rem;">Round Length</label>
-            <select id="round-length-select" style="border-color:#2a9d8f;">
+            <label style="color:var(--brand-green); font-size: 0.8rem;">Round Length</label>
+            <select id="round-length-select" style="border-color:var(--accent-teal);">
                 <option value="18">Full 18 Holes</option>
                 <option value="front">Front 9 Only (Out)</option>
                 <option value="back">Back 9 Only (In)</option>
@@ -183,7 +231,7 @@
         </div>
 
         <div id="nine-loop-selector" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">🔄 Modular 9-Hole Loop Selector</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🔄 Modular 9-Hole Loop Selector</label>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Front 9</label><select id="front-nine-select"></select></div>
                 <div><label style="font-size: 0.8rem;">Back 9</label><select id="back-nine-select"></select></div>
@@ -192,28 +240,28 @@
         
         <!-- DYNAMIC COURSE EDITOR -->
         <div class="extra-settings-box" style="display: block; margin-top: 12px; padding: 12px 10px;">
-            <label style="color:#0f4c3a; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-custom-course" onchange="document.getElementById('custom-course-container').style.display = this.checked ? 'block' : 'none';" style="width: 18px; height: 18px; margin: 0;">
                 <strong>✏️ Review / Edit Course Pars & Handicaps</strong>
             </label>
-            <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid #d0e1db; padding-top: 12px; overflow-x: auto;">
-                <p id="custom-course-warning" style="font-size: 0.75rem; color: #555; margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+            <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
+                <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
                 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
                     <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
-                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>OUT</th></tr>
-                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-out-val">36</td>
+                        <tr style="background:var(--border-light);"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>OUT</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid var(--border-faint);">Par</th>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-out-val">36</td>
                         </tr>
                         <tr><th style="padding:6px; text-align:left;">HCP</th>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-1" class="grid-input" onfocus="this.select()"></td>
@@ -225,25 +273,25 @@
                             <td><input type="tel" inputmode="numeric" id="c-hcp-7" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-8" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-9" class="grid-input" onfocus="this.select()"></td>
-                            <td style="background:#f4f6f8;"></td>
+                            <td style="background:var(--bg-page);"></td>
                         </tr>
                     </table>
 
                     <!-- Back 9 -->
                     <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
-                        <tr style="background:#e0e0e0;"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>IN</th><th>TOT</th></tr>
-                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid #eee;">Par</th>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee;"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
-                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-in-val">36</td>
-                            <td style="border-bottom: 1px solid #eee; font-weight:bold; background:#f4f6f8;" id="c-par-tot-val">72</td>
+                        <tr style="background:var(--border-light);"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>IN</th><th>TOT</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid var(--border-faint);">Par</th>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-in-val">36</td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-tot-val">72</td>
                         </tr>
                         <tr><th style="padding:6px; text-align:left;">HCP</th>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-10" class="grid-input" onfocus="this.select()"></td>
@@ -255,8 +303,8 @@
                             <td><input type="tel" inputmode="numeric" id="c-hcp-16" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-17" class="grid-input" onfocus="this.select()"></td>
                             <td><input type="tel" inputmode="numeric" id="c-hcp-18" class="grid-input" onfocus="this.select()"></td>
-                            <td style="background:#f4f6f8;"></td>
-                            <td style="background:#f4f6f8;"></td>
+                            <td style="background:var(--bg-page);"></td>
+                            <td style="background:var(--bg-page);"></td>
                         </tr>
                     </table>
                 </div>
@@ -282,11 +330,11 @@
         </select>
 
         <div id="hole-bet-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
                 <strong>💵 Enable Per-Hole Bet Option</strong>
             </label>
-            <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid #d0e1db; padding-top: 12px;">
+            <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
                 <div class="grid-2col">
                     <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1"></div>
                 </div>
@@ -294,7 +342,7 @@
         </div>
 
         <div id="match-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">🥊 Match Play Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
             <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.75rem;">Scoring Type</label>
@@ -308,11 +356,11 @@
                     <input type="number" id="match-stake" value="50" min="0">
                 </div>
             </div>
-            <div style="font-size: 0.7rem; color: #555; margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
         </div>
 
         <div id="nassau-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">💵 Nassau Bet Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">💵 Nassau Bet Options</label>
             <div class="grid-3col">
                 <div>
                     <label style="font-size: 0.75rem;">Match Type</label>
@@ -342,7 +390,7 @@
         </div>
 
         <div id="wolf-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">🐺 Wolf Game Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🐺 Wolf Game Options</label>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Point Value ($)</label><input type="number" id="wolf-point-value" value="2" min="1"></div>
                 <div>
@@ -356,28 +404,28 @@
         </div>
 
         <div id="dot-settings" class="extra-settings-box">
-            <label style="color:#0f4c3a; margin-bottom: 6px;">🎯 Dot Game Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Dot Game Options</label>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="1" min="1"></div>
             </div>
         </div>
     </div>
 
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+    <hr style="border: 0; border-top: 1px solid var(--border-faint); margin: 20px 0;">
 
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
-    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:#555; display:grid;"></div>
+    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
-    <button class="btn-add" style="background:#eef6f2; border-color:#2a9d8f; color:#0f4c3a;" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
-    <div id="strokes-preview-container" style="display:none; margin-top:12px; background:#f9fbf9; border:1px solid #d0e1db; border-radius:8px; padding:12px;"></div>
+    <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
+    <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
 
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
 
     <div class="end-box">
-        <h3 style="color: #e63946; margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: #555; display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
+        <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
+        <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
         <button class="btn-danger" onclick="endAndClearRound()">📥 End & Wipe Game</button>
     </div>
 </div>
@@ -395,6 +443,31 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+                btn.textContent = '☀️ Light Mode';
+            });
+        }
+    });
+    // ------------------
 
     // Fetch Global Courses immediately
     let globalCourses = {};
@@ -743,7 +816,7 @@
         }
 
         if (!hasResults) {
-            courseDropdown.innerHTML = `<div style="padding:12px; color:#888; text-align:center;">No courses found.</div>`;
+            courseDropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center;">No courses found.</div>`;
         }
     }
 
@@ -903,12 +976,12 @@
             customCheckbox.checked = true;
             customContainer.style.display = 'block';
             warningText.innerHTML = "⚠️ <strong>COURSE NOT MAPPED!</strong><br>Please enter the Pars and Handicaps from your scorecard. We will save it to the global database so you never have to do it again.";
-            warningText.style.color = "#e63946";
+            warningText.style.color = "var(--accent-red)";
         } else {
             customCheckbox.checked = false;
             customContainer.style.display = 'none';
             warningText.innerHTML = "Make quick adjustments from your phone if the course isn't mapped accurately.";
-            warningText.style.color = "#555";
+            warningText.style.color = "var(--text-muted)";
         }
     }
 
@@ -1086,14 +1159,14 @@
         const hasAnyHcpData = holeHcps.some((v, idx) => document.getElementById(`c-hcp-${idx + 1}`) && document.getElementById(`c-hcp-${idx + 1}`).value);
         if (!hasAnyHcpData) {
             container.style.display = "block";
-            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:#e63946;">⚠️ Select or enter a course with hole handicap (HCP) values first, so strokes can be calculated per hole.</p>`;
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:var(--accent-red);">⚠️ Select or enter a course with hole handicap (HCP) values first, so strokes can be calculated per hole.</p>`;
             return;
         }
 
         const rows = document.querySelectorAll('.player-row');
         if (rows.length === 0) {
             container.style.display = "block";
-            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:#666;">Add players first to preview strokes.</p>`;
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:var(--text-muted);">Add players first to preview strokes.</p>`;
             return;
         }
 
@@ -1118,7 +1191,7 @@
         // Lowest handicap in the field = the "scratch" player for this round's relative match-play convention
         const lowestHcp = Math.min(...playerResults.map(p => p.numericHcp));
 
-        let html = `<div style="font-weight:bold; color:#0f4c3a; margin-bottom:8px; font-size:0.85rem;">Strokes Received (Full Course Net)</div>`;
+        let html = `<div style="font-weight:bold; color:var(--brand-green); margin-bottom:8px; font-size:0.85rem;">Strokes Received (Full Course Net)</div>`;
         playerResults.forEach(p => {
             const holesList = p.holesWithStrokes.length > 0
                 ? p.holesWithStrokes.map(h => `#${h.hole}${h.strokes > 1 ? ` (${h.strokes}x)` : (h.strokes < 0 ? ' (gives)' : '')}`).join(', ')
@@ -1126,12 +1199,12 @@
             html += `
                 <div style="padding:6px 0; border-bottom:1px solid #eee; font-size:0.8rem;">
                     <strong>${p.name}</strong> (HCP ${p.numericHcp}) — <strong>${p.totalStrokes}</strong> strokes<br>
-                    <span style="color:#666; font-size:0.75rem;">Holes: ${holesList}</span>
+                    <span style="color:var(--text-muted); font-size:0.75rem;">Holes: ${holesList}</span>
                 </div>`;
         });
 
         if (playerResults.length >= 2) {
-            html += `<div style="font-weight:bold; color:#0f4c3a; margin-top:12px; margin-bottom:8px; font-size:0.85rem;">Suggested Match Strokes (vs. lowest HCP in group)</div>`;
+            html += `<div style="font-weight:bold; color:var(--brand-green); margin-top:12px; margin-bottom:8px; font-size:0.85rem;">Suggested Match Strokes (vs. lowest HCP in group)</div>`;
             playerResults.forEach(p => {
                 const relativeStrokes = Math.round(p.numericHcp - lowestHcp);
                 if (relativeStrokes > 0) {
@@ -1140,7 +1213,7 @@
                     html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> plays scratch (lowest handicap in this group).</div>`;
                 }
             });
-            html += `<div style="font-size:0.7rem; color:#888; margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
+            html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
         }
 
         container.style.display = "block";
