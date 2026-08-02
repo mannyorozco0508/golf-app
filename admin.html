@@ -92,6 +92,7 @@
         .custom-select-option:last-child { border-bottom: none; }
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
         .custom-select-group { background: var(--bg-page); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
+        .custom-select-add-option { text-align: center; color: var(--brand-green); font-weight: bold; }
 
         .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -478,6 +479,21 @@
         }
     });
 
+    // Detect the player's approximate location so nearby courses can surface first in search
+    let userCoords = null;
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                userCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                if (courseSearchInput && courseDropdown.style.display === 'block' && courseSearchInput.value === "") {
+                    populateCourseDropdown("");
+                }
+            },
+            () => { /* Location denied or unavailable - dropdown just falls back to the default region order */ },
+            { timeout: 6000, maximumAge: 600000 }
+        );
+    }
+
     db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
         const expDateStr = snapshot.val();
         const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
@@ -769,27 +785,79 @@
     const courseDropdown = document.getElementById('course-dropdown');
     const courseHiddenSelect = document.getElementById('course-select');
 
+    function buildCourseOptionRow(id, name) {
+        const optionDiv = document.createElement("div");
+        optionDiv.className = "custom-select-option";
+        optionDiv.textContent = name;
+        optionDiv.onclick = () => { selectCourse(id, name); };
+        return optionDiv;
+    }
+
+    // Rough center point for each regional group, used to guess which one is closest to the player
+    const regionCenters = {
+        "🌲 SW Washington, Gorge & Portland (Camas Area)": { lat: 45.586, lon: -122.435 },
+        "🏖️ Myrtle Beach Trip": { lat: 33.689, lon: -78.887 },
+        "🌵 Arizona (Phoenix / Scottsdale)": { lat: 33.494, lon: -111.926 },
+        "🌲 Washington (Seattle / Tacoma Top 50)": { lat: 47.253, lon: -122.444 },
+        "🌴 Florida (Miami / Hollywood)": { lat: 26.011, lon: -80.150 },
+        "🌲 Connecticut / Local (Milford Area)": { lat: 41.222, lon: -73.057 }
+    };
+
+    function haversineMiles(lat1, lon1, lat2, lon2) {
+        const toRad = (d) => d * Math.PI / 180;
+        const R = 3958.8;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function getNearestRegionGroup() {
+        if (!userCoords) return null;
+        let nearest = null;
+        let nearestDist = Infinity;
+        Object.keys(regionCenters).forEach(groupName => {
+            const c = regionCenters[groupName];
+            const dist = haversineMiles(userCoords.lat, userCoords.lon, c.lat, c.lon);
+            if (dist < nearestDist) { nearestDist = dist; nearest = groupName; }
+        });
+        return nearest;
+    }
+
+    function addCustomCourse(name) {
+        courseSearchInput.value = name;
+        courseHiddenSelect.value = "";
+        courseDropdown.style.display = "none";
+        handleCourseChange();
+    }
+
     function populateCourseDropdown(filterText = "") {
         courseDropdown.innerHTML = "";
         const lowerFilter = filterText.toLowerCase();
         let hasResults = false;
 
-        courseDirectory.forEach(group => {
+        // Order regional groups so the one closest to the player (if known) renders first
+        let orderedGroups = courseDirectory;
+        const nearestGroupName = (filterText === "") ? getNearestRegionGroup() : null;
+        if (nearestGroupName) {
+            const nearestGroup = courseDirectory.find(g => g.group === nearestGroupName);
+            const rest = courseDirectory.filter(g => g.group !== nearestGroupName);
+            if (nearestGroup) orderedGroups = [nearestGroup, ...rest];
+        }
+
+        orderedGroups.forEach(group => {
             const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
             if (filteredItems.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
                     const groupDiv = document.createElement("div");
                     groupDiv.className = "custom-select-group";
-                    groupDiv.textContent = group.group;
+                    const isNearest = group.group === nearestGroupName;
+                    groupDiv.textContent = isNearest ? `📍 Near You — ${group.group}` : group.group;
                     courseDropdown.appendChild(groupDiv);
                 }
                 filteredItems.forEach(item => {
-                    const optionDiv = document.createElement("div");
-                    optionDiv.className = "custom-select-option";
-                    optionDiv.textContent = item.name;
-                    optionDiv.onclick = () => { selectCourse(item.id, item.name); };
-                    courseDropdown.appendChild(optionDiv);
+                    courseDropdown.appendChild(buildCourseOptionRow(item.id, item.name));
                 });
             }
         });
@@ -806,17 +874,23 @@
                     courseDropdown.appendChild(groupDiv);
                 }
                 filteredGlobals.forEach(k => {
-                    const optionDiv = document.createElement("div");
-                    optionDiv.className = "custom-select-option";
-                    optionDiv.textContent = globalCourses[k].name;
-                    optionDiv.onclick = () => { selectCourse(k, globalCourses[k].name); };
-                    courseDropdown.appendChild(optionDiv);
+                    courseDropdown.appendChild(buildCourseOptionRow(k, globalCourses[k].name));
                 });
             }
         }
 
         if (!hasResults) {
-            courseDropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center;">No courses found.</div>`;
+            const typedName = filterText.trim();
+            if (typedName) {
+                courseDropdown.innerHTML = `<div style="padding:10px 12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No courses found for "${typedName.replace(/</g, '&lt;')}".</div>`;
+                const addDiv = document.createElement("div");
+                addDiv.className = "custom-select-option custom-select-add-option";
+                addDiv.textContent = `➕ Add "${typedName}" as a new course`;
+                addDiv.onclick = () => { addCustomCourse(typedName); };
+                courseDropdown.appendChild(addDiv);
+            } else {
+                courseDropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center;">No courses found.</div>`;
+            }
         }
     }
 
@@ -839,9 +913,31 @@
     document.addEventListener('click', (e) => {
         if (!document.getElementById('course-wrapper').contains(e.target)) {
             courseDropdown.style.display = 'none';
-            const currentSelectedName = getCourseNameById(courseHiddenSelect.value);
-            if (courseSearchInput.value !== currentSelectedName) {
-                courseSearchInput.value = currentSelectedName; 
+            const typedVal = courseSearchInput.value.trim();
+
+            if (typedVal === "") {
+                courseHiddenSelect.value = "";
+                return;
+            }
+
+            // If the typed text is an exact match for a known course, auto-select it
+            let foundId = null;
+            courseDirectory.forEach(g => {
+                g.items.forEach(i => {
+                    if (i.name.toLowerCase() === typedVal.toLowerCase()) foundId = i.id;
+                });
+            });
+            Object.keys(globalCourses).forEach(k => {
+                if (globalCourses[k].name.toLowerCase() === typedVal.toLowerCase()) foundId = k;
+            });
+
+            if (foundId) {
+                courseHiddenSelect.value = foundId;
+            } else if (getCourseNameById(courseHiddenSelect.value) !== typedVal) {
+                // Typed text doesn't match any known course or the previous selection -
+                // treat it as a brand-new course name instead of silently discarding it
+                courseHiddenSelect.value = "";
+                handleCourseChange();
             }
         }
     });
