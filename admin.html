@@ -370,6 +370,9 @@
     <div id="player-list"></div>
     <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
 
+    <button class="btn-add" style="background:#eef6f2; border-color:#2a9d8f; color:#0f4c3a;" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
+    <div id="strokes-preview-container" style="display:none; margin-top:12px; background:#f9fbf9; border:1px solid #d0e1db; border-radius:8px; padding:12px;"></div>
+
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
 
     <div class="end-box">
@@ -1049,6 +1052,99 @@
             }
             regenerateGroupLinks();
         });
+    }
+
+    function parseHcpAdmin(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokesAdmin(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function previewStrokes() {
+        const container = document.getElementById("strokes-preview-container");
+
+        // Pull the 18 hole-handicap (difficulty ranking) values currently in the course grid
+        const holeHcps = [];
+        for (let i = 1; i <= 18; i++) {
+            const el = document.getElementById(`c-hcp-${i}`);
+            const val = el && el.value ? parseInt(el.value, 10) : i;
+            holeHcps.push(val || i);
+        }
+        const hasAnyHcpData = holeHcps.some((v, idx) => document.getElementById(`c-hcp-${idx + 1}`) && document.getElementById(`c-hcp-${idx + 1}`).value);
+        if (!hasAnyHcpData) {
+            container.style.display = "block";
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:#e63946;">⚠️ Select or enter a course with hole handicap (HCP) values first, so strokes can be calculated per hole.</p>`;
+            return;
+        }
+
+        const rows = document.querySelectorAll('.player-row');
+        if (rows.length === 0) {
+            container.style.display = "block";
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:#666;">Add players first to preview strokes.</p>`;
+            return;
+        }
+
+        const playerResults = [];
+        rows.forEach(row => {
+            const nameEl = row.querySelector('.p-name-input');
+            const hcpEl = row.querySelector('.p-hcp-input');
+            const name = (nameEl && nameEl.value.trim()) || "Unnamed";
+            const numericHcp = parseHcpAdmin(hcpEl ? hcpEl.value : "");
+
+            let totalStrokes = 0;
+            const holesWithStrokes = [];
+            holeHcps.forEach((hcpIdx, i) => {
+                const s = getStrokesAdmin(hcpIdx, numericHcp);
+                totalStrokes += s;
+                if (s !== 0) holesWithStrokes.push({ hole: i + 1, strokes: s });
+            });
+
+            playerResults.push({ name, numericHcp, totalStrokes, holesWithStrokes });
+        });
+
+        // Lowest handicap in the field = the "scratch" player for this round's relative match-play convention
+        const lowestHcp = Math.min(...playerResults.map(p => p.numericHcp));
+
+        let html = `<div style="font-weight:bold; color:#0f4c3a; margin-bottom:8px; font-size:0.85rem;">Strokes Received (Full Course Net)</div>`;
+        playerResults.forEach(p => {
+            const holesList = p.holesWithStrokes.length > 0
+                ? p.holesWithStrokes.map(h => `#${h.hole}${h.strokes > 1 ? ` (${h.strokes}x)` : (h.strokes < 0 ? ' (gives)' : '')}`).join(', ')
+                : 'None (plays scratch on this course)';
+            html += `
+                <div style="padding:6px 0; border-bottom:1px solid #eee; font-size:0.8rem;">
+                    <strong>${p.name}</strong> (HCP ${p.numericHcp}) — <strong>${p.totalStrokes}</strong> strokes<br>
+                    <span style="color:#666; font-size:0.75rem;">Holes: ${holesList}</span>
+                </div>`;
+        });
+
+        if (playerResults.length >= 2) {
+            html += `<div style="font-weight:bold; color:#0f4c3a; margin-top:12px; margin-bottom:8px; font-size:0.85rem;">Suggested Match Strokes (vs. lowest HCP in group)</div>`;
+            playerResults.forEach(p => {
+                const relativeStrokes = Math.round(p.numericHcp - lowestHcp);
+                if (relativeStrokes > 0) {
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> would receive <strong>${relativeStrokes}</strong> strokes head-to-head against the lowest handicap in this group.</div>`;
+                } else {
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> plays scratch (lowest handicap in this group).</div>`;
+                }
+            });
+            html += `<div style="font-size:0.7rem; color:#888; margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
+        }
+
+        container.style.display = "block";
+        container.innerHTML = html;
     }
 
     function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true) {
