@@ -7,46 +7,95 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
-        .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
-        
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+            --leader-bg: #fff9e6;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+            --leader-bg: #3a3320;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
         /* Top Navigation Bar */
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
-        .view-toggle-container { display: flex; background: #e0e0e0; border-radius: 8px; padding: 4px; margin-bottom: 12px; }
-        .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #555; background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
-        .view-toggle-btn.active { background: #ffffff; color: #0f4c3a; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .view-toggle-container { display: flex; background: var(--border-light); border-radius: 8px; padding: 4px; margin-bottom: 12px; }
+        .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: var(--text-muted); background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
+        .view-toggle-btn.active { background: var(--bg-card); color: var(--brand-green); box-shadow: 0 2px 4px var(--shadow-color); }
 
-        .h2h-banner { background: #1d3557; color: white; padding: 16px; border-radius: 10px; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .h2h-banner { background: var(--brand-navy); color: white; padding: 16px; border-radius: 10px; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .h2h-status { font-size: 1.25rem; font-weight: bold; margin-bottom: 4px; }
         .h2h-sub { font-size: 0.9rem; color: #a8dadc; }
 
-        .board-table { width: 100%; border-collapse: collapse; margin-bottom: 20px;}
-        .board-table th, .board-table td { padding: 12px 8px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-        .board-table th { color: #666; font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid #ddd; }
-        .row-leader { background-color: #fff9e6; font-weight: bold; }
+        .board-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; color: var(--text-main); }
+        .board-table th, .board-table td { padding: 12px 8px; text-align: center; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .board-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid var(--border-light); }
+        .row-leader { background-color: var(--leader-bg); font-weight: bold; }
         .player-name { text-align: left; font-weight: bold; }
-        .player-hcp { font-size: 0.75rem; color: #888; font-weight: normal; display: block; margin-top: 2px; }
+        .player-hcp { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px; }
         
         .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-        .badge-up { background-color: #2a9d8f; color: #ffffff; }
-        .badge-down { background-color: #e63946; color: #ffffff; }
-        .badge-even { background-color: #e0e0e0; color: #333333; }
+        .badge-up { background-color: var(--accent-teal); color: #ffffff; }
+        .badge-down { background-color: var(--accent-red); color: #ffffff; }
+        .badge-even { background-color: var(--border-light); color: var(--text-main); }
         
-        .to-par-under { color: #e63946; font-weight: bold; }
-        .to-par-over { color: #1a1a1a; font-weight: bold; }
-        .to-par-even { color: #1a1a1a; font-weight: bold; }
+        .to-par-under { color: var(--accent-red); font-weight: bold; }
+        .to-par-over { color: var(--text-main); font-weight: bold; }
+        .to-par-even { color: var(--text-main); font-weight: bold; }
 
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
     </style>
 </head>
 <body>
 
 <div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -70,7 +119,7 @@
     </div>
 
     <div id="board-content">
-        <div style="text-align:center; padding:40px; color:#666;">Loading Leaderboard...</div>
+        <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading Leaderboard...</div>
     </div>
 </div>
 
@@ -86,6 +135,29 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+    });
+    // ------------------
 
     // --- DYNAMIC BETA TIME BOMB ---
     db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
@@ -234,7 +306,7 @@
         if (gameFormat === 'match' || gameFormat === 'bestball') matchScoringType = currentBoardData.matchScoring || "net";
 
         if (players.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">No players active. Admin needs to set up this game.</div>`;
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 20px;">No players active. Admin needs to set up this game.</div>`;
             return;
         }
 
@@ -302,7 +374,7 @@
             const teamKeys = Object.keys(teams);
 
             if (teamKeys.length < 2) {
-                container.innerHTML = `<div style="text-align:center; color:#666; padding: 20px;">Not enough teams assigned for Match Play. Assign players to T-1, T-2, etc. in Admin.</div>`;
+                container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 20px;">Not enough teams assigned for Match Play. Assign players to T-1, T-2, etc. in Admin.</div>`;
                 return;
             }
 
@@ -373,8 +445,8 @@
 
                 if (thruCount === 0) {
                     statusText = "ALL SQUARE";
-                    t1Badge = `<span style="color:#aaa;">-</span>`;
-                    t2Badge = `<span style="color:#aaa;">-</span>`;
+                    t1Badge = `<span style="color:var(--text-muted);">-</span>`;
+                    t2Badge = `<span style="color:var(--text-muted);">-</span>`;
                 } else if (matchClosed) {
                     statusText = `🏁 FINAL: ${finalResult}`;
                     if (totalMatch > 0) {
