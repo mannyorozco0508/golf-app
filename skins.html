@@ -7,44 +7,90 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
-        .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
-        
-        /* Top Navigation Bar */
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
 
-        .action-card { background: #eef6f2; border: 1px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-        .action-card h3 { color: #0f4c3a; margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+
+        .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-        .control-group label { display: block; font-size: 0.75rem; font-weight: bold; color: #0f4c3a; margin-bottom: 4px; }
-        .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid #2a9d8f; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .control-group label { display: block; font-size: 0.75rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
+        .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid var(--accent-teal); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; background: var(--bg-card); color: var(--text-main); }
 
-        .pot-summary { display: flex; justify-content: space-around; background: #1d3557; color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+        .pot-summary { display: flex; justify-content: space-around; background: var(--brand-navy); color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
         .pot-box { display: flex; flex-direction: column; }
         .pot-label { font-size: 0.7rem; text-transform: uppercase; color: #a8dadc; font-weight: bold; margin-bottom: 4px; }
         .pot-val { font-size: 1.1rem; font-weight: bold; }
 
-        .skin-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .skin-table th, .skin-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #eee; }
-        .skin-table th { background: #f0f4f2; color: #0f4c3a; text-transform: uppercase; font-size: 0.75rem; }
-        .winner-name { font-weight: bold; color: #1d3557; text-align: left; }
-        .score-circle { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; border: 2px solid #e63946; color: #e63946; font-weight: bold; font-size: 0.8rem; }
+        .skin-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; background: var(--bg-card); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px var(--shadow-color); }
+        .skin-table th, .skin-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); }
+        .skin-table th { background: var(--nav-bg); color: var(--brand-green); text-transform: uppercase; font-size: 0.75rem; }
+        .winner-name { font-weight: bold; color: var(--brand-navy); text-align: left; }
+        .score-circle { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; border: 2px solid var(--accent-red); color: var(--accent-red); font-weight: bold; font-size: 0.8rem; }
         
-        .ledger-table th { background: #1d3557; color: white; }
-        .val-pos { color: #2a9d8f; font-weight: bold; }
+        .ledger-table th { background: var(--brand-navy); color: white; }
+        .val-pos { color: var(--accent-teal); font-weight: bold; }
 
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
         
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .control-grid { display: none !important; }
+            .top-nav-bar, .btn-primary, .control-grid, .theme-toggle-btn { display: none !important; }
             .action-card { border: 1px solid #ccc; background: #fff; }
         }
     </style>
@@ -52,6 +98,7 @@
 <body>
 
 <div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -81,7 +128,7 @@
         </div>
 
         <div id="skins-content">
-            <div style="text-align:center; padding:30px; color:#666;">Calculating live skins...</div>
+            <div style="text-align:center; padding:30px; color:var(--text-muted);">Calculating live skins...</div>
         </div>
     </div>
 </div>
@@ -94,7 +141,7 @@
             <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
                 <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
                 <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+                <p style="color:var(--text-muted); font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
             </div>`;
         throw new Error("Beta period expired.");
     }
@@ -111,6 +158,29 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+    });
+    // ------------------
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
@@ -259,13 +329,13 @@
         if (potFormat === 'split' || potFormat === 'gross') {
             html += `<h3>Gross Skins Won (${grossSkins.length})</h3>`;
             if (grossSkins.length === 0) {
-                html += `<div style="text-align:center; padding:10px; color:#666; font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
+                html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
             } else {
                 html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th></tr></thead><tbody>`;
                 grossSkins.forEach(s => {
                     html += `<tr>
                         <td>${s.hole}</td>
-                        <td style="color:#888;">${s.par}</td>
+                        <td style="color:var(--text-muted);">${s.par}</td>
                         <td class="winner-name">${s.player.name}</td>
                         <td><span class="score-circle">${s.score}</span></td>
                     </tr>`;
@@ -278,13 +348,13 @@
         if (potFormat === 'split' || potFormat === 'net') {
             html += `<h3>Net Skins Won (${netSkins.length})</h3>`;
             if (netSkins.length === 0) {
-                html += `<div style="text-align:center; padding:10px; color:#666; font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
+                html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
             } else {
                 html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th></tr></thead><tbody>`;
                 netSkins.forEach(s => {
                     html += `<tr>
                         <td>${s.hole}</td>
-                        <td style="color:#888;">${s.par}</td>
+                        <td style="color:var(--text-muted);">${s.par}</td>
                         <td class="winner-name">${s.player.name}</td>
                         <td><span class="score-circle">${s.score}</span></td>
                     </tr>`;
