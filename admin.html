@@ -1482,7 +1482,7 @@
         row.className = `player-row ${gridClass}`;
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
-            <input type="text" class="p-hcp-input" placeholder="HCP (+3.4 if plus)" value="${hcp}">
+            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
             ${teamFieldHtml}
             ${squadFieldHtml}
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
