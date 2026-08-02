@@ -172,6 +172,9 @@
     <div class="header-box">
         <div style="margin-bottom: 6px;">
             <span id="room-code-badge" style="background: #1d3557; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">GAME: ----</span>
+        <div>
+            <span id="group-lock-badge" style="display:none; background: #e63946; color: #ffffff; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.5px; margin-top: 6px; display: inline-block;"></span>
+        </div>
         </div>
         <h1 class="header-title" id="course-title">Golf Scorecard</h1>
         <div class="header-sub" id="format-subtitle">Live Synchronized Scoring</div>
@@ -272,7 +275,8 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
-    let selectedGroup = "all";
+    let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
+    let selectedGroup = lockedGroup ? lockedGroup : "all";
     let currentData = {};
     
     let currentDotHole = 1;
@@ -293,6 +297,12 @@
         currentMode = currentMode.toUpperCase();
         document.getElementById("main-content").style.display = "block";
         document.getElementById("room-code-badge").textContent = "GAME: " + currentMode;
+
+        if (lockedGroup) {
+            const lockBadge = document.getElementById("group-lock-badge");
+            lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
+            lockBadge.style.display = "inline-block";
+        }
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
@@ -366,7 +376,10 @@
 
         let players = currentData.players || [];
         let filteredPlayers = players;
-        if (selectedGroup !== "all") {
+        if (lockedGroup !== null) {
+            const startIdx = (lockedGroup - 1) * 4;
+            filteredPlayers = players.slice(startIdx, startIdx + 4);
+        } else if (selectedGroup !== "all") {
             const startIdx = (selectedGroup - 1) * 4;
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
@@ -672,6 +685,9 @@
         const savedScores = currentData.scores || {};
         const gameFormat = currentData.gameFormat || "stroke";
         const holeBet = currentData.holeBetStake || 0;
+
+        let playerGroupMap = {};
+        players.forEach((p, idx) => { playerGroupMap[p.id] = Math.floor(idx / 4) + 1; });
         
         let scoringType = "net";
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
@@ -793,14 +809,20 @@
                     }
                 }
 
+                const isLocked = lockedGroup !== null && playerGroupMap[p.id] !== lockedGroup;
+                const lockIconHtml = isLocked ? `<div style="position:absolute; top:-6px; right:-8px; font-size:11px; z-index:6;">🔒</div>` : "";
+                const scoreInputHtml = isLocked
+                    ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" disabled style="opacity:0.5; cursor:not-allowed; background:#f0f0f0;">`
+                    : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)">`;
+
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
                             <div style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
                             <div class="score-input-wrapper">
-                                <input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}"
-                                       onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)">
+                                ${scoreInputHtml}
                                 ${shapeHtml}
+                                ${lockIconHtml}
                             </div>
                             ${currentToParHtml}
                             <div class="stroke-dots">${handicapDots}</div>
