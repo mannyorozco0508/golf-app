@@ -247,7 +247,11 @@
             </label>
             <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
                 <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
-                
+
+                <input type="file" accept="image/*" capture="environment" id="scorecard-photo-input" style="display:none;" onchange="handleScorecardPhoto(event)">
+                <button type="button" class="btn-add" style="margin-bottom:8px;" onclick="document.getElementById('scorecard-photo-input').click();">📷 Scan Scorecard Photo (Beta)</button>
+                <div id="ocr-status" style="display:none; font-size:0.78rem; padding:8px 10px; border-radius:6px; margin-bottom:10px; font-weight:bold;"></div>
+
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
                     <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
@@ -1010,6 +1014,123 @@
         if(outEl) outEl.textContent = outPar;
         if(inEl) inEl.textContent = inPar;
         if(totEl) totEl.textContent = outPar + inPar;
+    }
+
+    // --- SCORECARD PHOTO AUTOFILL (Beta) ---
+    // Runs entirely on-device via Tesseract.js - no server, no API key, no cost.
+    // Accuracy on real scorecards varies a lot (small grids, faint print, handwriting),
+    // so this only ever pre-fills the same editable grid above - nothing is saved
+    // to Firebase until the person reviews it and taps the normal Save button.
+    let tesseractLoaded = false;
+    let tesseractLoadingPromise = null;
+
+    function loadTesseractLib() {
+        if (tesseractLoaded && window.Tesseract) return Promise.resolve();
+        if (tesseractLoadingPromise) return tesseractLoadingPromise;
+        tesseractLoadingPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            s.onload = () => { tesseractLoaded = true; resolve(); };
+            s.onerror = () => reject(new Error('Failed to load the scanner library. Check your connection and try again.'));
+            document.head.appendChild(s);
+        });
+        return tesseractLoadingPromise;
+    }
+
+    function setOcrStatus(message, tone) {
+        const statusEl = document.getElementById('ocr-status');
+        if (!statusEl) return;
+        statusEl.style.display = 'block';
+        if (tone === 'error') {
+            statusEl.style.background = 'var(--danger-box-bg)';
+            statusEl.style.color = 'var(--accent-red)';
+        } else if (tone === 'success') {
+            statusEl.style.background = 'var(--nassau-box-bg)';
+            statusEl.style.color = 'var(--brand-green)';
+        } else {
+            statusEl.style.background = 'var(--nav-bg)';
+            statusEl.style.color = 'var(--text-main)';
+        }
+        statusEl.textContent = message;
+    }
+
+    // Looks for rows labeled "Par" and "HCP/Handicap/Index" in the raw OCR text,
+    // and falls back to guessing based on typical value ranges (pars 3-6, handicaps 1-18)
+    // if no explicit labels were recognized.
+    function parseScorecardText(text) {
+        const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const parLabelRegex = /\bpar\b/i;
+        const hcpLabelRegex = /\b(hcp|handicap|hdcp|h'?cap|index)\b/i;
+
+        let parNumbers = [];
+        let hcpNumbers = [];
+
+        lines.forEach(line => {
+            const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+            if (nums.length === 0) return;
+            if (parLabelRegex.test(line) && parNumbers.length < 18) {
+                parNumbers = parNumbers.concat(nums.filter(n => n >= 3 && n <= 6));
+            } else if (hcpLabelRegex.test(line) && hcpNumbers.length < 18) {
+                hcpNumbers = hcpNumbers.concat(nums.filter(n => n >= 1 && n <= 18));
+            }
+        });
+
+        // Fallback: no labeled rows found (or too few holes captured) - guess from value ranges
+        if (parNumbers.length < 9) {
+            lines.forEach(line => {
+                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 3 && n <= 6)) {
+                    if (nums.length > parNumbers.length) parNumbers = nums;
+                }
+            });
+        }
+        if (hcpNumbers.length < 9) {
+            lines.forEach(line => {
+                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 1 && n <= 18)) {
+                    if (nums.length > hcpNumbers.length) hcpNumbers = nums;
+                }
+            });
+        }
+
+        return { pars: parNumbers.slice(0, 18), hcps: hcpNumbers.slice(0, 18) };
+    }
+
+    function applyParsedScorecard(parsed) {
+        let parsFilled = 0, hcpsFilled = 0;
+        for (let i = 1; i <= 18; i++) {
+            const parEl = document.getElementById(`c-par-${i}`);
+            const hcpEl = document.getElementById(`c-hcp-${i}`);
+            if (parsed.pars[i - 1] !== undefined && parEl) { parEl.value = parsed.pars[i - 1]; parsFilled++; }
+            if (parsed.hcps[i - 1] !== undefined && hcpEl) { hcpEl.value = parsed.hcps[i - 1]; hcpsFilled++; }
+        }
+        updateCustomCoursePars();
+
+        if (parsFilled === 0 && hcpsFilled === 0) {
+            setOcrStatus('⚠️ Could not confidently read pars or handicaps from that photo. Please enter them manually below.', 'error');
+        } else {
+            setOcrStatus(`✅ Found ${parsFilled}/18 pars and ${hcpsFilled}/18 handicaps. Double-check every hole against your scorecard before saving - OCR can misread numbers.`, 'success');
+        }
+    }
+
+    async function handleScorecardPhoto(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        setOcrStatus('⏳ Loading scanner...', 'neutral');
+
+        try {
+            await loadTesseractLib();
+            setOcrStatus('🔍 Reading scorecard photo... this can take 10-20 seconds.', 'neutral');
+            const result = await Tesseract.recognize(file, 'eng');
+            const parsed = parseScorecardText(result && result.data ? result.data.text : '');
+            applyParsedScorecard(parsed);
+        } catch (err) {
+            console.error('Scorecard OCR error:', err);
+            setOcrStatus('⚠️ Could not read that photo. Please enter pars/handicaps manually below.', 'error');
+        } finally {
+            event.target.value = '';
+        }
     }
 
     function handleCourseChange() {
