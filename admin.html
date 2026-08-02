@@ -53,6 +53,9 @@
         @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
 
         .share-box { background: #eef6f2; border: 2px dashed #0f4c3a; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
+        .group-link-row { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #e0b3b6; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        .group-link-row span { font-weight: bold; color: #0f4c3a; font-size: 0.85rem; }
+        .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
         .end-box { background: #fff0f0; border: 2px dashed #e63946; border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
@@ -138,9 +141,15 @@
 
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
-        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Players will automatically join this specific private game:</span>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
         <div id="qrcode"></div>
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
+    </div>
+
+    <div class="share-box" id="group-links-box" style="display:none; border-color:#e63946;">
+        <h3>🔒 Group Scorekeeper Links</h3>
+        <span style="font-size: 0.8rem; color: #555; display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
+        <div id="group-links-list"></div>
     </div>
 
     <div class="form-group">
@@ -1065,7 +1074,44 @@
         updateCount();
     }
 
-    function updateCount() { document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; }
+    function updateCount() { 
+        document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
+        regenerateGroupLinks();
+    }
+
+    function regenerateGroupLinks() {
+        const box = document.getElementById('group-links-box');
+        const list = document.getElementById('group-links-list');
+        if (!box || !list) return;
+
+        const playerCount = document.querySelectorAll('.player-row').length;
+        const numGroups = Math.ceil(playerCount / 4);
+
+        if (!currentMode || numGroups <= 1) {
+            box.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+
+        box.style.display = 'block';
+        const baseHref = window.location.href.split('?')[0];
+        const scorecardBase = baseHref.replace('admin.html', 'index.html');
+        let html = '';
+        for (let i = 1; i <= numGroups; i++) {
+            const groupUrl = `${scorecardBase}?game=${currentMode}&group=${i}`;
+            html += `
+                <div class="group-link-row">
+                    <span>🏌️ Group ${i}</span>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${i})">📋 Copy Link</button>
+                </div>
+            `;
+        }
+        list.innerHTML = html;
+    }
+
+    function copyGroupLink(url, groupNum) {
+        navigator.clipboard.writeText(url).then(() => alert(`Copied Group ${groupNum}'s scorekeeper link! Send this ONLY to that group.`));
+    }
 
     function getCategoryIcon(type) {
         if (type === 'marty') return '🎰';
@@ -1281,6 +1327,7 @@
             } else {
                 loadModeData(currentMode);
             }
+            regenerateGroupLinks();
         });
     }
 </script>
