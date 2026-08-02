@@ -7,34 +7,80 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 12px 12px 40px 12px; color: #1a1a1a; -webkit-text-size-adjust: 100%; }
-        .container { max-width: 700px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; }
-        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: #0f4c3a; margin-top: 0; margin-bottom: 12px; }
-        
-        /* Top Navigation Bar */
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: #f0f4f2; color: #0f4c3a; border: 1px solid #d0e1db; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .top-nav-item.active { background: #0f4c3a; color: #ffffff; border-color: #0f4c3a; }
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
 
-        .settle-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-        .settle-header { font-size: 0.9rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+
+        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         
-        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #ffffff; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; font-weight: bold; font-size: 0.95rem; }
-        .val-pos { color: #2a9d8f; }
-        .val-neg { color: #e63946; }
-        .val-even { color: #555; }
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .val-pos { color: var(--accent-teal); }
+        .val-neg { color: var(--accent-red); }
+        .val-even { color: var(--text-muted); }
         
-        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: #555; border-top: 1px solid #d0e1db; padding-top: 8px; }
+        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid var(--border-mid); padding-top: 8px; }
         .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
 
-        .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
         
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .event-title { display: none !important; }
+            .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn { display: none !important; }
             .settle-card { border: 1px solid #ccc; background: #fff; }
         }
     </style>
@@ -42,6 +88,7 @@
 <body>
 
 <div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -55,7 +102,7 @@
     <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
 
     <div id="settle-content">
-        <div style="text-align:center; padding:20px; color:#666;">Calculating final payouts...</div>
+        <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
     </div>
 </div>
 
@@ -84,6 +131,29 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+    });
+    // ------------------
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
@@ -387,12 +457,12 @@
                     ${breakdownHtml}
                 </div>
 
-                <div class="ledger-row" style="background:#f9fbf9;">
+                <div class="ledger-row" style="background:var(--nav-bg);">
                     <span>${matchData.t1Name}:</span>
                     <span>${formatMoney(t1Total)}</span>
                 </div>
                 
-                <div class="ledger-row" style="background:#f9fbf9;">
+                <div class="ledger-row" style="background:var(--nav-bg);">
                     <span>${matchData.t2Name}:</span>
                     <span>${formatMoney(-t1Total)}</span>
                 </div>
