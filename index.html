@@ -275,6 +275,7 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    let hasGroupLock = urlParams.get('group') !== null;
     let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
     let selectedGroup = lockedGroup ? lockedGroup : "all";
     let currentData = {};
@@ -375,12 +376,9 @@
         tempDots = JSON.parse(JSON.stringify(existingDots)); 
 
         let players = currentData.players || [];
-        let filteredPlayers = players;
-        if (lockedGroup !== null) {
-            const startIdx = (lockedGroup - 1) * 4;
-            filteredPlayers = players.slice(startIdx, startIdx + 4);
-        } else if (selectedGroup !== "all") {
-            const startIdx = (selectedGroup - 1) * 4;
+        let filteredPlayers = [];
+        if (players.length <= 4 || hasGroupLock) {
+            const startIdx = hasGroupLock ? (lockedGroup - 1) * 4 : 0;
             filteredPlayers = players.slice(startIdx, startIdx + 4);
         }
 
@@ -688,6 +686,19 @@
 
         let playerGroupMap = {};
         players.forEach((p, idx) => { playerGroupMap[p.id] = Math.floor(idx / 4) + 1; });
+
+        const isMultiGroupRound = players.length > 4;
+
+        const lockBadge = document.getElementById("group-lock-badge");
+        if (lockedGroup) {
+            lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
+            lockBadge.style.display = "inline-block";
+        } else if (isMultiGroupRound) {
+            lockBadge.textContent = `👁️ Spectator View (Read-Only)`;
+            lockBadge.style.display = "inline-block";
+        } else {
+            lockBadge.style.display = "none";
+        }
         
         let scoringType = "net";
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
@@ -809,7 +820,7 @@
                     }
                 }
 
-                const isLocked = lockedGroup !== null && playerGroupMap[p.id] !== lockedGroup;
+                const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);
                 const lockIconHtml = isLocked ? `<div style="position:absolute; top:-6px; right:-8px; font-size:11px; z-index:6;">🔒</div>` : "";
                 const scoreInputHtml = isLocked
                     ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" disabled style="opacity:0.5; cursor:not-allowed; background:#f0f0f0;">`
@@ -845,7 +856,9 @@
                     Object.values(holeDots).forEach(arr => dotCount += arr.length);
                     const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
                     const dotBtnLabel = dotCount > 0 ? `🎯 Dots (${dotCount})` : "🎯 Add Dots";
-                    matchCellHtml += `<button class="${dotBtnClass}" onclick="openDotsModal(${h.hole})">${dotBtnLabel}</button>`;
+                    const dotsAllowed = !isMultiGroupRound || hasGroupLock;
+                    const dotBtnAttrs = dotsAllowed ? `onclick="openDotsModal(${h.hole})"` : `disabled style="opacity:0.5; cursor:not-allowed;"`;
+                    matchCellHtml += `<button class="${dotBtnClass}" ${dotBtnAttrs}>${dotBtnLabel}</button>`;
                 } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
                     const statusPillText = formatMatchPill(log.totMatch, matchCalc.t1Name, matchCalc.t2Name, log.totClosed, log.totRes);
