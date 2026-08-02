@@ -784,9 +784,9 @@
 
     const nineHoleLoops = {
         thistle_27: {
-            cameron: { name: "Cameron Nine (Par 36)", data: [{par:4,hcp:1},{par:4,hcp:3},{par:4,hcp:5},{par:4,hcp:7},{par:4,hcp:9},{par:4,hcp:11},{par:4,hcp:13},{par:4,hcp:15},{par:4,hcp:17}] },
-            mackay: { name: "MacKay Nine (Par 36)", data: [{par:4,hcp:2},{par:4,hcp:4},{par:4,hcp:6},{par:4,hcp:8},{par:4,hcp:10},{par:4,hcp:12},{par:4,hcp:14},{par:4,hcp:16},{par:4,hcp:18}] },
-            stewart: { name: "Stewart Nine (Par 36)", data: [{par:4,hcp:1},{par:4,hcp:3},{par:4,hcp:5},{par:4,hcp:7},{par:4,hcp:9},{par:4,hcp:11},{par:4,hcp:13},{par:4,hcp:15},{par:4,hcp:17}] }
+            cameron: { name: "Cameron Nine (Par 36)", data: [{par:4,hcp:7},{par:4,hcp:4},{par:4,hcp:5},{par:3,hcp:8},{par:5,hcp:3},{par:4,hcp:6},{par:4,hcp:2},{par:3,hcp:9},{par:5,hcp:1}] },
+            mackay: { name: "MacKay Nine (Par 36)", data: [{par:4,hcp:4},{par:4,hcp:5},{par:3,hcp:9},{par:4,hcp:7},{par:4,hcp:3},{par:3,hcp:8},{par:5,hcp:1},{par:4,hcp:6},{par:5,hcp:2}] },
+            stewart: { name: "Stewart Nine (Par 35)", data: [{par:4,hcp:9},{par:4,hcp:7},{par:3,hcp:6},{par:5,hcp:2},{par:3,hcp:8},{par:5,hcp:5},{par:4,hcp:1},{par:4,hcp:3},{par:3,hcp:4}] }
         }
     };
 
@@ -901,6 +901,18 @@
             warningText.innerHTML = "Make quick adjustments from your phone if the course isn't mapped accurately.";
             warningText.style.color = "#555";
         }
+    }
+
+    // Combines a 9-hole loop's REAL difficulty ranking into the odd (front) or even (back) 
+    // slots of an 18-hole handicap chart -- the standard way courses combine modular nines.
+    function remapNineHandicaps(nineData, isFront) {
+        const withIdx = nineData.map((item, idx) => ({ par: item.par, hcp: item.hcp, origIdx: idx }));
+        const sortedByDifficulty = [...withIdx].sort((a, b) => a.hcp - b.hcp);
+        const rankMap = {};
+        sortedByDifficulty.forEach((item, rank) => {
+            rankMap[item.origIdx] = isFront ? (rank * 2) + 1 : (rank * 2) + 2;
+        });
+        return nineData.map((item, idx) => ({ par: item.par, hcpIndex: rankMap[idx] }));
     }
 
     function captureCourseDataGrid() {
@@ -1029,6 +1041,7 @@
             } else {
                 addPlayerRow(); 
             }
+            regenerateGroupLinks();
         });
     }
 
@@ -1182,10 +1195,12 @@
                     const frontKey = document.getElementById("front-nine-select").value;
                     const backKey = document.getElementById("back-nine-select").value;
                     
-                    loops[frontKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: (idx * 2) + 1 }); });
+                    const frontRemapped = remapNineHandicaps(loops[frontKey].data, true);
+                    frontRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: item.hcpIndex }); });
                     
                     if (backKey !== "none") {
-                        loops[backKey].data.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: (idx + 1) * 2 }); });
+                        const backRemapped = remapNineHandicaps(loops[backKey].data, false);
+                        backRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: item.hcpIndex }); });
                         selectedCourseName = `${getCourseNameById(courseKey).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} / ${loops[backKey].name.split(' ')[0]})`;
                     } else {
                         selectedCourseName = `${getCourseNameById(courseKey).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
@@ -1324,10 +1339,10 @@
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
                 addPlayerRow(); 
+                regenerateGroupLinks();
             } else {
                 loadModeData(currentMode);
             }
-            regenerateGroupLinks();
         });
     }
 </script>
