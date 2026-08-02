@@ -38,6 +38,17 @@
         .total-row { background-color: #1d3557; color: white; font-weight: bold; font-size: 1.1rem; }
         .total-row td { border: none !important; color: white !important; }
 
+        /* Settlement Card Styles (matches settlement.html / skins.html design) */
+        .settle-card { background: #eef6f2; border: 2px solid #2a9d8f; border-radius: 10px; padding: 16px; margin-top: 16px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: #0f4c3a; text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #ffffff; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d0e1db; font-weight: bold; font-size: 0.95rem; }
+        .val-pos { color: #2a9d8f; }
+        .val-neg { color: #e63946; }
+        .val-even { color: #555; }
+        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: #555; border-top: 1px solid #d0e1db; padding-top: 8px; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
+        .settle-note { text-align: center; color: #555; font-size: 0.85rem; padding: 8px; }
+
         .btn-primary { width: 100%; background-color: #0f4c3a; color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); margin-top: 16px; }
         
         /* MAGIC PDF HIDING CSS */
@@ -46,6 +57,7 @@
             .container { box-shadow: none; max-width: 100%; padding: 0; }
             .top-nav-bar, .btn-primary, .event-title { display: none !important; }
             .clean-scorecard { box-shadow: none; border: 1px solid #ccc; margin-top: 0; padding: 10px; }
+            .settle-card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -115,6 +127,305 @@
             currentData = snapshot.val() || {};
             renderCleanCard(currentData);
         });
+    }
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    // --- Ported from settlement.html: handles Nassau / Match / Best Ball / Scramble / Ryder ---
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "T-1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
+
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
+
+        let t1Key = teamKeys[0];
+        let t2Key = teamKeys[1];
+        let t1Players = teams[t1Key];
+        let t2Players = teams[t2Key];
+
+        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
+        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
+
+        let activeMatches = [];
+        if (gameFormat === 'nassau') {
+            activeMatches = [
+                { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
+            ];
+        } else {
+            activeMatches = [
+                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
+            ];
+        }
+
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1Best = 999, t2Best = 999;
+            let t1Valid = false, t2Valid = false;
+
+            t1Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < t1Best) t1Best = s;
+                    t1Valid = true;
+                }
+            });
+
+            t2Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) {
+                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    if (s < t2Best) t2Best = s;
+                    t2Valid = true;
+                }
+            });
+
+            if (t1Valid && t2Valid) {
+                let diff = 0;
+                if (t1Best < t2Best) diff = 1;
+                else if (t2Best < t1Best) diff = -1;
+
+                let newPresses = [];
+
+                activeMatches.forEach(m => {
+                    if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
+                        m.status += diff;
+
+                        let hLeft = m.endHole - hNum;
+                        if (Math.abs(m.status) > hLeft) {
+                            m.closed = true;
+                            let winnerName = m.status > 0 ? t1Name : t2Name;
+                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                        }
+
+                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
+                            const threshold = pressRule === '2down' ? 2 : 1;
+
+                            if (Math.abs(m.status) >= threshold && m.triggers === 0) {
+                                m.triggers = 1;
+
+                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
+                                let nextPressNum = existingPresses + 1;
+
+                                newPresses.push({
+                                    id: `P_${m.baseId}_${nextPressNum}`,
+                                    baseId: m.baseId,
+                                    startHole: hNum + 1,
+                                    endHole: m.endHole,
+                                    status: 0,
+                                    label: `Press ${nextPressNum}`,
+                                    triggers: 0,
+                                    closed: false,
+                                    pressNum: nextPressNum
+                                });
+                            }
+                        }
+                    }
+                });
+
+                activeMatches = activeMatches.concat(newPresses);
+            }
+        });
+
+        let t1TotalMoney = 0;
+        if (gameFormat === 'nassau') {
+            activeMatches.forEach(m => {
+                if (m.status > 0) t1TotalMoney += stake;
+                else if (m.status < 0) t1TotalMoney -= stake;
+            });
+        } else {
+            let t18 = activeMatches.find(m => m.id === '18');
+            if (t18) {
+                if (holeBet > 0) {
+                    t1TotalMoney = t18.status * holeBet;
+                } else {
+                    if (t18.status > 0) t1TotalMoney = stake;
+                    else if (t18.status < 0) t1TotalMoney = -stake;
+                }
+            }
+        }
+
+        return { t1Name, t2Name, activeMatches, t1TotalMoney };
+    }
+
+    function formatMoney(amount) {
+        if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
+        if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
+        return `<span class="val-even">$0</span>`;
+    }
+
+    // --- Builds the settlement block that gets appended to the printable card ---
+    function renderSettlementBlock(data) {
+        const players = data.players || [];
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const gameFormat = data.gameFormat || "stroke";
+        const holeBet = data.holeBetStake || 0;
+
+        if (gameFormat === 'skins') {
+            return `
+                <div class="settle-card">
+                    <div class="settle-header">💵 Round Settlement</div>
+                    <div class="settle-note">Skins payouts are tracked on the <strong>💰 Action</strong> tab — open it to see the full per-player payout ledger.</div>
+                </div>
+            `;
+        }
+
+        if (gameFormat === 'dots') {
+            let playerDots = {};
+            players.forEach(p => playerDots[p.id] = 0);
+
+            if (data.dots) {
+                Object.values(data.dots).forEach(holeDots => {
+                    Object.keys(holeDots).forEach(pKey => {
+                        let pid = pKey.replace('p', '');
+                        if (playerDots[pid] !== undefined) {
+                            holeDots[pKey].forEach(dotType => {
+                                if (dotType === 'snake') playerDots[pid] -= 1;
+                                else playerDots[pid] += 1;
+                            });
+                        }
+                    });
+                });
+            }
+
+            let dotVal = data.dotPointVal || 1;
+            let ledgerHtml = "";
+
+            players.forEach(p => {
+                let pts = playerDots[p.id];
+                let money = pts * dotVal;
+                let moneyClass = pts >= 0 ? "val-pos" : "val-neg";
+                let moneyText = pts >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
+
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} Dots):</span>
+                        <span class="${moneyClass}">${moneyText}</span>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="settle-card">
+                    <div class="settle-header">🎯 Round Settlement (Dots)</div>
+                    ${ledgerHtml}
+                </div>
+            `;
+        }
+
+        if (gameFormat !== 'nassau' && !['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) {
+            return `
+                <div class="settle-card">
+                    <div class="settle-header">💵 Round Settlement</div>
+                    <div class="settle-note">Settlement isn't tracked for this game format yet.</div>
+                </div>
+            `;
+        }
+
+        let scoringType = data.nassauScoring || data.matchScoring || "net";
+        let pressRule = data.nassauPressRule || "none";
+        let nassauStake = data.nassauStake || 10;
+        let matchStake = data.matchStake || 50;
+        let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
+
+        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
+
+        if (!matchData) {
+            return `
+                <div class="settle-card">
+                    <div class="settle-header">💵 Round Settlement</div>
+                    <div class="settle-note">Waiting for players and scores to be entered...</div>
+                </div>
+            `;
+        }
+
+        let breakdownHtml = "";
+
+        if (gameFormat === 'nassau') {
+            ['F9', 'B9', '18'].forEach(bId => {
+                let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
+                if (groupMatches.length > 0) {
+                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
+
+                    groupMatches.forEach(m => {
+                        let statusDesc = "All Square ($0)";
+                        if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stakeToUse}`;
+                        else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stakeToUse}`;
+
+                        let lockIcon = m.closed ? "🔒 " : "";
+                        let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
+                        breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+                    });
+                }
+            });
+        } else {
+            let t18 = matchData.activeMatches.find(m => m.id === '18');
+            let statusDesc = "All Square ($0)";
+            if (holeBet > 0) {
+                let amt = Math.abs(t18.status * holeBet);
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+            } else {
+                let amt = matchStake;
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+            }
+            breakdownHtml += `
+                <div class="breakdown-item">
+                    <span>Overall Match:</span>
+                    <span><strong>${statusDesc}</strong></span>
+                </div>
+            `;
+        }
+
+        let t1Total = matchData.t1TotalMoney;
+
+        return `
+            <div class="settle-card">
+                <div class="settle-header">💵 Round Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
+
+                <div class="match-breakdown-list" style="margin-bottom: 16px;">
+                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet Breakdown:</div>
+                    ${breakdownHtml}
+                </div>
+
+                <div class="ledger-row" style="background:#f9fbf9;">
+                    <span>${matchData.t1Name}:</span>
+                    <span>${formatMoney(t1Total)}</span>
+                </div>
+
+                <div class="ledger-row" style="background:#f9fbf9;">
+                    <span>${matchData.t2Name}:</span>
+                    <span>${formatMoney(-t1Total)}</span>
+                </div>
+            </div>
+        `;
     }
 
     function renderCleanCard(data) {
@@ -214,6 +525,11 @@
                     </table>
                 </div>
             </div>
+        `;
+
+        html += renderSettlementBlock(data);
+
+        html += `
             <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
         `;
 
