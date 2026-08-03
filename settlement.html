@@ -373,7 +373,9 @@
                 } else {
                     if (config.tieRule === 'carry') {
                         carry = effectiveStake;
+                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: carry });
                     } else {
+                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: 0 });
                         carry = 0;
                     }
                 }
@@ -382,10 +384,11 @@
         });
 
         const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
-        const rateHistory = [{ stake: config.holeStake, fromHole: startHole }]
-            .concat(sortedPresses.map(pr => ({ stake: pr.newStake, fromHole: pr.fromHole })));
+        const rateHistory = [{ stake: config.holeStake, fromHole: startHole, pressNum: 0 }]
+            .concat(sortedPresses.map((pr, i) => ({ stake: pr.newStake, fromHole: pr.fromHole, pressNum: i + 1 })));
+        const tiesCarried = holeLog.filter(h => h.winner === null && h.carrying > 0).map(h => h.hole);
 
-        return { p1, p2, p1Money, holeLog, rateHistory };
+        return { p1, p2, p1Money, holeLog, rateHistory, tiesCarried };
     }
 
     function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
@@ -417,7 +420,7 @@
             }
 
             const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
-            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => segmentTotals(pr.startHole));
+            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole), { pressNum: i + 1 }));
 
             let p1Money = base.p1Money;
             pressSegs.forEach(seg => { p1Money += seg.p1Money; });
@@ -442,7 +445,7 @@
             }
 
             const baseStatus = matchStatusFromHole(1);
-            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
+            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole), pressNum: i + 1 }));
 
             let p1Money = 0;
             if (baseStatus > 0) p1Money += config.overallStake;
@@ -495,14 +498,18 @@
             p1 = holeCalc.p1; p2 = holeCalc.p2;
             p1TotalCombined += holeCalc.p1Money;
             const historyText = holeCalc.rateHistory.length > 1
-                ? holeCalc.rateHistory.map((r, i) => i === 0 ? `$${r.stake} (hole ${r.fromHole})` : `$${r.stake} (from hole ${r.fromHole})`).join(' → ')
+                ? holeCalc.rateHistory.map(r => r.pressNum === 0 ? `$${r.stake}/hole (Hole ${r.fromHole})` : `Press ${r.pressNum} (Hole ${r.fromHole}): $${r.stake}/hole`).join(' → ')
+                : "";
+            const tiesText = holeCalc.tiesCarried.length > 0
+                ? `<div style="font-size:0.7rem; color:var(--accent-red); padding:0 0 6px 0;">🔁 ${holeCalc.tiesCarried.length} tie${holeCalc.tiesCarried.length > 1 ? 's' : ''} carried forward (Hole${holeCalc.tiesCarried.length > 1 ? 's' : ''} ${holeCalc.tiesCarried.join(', ')})</div>`
                 : "";
             rowsHtml += `
                 <div class="breakdown-item">
                     <span>💵 Hole Bet ($${richConfig.holeStake}/hole${richConfig.tieRule === 'carry' ? ', carries on ties' : ', push on ties'}):</span>
                     <span><strong>${holeCalc.p1.name.split(' ')[0]}: ${fmtM(holeCalc.p1Money)}</strong></span>
                 </div>
-                ${historyText ? `<div style="font-size:0.7rem; color:var(--text-muted); padding:2px 0 6px 0;">${historyText}</div>` : ""}
+                ${historyText ? `<div style="font-size:0.7rem; color:var(--text-muted); padding:2px 0 4px 0;">${historyText}</div>` : ""}
+                ${tiesText}
             `;
         }
         if (overallCalc) {
@@ -514,17 +521,21 @@
                 statusDesc = b.winner ? `${b.winner} Won base bet` : (b.roundComplete ? "Base bet tied ($0)" : "Base bet incomplete");
                 if (overallCalc.pressSegs.length > 0) {
                     const segTexts = overallCalc.pressSegs.map(seg => {
-                        if (!seg.roundComplete) return `from hole ${seg.startHole}: incomplete`;
-                        return `from hole ${seg.startHole}: ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
+                        if (!seg.roundComplete) return `Press ${seg.pressNum} (Hole ${seg.startHole}): incomplete`;
+                        return `Press ${seg.pressNum} (Hole ${seg.startHole}): ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
                     });
-                    statusDesc += ` • Presses — ${segTexts.join(', ')}`;
+                    statusDesc += ` • ${segTexts.join(', ')}`;
                 }
             } else {
                 if (overallCalc.baseStatus > 0) statusDesc = `${overallCalc.p1.name.split(' ')[0]} Won`;
                 else if (overallCalc.baseStatus < 0) statusDesc = `${overallCalc.p2.name.split(' ')[0]} Won`;
                 if (overallCalc.pressResults.length > 0) {
-                    const pressHoles = overallCalc.pressResults.map(pr => pr.startHole).join(', ');
-                    statusDesc += ` (pressed at hole${overallCalc.pressResults.length > 1 ? 's' : ''} ${pressHoles})`;
+                    const segTexts = overallCalc.pressResults.map(pr => {
+                        const st = pr.status;
+                        const desc = st === 0 ? 'All Square' : (st > 0 ? `${overallCalc.p1.name.split(' ')[0]} ${st} UP` : `${overallCalc.p2.name.split(' ')[0]} ${Math.abs(st)} UP`);
+                        return `Press ${pr.pressNum} (Hole ${pr.startHole}): ${desc}`;
+                    });
+                    statusDesc += ` • ${segTexts.join(', ')}`;
                 }
             }
             rowsHtml += `
