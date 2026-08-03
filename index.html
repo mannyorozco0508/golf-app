@@ -276,6 +276,11 @@
         <div id="richholebet-rows-wrapper"></div>
     </div>
 
+    <div class="nassau-payout-box" id="kpgame-payout-container" style="display:none;">
+        <div class="nassau-payout-title">📍 Dollar Game (KPs)</div>
+        <div id="kpgame-rows-wrapper"></div>
+    </div>
+
     <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="card-table-wrapper">
@@ -984,6 +989,78 @@
             .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
+    function renderKPGameTally(data, courseData) {
+        const box = document.getElementById('kpgame-payout-container');
+        const wrapper = document.getElementById('kpgame-rows-wrapper');
+        if (!box || !wrapper) return;
+
+        const allPlayers = data.players || [];
+        const players = allPlayers.filter(p => p.playingForMoney !== false);
+        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
+
+        if (players.length < 2 || kpHoles.length === 0) {
+            box.style.display = 'none';
+            return;
+        }
+
+        if (players.length > 4) {
+            box.style.display = 'block';
+            wrapper.innerHTML = `<div style="font-size:0.8rem; color:var(--accent-red); padding:4px 0;">Set up for single-group rounds (4 players or fewer).</div>`;
+            return;
+        }
+
+        const kpWinners = data.kpWinners || {};
+        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 1;
+
+        let playerMoney = {};
+        players.forEach(p => playerMoney[p.id] = 0);
+
+        box.style.display = 'block';
+        let html = `<div style="margin-bottom:8px;">`;
+
+        kpHoles.forEach(h => {
+            const winnerId = kpWinners[`h${h.hole}`];
+            const winnerPlayer = winnerId ? players.find(p => String(p.id) === String(winnerId)) : null;
+            html += `<div style="padding:6px 0; border-bottom:1px solid var(--border-faint);">
+                <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">Hole ${h.hole} (Par 3)${winnerPlayer ? ` — 🏆 ${winnerPlayer.name.split(' ')[0]} +$${(buyIn * (players.length - 1)).toFixed(2)}` : ''}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:5px;">`;
+            players.forEach(p => {
+                const isWinner = winnerPlayer && String(winnerId) === String(p.id);
+                html += `<button onclick="markKPWinner(${h.hole}, '${p.id}')" style="padding:4px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:${isWinner ? 'var(--accent-teal)' : 'var(--bg-card)'}; color:${isWinner ? '#fff' : 'var(--text-main)'}; font-size:0.72rem; font-weight:bold; cursor:pointer;">${p.name.split(' ')[0]}</button>`;
+            });
+            if (winnerPlayer) {
+                html += `<button onclick="clearKPWinner(${h.hole})" style="padding:4px 10px; border-radius:14px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.72rem; cursor:pointer;">✕</button>`;
+            }
+            html += `</div></div>`;
+
+            if (winnerPlayer) {
+                players.forEach(p => {
+                    if (String(p.id) === String(winnerId)) playerMoney[p.id] += buyIn * (players.length - 1);
+                    else playerMoney[p.id] -= buyIn;
+                });
+            }
+        });
+        html += `</div>`;
+
+        players.forEach(p => {
+            const money = playerMoney[p.id] || 0;
+            const text = money > 0 ? `+$${money.toFixed(2)}` : (money < 0 ? `-$${Math.abs(money).toFixed(2)}` : `$0.00`);
+            const color = money > 0 ? 'var(--accent-teal)' : (money < 0 ? 'var(--accent-red)' : 'inherit');
+            html += `<div style="display:flex; justify-content:space-between; padding:2px 0; font-weight:bold;"><span>${p.name.split(' ')[0]}</span><span style="color:${color};">${text}</span></div>`;
+        });
+        wrapper.innerHTML = html;
+    }
+
+    function markKPWinner(hole, playerId) {
+        db.ref(`events/${currentMode}/kpWinners/h${hole}`).set(playerId)
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function clearKPWinner(hole) {
+        db.ref(`events/${currentMode}/kpWinners/h${hole}`).remove()
+            .catch(err => alert(`Failed to clear: ${err.message}`));
+    }
+
     function renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, setupWarning) {
         const box = document.getElementById('richholebet-payout-container');
         const wrapper = document.getElementById('richholebet-rows-wrapper');
@@ -1621,6 +1698,7 @@
 
         richBetMoneyPlayers = moneyPlayers;
         renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, richBetSetupWarning);
+        renderKPGameTally(currentData, courseData);
 
         buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig);
     }
