@@ -397,6 +397,20 @@
             </div>
         </div>
 
+        <div id="sidegames-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>🐦 Birdie Game</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 12px 26px;">Automatic — birdies/eagles are read from scores. Set up on the Action tab.</p>
+
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+                <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>📍 Dollar Game (KPs)</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin pot on Par 3s. Set up on the Action tab.</p>
+        </div>
+
         <div id="match-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
             <div class="grid-2col">
@@ -1396,6 +1410,13 @@
                 document.getElementById("rhb-overall-mode").value = rhb.overallMode || "stroke";
             }
 
+            if (document.getElementById("enable-birdiegame")) {
+                document.getElementById("enable-birdiegame").checked = data.birdieGameEnabled === true;
+            }
+            if (document.getElementById("enable-kpgame")) {
+                document.getElementById("enable-kpgame").checked = data.kpGameEnabled === true;
+            }
+
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
             
@@ -1746,6 +1767,9 @@
                 overallMode: document.getElementById("rhb-overall-mode").value
             } : null;
 
+            const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
+            const kpGameEnabled = document.getElementById("enable-kpgame") ? document.getElementById("enable-kpgame").checked : false;
+
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
             const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
@@ -1796,6 +1820,8 @@
                 gameFormat: gameFormat,
                 holeBetStake: holeBetStake,
                 richHoleBet: richHoleBet,
+                birdieGameEnabled: birdieGameEnabled,
+                kpGameEnabled: kpGameEnabled,
                 matchScoring: matchScoring,
                 matchStake: matchStake,
                 nassauType: nassauType,
