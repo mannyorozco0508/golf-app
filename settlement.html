@@ -381,7 +381,11 @@
             // Any carry unresolved at the end of a segment is voided - not added to p1Money, not carried further
         });
 
-        return { p1, p2, p1Money, holeLog };
+        const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
+        const rateHistory = [{ stake: config.holeStake, fromHole: startHole }]
+            .concat(sortedPresses.map(pr => ({ stake: pr.newStake, fromHole: pr.fromHole })));
+
+        return { p1, p2, p1Money, holeLog, rateHistory };
     }
 
     function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
@@ -424,7 +428,7 @@
             }
 
             const baseStatus = matchStatusFromHole(1);
-            const pressResults = (presses || []).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
+            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
 
             let p1Money = 0;
             if (baseStatus > 0) p1Money += config.overallStake;
@@ -476,11 +480,15 @@
         if (holeCalc) {
             p1 = holeCalc.p1; p2 = holeCalc.p2;
             p1TotalCombined += holeCalc.p1Money;
+            const historyText = holeCalc.rateHistory.length > 1
+                ? holeCalc.rateHistory.map((r, i) => i === 0 ? `$${r.stake} (hole ${r.fromHole})` : `$${r.stake} (from hole ${r.fromHole})`).join(' → ')
+                : "";
             rowsHtml += `
                 <div class="breakdown-item">
                     <span>💵 Hole Bet ($${richConfig.holeStake}/hole${richConfig.tieRule === 'carry' ? ', carries on ties' : ', push on ties'}):</span>
                     <span><strong>${holeCalc.p1.name.split(' ')[0]}: ${fmtM(holeCalc.p1Money)}</strong></span>
                 </div>
+                ${historyText ? `<div style="font-size:0.7rem; color:var(--text-muted); padding:2px 0 6px 0;">${historyText}</div>` : ""}
             `;
         }
         if (overallCalc) {
@@ -492,7 +500,10 @@
             } else {
                 if (overallCalc.baseStatus > 0) statusDesc = `${overallCalc.p1.name.split(' ')[0]} Won`;
                 else if (overallCalc.baseStatus < 0) statusDesc = `${overallCalc.p2.name.split(' ')[0]} Won`;
-                if (overallCalc.pressResults.length > 0) statusDesc += ` (+${overallCalc.pressResults.length} press${overallCalc.pressResults.length > 1 ? 'es' : ''})`;
+                if (overallCalc.pressResults.length > 0) {
+                    const pressHoles = overallCalc.pressResults.map(pr => pr.startHole).join(', ');
+                    statusDesc += ` (pressed at hole${overallCalc.pressResults.length > 1 ? 's' : ''} ${pressHoles})`;
+                }
             }
             rowsHtml += `
                 <div class="breakdown-item">
