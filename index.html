@@ -994,6 +994,11 @@
         const wrapper = document.getElementById('kpgame-rows-wrapper');
         if (!box || !wrapper) return;
 
+        if (data.kpGameEnabled !== true) {
+            box.style.display = 'none';
+            return;
+        }
+
         const allPlayers = data.players || [];
         const players = allPlayers.filter(p => p.playingForMoney !== false);
         const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
