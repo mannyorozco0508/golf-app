@@ -319,6 +319,211 @@
         return { t1Name, t2Name, activeMatches, t1TotalMoney };
     }
 
+    // --- HOLE BET + OVERALL BET ENGINE (mirrors index.html for final settlement) ---
+    function getRichHoleBetScore(player, holeNum, courseHole, scoringType, savedScores) {
+        const v = savedScores[`p${player.id}_h${holeNum}`];
+        if (!v || v <= 0) return null;
+        const gross = parseInt(v, 10);
+        if (scoringType === 'gross') return gross;
+        return gross - getStrokes(courseHole.hcpIndex, parseHcp(player.hcp));
+    }
+
+    function calculateHoleBetEngine(players, courseData, savedScores, config, presses) {
+        if (!config || config.holeEnabled === false || players.length < 2) return null;
+        const p1 = players[0], p2 = players[1];
+        const sortedPresses = (presses || []).slice().sort((a, b) => a.fromHole - b.fromHole);
+
+        function getStake(holeNum) {
+            let stake = config.holeStake;
+            sortedPresses.forEach(pr => { if (holeNum >= pr.fromHole) stake = pr.newStake; });
+            return stake;
+        }
+
+        let segments = [];
+        if (config.segment === 'frontback') {
+            segments = [
+                { holes: courseData.filter(h => h.hole <= 9) },
+                { holes: courseData.filter(h => h.hole > 9) }
+            ];
+        } else {
+            segments = [{ holes: courseData }];
+        }
+
+        let p1Money = 0;
+        let holeLog = [];
+
+        segments.forEach(seg => {
+            let carry = 0;
+            seg.holes.forEach(h => {
+                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
+                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                if (s1 === null || s2 === null) return;
+
+                const baseStake = getStake(h.hole);
+                const effectiveStake = baseStake + carry;
+
+                if (s1 < s2) {
+                    p1Money += effectiveStake;
+                    holeLog.push({ hole: h.hole, winner: p1.name, amount: effectiveStake });
+                    carry = 0;
+                } else if (s2 < s1) {
+                    p1Money -= effectiveStake;
+                    holeLog.push({ hole: h.hole, winner: p2.name, amount: effectiveStake });
+                    carry = 0;
+                } else {
+                    if (config.tieRule === 'carry') {
+                        carry = effectiveStake;
+                    } else {
+                        carry = 0;
+                    }
+                }
+            });
+            // Any carry unresolved at the end of a segment is voided - not added to p1Money, not carried further
+        });
+
+        return { p1, p2, p1Money, holeLog };
+    }
+
+    function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
+        if (!config || config.overallEnabled === false || players.length < 2) return null;
+        const p1 = players[0], p2 = players[1];
+
+        if (config.overallMode === 'stroke') {
+            let p1Total = 0, p2Total = 0, holesCompleted = 0;
+            courseData.forEach(h => {
+                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
+                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                if (s1 !== null && s2 !== null) {
+                    p1Total += s1;
+                    p2Total += s2;
+                    holesCompleted++;
+                }
+            });
+            const totalHoles = courseData.length;
+            const roundComplete = holesCompleted === totalHoles && totalHoles > 0;
+            let winner = null, money = 0;
+            if (roundComplete) {
+                if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
+                else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
+            }
+            const p1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
+            return { p1, p2, mode: 'stroke', p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, p1Money };
+        } else {
+            function matchStatusFromHole(startHole) {
+                let status = 0;
+                courseData.forEach(h => {
+                    if (h.hole < startHole) return;
+                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
+                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                    if (s1 !== null && s2 !== null) {
+                        if (s1 < s2) status += 1;
+                        else if (s2 < s1) status -= 1;
+                    }
+                });
+                return status;
+            }
+
+            const baseStatus = matchStatusFromHole(1);
+            const pressResults = (presses || []).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
+
+            let p1Money = 0;
+            if (baseStatus > 0) p1Money += config.overallStake;
+            else if (baseStatus < 0) p1Money -= config.overallStake;
+            pressResults.forEach(pr => {
+                if (pr.status > 0) p1Money += config.overallStake;
+                else if (pr.status < 0) p1Money -= config.overallStake;
+            });
+
+            return { p1, p2, mode: 'match', baseStatus, pressResults, p1Money };
+        }
+    }
+
+    function renderRichHoleBetSettlement(data, moneyPlayers) {
+        const richConfig = data.richHoleBet;
+        if (!richConfig || !['stroke', 'match'].includes(data.gameFormat || 'stroke')) return "";
+
+        if (moneyPlayers.length !== 2) {
+            return `
+                <div class="settle-card">
+                    <div class="settle-header">💵 Hole Bet + Overall Bet Settlement</div>
+                    <div style="text-align:center; color:var(--accent-red); padding:10px; font-size:0.85rem;">
+                        ⚠️ This bet needs exactly 2 players marked "Playing for Money" — currently ${moneyPlayers.length}. Fix this on the Home/setup page.
+                    </div>
+                </div>
+            `;
+        }
+
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const holePresses = data.richHoleBetPresses ? Object.values(data.richHoleBetPresses) : [];
+        const overallPresses = data.richOverallBetPresses ? Object.values(data.richOverallBetPresses) : [];
+
+        const holeCalc = calculateHoleBetEngine(moneyPlayers, courseData, savedScores, richConfig, holePresses);
+        const overallCalc = calculateOverallBetEngine(moneyPlayers, courseData, savedScores, richConfig, overallPresses);
+
+        if (!holeCalc && !overallCalc) return "";
+
+        function fmtM(amt) {
+            if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
+            if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
+            return `<span class="val-even">$0</span>`;
+        }
+
+        let rowsHtml = "";
+        let p1TotalCombined = 0;
+        let p1 = null, p2 = null;
+
+        if (holeCalc) {
+            p1 = holeCalc.p1; p2 = holeCalc.p2;
+            p1TotalCombined += holeCalc.p1Money;
+            rowsHtml += `
+                <div class="breakdown-item">
+                    <span>💵 Hole Bet ($${richConfig.holeStake}/hole${richConfig.tieRule === 'carry' ? ', carries on ties' : ', push on ties'}):</span>
+                    <span><strong>${holeCalc.p1.name.split(' ')[0]}: ${fmtM(holeCalc.p1Money)}</strong></span>
+                </div>
+            `;
+        }
+        if (overallCalc) {
+            p1 = overallCalc.p1; p2 = overallCalc.p2;
+            p1TotalCombined += overallCalc.p1Money;
+            let statusDesc = "All Square ($0)";
+            if (overallCalc.mode === 'stroke') {
+                statusDesc = overallCalc.winner ? `${overallCalc.winner} Won` : (overallCalc.roundComplete ? "Tied ($0)" : "Round Incomplete");
+            } else {
+                if (overallCalc.baseStatus > 0) statusDesc = `${overallCalc.p1.name.split(' ')[0]} Won`;
+                else if (overallCalc.baseStatus < 0) statusDesc = `${overallCalc.p2.name.split(' ')[0]} Won`;
+                if (overallCalc.pressResults.length > 0) statusDesc += ` (+${overallCalc.pressResults.length} press${overallCalc.pressResults.length > 1 ? 'es' : ''})`;
+            }
+            rowsHtml += `
+                <div class="breakdown-item">
+                    <span>🏆 Overall Bet ($${richConfig.overallStake}, ${overallCalc.mode === 'stroke' ? 'Stroke' : 'Match'}): ${statusDesc}</span>
+                    <span><strong>${fmtM(overallCalc.p1Money)}</strong></span>
+                </div>
+            `;
+        }
+
+        if (!p1) return "";
+
+        return `
+            <div class="settle-card">
+                <div class="settle-header">💵 Hole Bet + Overall Bet Settlement</div>
+                <div class="match-breakdown-list" style="margin-bottom: 16px;">
+                    <div style="font-weight: bold; margin-bottom: 4px; color: var(--brand-green);">Bet Breakdown:</div>
+                    ${rowsHtml}
+                </div>
+                <div class="ledger-row" style="background:var(--nav-bg);">
+                    <span>${p1.name}:</span>
+                    <span>${fmtM(p1TotalCombined)}</span>
+                </div>
+                <div class="ledger-row" style="background:var(--nav-bg);">
+                    <span>${p2.name}:</span>
+                    <span>${fmtM(-p1TotalCombined)}</span>
+                </div>
+            </div>
+        `;
+    }
+    // ------------------
+
     function renderSettlement(data) {
         const container = document.getElementById("settle-content");
         const players = data.players || [];
@@ -327,9 +532,14 @@
         const gameFormat = data.gameFormat || "stroke";
         const holeBet = data.holeBetStake || 0;
 
+        // Only players opted in to money betting are included in payout math below -
+        // everyone still scores normally regardless of this flag (team formats never show
+        // this checkbox, so it's a no-op there and full teams stay intact).
+        const moneyPlayers = players.filter(p => p.playingForMoney !== false);
+
         if (gameFormat === 'dots') {
             let playerDots = {};
-            players.forEach(p => playerDots[p.id] = 0);
+            moneyPlayers.forEach(p => playerDots[p.id] = 0);
             
             if (data.dots) {
                 Object.values(data.dots).forEach(holeDots => {
@@ -348,7 +558,7 @@
             let dotVal = data.dotPointVal || 1;
             let ledgerHtml = "";
             
-            players.forEach(p => {
+            moneyPlayers.forEach(p => {
                 let pts = playerDots[p.id];
                 let money = pts * dotVal;
                 let moneyClass = pts >= 0 ? "val-pos" : "val-neg";
@@ -372,6 +582,21 @@
             return;
         }
 
+        if (gameFormat === 'stroke') {
+            const richHtml = renderRichHoleBetSettlement(data, moneyPlayers);
+            if (richHtml) {
+                container.innerHTML = richHtml + `<button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>`;
+            } else {
+                container.innerHTML = `
+                    <div class="settle-card">
+                        <div class="settle-header">Final Ledger</div>
+                        <div style="text-align: center; color: var(--text-muted); padding: 10px;">No money bets were set up for this round.</div>
+                    </div>
+                `;
+            }
+            return;
+        }
+
         if (gameFormat !== 'nassau' && !['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) {
             container.innerHTML = `
                 <div class="settle-card">
@@ -389,7 +614,7 @@
         let matchStake = data.matchStake || 50;
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
-        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
+        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
 
         if (!matchData) {
             container.innerHTML = `
@@ -448,6 +673,8 @@
             return `<span class="val-even">$0</span>`;
         }
 
+        const richHtml = (gameFormat === 'match') ? renderRichHoleBetSettlement(data, moneyPlayers) : "";
+
         container.innerHTML = `
             <div class="settle-card">
                 <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
@@ -467,6 +694,7 @@
                     <span>${formatMoney(-t1Total)}</span>
                 </div>
             </div>
+            ${richHtml}
 
             <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
         `;
