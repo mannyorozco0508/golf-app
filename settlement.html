@@ -393,25 +393,39 @@
         const p1 = players[0], p2 = players[1];
 
         if (config.overallMode === 'stroke') {
-            let p1Total = 0, p2Total = 0, holesCompleted = 0;
-            courseData.forEach(h => {
-                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
-                if (s1 !== null && s2 !== null) {
-                    p1Total += s1;
-                    p2Total += s2;
-                    holesCompleted++;
+            function segmentTotals(startHole) {
+                let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
+                courseData.forEach(h => {
+                    if (h.hole < startHole) return;
+                    totalHolesInSeg++;
+                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
+                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                    if (s1 !== null && s2 !== null) {
+                        p1Total += s1;
+                        p2Total += s2;
+                        holesCompleted++;
+                    }
+                });
+                const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
+                let winner = null, money = 0;
+                if (roundComplete) {
+                    if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
+                    else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
                 }
-            });
-            const totalHoles = courseData.length;
-            const roundComplete = holesCompleted === totalHoles && totalHoles > 0;
-            let winner = null, money = 0;
-            if (roundComplete) {
-                if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
-                else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
+                const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
+                return { startHole, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
             }
-            const p1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
-            return { p1, p2, mode: 'stroke', p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, p1Money };
+
+            const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
+            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => segmentTotals(pr.startHole));
+
+            let p1Money = base.p1Money;
+            pressSegs.forEach(seg => { p1Money += seg.p1Money; });
+
+            return {
+                p1, p2, mode: 'stroke', base, pressSegs, p1Money,
+                p1Total: base.p1Total, p2Total: base.p2Total, holesCompleted: base.holesCompleted, totalHoles: base.totalHoles, roundComplete: base.roundComplete, winner: base.winner
+            };
         } else {
             function matchStatusFromHole(startHole) {
                 let status = 0;
@@ -496,7 +510,15 @@
             p1TotalCombined += overallCalc.p1Money;
             let statusDesc = "All Square ($0)";
             if (overallCalc.mode === 'stroke') {
-                statusDesc = overallCalc.winner ? `${overallCalc.winner} Won` : (overallCalc.roundComplete ? "Tied ($0)" : "Round Incomplete");
+                const b = overallCalc.base;
+                statusDesc = b.winner ? `${b.winner} Won base bet` : (b.roundComplete ? "Base bet tied ($0)" : "Base bet incomplete");
+                if (overallCalc.pressSegs.length > 0) {
+                    const segTexts = overallCalc.pressSegs.map(seg => {
+                        if (!seg.roundComplete) return `from hole ${seg.startHole}: incomplete`;
+                        return `from hole ${seg.startHole}: ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
+                    });
+                    statusDesc += ` • Presses — ${segTexts.join(', ')}`;
+                }
             } else {
                 if (overallCalc.baseStatus > 0) statusDesc = `${overallCalc.p1.name.split(' ')[0]} Won`;
                 else if (overallCalc.baseStatus < 0) statusDesc = `${overallCalc.p2.name.split(' ')[0]} Won`;
