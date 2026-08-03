@@ -264,6 +264,7 @@
     <div class="live-ticker-box">
         <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
         <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
+        <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.8rem;"></div>
     </div>
 
     <div class="nassau-payout-box" id="nassau-payout-container">
@@ -1066,6 +1067,102 @@
             .catch(err => alert(`Failed to clear: ${err.message}`));
     }
 
+    function calculateBirdieGameTotals(data, courseData, savedScores) {
+        if (data.birdieGameEnabled !== true) return {};
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 1;
+        const scoringType = data.birdieScoringType || 'gross';
+        let totals = {};
+        players.forEach(p => totals[p.id] = 0);
+        (courseData || []).forEach(h => {
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v || v <= 0) return;
+                let score = parseInt(v, 10);
+                if (scoringType === 'net') score -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const under = parseInt(h.par) - score;
+                if (under >= 1) totals[p.id] += under * unitVal;
+            });
+        });
+        return totals;
+    }
+
+    function calculateKPGameTotals(data, courseData) {
+        if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        if (players.length < 2 || players.length > 4) return { money: {}, wins: {} };
+        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
+        const kpWinners = data.kpWinners || {};
+        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 1;
+        let money = {}, wins = {};
+        players.forEach(p => { money[p.id] = 0; wins[p.id] = 0; });
+        kpHoles.forEach(h => {
+            const winnerId = kpWinners[`h${h.hole}`];
+            if (!winnerId) return;
+            const winnerPlayer = players.find(p => String(p.id) === String(winnerId));
+            if (!winnerPlayer) return;
+            wins[winnerPlayer.id] = (wins[winnerPlayer.id] || 0) + 1;
+            players.forEach(p => {
+                if (String(p.id) === String(winnerId)) money[p.id] += buyIn * (players.length - 1);
+                else money[p.id] -= buyIn;
+            });
+        });
+        return { money, wins };
+    }
+
+    function renderCombinedTally(data, courseData, savedScores, richHoleCalc, richOverallCalc) {
+        const row = document.getElementById('combined-tally-row');
+        if (!row) return;
+
+        const richActive = data.richHoleBet && (richHoleCalc || richOverallCalc);
+        const anyActive = richActive || data.birdieGameEnabled === true || data.kpGameEnabled === true;
+        if (!anyActive) { row.style.display = 'none'; return; }
+
+        let totals = {};
+        function add(name, amt) { totals[name] = (totals[name] || 0) + amt; }
+
+        if (richHoleCalc) { add(richHoleCalc.p1.name, richHoleCalc.p1Money); add(richHoleCalc.p2.name, -richHoleCalc.p1Money); }
+        if (richOverallCalc) { add(richOverallCalc.p1.name, richOverallCalc.p1Money); add(richOverallCalc.p2.name, -richOverallCalc.p1Money); }
+
+        const allPlayers = data.players || [];
+        const birdieTotals = calculateBirdieGameTotals(data, courseData, savedScores);
+        Object.keys(birdieTotals).forEach(pid => {
+            const p = allPlayers.find(pp => String(pp.id) === String(pid));
+            if (p && birdieTotals[pid] !== 0) add(p.name, birdieTotals[pid]);
+        });
+
+        const kpResult = calculateKPGameTotals(data, courseData);
+        let kpWinsList = [];
+        Object.keys(kpResult.money).forEach(pid => {
+            const p = allPlayers.find(pp => String(pp.id) === String(pid));
+            if (p) add(p.name, kpResult.money[pid]);
+        });
+        Object.keys(kpResult.wins || {}).forEach(pid => {
+            const count = kpResult.wins[pid];
+            if (count > 0) {
+                const p = allPlayers.find(pp => String(pp.id) === String(pid));
+                if (p) kpWinsList.push(`${p.name.split(' ')[0]} x${count}`);
+            }
+        });
+
+        const names = Object.keys(totals);
+        if (names.length === 0 && data.kpGameEnabled !== true) { row.style.display = 'none'; return; }
+
+        row.style.display = 'block';
+        let html = '';
+        if (names.length > 0) {
+            html += '💰 ' + names.map(n => {
+                const amt = totals[n];
+                const text = amt > 0 ? `+$${amt.toFixed(2)}` : (amt < 0 ? `-$${Math.abs(amt).toFixed(2)}` : `$0.00`);
+                return `${n.split(' ')[0]}: <strong>${text}</strong>`;
+            }).join(' &nbsp;|&nbsp; ');
+        }
+        if (data.kpGameEnabled === true) {
+            html += `${html ? '<br>' : ''}📍 KPs: ${kpWinsList.length > 0 ? kpWinsList.join(', ') : 'none yet'}`;
+        }
+        row.innerHTML = html;
+    }
+
     function renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, setupWarning) {
         const box = document.getElementById('richholebet-payout-container');
         const wrapper = document.getElementById('richholebet-rows-wrapper');
@@ -1704,6 +1801,7 @@
         richBetMoneyPlayers = moneyPlayers;
         renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, richBetSetupWarning);
         renderKPGameTally(currentData, courseData);
+        renderCombinedTally(currentData, courseData, savedScores, richHoleCalc, richOverallCalc);
 
         buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig);
     }
