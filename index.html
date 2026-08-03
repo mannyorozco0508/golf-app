@@ -294,7 +294,7 @@
     <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
         <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">📤 Export Scorecard</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Generate a traditional horizontal PDF scorecard to save or text out.</span>
-        <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Save Clean PDF</button>
+        <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Send Results PDF</button>
     </div>
 
     <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
@@ -306,7 +306,7 @@
     <div class="end-box-card">
         <h3 style="color: var(--accent-red); margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
-        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End & Wipe Game</button>
+        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End & Wipe Round</button>
     </div>
 </div>
 
@@ -876,10 +876,11 @@
         });
 
         const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
-        const rateHistory = [{ stake: config.holeStake, fromHole: startHole }]
-            .concat(sortedPresses.map(pr => ({ stake: pr.newStake, fromHole: pr.fromHole })));
+        const rateHistory = [{ stake: config.holeStake, fromHole: startHole, pressNum: 0 }]
+            .concat(sortedPresses.map((pr, i) => ({ stake: pr.newStake, fromHole: pr.fromHole, pressNum: i + 1 })));
+        const tiesCarried = holeLog.filter(h => h.winner === null && h.carrying > 0).map(h => h.hole);
 
-        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory };
+        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory, tiesCarried };
     }
 
     function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
@@ -911,7 +912,7 @@
             }
 
             const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
-            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => segmentTotals(pr.startHole));
+            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole), { pressNum: i + 1 }));
 
             let p1Money = base.p1Money;
             pressSegs.forEach(seg => { p1Money += seg.p1Money; });
@@ -936,7 +937,7 @@
             }
 
             const baseStatus = matchStatusFromHole(1);
-            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
+            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole), pressNum: i + 1 }));
 
             let p1Money = 0;
             if (baseStatus > 0) p1Money += config.overallStake;
@@ -1010,10 +1011,13 @@
         if (richHoleCalc) {
             const p1 = richHoleCalc.p1, p2 = richHoleCalc.p2;
             const carryText = richHoleCalc.currentCarry > 0
-                ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${richHoleCalc.currentCarry} carrying</span>`
+                ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${richHoleCalc.currentCarry} carrying to next hole</span>`
                 : '';
             const historyText = richHoleCalc.rateHistory.length > 1
-                ? richHoleCalc.rateHistory.map((r, i) => i === 0 ? `$${r.stake} (hole ${r.fromHole})` : `$${r.stake} (from hole ${r.fromHole})`).join(' → ')
+                ? richHoleCalc.rateHistory.map(r => r.pressNum === 0 ? `$${r.stake}/hole (Hole ${r.fromHole})` : `Press ${r.pressNum} (Hole ${r.fromHole}): $${r.stake}/hole`).join(' → ')
+                : '';
+            const tiesText = richHoleCalc.tiesCarried.length > 0
+                ? `<div style="font-size:0.7rem; color:var(--accent-red); padding:0 0 4px 0;">🔁 ${richHoleCalc.tiesCarried.length} tie${richHoleCalc.tiesCarried.length > 1 ? 's' : ''} carried forward (Hole${richHoleCalc.tiesCarried.length > 1 ? 's' : ''} ${richHoleCalc.tiesCarried.join(', ')})</div>`
                 : '';
             html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border-faint);">
@@ -1021,6 +1025,7 @@
                     <button onclick="pressHoleBet()" style="background:var(--accent-teal); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>
                 </div>
                 ${historyText ? `<div style="font-size:0.7rem; color:var(--text-muted); padding:2px 0 4px 0;">${historyText}</div>` : ''}
+                ${tiesText}
                 <div style="display:flex; justify-content:space-between; padding:4px 0; font-weight:bold;">
                     <span>${p1.name.split(' ')[0]}: ${fmtM(richHoleCalc.p1Money)}</span>
                     <span>${p2.name.split(' ')[0]}: ${fmtM(-richHoleCalc.p1Money)}</span>
@@ -1041,18 +1046,22 @@
                     })();
                 if (richOverallCalc.pressSegs.length > 0) {
                     const segTexts = richOverallCalc.pressSegs.map(seg => {
-                        if (seg.roundComplete) return `from hole ${seg.startHole}: ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
+                        if (seg.roundComplete) return `Press ${seg.pressNum} (Hole ${seg.startHole}): ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
                         const leader = seg.p1Total < seg.p2Total ? p1.name : (seg.p2Total < seg.p1Total ? p2.name : null);
-                        return `from hole ${seg.startHole}: ${leader ? leader.split(' ')[0] + ' leading' : 'tied so far'}`;
+                        return `Press ${seg.pressNum} (Hole ${seg.startHole}): ${leader ? leader.split(' ')[0] + ' leading' : 'tied so far'}`;
                     });
-                    statusText += ` • Presses — ${segTexts.join(', ')}`;
+                    statusText += ` • ${segTexts.join(', ')}`;
                 }
             } else {
                 const s = richOverallCalc.baseStatus;
                 statusText = s === 0 ? 'All Square' : (s > 0 ? `${p1.name.split(' ')[0]} ${s} UP` : `${p2.name.split(' ')[0]} ${Math.abs(s)} UP`);
                 if (richOverallCalc.pressResults.length > 0) {
-                    const pressHoles = richOverallCalc.pressResults.map(pr => pr.startHole).join(', ');
-                    statusText += ` (pressed at hole${richOverallCalc.pressResults.length > 1 ? 's' : ''} ${pressHoles})`;
+                    const segTexts = richOverallCalc.pressResults.map(pr => {
+                        const st = pr.status;
+                        const desc = st === 0 ? 'All Square' : (st > 0 ? `${p1.name.split(' ')[0]} ${st} UP` : `${p2.name.split(' ')[0]} ${Math.abs(st)} UP`);
+                        return `Press ${pr.pressNum} (Hole ${pr.startHole}): ${desc}`;
+                    });
+                    statusText += ` • ${segTexts.join(', ')}`;
                 }
             }
 
@@ -1612,12 +1621,12 @@
 
         richBetMoneyPlayers = moneyPlayers;
         renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, richBetSetupWarning);
-        
-        buildPrintScorecard(filteredPlayers, courseData, savedScores);
+
+        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
-    function buildPrintScorecard(filteredPlayers, courseData, savedScores) {
+    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig) {
         const courseName = currentData.courseName || "Golf Scorecard";
         const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         
@@ -1838,6 +1847,53 @@
                 printHtml += `<div class="pledger-row"><span>No skins won yet.</span></div>`;
             }
             
+            printHtml += `</div>`;
+        }
+
+        // Hole Bet + Overall Bet ledger — independent of gameFormat, shown whenever it's configured
+        if (richHoleCalc || richOverallCalc) {
+            function fmtM(amt) {
+                if (amt > 0) return `+$${amt}`;
+                if (amt < 0) return `-$${Math.abs(amt)}`;
+                return `$0`;
+            }
+            printHtml += `<div class="pledger"><h3>💵 Hole Bet + Overall Bet</h3>`;
+
+            if (richHoleCalc) {
+                const p1 = richHoleCalc.p1, p2 = richHoleCalc.p2;
+                const historyText = richHoleCalc.rateHistory.length > 1
+                    ? richHoleCalc.rateHistory.map(r => r.pressNum === 0 ? `$${r.stake}/hole (Hole ${r.fromHole})` : `Press ${r.pressNum} (Hole ${r.fromHole}): $${r.stake}/hole`).join(' → ')
+                    : `$${richHoleCalc.currentStake}/hole`;
+                const tiesText = richHoleCalc.tiesCarried.length > 0
+                    ? ` — 🔁 ${richHoleCalc.tiesCarried.length} tie${richHoleCalc.tiesCarried.length > 1 ? 's' : ''} carried (Hole${richHoleCalc.tiesCarried.length > 1 ? 's' : ''} ${richHoleCalc.tiesCarried.join(', ')})`
+                    : '';
+                printHtml += `<div class="pledger-row"><span><strong>Hole Bet:</strong> ${historyText}${tiesText}</span></div>`;
+                printHtml += `<div class="pledger-row"><span>${p1.name}: ${fmtM(richHoleCalc.p1Money)} | ${p2.name}: ${fmtM(-richHoleCalc.p1Money)}</span></div>`;
+            }
+            if (richOverallCalc) {
+                const p1 = richOverallCalc.p1, p2 = richOverallCalc.p2;
+                let statusText = '';
+                if (richOverallCalc.mode === 'stroke') {
+                    const b = richOverallCalc.base;
+                    statusText = b.winner ? `${b.winner} won base bet` : (b.roundComplete ? 'Base bet tied' : 'Base bet incomplete');
+                    if (richOverallCalc.pressSegs.length > 0) {
+                        statusText += ' • ' + richOverallCalc.pressSegs.map(seg => `Press ${seg.pressNum} (Hole ${seg.startHole}): ${seg.winner ? seg.winner.split(' ')[0] + ' won' : (seg.roundComplete ? 'tied' : 'incomplete')}`).join(', ');
+                    }
+                } else {
+                    const s = richOverallCalc.baseStatus;
+                    statusText = s === 0 ? 'All Square' : (s > 0 ? `${p1.name.split(' ')[0]} ${s} UP` : `${p2.name.split(' ')[0]} ${Math.abs(s)} UP`);
+                    if (richOverallCalc.pressResults.length > 0) {
+                        statusText += ' • ' + richOverallCalc.pressResults.map(pr => {
+                            const st = pr.status;
+                            const desc = st === 0 ? 'All Square' : (st > 0 ? `${p1.name.split(' ')[0]} ${st} UP` : `${p2.name.split(' ')[0]} ${Math.abs(st)} UP`);
+                            return `Press ${pr.pressNum} (Hole ${pr.startHole}): ${desc}`;
+                        }).join(', ');
+                    }
+                }
+                printHtml += `<div class="pledger-row" style="margin-top:8px; border-top:1px solid #ccc; padding-top:8px;"><span><strong>Overall Bet ($${richConfig.overallStake}, ${richOverallCalc.mode === 'stroke' ? 'Stroke' : 'Match'}):</strong> ${statusText}</span></div>`;
+                printHtml += `<div class="pledger-row"><span>${p1.name}: ${fmtM(richOverallCalc.p1Money)} | ${p2.name}: ${fmtM(-richOverallCalc.p1Money)}</span></div>`;
+            }
+
             printHtml += `</div>`;
         }
 
