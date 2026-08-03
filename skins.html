@@ -226,7 +226,10 @@
     function renderSkinsEngine() {
         if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) return;
 
-        const players = currentData.players || [];
+        const allPlayers = currentData.players || [];
+        // Only players opted in to money betting compete for skins - everyone still scores
+        // normally on the Scorecard tab, but a non-participant's score can't win or affect a skin.
+        const players = allPlayers.filter(p => p.playingForMoney !== false);
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
         const container = document.getElementById("skins-content");
