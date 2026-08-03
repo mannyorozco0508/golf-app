@@ -346,6 +346,57 @@
             </div>
         </div>
 
+        <div id="richholebet-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-richholebet" onchange="toggleRichHoleBet()" style="width: 18px; height: 18px; margin: 0;">
+                <strong>💵 Hole Bet + Overall Bet</strong>
+            </label>
+            <div id="richholebet-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+
+                <label style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                    <input type="checkbox" id="rhb-hole-enabled" checked style="width: 16px; height: 16px; margin: 0;"> Per-Hole Bet
+                </label>
+                <div class="grid-2col" style="margin-bottom: 10px;">
+                    <div><label style="font-size: 0.75rem;">$ per Hole</label><input type="number" id="rhb-hole-stake" value="20" min="1"></div>
+                    <div><label style="font-size: 0.75rem;">Tied Hole</label>
+                        <select id="rhb-tie-rule">
+                            <option value="push">Push (no $ moves)</option>
+                            <option value="carry">Carry Over (rolls to next hole)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-2col" style="margin-bottom: 14px;">
+                    <div><label style="font-size: 0.75rem;">Hole Bet Structure</label>
+                        <select id="rhb-hole-segment">
+                            <option value="full18">Full 18 (continuous)</option>
+                            <option value="frontback">Front 9 &amp; Back 9 (separate)</option>
+                        </select>
+                    </div>
+                    <div><label style="font-size: 0.75rem;">Scored By</label>
+                        <select id="rhb-scoring-type">
+                            <option value="net">Net (uses HCP)</option>
+                            <option value="gross">Gross</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: -8px 0 14px 0;">A carry still unresolved at the last hole of its segment is voided - nobody collects it.</p>
+
+                <label style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+                    <input type="checkbox" id="rhb-overall-enabled" checked style="width: 16px; height: 16px; margin: 0;"> Overall Bet
+                </label>
+                <div class="grid-2col">
+                    <div><label style="font-size: 0.75rem;">$ Overall</label><input type="number" id="rhb-overall-stake" value="100" min="1"></div>
+                    <div><label style="font-size: 0.75rem;">Decided By</label>
+                        <select id="rhb-overall-mode">
+                            <option value="stroke">Lowest Total Score</option>
+                            <option value="match">Most Holes Won (Match Play)</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A tie on the overall bet, either way, means no money changes hands.</p>
+            </div>
+        </div>
+
         <div id="match-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
             <div class="grid-2col">
@@ -606,6 +657,10 @@
 
     function toggleHoleBet() {
         document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
+    }
+
+    function toggleRichHoleBet() {
+        document.getElementById('richholebet-container').style.display = document.getElementById('enable-richholebet').checked ? 'block' : 'none';
     }
 
     function generateRoomCode() {
@@ -1232,7 +1287,9 @@
             const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
             const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / 2) + 1}`;
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
-            list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
+            const moneyInput = row.querySelector('.p-money-input');
+            const moneyVal = moneyInput ? moneyInput.checked : true;
+            list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
         });
         return list;
     }
@@ -1252,28 +1309,35 @@
 
         listContainer.innerHTML = "";
 
+        const showMoneyCheckbox = moneyFormats.includes(format);
+        const moneyHeaderHtml = showMoneyCheckbox ? `<span style="text-align:center; font-size:0.85rem;" title="Playing for money?">💰</span>` : "";
+
         if (format === 'ryder') {
-            headerRow.className = "grid-ryder";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span><span></span>`;
+            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
-            headerRow.className = "grid-team";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span></span>`;
+            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
-            headerRow.className = "grid-stroke";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span></span>`;
+            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
         }
 
         existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false);
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false);
         });
     }
 
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
-        const formatsWithHoleBets = ['stroke', 'match', 'hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
+        const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
+        const formatsWithRichHoleBet = ['stroke', 'match'];
         
         if (document.getElementById("hole-bet-settings")) {
             document.getElementById("hole-bet-settings").style.display = formatsWithHoleBets.includes(format) ? "block" : "none";
+        }
+        if (document.getElementById("richholebet-settings")) {
+            document.getElementById("richholebet-settings").style.display = formatsWithRichHoleBet.includes(format) ? "block" : "none";
         }
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
@@ -1316,6 +1380,20 @@
                     document.getElementById("enable-hole-bet").checked = true;
                     document.getElementById("hole-bet-stake-container").style.display = "block";
                 }
+            }
+
+            if (data.richHoleBet) {
+                const rhb = data.richHoleBet;
+                document.getElementById("enable-richholebet").checked = true;
+                document.getElementById("richholebet-container").style.display = "block";
+                document.getElementById("rhb-hole-enabled").checked = rhb.holeEnabled !== false;
+                document.getElementById("rhb-hole-stake").value = rhb.holeStake || 20;
+                document.getElementById("rhb-tie-rule").value = rhb.tieRule || "push";
+                document.getElementById("rhb-hole-segment").value = rhb.segment || "full18";
+                document.getElementById("rhb-scoring-type").value = rhb.scoringType || "net";
+                document.getElementById("rhb-overall-enabled").checked = rhb.overallEnabled !== false;
+                document.getElementById("rhb-overall-stake").value = rhb.overallStake || 100;
+                document.getElementById("rhb-overall-mode").value = rhb.overallMode || "stroke";
             }
 
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
@@ -1449,7 +1527,9 @@
         container.innerHTML = html;
     }
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true) {
+    const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match'];
+
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value || 'stroke';
@@ -1461,12 +1541,12 @@
         let teamOptionsHtml = "";
         teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
 
-        let gridClass = "grid-stroke";
+        let baseColumns = "2fr 1fr";
         let teamFieldHtml = "";
         let squadFieldHtml = "";
 
         if (format === 'ryder') {
-            gridClass = "grid-ryder";
+            baseColumns = "1.5fr 0.7fr 1fr 1fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
             squadFieldHtml = `
                 <select class="p-squad-input">
@@ -1474,17 +1554,25 @@
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
                 </select>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
-            gridClass = "grid-team";
+            baseColumns = "1.8fr 0.8fr 1.2fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
 
+        const showMoneyCheckbox = moneyFormats.includes(format);
+        let moneyCheckboxHtml = "";
+        if (showMoneyCheckbox) {
+            moneyCheckboxHtml = `<input type="checkbox" class="p-money-input" title="Playing for money?" ${playingForMoney !== false ? 'checked' : ''} style="width:20px; height:20px; cursor:pointer; justify-self:center; accent-color:var(--accent-teal);">`;
+        }
+
         const row = document.createElement("div");
-        row.className = `player-row ${gridClass}`;
+        row.className = "player-row";
+        row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 30px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
             ${teamFieldHtml}
             ${squadFieldHtml}
+            ${moneyCheckboxHtml}
             <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
         `;
         listContainer.appendChild(row);
@@ -1635,6 +1723,29 @@
             const categoryIcon = getCategoryIcon(currentCategory);
 
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
+
+            const richHoleBetEnabled = document.getElementById("enable-richholebet") ? document.getElementById("enable-richholebet").checked : false;
+
+            if (richHoleBetEnabled) {
+                const moneyCheckedCount = Array.from(document.querySelectorAll('.p-money-input')).filter(cb => cb.checked).length;
+                if (moneyCheckedCount !== 2) {
+                    alert(`⚠️ Hole Bet + Overall Bet needs exactly 2 players checked "Playing for Money" — you currently have ${moneyCheckedCount} checked. Adjust the checkboxes next to each player's name, or turn off Hole Bet + Overall Bet.`);
+                    saveBtn.innerText = originalText; saveBtn.disabled = false;
+                    return;
+                }
+            }
+
+            const richHoleBet = richHoleBetEnabled ? {
+                holeEnabled: document.getElementById("rhb-hole-enabled").checked,
+                holeStake: parseFloat(document.getElementById("rhb-hole-stake").value) || 20,
+                tieRule: document.getElementById("rhb-tie-rule").value,
+                segment: document.getElementById("rhb-hole-segment").value,
+                scoringType: document.getElementById("rhb-scoring-type").value,
+                overallEnabled: document.getElementById("rhb-overall-enabled").checked,
+                overallStake: parseFloat(document.getElementById("rhb-overall-stake").value) || 100,
+                overallMode: document.getElementById("rhb-overall-mode").value
+            } : null;
+
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
             const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
@@ -1651,9 +1762,11 @@
                 
                 const teamSelect = row.querySelector('.p-team-input');
                 const squadSelect = row.querySelector('.p-squad-input');
+                const moneyInput = row.querySelector('.p-money-input');
 
                 const teamVal = teamSelect ? teamSelect.value : "T-1";
                 const squadVal = squadSelect ? squadSelect.value : "red";
+                const moneyVal = moneyInput ? moneyInput.checked : true;
                 
                 if (hcpVal !== "") {
                     if (!hcpVal.startsWith("+")) {
@@ -1664,7 +1777,7 @@
                     }
                 }
 
-                playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal });
+                playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
             });
 
             try {
@@ -1682,6 +1795,7 @@
                 courseName: selectedCourseName,
                 gameFormat: gameFormat,
                 holeBetStake: holeBetStake,
+                richHoleBet: richHoleBet,
                 matchScoring: matchScoring,
                 matchStake: matchStake,
                 nassauType: nassauType,
