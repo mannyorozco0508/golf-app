@@ -129,7 +129,7 @@
             </div>
             <div class="control-group">
                 <label>Buy-In Per Player ($)</label>
-                <input type="number" id="skins-buyin" value="20" min="0" onchange="renderSkinsEngine()">
+                <input type="number" id="skins-buyin" value="" min="0" onchange="renderSkinsEngine()" placeholder="0">
             </div>
         </div>
 
@@ -684,19 +684,16 @@
             html += `</div></div>`;
 
             if (winnerPlayer) {
-                players.forEach(p => {
-                    if (String(p.id) === String(winnerId)) playerMoney[p.id] += buyIn * (players.length - 1);
-                    else playerMoney[p.id] -= buyIn;
-                });
+                playerMoney[winnerPlayer.id] += buyIn * (players.length - 1);
             }
         });
         html += `</div>`;
 
-        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
+        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger (amount won)</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
         players.forEach(p => {
             const money = playerMoney[p.id] || 0;
-            const cls = money > 0 ? 'val-pos' : (money < 0 ? 'val-neg' : '');
-            const text = money > 0 ? `+$${money.toFixed(2)}` : (money < 0 ? `-$${Math.abs(money).toFixed(2)}` : `$0.00`);
+            const cls = money > 0 ? 'val-pos' : '';
+            const text = `$${money.toFixed(2)}`;
             html += `<tr><td class="winner-name">${p.name}</td><td class="${cls}">${text}</td></tr>`;
         });
         html += `</tbody></table>`;
