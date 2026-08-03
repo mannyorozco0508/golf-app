@@ -1045,13 +1045,6 @@
         });
         html += `</div>`;
 
-        html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:2px;">Amount won:</div>`;
-        players.forEach(p => {
-            const money = playerMoney[p.id] || 0;
-            const text = `$${money.toFixed(2)}`;
-            const color = money > 0 ? 'var(--accent-teal)' : 'inherit';
-            html += `<div style="display:flex; justify-content:space-between; padding:2px 0; font-weight:bold;"><span>${p.name.split(' ')[0]}</span><span style="color:${color};">${text}</span></div>`;
-        });
         wrapper.innerHTML = html;
     }
 
