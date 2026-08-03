@@ -887,25 +887,39 @@
         const p1 = players[0], p2 = players[1];
 
         if (config.overallMode === 'stroke') {
-            let p1Total = 0, p2Total = 0, holesCompleted = 0;
-            courseData.forEach(h => {
-                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
-                if (s1 !== null && s2 !== null) {
-                    p1Total += s1;
-                    p2Total += s2;
-                    holesCompleted++;
+            function segmentTotals(startHole) {
+                let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
+                courseData.forEach(h => {
+                    if (h.hole < startHole) return;
+                    totalHolesInSeg++;
+                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
+                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                    if (s1 !== null && s2 !== null) {
+                        p1Total += s1;
+                        p2Total += s2;
+                        holesCompleted++;
+                    }
+                });
+                const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
+                let winner = null, money = 0;
+                if (roundComplete) {
+                    if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
+                    else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
                 }
-            });
-            const totalHoles = courseData.length;
-            const roundComplete = holesCompleted === totalHoles && totalHoles > 0;
-            let winner = null, money = 0;
-            if (roundComplete) {
-                if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
-                else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
+                const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
+                return { startHole, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
             }
-            const p1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
-            return { p1, p2, mode: 'stroke', p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, p1Money };
+
+            const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
+            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => segmentTotals(pr.startHole));
+
+            let p1Money = base.p1Money;
+            pressSegs.forEach(seg => { p1Money += seg.p1Money; });
+
+            return {
+                p1, p2, mode: 'stroke', base, pressSegs, p1Money,
+                p1Total: base.p1Total, p2Total: base.p2Total, holesCompleted: base.holesCompleted, totalHoles: base.totalHoles, roundComplete: base.roundComplete, winner: base.winner
+            };
         } else {
             function matchStatusFromHole(startHole) {
                 let status = 0;
@@ -1018,11 +1032,20 @@
             const p1 = richOverallCalc.p1, p2 = richOverallCalc.p2;
             let statusText = '';
             if (richOverallCalc.mode === 'stroke') {
-                if (richOverallCalc.roundComplete) {
-                    statusText = richOverallCalc.winner ? `${richOverallCalc.winner.split(' ')[0]} wins the overall bet` : 'Tied - no money on overall bet';
-                } else {
-                    const leader = richOverallCalc.p1Total < richOverallCalc.p2Total ? p1.name : (richOverallCalc.p2Total < richOverallCalc.p1Total ? p2.name : null);
-                    statusText = leader ? `${leader.split(' ')[0]} currently leading (thru ${richOverallCalc.holesCompleted})` : `Tied through ${richOverallCalc.holesCompleted} holes`;
+                const b = richOverallCalc.base;
+                statusText = b.roundComplete
+                    ? (b.winner ? `${b.winner.split(' ')[0]} won the base bet` : 'Base bet tied - $0')
+                    : (() => {
+                        const leader = b.p1Total < b.p2Total ? p1.name : (b.p2Total < b.p1Total ? p2.name : null);
+                        return leader ? `${leader.split(' ')[0]} currently leading (thru ${b.holesCompleted})` : `Tied through ${b.holesCompleted} holes`;
+                    })();
+                if (richOverallCalc.pressSegs.length > 0) {
+                    const segTexts = richOverallCalc.pressSegs.map(seg => {
+                        if (seg.roundComplete) return `from hole ${seg.startHole}: ${seg.winner ? seg.winner.split(' ')[0] + ' won' : 'tied'}`;
+                        const leader = seg.p1Total < seg.p2Total ? p1.name : (seg.p2Total < seg.p1Total ? p2.name : null);
+                        return `from hole ${seg.startHole}: ${leader ? leader.split(' ')[0] + ' leading' : 'tied so far'}`;
+                    });
+                    statusText += ` • Presses — ${segTexts.join(', ')}`;
                 }
             } else {
                 const s = richOverallCalc.baseStatus;
@@ -1036,7 +1059,7 @@
             html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:2px solid var(--border-mid); margin-top:4px;">
                     <span>🏆 Overall Bet ($${richConfig.overallStake}, ${richOverallCalc.mode === 'stroke' ? 'Stroke' : 'Match'})</span>
-                    ${richOverallCalc.mode === 'match' ? `<button onclick="pressOverallBet()" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>` : ''}
+                    <button onclick="pressOverallBet()" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>
                 </div>
                 <div style="font-size:0.8rem; color:var(--text-muted); padding:2px 0;">${statusText}</div>
                 <div style="display:flex; justify-content:space-between; padding:4px 0; font-weight:bold;">
