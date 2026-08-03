@@ -875,7 +875,11 @@
             currentCarry = carry; // carry left over from whichever segment is currently in progress
         });
 
-        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake };
+        const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
+        const rateHistory = [{ stake: config.holeStake, fromHole: startHole }]
+            .concat(sortedPresses.map(pr => ({ stake: pr.newStake, fromHole: pr.fromHole })));
+
+        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory };
     }
 
     function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
@@ -918,7 +922,7 @@
             }
 
             const baseStatus = matchStatusFromHole(1);
-            const pressResults = (presses || []).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
+            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map(pr => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole) }));
 
             let p1Money = 0;
             if (baseStatus > 0) p1Money += config.overallStake;
@@ -994,11 +998,15 @@
             const carryText = richHoleCalc.currentCarry > 0
                 ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${richHoleCalc.currentCarry} carrying</span>`
                 : '';
+            const historyText = richHoleCalc.rateHistory.length > 1
+                ? richHoleCalc.rateHistory.map((r, i) => i === 0 ? `$${r.stake} (hole ${r.fromHole})` : `$${r.stake} (from hole ${r.fromHole})`).join(' → ')
+                : '';
             html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border-faint);">
                     <span>💵 Hole Bet ($${richHoleCalc.currentStake}/hole)${carryText}</span>
                     <button onclick="pressHoleBet()" style="background:var(--accent-teal); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>
                 </div>
+                ${historyText ? `<div style="font-size:0.7rem; color:var(--text-muted); padding:2px 0 4px 0;">${historyText}</div>` : ''}
                 <div style="display:flex; justify-content:space-between; padding:4px 0; font-weight:bold;">
                     <span>${p1.name.split(' ')[0]}: ${fmtM(richHoleCalc.p1Money)}</span>
                     <span>${p2.name.split(' ')[0]}: ${fmtM(-richHoleCalc.p1Money)}</span>
@@ -1020,7 +1028,8 @@
                 const s = richOverallCalc.baseStatus;
                 statusText = s === 0 ? 'All Square' : (s > 0 ? `${p1.name.split(' ')[0]} ${s} UP` : `${p2.name.split(' ')[0]} ${Math.abs(s)} UP`);
                 if (richOverallCalc.pressResults.length > 0) {
-                    statusText += ` (+${richOverallCalc.pressResults.length} press${richOverallCalc.pressResults.length > 1 ? 'es' : ''})`;
+                    const pressHoles = richOverallCalc.pressResults.map(pr => pr.startHole).join(', ');
+                    statusText += ` (pressed at hole${richOverallCalc.pressResults.length > 1 ? 's' : ''} ${pressHoles})`;
                 }
             }
 
