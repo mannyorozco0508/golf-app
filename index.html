@@ -953,14 +953,16 @@
         const rate = parseFloat(input);
         if (isNaN(rate) || rate <= 0) { alert("Please enter a valid dollar amount."); return; }
         const pushKey = db.ref(`events/${currentMode}/richHoleBetPresses`).push().key;
-        writeToFirebase(`events/${currentMode}/richHoleBetPresses/${pushKey}`, { fromHole: nextHole, newStake: rate }, false);
+        db.ref(`events/${currentMode}/richHoleBetPresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
+            .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
     function pressOverallBet() {
         const nextHole = getLastPlayedHoleForRichBet() + 1;
         if (!confirm(`Start a new press on the overall bet, starting hole ${nextHole}?`)) return;
         const pushKey = db.ref(`events/${currentMode}/richOverallBetPresses`).push().key;
-        writeToFirebase(`events/${currentMode}/richOverallBetPresses/${pushKey}`, { startHole: nextHole }, false);
+        db.ref(`events/${currentMode}/richOverallBetPresses/${pushKey}`).set({ startHole: nextHole })
+            .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
     function renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, setupWarning) {
