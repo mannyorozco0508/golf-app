@@ -138,7 +138,7 @@
         </div>
     </div>
 
-    <div class="action-card">
+    <div class="action-card" id="birdiegame-card" style="display:none;">
         <h3>🐦 Birdie Game</h3>
         <div class="control-grid">
             <div class="control-group">
@@ -159,12 +159,12 @@
         </div>
     </div>
 
-    <div class="action-card">
+    <div class="action-card" id="kpgame-card" style="display:none;">
         <h3>📍 Dollar Game (KPs)</h3>
         <div class="control-grid">
             <div class="control-group">
                 <label>Buy-In Per Player ($)</label>
-                <input type="number" id="kp-buyin" value="1" min="0" step="0.5" onchange="renderKPGame()">
+                <input type="number" id="kp-buyin" value="1" min="0" step="0.5" onchange="saveKPBuyIn()">
             </div>
         </div>
         <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:12px;">Everyone chips in on each Par 3. Tap the winner for a hole once it's settled on the course — everyone else's dollar goes to them.</span>
@@ -561,7 +561,15 @@
     }
 
     function renderBirdieGame() {
+        const card = document.getElementById("birdiegame-card");
         if (!currentData || !currentData.players) return;
+
+        if (currentData.birdieGameEnabled !== true) {
+            if (card) card.style.display = 'none';
+            return;
+        }
+        if (card) card.style.display = 'block';
+
         const allPlayers = currentData.players || [];
         const players = allPlayers.filter(p => p.playingForMoney !== false);
         const courseData = currentData.courseData || [];
@@ -617,7 +625,15 @@
     }
 
     function renderKPGame() {
+        const card = document.getElementById("kpgame-card");
         if (!currentData || !currentData.players) return;
+
+        if (currentData.kpGameEnabled !== true) {
+            if (card) card.style.display = 'none';
+            return;
+        }
+        if (card) card.style.display = 'block';
+
         const allPlayers = currentData.players || [];
         const players = allPlayers.filter(p => p.playingForMoney !== false);
         const courseData = currentData.courseData || [];
@@ -633,7 +649,9 @@
             return;
         }
 
-        const buyIn = parseFloat(document.getElementById("kp-buyin").value) || 0;
+        const buyIn = currentData.kpBuyIn !== undefined ? currentData.kpBuyIn : 1;
+        const kpBuyInEl = document.getElementById("kp-buyin");
+        if (kpBuyInEl && document.activeElement !== kpBuyInEl) kpBuyInEl.value = buyIn;
         const kpHoles = courseData.filter(h => parseInt(h.par) === 3);
         const kpWinners = currentData.kpWinners || {};
 
@@ -680,6 +698,12 @@
         html += `</tbody></table>`;
 
         container.innerHTML = html;
+    }
+
+    function saveKPBuyIn() {
+        const val = parseFloat(document.getElementById("kp-buyin").value) || 0;
+        db.ref(`events/${currentMode}/kpBuyIn`).set(val)
+            .catch(err => alert(`Failed to save buy-in: ${err.message}`));
     }
 
     function markKPWinner(hole, playerId) {
