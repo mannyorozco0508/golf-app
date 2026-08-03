@@ -356,6 +356,10 @@
         const gameFormat = data.gameFormat || "stroke";
         const holeBet = data.holeBetStake || 0;
 
+        // Only players opted in to money betting are included in payout math below -
+        // everyone still scores normally regardless of this flag.
+        const moneyPlayers = players.filter(p => p.playingForMoney !== false);
+
         if (gameFormat === 'skins') {
             return `
                 <div class="settle-card">
@@ -367,7 +371,7 @@
 
         if (gameFormat === 'dots') {
             let playerDots = {};
-            players.forEach(p => playerDots[p.id] = 0);
+            moneyPlayers.forEach(p => playerDots[p.id] = 0);
 
             if (data.dots) {
                 Object.values(data.dots).forEach(holeDots => {
@@ -386,7 +390,7 @@
             let dotVal = data.dotPointVal || 1;
             let ledgerHtml = "";
 
-            players.forEach(p => {
+            moneyPlayers.forEach(p => {
                 let pts = playerDots[p.id];
                 let money = pts * dotVal;
                 let moneyClass = pts >= 0 ? "val-pos" : "val-neg";
@@ -423,7 +427,7 @@
         let matchStake = data.matchStake || 50;
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
-        const matchData = calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
+        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
 
         if (!matchData) {
             return `
