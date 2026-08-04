@@ -1313,10 +1313,12 @@
     function captureCurrentPlayerInputs() {
         const rows = document.querySelectorAll('.player-row');
         const list = [];
+        const captureFormat = document.getElementById("game-format-select") ? document.getElementById("game-format-select").value : 'stroke';
+        const captureTeamSize = (captureFormat === 'scramble') ? 4 : (captureFormat === 'match' ? 1 : 2);
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : "";
             const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
-            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / 2) + 1}`;
+            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / captureTeamSize) + 1}`;
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
             const moneyInput = row.querySelector('.p-money-input');
             const moneyVal = moneyInput ? moneyInput.checked : true;
