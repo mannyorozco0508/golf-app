@@ -215,18 +215,37 @@
         let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
         let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
 
+        let hasFront = courseData.some(h => h.hole <= 9);
+        let hasBack = courseData.some(h => h.hole > 9);
+
         let activeMatches = [];
         if (gameFormat === 'nassau') {
-            activeMatches = [
-                { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
-                { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
-                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
-            ];
+            if (hasFront && hasBack) {
+                activeMatches = [
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
+                    { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            } else if (hasFront) {
+                activeMatches = [
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            } else if (hasBack) {
+                activeMatches = [
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                ];
+            }
         } else {
+            let startH = hasFront ? 1 : 10;
+            let endH = hasBack ? 18 : 9;
             activeMatches = [
-                { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Match', triggers: 0, closed: false, pressNum: 0 }
+                { id: '18', baseId: '18', startHole: startH, endHole: endH, status: 0, label: 'Overall Match', triggers: 0, closed: false, pressNum: 0 }
             ];
         }
+
+        let pressCount = 0;
+        let maxThru = 0;
+        let holeLog = {};
 
         courseData.forEach(hole => {
             let hNum = hole.hole;
@@ -252,10 +271,12 @@
             });
 
             if (t1Valid && t2Valid) {
+                maxThru++;
                 let diff = 0;
                 if (t1Best < t2Best) diff = 1;
                 else if (t2Best < t1Best) diff = -1;
 
+                let holeWinner = diff === 1 ? t1Name : (diff === -1 ? t2Name : "Halved");
                 let newPresses = [];
 
                 activeMatches.forEach(m => {
@@ -276,12 +297,13 @@
 
                             if ((autoTrigger || manualTrigger) && m.triggers === 0) {
                                 m.triggers = 1;
+                                pressCount++;
                                 
                                 let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
                                 let nextPressNum = existingPresses + 1;
                                 
                                 newPresses.push({
-                                    id: `P_${m.baseId}_${nextPressNum}`, 
+                                    id: `P${pressCount}`, 
                                     baseId: m.baseId, 
                                     startHole: hNum + 1, 
                                     endHole: m.endHole, 
@@ -297,6 +319,17 @@
                 });
                 
                 activeMatches = activeMatches.concat(newPresses);
+
+                let f9 = activeMatches.find(m => m.id === 'F9');
+                let b9 = activeMatches.find(m => m.id === 'B9');
+                let t18 = activeMatches.find(m => m.id === '18');
+
+                holeLog[hNum] = {
+                    holeWinner: holeWinner,
+                    f9Match: f9 ? f9.status : 0, f9Closed: f9 ? f9.closed : false, f9Res: f9 ? f9.finalResult : "",
+                    b9Match: b9 ? b9.status : 0, b9Closed: b9 ? b9.closed : false, b9Res: b9 ? b9.finalResult : "",
+                    totMatch: t18 ? t18.status : 0, totClosed: t18 ? t18.closed : false, totRes: t18 ? t18.finalResult : ""
+                };
             }
         });
 
@@ -317,7 +350,7 @@
             });
         }
 
-        return { t1Name, t2Name, activeMatches, t1TotalMoney };
+        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
     }
 
     // --- HOLE BET + OVERALL BET ENGINE (mirrors index.html for final settlement) ---
@@ -731,7 +764,7 @@
         let scoringType = data.nassauScoring || data.matchScoring || "net";
         let pressRule = gameFormat === 'nassau' ? (data.nassauPressRule || "none") : (data.matchPressRule || "none");
         let nassauStake = data.nassauStake || 10;
-        let matchStake = data.matchStake || 50;
+        let matchStake = data.matchStake || 0;
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
         const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
