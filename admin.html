@@ -397,12 +397,19 @@
             </div>
         </div>
 
-        <div id="sidegames-settings" class="extra-settings-box" style="display: block;">
+        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0;">
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">Side Games — run independently, no matter what's set above</p>
+
+        <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
             </label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 12px 26px;">Automatic — birdies/eagles are read from scores. Set up on the Action tab.</p>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores.</p>
+            <div style="margin: 0 0 12px 26px; max-width: 200px;">
+                <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
+                <input type="number" id="birdie-unit-val-admin" value="1" min="0" step="0.5">
+            </div>
 
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
                 <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
@@ -410,6 +417,7 @@
             </label>
             <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin pot on Par 3s. Set up on the Action tab.</p>
         </div>
+        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0 0 0;">
 
         <div id="match-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
@@ -423,9 +431,18 @@
                 </div>
                 <div>
                     <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
-                    <input type="number" id="match-stake" value="50" min="0">
+                    <input type="number" id="match-stake" value="" min="0" placeholder="0">
                 </div>
             </div>
+            <div style="margin-top: 10px;">
+                <label style="font-size: 0.75rem;">Press Rule</label>
+                <select id="match-press-rule">
+                    <option value="none">No Press</option>
+                    <option value="2down" selected>Auto @ 2 Down</option>
+                    <option value="1down">Auto @ 1 Down</option>
+                </select>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
             <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
         </div>
 
@@ -1413,12 +1430,16 @@
             if (document.getElementById("enable-birdiegame")) {
                 document.getElementById("enable-birdiegame").checked = data.birdieGameEnabled === true;
             }
+            if (document.getElementById("birdie-unit-val-admin")) {
+                document.getElementById("birdie-unit-val-admin").value = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 1;
+            }
             if (document.getElementById("enable-kpgame")) {
                 document.getElementById("enable-kpgame").checked = data.kpGameEnabled === true;
             }
 
             if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
             if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
+            if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
             
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
@@ -1769,9 +1790,11 @@
 
             const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
             const kpGameEnabled = document.getElementById("enable-kpgame") ? document.getElementById("enable-kpgame").checked : false;
+            const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
 
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
             const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
+            const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
             const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
@@ -1822,8 +1845,10 @@
                 richHoleBet: richHoleBet,
                 birdieGameEnabled: birdieGameEnabled,
                 kpGameEnabled: kpGameEnabled,
+                birdieUnitVal: birdieUnitVal,
                 matchScoring: matchScoring,
                 matchStake: matchStake,
+                matchPressRule: matchPressRule,
                 nassauType: nassauType,
                 nassauScoring: nassauScoring,
                 nassauStake: nassauStake,
