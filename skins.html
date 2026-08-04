@@ -143,7 +143,7 @@
         <div class="control-grid">
             <div class="control-group">
                 <label>$ Per Unit</label>
-                <input type="number" id="birdie-unit-val" value="1" min="0" step="0.5" onchange="saveBirdieConfig()">
+                <input type="number" id="birdie-unit-val" value="" min="0" step="0.5" placeholder="0" onchange="saveBirdieConfig()">
             </div>
             <div class="control-group">
                 <label>Scoring</label>
@@ -164,7 +164,7 @@
         <div class="control-grid">
             <div class="control-group">
                 <label>Buy-In Per Player ($)</label>
-                <input type="number" id="kp-buyin" value="1" min="0" step="0.5" onchange="saveKPBuyIn()">
+                <input type="number" id="kp-buyin" value="" min="0" step="0.5" placeholder="0" onchange="saveKPBuyIn()">
             </div>
         </div>
         <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:12px;">Everyone chips in on each Par 3. Tap the winner for a hole once it's settled on the course — everyone else's dollar goes to them.</span>
@@ -577,7 +577,7 @@
         const container = document.getElementById("birdie-content");
         if (!container) return;
 
-        const unitVal = currentData.birdieUnitVal !== undefined ? currentData.birdieUnitVal : 1;
+        const unitVal = currentData.birdieUnitVal !== undefined ? currentData.birdieUnitVal : 0;
         const scoringType = currentData.birdieScoringType || 'gross';
         const unitValEl = document.getElementById("birdie-unit-val");
         const scoringTypeEl = document.getElementById("birdie-scoring-type");
@@ -653,7 +653,7 @@
             return;
         }
 
-        const buyIn = currentData.kpBuyIn !== undefined ? currentData.kpBuyIn : 1;
+        const buyIn = currentData.kpBuyIn !== undefined ? currentData.kpBuyIn : 0;
         const kpBuyInEl = document.getElementById("kp-buyin");
         if (kpBuyInEl && document.activeElement !== kpBuyInEl) kpBuyInEl.value = buyIn;
         const kpHoles = courseData.filter(h => parseInt(h.par) === 3);
