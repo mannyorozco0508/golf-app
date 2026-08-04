@@ -735,7 +735,7 @@
                             m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
-                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
+                        if ((pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
                             const threshold = pressRule === '2down' ? 2 : 1;
                             
                             if (Math.abs(m.status) >= threshold && m.triggers === 0) {
@@ -1356,7 +1356,7 @@
         if (gameFormat === 'hilo') {
             hiloCalc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
-            let pressRule = currentData.nassauPressRule || "none";
+            let pressRule = gameFormat === 'nassau' ? (currentData.nassauPressRule || "none") : (currentData.matchPressRule || "none");
             let nassauStake = currentData.nassauStake || 10;
             let matchStake = currentData.matchStake || 50;
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
@@ -1597,7 +1597,11 @@
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
             const thruText = t18.closed ? "" : ` (Thru ${matchCalc.maxThru})`;
-            statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>`;
+            const pressLabels = matchCalc.activeMatches.filter(m => m.pressNum > 0).map(m => m.label);
+            const pressText = pressLabels.length > 0
+                ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">🔥 ${pressLabels.join(' → ')}</div>`
+                : '';
+            statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${pressText}`;
             
             document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
             let t1Money = matchCalc.t1TotalMoney;
