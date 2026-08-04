@@ -293,7 +293,7 @@
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
-            let key = p.team || "T-1";
+            let key = p.team || "Team 1";
             if (!teams[key]) teams[key] = [];
             teams[key].push(p);
         });
