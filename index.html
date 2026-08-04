@@ -641,7 +641,7 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
             let key = p.team || "T-1";
@@ -735,10 +735,12 @@
                             m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
-                        if ((pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
-                            const threshold = pressRule === '2down' ? 2 : 1;
-                            
-                            if (Math.abs(m.status) >= threshold && m.triggers === 0) {
+                        if (hNum < m.endHole) {
+                            const threshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : null);
+                            const autoTrigger = threshold !== null && Math.abs(m.status) >= threshold;
+                            const manualTrigger = (manualPresses || []).some(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
+
+                            if ((autoTrigger || manualTrigger) && m.triggers === 0) {
                                 m.triggers = 1;
                                 pressCount++;
                                 
@@ -783,15 +785,14 @@
                 else if (m.status < 0) t1TotalMoney -= stake;
             });
         } else {
-            let t18 = activeMatches.find(m => m.id === '18');
-            if (t18) {
+            activeMatches.forEach(m => {
                 if (holeBet > 0) {
-                    t1TotalMoney = t18.status * holeBet;
+                    t1TotalMoney += m.status * holeBet;
                 } else {
-                    if (t18.status > 0) t1TotalMoney = stake;
-                    else if (t18.status < 0) t1TotalMoney = -stake;
+                    if (m.status > 0) t1TotalMoney += stake;
+                    else if (m.status < 0) t1TotalMoney -= stake;
                 }
-            }
+            });
         }
 
         return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
@@ -969,6 +970,13 @@
             if (v1 && v1 > 0 && v2 && v2 > 0) last = Math.max(last, h.hole);
         });
         return last;
+    }
+
+    function pressMatchBet(baseId, nextHole) {
+        if (!confirm(`Start a new press, starting hole ${nextHole}?`)) return;
+        const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
+        db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId, startHole: nextHole })
+            .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
     function pressHoleBet() {
@@ -1361,7 +1369,8 @@
             let matchStake = currentData.matchStake || 50;
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
-            matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
+            const manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
+            matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
         }
 
         // Hole Bet + Overall Bet add-on (Stroke Play / Match Play only)
@@ -1611,6 +1620,9 @@
                 return `<span class="val-even">$0</span>`;
             }
             let betTypeStr = holeBet > 0 ? `$${holeBet} Per Hole` : `$${currentData.matchStake || 50} Flat Match`;
+            const pressBtnHtml = (!t18.closed && matchCalc.maxThru < t18.endHole)
+                ? `<button onclick="pressMatchBet('18', ${matchCalc.maxThru + 1})" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
+                : '';
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
                     <span>Bet Type:</span>
@@ -1620,6 +1632,7 @@
                     <span>Financial Ledger:</span>
                     <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
                 </div>
+                ${pressBtnHtml ? `<div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>` : ''}
             `;
             
         } else if (gameFormat === 'nassau' && matchCalc && matchCalc.maxThru > 0) {
@@ -1661,7 +1674,11 @@
                 if(groupMatches.length > 0) {
                     let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
                     if (!hasBack || !hasFront) groupLabel = 'Match';
-                    matchesListHtml += `<div style="background:var(--subtle-bg); color:var(--brand-green); padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
+                    const openMatch = groupMatches.find(m => !m.closed && m.triggers === 0 && matchCalc.maxThru < m.endHole);
+                    const pressBtn = openMatch
+                        ? `<button onclick="pressMatchBet('${bId}', ${matchCalc.maxThru + 1})" style="background:var(--brand-navy); color:white; border:none; border-radius:5px; padding:2px 8px; font-size:0.7rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
+                        : '';
+                    matchesListHtml += `<div style="background:var(--subtle-bg); color:var(--brand-green); padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;"><span>${groupLabel} Bets</span>${pressBtn}</div>`;
                     
                     groupMatches.forEach(m => {
                         let statusDesc = "All Square ($0)";
