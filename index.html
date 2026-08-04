@@ -172,6 +172,7 @@
         }
         .pill-main { background-color: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); }
         .pill-press { background-color: var(--danger-box-bg); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .pill-fire { background-color: var(--accent-red); color: #ffffff; border: 1px solid var(--accent-red); font-weight: bold; }
         
         .press-btn {
             background-color: var(--bg-card); color: var(--accent-teal); border: 1px solid var(--accent-teal);
@@ -795,7 +796,13 @@
             });
         }
 
-        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
+        let pressesByHole = {};
+        activeMatches.filter(m => m.pressNum > 0).forEach(m => {
+            if (!pressesByHole[m.startHole]) pressesByHole[m.startHole] = [];
+            pressesByHole[m.startHole].push(m.label);
+        });
+
+        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount, pressesByHole };
     }
 
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
@@ -1539,6 +1546,33 @@
                 }
 
                 matchCellHtml += `</div>`;
+
+                let pressBadgesHtml = '';
+                if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat) && matchCalc && matchCalc.pressesByHole && matchCalc.pressesByHole[h.hole]) {
+                    matchCalc.pressesByHole[h.hole].forEach(label => {
+                        pressBadgesHtml += `<span class="status-pill pill-fire">🔥 ${label}</span>`;
+                    });
+                }
+                if (richHoleCalc && richHoleCalc.rateHistory) {
+                    richHoleCalc.rateHistory.filter(r => r.pressNum > 0 && r.fromHole === h.hole).forEach(r => {
+                        pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Hole Bet Press ${r.pressNum} ($${r.stake}/hole)</span>`;
+                    });
+                }
+                if (richOverallCalc) {
+                    if (richOverallCalc.mode === 'stroke' && richOverallCalc.pressSegs) {
+                        richOverallCalc.pressSegs.filter(seg => seg.startHole === h.hole).forEach(seg => {
+                            pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Overall Press ${seg.pressNum}</span>`;
+                        });
+                    } else if (richOverallCalc.mode === 'match' && richOverallCalc.pressResults) {
+                        richOverallCalc.pressResults.filter(pr => pr.startHole === h.hole).forEach(pr => {
+                            pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Overall Press ${pr.pressNum}</span>`;
+                        });
+                    }
+                }
+                if (pressBadgesHtml) {
+                    matchCellHtml += `<div class="match-status-cell" style="margin-top:2px;">${pressBadgesHtml}</div>`;
+                }
+
                 rowHtml += `<td>${matchCellHtml}</td>`;
             }
 
