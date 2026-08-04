@@ -453,7 +453,7 @@
                 <div>
                     <label style="font-size: 0.75rem;">Match Type</label>
                     <select id="nassau-type" onchange="renderPlayerList(false)">
-                        <option value="team">2-Man Team (Best Ball)</option>
+                        <option value="team">2v2 Team (Best Ball)</option>
                         <option value="1v1">1v1 Match</option>
                     </select>
                 </div>
@@ -643,7 +643,7 @@
     let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
-    const teamOptions = ["T-1", "T-2", "T-3", "T-4", "T-5", "T-6", "T-7", "T-8", "T-9", "T-10", "T-11", "T-12", "T-13", "T-14", "T-15", "T-16"];
+    const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     if (!currentMode) {
         document.getElementById("lobby-screen").style.display = "block";
@@ -1320,7 +1320,7 @@
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : "";
             const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
-            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `T-${Math.floor(idx / captureTeamSize) + 1}`;
+            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `Team ${Math.floor(idx / captureTeamSize) + 1}`;
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
             const moneyInput = row.querySelector('.p-money-input');
             const moneyVal = moneyInput ? moneyInput.checked : true;
@@ -1815,7 +1815,7 @@
                 const squadSelect = row.querySelector('.p-squad-input');
                 const moneyInput = row.querySelector('.p-money-input');
 
-                const teamVal = teamSelect ? teamSelect.value : "T-1";
+                const teamVal = teamSelect ? teamSelect.value : "Team 1";
                 const squadVal = squadSelect ? squadSelect.value : "red";
                 const moneyVal = moneyInput ? moneyInput.checked : true;
                 
