@@ -1366,7 +1366,7 @@
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
             let pressRule = gameFormat === 'nassau' ? (currentData.nassauPressRule || "none") : (currentData.matchPressRule || "none");
             let nassauStake = currentData.nassauStake || 10;
-            let matchStake = currentData.matchStake || 50;
+            let matchStake = currentData.matchStake || 0;
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
             const manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
@@ -1619,7 +1619,7 @@
                 if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
                 return `<span class="val-even">$0</span>`;
             }
-            let betTypeStr = holeBet > 0 ? `$${holeBet} Per Hole` : `$${currentData.matchStake || 50} Flat Match`;
+            let betTypeStr = holeBet > 0 ? `$${holeBet} Per Hole` : `$${currentData.matchStake || 0} Flat Match`;
             const pressBtnHtml = (!t18.closed && matchCalc.maxThru < t18.endHole)
                 ? `<button onclick="pressMatchBet('18', ${matchCalc.maxThru + 1})" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
                 : '';
@@ -1959,7 +1959,7 @@
                 return `$0`;
             }
             
-            let betTypeStr = currentData.holeBetStake > 0 ? `$${currentData.holeBetStake} Per Hole` : `$${currentData.matchStake || 50} Flat Match`;
+            let betTypeStr = currentData.holeBetStake > 0 ? `$${currentData.holeBetStake} Per Hole` : `$${currentData.matchStake || 0} Flat Match`;
             
             printHtml += `<div class="pledger-row"><span><strong>Bet Type:</strong></span> <span>${betTypeStr}</span></div>`;
             printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
