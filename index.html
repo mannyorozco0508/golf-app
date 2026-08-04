@@ -1367,6 +1367,9 @@
 
         let hiloCalc = null;
         let matchCalc = null;
+        let pressRuleUsed = "none";
+        let stakeToUseVal = 0;
+        let manualMatchPresses = [];
 
         if (gameFormat === 'hilo') {
             hiloCalc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
@@ -1376,7 +1379,9 @@
             let matchStake = currentData.matchStake || 0;
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
-            const manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
+            manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
+            pressRuleUsed = pressRule;
+            stakeToUseVal = stakeToUse;
             matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
         }
 
@@ -1385,12 +1390,14 @@
         let richOverallCalc = null;
         const richConfig = currentData.richHoleBet || null;
         let richBetSetupWarning = "";
+        let holePresses = [];
+        let overallPresses = [];
         if (richConfig && ['stroke', 'match'].includes(gameFormat) && moneyPlayers.length !== 2) {
             richBetSetupWarning = `Hole/Overall side bet is on, but ${moneyPlayers.length} player${moneyPlayers.length === 1 ? ' is' : 's are'} marked "Playing for Money" in this view — it needs exactly 2. Fix this on the Home/setup page.`;
         }
         if (richConfig && ['stroke', 'match'].includes(gameFormat) && moneyPlayers.length === 2) {
-            const holePresses = currentData.richHoleBetPresses ? Object.values(currentData.richHoleBetPresses) : [];
-            const overallPresses = currentData.richOverallBetPresses ? Object.values(currentData.richOverallBetPresses) : [];
+            holePresses = currentData.richHoleBetPresses ? Object.values(currentData.richHoleBetPresses) : [];
+            overallPresses = currentData.richOverallBetPresses ? Object.values(currentData.richOverallBetPresses) : [];
             richHoleCalc = calculateHoleBetEngine(moneyPlayers, courseData, savedScores, richConfig, holePresses);
             richOverallCalc = calculateOverallBetEngine(moneyPlayers, courseData, savedScores, richConfig, overallPresses);
         }
@@ -1402,71 +1409,70 @@
             if (diff === 0) return "ALL SQUARE";
             return diff > 0 ? `${nameA} UP` : `${nameB} UP`;
         }
-        const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
-        let globalBets = [];
-        let pressCandidates = [];
 
-        if (matchCalc) {
-            matchCalc.activeMatches.filter(m => m.pressNum === 0).forEach(m => {
-                globalBets.push({
-                    startHole: m.startHole,
-                    label: m.label,
-                    isPrimaryMatch: true,
-                    statusPlain: whosUpText(m.status, matchCalc.t1Name, matchCalc.t2Name),
-                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? matchCalc.t1Name : matchCalc.t2Name} ${Math.abs(m.status)} UP`)
-                });
-            });
-            matchCalc.activeMatches.filter(m => m.pressNum > 0).forEach(m => {
-                pressCandidates.push({
-                    startHole: m.startHole,
-                    label: m.label,
-                    statusPlain: whosUpText(m.status, matchCalc.t1Name, matchCalc.t2Name),
-                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? matchCalc.t1Name : matchCalc.t2Name} ${Math.abs(m.status)} UP`)
-                });
-            });
-        }
-        if (richHoleCalc) {
-            const p1n = richHoleCalc.p1.name.split(' ')[0], p2n = richHoleCalc.p2.name.split(' ')[0];
-            globalBets.push({
-                startHole: firstCourseHole,
-                label: 'Hole Bet',
-                statusPlain: whosUpText(richHoleCalc.p1Money, p1n, p2n),
-                statusFull: whosUpText(richHoleCalc.p1Money, p1n, p2n)
-            });
-        }
-        if (richOverallCalc) {
-            const p1n = richOverallCalc.p1.name.split(' ')[0], p2n = richOverallCalc.p2.name.split(' ')[0];
-            if (richOverallCalc.mode === 'stroke') {
-                const b = richOverallCalc.base;
-                const diff = b.winner === richOverallCalc.p1.name ? 1 : (b.winner === richOverallCalc.p2.name ? -1 : 0);
-                globalBets.push({ startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(diff, p1n, p2n), statusFull: whosUpText(diff, p1n, p2n) });
-                (richOverallCalc.pressSegs || []).forEach(seg => {
-                    const sdiff = seg.winner === richOverallCalc.p1.name ? 1 : (seg.winner === richOverallCalc.p2.name ? -1 : 0);
-                    pressCandidates.push({
-                        startHole: seg.startHole, label: `Overall Press ${seg.pressNum}`,
-                        statusPlain: whosUpText(sdiff, p1n, p2n),
-                        statusFull: seg.roundComplete ? (seg.winner ? `${seg.winner.split(' ')[0]} WON` : 'TIED') : whosUpText(sdiff, p1n, p2n)
+        // Builds the same registry shape from a given match/hole/overall calc set - used both for the
+        // full/final numbering (Bet 1, 2, 3...) and for progressive per-hole "as of this hole" status.
+        function buildBetEntries(mCalc, hCalc, oCalc) {
+            let bases = [];
+            let presses = [];
+            if (mCalc) {
+                mCalc.activeMatches.filter(m => m.pressNum === 0).forEach(m => {
+                    bases.push({
+                        key: `match-${m.id}`, startHole: m.startHole, label: m.label, isPrimaryMatch: true,
+                        statusPlain: whosUpText(m.status, mCalc.t1Name, mCalc.t2Name),
+                        statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? mCalc.t1Name : mCalc.t2Name} ${Math.abs(m.status)} UP`)
                     });
                 });
-            } else {
-                globalBets.push({ startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(richOverallCalc.baseStatus, p1n, p2n), statusFull: whosUpText(richOverallCalc.baseStatus, p1n, p2n) });
-                (richOverallCalc.pressResults || []).forEach(pr => {
-                    pressCandidates.push({
-                        startHole: pr.startHole, label: `Overall Press ${pr.pressNum}`,
-                        statusPlain: whosUpText(pr.status, p1n, p2n),
-                        statusFull: pr.status === 0 ? "ALL SQUARE" : `${pr.status > 0 ? p1n : p2n} ${Math.abs(pr.status)} UP`
+                mCalc.activeMatches.filter(m => m.pressNum > 0).forEach(m => {
+                    presses.push({
+                        key: `match-${m.id}`, startHole: m.startHole, label: m.label,
+                        statusPlain: whosUpText(m.status, mCalc.t1Name, mCalc.t2Name),
+                        statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? mCalc.t1Name : mCalc.t2Name} ${Math.abs(m.status)} UP`)
                     });
                 });
             }
+            if (hCalc) {
+                const p1n = hCalc.p1.name.split(' ')[0], p2n = hCalc.p2.name.split(' ')[0];
+                bases.push({
+                    key: 'holebet', startHole: firstCourseHole, label: 'Hole Bet',
+                    statusPlain: whosUpText(hCalc.p1Money, p1n, p2n),
+                    statusFull: whosUpText(hCalc.p1Money, p1n, p2n)
+                });
+            }
+            if (oCalc) {
+                const p1n = oCalc.p1.name.split(' ')[0], p2n = oCalc.p2.name.split(' ')[0];
+                if (oCalc.mode === 'stroke') {
+                    const b = oCalc.base;
+                    const diff = b.winner === oCalc.p1.name ? 1 : (b.winner === oCalc.p2.name ? -1 : 0);
+                    bases.push({ key: 'overall-base', startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(diff, p1n, p2n), statusFull: whosUpText(diff, p1n, p2n) });
+                    (oCalc.pressSegs || []).forEach(seg => {
+                        const sdiff = seg.winner === oCalc.p1.name ? 1 : (seg.winner === oCalc.p2.name ? -1 : 0);
+                        presses.push({
+                            key: `overall-press-${seg.pressNum}`, startHole: seg.startHole, label: `Overall Press ${seg.pressNum}`,
+                            statusPlain: whosUpText(sdiff, p1n, p2n),
+                            statusFull: seg.roundComplete ? (seg.winner ? `${seg.winner.split(' ')[0]} WON` : 'TIED') : whosUpText(sdiff, p1n, p2n)
+                        });
+                    });
+                } else {
+                    bases.push({ key: 'overall-base', startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(oCalc.baseStatus, p1n, p2n), statusFull: whosUpText(oCalc.baseStatus, p1n, p2n) });
+                    (oCalc.pressResults || []).forEach(pr => {
+                        presses.push({
+                            key: `overall-press-${pr.pressNum}`, startHole: pr.startHole, label: `Overall Press ${pr.pressNum}`,
+                            statusPlain: whosUpText(pr.status, p1n, p2n),
+                            statusFull: pr.status === 0 ? "ALL SQUARE" : `${pr.status > 0 ? p1n : p2n} ${Math.abs(pr.status)} UP`
+                        });
+                    });
+                }
+            }
+            presses.sort((a, b) => a.startHole - b.startHole);
+            return bases.concat(presses);
         }
-        pressCandidates.sort((a, b) => a.startHole - b.startHole);
-        globalBets = globalBets.concat(pressCandidates);
+
+        const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
+        let globalBets = buildBetEntries(matchCalc, richHoleCalc, richOverallCalc);
         globalBets.forEach((b, i) => { b.num = i + 1; });
-        let betsByStartHole = {};
-        globalBets.forEach(b => {
-            if (!betsByStartHole[b.startHole]) betsByStartHole[b.startHole] = [];
-            betsByStartHole[b.startHole].push(b);
-        });
+        let betNumByKey = {};
+        globalBets.forEach(b => { betNumByKey[b.key] = b.num; });
 
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
@@ -1619,10 +1625,28 @@
                 matchCellHtml += `</div>`;
 
                 let betBadgesHtml = '';
-                if (betsByStartHole[h.hole]) {
-                    betsByStartHole[h.hole].forEach(b => {
+                if (globalBets.some(b => b.startHole <= h.hole)) {
+                    let holeTrunc = courseData.filter(c => c.hole <= h.hole);
+                    let asOfMatchCalc = null, asOfHoleCalc = null, asOfOverallCalc = null;
+                    if (matchCalc) {
+                        let prFilter = manualMatchPresses.filter(mp => mp.startHole <= h.hole);
+                        asOfMatchCalc = calculateMatchEngine(moneyPlayers, holeTrunc, savedScores, scoringType, gameFormat, pressRuleUsed, stakeToUseVal, holeBet, prFilter);
+                    }
+                    if (richHoleCalc) {
+                        let hpFilter = holePresses.filter(p => p.fromHole <= h.hole);
+                        asOfHoleCalc = calculateHoleBetEngine(moneyPlayers, holeTrunc, savedScores, richConfig, hpFilter);
+                    }
+                    if (richOverallCalc) {
+                        let opFilter = overallPresses.filter(p => p.startHole <= h.hole);
+                        asOfOverallCalc = calculateOverallBetEngine(moneyPlayers, holeTrunc, savedScores, richConfig, opFilter);
+                    }
+                    let asOfEntries = buildBetEntries(asOfMatchCalc, asOfHoleCalc, asOfOverallCalc);
+                    asOfEntries.sort((a, b) => (betNumByKey[a.key] || 999) - (betNumByKey[b.key] || 999));
+                    asOfEntries.forEach(b => {
+                        const num = betNumByKey[b.key];
+                        if (!num) return;
                         if (b.isPrimaryMatch) return; // skip base Match bet - already shown by the M/T UP pill above
-                        betBadgesHtml += `<span class="status-pill pill-fire">🔥 Bet ${b.num} (${b.statusFull})</span>`;
+                        betBadgesHtml += `<span class="status-pill pill-fire">🔥 Bet ${num} (${b.statusFull})</span>`;
                     });
                 }
                 if (betBadgesHtml) {
