@@ -1623,13 +1623,35 @@
             const pressBtnHtml = (!t18.closed && matchCalc.maxThru < t18.endHole)
                 ? `<button onclick="pressMatchBet('18', ${matchCalc.maxThru + 1})" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
                 : '';
+
+            let matchBetsListHtml = "";
+            let flatStakeForList = currentData.matchStake || 0;
+            matchCalc.activeMatches.forEach(m => {
+                let statusDesc = "All Square ($0)";
+                if (holeBet > 0) {
+                    let amt = Math.abs(m.status * holeBet);
+                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${amt}`;
+                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${amt}`;
+                } else {
+                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${flatStakeForList}`;
+                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${flatStakeForList}`;
+                }
+                let lockIcon = m.closed ? "🔒 " : "";
+                let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid var(--accent-teal); padding-left: 8px;" : "padding-left: 4px;";
+                matchBetsListHtml += `<div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid var(--border-faint); padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}</span> <strong>${statusDesc}</strong></div>`;
+            });
+
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
                     <span>Bet Type:</span>
                     <span>${betTypeStr}</span>
                 </div>
-                <div class="payout-row">
-                    <span>Financial Ledger:</span>
+                <div class="payout-row" style="flex-direction:column; align-items: stretch; margin-top:8px;">
+                    <div style="font-weight:bold; color:var(--brand-green); margin-bottom:4px; border-bottom: 2px solid var(--accent-teal); padding-bottom:4px;">Bet-by-Bet Breakdown</div>
+                    ${matchBetsListHtml}
+                </div>
+                <div class="payout-row" style="margin-top:8px;">
+                    <span>Total Ledger:</span>
                     <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
                 </div>
                 ${pressBtnHtml ? `<div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>` : ''}
