@@ -1315,7 +1315,8 @@
         const rows = document.querySelectorAll('.player-row');
         const list = [];
         const captureFormat = document.getElementById("game-format-select") ? document.getElementById("game-format-select").value : 'stroke';
-        const captureTeamSize = (captureFormat === 'scramble') ? 4 : (captureFormat === 'match' ? 1 : 2);
+        const captureNassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
+        const captureTeamSize = (captureFormat === 'scramble') ? 4 : ((captureFormat === 'match' || (captureFormat === 'nassau' && captureNassauType === '1v1')) ? 1 : 2);
         rows.forEach((row, idx) => {
             const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : "";
             const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
@@ -1349,7 +1350,7 @@
         if (format === 'ryder') {
             headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
             headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
@@ -1579,7 +1580,7 @@
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value || 'stroke';
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
-        const teamSize = (format === 'scramble') ? 4 : (format === 'match' ? 1 : 2);
+        const teamSize = (format === 'scramble') ? 4 : ((format === 'match' || (format === 'nassau' && nassauType === '1v1')) ? 1 : 2);
         const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
 
@@ -1598,7 +1599,7 @@
                     <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
                 </select>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || format === 'match') {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
             baseColumns = "1.8fr 0.8fr 1.2fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
