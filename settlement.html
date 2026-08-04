@@ -269,7 +269,7 @@
                             m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
-                        if (gameFormat === 'nassau' && (pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
+                        if ((pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
                             const threshold = pressRule === '2down' ? 2 : 1;
                             
                             if (Math.abs(m.status) >= threshold && m.triggers === 0) {
@@ -728,7 +728,7 @@
         }
 
         let scoringType = data.nassauScoring || data.matchScoring || "net";
-        let pressRule = data.nassauPressRule || "none";
+        let pressRule = gameFormat === 'nassau' ? (data.nassauPressRule || "none") : (data.matchPressRule || "none");
         let nassauStake = data.nassauStake || 10;
         let matchStake = data.matchStake || 50;
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
