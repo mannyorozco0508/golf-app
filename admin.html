@@ -480,7 +480,7 @@
         <div id="wolf-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🐺 Wolf Game Options</label>
             <div class="grid-2col">
-                <div><label style="font-size: 0.8rem;">Point Value ($)</label><input type="number" id="wolf-point-value" value="2" min="1"></div>
+                <div><label style="font-size: 0.8rem;">Point Value ($)</label><input type="number" id="wolf-point-value" value="" min="0" placeholder="0"></div>
                 <div>
                     <label style="font-size: 0.8rem;">Lone Wolf Win</label>
                     <select id="wolf-lone-mult">
@@ -494,7 +494,7 @@
         <div id="dot-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Dot Game Options</label>
             <div class="grid-2col">
-                <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="1" min="1"></div>
+                <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
             </div>
         </div>
     </div>
@@ -1803,8 +1803,8 @@
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
             const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
             const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
-            const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 2;
-            const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 1;
+            const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 0;
+            const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
 
             const playersList = [];
             rows.forEach((row, idx) => {
