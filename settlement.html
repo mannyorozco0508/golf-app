@@ -196,7 +196,7 @@
         }
     }
 
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
             let key = p.team || "T-1";
@@ -269,10 +269,12 @@
                             m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
-                        if ((pressRule === '2down' || pressRule === '1down') && hNum < m.endHole) {
-                            const threshold = pressRule === '2down' ? 2 : 1;
-                            
-                            if (Math.abs(m.status) >= threshold && m.triggers === 0) {
+                        if (hNum < m.endHole) {
+                            const threshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : null);
+                            const autoTrigger = threshold !== null && Math.abs(m.status) >= threshold;
+                            const manualTrigger = (manualPresses || []).some(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
+
+                            if ((autoTrigger || manualTrigger) && m.triggers === 0) {
                                 m.triggers = 1;
                                 
                                 let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
@@ -305,15 +307,14 @@
                 else if (m.status < 0) t1TotalMoney -= stake;
             });
         } else {
-            let t18 = activeMatches.find(m => m.id === '18');
-            if (t18) {
+            activeMatches.forEach(m => {
                 if (holeBet > 0) {
-                    t1TotalMoney = t18.status * holeBet;
+                    t1TotalMoney += m.status * holeBet;
                 } else {
-                    if (t18.status > 0) t1TotalMoney = stake;
-                    else if (t18.status < 0) t1TotalMoney = -stake;
+                    if (m.status > 0) t1TotalMoney += stake;
+                    else if (m.status < 0) t1TotalMoney -= stake;
                 }
-            }
+            });
         }
 
         return { t1Name, t2Name, activeMatches, t1TotalMoney };
@@ -733,7 +734,8 @@
         let matchStake = data.matchStake || 50;
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
-        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet);
+        const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
+        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
 
         if (!matchData) {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
