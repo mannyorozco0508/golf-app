@@ -1576,7 +1576,7 @@
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         const format = document.getElementById("game-format-select").value || 'stroke';
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
-        const teamSize = (format === 'scramble') ? 4 : 2;
+        const teamSize = (format === 'scramble') ? 4 : (format === 'match' ? 1 : 2);
         const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
 
