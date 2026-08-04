@@ -221,7 +221,7 @@
     function calculateBirdieGameTotalsForSettle(data, courseData, savedScores) {
         if (data.birdieGameEnabled !== true) return {};
         const players = (data.players || []).filter(p => p.playingForMoney !== false);
-        const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 1;
+        const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 0;
         const scoringType = data.birdieScoringType || 'gross';
         let totals = {};
         players.forEach(p => totals[p.id] = 0);
@@ -244,7 +244,7 @@
         if (players.length < 2 || players.length > 4) return { money: {}, wins: {} };
         const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
         const kpWinners = data.kpWinners || {};
-        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 1;
+        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 0;
         let money = {}, wins = {};
         players.forEach(p => { money[p.id] = 0; wins[p.id] = 0; });
         kpHoles.forEach(h => {
