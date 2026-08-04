@@ -1599,13 +1599,13 @@
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
 
-        if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.maxThru > 0) {
+        if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
             payoutBox.style.display = "block";
             titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
             
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
-            const thruText = t18.closed ? "" : ` (Thru ${matchCalc.maxThru})`;
+            const thruText = (t18.closed || matchCalc.maxThru === 0) ? "" : ` (Thru ${matchCalc.maxThru})`;
             const pressLabels = matchCalc.activeMatches.filter(m => m.pressNum > 0).map(m => m.label);
             const pressText = pressLabels.length > 0
                 ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">🔥 ${pressLabels.join(' → ')}</div>`
@@ -1635,7 +1635,7 @@
                 ${pressBtnHtml ? `<div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>` : ''}
             `;
             
-        } else if (gameFormat === 'nassau' && matchCalc && matchCalc.maxThru > 0) {
+        } else if (gameFormat === 'nassau' && matchCalc) {
             payoutBox.style.display = "block";
             titleEl.textContent = "💵 LIVE NASSAU MATCH STATUS";
             
