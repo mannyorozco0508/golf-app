@@ -1397,6 +1397,77 @@
 
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
 
+        // --- GLOBAL BET REGISTRY: Bet 1 = Match, Bet 2 = Hole Bet, Bet 3 = Overall Bet, Bet 4+ = presses in the order they started ---
+        function whosUpText(diff, nameA, nameB) {
+            if (diff === 0) return "ALL SQUARE";
+            return diff > 0 ? `${nameA} UP` : `${nameB} UP`;
+        }
+        const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
+        let globalBets = [];
+        let pressCandidates = [];
+
+        if (matchCalc) {
+            matchCalc.activeMatches.filter(m => m.pressNum === 0).forEach(m => {
+                globalBets.push({
+                    startHole: m.startHole,
+                    label: m.label,
+                    isPrimaryMatch: true,
+                    statusPlain: whosUpText(m.status, matchCalc.t1Name, matchCalc.t2Name),
+                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? matchCalc.t1Name : matchCalc.t2Name} ${Math.abs(m.status)} UP`)
+                });
+            });
+            matchCalc.activeMatches.filter(m => m.pressNum > 0).forEach(m => {
+                pressCandidates.push({
+                    startHole: m.startHole,
+                    label: m.label,
+                    statusPlain: whosUpText(m.status, matchCalc.t1Name, matchCalc.t2Name),
+                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? matchCalc.t1Name : matchCalc.t2Name} ${Math.abs(m.status)} UP`)
+                });
+            });
+        }
+        if (richHoleCalc) {
+            const p1n = richHoleCalc.p1.name.split(' ')[0], p2n = richHoleCalc.p2.name.split(' ')[0];
+            globalBets.push({
+                startHole: firstCourseHole,
+                label: 'Hole Bet',
+                statusPlain: whosUpText(richHoleCalc.p1Money, p1n, p2n),
+                statusFull: whosUpText(richHoleCalc.p1Money, p1n, p2n)
+            });
+        }
+        if (richOverallCalc) {
+            const p1n = richOverallCalc.p1.name.split(' ')[0], p2n = richOverallCalc.p2.name.split(' ')[0];
+            if (richOverallCalc.mode === 'stroke') {
+                const b = richOverallCalc.base;
+                const diff = b.winner === richOverallCalc.p1.name ? 1 : (b.winner === richOverallCalc.p2.name ? -1 : 0);
+                globalBets.push({ startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(diff, p1n, p2n), statusFull: whosUpText(diff, p1n, p2n) });
+                (richOverallCalc.pressSegs || []).forEach(seg => {
+                    const sdiff = seg.winner === richOverallCalc.p1.name ? 1 : (seg.winner === richOverallCalc.p2.name ? -1 : 0);
+                    pressCandidates.push({
+                        startHole: seg.startHole, label: `Overall Press ${seg.pressNum}`,
+                        statusPlain: whosUpText(sdiff, p1n, p2n),
+                        statusFull: seg.roundComplete ? (seg.winner ? `${seg.winner.split(' ')[0]} WON` : 'TIED') : whosUpText(sdiff, p1n, p2n)
+                    });
+                });
+            } else {
+                globalBets.push({ startHole: firstCourseHole, label: 'Overall Bet', statusPlain: whosUpText(richOverallCalc.baseStatus, p1n, p2n), statusFull: whosUpText(richOverallCalc.baseStatus, p1n, p2n) });
+                (richOverallCalc.pressResults || []).forEach(pr => {
+                    pressCandidates.push({
+                        startHole: pr.startHole, label: `Overall Press ${pr.pressNum}`,
+                        statusPlain: whosUpText(pr.status, p1n, p2n),
+                        statusFull: pr.status === 0 ? "ALL SQUARE" : `${pr.status > 0 ? p1n : p2n} ${Math.abs(pr.status)} UP`
+                    });
+                });
+            }
+        }
+        pressCandidates.sort((a, b) => a.startHole - b.startHole);
+        globalBets = globalBets.concat(pressCandidates);
+        globalBets.forEach((b, i) => { b.num = i + 1; });
+        let betsByStartHole = {};
+        globalBets.forEach(b => {
+            if (!betsByStartHole[b.startHole]) betsByStartHole[b.startHole] = [];
+            betsByStartHole[b.startHole].push(b);
+        });
+
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
@@ -1547,30 +1618,15 @@
 
                 matchCellHtml += `</div>`;
 
-                let pressBadgesHtml = '';
-                if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat) && matchCalc && matchCalc.pressesByHole && matchCalc.pressesByHole[h.hole]) {
-                    matchCalc.pressesByHole[h.hole].forEach(label => {
-                        pressBadgesHtml += `<span class="status-pill pill-fire">🔥 ${label}</span>`;
+                let betBadgesHtml = '';
+                if (betsByStartHole[h.hole]) {
+                    betsByStartHole[h.hole].forEach(b => {
+                        if (b.isPrimaryMatch) return; // skip base Match bet - already shown by the M/T UP pill above
+                        betBadgesHtml += `<span class="status-pill pill-fire">🔥 Bet ${b.num} (${b.statusFull})</span>`;
                     });
                 }
-                if (richHoleCalc && richHoleCalc.rateHistory) {
-                    richHoleCalc.rateHistory.filter(r => r.pressNum > 0 && r.fromHole === h.hole).forEach(r => {
-                        pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Hole Bet Press ${r.pressNum} ($${r.stake}/hole)</span>`;
-                    });
-                }
-                if (richOverallCalc) {
-                    if (richOverallCalc.mode === 'stroke' && richOverallCalc.pressSegs) {
-                        richOverallCalc.pressSegs.filter(seg => seg.startHole === h.hole).forEach(seg => {
-                            pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Overall Press ${seg.pressNum}</span>`;
-                        });
-                    } else if (richOverallCalc.mode === 'match' && richOverallCalc.pressResults) {
-                        richOverallCalc.pressResults.filter(pr => pr.startHole === h.hole).forEach(pr => {
-                            pressBadgesHtml += `<span class="status-pill pill-fire">🔥 Overall Press ${pr.pressNum}</span>`;
-                        });
-                    }
-                }
-                if (pressBadgesHtml) {
-                    matchCellHtml += `<div class="match-status-cell" style="margin-top:2px;">${pressBadgesHtml}</div>`;
+                if (betBadgesHtml) {
+                    matchCellHtml += `<div class="match-status-cell" style="margin-top:2px;">${betBadgesHtml}</div>`;
                 }
 
                 rowHtml += `<td>${matchCellHtml}</td>`;
@@ -1640,11 +1696,10 @@
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
             const thruText = (t18.closed || matchCalc.maxThru === 0) ? "" : ` (Thru ${matchCalc.maxThru})`;
-            const pressLabels = matchCalc.activeMatches.filter(m => m.pressNum > 0).map(m => m.label);
-            const pressText = pressLabels.length > 0
-                ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">🔥 ${pressLabels.join(' → ')}</div>`
+            const betsLine = globalBets.length > 0
+                ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">${globalBets.map(b => `Bet ${b.num}: <strong style="color:#fff;">${b.statusPlain}</strong>`).join(' &nbsp;|&nbsp; ')}</div>`
                 : '';
-            statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${pressText}`;
+            statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${betsLine}`;
             
             document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
             let t1Money = matchCalc.t1TotalMoney;
