@@ -1,1 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tournament Setup</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h2, h3 { color: var(--brand-green); margin-top: 0; }
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
+        .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
+        .lobby-title { font-size: 1.7rem; color: var(--brand-navy); text-align: center; margin-bottom: 10px; font-weight: bold; }
+        .lobby-sub { color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 20px; line-height: 1.4; }
+
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
+        input[type="text"], input[type="number"], select {
+            width: 100%; padding: 10px; border: 1px solid var(--border-mid);
+            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
+        }
+
+        .custom-select-wrapper { position: relative; }
+        .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
+        #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid var(--border-mid); border-radius: 6px; font-size: 16px; background-color: var(--bg-card); color: var(--text-main); box-sizing: border-box; cursor: text; }
+        #course-search-input:focus { border-color: var(--accent-teal); outline: none; }
+        .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal); border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px var(--shadow-color); }
+        .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; }
+        .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .format-card { border: 2px solid var(--border-mid); border-radius: 10px; padding: 12px; cursor: pointer; text-align: center; transition: all 0.15s ease; }
+        .format-card.active { border-color: var(--brand-green); background: var(--nassau-box-bg); }
+        .format-card .fmt-icon { font-size: 1.6rem; }
+        .format-card .fmt-name { font-weight: bold; color: var(--brand-green); font-size: 0.9rem; margin-top: 4px; }
+        .format-card .fmt-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; line-height: 1.3; }
+
+        .team-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--nassau-box-bg); }
+        .team-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .team-card-header .team-label { font-weight: bold; color: var(--brand-green); }
+        .team-name-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .team-name-inputs input { font-size: 0.9rem; padding: 8px; }
+        .btn-remove-team { background: none; border: none; color: var(--accent-red); font-weight: bold; font-size: 0.8rem; cursor: pointer; padding: 4px 8px; }
+
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
+        .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
+        .btn-add-team { width: 100%; background: var(--bg-card); color: var(--brand-navy); border: 2px dashed var(--brand-navy); padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-bottom: 14px; }
+
+        .team-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; gap: 8px; }
+        .team-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.82rem; }
+        .team-link-row button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; }
+
+        .lb-row { display: flex; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .lb-pos { width: 28px; font-weight: bold; color: var(--text-muted); }
+        .lb-team { flex: 1; font-weight: bold; }
+        .lb-thru { width: 56px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
+        .lb-score { width: 60px; text-align: right; font-weight: bold; }
+        .lb-row.leader { background: #fff8e1; }
+        html.dark-mode .lb-row.leader { background: #2b2712; }
+
+        .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
+        .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="setup-screen">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo">🏆</div>
+    <div class="lobby-title">Tournament Mode</div>
+    <p class="lobby-sub">Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.</p>
+
+    <div class="form-group">
+        <label>Tournament Name</label>
+        <input type="text" id="t-name" placeholder="e.g. Hope Foundation Golf Tournament">
+    </div>
+
+    <div class="form-group">
+        <label>Select Golf Course</label>
+        <div class="custom-select-wrapper">
+            <input type="text" id="course-search-input" placeholder="-- Search / Select Golf Course --" autocomplete="off" oninput="filterCourseDropdown(this.value)" onfocus="openCourseDropdown()">
+            <div class="custom-select-dropdown" id="course-dropdown"></div>
+        </div>
+        <input type="hidden" id="course-key">
+    </div>
+
+    <div class="form-group">
+        <label>Format</label>
+        <div class="grid-2col" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <div class="format-card active" id="fmt-scramble" onclick="selectFormat('scramble')">
+                <div class="fmt-icon">🏌️</div>
+                <div class="fmt-name">Scramble</div>
+                <div class="fmt-desc">One team score per hole</div>
+            </div>
+            <div class="format-card" id="fmt-shamble" onclick="selectFormat('shamble')">
+                <div class="fmt-icon">🎯</div>
+                <div class="fmt-name">Shamble</div>
+                <div class="fmt-desc">Best drive, then play your own ball</div>
+            </div>
+            <div class="format-card" id="fmt-bestball" onclick="selectFormat('bestball')">
+                <div class="fmt-icon">⛳</div>
+                <div class="fmt-name">2-Man Best Ball</div>
+                <div class="fmt-desc">Low ball of the pair counts</div>
+            </div>
+        </div>
+        <div id="fmt-more-note" style="font-size:0.72rem; color:var(--text-muted); margin-top:8px;">Shamble and Best Ball are on the way — Scramble is ready to run today.</div>
+    </div>
+
+    <div class="form-group" id="team-handicap-group">
+        <label>Team Handicap Allowance (strokes off final total, optional)</label>
+        <input type="number" id="t-handicap" value="0" min="0" placeholder="0">
+    </div>
+
+    <hr class="section-divider">
+
+    <h3>👥 Teams</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team gets 4 name slots. Leave any blank — 2 or 3 players on a team is totally fine.</p>
+    <div id="teams-list"></div>
+    <button class="btn-add-team" onclick="addTeam()">➕ Add Team</button>
+
+    <button class="btn-primary" onclick="saveTournament()">💾 Save Tournament &amp; Get Team Links</button>
+    <button class="btn-outline" onclick="window.location.href='admin.html'">← Back to Home</button>
+</div>
+
+<div class="container" id="manage-screen" style="display:none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="top-nav-bar">
+        <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
+        <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
+    </div>
+
+    <div id="manage-tab-setup">
+        <div style="text-align:center;">
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Tournament Code</span><br>
+            <span class="room-badge" id="manage-room-badge"></span>
+        </div>
+        <h2 id="manage-t-name" style="text-align:center; font-size:1.3rem;"></h2>
+        <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
+
+        <hr class="section-divider">
+        <h3>🔒 Team Scorecard Links</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Send each team ONLY their own link. They can only enter their own team's scores.</p>
+        <div id="team-links-list"></div>
+
+        <hr class="section-divider">
+        <button class="btn-outline" onclick="showAddTeamPanel()">➕ Add Another Team</button>
+        <div id="add-team-panel" style="display:none; margin-top:12px;">
+            <div class="team-card">
+                <div class="team-name-inputs">
+                    <input type="text" id="new-team-p1" placeholder="Player 1">
+                    <input type="text" id="new-team-p2" placeholder="Player 2">
+                    <input type="text" id="new-team-p3" placeholder="Player 3 (optional)">
+                    <input type="text" id="new-team-p4" placeholder="Player 4 (optional)">
+                </div>
+                <button class="btn-primary" onclick="saveNewTeam()">💾 Save Team &amp; Get Link</button>
+            </div>
+        </div>
+
+        <hr class="section-divider">
+        <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='tournament.html'">➕ Start a Different Tournament</button>
+    </div>
+
+    <div id="manage-tab-leaderboard" style="display:none;">
+        <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
+        <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
+        <div id="leaderboard-list"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        });
+    }
+    if (localStorage.getItem('golfapp-theme') === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = '☀️ Light Mode'; });
+        }
+    });
+
+    // --- COURSE SELECTION (reads the same global_courses database as regular rounds) ---
+    let globalCourses = {};
+    let selectedCourseData = null;
+    let selectedCourseName = "";
+
+    db.ref('global_courses').on('value', (snap) => {
+        globalCourses = snap.val() || {};
+    });
+
+    function openCourseDropdown() { filterCourseDropdown(document.getElementById('course-search-input').value); }
+
+    function filterCourseDropdown(filterText) {
+        const dropdown = document.getElementById('course-dropdown');
+        const lower = filterText.toLowerCase();
+        const keys = Object.keys(globalCourses).filter(k => globalCourses[k].name.toLowerCase().includes(lower));
+        keys.sort((a, b) => globalCourses[a].name.localeCompare(globalCourses[b].name));
+
+        if (keys.length === 0) {
+            dropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No mapped courses found. Map a course in a regular round first, then it'll show up here.</div>`;
+        } else {
+            dropdown.innerHTML = keys.map(k => `<div class="custom-select-option" onclick="pickCourse('${k}')">${globalCourses[k].name}</div>`).join('');
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function pickCourse(key) {
+        selectedCourseData = globalCourses[key].data;
+        selectedCourseName = globalCourses[key].name;
+        document.getElementById('course-search-input').value = selectedCourseName;
+        document.getElementById('course-key').value = key;
+        document.getElementById('course-dropdown').style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.custom-select-wrapper')) {
+            const dd = document.getElementById('course-dropdown');
+            if (dd) dd.style.display = 'none';
+        }
+    });
+
+    // --- FORMAT SELECTION ---
+    let selectedFormat = 'scramble';
+    function selectFormat(fmt) {
+        if (fmt !== 'scramble') {
+            alert("🚧 " + (fmt === 'shamble' ? 'Shamble' : '2-Man Best Ball') + " is coming soon — Scramble is ready to run today.");
+            return;
+        }
+        selectedFormat = fmt;
+        document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
+        document.getElementById('fmt-' + fmt).classList.add('active');
+    }
+
+    // --- TEAM BUILDING (setup screen, before first save) ---
+    let teamCount = 0;
+    function addTeam() {
+        teamCount++;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'team-card';
+        wrapper.id = `team-block-${teamCount}`;
+        wrapper.innerHTML = `
+            <div class="team-card-header">
+                <span class="team-label">Team ${teamCount}</span>
+                <button class="btn-remove-team" onclick="document.getElementById('team-block-${teamCount}').remove()">✕ Remove</button>
+            </div>
+            <div class="team-name-inputs">
+                <input type="text" placeholder="Player 1">
+                <input type="text" placeholder="Player 2">
+                <input type="text" placeholder="Player 3 (optional)">
+                <input type="text" placeholder="Player 4 (optional)">
+            </div>
+        `;
+        document.getElementById('teams-list').appendChild(wrapper);
+    }
+    addTeam(); // start with one team block visible
+
+    function generateCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let code = "";
+        for (let i = 0; i < 4; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
+        return code;
+    }
+
+    let currentCode = null;
+
+    function saveTournament() {
+        const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
+        if (!selectedCourseData) { alert("⚠️ Please select a golf course."); return; }
+
+        const teamBlocks = document.querySelectorAll('#teams-list .team-card');
+        const teams = {};
+        let teamNum = 0;
+        teamBlocks.forEach(block => {
+            const inputs = block.querySelectorAll('input');
+            const players = Array.from(inputs).map(i => i.value.trim()).filter(v => v.length > 0);
+            if (players.length === 0) return;
+            teamNum++;
+            teams[`team${teamNum}`] = { num: teamNum, players: players };
+        });
+
+        if (teamNum === 0) { alert("⚠️ Add at least one team with a player name."); return; }
+
+        currentCode = generateCode();
+        const handicap = parseFloat(document.getElementById('t-handicap').value) || 0;
+
+        const payload = {
+            name: name,
+            format: selectedFormat,
+            courseName: selectedCourseName,
+            courseData: selectedCourseData,
+            teamHandicap: handicap,
+            teams: teams,
+            createdAt: Date.now()
+        };
+
+        db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
+            localStorage.setItem('lastTournamentCode', currentCode);
+            window.location.href = `tournament.html?tourney=${currentCode}`;
+        }).catch(err => alert(`Error saving tournament: ${err.message}`));
+    }
+
+    // --- MANAGE SCREEN (after a tournament exists) ---
+    let currentData = {};
+
+    function scorecardBaseUrl() {
+        return window.location.href.split('?')[0].replace('tournament.html', 'tournament-scorecard.html');
+    }
+
+    function renderTeamLinks() {
+        const list = document.getElementById('team-links-list');
+        const teams = currentData.teams || {};
+        const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
+        list.innerHTML = teamIds.map(tid => {
+            const t = teams[tid];
+            const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+            const names = t.players.join(', ');
+            return `<div class="team-link-row">
+                <span>🏌️ Team ${t.num} — ${names}</span>
+                <button class="btn-outline" onclick="copyTeamLink('${url}', ${t.num})">📋 Copy</button>
+            </div>`;
+        }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
+    }
+
+    function copyTeamLink(url, num) {
+        navigator.clipboard.writeText(url).then(() => {
+            alert(`✅ Team ${num} link copied!`);
+        }).catch(() => {
+            prompt('Copy this link:', url);
+        });
+    }
+
+    function showAddTeamPanel() {
+        document.getElementById('add-team-panel').style.display = 'block';
+    }
+
+    function saveNewTeam() {
+        const players = [
+            document.getElementById('new-team-p1').value.trim(),
+            document.getElementById('new-team-p2').value.trim(),
+            document.getElementById('new-team-p3').value.trim(),
+            document.getElementById('new-team-p4').value.trim()
+        ].filter(v => v.length > 0);
+
+        if (players.length === 0) { alert("⚠️ Add at least one player name."); return; }
+
+        const existingTeams = currentData.teams || {};
+        const nextNum = Object.values(existingTeams).reduce((max, t) => Math.max(max, t.num), 0) + 1;
+
+        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, players: players }).then(() => {
+            document.getElementById('new-team-p1').value = '';
+            document.getElementById('new-team-p2').value = '';
+            document.getElementById('new-team-p3').value = '';
+            document.getElementById('new-team-p4').value = '';
+            document.getElementById('add-team-panel').style.display = 'none';
+        }).catch(err => alert(`Error adding team: ${err.message}`));
+    }
+
+    function showTab(tab) {
+        document.getElementById('manage-tab-setup').style.display = tab === 'setup' ? 'block' : 'none';
+        document.getElementById('manage-tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
+        document.getElementById('tab-btn-setup').classList.toggle('active', tab === 'setup');
+        document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
+    }
+
+    function formatLabel(fmt) {
+        if (fmt === 'shamble') return 'Shamble';
+        if (fmt === 'bestball') return '2-Man Best Ball';
+        return 'Scramble';
+    }
+
+    function renderLeaderboard() {
+        const container = document.getElementById('leaderboard-list');
+        const teams = currentData.teams || {};
+        const scores = currentData.scores || {};
+        const courseData = currentData.courseData || [];
+        const totalPar = courseData.reduce((sum, h) => sum + (h.par || 0), 0);
+        const handicap = currentData.teamHandicap || 0;
+
+        let rows = Object.keys(teams).map(tid => {
+            const t = teams[tid];
+            let strokes = 0, thru = 0, parPlayed = 0;
+            courseData.forEach(h => {
+                const v = scores[`team${t.num}_h${h.hole}`];
+                if (v && v > 0) {
+                    strokes += parseInt(v, 10);
+                    thru++;
+                    parPlayed += h.par;
+                }
+            });
+            const net = thru > 0 ? strokes - handicap : 0;
+            const toPar = thru > 0 ? net - parPlayed : null;
+            return { num: t.num, names: t.players.join('/'), strokes, thru, toPar, hasScores: thru > 0 };
+        });
+
+        rows.sort((a, b) => {
+            if (a.hasScores && !b.hasScores) return -1;
+            if (!a.hasScores && b.hasScores) return 1;
+            if (!a.hasScores && !b.hasScores) return a.num - b.num;
+            return a.toPar - b.toPar;
+        });
+
+        if (rows.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams yet.</div>`;
+            return;
+        }
+
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+        </div>`;
+        rows.forEach((r, i) => {
+            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+            html += `<div class="lb-row ${i === 0 && r.hasScores ? 'leader' : ''}">
+                <span class="lb-pos">${i + 1}</span>
+                <span class="lb-team">Team ${r.num} <span style="font-weight:normal; color:var(--text-muted); font-size:0.78rem;">(${r.names})</span></span>
+                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                <span class="lb-score">${toParStr}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function loadTournament(code) {
+        db.ref(`tournaments/${code}`).on('value', (snap) => {
+            currentData = snap.val();
+            if (!currentData) {
+                alert("Tournament not found.");
+                window.location.href = "tournament.html";
+                return;
+            }
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('manage-screen').style.display = 'block';
+            document.getElementById('manage-room-badge').textContent = code;
+            document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
+            document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+            document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
+            document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+            renderTeamLinks();
+            renderLeaderboard();
+        });
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tourneyParam = urlParams.get('tourney');
+    if (tourneyParam) {
+        currentCode = tourneyParam.toUpperCase();
+        loadTournament(currentCode);
+    }
+</script>
+</body>
+</html>
