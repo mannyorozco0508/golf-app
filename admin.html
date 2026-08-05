@@ -56,7 +56,11 @@
         .container { max-width: 650px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
         h2, h3 { color: var(--brand-green); margin-top: 0; }
 
-        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
+        .theme-switch-btn { background: transparent; border: none; padding: 0; cursor: pointer; display: block; margin: 0 auto 16px auto; }
+        .theme-switch-track { width: 46px; height: 24px; border-radius: 24px; background: var(--border-mid); position: relative; transition: background 0.2s ease; margin: 0 auto; }
+        .theme-switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; line-height: 1; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        html.dark-mode .theme-switch-track { background: var(--brand-green); }
+        html.dark-mode .theme-switch-thumb { transform: translateX(22px); }
         
         /* Top Navigation Bar */
         .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -95,6 +99,21 @@
         .custom-select-add-option { text-align: center; color: var(--brand-green); font-weight: bold; }
 
         .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
+
+        /* Compact binary toggle switch - replaces two-option dropdowns */
+        .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .toggle-row.toggle-row-center { justify-content: center; }
+        .toggle-label-sm { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        .toggle-label-sm.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch.toggle-switch-sm { width: 36px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .toggle-switch.toggle-switch-sm .toggle-slider:before { height: 14px; width: 14px; }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+        .toggle-switch.toggle-switch-sm input:checked + .toggle-slider:before { transform: translateX(16px); }
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
@@ -132,7 +151,9 @@
 <body>
 
 <div class="container" id="lobby-screen">
-    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <button class="theme-switch-btn" onclick="toggleTheme()" aria-label="Toggle dark mode">
+        <span class="theme-switch-track"><span class="theme-switch-thumb">🌙</span></span>
+    </button>
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
@@ -172,7 +193,9 @@
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
-    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <button class="theme-switch-btn" onclick="toggleTheme()" aria-label="Toggle dark mode">
+        <span class="theme-switch-track"><span class="theme-switch-thumb">🌙</span></span>
+    </button>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -374,10 +397,15 @@
             <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.75rem;">Scoring Type</label>
-                    <select id="match-scoring">
-                        <option value="net">Net (HCP)</option>
-                        <option value="gross">Gross (Straight)</option>
-                    </select>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="match-scoring-label-net" onclick="setMatchScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="match-scoring-switch" onchange="setMatchScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="match-scoring-label-gross" onclick="setMatchScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="match-scoring" value="net">
                 </div>
                 <div>
                     <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
@@ -409,10 +437,15 @@
                 </div>
                 <div>
                     <label style="font-size: 0.75rem;">Scoring Type</label>
-                    <select id="nassau-scoring">
-                        <option value="net">Net (HCP)</option>
-                        <option value="gross">Gross (Straight)</option>
-                    </select>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="nassau-scoring-label-net" onclick="setNassauScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="nassau-scoring-switch" onchange="setNassauScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="nassau-scoring-label-gross" onclick="setNassauScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="nassau-scoring" value="net">
                 </div>
                 <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
             </div>
@@ -449,10 +482,15 @@
                 </div>
                 <div>
                     <label style="font-size: 0.8rem;">Tied Hole Rule</label>
-                    <select id="wolf-tie-rule">
-                        <option value="carry">Carry to Next Hole</option>
-                        <option value="void">Void (No Points)</option>
-                    </select>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="wolf-tie-rule-label-carry" onclick="setWolfTieRule('carry')">Carry</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="wolf-tie-rule-switch" onchange="setWolfTieRule(this.checked ? 'void' : 'carry')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="wolf-tie-rule-label-void" onclick="setWolfTieRule('void')">Void</span>
+                    </div>
+                    <input type="hidden" id="wolf-tie-rule" value="carry">
                 </div>
             </div>
             <div style="margin-top:8px;">
@@ -472,10 +510,15 @@
             <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.8rem;">Scoring</label>
-                    <select id="stableford-scoring">
-                        <option value="net">Net</option>
-                        <option value="gross">Gross</option>
-                    </select>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="stableford-scoring-label-net" onclick="setStablefordScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="stableford-scoring-switch" onchange="setStablefordScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="stableford-scoring-label-gross" onclick="setStablefordScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="stableford-scoring" value="net">
                 </div>
                 <div><label style="font-size: 0.8rem;">$ Per Point</label><input type="number" id="stableford-point-value" value="" min="0" placeholder="0"></div>
             </div>
@@ -548,16 +591,12 @@
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');
         localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
-        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
-            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-        });
+        document.querySelectorAll('.theme-switch-thumb').forEach(thumb => { thumb.textContent = isDark ? '☀️' : '🌙'; });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         if (document.documentElement.classList.contains('dark-mode')) {
-            document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
-                btn.textContent = '☀️ Light Mode';
-            });
+            document.querySelectorAll('.theme-switch-thumb').forEach(thumb => { thumb.textContent = '☀️'; });
         }
     });
     // ------------------
@@ -683,6 +722,35 @@
         } else {
             navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
         }
+    }
+
+    // Generic helper for the compact binary toggle switches (Net/Gross, Carry/Void, etc.)
+    // Keeps a hidden input's value in sync with the switch position and label highlighting.
+    function syncToggle(hiddenId, switchId, leftLabelId, rightLabelId, leftVal) {
+        const val = document.getElementById(hiddenId).value;
+        document.getElementById(switchId).checked = (val !== leftVal);
+        document.getElementById(leftLabelId).classList.toggle('active', val === leftVal);
+        document.getElementById(rightLabelId).classList.toggle('active', val !== leftVal);
+    }
+
+    function setMatchScoring(val) {
+        document.getElementById('match-scoring').value = val;
+        syncToggle('match-scoring', 'match-scoring-switch', 'match-scoring-label-net', 'match-scoring-label-gross', 'net');
+    }
+
+    function setNassauScoring(val) {
+        document.getElementById('nassau-scoring').value = val;
+        syncToggle('nassau-scoring', 'nassau-scoring-switch', 'nassau-scoring-label-net', 'nassau-scoring-label-gross', 'net');
+    }
+
+    function setWolfTieRule(val) {
+        document.getElementById('wolf-tie-rule').value = val;
+        syncToggle('wolf-tie-rule', 'wolf-tie-rule-switch', 'wolf-tie-rule-label-carry', 'wolf-tie-rule-label-void', 'carry');
+    }
+
+    function setStablefordScoring(val) {
+        document.getElementById('stableford-scoring').value = val;
+        syncToggle('stableford-scoring', 'stableford-scoring-switch', 'stableford-scoring-label-net', 'stableford-scoring-label-gross', 'net');
     }
 
     function toggleHoleBet() {
@@ -1419,22 +1487,22 @@
                 document.getElementById("enable-kpgame").checked = data.kpGameEnabled === true;
             }
 
-            if (data.matchScoring && document.getElementById("match-scoring")) document.getElementById("match-scoring").value = data.matchScoring;
+            if (data.matchScoring && document.getElementById("match-scoring")) { document.getElementById("match-scoring").value = data.matchScoring; syncToggle("match-scoring", "match-scoring-switch", "match-scoring-label-net", "match-scoring-label-gross", "net"); }
             if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
             if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
             
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
-            if (data.nassauScoring && document.getElementById("nassau-scoring")) document.getElementById("nassau-scoring").value = data.nassauScoring;
+            if (data.nassauScoring && document.getElementById("nassau-scoring")) { document.getElementById("nassau-scoring").value = data.nassauScoring; syncToggle("nassau-scoring", "nassau-scoring-switch", "nassau-scoring-label-net", "nassau-scoring-label-gross", "net"); }
             if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
             if (data.wolfLoneMult && document.getElementById("wolf-lone-mult")) document.getElementById("wolf-lone-mult").value = data.wolfLoneMult;
             if (data.wolfBlindMult && document.getElementById("wolf-blind-mult")) document.getElementById("wolf-blind-mult").value = data.wolfBlindMult;
-            if (data.wolfTieRule && document.getElementById("wolf-tie-rule")) document.getElementById("wolf-tie-rule").value = data.wolfTieRule;
+            if (data.wolfTieRule && document.getElementById("wolf-tie-rule")) { document.getElementById("wolf-tie-rule").value = data.wolfTieRule; syncToggle("wolf-tie-rule", "wolf-tie-rule-switch", "wolf-tie-rule-label-carry", "wolf-tie-rule-label-void", "carry"); }
             if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
             if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
-            if (data.stablefordScoring && document.getElementById("stableford-scoring")) document.getElementById("stableford-scoring").value = data.stablefordScoring;
+            if (data.stablefordScoring && document.getElementById("stableford-scoring")) { document.getElementById("stableford-scoring").value = data.stablefordScoring; syncToggle("stableford-scoring", "stableford-scoring-switch", "stableford-scoring-label-net", "stableford-scoring-label-gross", "net"); }
             if (data.stablefordPoints) {
                 const sp = data.stablefordPoints;
                 if (sp.other !== undefined && document.getElementById("stableford-pts-other")) document.getElementById("stableford-pts-other").value = sp.other;
