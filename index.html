@@ -62,11 +62,16 @@
         .header-title { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin: 0; }
         .header-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
 
-        .theme-toggle-btn, .history-open-btn {
+        .history-open-btn {
             background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid);
             border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px;
             cursor: pointer; white-space: nowrap;
         }
+        .theme-switch-btn { background: transparent; border: none; padding: 0; cursor: pointer; display: inline-flex; align-items: center; }
+        .theme-switch-track { width: 46px; height: 24px; border-radius: 24px; background: var(--border-mid); position: relative; transition: background 0.2s ease; }
+        .theme-switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; line-height: 1; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        html.dark-mode .theme-switch-track { background: var(--brand-green); }
+        html.dark-mode .theme-switch-thumb { transform: translateX(22px); }
         .header-controls-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 
         /* Top Navigation Bar */
@@ -238,7 +243,9 @@
 
 <div class="container" id="main-content" style="display: none;">
     <div class="header-controls-row">
-        <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+        <button class="theme-switch-btn" onclick="toggleTheme()" aria-label="Toggle dark mode">
+            <span class="theme-switch-track"><span class="theme-switch-thumb">🌙</span></span>
+        </button>
         <button class="history-open-btn" onclick="openHistoryModal()">🕘 History</button>
     </div>
     <div class="header-box">
@@ -379,14 +386,12 @@
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');
         localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        document.querySelectorAll('.theme-switch-thumb').forEach(thumb => { thumb.textContent = isDark ? '☀️' : '🌙'; });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn && document.documentElement.classList.contains('dark-mode')) {
-            btn.textContent = '☀️ Light Mode';
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-switch-thumb').forEach(thumb => { thumb.textContent = '☀️'; });
         }
     });
     // ------------------
