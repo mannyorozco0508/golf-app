@@ -347,57 +347,6 @@
             </div>
         </div>
 
-        <div id="richholebet-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                <input type="checkbox" id="enable-richholebet" onchange="toggleRichHoleBet()" style="width: 18px; height: 18px; margin: 0;">
-                <strong>💵 Hole Bet + Overall Bet</strong>
-            </label>
-            <div id="richholebet-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
-
-                <label style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-                    <input type="checkbox" id="rhb-hole-enabled" checked style="width: 16px; height: 16px; margin: 0;"> Per-Hole Bet
-                </label>
-                <div class="grid-2col" style="margin-bottom: 10px;">
-                    <div><label style="font-size: 0.75rem;">$ per Hole</label><input type="number" id="rhb-hole-stake" value="20" min="1"></div>
-                    <div><label style="font-size: 0.75rem;">Tied Hole</label>
-                        <select id="rhb-tie-rule">
-                            <option value="push">Push (no $ moves)</option>
-                            <option value="carry">Carry Over (rolls to next hole)</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="grid-2col" style="margin-bottom: 14px;">
-                    <div><label style="font-size: 0.75rem;">Hole Bet Structure</label>
-                        <select id="rhb-hole-segment">
-                            <option value="full18">Full 18 (continuous)</option>
-                            <option value="frontback">Front 9 &amp; Back 9 (separate)</option>
-                        </select>
-                    </div>
-                    <div><label style="font-size: 0.75rem;">Scored By</label>
-                        <select id="rhb-scoring-type">
-                            <option value="net">Net (uses HCP)</option>
-                            <option value="gross">Gross</option>
-                        </select>
-                    </div>
-                </div>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin: -8px 0 14px 0;">A carry still unresolved at the last hole of its segment is voided - nobody collects it.</p>
-
-                <label style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
-                    <input type="checkbox" id="rhb-overall-enabled" checked style="width: 16px; height: 16px; margin: 0;"> Overall Bet
-                </label>
-                <div class="grid-2col">
-                    <div><label style="font-size: 0.75rem;">$ Overall</label><input type="number" id="rhb-overall-stake" value="100" min="1"></div>
-                    <div><label style="font-size: 0.75rem;">Decided By</label>
-                        <select id="rhb-overall-mode">
-                            <option value="stroke">Lowest Total Score</option>
-                            <option value="match">Most Holes Won (Match Play)</option>
-                        </select>
-                    </div>
-                </div>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A tie on the overall bet, either way, means no money changes hands.</p>
-            </div>
-        </div>
-
         <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0;">
         <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">Side Games — run independently, no matter what's set above</p>
 
@@ -738,10 +687,6 @@
 
     function toggleHoleBet() {
         document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
-    }
-
-    function toggleRichHoleBet() {
-        document.getElementById('richholebet-container').style.display = document.getElementById('enable-richholebet').checked ? 'block' : 'none';
     }
 
     function generateRoomCode() {
@@ -1415,13 +1360,9 @@
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
-        const formatsWithRichHoleBet = ['stroke', 'match'];
         
         if (document.getElementById("hole-bet-settings")) {
             document.getElementById("hole-bet-settings").style.display = formatsWithHoleBets.includes(format) ? "block" : "none";
-        }
-        if (document.getElementById("richholebet-settings")) {
-            document.getElementById("richholebet-settings").style.display = formatsWithRichHoleBet.includes(format) ? "block" : "none";
         }
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
@@ -1466,20 +1407,6 @@
                     document.getElementById("enable-hole-bet").checked = true;
                     document.getElementById("hole-bet-stake-container").style.display = "block";
                 }
-            }
-
-            if (data.richHoleBet) {
-                const rhb = data.richHoleBet;
-                document.getElementById("enable-richholebet").checked = true;
-                document.getElementById("richholebet-container").style.display = "block";
-                document.getElementById("rhb-hole-enabled").checked = rhb.holeEnabled !== false;
-                document.getElementById("rhb-hole-stake").value = rhb.holeStake || 20;
-                document.getElementById("rhb-tie-rule").value = rhb.tieRule || "push";
-                document.getElementById("rhb-hole-segment").value = rhb.segment || "full18";
-                document.getElementById("rhb-scoring-type").value = rhb.scoringType || "net";
-                document.getElementById("rhb-overall-enabled").checked = rhb.overallEnabled !== false;
-                document.getElementById("rhb-overall-stake").value = rhb.overallStake || 100;
-                document.getElementById("rhb-overall-mode").value = rhb.overallMode || "stroke";
             }
 
             if (document.getElementById("enable-birdiegame")) {
@@ -1909,28 +1836,6 @@
 
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
 
-            const richHoleBetEnabled = document.getElementById("enable-richholebet") ? document.getElementById("enable-richholebet").checked : false;
-
-            if (richHoleBetEnabled) {
-                const moneyCheckedCount = Array.from(document.querySelectorAll('.p-money-input')).filter(cb => cb.checked).length;
-                if (moneyCheckedCount !== 2) {
-                    alert(`⚠️ Hole Bet + Overall Bet needs exactly 2 players checked "Playing for Money" — you currently have ${moneyCheckedCount} checked. Adjust the checkboxes next to each player's name, or turn off Hole Bet + Overall Bet.`);
-                    saveBtn.innerText = originalText; saveBtn.disabled = false;
-                    return;
-                }
-            }
-
-            const richHoleBet = richHoleBetEnabled ? {
-                holeEnabled: document.getElementById("rhb-hole-enabled").checked,
-                holeStake: parseFloat(document.getElementById("rhb-hole-stake").value) || 20,
-                tieRule: document.getElementById("rhb-tie-rule").value,
-                segment: document.getElementById("rhb-hole-segment").value,
-                scoringType: document.getElementById("rhb-scoring-type").value,
-                overallEnabled: document.getElementById("rhb-overall-enabled").checked,
-                overallStake: parseFloat(document.getElementById("rhb-overall-stake").value) || 100,
-                overallMode: document.getElementById("rhb-overall-mode").value
-            } : null;
-
             const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
             const kpGameEnabled = document.getElementById("enable-kpgame") ? document.getElementById("enable-kpgame").checked : false;
             const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
@@ -1999,7 +1904,9 @@
                 courseName: selectedCourseName,
                 gameFormat: gameFormat,
                 holeBetStake: holeBetStake,
-                richHoleBet: richHoleBet,
+                richHoleBet: null,
+                richHoleBetPresses: null,
+                richOverallBetPresses: null,
                 birdieGameEnabled: birdieGameEnabled,
                 kpGameEnabled: kpGameEnabled,
                 birdieUnitVal: birdieUnitVal,
