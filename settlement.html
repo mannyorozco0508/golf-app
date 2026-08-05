@@ -196,6 +196,155 @@
         }
     }
 
+    // --- WOLF GAME ENGINE (mirrors index.html) ---
+    function calcWolfEngine(data, courseData, savedScores) {
+        const players = data.players || [];
+        const result = { totals: {}, holeLog: {}, carryPending: 0 };
+        players.forEach(p => result.totals[p.id] = 0);
+        if (players.length !== 4) return result;
+
+        const loneMult = parseFloat(data.wolfLoneMult) || 2;
+        const blindMult = parseFloat(data.wolfBlindMult) || 4;
+        const tieRule = data.wolfTieRule || 'carry';
+        const lastPlaceRule = data.wolfLastPlaceRule === 'on';
+        const calls = data.wolfCalls || {};
+
+        let carry = 0;
+        const sortedHoles = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+
+        sortedHoles.forEach(h => {
+            const hole = h.hole;
+            let wolfPlayer;
+            if (lastPlaceRule && (hole === 17 || hole === 18)) {
+                let sorted = players.slice().sort((a, b) => (result.totals[a.id] || 0) - (result.totals[b.id] || 0));
+                wolfPlayer = sorted[0];
+            } else {
+                wolfPlayer = players[(hole - 1) % 4];
+            }
+
+            const callData = calls[`h${hole}`];
+            const allScored = players.every(p => savedScores[`p${p.id}_h${hole}`]);
+
+            let log = { hole, wolfId: wolfPlayer.id, wolfName: wolfPlayer.name, call: callData ? callData.call : null, partnerId: callData ? callData.partnerId : null, resolved: false, winner: null, pts: {} };
+
+            if (!callData || !allScored) {
+                result.holeLog[hole] = log;
+                return;
+            }
+
+            let nets = {};
+            players.forEach(p => {
+                const gross = parseInt(savedScores[`p${p.id}_h${hole}`], 10);
+                const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                nets[p.id] = gross - strokes;
+            });
+
+            const others = players.filter(p => String(p.id) !== String(wolfPlayer.id));
+            let winnerSide = null;
+            let basePot = 0;
+
+            if (callData.call === 'partner' && callData.partnerId) {
+                const partner = others.find(p => String(p.id) === String(callData.partnerId));
+                const rest = others.filter(p => String(p.id) !== String(callData.partnerId));
+                if (partner && rest.length === 2) {
+                    basePot = 2;
+                    const teamScore = Math.min(nets[wolfPlayer.id], nets[partner.id]);
+                    const oppScore = Math.min(nets[rest[0].id], nets[rest[1].id]);
+                    if (teamScore < oppScore) {
+                        winnerSide = 'wolf';
+                        const pot = basePot + carry;
+                        log.pts[wolfPlayer.id] = pot / 2;
+                        log.pts[partner.id] = pot / 2;
+                    } else if (oppScore < teamScore) {
+                        winnerSide = 'other';
+                        const pot = basePot + carry;
+                        log.pts[rest[0].id] = pot / 2;
+                        log.pts[rest[1].id] = pot / 2;
+                    } else {
+                        winnerSide = 'tie';
+                    }
+                }
+            } else if (callData.call === 'lone' || callData.call === 'blind') {
+                const mult = callData.call === 'blind' ? blindMult : loneMult;
+                basePot = mult;
+                const wolfScore = nets[wolfPlayer.id];
+                const bestOther = Math.min(...others.map(p => nets[p.id]));
+                if (wolfScore < bestOther) {
+                    winnerSide = 'wolf';
+                    log.pts[wolfPlayer.id] = basePot + carry;
+                } else if (bestOther < wolfScore) {
+                    winnerSide = 'other';
+                    basePot = 3;
+                    const pot = basePot + carry;
+                    others.forEach(p => log.pts[p.id] = pot / 3);
+                } else {
+                    winnerSide = 'tie';
+                }
+            }
+
+            if (winnerSide === 'tie') {
+                log.winner = 'tie';
+                if (tieRule === 'carry') carry += basePot;
+            } else if (winnerSide) {
+                log.winner = winnerSide;
+                carry = 0;
+                Object.keys(log.pts).forEach(pid => {
+                    result.totals[pid] = (result.totals[pid] || 0) + log.pts[pid];
+                });
+            }
+
+            log.resolved = !!winnerSide;
+            result.holeLog[hole] = log;
+        });
+
+        result.carryPending = carry;
+        return result;
+    }
+
+    // --- STABLEFORD ENGINE (mirrors index.html) ---
+    function calcStablefordEngine(data, courseData, savedScores) {
+        const players = data.players || [];
+        const pts = data.stablefordPoints || { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 5, albatross: 10 };
+        let totals = {}, holeLog = {};
+        players.forEach(p => totals[p.id] = 0);
+        (courseData || []).forEach(h => {
+            let log = {};
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v) return;
+                const gross = parseInt(v, 10);
+                const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const net = gross - strokes;
+                const diff = net - parseInt(h.par, 10);
+                let awarded, label;
+                if (diff <= -3) { awarded = pts.albatross; label = 'Alb'; }
+                else if (diff === -2) { awarded = pts.eagle; label = 'Eagle'; }
+                else if (diff === -1) { awarded = pts.birdie; label = 'Birdie'; }
+                else if (diff === 0) { awarded = pts.par; label = 'Par'; }
+                else if (diff === 1) { awarded = pts.bogey; label = 'Bogey'; }
+                else { awarded = pts.other; label = 'Dbl+'; }
+                totals[p.id] += awarded;
+                log[p.id] = { pts: awarded, label };
+            });
+            holeLog[h.hole] = log;
+        });
+        return { totals, holeLog };
+    }
+
+    // Zero-sum $ settlement shared by Wolf and Stableford point totals
+    function calcPointSettlement(players, totals, dollarPerPoint) {
+        let money = {};
+        const n = players.length;
+        if (n === 0) return money;
+        let sumPts = 0;
+        players.forEach(p => sumPts += (totals[p.id] || 0));
+        players.forEach(p => {
+            const myPts = totals[p.id] || 0;
+            money[p.id] = dollarPerPoint * (n * myPts - sumPts);
+        });
+        return money;
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
@@ -686,6 +835,70 @@
         // this checkbox, so it's a no-op there and full teams stay intact).
         const moneyPlayers = players.filter(p => p.playingForMoney !== false);
 
+        if (gameFormat === 'wolf') {
+            const wolfCalc = calcWolfEngine(data, courseData, savedScores);
+            const wolfMoney = calcPointSettlement(moneyPlayers, wolfCalc.totals, data.wolfPointVal || 0);
+            let ledgerHtml = "";
+
+            moneyPlayers.forEach(p => {
+                let pts = wolfCalc.totals[p.id] || 0;
+                let money = wolfMoney[p.id] || 0;
+                let moneyClass = money >= 0 ? "val-pos" : "val-neg";
+                let moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
+
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span class="${moneyClass}">${moneyText}</span>
+                    </div>
+                `;
+            });
+
+            if (players.length !== 4) {
+                ledgerHtml = `<div style="text-align:center; color: var(--text-muted); padding: 10px;">Wolf requires exactly 4 players — check the Home/setup page.</div>`;
+            }
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🐺 Final Wolf Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'stableford') {
+            const sfCalc = calcStablefordEngine(data, courseData, savedScores);
+            const sfMoney = calcPointSettlement(moneyPlayers, sfCalc.totals, data.stablefordPointVal || 0);
+            let ledgerHtml = "";
+
+            moneyPlayers.forEach(p => {
+                let pts = sfCalc.totals[p.id] || 0;
+                let money = sfMoney[p.id] || 0;
+                let moneyClass = money >= 0 ? "val-pos" : "val-neg";
+                let moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
+
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span class="${moneyClass}">${moneyText}</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🎯 Final Stableford Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            `;
+            return;
+        }
+
         if (gameFormat === 'dots') {
             let playerDots = {};
             moneyPlayers.forEach(p => playerDots[p.id] = 0);
@@ -753,7 +966,7 @@
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">Final Ledger</div>
-                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, and Dot formats.</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
                 </div>
                 ${sideHtml}
                 <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
