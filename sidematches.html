@@ -522,7 +522,11 @@
 
     function toggleSideMatchPick(playerId) {
         const current = sidematchPickState[playerId];
-        if (!current) sidematchPickState[playerId] = 'a';
+        if (!current) {
+            const aCount = Object.values(sidematchPickState).filter(s => s === 'a').length;
+            const bCount = Object.values(sidematchPickState).filter(s => s === 'b').length;
+            sidematchPickState[playerId] = (aCount <= bCount) ? 'a' : 'b';
+        }
         else if (current === 'a') sidematchPickState[playerId] = 'b';
         else delete sidematchPickState[playerId];
         renderSideMatchPicker();
