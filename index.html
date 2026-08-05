@@ -283,6 +283,11 @@
         <div id="kpgame-rows-wrapper"></div>
     </div>
 
+    <div class="nassau-payout-box" id="wolfcall-payout-container" style="display:none;">
+        <div class="nassau-payout-title">🐺 Wolf Call</div>
+        <div id="wolfcall-rows-wrapper"></div>
+    </div>
+
     <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="card-table-wrapper">
@@ -1200,6 +1205,230 @@
         return { money, wins };
     }
 
+    // --- WOLF GAME ENGINE ---
+    function calcWolfEngine(data, courseData, savedScores) {
+        const players = data.players || [];
+        const result = { totals: {}, holeLog: {}, carryPending: 0 };
+        players.forEach(p => result.totals[p.id] = 0);
+        if (players.length !== 4) return result;
+
+        const loneMult = parseFloat(data.wolfLoneMult) || 2;
+        const blindMult = parseFloat(data.wolfBlindMult) || 4;
+        const tieRule = data.wolfTieRule || 'carry';
+        const lastPlaceRule = data.wolfLastPlaceRule === 'on';
+        const calls = data.wolfCalls || {};
+
+        let carry = 0;
+        const sortedHoles = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+
+        sortedHoles.forEach(h => {
+            const hole = h.hole;
+            let wolfPlayer;
+            if (lastPlaceRule && (hole === 17 || hole === 18)) {
+                let sorted = players.slice().sort((a, b) => (result.totals[a.id] || 0) - (result.totals[b.id] || 0));
+                wolfPlayer = sorted[0];
+            } else {
+                wolfPlayer = players[(hole - 1) % 4];
+            }
+
+            const callData = calls[`h${hole}`];
+            const allScored = players.every(p => savedScores[`p${p.id}_h${hole}`]);
+
+            let log = { hole, wolfId: wolfPlayer.id, wolfName: wolfPlayer.name, call: callData ? callData.call : null, partnerId: callData ? callData.partnerId : null, resolved: false, winner: null, pts: {} };
+
+            if (!callData || !allScored) {
+                result.holeLog[hole] = log;
+                return;
+            }
+
+            let nets = {};
+            players.forEach(p => {
+                const gross = parseInt(savedScores[`p${p.id}_h${hole}`], 10);
+                const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                nets[p.id] = gross - strokes;
+            });
+
+            const others = players.filter(p => String(p.id) !== String(wolfPlayer.id));
+            let winnerSide = null;
+            let basePot = 0;
+
+            if (callData.call === 'partner' && callData.partnerId) {
+                const partner = others.find(p => String(p.id) === String(callData.partnerId));
+                const rest = others.filter(p => String(p.id) !== String(callData.partnerId));
+                if (partner && rest.length === 2) {
+                    basePot = 2;
+                    const teamScore = Math.min(nets[wolfPlayer.id], nets[partner.id]);
+                    const oppScore = Math.min(nets[rest[0].id], nets[rest[1].id]);
+                    if (teamScore < oppScore) {
+                        winnerSide = 'wolf';
+                        const pot = basePot + carry;
+                        log.pts[wolfPlayer.id] = pot / 2;
+                        log.pts[partner.id] = pot / 2;
+                    } else if (oppScore < teamScore) {
+                        winnerSide = 'other';
+                        const pot = basePot + carry;
+                        log.pts[rest[0].id] = pot / 2;
+                        log.pts[rest[1].id] = pot / 2;
+                    } else {
+                        winnerSide = 'tie';
+                    }
+                }
+            } else if (callData.call === 'lone' || callData.call === 'blind') {
+                const mult = callData.call === 'blind' ? blindMult : loneMult;
+                basePot = mult;
+                const wolfScore = nets[wolfPlayer.id];
+                const bestOther = Math.min(...others.map(p => nets[p.id]));
+                if (wolfScore < bestOther) {
+                    winnerSide = 'wolf';
+                    log.pts[wolfPlayer.id] = basePot + carry;
+                } else if (bestOther < wolfScore) {
+                    winnerSide = 'other';
+                    basePot = 3;
+                    const pot = basePot + carry;
+                    others.forEach(p => log.pts[p.id] = pot / 3);
+                } else {
+                    winnerSide = 'tie';
+                }
+            }
+
+            if (winnerSide === 'tie') {
+                log.winner = 'tie';
+                if (tieRule === 'carry') carry += basePot;
+            } else if (winnerSide) {
+                log.winner = winnerSide;
+                carry = 0;
+                Object.keys(log.pts).forEach(pid => {
+                    result.totals[pid] = (result.totals[pid] || 0) + log.pts[pid];
+                });
+            }
+
+            log.resolved = !!winnerSide;
+            result.holeLog[hole] = log;
+        });
+
+        result.carryPending = carry;
+        return result;
+    }
+
+    function saveWolfCall(hole, call, partnerId) {
+        const payload = { call: call };
+        if (call === 'partner' && partnerId) payload.partnerId = partnerId;
+        db.ref(`events/${currentMode}/wolfCalls/h${hole}`).set(payload)
+            .catch(err => alert(`Failed to save Wolf call: ${err.message}`));
+    }
+
+    function clearWolfCall(hole) {
+        db.ref(`events/${currentMode}/wolfCalls/h${hole}`).remove()
+            .catch(err => alert(`Failed to clear: ${err.message}`));
+    }
+
+    function renderWolfCallBox(data, courseData, savedScores) {
+        const box = document.getElementById('wolfcall-payout-container');
+        const wrapper = document.getElementById('wolfcall-rows-wrapper');
+        if (!box || !wrapper) return;
+        const gameFormat = data.gameFormat || 'stroke';
+        if (gameFormat !== 'wolf') { box.style.display = 'none'; return; }
+
+        const players = data.players || [];
+        if (players.length !== 4) {
+            box.style.display = 'block';
+            wrapper.innerHTML = `<div style="font-size:0.8rem; color:var(--accent-red); padding:4px 0;">Wolf requires exactly 4 players.</div>`;
+            return;
+        }
+
+        const wolfCalc = calcWolfEngine(data, courseData, savedScores);
+        box.style.display = 'block';
+
+        // Only show the next hole that needs a call (first hole with a score entered but no call, or first unplayed hole's wolf)
+        let targetHole = null;
+        (courseData || []).slice().sort((a, b) => a.hole - b.hole).forEach(h => {
+            if (targetHole !== null) return;
+            const log = wolfCalc.holeLog[h.hole];
+            if (log && !log.call) targetHole = h.hole;
+        });
+        if (targetHole === null && courseData.length > 0) {
+            const lastHole = Math.max(...courseData.map(h => h.hole));
+            const lastLog = wolfCalc.holeLog[lastHole];
+            targetHole = lastLog && lastLog.call ? null : lastHole;
+        }
+
+        let html = '';
+        if (targetHole !== null) {
+            const log = wolfCalc.holeLog[targetHole];
+            const others = players.filter(p => String(p.id) !== String(log.wolfId));
+            html += `<div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Hole ${targetHole} Wolf: 🐺 ${log.wolfName.split(' ')[0]}</div>`;
+            html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">`;
+            others.forEach(p => {
+                html += `<button onclick="saveWolfCall(${targetHole}, 'partner', '${p.id}')" style="padding:6px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:var(--bg-card); color:var(--text-main); font-size:0.72rem; font-weight:bold; cursor:pointer;">🤝 ${p.name.split(' ')[0]}</button>`;
+            });
+            html += `</div>`;
+            html += `<div style="display:flex; gap:6px;">`;
+            html += `<button onclick="saveWolfCall(${targetHole}, 'lone', null)" style="flex:1; padding:6px 10px; border-radius:14px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-size:0.72rem; font-weight:bold; cursor:pointer;">🐺 Lone Wolf</button>`;
+            html += `<button onclick="saveWolfCall(${targetHole}, 'blind', null)" style="flex:1; padding:6px 10px; border-radius:14px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.72rem; font-weight:bold; cursor:pointer;">🙈 Blind Wolf</button>`;
+            html += `</div>`;
+        }
+
+        // Recent hole results
+        let recentHtml = '';
+        Object.values(wolfCalc.holeLog).sort((a, b) => b.hole - a.hole).forEach(log => {
+            if (!log.call) return;
+            const callLabel = log.call === 'partner' ? `🤝 w/ ${players.find(p => String(p.id) === String(log.partnerId)) ? players.find(p => String(p.id) === String(log.partnerId)).name.split(' ')[0] : '?'}` : (log.call === 'blind' ? '🙈 Blind Wolf' : '🐺 Lone Wolf');
+            const resultLabel = !log.resolved ? (log.winner === 'tie' ? '🔁 Tied — carries' : '⏳ Awaiting scores') : (log.winner === 'wolf' ? `✅ Wolf side won` : `❌ Wolf side lost`);
+            recentHtml += `<div style="display:flex; justify-content:space-between; font-size:0.72rem; padding:3px 0; border-bottom:1px solid var(--border-faint);">
+                <span>H${log.hole}: ${log.wolfName.split(' ')[0]} ${callLabel} <button onclick="clearWolfCall(${log.hole})" style="border:none; background:none; color:var(--accent-red); cursor:pointer; font-size:0.7rem;">✕</button></span>
+                <span>${resultLabel}</span>
+            </div>`;
+        });
+        if (recentHtml) html += `<div style="margin-top:8px; max-height:160px; overflow-y:auto;">${recentHtml}</div>`;
+        if (wolfCalc.carryPending > 0) html += `<div style="font-size:0.72rem; color:var(--accent-red); margin-top:6px;">🔁 ${wolfCalc.carryPending} pt(s) carrying to next hole</div>`;
+
+        wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">All Wolf calls made for played holes.</div>`;
+    }
+
+    // --- STABLEFORD ENGINE ---
+    function calcStablefordEngine(data, courseData, savedScores) {
+        const players = data.players || [];
+        const pts = data.stablefordPoints || { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 5, albatross: 10 };
+        let totals = {}, holeLog = {};
+        players.forEach(p => totals[p.id] = 0);
+        (courseData || []).forEach(h => {
+            let log = {};
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v) return;
+                const gross = parseInt(v, 10);
+                const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const net = gross - strokes;
+                const diff = net - parseInt(h.par, 10);
+                let awarded, label;
+                if (diff <= -3) { awarded = pts.albatross; label = 'Alb'; }
+                else if (diff === -2) { awarded = pts.eagle; label = 'Eagle'; }
+                else if (diff === -1) { awarded = pts.birdie; label = 'Birdie'; }
+                else if (diff === 0) { awarded = pts.par; label = 'Par'; }
+                else if (diff === 1) { awarded = pts.bogey; label = 'Bogey'; }
+                else { awarded = pts.other; label = 'Dbl+'; }
+                totals[p.id] += awarded;
+                log[p.id] = { pts: awarded, label };
+            });
+            holeLog[h.hole] = log;
+        });
+        return { totals, holeLog };
+    }
+
+    // Zero-sum $ settlement shared by Wolf and Stableford point totals
+    function calcPointSettlement(players, totals, dollarPerPoint) {
+        let money = {};
+        const n = players.length;
+        if (n === 0) return money;
+        let sumPts = 0;
+        players.forEach(p => sumPts += (totals[p.id] || 0));
+        players.forEach(p => {
+            const myPts = totals[p.id] || 0;
+            money[p.id] = dollarPerPoint * (n * myPts - sumPts);
+        });
+        return money;
+    }
+
     function renderCombinedTally(data, courseData, savedScores, richHoleCalc, richOverallCalc) {
         const row = document.getElementById('combined-tally-row');
         if (!row) return;
@@ -1489,7 +1718,14 @@
             richOverallCalc = calculateOverallBetEngine(moneyPlayers, courseData, savedScores, richConfig, overallPresses);
         }
 
-        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo'].includes(gameFormat));
+        let wolfCalc = null, stablefordCalc = null;
+        if (gameFormat === 'wolf') {
+            wolfCalc = calcWolfEngine(currentData, courseData, savedScores);
+        } else if (gameFormat === 'stableford') {
+            stablefordCalc = calcStablefordEngine(currentData, courseData, savedScores);
+        }
+
+        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo', 'wolf', 'stableford'].includes(gameFormat));
 
         // --- GLOBAL BET REGISTRY: Bet 1 = Match, Bet 2 = Hole Bet, Bet 3 = Overall Bet, Bet 4+ = presses in the order they started ---
         const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
@@ -1506,7 +1742,7 @@
         });
 
         if (showMatchColumn) {
-            let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : "Match & Bets");
+            let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : (gameFormat === 'wolf' ? "Wolf" : (gameFormat === 'stableford' ? "Stableford Pts" : "Match & Bets")));
             headRow.innerHTML += `<th style="width: 100px;">${colLabel}</th>`;
         }
 
@@ -1570,6 +1806,11 @@
                     currentToParHtml = `<div style="font-size: 0.7rem; font-weight: bold; color: ${toParColor}; margin-top: 2px; text-align: center;">${toParText}</div>`;
                 }
                 
+                if (gameFormat === 'stableford' && stablefordCalc && stablefordCalc.holeLog[h.hole] && stablefordCalc.holeLog[h.hole][p.id]) {
+                    const entry = stablefordCalc.holeLog[h.hole][p.id];
+                    earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; font-weight:bold; color:var(--brand-green);">${entry.label} +${entry.pts}</div>`;
+                }
+
                 if (gameFormat === 'dots') {
                     const hDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
                     const myDots = hDots[`p${p.id}`] || [];
@@ -1626,6 +1867,23 @@
                     const dotsAllowed = !isMultiGroupRound || hasGroupLock;
                     const dotBtnAttrs = dotsAllowed ? `onclick="openDotsModal(${h.hole})"` : `disabled style="opacity:0.5; cursor:not-allowed;"`;
                     matchCellHtml += `<button class="${dotBtnClass}" ${dotBtnAttrs}>${dotBtnLabel}</button>`;
+                } else if (gameFormat === 'wolf' && wolfCalc && wolfCalc.holeLog[h.hole]) {
+                    const log = wolfCalc.holeLog[h.hole];
+                    if (log.call) {
+                        const callTag = log.call === 'partner' ? '🤝' : (log.call === 'blind' ? '🙈' : '🐺');
+                        const statusTxt = !log.resolved ? (log.winner === 'tie' ? 'Tied' : 'Pending') : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
+                        matchCellHtml += `<span class="status-pill pill-main">${callTag} ${log.wolfName.split(' ')[0]}</span>`;
+                        matchCellHtml += `<span class="status-pill pill-press">${statusTxt}</span>`;
+                    } else {
+                        matchCellHtml += `<span class="status-pill pill-main">🐺 ${log.wolfName.split(' ')[0]}</span>`;
+                    }
+                } else if (gameFormat === 'stableford' && stablefordCalc && stablefordCalc.holeLog[h.hole]) {
+                    const log = stablefordCalc.holeLog[h.hole];
+                    const parts = Object.keys(log).map(pid => {
+                        const pl = players.find(pp => String(pp.id) === String(pid));
+                        return pl ? `${pl.name.split(' ')[0]}: ${log[pid].pts}` : null;
+                    }).filter(Boolean);
+                    if (parts.length) matchCellHtml += `<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">${parts.join(' · ')}</span>`;
                 } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
                     const statusPillText = formatMatchPill(log.totMatch, matchCalc.t1Name, matchCalc.t2Name, log.totClosed, log.totRes);
@@ -1887,6 +2145,44 @@
                 <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
                 <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
             `;
+        } else if (gameFormat === 'wolf' && wolfCalc) {
+            payoutBox.style.display = "none";
+            titleEl.textContent = "🐺 LIVE WOLF STANDINGS";
+
+            const wolfMoneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
+            const wolfMoney = calcPointSettlement(wolfMoneyPlayers, wolfCalc.totals, currentData.wolfPointVal || 0);
+
+            let scoresList = [];
+            filteredPlayers.forEach(p => {
+                let shortName = p.name.split(" ")[0];
+                let pts = wolfCalc.totals[p.id] || 0;
+                let moneyTxt = "";
+                if (p.playingForMoney !== false && currentData.wolfPointVal) {
+                    let m = wolfMoney[p.id] || 0;
+                    moneyTxt = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
+                }
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
+            });
+            statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
+        } else if (gameFormat === 'stableford' && stablefordCalc) {
+            payoutBox.style.display = "none";
+            titleEl.textContent = "🎯 LIVE STABLEFORD STANDINGS";
+
+            const sfMoneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
+            const sfMoney = calcPointSettlement(sfMoneyPlayers, stablefordCalc.totals, currentData.stablefordPointVal || 0);
+
+            let scoresList = [];
+            filteredPlayers.forEach(p => {
+                let shortName = p.name.split(" ")[0];
+                let pts = stablefordCalc.totals[p.id] || 0;
+                let moneyTxt = "";
+                if (p.playingForMoney !== false && currentData.stablefordPointVal) {
+                    let m = sfMoney[p.id] || 0;
+                    moneyTxt = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
+                }
+                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
+            });
+            statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else if (gameFormat === 'dots') {
             payoutBox.style.display = "none";
             titleEl.textContent = "🎯 LIVE DOT TOTALS";
@@ -1950,13 +2246,14 @@
         richBetMoneyPlayers = moneyPlayers;
         renderRichHoleBetBox(richHoleCalc, richOverallCalc, richConfig, richBetSetupWarning);
         renderKPGameTally(currentData, courseData);
+        renderWolfCallBox(currentData, courseData, savedScores);
         renderCombinedTally(currentData, courseData, savedScores, richHoleCalc, richOverallCalc);
 
-        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig);
+        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig, wolfCalc, stablefordCalc);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
-    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig) {
+    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, richHoleCalc, richOverallCalc, richConfig, wolfCalc, stablefordCalc) {
         const courseName = currentData.courseName || "Golf Scorecard";
         const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         
@@ -2070,6 +2367,36 @@
                 printHtml += `<div class="pledger-row"><span>${hiloCalc.t2Name}</span><strong>${hiloCalc.t2Points} pts (${t2Str})</strong></div>`;
             }
             
+            printHtml += `</div>`;
+        } else if (format === 'wolf' && typeof wolfCalc !== 'undefined' && wolfCalc) {
+            const wolfStake = currentData.wolfPointVal || 0;
+            const wolfMoneyPlayersP = filteredPlayers.filter(p => p.playingForMoney !== false);
+            const wolfMoneyP = calcPointSettlement(wolfMoneyPlayersP, wolfCalc.totals, wolfStake);
+            printHtml += `<div class="pledger"><h3>🐺 Game Ledger (WOLF)</h3>`;
+            filteredPlayers.forEach(p => {
+                let pts = wolfCalc.totals[p.id] || 0;
+                let moneyStr = '';
+                if (p.playingForMoney !== false && wolfStake) {
+                    let m = wolfMoneyP[p.id] || 0;
+                    moneyStr = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
+                }
+                printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts${moneyStr}</strong></div>`;
+            });
+            printHtml += `</div>`;
+        } else if (format === 'stableford' && typeof stablefordCalc !== 'undefined' && stablefordCalc) {
+            const sfStake = currentData.stablefordPointVal || 0;
+            const sfMoneyPlayersP = filteredPlayers.filter(p => p.playingForMoney !== false);
+            const sfMoneyP = calcPointSettlement(sfMoneyPlayersP, stablefordCalc.totals, sfStake);
+            printHtml += `<div class="pledger"><h3>🎯 Game Ledger (STABLEFORD)</h3>`;
+            filteredPlayers.forEach(p => {
+                let pts = stablefordCalc.totals[p.id] || 0;
+                let moneyStr = '';
+                if (p.playingForMoney !== false && sfStake) {
+                    let m = sfMoneyP[p.id] || 0;
+                    moneyStr = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
+                }
+                printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts${moneyStr}</strong></div>`;
+            });
             printHtml += `</div>`;
         } else if (format === 'nassau' && typeof matchCalc !== 'undefined' && matchCalc) {
             printHtml += `<div class="pledger"><h3>💵 Game Ledger (NASSAU)</h3>`;
