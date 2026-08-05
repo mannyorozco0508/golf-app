@@ -65,9 +65,16 @@
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
-        .view-toggle-container { display: flex; background: var(--border-light); border-radius: 8px; padding: 4px; margin-bottom: 12px; }
-        .view-toggle-btn { flex: 1; padding: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; color: var(--text-muted); background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
-        .view-toggle-btn.active { background: var(--bg-card); color: var(--brand-green); box-shadow: 0 2px 4px var(--shadow-color); }
+        /* Compact binary toggle switch - replaces two-button pill pairs */
+        .toggle-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+        .toggle-row .toggle-label { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        .toggle-row .toggle-label.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
 
         .h2h-banner { background: var(--brand-navy); color: white; padding: 16px; border-radius: 10px; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .h2h-status { font-size: 1.25rem; font-weight: bold; margin-bottom: 4px; }
@@ -109,14 +116,22 @@
 
     <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
     
-    <div class="view-toggle-container" id="format-toggle">
-        <button class="view-toggle-btn active" id="btn-individual" onclick="switchView('individual')">Stroke (Individual)</button>
-        <button class="view-toggle-btn" id="btn-team" onclick="switchView('team')">Match (Team/Cart)</button>
+    <div class="toggle-row" id="format-toggle">
+        <span class="toggle-label active" id="label-individual" onclick="switchView('individual')">Stroke (Individual)</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="view-toggle-input" onchange="switchView(this.checked ? 'team' : 'individual')">
+            <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label" id="label-team" onclick="switchView('team')">Match (Team/Cart)</span>
     </div>
 
-    <div class="view-toggle-container" id="scoring-toggle" style="display: flex;">
-        <button class="view-toggle-btn active" id="btn-net" onclick="switchScoring('net')">Net (HCP)</button>
-        <button class="view-toggle-btn" id="btn-gross" onclick="switchScoring('gross')">Gross</button>
+    <div class="toggle-row" id="scoring-toggle">
+        <span class="toggle-label active" id="label-net" onclick="switchScoring('net')">Net (HCP)</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="scoring-toggle-input" onchange="switchScoring(this.checked ? 'gross' : 'net')">
+            <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label" id="label-gross" onclick="switchScoring('gross')">Gross</span>
     </div>
 
     <div id="board-content">
@@ -254,10 +269,10 @@
 
     function switchView(view) {
         activeView = view;
-        document.getElementById('btn-individual').classList.remove('active');
-        document.getElementById('btn-team').classList.remove('active');
-        document.getElementById(`btn-${view}`).classList.add('active');
-        
+        document.getElementById('view-toggle-input').checked = (view === 'team');
+        document.getElementById('label-individual').classList.toggle('active', view === 'individual');
+        document.getElementById('label-team').classList.toggle('active', view === 'team');
+
         if (view === 'individual') {
             document.getElementById('scoring-toggle').style.display = 'flex';
         } else {
@@ -269,9 +284,9 @@
 
     function switchScoring(scoring) {
         activeScoring = scoring;
-        document.getElementById('btn-net').classList.remove('active');
-        document.getElementById('btn-gross').classList.remove('active');
-        document.getElementById(`btn-${scoring}`).classList.add('active');
+        document.getElementById('scoring-toggle-input').checked = (scoring === 'gross');
+        document.getElementById('label-net').classList.toggle('active', scoring === 'net');
+        document.getElementById('label-gross').classList.toggle('active', scoring === 'gross');
         renderBoard();
     }
 
