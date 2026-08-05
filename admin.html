@@ -519,25 +519,31 @@
         </div>
 
         <div id="stableford-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Net Stableford Points</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Stableford Points</label>
             <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.8rem;">Scoring</label>
+                    <select id="stableford-scoring">
+                        <option value="net">Net</option>
+                        <option value="gross">Gross</option>
+                    </select>
+                </div>
                 <div><label style="font-size: 0.8rem;">$ Per Point</label><input type="number" id="stableford-point-value" value="" min="0" placeholder="0"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
                 <div><label style="font-size: 0.8rem;">Double Bogey+</label><input type="number" id="stableford-pts-other" value="0" min="0" step="1"></div>
-            </div>
-            <div class="grid-2col" style="margin-top:8px;">
                 <div><label style="font-size: 0.8rem;">Bogey</label><input type="number" id="stableford-pts-bogey" value="1" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
                 <div><label style="font-size: 0.8rem;">Par</label><input type="number" id="stableford-pts-par" value="2" min="0" step="1"></div>
-            </div>
-            <div class="grid-2col" style="margin-top:8px;">
                 <div><label style="font-size: 0.8rem;">Birdie</label><input type="number" id="stableford-pts-birdie" value="3" min="0" step="1"></div>
-                <div><label style="font-size: 0.8rem;">Eagle</label><input type="number" id="stableford-pts-eagle" value="5" min="0" step="1"></div>
             </div>
             <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Eagle</label><input type="number" id="stableford-pts-eagle" value="5" min="0" step="1"></div>
                 <div><label style="font-size: 0.8rem;">Albatross</label><input type="number" id="stableford-pts-albatross" value="10" min="0" step="1"></div>
-                <div></div>
             </div>
             <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-                Points based on NET score vs. par on each hole. Defaults shown are our house standard — edit any value to customize for this round.
+                Points based on score vs. par on each hole — choose Net (score minus handicap strokes) or Gross (raw score) above. Point defaults shown are our house standard — edit any value to customize for this round.
             </div>
         </div>
 
@@ -1507,6 +1513,7 @@
             if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
             if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
+            if (data.stablefordScoring && document.getElementById("stableford-scoring")) document.getElementById("stableford-scoring").value = data.stablefordScoring;
             if (data.stablefordPoints) {
                 const sp = data.stablefordPoints;
                 if (sp.other !== undefined && document.getElementById("stableford-pts-other")) document.getElementById("stableford-pts-other").value = sp.other;
@@ -1875,6 +1882,7 @@
             const wolfLastPlaceRule = document.getElementById("wolf-lastplace-rule") ? document.getElementById("wolf-lastplace-rule").value : "off";
             const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
             const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
+            const stablefordScoring = document.getElementById("stableford-scoring") ? document.getElementById("stableford-scoring").value : "net";
             const stablefordPoints = {
                 other: document.getElementById("stableford-pts-other") ? (parseInt(document.getElementById("stableford-pts-other").value, 10) || 0) : 0,
                 bogey: document.getElementById("stableford-pts-bogey") ? (parseInt(document.getElementById("stableford-pts-bogey").value, 10) || 0) : 1,
@@ -1941,6 +1949,7 @@
                 wolfTieRule: wolfTieRule,
                 wolfLastPlaceRule: wolfLastPlaceRule,
                 stablefordPointVal: stablefordPointVal,
+                stablefordScoring: stablefordScoring,
                 stablefordPoints: stablefordPoints,
                 dotPointVal: dotPointVal,
                 courseData: finalCourseData,
