@@ -622,20 +622,9 @@
         }
     });
 
-    // Detect the player's approximate location so nearby courses can surface first in search
+    // GPS-based "near you" course sorting has been turned off — no location prompt.
+    // Course dropdown falls back to the default region order.
     let userCoords = null;
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                userCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-                if (courseSearchInput && courseDropdown.style.display === 'block' && courseSearchInput.value === "") {
-                    populateCourseDropdown("");
-                }
-            },
-            () => { /* Location denied or unavailable - dropdown just falls back to the default region order */ },
-            { timeout: 6000, maximumAge: 600000 }
-        );
-    }
 
     db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
         const expDateStr = snapshot.val();
