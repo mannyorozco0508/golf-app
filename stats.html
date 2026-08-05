@@ -328,6 +328,7 @@
     function calcStablefordEngine(data, courseData, savedScores) {
         const players = data.players || [];
         const pts = data.stablefordPoints || { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 5, albatross: 10 };
+        const scoringType = data.stablefordScoring || 'net';
         let totals = {}, holeLog = {};
         players.forEach(p => totals[p.id] = 0);
         (courseData || []).forEach(h => {
@@ -337,8 +338,8 @@
                 if (!v) return;
                 const gross = parseInt(v, 10);
                 const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                const net = gross - strokes;
-                const diff = net - parseInt(h.par, 10);
+                const scoreToUse = scoringType === 'gross' ? gross : (gross - strokes);
+                const diff = scoreToUse - parseInt(h.par, 10);
                 let awarded, label;
                 if (diff <= -3) { awarded = pts.albatross; label = 'Alb'; }
                 else if (diff === -2) { awarded = pts.eagle; label = 'Eagle'; }
