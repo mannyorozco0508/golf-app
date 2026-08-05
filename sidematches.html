@@ -599,20 +599,41 @@
         return last;
     }
 
-    function pressSideMatchHole(matchId, p1Id, p2Id) {
-        const sm = (currentData.sideMatches || {})[matchId];
-        if (!sm) return;
+    function showSideHolePressInput(matchId, p1Id, p2Id) {
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
         const p2 = players.find(p => String(p.id) === String(p2Id));
         if (!p1 || !p2) return;
         const nextHole = getLastPlayedHoleForSideMatch(p1, p2, currentData.courseData || [], currentData.scores || {}) + 1;
-        const input = prompt(`New $ amount per hole, starting hole ${nextHole}:`, "");
-        if (input === null || input.trim() === "") return;
-        const rate = parseFloat(input);
+        const row = document.getElementById(`sm-hole-press-row-${matchId}`);
+        if (!row) return;
+        row.innerHTML = `
+            <input type="number" id="sm-hole-press-amount-${matchId}" placeholder="New $/hole" min="0" step="1" inputmode="decimal"
+                style="width:90px; padding:4px 8px; border-radius:6px; border:1px solid var(--border-mid); font-size:0.8rem;">
+            <button onclick="confirmSideHolePress('${matchId}', ${nextHole}, '${p1Id}', '${p2Id}')" style="background:var(--accent-teal); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer; margin-left:4px;">✓ Set</button>
+            <button onclick="cancelSideHolePressInput('${matchId}', '${p1Id}', '${p2Id}')" style="background:transparent; color:var(--text-muted); border:1px solid var(--border-mid); border-radius:6px; padding:4px 8px; font-size:0.75rem; cursor:pointer; margin-left:4px;">✕</button>
+        `;
+        const inputEl = document.getElementById(`sm-hole-press-amount-${matchId}`);
+        if (inputEl) {
+            inputEl.focus();
+            inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmSideHolePress(matchId, nextHole, p1Id, p2Id); });
+        }
+    }
+
+    function cancelSideHolePressInput(matchId, p1Id, p2Id) {
+        const row = document.getElementById(`sm-hole-press-row-${matchId}`);
+        if (!row) return;
+        row.innerHTML = `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1Id}', '${p2Id}')">🔥 Press</button>`;
+    }
+
+    function confirmSideHolePress(matchId, nextHole, p1Id, p2Id) {
+        const input = document.getElementById(`sm-hole-press-amount-${matchId}`);
+        if (!input) return;
+        const rate = parseFloat(input.value);
         if (isNaN(rate) || rate <= 0) { alert("Please enter a valid dollar amount."); return; }
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
+            .then(() => cancelSideHolePressInput(matchId, p1Id, p2Id))
             .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
@@ -682,7 +703,7 @@
                     const carryText = holeCalc.currentCarry > 0 ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${holeCalc.currentCarry} carrying</span>` : '';
                     html += `<div class="side-match-row">
                         <span style="font-size:0.8rem;">💵 $${holeCalc.currentStake}/hole${carryText}</span>
-                        <button class="btn-outline-sm" onclick="pressSideMatchHole('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button>
+                        <span id="sm-hole-press-row-${matchId}"><button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button></span>
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
                 }
