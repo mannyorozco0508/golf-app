@@ -106,10 +106,26 @@
 
         /* MAGIC PDF HIDING CSS */
         @media print {
+            :root, html.dark-mode {
+                --bg-page: #ffffff;
+                --bg-card: #ffffff;
+                --text-main: #1a1a1a;
+                --text-muted: #555555;
+                --brand-green: #0f4c3a;
+                --brand-navy: #1d3557;
+                --accent-teal: #0f7a5c;
+                --accent-red: #c0392b;
+                --border-light: #e0e0e0;
+                --border-mid: #cccccc;
+                --border-faint: #e5e5e5;
+                --nav-bg: #f4f6f8;
+                --nassau-box-bg: #ffffff;
+                --danger-box-bg: #ffffff;
+            }
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .control-grid, .theme-toggle-btn { display: none !important; }
-            .action-card { border: 1px solid #ccc; background: #fff; }
+            .top-nav-bar, .btn-primary, .control-grid, .theme-toggle-btn, .btn-outline-sm, .btn-danger-sm { display: none !important; }
+            .action-card, .side-match-card { border: 1px solid #ccc; background: #fff; }
         }
     </style>
 </head>
@@ -135,6 +151,7 @@
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ New Side Match</button>
+        <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="window.print()">📄 Send Results PDF</button>
     </div>
 </div>
 
