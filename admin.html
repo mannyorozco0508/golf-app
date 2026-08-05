@@ -699,6 +699,7 @@
     let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
+    let groupSizeOverrides = {}; // sparse: { groupIndex(0-based): explicitSize }
     const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     if (!currentMode) {
@@ -1442,6 +1443,7 @@
     function loadModeData(modeKey) {
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
+            groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
             if (data.eventCategory) currentCategory = data.eventCategory;
 
@@ -1699,6 +1701,79 @@
 
     function updateCount() { 
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
+        renderGroupDividers();
+        regenerateGroupLinks();
+    }
+
+    // --- CUSTOM GROUP SIZING ---
+    // overrides is sparse (0-based group index -> explicit size). Any group without an
+    // override defaults to 4 (or whatever's left), so pinning one group's size doesn't
+    // require touching the rest — they auto-adjust as players are added/removed.
+    function computeGroupSizes(playerCount, overrides) {
+        overrides = overrides || {};
+        let sizes = [];
+        let sum = 0;
+        let gIdx = 0;
+        while (sum < playerCount) {
+            let remaining = playerCount - sum;
+            let defaultSize = Math.min(4, remaining);
+            let ov = overrides[gIdx];
+            let sz = (ov !== undefined && ov > 0) ? Math.min(ov, remaining) : defaultSize;
+            sizes.push(sz);
+            sum += sz;
+            gIdx++;
+        }
+        return sizes;
+    }
+
+    function computeGroupBoundaries(playerCount, overrides) {
+        const sizes = computeGroupSizes(playerCount, overrides);
+        let boundaries = [];
+        let idx = 0;
+        sizes.forEach((size, i) => {
+            boundaries.push({ group: i + 1, startIdx: idx, size: size });
+            idx += size;
+        });
+        return boundaries;
+    }
+
+    function renderGroupDividers() {
+        const listContainer = document.getElementById("player-list");
+        if (!listContainer) return;
+
+        listContainer.querySelectorAll('.group-divider').forEach(el => el.remove());
+
+        const rows = Array.from(listContainer.querySelectorAll('.player-row'));
+        const playerCount = rows.length;
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
+
+        if (boundaries.length <= 1) return; // single group, no need to label it
+
+        boundaries.forEach((b, gIdx) => {
+            const divider = document.createElement("div");
+            divider.className = "group-divider";
+            divider.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:14px 0 8px 0;";
+            divider.innerHTML = `
+                <span style="font-weight:bold; color:var(--brand-green); font-size:0.85rem;">🏌️ Group ${b.group}</span>
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" onclick="adjustGroupSize(${gIdx}, -1)" style="width:26px; height:26px; border-radius:50%; border:1px solid var(--border-mid); background:var(--bg-card); color:var(--brand-green); font-weight:bold; cursor:pointer; font-size:1rem; line-height:1;">−</button>
+                    <span style="font-size:0.8rem; color:var(--text-muted); min-width:64px; text-align:center;">${b.size} player${b.size === 1 ? '' : 's'}</span>
+                    <button type="button" onclick="adjustGroupSize(${gIdx}, 1)" style="width:26px; height:26px; border-radius:50%; border:1px solid var(--border-mid); background:var(--bg-card); color:var(--brand-green); font-weight:bold; cursor:pointer; font-size:1rem; line-height:1;">+</button>
+                </span>
+            `;
+            const anchorRow = rows[b.startIdx];
+            if (anchorRow) listContainer.insertBefore(divider, anchorRow);
+        });
+    }
+
+    function adjustGroupSize(groupIdx, delta) {
+        const playerCount = document.querySelectorAll('.player-row').length;
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
+        const current = boundaries[groupIdx] ? boundaries[groupIdx].size : 4;
+        let newSize = current + delta;
+        newSize = Math.max(1, Math.min(6, newSize));
+        groupSizeOverrides[groupIdx] = newSize;
+        renderGroupDividers();
         regenerateGroupLinks();
     }
 
@@ -1708,9 +1783,9 @@
         if (!box || !list) return;
 
         const playerCount = document.querySelectorAll('.player-row').length;
-        const numGroups = Math.ceil(playerCount / 4);
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
 
-        if (!currentMode || numGroups <= 1) {
+        if (!currentMode || boundaries.length <= 1) {
             box.style.display = 'none';
             list.innerHTML = '';
             return;
@@ -1720,15 +1795,15 @@
         const baseHref = window.location.href.split('?')[0];
         const scorecardBase = baseHref.replace('admin.html', 'index.html');
         let html = '';
-        for (let i = 1; i <= numGroups; i++) {
-            const groupUrl = `${scorecardBase}?game=${currentMode}&group=${i}`;
+        boundaries.forEach(b => {
+            const groupUrl = `${scorecardBase}?game=${currentMode}&group=${b.group}`;
             html += `
                 <div class="group-link-row">
-                    <span>🏌️ Group ${i}</span>
-                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${i})">📋 Copy Link</button>
+                    <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
                 </div>
             `;
-        }
+        });
         list.innerHTML = html;
     }
 
@@ -1949,6 +2024,7 @@
                 wolfTieRule: wolfTieRule,
                 wolfLastPlaceRule: wolfLastPlaceRule,
                 stablefordPointVal: stablefordPointVal,
+                groupSizeOverrides: groupSizeOverrides,
                 stablefordScoring: stablefordScoring,
                 stablefordPoints: stablefordPoints,
                 dotPointVal: dotPointVal,
