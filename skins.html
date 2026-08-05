@@ -565,11 +565,24 @@
     function renderSideMatchPicker() {
         const wrapper = document.getElementById("sm-player-picker");
         const players = currentData.players || [];
+        const sideMatches = currentData.sideMatches || {};
+
+        let existingCount = {};
+        players.forEach(p => existingCount[p.id] = 0);
+        Object.values(sideMatches).forEach(sm => {
+            (sm.teamAIds || []).concat(sm.teamBIds || []).forEach(pid => {
+                const match = players.find(p => String(p.id) === String(pid));
+                if (match) existingCount[match.id] = (existingCount[match.id] || 0) + 1;
+            });
+        });
+
         let html = "";
         players.forEach(p => {
             const side = sidematchPickState[p.id];
             const cls = side === 'a' ? 'pick-a' : (side === 'b' ? 'pick-b' : '');
-            html += `<div class="player-pick-badge ${cls}" onclick="toggleSideMatchPick('${p.id}')">${p.name.split(' ')[0]}</div>`;
+            const cnt = existingCount[p.id] || 0;
+            const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
+            html += `<div class="player-pick-badge ${cls}" onclick="toggleSideMatchPick('${p.id}')">${p.name.split(' ')[0]}${tag}</div>`;
         });
         wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
     }
