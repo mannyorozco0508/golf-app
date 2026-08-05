@@ -430,7 +430,10 @@
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
-            link.href = base + '?game=' + currentMode;
+            let navHref = base + '?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) navHref += '&group=' + groupParam;
+            link.href = navHref;
         });
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
