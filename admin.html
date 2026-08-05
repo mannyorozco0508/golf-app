@@ -489,6 +489,55 @@
                     </select>
                 </div>
             </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div>
+                    <label style="font-size: 0.8rem;">🙈 Blind Wolf Win</label>
+                    <select id="wolf-blind-mult">
+                        <option value="3">3x Points</option>
+                        <option value="4">4x Points</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">Tied Hole Rule</label>
+                    <select id="wolf-tie-rule">
+                        <option value="carry">Carry to Next Hole</option>
+                        <option value="void">Void (No Points)</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <label style="font-size: 0.8rem;">Last-Place Wolf Rule (Holes 17 &amp; 18)</label>
+                <select id="wolf-lastplace-rule">
+                    <option value="off">Off — Normal Rotation</option>
+                    <option value="on">On — Last Place Becomes Wolf</option>
+                </select>
+            </div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+                🙈 Blind Wolf: caller picks lone wolf before anyone tees off. Wolf order rotates through your player list each hole 1-4, repeating.
+            </div>
+        </div>
+
+        <div id="stableford-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Net Stableford Points</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">$ Per Point</label><input type="number" id="stableford-point-value" value="" min="0" placeholder="0"></div>
+                <div><label style="font-size: 0.8rem;">Double Bogey+</label><input type="number" id="stableford-pts-other" value="0" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Bogey</label><input type="number" id="stableford-pts-bogey" value="1" min="0" step="1"></div>
+                <div><label style="font-size: 0.8rem;">Par</label><input type="number" id="stableford-pts-par" value="2" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Birdie</label><input type="number" id="stableford-pts-birdie" value="3" min="0" step="1"></div>
+                <div><label style="font-size: 0.8rem;">Eagle</label><input type="number" id="stableford-pts-eagle" value="5" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Albatross</label><input type="number" id="stableford-pts-albatross" value="10" min="0" step="1"></div>
+                <div></div>
+            </div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+                Points based on NET score vs. par on each hole. Defaults shown are our house standard — edit any value to customize for this round.
+            </div>
         </div>
 
         <div id="dot-settings" class="extra-settings-box">
@@ -1376,6 +1425,7 @@
         }
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        if (document.getElementById("stableford-settings")) document.getElementById("stableford-settings").style.display = (format === "stableford") ? "block" : "none";
         if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (['match', 'bestball', 'scramble', 'ryder'].includes(format)) ? "block" : "none";
         if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
         
@@ -1450,7 +1500,21 @@
             if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
+            if (data.wolfLoneMult && document.getElementById("wolf-lone-mult")) document.getElementById("wolf-lone-mult").value = data.wolfLoneMult;
+            if (data.wolfBlindMult && document.getElementById("wolf-blind-mult")) document.getElementById("wolf-blind-mult").value = data.wolfBlindMult;
+            if (data.wolfTieRule && document.getElementById("wolf-tie-rule")) document.getElementById("wolf-tie-rule").value = data.wolfTieRule;
+            if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
+            if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
+            if (data.stablefordPoints) {
+                const sp = data.stablefordPoints;
+                if (sp.other !== undefined && document.getElementById("stableford-pts-other")) document.getElementById("stableford-pts-other").value = sp.other;
+                if (sp.bogey !== undefined && document.getElementById("stableford-pts-bogey")) document.getElementById("stableford-pts-bogey").value = sp.bogey;
+                if (sp.par !== undefined && document.getElementById("stableford-pts-par")) document.getElementById("stableford-pts-par").value = sp.par;
+                if (sp.birdie !== undefined && document.getElementById("stableford-pts-birdie")) document.getElementById("stableford-pts-birdie").value = sp.birdie;
+                if (sp.eagle !== undefined && document.getElementById("stableford-pts-eagle")) document.getElementById("stableford-pts-eagle").value = sp.eagle;
+                if (sp.albatross !== undefined && document.getElementById("stableford-pts-albatross")) document.getElementById("stableford-pts-albatross").value = sp.albatross;
+            }
 
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
@@ -1573,7 +1637,7 @@
         container.innerHTML = html;
     }
 
-    const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match'];
+    const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
     function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true) {
         const listContainer = document.getElementById("player-list");
@@ -1804,7 +1868,20 @@
             const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
             const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
             const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 0;
+            const wolfLoneMult = document.getElementById("wolf-lone-mult") ? document.getElementById("wolf-lone-mult").value : "2";
+            const wolfBlindMult = document.getElementById("wolf-blind-mult") ? document.getElementById("wolf-blind-mult").value : "4";
+            const wolfTieRule = document.getElementById("wolf-tie-rule") ? document.getElementById("wolf-tie-rule").value : "carry";
+            const wolfLastPlaceRule = document.getElementById("wolf-lastplace-rule") ? document.getElementById("wolf-lastplace-rule").value : "off";
             const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
+            const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
+            const stablefordPoints = {
+                other: document.getElementById("stableford-pts-other") ? (parseInt(document.getElementById("stableford-pts-other").value, 10) || 0) : 0,
+                bogey: document.getElementById("stableford-pts-bogey") ? (parseInt(document.getElementById("stableford-pts-bogey").value, 10) || 0) : 1,
+                par: document.getElementById("stableford-pts-par") ? (parseInt(document.getElementById("stableford-pts-par").value, 10) || 0) : 2,
+                birdie: document.getElementById("stableford-pts-birdie") ? (parseInt(document.getElementById("stableford-pts-birdie").value, 10) || 0) : 3,
+                eagle: document.getElementById("stableford-pts-eagle") ? (parseInt(document.getElementById("stableford-pts-eagle").value, 10) || 0) : 5,
+                albatross: document.getElementById("stableford-pts-albatross") ? (parseInt(document.getElementById("stableford-pts-albatross").value, 10) || 0) : 10
+            };
 
             const playersList = [];
             rows.forEach((row, idx) => {
@@ -1858,6 +1935,12 @@
                 nassauStake: nassauStake,
                 nassauPressRule: nassauPressRule,
                 wolfPointVal: wolfPointVal,
+                wolfLoneMult: wolfLoneMult,
+                wolfBlindMult: wolfBlindMult,
+                wolfTieRule: wolfTieRule,
+                wolfLastPlaceRule: wolfLastPlaceRule,
+                stablefordPointVal: stablefordPointVal,
+                stablefordPoints: stablefordPoints,
                 dotPointVal: dotPointVal,
                 courseData: finalCourseData,
                 players: playersList
