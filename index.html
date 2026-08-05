@@ -439,6 +439,38 @@
         });
     }
 
+    // --- CUSTOM GROUP SIZING ---
+    // overrides is a sparse object keyed by 0-based group index -> explicit size.
+    // Any group without an override defaults to 4 (or whatever's left). This lets an
+    // admin pin specific groups (e.g. two 3-somes) while the rest auto-adjust to the roster.
+    function computeGroupSizes(playerCount, overrides) {
+        overrides = overrides || {};
+        let sizes = [];
+        let sum = 0;
+        let gIdx = 0;
+        while (sum < playerCount) {
+            let remaining = playerCount - sum;
+            let defaultSize = Math.min(4, remaining);
+            let ov = overrides[gIdx];
+            let sz = (ov !== undefined && ov > 0) ? Math.min(ov, remaining) : defaultSize;
+            sizes.push(sz);
+            sum += sz;
+            gIdx++;
+        }
+        return sizes;
+    }
+
+    function computeGroupBoundaries(playerCount, overrides) {
+        const sizes = computeGroupSizes(playerCount, overrides);
+        let boundaries = [];
+        let idx = 0;
+        sizes.forEach((size, i) => {
+            boundaries.push({ group: i + 1, startIdx: idx, size: size });
+            idx += size;
+        });
+        return boundaries;
+    }
+
     function parseHcp(hcpStr) {
         if (!hcpStr) return 0;
         const str = String(hcpStr).trim();
@@ -464,16 +496,16 @@
 
     function renderGroupFilters(playersCount) {
         const container = document.getElementById("group-filter-container");
-        const numGroups = Math.ceil(playersCount / 4);
-        
+        const boundaries = computeGroupBoundaries(playersCount, currentData.groupSizeOverrides || {});
+
         let html = `<button class="group-btn ${selectedGroup === 'all' ? 'active' : ''}" onclick="filterGroup('all')">👥 All Players</button>`;
-        
-        if (numGroups > 1) {
-            for(let i = 1; i <= numGroups; i++) {
-                html += `<button class="group-btn ${selectedGroup === i ? 'active' : ''}" onclick="filterGroup(${i})">Group ${i}</button>`;
-            }
+
+        if (boundaries.length > 1) {
+            boundaries.forEach(b => {
+                html += `<button class="group-btn ${selectedGroup === b.group ? 'active' : ''}" onclick="filterGroup(${b.group})">Group ${b.group}</button>`;
+            });
         }
-        
+
         container.innerHTML = html;
     }
 
@@ -591,8 +623,11 @@
         let players = currentData.players || [];
         let filteredPlayers = [];
         if (players.length <= 4 || hasGroupLock) {
-            const startIdx = hasGroupLock ? (lockedGroup - 1) * 4 : 0;
-            filteredPlayers = players.slice(startIdx, startIdx + 4);
+            const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
+            const b = hasGroupLock ? boundaries.find(bd => bd.group === lockedGroup) : null;
+            const startIdx = b ? b.startIdx : 0;
+            const size = b ? b.size : players.length;
+            filteredPlayers = players.slice(startIdx, startIdx + size);
         }
 
         let html = "";
@@ -1649,7 +1684,12 @@
         const holeBet = currentData.holeBetStake || 0;
 
         let playerGroupMap = {};
-        players.forEach((p, idx) => { playerGroupMap[p.id] = Math.floor(idx / 4) + 1; });
+        const groupBoundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
+        groupBoundaries.forEach(b => {
+            for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
+                if (players[i]) playerGroupMap[players[i].id] = b.group;
+            }
+        });
 
         const isMultiGroupRound = players.length > 4;
 
@@ -1676,8 +1716,10 @@
 
         let filteredPlayers = players;
         if (selectedGroup !== "all") {
-            const startIdx = (selectedGroup - 1) * 4;
-            filteredPlayers = players.slice(startIdx, startIdx + 4);
+            const b = groupBoundaries.find(bd => bd.group === selectedGroup);
+            const startIdx = b ? b.startIdx : 0;
+            const size = b ? b.size : players.length;
+            filteredPlayers = players.slice(startIdx, startIdx + size);
         }
 
         // Only players opted in to money betting participate in the payout engines below -
