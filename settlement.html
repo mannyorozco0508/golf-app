@@ -537,15 +537,17 @@
         let segments = [];
         if (config.segment === 'frontback') {
             segments = [
-                { holes: courseData.filter(h => h.hole <= 9) },
-                { holes: courseData.filter(h => h.hole > 9) }
+                { holes: courseData.filter(h => h.hole <= 9), label: 'Front 9' },
+                { holes: courseData.filter(h => h.hole > 9), label: 'Back 9' }
             ];
         } else {
-            segments = [{ holes: courseData }];
+            segments = [{ holes: courseData, label: 'Full Round' }];
         }
 
         let p1Money = 0;
         let holeLog = [];
+        let currentCarry = 0;
+        let lastPlayedHole = 0;
 
         segments.forEach(seg => {
             let carry = 0;
@@ -553,6 +555,7 @@
                 const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
                 const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
                 if (s1 === null || s2 === null) return;
+                lastPlayedHole = Math.max(lastPlayedHole, h.hole);
 
                 const baseStake = getStake(h.hole);
                 const effectiveStake = baseStake + carry;
@@ -575,7 +578,7 @@
                     }
                 }
             });
-            // Any carry unresolved at the end of a segment is voided - not added to p1Money, not carried further
+            currentCarry = carry;
         });
 
         const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
@@ -583,7 +586,7 @@
             .concat(sortedPresses.map((pr, i) => ({ stake: pr.newStake, fromHole: pr.fromHole, pressNum: i + 1 })));
         const tiesCarried = holeLog.filter(h => h.winner === null && h.carrying > 0).map(h => h.hole);
 
-        return { p1, p2, p1Money, holeLog, rateHistory, tiesCarried };
+        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory, tiesCarried };
     }
 
     function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
