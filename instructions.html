@@ -1,1 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>How GolfApp Works</title>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 720px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h1, h2, h3 { color: var(--brand-green); }
+        h1 { font-size: 1.5rem; text-align: center; margin-top: 0; margin-bottom: 4px; }
+        .sub { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4; }
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
+        .back-btn { display: inline-block; margin-bottom: 14px; color: var(--brand-navy); font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; }
 
+        .jump-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; justify-content: center; }
+        .jump-nav a { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; padding: 6px 12px; font-size: 0.78rem; font-weight: bold; text-decoration: none; }
+
+        section { margin-bottom: 28px; }
+        section h2 { font-size: 1.15rem; margin-bottom: 4px; scroll-margin-top: 12px; }
+        section .section-sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px; line-height: 1.4; }
+
+        .step-list { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+        .step-list li { counter-increment: step; position: relative; padding: 8px 0 8px 34px; font-size: 0.9rem; line-height: 1.4; border-bottom: 1px solid var(--border-faint); }
+        .step-list li:last-child { border-bottom: none; }
+        .step-list li::before { content: counter(step); position: absolute; left: 0; top: 8px; width: 22px; height: 22px; background: var(--brand-green); color: #fff; border-radius: 50%; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+
+        .format-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+        .format-item { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; background: var(--nassau-box-bg); }
+        .format-item .f-name { font-weight: bold; color: var(--brand-green); font-size: 0.92rem; margin-bottom: 3px; }
+        .format-item .f-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; }
+
+        .info-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 14px; margin-bottom: 10px; background: var(--bg-card); }
+        .info-card .i-name { font-weight: bold; color: var(--brand-green); font-size: 0.95rem; margin-bottom: 4px; }
+        .info-card .i-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.45; }
+
+        .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .tag { font-size: 0.68rem; font-weight: bold; background: var(--nav-bg); color: var(--brand-navy); border-radius: 10px; padding: 2px 8px; }
+
+        .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 24px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <a class="back-btn" onclick="goBack()">← Back to Home</a>
+
+    <h1>📖 How GolfApp Works</h1>
+    <p class="sub">A quick guide to setting up a round, picking a format, and tracking the money — built for foursomes, buddy trips, and regular groups.</p>
+
+    <div class="jump-nav">
+        <a href="#getting-started">Getting Started</a>
+        <a href="#groups">Groups &amp; Links</a>
+        <a href="#formats">Game Formats</a>
+        <a href="#side-games">Side Games</a>
+        <a href="#side-matches">Side Matches</a>
+        <a href="#money">Settling Up</a>
+    </div>
+
+    <section id="getting-started">
+        <h2>🏌️ Getting Started</h2>
+        <p class="section-sub">Every round lives behind a 4-character game code — no accounts, no sign-ups.</p>
+        <ol class="step-list">
+            <li><strong>Start New Game</strong> on the Home screen if you're setting up the round. You'll pick a course, a format, and add your players.</li>
+            <li><strong>Join Game</strong> if someone already made the room — just type in the 4-character code they sent you.</li>
+            <li>Once a round is saved, everyone taps between <strong>Scorecard, Leaderboard, Action, Matches, Stats,</strong> and <strong>Settle</strong> using the nav bar at the top of every page.</li>
+            <li>Your device remembers your last game — if you close the app and come back, Home will offer a <strong>Resume Game</strong> shortcut.</li>
+        </ol>
+    </section>
+
+    <section id="groups">
+        <h2>🔒 Groups &amp; Scorekeeper Links</h2>
+        <p class="section-sub">If more than 4 players are in the round, the app splits everyone into groups automatically (4 per group by default — adjustable on the Home setup screen).</p>
+        <div class="info-card">
+            <div class="i-name">📱 Group Scorekeeper Links</div>
+            <div class="i-desc">Each group gets its own link from the Home screen after you save the round. Send <strong>only</strong> that link to that foursome — it lets them enter scores for their own group and shows everyone else read-only.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">👁️ Spectator / Invite Link</div>
+            <div class="i-desc">The QR code and "Copy Invite Link" button on Home give out a link where scores are always read-only. Good for a spouse, a group text, or anyone just watching along — and it's the only link you need if there's just one group of 4 or fewer.</div>
+        </div>
+    </section>
+
+    <section id="formats">
+        <h2>🎮 Game Formats</h2>
+        <p class="section-sub">Pick one as the main format for the round on the Home setup screen — this drives the Scorecard, Leaderboard, and Settle pages.</p>
+        <div class="format-grid">
+            <div class="format-item">
+                <div class="f-name">⛳ Stroke Play</div>
+                <div class="f-desc">Standard gross or net scoring. Lowest total wins — the format most rounds start from.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🥊 1v1 Match Play</div>
+                <div class="f-desc">Two players go head-to-head, hole by hole. Supports auto or manual presses.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">💵 Nassau</div>
+                <div class="f-desc">Three bets in one — Front 9, Back 9, and overall 18 — each with its own press rule.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🏆 Ryder Cup</div>
+                <div class="f-desc">Team match play, Red vs Blue, with the same press logic as 1v1 Match Play.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">2-Man Best Ball</div>
+                <div class="f-desc">Partner up — the lower of your two scores counts on every hole.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">4-Man Scramble</div>
+                <div class="f-desc">Everyone tees off, the group plays the best ball each shot, one score per hole for the whole team.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🐺 Wolf</div>
+                <div class="f-desc">The Wolf rotates each hole and calls Partner, Lone Wolf, or Blind Wolf before scores go in. Points-based, with configurable multipliers.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🎯 Net Stableford</div>
+                <div class="f-desc">Points awarded per hole based on your score vs. par — bogeys, pars, birdies, eagles, and albatrosses all worth different points.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🥩 Skins</div>
+                <div class="f-desc">Lowest score on a hole wins the pot; ties carry the pot to the next hole. Gross or net.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">♠️ Hi-Lo</div>
+                <div class="f-desc">Team format splitting points for the low ball and the high ball of the group on each hole.</div>
+            </div>
+            <div class="format-item">
+                <div class="f-name">🎯 Dot Game</div>
+                <div class="f-desc">Old-school "garbage" scoring — dots for greenies, sandies, birdies, and more, tallied per player.</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="side-games">
+        <h2>🐦 Side Games</h2>
+        <p class="section-sub">Turn these on independently of whatever main format you picked — they run alongside it and live on the <strong>Action</strong> tab.</p>
+        <div class="info-card">
+            <div class="i-name">🐦 Birdie Game</div>
+            <div class="i-desc">Automatic — birdies and eagles are read straight from the scores. Set a $ amount per birdie, eagles pay double.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">📍 Dollar Game (KPs)</div>
+            <div class="i-desc">Closest-to-the-pin pot on every Par 3. Everyone chips in, whoever's marked the winner for that hole takes the pot.</div>
+        </div>
+    </section>
+
+    <section id="side-matches">
+        <h2>⚔️ Side Matches</h2>
+        <p class="section-sub">Found on the <strong>Matches</strong> tab. This is for action between specific players that doesn't depend on the round's main format at all.</p>
+        <div class="info-card">
+            <div class="i-name">Any 2 or 4 players, any groups</div>
+            <div class="i-desc">Set up a private 1v1 or 2v2 — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — between any players in the round, even if they're in different groups or already playing their own group's main format. Everyone can build as many of these as they want, and each one tracks and settles independently.</div>
+        </div>
+    </section>
+
+    <section id="money">
+        <h2>💸 Settling Up</h2>
+        <div class="info-card">
+            <div class="i-name">📊 Stats</div>
+            <div class="i-desc">Full scorecard breakdown, birdie/eagle counts, and a printable PDF summary of everything — main format, side games, and Side Matches all in one place.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">💰 Settle</div>
+            <div class="i-desc">The final money ledger for the round's main format and side games — who owes who, ready to Venmo.</div>
+        </div>
+    </section>
+
+    <hr class="section-divider">
+    <p style="text-align:center; font-size:0.8rem; color:var(--text-muted);">Questions or something not working right? Just ask whoever set up your round.</p>
+</div>
+
+<script>
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        });
+    }
+    if (localStorage.getItem('golfapp-theme') === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = '☀️ Light Mode'; });
+        }
+    });
+
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
+    }
+</script>
+</body>
+</html>
