@@ -181,7 +181,8 @@
 
         document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
         document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
-        document.getElementById('team-roster').textContent = `Team ${team.num}: ${team.players.join(', ')}`;
+        const teamName = team.name || `Team ${team.num}`;
+        document.getElementById('team-roster').innerHTML = `${teamName}<br><span style="font-weight:normal; font-size:0.78rem; color:var(--text-muted);">${team.players.join(', ')}</span>`;
 
         let thru = 0, total = 0, parPlayed = 0;
         let html = '';
@@ -223,7 +224,7 @@
             });
             const net = thru > 0 ? strokes - handicap : 0;
             const toPar = thru > 0 ? net - parPlayed : null;
-            return { num: t.num, names: t.players.join('/'), strokes, thru, toPar, hasScores: thru > 0 };
+            return { num: t.num, teamName: t.name || `Team ${t.num}`, strokes, thru, toPar, hasScores: thru > 0 };
         });
 
         rows.sort((a, b) => {
@@ -241,7 +242,7 @@
             const isMe = r.num === myTeamNum;
             html += `<div class="lb-row ${i === 0 && r.hasScores ? 'leader' : ''} ${isMe ? 'me' : ''}">
                 <span class="lb-pos">${i + 1}</span>
-                <span class="lb-team">Team ${r.num} ${isMe ? '(You)' : ''} <span style="font-weight:normal; color:var(--text-muted); font-size:0.78rem;">(${r.names})</span></span>
+                <span class="lb-team">${r.teamName} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
                 <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
