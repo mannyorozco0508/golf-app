@@ -86,6 +86,8 @@
         .team-card-header .team-label { font-weight: bold; color: var(--brand-green); }
         .team-name-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .team-name-inputs input { font-size: 0.9rem; padding: 8px; }
+        .team-name-input { width: 100%; padding: 10px; border: 1px solid var(--border-mid); border-radius: 6px; font-size: 1rem; font-weight: bold; color: var(--brand-green); background: var(--bg-card); box-sizing: border-box; }
+        .team-name-input::placeholder { color: var(--text-muted); font-weight: normal; }
         .btn-remove-team { background: none; border: none; color: var(--accent-red); font-weight: bold; font-size: 0.8rem; cursor: pointer; padding: 4px 8px; }
 
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
@@ -192,6 +194,7 @@
         <button class="btn-outline" onclick="showAddTeamPanel()">➕ Add Another Team</button>
         <div id="add-team-panel" style="display:none; margin-top:12px;">
             <div class="team-card">
+                <input type="text" id="new-team-name" class="team-name-input" placeholder="Team Name (e.g. company/sponsor)" style="margin-bottom:8px;">
                 <div class="team-name-inputs">
                     <input type="text" id="new-team-p1" placeholder="Player 1">
                     <input type="text" id="new-team-p2" placeholder="Player 2">
@@ -306,6 +309,7 @@
                 <span class="team-label">Team ${teamCount}</span>
                 <button class="btn-remove-team" onclick="document.getElementById('team-block-${teamCount}').remove()">✕ Remove</button>
             </div>
+            <input type="text" class="team-name-input" placeholder="Team ${teamCount}" style="margin-bottom:8px;">
             <div class="team-name-inputs">
                 <input type="text" placeholder="Player 1">
                 <input type="text" placeholder="Player 2">
@@ -334,11 +338,13 @@
         const teams = {};
         let teamNum = 0;
         teamBlocks.forEach(block => {
-            const inputs = block.querySelectorAll('input');
-            const players = Array.from(inputs).map(i => i.value.trim()).filter(v => v.length > 0);
+            const playerInputs = block.querySelectorAll('.team-name-inputs input');
+            const players = Array.from(playerInputs).map(i => i.value.trim()).filter(v => v.length > 0);
             if (players.length === 0) return;
             teamNum++;
-            teams[`team${teamNum}`] = { num: teamNum, players: players };
+            const nameInput = block.querySelector('.team-name-input');
+            const teamName = (nameInput && nameInput.value.trim()) || `Team ${teamNum}`;
+            teams[`team${teamNum}`] = { num: teamNum, name: teamName, players: players };
         });
 
         if (teamNum === 0) { alert("⚠️ Add at least one team with a player name."); return; }
@@ -377,8 +383,9 @@
             const t = teams[tid];
             const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
             const names = t.players.join(', ');
+            const teamName = t.name || `Team ${t.num}`;
             return `<div class="team-link-row">
-                <span>🏌️ Team ${t.num} — ${names}</span>
+                <span>🏌️ ${teamName} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
                 <button class="btn-outline" onclick="copyTeamLink('${url}', ${t.num})">📋 Copy</button>
             </div>`;
         }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
@@ -408,8 +415,10 @@
 
         const existingTeams = currentData.teams || {};
         const nextNum = Object.values(existingTeams).reduce((max, t) => Math.max(max, t.num), 0) + 1;
+        const teamName = document.getElementById('new-team-name').value.trim() || `Team ${nextNum}`;
 
-        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, players: players }).then(() => {
+        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, name: teamName, players: players }).then(() => {
+            document.getElementById('new-team-name').value = '';
             document.getElementById('new-team-p1').value = '';
             document.getElementById('new-team-p2').value = '';
             document.getElementById('new-team-p3').value = '';
@@ -452,7 +461,7 @@
             });
             const net = thru > 0 ? strokes - handicap : 0;
             const toPar = thru > 0 ? net - parPlayed : null;
-            return { num: t.num, names: t.players.join('/'), strokes, thru, toPar, hasScores: thru > 0 };
+            return { num: t.num, teamName: t.name || `Team ${t.num}`, strokes, thru, toPar, hasScores: thru > 0 };
         });
 
         rows.sort((a, b) => {
@@ -474,7 +483,7 @@
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
             html += `<div class="lb-row ${i === 0 && r.hasScores ? 'leader' : ''}">
                 <span class="lb-pos">${i + 1}</span>
-                <span class="lb-team">Team ${r.num} <span style="font-weight:normal; color:var(--text-muted); font-size:0.78rem;">(${r.names})</span></span>
+                <span class="lb-team">${r.teamName}</span>
                 <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
