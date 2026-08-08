@@ -188,8 +188,6 @@
     
     <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
-
-    <button class="btn-outline" style="border-color: var(--border-mid); color: var(--text-muted); margin-top: 16px;" onclick="window.location.href='instructions.html'">📖 How This App Works</button>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -346,7 +344,7 @@
             <option value="stroke">Stroke Play (Gross & Net)</option>
             <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
             <option value="hilo">♠️ Hi-Lo (Low Ball / High Ball)</option>
-            <option value="dots">🎯 Dot Game (Garbage/Junk)</option>
+            <option value="dots">🔴 Dot Game (Garbage/Junk)</option>
             <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
             <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
             <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
@@ -538,7 +536,7 @@
         </div>
 
         <div id="dot-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Dot Game Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🔴 Dot Game Options</label>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
             </div>
