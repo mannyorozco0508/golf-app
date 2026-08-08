@@ -546,6 +546,33 @@
         renderScorecard();
     }
 
+    // --- Auto-advance to the next score box, so a whole hole can be entered without extra taps ---
+    let scoreAdvanceTimer = null;
+
+    function handleScoreInput(inputEl) {
+        if (scoreAdvanceTimer) { clearTimeout(scoreAdvanceTimer); scoreAdvanceTimer = null; }
+        const val = inputEl.value;
+        if (!val) return; // cleared/backspaced - wait for the user, don't advance
+        if (val.length >= 2) {
+            advanceToNextScoreInput(inputEl);
+        } else {
+            // Single digit so far - give them a beat to type a second digit (e.g. "10", "12") before advancing
+            scoreAdvanceTimer = setTimeout(() => { advanceToNextScoreInput(inputEl); }, 700);
+        }
+    }
+
+    function advanceToNextScoreInput(currentInputEl) {
+        const inputs = Array.from(document.querySelectorAll('.score-input:not([disabled])'));
+        const idx = inputs.indexOf(currentInputEl);
+        if (idx > -1 && idx < inputs.length - 1) {
+            const next = inputs[idx + 1];
+            next.focus();
+            next.select();
+        } else {
+            currentInputEl.blur();
+        }
+    }
+
     function saveScore(playerId, holeNum, val) {
         const intVal = parseInt(val, 10);
         const scoreKey = `p${playerId}_h${holeNum}`;
@@ -1561,7 +1588,7 @@
                 const lockIconHtml = isLocked ? `<div style="position:absolute; top:-6px; right:-8px; font-size:11px; z-index:6;">🔒</div>` : "";
                 const scoreInputHtml = isLocked
                     ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" disabled>`
-                    : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)">`;
+                    : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)" oninput="handleScoreInput(this)">`;
 
                 rowHtml += `
                     <td>
