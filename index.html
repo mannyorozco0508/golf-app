@@ -547,17 +547,19 @@
     }
 
     // --- Auto-advance to the next score box, so a whole hole can be entered without extra taps ---
-    let scoreAdvanceTimer = null;
-
+    // Must stay fully synchronous (no setTimeout/promise) - iOS Safari only allows a focus() call
+    // to pop the keyboard open on another box if it happens directly inside the same keystroke event.
+    // Any delay breaks that, so instead of "wait and see if a 2nd digit is coming," we advance
+    // immediately whenever the digit typed can't realistically be the start of a longer score.
+    // Only "1" is ambiguous (could be a hole-in-one, or the start of 10-19) - for that one case,
+    // entering a 2nd digit still advances instantly; typing just "1" and moving on is a manual tap.
     function handleScoreInput(inputEl) {
-        if (scoreAdvanceTimer) { clearTimeout(scoreAdvanceTimer); scoreAdvanceTimer = null; }
         const val = inputEl.value;
         if (!val) return; // cleared/backspaced - wait for the user, don't advance
         if (val.length >= 2) {
             advanceToNextScoreInput(inputEl);
-        } else {
-            // Single digit so far - give them a beat to type a second digit (e.g. "10", "12") before advancing
-            scoreAdvanceTimer = setTimeout(() => { advanceToNextScoreInput(inputEl); }, 700);
+        } else if (val !== '1') {
+            advanceToNextScoreInput(inputEl);
         }
     }
 
