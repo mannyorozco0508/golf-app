@@ -62,6 +62,17 @@
         .hole-score-input { width: 64px; height: 48px; text-align: center; font-size: 1.3rem; font-weight: bold; border: 2px solid var(--border-mid); border-radius: 8px; background: var(--bg-card); color: var(--text-main); }
         .hole-score-input:focus { border-color: var(--brand-green); outline: none; }
 
+        .hole-row-multi { padding: 12px 4px; border-bottom: 1px solid var(--border-faint); }
+        .hole-row-multi .hole-info-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+        .hole-row-multi .hole-num { font-weight: bold; font-size: 1.05rem; }
+        .hole-row-multi .hole-par { font-size: 0.75rem; color: var(--text-muted); }
+        .hole-row-multi .team-hole-result { font-size: 0.78rem; font-weight: bold; color: var(--brand-green); }
+        .player-score-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .player-score-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .player-score-cell .player-score-label { font-size: 0.68rem; color: var(--text-muted); font-weight: bold; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hole-score-input-sm { width: 48px; height: 40px; text-align: center; font-size: 1.05rem; font-weight: bold; border: 2px solid var(--border-mid); border-radius: 6px; background: var(--bg-card); color: var(--text-main); }
+        .hole-score-input-sm:focus { border-color: var(--brand-green); outline: none; }
+
         .lb-row { display: flex; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .lb-pos { width: 28px; font-weight: bold; color: var(--text-muted); }
         .lb-team { flex: 1; font-weight: bold; }
@@ -166,6 +177,21 @@
         });
     }
 
+    // Works out a team's score for one hole from whichever players have posted a score so far.
+    function computeTeamHoleScore(format, playerScores, shambleCountBest) {
+        if (playerScores.length === 0) return null;
+        if (format === 'bestball') {
+            return Math.min(...playerScores);
+        }
+        if (format === 'shamble') {
+            const n = shambleCountBest || 1;
+            const sorted = playerScores.slice().sort((a, b) => a - b);
+            const take = sorted.slice(0, Math.min(n, sorted.length));
+            return take.reduce((s, v) => s + v, 0);
+        }
+        return null;
+    }
+
     function saveHoleScore(holeNum, val) {
         if (val === '' || val === null) {
             db.ref(`tournaments/${currentCode}/scores/team${myTeamNum}_h${holeNum}`).remove();
@@ -174,10 +200,21 @@
         }
     }
 
+    function savePlayerHoleScore(holeNum, playerIdx, val) {
+        const path = `tournaments/${currentCode}/scores/team${myTeamNum}_p${playerIdx}_h${holeNum}`;
+        if (val === '' || val === null) {
+            db.ref(path).remove();
+        } else {
+            db.ref(path).set(parseInt(val, 10));
+        }
+    }
+
     function renderAll() {
         const team = currentData.teams[`team${myTeamNum}`];
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const scores = currentData.scores || {};
+        const format = currentData.format || 'scramble';
+        const shambleCountBest = currentData.shambleCountBest || 1;
 
         document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
         document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
@@ -186,20 +223,52 @@
 
         let thru = 0, total = 0, parPlayed = 0;
         let html = '';
-        courseData.forEach(h => {
-            const key = `team${myTeamNum}_h${h.hole}`;
-            const v = scores[key];
-            if (v && v > 0) { thru++; total += parseInt(v, 10); parPlayed += h.par; }
-            html += `<div class="hole-row">
-                <div class="hole-info">
-                    <span class="hole-num">Hole ${h.hole}</span>
-                    <span class="hole-par">Par ${h.par}</span>
-                </div>
-                <input type="number" class="hole-score-input" inputmode="numeric" min="1"
-                    value="${v || ''}"
-                    onchange="saveHoleScore(${h.hole}, this.value)">
-            </div>`;
-        });
+
+        if (format === 'scramble') {
+            courseData.forEach(h => {
+                const key = `team${myTeamNum}_h${h.hole}`;
+                const v = scores[key];
+                if (v && v > 0) { thru++; total += parseInt(v, 10); parPlayed += h.par; }
+                html += `<div class="hole-row">
+                    <div class="hole-info">
+                        <span class="hole-num">Hole ${h.hole}</span>
+                        <span class="hole-par">Par ${h.par}</span>
+                    </div>
+                    <input type="number" class="hole-score-input" inputmode="numeric" min="1"
+                        value="${v || ''}"
+                        onchange="saveHoleScore(${h.hole}, this.value)">
+                </div>`;
+            });
+        } else {
+            courseData.forEach(h => {
+                const holeScores = [];
+                let playerCellsHtml = '';
+                team.players.forEach((p, pIdx) => {
+                    const key = `team${myTeamNum}_p${pIdx}_h${h.hole}`;
+                    const v = scores[key];
+                    if (v && v > 0) holeScores.push(parseInt(v, 10));
+                    playerCellsHtml += `<div class="player-score-cell">
+                        <span class="player-score-label">${p.split(' ')[0]}</span>
+                        <input type="number" class="hole-score-input-sm" inputmode="numeric" min="1"
+                            value="${v || ''}"
+                            onchange="savePlayerHoleScore(${h.hole}, ${pIdx}, this.value)">
+                    </div>`;
+                });
+
+                const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
+                if (teamHoleScore !== null) { thru++; total += teamHoleScore; parPlayed += h.par; }
+                const resultText = teamHoleScore === null ? '' : `Team: ${teamHoleScore}`;
+
+                html += `<div class="hole-row-multi">
+                    <div class="hole-info-row">
+                        <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span></span>
+                        <span class="team-hole-result">${resultText}</span>
+                    </div>
+                    <div class="player-score-grid">${playerCellsHtml}</div>
+                </div>`;
+            });
+        }
+
         document.getElementById('holes-list').innerHTML = html;
 
         const toPar = thru > 0 ? total - parPlayed : null;
@@ -214,13 +283,25 @@
         const scores = currentData.scores || {};
         const courseData = currentData.courseData || [];
         const handicap = currentData.teamHandicap || 0;
+        const format = currentData.format || 'scramble';
+        const shambleCountBest = currentData.shambleCountBest || 1;
 
         let rows = Object.keys(teams).map(tid => {
             const t = teams[tid];
             let strokes = 0, thru = 0, parPlayed = 0;
             courseData.forEach(h => {
-                const v = scores[`team${t.num}_h${h.hole}`];
-                if (v && v > 0) { strokes += parseInt(v, 10); thru++; parPlayed += h.par; }
+                if (format === 'scramble') {
+                    const v = scores[`team${t.num}_h${h.hole}`];
+                    if (v && v > 0) { strokes += parseInt(v, 10); thru++; parPlayed += h.par; }
+                } else {
+                    const holeScores = [];
+                    t.players.forEach((p, pIdx) => {
+                        const v = scores[`team${t.num}_p${pIdx}_h${h.hole}`];
+                        if (v && v > 0) holeScores.push(parseInt(v, 10));
+                    });
+                    const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
+                    if (teamHoleScore !== null) { strokes += teamHoleScore; thru++; parPlayed += h.par; }
+                }
             });
             const net = thru > 0 ? strokes - handicap : 0;
             const toPar = thru > 0 ? net - parPlayed : null;
