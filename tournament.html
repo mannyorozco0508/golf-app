@@ -134,7 +134,7 @@
 
     <div class="form-group">
         <label>Format</label>
-        <div class="grid-2col" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+        <div class="grid-2col" id="main-format-picker" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
             <div class="format-card active" id="fmt-scramble" onclick="selectFormat('scramble')">
                 <div class="fmt-icon">🏌️</div>
                 <div class="fmt-name">Scramble</div>
@@ -151,7 +151,21 @@
                 <div class="fmt-desc">Low ball of the pair counts</div>
             </div>
         </div>
-        <div id="fmt-more-note" style="font-size:0.72rem; color:var(--text-muted); margin-top:8px;">Shamble and Best Ball are on the way — Scramble is ready to run today.</div>
+    </div>
+
+    <div class="form-group" id="shamble-count-group" style="display:none;">
+        <label>Shamble: Count Best</label>
+        <div class="grid-2col">
+            <div class="format-card active" id="shamble-count-1" onclick="setShambleCount(1)" style="padding:10px;">
+                <div class="fmt-name" style="font-size:0.85rem;">Best 1 Score</div>
+                <div class="fmt-desc">Lowest individual net score counts</div>
+            </div>
+            <div class="format-card" id="shamble-count-2" onclick="setShambleCount(2)" style="padding:10px;">
+                <div class="fmt-name" style="font-size:0.85rem;">Best 2 Scores</div>
+                <div class="fmt-desc">Two lowest scores added together</div>
+            </div>
+        </div>
+        <input type="hidden" id="shamble-count-best" value="1">
     </div>
 
     <div class="form-group" id="team-handicap-group">
@@ -288,13 +302,16 @@
     // --- FORMAT SELECTION ---
     let selectedFormat = 'scramble';
     function selectFormat(fmt) {
-        if (fmt !== 'scramble') {
-            alert("🚧 " + (fmt === 'shamble' ? 'Shamble' : '2-Man Best Ball') + " is coming soon — Scramble is ready to run today.");
-            return;
-        }
         selectedFormat = fmt;
-        document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('#main-format-picker .format-card').forEach(c => c.classList.remove('active'));
         document.getElementById('fmt-' + fmt).classList.add('active');
+        document.getElementById('shamble-count-group').style.display = (fmt === 'shamble') ? 'block' : 'none';
+    }
+
+    function setShambleCount(n) {
+        document.getElementById('shamble-count-best').value = n;
+        document.getElementById('shamble-count-1').classList.toggle('active', n === 1);
+        document.getElementById('shamble-count-2').classList.toggle('active', n === 2);
     }
 
     // --- TEAM BUILDING (setup screen, before first save) ---
@@ -351,6 +368,7 @@
 
         currentCode = generateCode();
         const handicap = parseFloat(document.getElementById('t-handicap').value) || 0;
+        const shambleCountBest = parseInt(document.getElementById('shamble-count-best').value, 10) || 1;
 
         const payload = {
             name: name,
@@ -358,6 +376,7 @@
             courseName: selectedCourseName,
             courseData: selectedCourseData,
             teamHandicap: handicap,
+            shambleCountBest: shambleCountBest,
             teams: teams,
             createdAt: Date.now()
         };
@@ -440,25 +459,56 @@
         return 'Scramble';
     }
 
+    // Works out a team's score for one hole, given whichever players have posted a score so far.
+    // Scramble doesn't use this (it's a single shared score already).
+    function computeTeamHoleScore(format, playerScores, shambleCountBest) {
+        if (playerScores.length === 0) return null;
+        if (format === 'bestball') {
+            return Math.min(...playerScores);
+        }
+        if (format === 'shamble') {
+            const n = shambleCountBest || 1;
+            const sorted = playerScores.slice().sort((a, b) => a - b);
+            const take = sorted.slice(0, Math.min(n, sorted.length));
+            return take.reduce((s, v) => s + v, 0);
+        }
+        return null;
+    }
+
+    function computeTeamTotals(data, team) {
+        const format = data.format || 'scramble';
+        const courseData = data.courseData || [];
+        const scores = data.scores || {};
+        const shambleCountBest = data.shambleCountBest || 1;
+
+        let strokes = 0, thru = 0, parPlayed = 0;
+
+        courseData.forEach(h => {
+            if (format === 'scramble') {
+                const v = scores[`team${team.num}_h${h.hole}`];
+                if (v && v > 0) { strokes += parseInt(v, 10); thru++; parPlayed += h.par; }
+            } else {
+                const holeScores = [];
+                team.players.forEach((p, pIdx) => {
+                    const v = scores[`team${team.num}_p${pIdx}_h${h.hole}`];
+                    if (v && v > 0) holeScores.push(parseInt(v, 10));
+                });
+                const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
+                if (teamHoleScore !== null) { strokes += teamHoleScore; thru++; parPlayed += h.par; }
+            }
+        });
+
+        return { strokes, thru, parPlayed };
+    }
+
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
         const teams = currentData.teams || {};
-        const scores = currentData.scores || {};
-        const courseData = currentData.courseData || [];
-        const totalPar = courseData.reduce((sum, h) => sum + (h.par || 0), 0);
         const handicap = currentData.teamHandicap || 0;
 
         let rows = Object.keys(teams).map(tid => {
             const t = teams[tid];
-            let strokes = 0, thru = 0, parPlayed = 0;
-            courseData.forEach(h => {
-                const v = scores[`team${t.num}_h${h.hole}`];
-                if (v && v > 0) {
-                    strokes += parseInt(v, 10);
-                    thru++;
-                    parPlayed += h.par;
-                }
-            });
+            const { strokes, thru, parPlayed } = computeTeamTotals(currentData, t);
             const net = thru > 0 ? strokes - handicap : 0;
             const toPar = thru > 0 ? net - parPlayed : null;
             return { num: t.num, teamName: t.name || `Team ${t.num}`, strokes, thru, toPar, hasScores: thru > 0 };
