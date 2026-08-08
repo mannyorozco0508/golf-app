@@ -109,6 +109,19 @@
             -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
         .group-filter-bar::-webkit-scrollbar { display: none; }
+        .hole-jump-nav {
+            display: flex; gap: 4px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            position: sticky; top: 0; z-index: 15; background: var(--bg-card);
+        }
+        .hole-jump-nav::-webkit-scrollbar { display: none; }
+        .hole-jump-btn {
+            flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-mid);
+            background: var(--nav-bg); color: var(--brand-green); font-size: 0.75rem; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .hole-jump-btn.played { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+        .hole-jump-divider { flex: 0 0 auto; width: 1px; background: var(--border-mid); margin: 2px 4px; }
         .group-btn {
             flex: 0 0 auto; padding: 6px 12px; border: 1px solid var(--brand-green); background: var(--bg-card);
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
@@ -286,6 +299,8 @@
 
     <div class="group-filter-bar" id="group-filter-container"></div>
 
+    <div class="hole-jump-nav" id="hole-jump-nav"></div>
+
     <div class="card-table-wrapper">
         <table class="card-table">
             <thead>
@@ -322,7 +337,7 @@
 <div class="modal-overlay" id="dots-modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span id="dots-modal-title">🎯 Hole Dots</span>
+            <span id="dots-modal-title">🔴 Hole Dots</span>
             <button class="close-modal" onclick="closeDotsModal()">&times;</button>
         </div>
         <div id="dots-modal-body"></div>
@@ -492,6 +507,25 @@
         return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
+    function jumpToHole(holeNum) {
+        const row = document.getElementById(`hole-row-${holeNum}`);
+        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function renderHoleJumpNav(courseData, savedScores, filteredPlayers) {
+        const nav = document.getElementById('hole-jump-nav');
+        if (!nav || !courseData || courseData.length === 0) { if (nav) nav.innerHTML = ''; return; }
+
+        const sorted = courseData.slice().sort((a, b) => a.hole - b.hole);
+        let html = '';
+        sorted.forEach((h, i) => {
+            const played = filteredPlayers.some(p => savedScores[`p${p.id}_h${h.hole}`] > 0);
+            html += `<div class="hole-jump-btn ${played ? 'played' : ''}" onclick="jumpToHole(${h.hole})">${h.hole}</div>`;
+            if (h.hole === 9 && sorted.length > 9) html += `<div class="hole-jump-divider"></div>`;
+        });
+        nav.innerHTML = html;
+    }
+
     function renderGroupFilters(playersCount) {
         const container = document.getElementById("group-filter-container");
         const boundaries = computeGroupBoundaries(playersCount, currentData.groupSizeOverrides || {});
@@ -613,7 +647,7 @@
 
     function openDotsModal(holeNum) {
         currentDotHole = holeNum;
-        document.getElementById("dots-modal-title").textContent = `🎯 Hole ${holeNum} Dots`;
+        document.getElementById("dots-modal-title").textContent = `🔴 Hole ${holeNum} Dots`;
         
         const existingDots = currentData.dots && currentData.dots[`h${holeNum}`] ? currentData.dots[`h${holeNum}`] : {};
         tempDots = JSON.parse(JSON.stringify(existingDots)); 
@@ -1387,6 +1421,8 @@
             filteredPlayers = players.slice(startIdx, startIdx + size);
         }
 
+        renderHoleJumpNav(courseData, savedScores, filteredPlayers);
+
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
         const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
@@ -1459,7 +1495,7 @@
         });
 
         courseData.forEach(h => {
-            let rowHtml = `<tr>
+            let rowHtml = `<tr id="hole-row-${h.hole}">
                 <td style="padding-top:12px;"><strong>${h.hole}</strong></td>
                 <td style="padding-top:12px;">${h.par}</td>
                 <td style="color:var(--text-muted); padding-top:12px;">${h.hcpIndex}</td>`;
@@ -1556,7 +1592,7 @@
                     let dotCount = 0;
                     Object.values(holeDots).forEach(arr => dotCount += arr.length);
                     const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
-                    const dotBtnLabel = dotCount > 0 ? `🎯 Dots (${dotCount})` : "🎯 Add Dots";
+                    const dotBtnLabel = dotCount > 0 ? `🔴 Dots (${dotCount})` : "🔴 Add Dots";
                     const dotsAllowed = !isMultiGroupRound || hasGroupLock;
                     const dotBtnAttrs = dotsAllowed ? `onclick="openDotsModal(${h.hole})"` : `disabled style="opacity:0.5; cursor:not-allowed;"`;
                     matchCellHtml += `<button class="${dotBtnClass}" ${dotBtnAttrs}>${dotBtnLabel}</button>`;
@@ -1870,7 +1906,7 @@
             statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else if (gameFormat === 'dots') {
             payoutBox.style.display = "none";
-            titleEl.textContent = "🎯 LIVE DOT TOTALS";
+            titleEl.textContent = "🔴 LIVE DOT TOTALS";
             
             let playerDots = {};
             filteredPlayers.forEach(p => playerDots[p.id] = 0);
