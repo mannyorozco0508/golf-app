@@ -87,17 +87,17 @@
             padding: 10px 14px; text-align: center; margin-bottom: 10px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         }
-        .ticker-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #a8dadc; font-weight: bold; }
-        .ticker-status { font-size: 0.95rem; font-weight: bold; margin-top: 4px; color: #fff; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+        .ticker-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #a8dadc; font-weight: bold; }
+        .ticker-status { font-size: 1.15rem; font-weight: bold; margin-top: 4px; color: #fff; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
         .ticker-part { background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 6px; }
 
         .nassau-payout-box {
             background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px;
             padding: 10px 14px; margin-bottom: 12px; display: none;
         }
-        .nassau-payout-title { font-size: 0.8rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+        .nassau-payout-title { font-size: 0.95rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 8px; text-align: center; }
         
-        .payout-row { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 6px 10px; background: var(--bg-card); border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border-mid); font-size: 0.85rem; font-weight: bold; color: var(--text-main); }
+        .payout-row { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 6px 10px; background: var(--bg-card); border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border-mid); font-size: 1rem; font-weight: bold; color: var(--text-main); }
         @media (max-width: 400px) { .payout-row { flex-direction: column; text-align: center; gap: 4px; } }
 
         .val-pos { color: var(--accent-teal); }
@@ -160,6 +160,8 @@
         .hv-player-name { font-weight: bold; font-size: 0.95rem; flex: 1; }
         .hv-player-cell { display: flex; align-items: center; gap: 8px; }
         .hv-bets-row { padding-top: 10px; margin-top: 4px; border-top: 1px dashed var(--border-mid); }
+        .hv-bets-row .status-pill { font-size: 1rem; padding: 10px 12px; margin-bottom: 6px; }
+        .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
         .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
         .hole-view-nav-btn {
             flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px;
@@ -326,7 +328,7 @@
         <div class="live-ticker-box">
             <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
             <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
-            <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.8rem;"></div>
+            <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.95rem;"></div>
         </div>
 
         <div class="nassau-payout-box" id="nassau-payout-container">
