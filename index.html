@@ -122,6 +122,51 @@
         }
         .hole-jump-btn.played { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .hole-jump-divider { flex: 0 0 auto; width: 1px; background: var(--border-mid); margin: 2px 4px; }
+
+        /* Round body layout: status panel stacks above the scorecard on phones,
+           moves to a side panel next to it on wider screens (tablet/iPad and up) */
+        .round-body-layout { display: block; }
+        .status-panel { margin-bottom: 4px; }
+        @media (min-width: 900px) {
+            .round-body-layout { display: flex; flex-direction: row-reverse; gap: 18px; align-items: flex-start; }
+            .status-panel { flex: 0 0 300px; position: sticky; top: 12px; margin-bottom: 0; }
+            .scorecard-main { flex: 1 1 auto; min-width: 0; }
+        }
+
+        .view-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+        .view-mode-btn {
+            flex: 1; padding: 9px; text-align: center; font-size: 0.85rem; font-weight: bold;
+            border-radius: 20px; border: 1px solid var(--border-mid); background: var(--nav-bg);
+            color: var(--brand-green); cursor: pointer;
+        }
+        .view-mode-btn.active { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+
+        #hole-view-container { display: block; }
+        .hole-view-card {
+            border: 1px solid var(--border-mid); border-radius: 14px; background: var(--bg-card);
+            padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 6px var(--shadow-color);
+        }
+        .hole-view-header {
+            display: flex; justify-content: space-between; align-items: baseline;
+            border-bottom: 1px solid var(--border-faint); padding-bottom: 10px; margin-bottom: 12px;
+        }
+        .hv-hole-num { font-size: 1.5rem; font-weight: bold; color: var(--brand-green); }
+        .hv-hole-meta { font-size: 0.85rem; color: var(--text-muted); font-weight: bold; }
+        .hv-player-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-faint);
+        }
+        .hv-player-row:last-child { border-bottom: none; }
+        .hv-player-name { font-weight: bold; font-size: 0.95rem; flex: 1; }
+        .hv-player-cell { display: flex; align-items: center; gap: 8px; }
+        .hv-bets-row { padding-top: 10px; margin-top: 4px; border-top: 1px dashed var(--border-mid); }
+        .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+        .hole-view-nav-btn {
+            flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px;
+            border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); cursor: pointer;
+        }
+        .hole-view-position { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
+
         .group-btn {
             flex: 0 0 auto; padding: 6px 12px; border: 1px solid var(--brand-green); background: var(--bg-card);
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
@@ -276,32 +321,50 @@
         <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
     </div>
 
-    <div class="live-ticker-box">
-        <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
-        <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
-        <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.8rem;"></div>
+    <div class="round-body-layout" id="round-body-layout">
+    <div class="status-panel" id="status-panel">
+        <div class="live-ticker-box">
+            <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
+            <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
+            <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.8rem;"></div>
+        </div>
+
+        <div class="nassau-payout-box" id="nassau-payout-container">
+            <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Standings</div>
+            <div id="payout-rows-wrapper"></div>
+        </div>
+
+        <div class="nassau-payout-box" id="kpgame-payout-container" style="display:none;">
+            <div class="nassau-payout-title">📍 Dollar Game (KPs)</div>
+            <div id="kpgame-rows-wrapper"></div>
+        </div>
+
+        <div class="nassau-payout-box" id="wolfcall-payout-container" style="display:none;">
+            <div class="nassau-payout-title">🐺 Wolf Call</div>
+            <div id="wolfcall-rows-wrapper"></div>
+        </div>
     </div>
 
-    <div class="nassau-payout-box" id="nassau-payout-container">
-        <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Standings</div>
-        <div id="payout-rows-wrapper"></div>
-    </div>
-
-    <div class="nassau-payout-box" id="kpgame-payout-container" style="display:none;">
-        <div class="nassau-payout-title">📍 Dollar Game (KPs)</div>
-        <div id="kpgame-rows-wrapper"></div>
-    </div>
-
-    <div class="nassau-payout-box" id="wolfcall-payout-container" style="display:none;">
-        <div class="nassau-payout-title">🐺 Wolf Call</div>
-        <div id="wolfcall-rows-wrapper"></div>
-    </div>
-
+    <div class="scorecard-main" id="scorecard-main">
     <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="hole-jump-nav" id="hole-jump-nav"></div>
 
-    <div class="card-table-wrapper">
+    <div class="view-mode-toggle">
+        <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">🎯 Hole View</button>
+        <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
+    </div>
+
+    <div id="hole-view-container">
+        <div id="hole-view-card"></div>
+        <div class="hole-view-nav-row">
+            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
+            <span id="hole-view-position-label" class="hole-view-position"></span>
+            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>
+        </div>
+    </div>
+
+    <div class="card-table-wrapper" id="full-card-container" style="display:none;">
         <table class="card-table">
             <thead>
                 <tr id="table-head-row">
@@ -312,6 +375,8 @@
             </thead>
             <tbody id="card-body"></tbody>
         </table>
+    </div>
+    </div>
     </div>
 
     <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
@@ -411,6 +476,8 @@
     let hasGroupLock = urlParams.get('group') !== null;
     let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
     let selectedGroup = lockedGroup ? lockedGroup : "all";
+    let currentViewMode = 'hole';
+    let currentViewedHole = null; // set on first render to the first hole missing a score
     let currentData = {};
     
     let currentDotHole = 1;
@@ -508,8 +575,82 @@
     }
 
     function jumpToHole(holeNum) {
-        const row = document.getElementById(`hole-row-${holeNum}`);
-        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (currentViewMode === 'hole') {
+            currentViewedHole = holeNum;
+            renderHoleView();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            const row = document.getElementById(`hole-row-${holeNum}`);
+            if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function setViewMode(mode) {
+        currentViewMode = mode;
+        document.getElementById('view-mode-hole-btn').classList.toggle('active', mode === 'hole');
+        document.getElementById('view-mode-full-btn').classList.toggle('active', mode === 'full');
+        document.getElementById('hole-view-container').style.display = mode === 'hole' ? 'block' : 'none';
+        document.getElementById('full-card-container').style.display = mode === 'full' ? 'block' : 'none';
+        if (mode === 'hole') renderHoleView();
+    }
+
+    function goToAdjacentHole(delta) {
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (courseData.length === 0) return;
+        const holeNumbers = courseData.map(h => h.hole);
+        let idx = holeNumbers.indexOf(currentViewedHole);
+        if (idx === -1) idx = 0;
+        idx = Math.max(0, Math.min(holeNumbers.length - 1, idx + delta));
+        currentViewedHole = holeNumbers[idx];
+        renderHoleView();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
+    // same render pass) and re-lays it out as a card. This means Hole View can never show a different
+    // number than the Full Card view - it's the exact same DOM, just displayed differently.
+    function renderHoleView() {
+        const container = document.getElementById('hole-view-card');
+        const posLabel = document.getElementById('hole-view-position-label');
+        if (!container) return;
+
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (courseData.length === 0) { container.innerHTML = ''; if (posLabel) posLabel.textContent = ''; return; }
+        const holeNumbers = courseData.map(h => h.hole);
+
+        if (currentViewedHole === null || !holeNumbers.includes(currentViewedHole)) {
+            currentViewedHole = holeNumbers[0]; // safe fallback, refined below once scores are known
+        }
+
+        const row = document.getElementById(`hole-row-${currentViewedHole}`);
+        if (posLabel) posLabel.textContent = `Hole ${currentViewedHole} of ${holeNumbers.length}`;
+
+        if (!row) {
+            container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted);">No data for this hole.</div>`;
+            return;
+        }
+
+        const headRow = document.getElementById('table-head-row');
+        const headCells = headRow ? Array.from(headRow.children) : [];
+        const cells = Array.from(row.children);
+        const holeNum = cells[0] ? cells[0].textContent.trim() : currentViewedHole;
+        const par = cells[1] ? cells[1].textContent.trim() : '';
+        const hcp = cells[2] ? cells[2].textContent.trim() : '';
+
+        let html = `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
+
+        const playerCellCount = cells.length - 3 - (window.__scHasMatchColumn ? 1 : 0);
+        for (let i = 3; i < 3 + playerCellCount; i++) {
+            const name = headCells[i] ? headCells[i].textContent.trim() : '';
+            html += `<div class="hv-player-row"><div class="hv-player-name">${name}</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
+        }
+
+        if (window.__scHasMatchColumn && cells[cells.length - 1]) {
+            const betsHtml = cells[cells.length - 1].innerHTML.trim();
+            if (betsHtml) html += `<div class="hv-bets-row">${betsHtml}</div>`;
+        }
+
+        container.innerHTML = html;
     }
 
     function renderHoleJumpNav(courseData, savedScores, filteredPlayers) {
@@ -1484,6 +1625,7 @@
         }
 
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo', 'wolf', 'stableford'].includes(gameFormat));
+        window.__scHasMatchColumn = showMatchColumn;
 
         // --- GLOBAL BET REGISTRY: Bet 1 = Match, Bet 2+ = presses in the order they started ---
         const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
@@ -1996,6 +2138,15 @@
         renderKPGameTally(currentData, courseData);
         renderWolfCallBox(currentData, courseData, savedScores);
         renderCombinedTally(currentData, courseData, savedScores);
+
+        // On first load, land on the first hole that's missing a score - not always hole 1,
+        // so picking back up mid-round drops you right where scoring left off.
+        if (currentViewedHole === null) {
+            const sortedHoles = courseData.slice().sort((a, b) => a.hole - b.hole);
+            const nextUp = sortedHoles.find(h => filteredPlayers.some(p => !savedScores[`p${p.id}_h${h.hole}`]));
+            currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
+        }
+        if (currentViewMode === 'hole') renderHoleView();
 
         buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc);
     }
