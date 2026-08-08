@@ -574,11 +574,22 @@
         return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
+    // Scrolls to the hole card itself (skipping past the status panel above it), landing just below
+    // the sticky 1-18 strip so the hole header isn't hidden underneath it.
+    function scrollToHoleCard() {
+        const target = document.getElementById('hole-view-card');
+        const navEl = document.getElementById('hole-jump-nav');
+        if (!target) return;
+        const navHeight = navEl ? navEl.offsetHeight : 0;
+        const targetTop = target.getBoundingClientRect().top + window.pageYOffset;
+        window.scrollTo({ top: targetTop - navHeight - 8, behavior: 'smooth' });
+    }
+
     function jumpToHole(holeNum) {
         if (currentViewMode === 'hole') {
             currentViewedHole = holeNum;
             renderHoleView();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            scrollToHoleCard();
         } else {
             const row = document.getElementById(`hole-row-${holeNum}`);
             if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -603,7 +614,7 @@
         idx = Math.max(0, Math.min(holeNumbers.length - 1, idx + delta));
         currentViewedHole = holeNumbers[idx];
         renderHoleView();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollToHoleCard();
     }
 
     // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
