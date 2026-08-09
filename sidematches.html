@@ -95,6 +95,15 @@
         .pill-press { background-color: var(--danger-box-bg); color: var(--accent-red); border: 1px solid var(--accent-red); }
 
         .side-match-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--nassau-box-bg); }
+        .sm-scorecard-toggle {
+            font-size: 0.78rem; font-weight: bold; color: var(--brand-navy); cursor: pointer;
+            padding: 6px 0; border-top: 1px dashed var(--border-mid); margin-top: 6px;
+        }
+        .sm-scorecard-body { margin-top: 6px; max-height: 260px; overflow-y: auto; }
+        .sm-mini-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 6px; overflow: hidden; }
+        .sm-mini-table th, .sm-mini-table td { padding: 5px 4px; text-align: center; font-size: 0.75rem; border-bottom: 1px solid var(--border-faint); }
+        .sm-mini-table th { background: var(--nav-bg); color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; position: sticky; top: 0; }
+        .sm-mini-table td:first-child, .sm-mini-table th:first-child { font-weight: bold; color: var(--brand-green); }
         .side-match-players { font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; }
         .side-match-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 
@@ -845,6 +854,43 @@
         return `<span>$0</span>`;
     }
 
+    // A compact hole-by-hole scorecard for just the players in one side match, so both sides can
+    // verify the actual scores feeding their bet without needing to go find the main scorecard.
+    function buildSideMatchMiniScorecard(matchId, virtualPlayers, courseData, savedScores) {
+        const sortedHoles = courseData.slice().sort((a, b) => a.hole - b.hole);
+        let rows = '';
+        sortedHoles.forEach(h => {
+            let cells = `<td>${h.hole}</td><td style="color:var(--text-muted);">${h.par}</td>`;
+            virtualPlayers.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                cells += `<td>${v || '—'}</td>`;
+            });
+            rows += `<tr>${cells}</tr>`;
+        });
+        const headerCells = virtualPlayers.map(p => `<th>${p.name.split(' ')[0]}</th>`).join('');
+
+        return `
+            <div class="sm-scorecard-toggle" onclick="toggleSmScorecard('${matchId}')">
+                📋 Verify Scores <span id="sm-sc-arrow-${matchId}">▼</span>
+            </div>
+            <div class="sm-scorecard-body" id="sm-scorecard-${matchId}" style="display:none;">
+                <table class="sm-mini-table">
+                    <tr><th>Hole</th><th>Par</th>${headerCells}</tr>
+                    ${rows}
+                </table>
+            </div>
+        `;
+    }
+
+    function toggleSmScorecard(matchId) {
+        const body = document.getElementById('sm-scorecard-' + matchId);
+        const arrow = document.getElementById('sm-sc-arrow-' + matchId);
+        if (!body) return;
+        const isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
+    }
+
     function renderSideMatches() {
         const list = document.getElementById("sidematches-list");
         if (!list) return;
@@ -923,6 +969,7 @@
                     html += `<div style="font-size:0.8rem; color:var(--text-muted); padding:6px 0;">No $/hole or $/overall amount set for this match.</div>`;
                 }
 
+                html += buildSideMatchMiniScorecard(matchId, [p1, p2], courseData, savedScores);
                 html += `<div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button></div></div>`;
                 return;
             }
@@ -973,6 +1020,8 @@
             if (sm.stake > 0) {
                 html += `<div class="side-match-row"><span style="font-size:0.8rem;">Ledger:</span><span style="font-size:0.8rem;">${calc.t1Name}: ${fmtSideM(calc.t1TotalMoney)} | ${calc.t2Name}: ${fmtSideM(-calc.t1TotalMoney)}</span></div>`;
             }
+
+            html += buildSideMatchMiniScorecard(matchId, virtualPlayers, courseData, savedScores);
 
             html += `<div class="side-match-row">`;
             const lastHole = courseData.length > 0 ? Math.max(...courseData.map(h => h.hole)) : 18;
