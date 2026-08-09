@@ -99,11 +99,17 @@
             font-size: 0.78rem; font-weight: bold; color: var(--brand-navy); cursor: pointer;
             padding: 6px 0; border-top: 1px dashed var(--border-mid); margin-top: 6px;
         }
-        .sm-scorecard-body { margin-top: 6px; max-height: 260px; overflow-y: auto; }
-        .sm-mini-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 6px; overflow: hidden; }
-        .sm-mini-table th, .sm-mini-table td { padding: 5px 4px; text-align: center; font-size: 0.75rem; border-bottom: 1px solid var(--border-faint); }
-        .sm-mini-table th { background: var(--nav-bg); color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; position: sticky; top: 0; }
-        .sm-mini-table td:first-child, .sm-mini-table th:first-child { font-weight: bold; color: var(--brand-green); }
+        .sm-scorecard-body { margin-top: 6px; }
+        .sm-scorecard-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .sm-hcard-table { border-collapse: collapse; background: var(--bg-card); border-radius: 6px; min-width: 100%; }
+        .sm-hcard-table th, .sm-hcard-table td { padding: 6px 5px; text-align: center; font-size: 0.72rem; border: 1px solid var(--border-faint); white-space: nowrap; }
+        .sm-hcard-table th { background: var(--nav-bg); color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; }
+        .sm-hcard-table td.sm-row-label, .sm-hcard-table th.sm-row-label { text-align: left; font-weight: bold; color: var(--brand-green); position: sticky; left: 0; background: var(--bg-card); }
+        .sm-hcard-table th.sm-row-label { background: var(--nav-bg); }
+        .sm-hcard-table td.sm-section-col, .sm-hcard-table th.sm-section-col { background: var(--nassau-box-bg); font-weight: bold; }
+        .sm-pscore { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; font-weight: bold; }
+        .sm-pcircle1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid var(--accent-red); border-radius: 50%; pointer-events: none; }
+        .sm-pcircle2 { position: absolute; top: -3px; left: -3px; right: -3px; bottom: -3px; border: 1px solid var(--accent-red); border-radius: 50%; pointer-events: none; }
         .side-match-players { font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; }
         .side-match-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 
@@ -120,6 +126,7 @@
 
         /* MAGIC PDF HIDING CSS */
         @media print {
+            @page { size: landscape; margin: 0.4in; }
             :root, html.dark-mode {
                 --bg-page: #ffffff;
                 --bg-card: #ffffff;
@@ -141,8 +148,8 @@
             .top-nav-bar, .btn-primary, .control-grid, .theme-toggle-btn, .btn-outline-sm, .btn-danger-sm { display: none !important; }
             .action-card, .side-match-card { border: 1px solid #ccc; background: #fff; }
             .sm-scorecard-toggle { display: none !important; }
-            .sm-scorecard-body { display: block !important; max-height: none !important; overflow: visible !important; }
-            .sm-mini-table th { position: static; }
+            .sm-scorecard-body { display: block !important; }
+            .sm-hcard-table td.sm-row-label, .sm-hcard-table th.sm-row-label { position: static; }
         }
     </style>
 
@@ -859,28 +866,78 @@
 
     // A compact hole-by-hole scorecard for just the players in one side match, so both sides can
     // verify the actual scores feeding their bet without needing to go find the main scorecard.
+    // A real horizontal scorecard - just the players in one side match - so both sides can verify
+    // the actual scores feeding their bet without needing to go find the main scorecard. Circles
+    // birdies and eagles the same way the main scorecard's printout does.
     function buildSideMatchMiniScorecard(matchId, virtualPlayers, courseData, savedScores) {
         const sortedHoles = courseData.slice().sort((a, b) => a.hole - b.hole);
-        let rows = '';
-        sortedHoles.forEach(h => {
-            let cells = `<td>${h.hole}</td><td style="color:var(--text-muted);">${h.par}</td>`;
-            virtualPlayers.forEach(p => {
+        const hasFront = sortedHoles.some(h => h.hole <= 9);
+        const hasBack = sortedHoles.some(h => h.hole > 9);
+        const frontHoles = sortedHoles.filter(h => h.hole <= 9);
+        const backHoles = sortedHoles.filter(h => h.hole > 9);
+        const outPar = frontHoles.reduce((s, h) => s + (parseInt(h.par, 10) || 0), 0);
+        const inPar = backHoles.reduce((s, h) => s + (parseInt(h.par, 10) || 0), 0);
+
+        let holeRow = `<th class="sm-row-label">Hole</th>`;
+        let parRow = `<th class="sm-row-label">Par</th>`;
+        if (hasFront) {
+            frontHoles.forEach(h => { holeRow += `<th>${h.hole}</th>`; parRow += `<th>${h.par}</th>`; });
+            if (hasBack) { holeRow += `<th class="sm-section-col">OUT</th>`; parRow += `<th class="sm-section-col">${outPar}</th>`; }
+        }
+        if (hasBack) {
+            backHoles.forEach(h => { holeRow += `<th>${h.hole}</th>`; parRow += `<th>${h.par}</th>`; });
+            if (hasFront) { holeRow += `<th class="sm-section-col">IN</th>`; parRow += `<th class="sm-section-col">${inPar}</th>`; }
+        }
+        holeRow += `<th class="sm-section-col">Total</th>`;
+        parRow += `<th class="sm-section-col">${outPar + inPar}</th>`;
+
+        let playerRows = '';
+        virtualPlayers.forEach(p => {
+            let outScore = 0, inScore = 0;
+            let row = `<td class="sm-row-label">${p.name.split(' ')[0]}</td>`;
+
+            function scoreCell(h) {
                 const v = savedScores[`p${p.id}_h${h.hole}`];
-                cells += `<td>${v || '—'}</td>`;
-            });
-            rows += `<tr>${cells}</tr>`;
+                if (!v || v <= 0) return `<td></td>`;
+                const score = parseInt(v, 10);
+                const diff = score - (parseInt(h.par, 10) || 0);
+                const shape = diff === -1 ? `<div class="sm-pcircle1"></div>` : (diff <= -2 ? `<div class="sm-pcircle1"></div><div class="sm-pcircle2"></div>` : '');
+                return `<td><div class="sm-pscore">${score}${shape}</div></td>`;
+            }
+
+            if (hasFront) {
+                frontHoles.forEach(h => {
+                    const v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v > 0) outScore += parseInt(v, 10);
+                    row += scoreCell(h);
+                });
+                if (hasBack) row += `<td class="sm-section-col">${outScore > 0 ? outScore : ''}</td>`;
+            }
+            if (hasBack) {
+                backHoles.forEach(h => {
+                    const v = savedScores[`p${p.id}_h${h.hole}`];
+                    if (v > 0) inScore += parseInt(v, 10);
+                    row += scoreCell(h);
+                });
+                if (hasFront) row += `<td class="sm-section-col">${inScore > 0 ? inScore : ''}</td>`;
+            }
+            const total = outScore + inScore;
+            row += `<td class="sm-section-col">${total > 0 ? total : ''}</td>`;
+            playerRows += `<tr>${row}</tr>`;
         });
-        const headerCells = virtualPlayers.map(p => `<th>${p.name.split(' ')[0]}</th>`).join('');
 
         return `
             <div class="sm-scorecard-toggle" onclick="toggleSmScorecard('${matchId}')">
                 📋 Verify Scores <span id="sm-sc-arrow-${matchId}">▼</span>
             </div>
             <div class="sm-scorecard-body" id="sm-scorecard-${matchId}" style="display:none;">
-                <table class="sm-mini-table">
-                    <tr><th>Hole</th><th>Par</th>${headerCells}</tr>
-                    ${rows}
-                </table>
+                <div class="sm-scorecard-scroll">
+                    <table class="sm-hcard-table">
+                        <tr>${holeRow}</tr>
+                        <tr>${parRow}</tr>
+                        ${playerRows}
+                    </table>
+                </div>
             </div>
         `;
     }
