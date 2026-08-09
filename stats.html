@@ -62,6 +62,8 @@
         .top-nav-bar::-webkit-scrollbar { display: none; }
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
+        .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
 
         /* Clean Scorecard Styles */
         .clean-scorecard { background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 20px; margin-top: 16px; box-shadow: 0 8px 24px var(--shadow-color); }
@@ -116,7 +118,7 @@
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
-        <a href="sidematches.html" class="top-nav-item nav-link">⚔️ Matches</a>
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
         <a href="stats.html" class="top-nav-item active nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
         <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
