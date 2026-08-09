@@ -169,6 +169,30 @@
         }
         .hole-view-position { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
 
+        .finish-round-banner {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: linear-gradient(135deg, var(--brand-green), var(--accent-teal));
+            color: #fff; border: none; border-radius: 12px; padding: 14px; margin-bottom: 12px;
+            font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%;
+            box-shadow: 0 3px 8px var(--shadow-color);
+        }
+        .finish-round-modal-content { max-width: 420px; }
+        .fr-headline { text-align: center; font-size: 1.1rem; font-weight: bold; color: var(--brand-green); background: var(--nassau-box-bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+        .fr-player-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); }
+        .fr-player-row:last-child { border-bottom: none; }
+        .fr-player-name { font-weight: bold; }
+        .fr-player-score { text-align: right; font-size: 0.9rem; }
+        .fr-player-score .fr-gross { font-weight: bold; color: var(--text-main); }
+        .fr-player-score .fr-net { font-size: 0.75rem; color: var(--text-muted); }
+        .fr-jump-links { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .fr-section-divider { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px 0; border-top: 1px dashed var(--border-mid); padding-top: 12px; }
+        #fr-full-results .status-panel, #fr-full-results .live-ticker-box, #fr-full-results .nassau-payout-box { margin-bottom: 10px; }
+        .fr-jump-link {
+            display: block; text-align: center; padding: 11px; border-radius: 8px; border: 1px solid var(--brand-green);
+            color: var(--brand-green); font-weight: bold; text-decoration: none; font-size: 0.9rem;
+        }
+        .fr-close-btn { width: 100%; margin-top: 12px; padding: 12px; background: var(--brand-green); color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
+
         .group-btn {
             flex: 0 0 auto; padding: 6px 12px; border: 1px solid var(--brand-green); background: var(--bg-card);
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
@@ -352,6 +376,8 @@
 
     <div class="hole-jump-nav" id="hole-jump-nav"></div>
 
+    <button class="finish-round-banner" id="finish-round-banner" style="display:none;" onclick="openFinishRoundModal()">🏁 Finish Round</button>
+
     <div class="view-mode-toggle">
         <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">🎯 Hole View</button>
         <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
@@ -415,6 +441,25 @@
             <button class="close-modal" onclick="closeHistoryModal()">&times;</button>
         </div>
         <div id="history-list-container"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="finish-round-modal-overlay">
+    <div class="modal-content finish-round-modal-content">
+        <div class="modal-header">
+            <span>🏁 Round Complete!</span>
+            <button class="close-modal" onclick="closeFinishRoundModal()">&times;</button>
+        </div>
+        <div id="fr-headline" class="fr-headline"></div>
+        <div id="fr-player-list"></div>
+
+        <div class="fr-section-divider">💰 Full Results — All Games &amp; Presses</div>
+        <div id="fr-full-results"></div>
+
+        <button class="btn-primary" style="margin-top: 14px;" onclick="window.print()">📄 Send Results PDF</button>
+
+        <div id="fr-jump-links" class="fr-jump-links"></div>
+        <button class="fr-close-btn" onclick="closeFinishRoundModal()">Got It, Keep Playing</button>
     </div>
 </div>
 
@@ -792,6 +837,79 @@
 
         // Log the undo itself as a new entry so the trail stays honest
         logAuditEntry(entry.playerId, entry.hole, entry.newValue, entry.oldValue);
+    }
+
+    // --- FINISH ROUND ---
+    function checkRoundComplete(filteredPlayers, courseData, savedScores) {
+        const banner = document.getElementById('finish-round-banner');
+        if (!banner) return;
+        if (!filteredPlayers.length || !courseData.length) { banner.style.display = 'none'; return; }
+        const allDone = courseData.every(h => filteredPlayers.every(p => savedScores[`p${p.id}_h${h.hole}`] > 0));
+        banner.style.display = allDone ? 'flex' : 'none';
+    }
+
+    function getNavLinkHref(labelSubstring) {
+        const links = Array.from(document.querySelectorAll('.nav-link'));
+        const link = links.find(l => l.textContent.includes(labelSubstring));
+        return link ? link.href : '#';
+    }
+
+    // Reuses the already-computed status panel (live match status, every press, KP results,
+    // Wolf results, birdie tally) instead of recalculating any of it a second time.
+    // IDs are stripped since this becomes a second copy living inside the modal.
+    function cloneStatusPanelHtml() {
+        const panel = document.getElementById('status-panel');
+        if (!panel) return '<div style="color:var(--text-muted); text-align:center; padding:10px;">No game results for this round.</div>';
+        return panel.innerHTML.replace(/\sid="[^"]*"/g, '');
+    }
+
+    function openFinishRoundModal() {
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const players = currentData.players || [];
+        const urlParams2 = new URLSearchParams(window.location.search);
+        const lockedGroup2 = urlParams2.get('group');
+        let scopedPlayers = players;
+        if (lockedGroup2 && window.__scPlayerGroupMap) {
+            scopedPlayers = players.filter(p => String(window.__scPlayerGroupMap[p.id]) === String(lockedGroup2));
+        }
+
+        const headlineEl = document.getElementById('ticker-status-val');
+        document.getElementById('fr-headline').textContent = headlineEl ? headlineEl.innerText : 'Round Complete!';
+        document.getElementById('fr-full-results').innerHTML = cloneStatusPanelHtml();
+
+        const isNet = (window.__scScoringType || 'net').toLowerCase() === 'net';
+        let listHtml = '';
+        scopedPlayers.forEach(p => {
+            let gross = 0;
+            let strokesOff = 0;
+            courseData.forEach(h => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (v > 0) gross += parseInt(v, 10);
+                if (isNet) strokesOff += getStrokes(h.hcpIndex, parseHcp(p.hcp));
+            });
+            const netTotal = gross - strokesOff;
+            listHtml += `<div class="fr-player-row">
+                <span class="fr-player-name">${p.name}</span>
+                <span class="fr-player-score">
+                    <span class="fr-gross">${gross}</span>
+                    ${isNet ? `<br><span class="fr-net">Net ${netTotal}</span>` : ''}
+                </span>
+            </div>`;
+        });
+        document.getElementById('fr-player-list').innerHTML = listHtml;
+
+        document.getElementById('fr-jump-links').innerHTML = `
+            <a class="fr-jump-link" href="${getNavLinkHref('Settle')}">💸 View Settle</a>
+            <a class="fr-jump-link" href="${getNavLinkHref('Stats')}">📊 View Stats</a>
+            <a class="fr-jump-link" href="${getNavLinkHref('Leaderboard')}">🏆 View Leaderboard</a>
+        `;
+
+        document.getElementById('finish-round-modal-overlay').style.display = 'flex';
+    }
+
+    function closeFinishRoundModal() {
+        document.getElementById('finish-round-modal-overlay').style.display = 'none';
     }
 
     function openHistoryModal() {
@@ -1575,6 +1693,7 @@
                 if (players[i]) playerGroupMap[players[i].id] = b.group;
             }
         });
+        window.__scPlayerGroupMap = playerGroupMap;
 
         const isMultiGroupRound = players.length > 4;
 
@@ -1593,6 +1712,7 @@
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
         if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
         if (gameFormat === 'stableford') scoringType = currentData.stablefordScoring || "net";
+        window.__scScoringType = scoringType;
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
         document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
@@ -2163,6 +2283,7 @@
             currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
         }
         if (currentViewMode === 'hole') renderHoleView();
+        checkRoundComplete(filteredPlayers, courseData, savedScores);
 
         buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc);
     }
