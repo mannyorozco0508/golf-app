@@ -162,7 +162,7 @@
         .hv-bets-row { padding-top: 10px; margin-top: 4px; border-top: 1px dashed var(--border-mid); }
         .hv-bets-row .status-pill { font-size: 1rem; padding: 10px 12px; margin-bottom: 6px; }
         .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
-        .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+        .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 14px; margin-bottom: 4px; border-top: 1px solid var(--border-faint); }
         .hole-view-nav-btn {
             flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px;
             border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); cursor: pointer;
@@ -359,11 +359,6 @@
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
-        <div class="hole-view-nav-row">
-            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
-            <span id="hole-view-position-label" class="hole-view-position"></span>
-            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>
-        </div>
     </div>
 
     <div class="card-table-wrapper" id="full-card-container" style="display:none;">
@@ -624,11 +619,10 @@
     // number than the Full Card view - it's the exact same DOM, just displayed differently.
     function renderHoleView() {
         const container = document.getElementById('hole-view-card');
-        const posLabel = document.getElementById('hole-view-position-label');
         if (!container) return;
 
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        if (courseData.length === 0) { container.innerHTML = ''; if (posLabel) posLabel.textContent = ''; return; }
+        if (courseData.length === 0) { container.innerHTML = ''; return; }
         const holeNumbers = courseData.map(h => h.hole);
 
         if (currentViewedHole === null || !holeNumbers.includes(currentViewedHole)) {
@@ -636,10 +630,15 @@
         }
 
         const row = document.getElementById(`hole-row-${currentViewedHole}`);
-        if (posLabel) posLabel.textContent = `Hole ${currentViewedHole} of ${holeNumbers.length}`;
+        const positionText = `Hole ${currentViewedHole} of ${holeNumbers.length}`;
+        const navRowHtml = `<div class="hole-view-nav-row">
+            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
+            <span class="hole-view-position">${positionText}</span>
+            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>
+        </div>`;
 
         if (!row) {
-            container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted);">No data for this hole.</div>`;
+            container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted);">No data for this hole.</div>${navRowHtml}`;
             return;
         }
 
@@ -657,6 +656,10 @@
             const name = headCells[i] ? headCells[i].textContent.trim() : '';
             html += `<div class="hv-player-row"><div class="hv-player-name">${name}</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
         }
+
+        // Prev/Next stays right here, directly under the scores - so it never moves as
+        // more bet badges pile up below it.
+        html += navRowHtml;
 
         if (window.__scHasMatchColumn && cells[cells.length - 1]) {
             const betsHtml = cells[cells.length - 1].innerHTML.trim();
