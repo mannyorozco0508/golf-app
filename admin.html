@@ -96,6 +96,26 @@
 
         .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
 
+        .wizard-progress { display: flex; justify-content: center; gap: 6px; margin: 4px 0 18px 0; flex-wrap: wrap; }
+        .wizard-dot {
+            width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-muted); font-size: 0.7rem; font-weight: bold; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0;
+        }
+        .wizard-dot.active { border-color: var(--brand-green); background: var(--brand-green); color: #fff; }
+        .wizard-dot.done { border-color: var(--brand-green); color: var(--brand-green); }
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+        .wizard-step-title { font-size: 1.05rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
+        .wizard-step-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
+        .wizard-nav-row { display: flex; gap: 10px; margin-top: 20px; }
+        .wizard-btn-back { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 0.95rem; cursor: pointer; }
+        .wizard-btn-next { flex: 2; padding: 12px; border-radius: 10px; border: none; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
+        .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .wizard-review-row .wr-label { color: var(--text-muted); }
+        .wizard-review-row .wr-value { font-weight: bold; text-align: right; }
+        .wizard-edit-link { font-size: 0.75rem; color: var(--brand-navy); text-decoration: underline; cursor: pointer; margin-left: 8px; }
+
         /* Compact binary toggle switch - replaces two-option dropdowns */
         .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
         .toggle-row.toggle-row-center { justify-content: center; }
@@ -221,6 +241,11 @@
         <div id="group-links-list"></div>
     </div>
 
+    <div class="wizard-progress" id="wizard-progress"></div>
+
+    <div class="wizard-step" id="wizard-step-1" data-step="1">
+        <div class="wizard-step-title">⛳ Step 1: Course</div>
+        <div class="wizard-step-sub">Pick the day/round label and search for your course.</div>
     <div class="form-group">
         <label>Round / Day #</label>
         <select id="round-day-select">
@@ -241,7 +266,16 @@
             <input type="hidden" id="course-select" value="">
             <div class="custom-select-dropdown" id="course-dropdown"></div>
         </div>
+    </div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-next" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
+        </div>
+    </div>
 
+    <div class="wizard-step" id="wizard-step-2" data-step="2">
+        <div class="wizard-step-title">📏 Step 2: Round Length</div>
+        <div class="wizard-step-sub">Full 18, front/back 9, or a custom 9-hole loop.</div>
+    <div class="form-group">
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
             <label style="color:var(--brand-green); font-size: 0.8rem;">Round Length</label>
             <select id="round-length-select" style="border-color:var(--accent-teal);">
@@ -336,7 +370,15 @@
             </div>
         </div>
     </div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(2)">◀ Back</button>
+            <button class="wizard-btn-next" onclick="wizardNext(2)">Next: Format ▶</button>
+        </div>
+    </div>
 
+    <div class="wizard-step" id="wizard-step-3" data-step="3">
+        <div class="wizard-step-title">🎮 Step 3: Game Format</div>
+        <div class="wizard-step-sub">What are you playing today?</div>
     <div class="form-group">
         <label>Game Format</label>
         <select id="game-format-select" onchange="handleFormatChange()">
@@ -365,29 +407,17 @@
                 </div>
             </div>
         </div>
-
-        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0;">
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">Side Games — run independently, no matter what's set above</p>
-
-        <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
-            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
-                <strong>🐦 Birdie Game</strong>
-            </label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores.</p>
-            <div style="margin: 0 0 12px 26px; max-width: 200px;">
-                <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
-                <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
-            </div>
-
-            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
-                <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
-                <strong>📍 Dollar Game (KPs)</strong>
-            </label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin pot on Par 3s. Set up on the Action tab.</p>
+    </div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(3)">◀ Back</button>
+            <button class="wizard-btn-next" onclick="wizardNext(3)">Next: Format Settings ▶</button>
         </div>
-        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0 0 0;">
+    </div>
 
+    <div class="wizard-step" id="wizard-step-4" data-step="4">
+        <div class="wizard-step-title">⚙️ Step 4: Format Settings</div>
+        <div class="wizard-step-sub" id="step4-sub">Options specific to the format you picked.</div>
+    <div class="form-group">
         <div id="match-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
             <div class="grid-2col">
@@ -542,9 +572,15 @@
             </div>
         </div>
     </div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(4)">◀ Back</button>
+            <button class="wizard-btn-next" onclick="wizardNext(4)">Next: Players ▶</button>
+        </div>
+    </div>
 
-    <hr style="border: 0; border-top: 1px solid var(--border-faint); margin: 20px 0;">
-
+    <div class="wizard-step" id="wizard-step-5" data-step="5">
+        <div class="wizard-step-title">👥 Step 5: Players</div>
+        <div class="wizard-step-sub">Add everyone playing today.</div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
@@ -552,8 +588,48 @@
 
     <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(5)">◀ Back</button>
+            <button class="wizard-btn-next" onclick="wizardNext(5)">Next: Side Games ▶</button>
+        </div>
+    </div>
+
+    <div class="wizard-step" id="wizard-step-6" data-step="6">
+        <div class="wizard-step-title">🐦 Step 6: Side Games</div>
+        <div class="wizard-step-sub">Optional — run independently of whatever format you picked. Now that players are added, pick who's in when you get to the Action tab.</div>
+        <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>🐦 Birdie Game</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores.</p>
+            <div style="margin: 0 0 12px 26px; max-width: 200px;">
+                <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
+                <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
+            </div>
+
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+                <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>📍 Dollar Game (KPs)</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin pot on Par 3s. Set up on the Action tab.</p>
+        </div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(6)">◀ Back</button>
+            <button class="wizard-btn-next" onclick="wizardNext(6)">Next: Review ▶</button>
+        </div>
+    </div>
+
+    <div class="wizard-step" id="wizard-step-7" data-step="7">
+        <div class="wizard-step-title">✅ Step 7: Review &amp; Save</div>
+        <div class="wizard-step-sub">Quick check before you start the round — tap any step above to jump back and change something.</div>
+        <div id="wizard-review-summary"></div>
+        <div class="wizard-nav-row">
+            <button class="wizard-btn-back" onclick="wizardBack(7)">◀ Back</button>
+        </div>
 
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
+    </div>
 
     <div class="end-box">
         <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
@@ -583,6 +659,89 @@
             document.documentElement.classList.add('dark-mode');
         }
     })();
+
+    // --- SETUP WIZARD ---
+    const WIZARD_TOTAL_STEPS = 7;
+    const WIZARD_STEP_LABELS = { 1: 'Course', 2: 'Length', 3: 'Format', 4: 'Settings', 5: 'Players', 6: 'Side Games', 7: 'Review' };
+    let currentWizardStep = 1;
+
+    function renderWizardProgress() {
+        const container = document.getElementById('wizard-progress');
+        if (!container) return;
+        let html = '';
+        for (let i = 1; i <= WIZARD_TOTAL_STEPS; i++) {
+            let cls = 'wizard-dot';
+            if (i === currentWizardStep) cls += ' active';
+            else if (i < currentWizardStep) cls += ' done';
+            html += `<div class="${cls}" onclick="goToWizardStep(${i})" title="${WIZARD_STEP_LABELS[i]}">${i}</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function goToWizardStep(n) {
+        if (n < 1 || n > WIZARD_TOTAL_STEPS) return;
+        currentWizardStep = n;
+        for (let i = 1; i <= WIZARD_TOTAL_STEPS; i++) {
+            const el = document.getElementById('wizard-step-' + i);
+            if (el) el.classList.toggle('active', i === n);
+        }
+        renderWizardProgress();
+        if (n === 7) renderWizardReview();
+        const progressEl = document.getElementById('wizard-progress');
+        if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function wizardNext(fromStep) {
+        if (fromStep === 1) {
+            const courseVal = document.getElementById('course-search-input').value.trim();
+            if (!courseVal) { alert('⚠️ Please select a golf course before continuing.'); return; }
+        }
+        if (fromStep === 3) {
+            const formatVal = document.getElementById('game-format-select').value;
+            if (!formatVal) { alert('⚠️ Please select a game format before continuing.'); return; }
+        }
+        goToWizardStep(fromStep + 1);
+    }
+
+    function wizardBack(fromStep) {
+        goToWizardStep(fromStep - 1);
+    }
+
+    function renderWizardReview() {
+        const container = document.getElementById('wizard-review-summary');
+        if (!container) return;
+
+        const roundDay = document.getElementById('round-day-select').value || 'Single Round';
+        const courseName = document.getElementById('course-search-input').value.trim() || 'Not selected';
+        const lengthSelect = document.getElementById('round-length-select');
+        const lengthMap = { '18': 'Full 18 Holes', 'front': 'Front 9 Only', 'back': 'Back 9 Only' };
+        const roundLength = lengthSelect ? (lengthMap[lengthSelect.value] || 'Full 18 Holes') : 'Full 18 Holes';
+        const formatSelect = document.getElementById('game-format-select');
+        const formatLabel = formatSelect && formatSelect.selectedIndex >= 0 ? formatSelect.options[formatSelect.selectedIndex].text : 'Not selected';
+        const playerCount = document.getElementById('player-count') ? document.getElementById('player-count').textContent : '0';
+        const birdieOn = document.getElementById('enable-birdiegame') && document.getElementById('enable-birdiegame').checked;
+        const kpOn = document.getElementById('enable-kpgame') && document.getElementById('enable-kpgame').checked;
+        let sideGamesText = 'None';
+        if (birdieOn && kpOn) sideGamesText = 'Birdie Game + KPs';
+        else if (birdieOn) sideGamesText = 'Birdie Game';
+        else if (kpOn) sideGamesText = 'KPs (Dollar Game)';
+
+        const rows = [
+            ['Round', roundDay, 1],
+            ['Course', courseName, 1],
+            ['Length', roundLength, 2],
+            ['Format', formatLabel, 3],
+            ['Players', `${playerCount} added`, 5],
+            ['Side Games', sideGamesText, 6],
+        ];
+
+        container.innerHTML = rows.map(([label, value, step]) => `
+            <div class="wizard-review-row">
+                <span class="wr-label">${label}</span>
+                <span class="wr-value">${value} <span class="wizard-edit-link" onclick="goToWizardStep(${step})">Edit</span></span>
+            </div>
+        `).join('');
+    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');
@@ -2042,6 +2201,9 @@
         navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
     }
 
+    renderWizardProgress();
+    goToWizardStep(1);
+
     if (currentMode) {
         generateQRCode();
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
@@ -2049,8 +2211,12 @@
             if (!data.players || data.players.length === 0) {
                 addPlayerRow(); 
                 regenerateGroupLinks();
+                // Fresh round, nothing saved yet - starting at Step 1 (already done above) is right.
             } else {
                 loadModeData(currentMode);
+                // loadModeData fetches its own data asynchronously, so give it a moment to actually
+                // populate the fields before building the review screen from them.
+                setTimeout(() => goToWizardStep(7), 600);
             }
         });
     }
