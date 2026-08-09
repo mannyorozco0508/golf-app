@@ -111,6 +111,14 @@
             -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
         .group-filter-bar::-webkit-scrollbar { display: none; }
+        .side-match-callout-link {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            background: var(--brand-navy); color: #fff; border-radius: 8px; padding: 10px 14px;
+            text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 6px;
+        }
+        .side-match-callout-link:last-child { margin-bottom: 0; }
+        .side-match-callout-arrow { font-size: 0.9rem; opacity: 0.8; flex-shrink: 0; }
+
         .hole-jump-nav {
             display: flex; gap: 4px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;
             -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -347,8 +355,14 @@
         <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
     </div>
 
+    <div id="spectator-hint-banner" style="display:none; background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; text-align:center; font-size:0.85rem; color: var(--text-main);">
+        👁️ You're viewing read-only. To enter scores, ask whoever set up the round for <strong>your group's link</strong> — they can grab it from the Home tab.
+    </div>
+
     <div class="round-body-layout" id="round-body-layout">
     <div class="status-panel" id="status-panel">
+        <div id="side-match-callout" style="display:none; margin-bottom: 10px;"></div>
+
         <div class="live-ticker-box">
             <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
             <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
@@ -631,6 +645,44 @@
         const navHeight = navEl ? navEl.offsetHeight : 0;
         const targetTop = target.getBoundingClientRect().top + window.pageYOffset;
         window.scrollTo({ top: targetTop - navHeight - 8, behavior: 'smooth' });
+    }
+
+    // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
+    // otherwise there's no way to know a Side Match is even running without a special trip to Matches.
+    function renderActiveSideMatchCallout(filteredPlayers, allPlayers) {
+        const container = document.getElementById('side-match-callout');
+        if (!container) return;
+
+        const sideMatches = currentData.sideMatches || {};
+        const filteredIds = filteredPlayers.map(p => String(p.id));
+        const groupParam = urlParams.get('group');
+        let smHref = `sidematches.html?game=${currentMode}`;
+        if (groupParam) smHref += `&group=${groupParam}`;
+
+        const lines = [];
+        Object.keys(sideMatches).forEach(matchId => {
+            const sm = sideMatches[matchId];
+            const teamAIds = (sm.teamAIds || []).map(String);
+            const teamBIds = (sm.teamBIds || []).map(String);
+            const onTeamA = teamAIds.some(id => filteredIds.includes(id));
+            const onTeamB = teamBIds.some(id => filteredIds.includes(id));
+            if (!onTeamA && !onTeamB) return;
+
+            const oppIds = onTeamA ? teamBIds : teamAIds;
+            const oppNames = oppIds.map(id => {
+                const p = allPlayers.find(pl => String(pl.id) === id);
+                return p ? p.name.split(' ')[0] : '?';
+            }).join(' & ');
+
+            lines.push(oppNames);
+        });
+
+        if (lines.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
+
+        container.style.display = 'block';
+        container.innerHTML = lines.map(opp =>
+            `<a href="${smHref}" class="side-match-callout-link">⚔️ Side Match vs ${opp} <span class="side-match-callout-arrow">Tap to view ▶</span></a>`
+        ).join('');
     }
 
     function jumpToHole(holeNum) {
@@ -1709,14 +1761,18 @@
         const isMultiGroupRound = players.length > 4;
 
         const lockBadge = document.getElementById("group-lock-badge");
+        const spectatorBanner = document.getElementById("spectator-hint-banner");
         if (lockedGroup) {
             lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
             lockBadge.style.display = "inline-block";
+            if (spectatorBanner) spectatorBanner.style.display = "none";
         } else if (isMultiGroupRound) {
             lockBadge.textContent = `👁️ Spectator View (Read-Only)`;
             lockBadge.style.display = "inline-block";
+            if (spectatorBanner) spectatorBanner.style.display = "block";
         } else {
             lockBadge.style.display = "none";
+            if (spectatorBanner) spectatorBanner.style.display = "none";
         }
         
         let scoringType = "net";
@@ -1738,6 +1794,7 @@
             filteredPlayers = players.slice(startIdx, startIdx + size);
         }
         window.__scFilteredPlayers = filteredPlayers;
+        renderActiveSideMatchCallout(filteredPlayers, players);
 
         renderHoleJumpNav(courseData, savedScores, filteredPlayers);
 
@@ -1877,7 +1934,6 @@
                 }
 
                 const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);
-                const lockIconHtml = isLocked ? `<div style="position:absolute; top:-6px; right:-8px; font-size:11px; z-index:6;">🔒</div>` : "";
                 const scoreInputHtml = isLocked
                     ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" disabled>`
                     : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)" oninput="handleScoreInput(this)">`;
@@ -1889,7 +1945,6 @@
                             <div class="score-input-wrapper">
                                 ${scoreInputHtml}
                                 ${shapeHtml}
-                                ${lockIconHtml}
                             </div>
                             ${currentToParHtml}
                             <div class="stroke-dots">${handicapDots}</div>
