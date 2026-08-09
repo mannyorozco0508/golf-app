@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trip & Round Setup - Home</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 650px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h2, h3 { color: var(--brand-green); margin-top: 0; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
+        
+        /* Top Navigation Bar */
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+
+        /* Lobby Styles */
+        #lobby-screen { text-align: center; padding: 30px 15px; }
+        .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .lobby-title { font-size: 2rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; }
+        .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
+        .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
+        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid var(--border-mid) !important; border-radius: 10px !important; padding: 14px !important; background: var(--nav-bg) !important; color: var(--text-main) !important; }
+        .join-input:focus { border-color: var(--brand-green) !important; outline: none; background: var(--bg-card) !important; }
+
+        /* Admin Styles */
+        .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
+        
+        input[type="text"], input[type="number"], input[type="tel"], select { 
+            width: 100%; padding: 10px; border: 1px solid var(--input-disabled-border); 
+            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
+        }
+
+        .custom-select-wrapper { position: relative; }
+        .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
+        #course-search-input { width: 100%; padding: 10px 30px 10px 10px; border: 1px solid var(--input-disabled-border); border-radius: 6px; font-size: 16px; background-color: var(--bg-card); color: var(--text-main); box-sizing: border-box; cursor: text; }
+        #course-search-input:focus { border-color: var(--accent-teal); outline: none; background-color: var(--nassau-box-bg); border-bottom-left-radius: 0; border-bottom-right-radius: 0;}
+        .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal); border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px var(--shadow-color); }
+        .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; color: var(--text-main); }
+        .custom-select-option:last-child { border-bottom: none; }
+        .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .custom-select-group { background: var(--bg-page); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
+        .custom-select-add-option { text-align: center; color: var(--brand-green); font-weight: bold; }
+
+        .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
+
+        /* Compact binary toggle switch - replaces two-option dropdowns */
+        .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .toggle-row.toggle-row-center { justify-content: center; }
+        .toggle-label-sm { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        .toggle-label-sm.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch.toggle-switch-sm { width: 36px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .toggle-switch.toggle-switch-sm .toggle-slider:before { height: 14px; width: 14px; }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+        .toggle-switch.toggle-switch-sm input:checked + .toggle-slider:before { transform: translateX(16px); }
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
+
+        .share-box { background: var(--nassau-box-bg); border: 2px dashed var(--brand-green); border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
+        .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
+        .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
+        .end-box { background: var(--danger-box-bg); border: 2px dashed var(--accent-red); border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
+        #qrcode { display: flex; justify-content: center; margin: 12px 0; }
+        #qrcode img { border: 4px solid white; border-radius: 8px; }
+        
+        .player-row { display: grid; gap: 6px; align-items: center; margin-bottom: 10px; }
+        .grid-stroke { grid-template-columns: 2fr 1fr 38px; }
+        .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
+        .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
+
+        .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
+        .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
+        .btn-primary:hover { background-color: #125d48; }
+        .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .btn-outline:hover { background-color: var(--nav-bg); }
+
+        /* Custom Course Grid Inputs */
+        .grid-input { width: 34px !important; padding: 6px 2px !important; text-align: center; border: 1px solid var(--input-disabled-border); border-radius: 4px; font-size: 0.85rem !important; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main); }
+        .grid-input:focus { border-color: var(--brand-green); outline: none; background: var(--nassau-box-bg); }
+
+        /* Secret Panel Styles */
+        #secret-master-panel { display: none; background: var(--brand-navy); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
+        #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="lobby-screen">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
+    <div class="lobby-title">GolfApp</div>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
+    
+    <!-- SECRET BETA CONTROL PANEL -->
+    <div id="secret-master-panel">
+        <h3>🔐 Master Beta Switch</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Set the global expiration date. Anyone opening the app after this date gets locked out.</p>
+        <input type="date" id="secret-exp-date" style="margin-bottom: 12px;">
+        <button class="btn-primary" style="background-color: var(--accent-red);" onclick="updateBetaExpiration()">💾 Force Update Date</button>
+        
+        <h3 style="margin-top: 20px;">☁️ Sync Courses to Firebase</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Push all pre-coded local courses to the global database.</p>
+        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="syncPresetsToFirebase()">📤 Push to Global Database</button>
+
+        <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
+        <button class="btn-primary" style="background-color: var(--bg-card); color: var(--brand-navy);" onclick="shareMainApp()">📤 Share App Link</button>
+
+        <h3 style="margin-top: 20px;">🏆 Tournament Mode</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">In development — multi-team events with a shared leaderboard.</p>
+        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="window.location.href='tournament.html'">🏆 Enter Tournament Mode</button>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <span style="font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
+        </div>
+    </div>
+
+    <!-- RESUME GAME BOX -->
+    <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid var(--border-light);">
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
+        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
+    </div>
+
+    <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
+
+    <div class="lobby-divider"><span>OR</span></div>
+    
+    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
+    <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
+</div>
+
+<div class="container" id="admin-screen" style="display: none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <!-- Top Navigation Bar -->
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="sidematches.html" class="top-nav-item nav-link">⚔️ Matches</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
+        <a href="admin.html" class="top-nav-item active nav-link">⚙️ Home</a>
+    </div>
+
+    <div style="text-align: center; margin-top: 10px;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Game Code</span>
+        <div class="room-badge" id="display-room-code">----</div>
+    </div>
+
+    <div class="share-box">
+        <h3>📲 Share Link with Group</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
+        <div id="qrcode"></div>
+        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
+    </div>
+
+    <div class="share-box" id="group-links-box" style="display:none; border-color:var(--accent-red);">
+        <h3>🔒 Group Scorekeeper Links</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
+        <div id="group-links-list"></div>
+    </div>
+
+    <div class="form-group">
+        <label>Round / Day #</label>
+        <select id="round-day-select">
+            <option value="Single Round">Single Round</option>
+            <option value="Day 1 - Round 1">Day 1 - Round 1</option>
+            <option value="Day 1 - Round 2">Day 1 - Round 2</option>
+            <option value="Day 2 - Round 1">Day 2 - Round 1</option>
+            <option value="Day 2 - Round 2">Day 2 - Round 2</option>
+            <option value="Day 3 - Round 1">Day 3 - Round 1</option>
+            <option value="Day 4 - Final Round">Day 4 - Final Round</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Select Golf Course for Active Game</label>
+        <div class="custom-select-wrapper" id="course-wrapper">
+            <input type="text" id="course-search-input" placeholder="-- Search / Select Golf Course --" autocomplete="off">
+            <input type="hidden" id="course-select" value="">
+            <div class="custom-select-dropdown" id="course-dropdown"></div>
+        </div>
+
+        <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
+            <label style="color:var(--brand-green); font-size: 0.8rem;">Round Length</label>
+            <select id="round-length-select" style="border-color:var(--accent-teal);">
+                <option value="18">Full 18 Holes</option>
+                <option value="front">Front 9 Only (Out)</option>
+                <option value="back">Back 9 Only (In)</option>
+            </select>
+        </div>
+
+        <div id="nine-loop-selector" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🔄 Modular 9-Hole Loop Selector</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">Front 9</label><select id="front-nine-select"></select></div>
+                <div><label style="font-size: 0.8rem;">Back 9</label><select id="back-nine-select"></select></div>
+            </div>
+        </div>
+        
+        <!-- DYNAMIC COURSE EDITOR -->
+        <div class="extra-settings-box" style="display: block; margin-top: 12px; padding: 12px 10px;">
+            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-custom-course" onchange="document.getElementById('custom-course-container').style.display = this.checked ? 'block' : 'none';" style="width: 18px; height: 18px; margin: 0;">
+                <strong>✏️ Review / Edit Course Pars & Handicaps</strong>
+            </label>
+            <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
+                <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+
+                <input type="file" accept="image/*" capture="environment" id="scorecard-photo-input" style="display:none;" onchange="handleScorecardPhoto(event)">
+                <button type="button" class="btn-add" style="margin-bottom:8px;" onclick="document.getElementById('scorecard-photo-input').click();">📷 Scan Scorecard Photo (Beta)</button>
+                <div id="ocr-status" style="display:none; font-size:0.78rem; padding:8px 10px; border-radius:6px; margin-bottom:10px; font-weight:bold;"></div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Front 9 -->
+                    <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
+                        <tr style="background:var(--border-light);"><th style="padding:6px; text-align:left;">Out</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>OUT</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid var(--border-faint);">Par</th>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-1" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-2" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-3" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-4" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-5" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-6" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-7" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-8" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-9" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-out-val">36</td>
+                        </tr>
+                        <tr><th style="padding:6px; text-align:left;">HCP</th>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-1" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-2" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-3" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-4" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-5" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-6" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-7" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-8" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-9" class="grid-input" onfocus="this.select()"></td>
+                            <td style="background:var(--bg-page);"></td>
+                        </tr>
+                    </table>
+
+                    <!-- Back 9 -->
+                    <table style="border-collapse: collapse; text-align: center; font-size: 0.8rem; width: 100%; min-width: 400px;">
+                        <tr style="background:var(--border-light);"><th style="padding:6px; text-align:left;">In</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>IN</th><th>TOT</th></tr>
+                        <tr><th style="padding:6px; text-align:left; border-bottom: 1px solid var(--border-faint);">Par</th>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-10" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-11" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-12" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-13" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-14" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-15" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-16" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-17" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint);"><input type="tel" inputmode="numeric" id="c-par-18" class="grid-input" onfocus="this.select()" oninput="updateCustomCoursePars()"></td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-in-val">36</td>
+                            <td style="border-bottom: 1px solid var(--border-faint); font-weight:bold; background:var(--bg-page);" id="c-par-tot-val">72</td>
+                        </tr>
+                        <tr><th style="padding:6px; text-align:left;">HCP</th>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-10" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-11" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-12" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-13" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-14" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-15" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-16" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-17" class="grid-input" onfocus="this.select()"></td>
+                            <td><input type="tel" inputmode="numeric" id="c-hcp-18" class="grid-input" onfocus="this.select()"></td>
+                            <td style="background:var(--bg-page);"></td>
+                            <td style="background:var(--bg-page);"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Game Format</label>
+        <select id="game-format-select" onchange="handleFormatChange()">
+            <option value="" disabled selected>-- Select Game Format --</option>
+            <option value="stroke">Stroke Play (Gross & Net)</option>
+            <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
+            <option value="hilo">♠️ Hi-Lo (Low Ball / High Ball)</option>
+            <option value="dots">🔴 Dot Game (Garbage/Junk)</option>
+            <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
+            <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
+            <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
+            <option value="bestball">2-Man Best Ball (Four-Ball)</option>
+            <option value="scramble">4-Man Scramble</option>
+            <option value="stableford">Net Stableford Points</option>
+            <option value="skins">🥩 Skins Game (Gross & Net)</option>
+        </select>
+
+        <div id="hole-bet-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
+                <strong>💵 Enable Per-Hole Bet Option</strong>
+            </label>
+            <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+                <div class="grid-2col">
+                    <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1"></div>
+                </div>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0;">
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">Side Games — run independently, no matter what's set above</p>
+
+        <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>🐦 Birdie Game</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores.</p>
+            <div style="margin: 0 0 12px 26px; max-width: 200px;">
+                <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
+                <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
+            </div>
+
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
+                <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
+                <strong>📍 Dollar Game (KPs)</strong>
+            </label>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin pot on Par 3s. Set up on the Action tab.</p>
+        </div>
+        <hr style="border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0 0 0;">
+
+        <div id="match-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
+            <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.75rem;">Scoring Type</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="match-scoring-label-net" onclick="setMatchScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="match-scoring-switch" onchange="setMatchScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="match-scoring-label-gross" onclick="setMatchScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="match-scoring" value="net">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
+                    <input type="number" id="match-stake" value="" min="0" placeholder="0">
+                </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <label style="font-size: 0.75rem;">Auto-Press Rule</label>
+                <select id="match-press-rule">
+                    <option value="none">No Auto-Press</option>
+                    <option value="2down" selected>Auto @ 2 Down</option>
+                    <option value="1down">Auto @ 1 Down</option>
+                </select>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
+            <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;"><strong>🔥 Manual Press:</strong> No matter which rule you pick above, a "Press" button is always available on the scorecard so you can start a press on any hole, any time.</p>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
+        </div>
+
+        <div id="nassau-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">💵 Nassau Bet Options</label>
+            <div class="grid-3col">
+                <div>
+                    <label style="font-size: 0.75rem;">Match Type</label>
+                    <select id="nassau-type" onchange="renderPlayerList(false)">
+                        <option value="team">2v2 Team (Best Ball)</option>
+                        <option value="1v1">1v1 Match</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem;">Scoring Type</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="nassau-scoring-label-net" onclick="setNassauScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="nassau-scoring-switch" onchange="setNassauScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="nassau-scoring-label-gross" onclick="setNassauScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="nassau-scoring" value="net">
+                </div>
+                <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
+            </div>
+            <div style="margin-top: 8px;">
+                <label style="font-size: 0.75rem;">Press Rule</label>
+                <select id="nassau-press-rule">
+                    <option value="2down">Auto @ 2 Down</option>
+                    <option value="1down">Auto @ 1 Down</option>
+                    <option value="anytime">Press Any Hole</option>
+                    <option value="none">No Press</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="wolf-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🐺 Wolf Game Options</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">Point Value ($)</label><input type="number" id="wolf-point-value" value="" min="0" placeholder="0"></div>
+                <div>
+                    <label style="font-size: 0.8rem;">Lone Wolf Win</label>
+                    <select id="wolf-lone-mult">
+                        <option value="2">2x Points</option>
+                        <option value="3">3x Points</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div>
+                    <label style="font-size: 0.8rem;">🙈 Blind Wolf Win</label>
+                    <select id="wolf-blind-mult">
+                        <option value="3">3x Points</option>
+                        <option value="4">4x Points</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">Tied Hole Rule</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="wolf-tie-rule-label-carry" onclick="setWolfTieRule('carry')">Carry</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="wolf-tie-rule-switch" onchange="setWolfTieRule(this.checked ? 'void' : 'carry')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="wolf-tie-rule-label-void" onclick="setWolfTieRule('void')">Void</span>
+                    </div>
+                    <input type="hidden" id="wolf-tie-rule" value="carry">
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <label style="font-size: 0.8rem;">Last-Place Wolf Rule (Holes 17 &amp; 18)</label>
+                <select id="wolf-lastplace-rule">
+                    <option value="off">Off — Normal Rotation</option>
+                    <option value="on">On — Last Place Becomes Wolf</option>
+                </select>
+            </div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+                🙈 Blind Wolf: caller picks lone wolf before anyone tees off. Wolf order rotates through your player list each hole 1-4, repeating.
+            </div>
+        </div>
+
+        <div id="stableford-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Stableford Points</label>
+            <div class="grid-2col">
+                <div>
+                    <label style="font-size: 0.8rem;">Scoring</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label-sm active" id="stableford-scoring-label-net" onclick="setStablefordScoring('net')">Net</span>
+                        <label class="toggle-switch toggle-switch-sm">
+                            <input type="checkbox" id="stableford-scoring-switch" onchange="setStablefordScoring(this.checked ? 'gross' : 'net')">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label-sm" id="stableford-scoring-label-gross" onclick="setStablefordScoring('gross')">Gross</span>
+                    </div>
+                    <input type="hidden" id="stableford-scoring" value="net">
+                </div>
+                <div><label style="font-size: 0.8rem;">$ Per Point</label><input type="number" id="stableford-point-value" value="" min="0" placeholder="0"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Double Bogey+</label><input type="number" id="stableford-pts-other" value="0" min="0" step="1"></div>
+                <div><label style="font-size: 0.8rem;">Bogey</label><input type="number" id="stableford-pts-bogey" value="1" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Par</label><input type="number" id="stableford-pts-par" value="2" min="0" step="1"></div>
+                <div><label style="font-size: 0.8rem;">Birdie</label><input type="number" id="stableford-pts-birdie" value="3" min="0" step="1"></div>
+            </div>
+            <div class="grid-2col" style="margin-top:8px;">
+                <div><label style="font-size: 0.8rem;">Eagle</label><input type="number" id="stableford-pts-eagle" value="5" min="0" step="1"></div>
+                <div><label style="font-size: 0.8rem;">Albatross</label><input type="number" id="stableford-pts-albatross" value="10" min="0" step="1"></div>
+            </div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+                Points based on score vs. par on each hole — choose Net (score minus handicap strokes) or Gross (raw score) above. Point defaults shown are our house standard — edit any value to customize for this round.
+            </div>
+        </div>
+
+        <div id="dot-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🔴 Dot Game Options</label>
+            <div class="grid-2col">
+                <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
+            </div>
+        </div>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid var(--border-faint); margin: 20px 0;">
+
+    <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
+    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
+    <div id="player-list"></div>
+    <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
+
+    <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
+    <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
+
+    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
+
+    <div class="end-box">
+        <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
+        <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
+        <button class="btn-danger" onclick="endAndClearRound()">📥 End & Wipe Round</button>
+    </div>
+</div>
+
+<script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+                btn.textContent = '☀️ Light Mode';
+            });
+        }
+    });
+    // ------------------
+
+    // Fetch Global Courses immediately
+    let globalCourses = {};
+    db.ref('global_courses').on('value', (snap) => {
+        globalCourses = snap.val() || {};
+        if(document.getElementById('course-search-input').value.length > 0) {
+            populateCourseDropdown(document.getElementById('course-search-input').value);
+        }
+    });
+
+    // GPS-based "near you" course sorting has been turned off — no location prompt.
+    // Course dropdown falls back to the default region order.
+    let userCoords = null;
+
+    db.ref('app_settings/beta_expiration').once('value').then((snapshot) => {
+        const expDateStr = snapshot.val();
+        const cutoffDate = expDateStr ? new Date(expDateStr) : new Date("2026-09-01T00:00:00");
+        
+        if (new Date() > cutoffDate) {
+            document.body.innerHTML = `
+                <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                    <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                    <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                    <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+                </div>`;
+            throw new Error("Beta period expired.");
+        }
+    });
+
+    // --- SECRET TAP LOGIC ---
+    let tapCount = 0;
+    function handleSecretTap() {
+        tapCount++;
+        if (tapCount >= 5) {
+            document.getElementById('secret-master-panel').style.display = 'block';
+            tapCount = 0;
+            db.ref('app_settings/beta_expiration').once('value').then(snap => {
+                const current = snap.val();
+                if(current) document.getElementById('secret-exp-date').value = current.split('T')[0];
+            });
+        }
+    }
+
+    function updateBetaExpiration() {
+        const dateVal = document.getElementById('secret-exp-date').value;
+        if(!dateVal) return alert('Select a valid date!');
+        const fullDateStr = dateVal + "T00:00:00";
+        db.ref('app_settings/beta_expiration').set(fullDateStr).then(() => {
+            alert("✅ Beta expiration successfully updated to " + dateVal);
+            document.getElementById('secret-master-panel').style.display = 'none';
+        }).catch(err => alert("Error: " + err.message));
+    }
+
+    function syncPresetsToFirebase() {
+        const updates = {};
+        Object.keys(coursePresets).forEach(key => {
+            updates[key] = {
+                name: coursePresets[key].name,
+                data: coursePresets[key].data
+            };
+        });
+        
+        db.ref('global_courses').update(updates).then(() => {
+            alert("✅ All preset courses successfully synced to Firebase global database!");
+            document.getElementById('secret-master-panel').style.display = 'none';
+        }).catch(err => {
+            alert("Error: " + err.message);
+        });
+    }
+    // -------------------------
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+    let currentCategory = "weekend";
+    
+    let storedPlayersTemp = [];
+    let groupSizeOverrides = {}; // sparse: { groupIndex(0-based): explicitSize }
+    const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
+
+    if (!currentMode) {
+        document.getElementById("lobby-screen").style.display = "block";
+        document.getElementById("admin-screen").style.display = "none";
+        
+        const lastRoom = localStorage.getItem('lastRoomCode');
+        if (lastRoom) {
+            document.getElementById("resume-container").style.display = "block";
+            document.getElementById("resume-room-badge").textContent = lastRoom;
+        }
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("lobby-screen").style.display = "none";
+        document.getElementById("admin-screen").style.display = "block";
+        document.getElementById("display-room-code").textContent = currentMode;
+        localStorage.setItem('lastRoomCode', currentMode);
+        
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            let navHref = base + '?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) navHref += '&group=' + groupParam;
+            link.href = navHref;
+        });
+
+        loadModeData(currentMode);
+    }
+
+    function resumeGame() {
+        const lastRoom = localStorage.getItem('lastRoomCode');
+        if (lastRoom) {
+            window.location.href = `index.html?game=${lastRoom}`;
+        }
+    }
+
+    function shareMainApp() {
+        const baseUrl = window.location.href.split('?')[0];
+        const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
+        
+        if (navigator.share) {
+            navigator.share({ title: `GolfApp Beta`, text: textMsg, url: baseUrl }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
+        }
+    }
+
+    // Generic helper for the compact binary toggle switches (Net/Gross, Carry/Void, etc.)
+    // Keeps a hidden input's value in sync with the switch position and label highlighting.
+    function syncToggle(hiddenId, switchId, leftLabelId, rightLabelId, leftVal) {
+        const val = document.getElementById(hiddenId).value;
+        document.getElementById(switchId).checked = (val !== leftVal);
+        document.getElementById(leftLabelId).classList.toggle('active', val === leftVal);
+        document.getElementById(rightLabelId).classList.toggle('active', val !== leftVal);
+    }
+
+    function setMatchScoring(val) {
+        document.getElementById('match-scoring').value = val;
+        syncToggle('match-scoring', 'match-scoring-switch', 'match-scoring-label-net', 'match-scoring-label-gross', 'net');
+    }
+
+    function setNassauScoring(val) {
+        document.getElementById('nassau-scoring').value = val;
+        syncToggle('nassau-scoring', 'nassau-scoring-switch', 'nassau-scoring-label-net', 'nassau-scoring-label-gross', 'net');
+    }
+
+    function setWolfTieRule(val) {
+        document.getElementById('wolf-tie-rule').value = val;
+        syncToggle('wolf-tie-rule', 'wolf-tie-rule-switch', 'wolf-tie-rule-label-carry', 'wolf-tie-rule-label-void', 'carry');
+    }
+
+    function setStablefordScoring(val) {
+        document.getElementById('stableford-scoring').value = val;
+        syncToggle('stableford-scoring', 'stableford-scoring-switch', 'stableford-scoring-label-net', 'stableford-scoring-label-gross', 'net');
+    }
+
+    function toggleHoleBet() {
+        document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
+    }
+
+    function generateRoomCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let code = "";
+        for (let i = 0; i < 4; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
+        return code;
+    }
+
+    function createRoom() {
+        const newCode = generateRoomCode();
+        window.location.href = `admin.html?game=${newCode}`;
+    }
+
+    function joinRoom() {
+        const inputCode = document.getElementById("join-room-input").value.trim().toUpperCase();
+        if (inputCode.length < 2) {
+            alert("⚠️ Please enter a valid game code.");
+            return;
+        }
+        window.location.href = `admin.html?game=${inputCode}`;
+    }
+
+    const courseDirectory = [
+        { group: "🌲 SW Washington, Gorge & Portland (Camas Area)", items: [
+            { id: "swwa_camasmeadows", name: "Camas Meadows Golf Club" },
+            { id: "swwa_trimountain", name: "Tri-Mountain Golf Course" },
+            { id: "swwa_lewisriver", name: "Lewis River Golf Course" },
+            { id: "swwa_mintvalley", name: "Mint Valley Golf Course" },
+            { id: "swwa_threerivers", name: "Three Rivers Golf Course" },
+            { id: "swwa_elkridge", name: "Elk Ridge Golf Course" },
+            { id: "swwa_tahoma_valley", name: "Tahoma Valley Golf Course (Yelm)" },
+            { id: "swwa_skamania", name: "Skamania Lodge Golf Course" },
+            { id: "swwa_beaconrock", name: "Beacon Rock Golf Course" },
+            { id: "swwa_cedars", name: "The Cedars at Salmon Creek" },
+            { id: "swwa_fairwayvillage", name: "Fairway Village Golf Course" },
+            { id: "swwa_orchardhills", name: "Orchard Hills Country Club" },
+            { id: "swwa_royaloaks", name: "Royal Oaks Country Club" },
+            { id: "or_indiancreek", name: "Indian Creek Golf Course (Hood River)" },
+            { id: "or_hoodriver", name: "Hood River Golf Course" },
+            { id: "or_stonecreek", name: "Stone Creek Golf Club (Oregon City)" },
+            { id: "or_wildwood", name: "Wildwood Golf Course" },
+            { id: "or_glendoveer_east", name: "Glendoveer Golf Course (East)" },
+            { id: "or_glendoveer_west", name: "Glendoveer Golf Course (West)" },
+            { id: "or_heronlakes_blue", name: "Heron Lakes (Great Blue)" },
+            { id: "or_heronlakes_greenback", name: "Heron Lakes (Greenback)" },
+            { id: "or_broadmoor_pdx", name: "Broadmoor Golf Course (Portland)" },
+            { id: "or_colwood", name: "Colwood Golf Center" },
+            { id: "or_rosecity", name: "Rose City Golf Course" },
+            { id: "or_eastmoreland", name: "Eastmoreland Golf Course" },
+            { id: "or_columbiaedgewater", name: "Columbia Edgewater Country Club" },
+            { id: "or_riverside", name: "Riverside Golf & Country Club" },
+            { id: "or_pumpkin_ghost", name: "Pumpkin Ridge (Ghost Creek)" },
+            { id: "or_pumpkin_witch", name: "Pumpkin Ridge (Witch Hollow)" },
+            { id: "or_langdonfarms", name: "Langdon Farms Golf Club" },
+            { id: "or_reserve_north", name: "The Reserve Vineyards (North)" },
+            { id: "or_reserve_south", name: "The Reserve Vineyards (South)" },
+            { id: "or_ogagolf", name: "OGA Golf Course (Woodburn)" },
+            { id: "or_chehalem", name: "Chehalem Glenn Golf Course" },
+            { id: "or_redtail", name: "RedTail Golf Center" },
+            { id: "or_oregoncitygc", name: "Oregon City Golf Club" },
+            { id: "or_waverley", name: "Waverley Country Club" },
+            { id: "or_portlandgc", name: "Portland Golf Club" },
+            { id: "or_tualatincc", name: "Tualatin Country Club" },
+            { id: "or_meriwether", name: "Meriwether National Golf Club" },
+            { id: "or_quailvalley", name: "Quail Valley Golf Course" },
+            { id: "or_mtview_boring", name: "Mountain View Golf Course (Boring)" }
+        ]},
+        { group: "🏖️ Myrtle Beach Trip", items: [
+            { id: "caledonia", name: "Caledonia Golf & Fish Club" },
+            { id: "trueblue", name: "True Blue Golf Club" },
+            { id: "pinelakes", name: "Pine Lakes Country Club" },
+            { id: "pinehills", name: "Myrtlewood - Pine Hills" },
+            { id: "thistle_27", name: "Thistle Golf Club (NC - 27 Hole)" },
+            { id: "prestwick", name: "Prestwick Country Club" },
+            { id: "manofwar", name: "Man O' War Golf Club" }
+        ]},
+        { group: "🌵 Arizona (Phoenix / Scottsdale)", items: [
+            { id: "az_tpc_stadium", name: "TPC Scottsdale (Stadium)" },
+            { id: "az_tpc_champions", name: "TPC Scottsdale (Champions)" },
+            { id: "az_troon_monument", name: "Troon North (Monument)" },
+            { id: "az_troon_pinnacle", name: "Troon North (Pinnacle)" },
+            { id: "az_wekopa_cholla", name: "We-Ko-Pa (Cholla)" },
+            { id: "az_wekopa_saguaro", name: "We-Ko-Pa (Saguaro)" },
+            { id: "az_grayhawk_raptor", name: "Grayhawk (Raptor)" },
+            { id: "az_grayhawk_talon", name: "Grayhawk (Talon)" },
+            { id: "az_papago", name: "Papago Golf Club" },
+            { id: "az_talking_oodham", name: "Talking Stick Golf Club (O'odham)" },
+            { id: "az_talking_piipaash", name: "Talking Stick Golf Club (Piipaash)" },
+            { id: "az_quintero", name: "Quintero Golf Club" },
+            { id: "az_camelback_ambiente", name: "Camelback (Ambiente)" },
+            { id: "az_camelback_padre", name: "Camelback (Padre)" },
+            { id: "az_boulders_north", name: "The Boulders (North)" },
+            { id: "az_boulders_south", name: "The Boulders (South)" },
+            { id: "az_wickenburg", name: "Wickenburg Ranch" },
+            { id: "az_akchin", name: "Ak-Chin Southern Dunes" },
+            { id: "az_raven", name: "Raven Golf Club" },
+            { id: "az_goldcanyon_dinosaur", name: "Gold Canyon (Dinosaur Mountain)" },
+            { id: "az_goldcanyon_sidewinder", name: "Gold Canyon (Sidewinder)" },
+            { id: "az_starfire", name: "Starfire Golf Club" },
+            { id: "az_mccormick_palm", name: "McCormick Ranch (Palm)" },
+            { id: "az_mccormick_pine", name: "McCormick Ranch (Pine)" },
+            { id: "az_biltmore_adobe", name: "Arizona Biltmore (Adobe)" },
+            { id: "az_biltmore_links", name: "Arizona Biltmore (Links)" },
+            { id: "az_wildfire_palmer", name: "Wildfire (Palmer)" },
+            { id: "az_wildfire_faldo", name: "Wildfire (Faldo)" },
+            { id: "az_phoenician", name: "The Phoenician" },
+            { id: "az_superstition", name: "Superstition Mountain" }
+        ]},
+        { group: "🌲 Washington (Seattle / Tacoma Top 50)", items: [
+            { id: "wa_chambers", name: "Chambers Bay" },
+            { id: "wa_gold_olympic", name: "Gold Mountain (Olympic)" },
+            { id: "wa_gold_cascade", name: "Gold Mountain (Cascade)" },
+            { id: "wa_homecourse", name: "The Home Course" },
+            { id: "wa_salish", name: "Salish Cliffs" },
+            { id: "wa_newcastle_coal", name: "Newcastle (Coal Creek)" },
+            { id: "wa_newcastle_china", name: "Newcastle (China Creek)" },
+            { id: "wa_wanational", name: "Washington National" },
+            { id: "wa_tpc_snoqualmie", name: "TPC Snoqualmie Ridge" },
+            { id: "wa_sahalee", name: "Sahalee Country Club" },
+            { id: "wa_broadmoor", name: "Broadmoor Golf Club" },
+            { id: "wa_seattle_gc", name: "Seattle Golf Club" },
+            { id: "wa_meridian", name: "Meridian Valley Country Club" },
+            { id: "wa_tacoma_cgc", name: "Tacoma Country & Golf Club" },
+            { id: "wa_redmond_ridge", name: "The Golf Club at Redmond Ridge" },
+            { id: "wa_harbour_pointe", name: "Harbour Pointe Golf Club" },
+            { id: "wa_druids_glen", name: "Druids Glen" },
+            { id: "wa_port_ludlow", name: "Port Ludlow" },
+            { id: "wa_white_horse", name: "White Horse Golf Club" },
+            { id: "wa_jefferson_park", name: "Jefferson Park" },
+            { id: "wa_west_seattle", name: "West Seattle Golf Course" },
+            { id: "wa_jackson_park", name: "Jackson Park" },
+            { id: "wa_interbay", name: "Interbay Golf Center" },
+            { id: "wa_foster", name: "Foster Golf Links" },
+            { id: "wa_high_cedars", name: "High Cedars Golf Club" },
+            { id: "wa_madrona", name: "Madrona Links" },
+            { id: "wa_spanaway", name: "Lake Spanaway" },
+            { id: "wa_meadow_park", name: "Meadow Park" },
+            { id: "wa_oakbrook", name: "Oakbrook Golf Club" },
+            { id: "wa_allenmore", name: "Allenmore Golf Course" },
+            { id: "wa_riverbend", name: "Riverbend Golf Complex" },
+            { id: "wa_maplewood", name: "Maplewood Golf Course" },
+            { id: "wa_cedarcrest", name: "Cedarcrest Golf Course" },
+            { id: "wa_eaglemont", name: "Eaglemont Golf Course" },
+            { id: "wa_semiahmoo", name: "Semiahmoo" },
+            { id: "wa_loomis", name: "Loomis Trail" },
+            { id: "wa_bellingham_gcc", name: "Bellingham G&CC" },
+            { id: "wa_north_bellingham", name: "North Bellingham" },
+            { id: "wa_twin_lakes", name: "Twin Lakes G&CC" },
+            { id: "wa_enumclaw", name: "Enumclaw Golf Course" },
+            { id: "wa_twin_rivers", name: "Twin Rivers" },
+            { id: "wa_mount_si", name: "Mount Si Golf Course" },
+            { id: "wa_snohomish", name: "Snohomish Golf Course" },
+            { id: "wa_willows_coyote", name: "Willows Run (Coyote Creek)" },
+            { id: "wa_willows_eagle", name: "Willows Run (Eagle's Talon)" },
+            { id: "wa_bellevue", name: "Bellevue Golf Course" },
+            { id: "wa_overlake", name: "Overlake G&CC" },
+            { id: "wa_fairwood", name: "Fairwood G&CC" },
+            { id: "eaglespride_redblue", name: "Eagle's Pride (Red/Blue)" },
+            { id: "eaglespride_redgreen", name: "Eagle's Pride (Red/Green)" }
+        ]},
+        { group: "🌴 Florida (Miami / Hollywood)", items: [
+            { id: "emerald_hills", name: "The Club at Emerald Hills" },
+            { id: "hollywood_beach", name: "Hollywood Beach Golf Club" }
+        ]},
+        { group: "🌲 Connecticut / Local (Milford Area)", items: [
+            { id: "oaklane", name: "Tradition at Oak Lane" },
+            { id: "orangehills", name: "Orange Hills Country Club" },
+            { id: "grassyhill", name: "Grassy Hill Country Club" },
+            { id: "greatriver", name: "Great River Golf Club" },
+            { id: "yale", name: "The Course at Yale" },
+            { id: "millriver", name: "Mill River Country Club" },
+            { id: "fairchild_black", name: "Fairchild Wheeler - Black" },
+            { id: "fairchild_red", name: "Fairchild Wheeler - Red" },
+            { id: "tashuaknolls", name: "Tashua Knolls Golf Course" },
+            { id: "whitneyfarms", name: "Whitney Farms Golf Course" }
+        ]}
+    ];
+
+    const courseSearchInput = document.getElementById('course-search-input');
+    const courseDropdown = document.getElementById('course-dropdown');
+    const courseHiddenSelect = document.getElementById('course-select');
+
+    function buildCourseOptionRow(id, name) {
+        const optionDiv = document.createElement("div");
+        optionDiv.className = "custom-select-option";
+        optionDiv.textContent = name;
+        optionDiv.onclick = () => { selectCourse(id, name); };
+        return optionDiv;
+    }
+
+    // Rough center point for each regional group, used to guess which one is closest to the player
+    const regionCenters = {
+        "🌲 SW Washington, Gorge & Portland (Camas Area)": { lat: 45.586, lon: -122.435 },
+        "🏖️ Myrtle Beach Trip": { lat: 33.689, lon: -78.887 },
+        "🌵 Arizona (Phoenix / Scottsdale)": { lat: 33.494, lon: -111.926 },
+        "🌲 Washington (Seattle / Tacoma Top 50)": { lat: 47.253, lon: -122.444 },
+        "🌴 Florida (Miami / Hollywood)": { lat: 26.011, lon: -80.150 },
+        "🌲 Connecticut / Local (Milford Area)": { lat: 41.222, lon: -73.057 }
+    };
+
+    function haversineMiles(lat1, lon1, lat2, lon2) {
+        const toRad = (d) => d * Math.PI / 180;
+        const R = 3958.8;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function getNearestRegionGroup() {
+        if (!userCoords) return null;
+        let nearest = null;
+        let nearestDist = Infinity;
+        Object.keys(regionCenters).forEach(groupName => {
+            const c = regionCenters[groupName];
+            const dist = haversineMiles(userCoords.lat, userCoords.lon, c.lat, c.lon);
+            if (dist < nearestDist) { nearestDist = dist; nearest = groupName; }
+        });
+        return nearest;
+    }
+
+    function addCustomCourse(name) {
+        courseSearchInput.value = name;
+        courseHiddenSelect.value = "";
+        courseDropdown.style.display = "none";
+        handleCourseChange();
+    }
+
+    function populateCourseDropdown(filterText = "") {
+        courseDropdown.innerHTML = "";
+        const lowerFilter = filterText.toLowerCase();
+        let hasResults = false;
+
+        // Order regional groups so the one closest to the player (if known) renders first
+        let orderedGroups = courseDirectory;
+        const nearestGroupName = (filterText === "") ? getNearestRegionGroup() : null;
+        if (nearestGroupName) {
+            const nearestGroup = courseDirectory.find(g => g.group === nearestGroupName);
+            const rest = courseDirectory.filter(g => g.group !== nearestGroupName);
+            if (nearestGroup) orderedGroups = [nearestGroup, ...rest];
+        }
+
+        orderedGroups.forEach(group => {
+            const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
+            if (filteredItems.length > 0) {
+                hasResults = true;
+                if (filterText === "") {
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "custom-select-group";
+                    const isNearest = group.group === nearestGroupName;
+                    groupDiv.textContent = isNearest ? `📍 Near You — ${group.group}` : group.group;
+                    courseDropdown.appendChild(groupDiv);
+                }
+                filteredItems.forEach(item => {
+                    courseDropdown.appendChild(buildCourseOptionRow(item.id, item.name));
+                });
+            }
+        });
+
+        const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
+        if (globalKeys.length > 0) {
+            const filteredGlobals = globalKeys.filter(k => globalCourses[k].name.toLowerCase().includes(lowerFilter));
+            if (filteredGlobals.length > 0) {
+                hasResults = true;
+                if (filterText === "") {
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "custom-select-group";
+                    groupDiv.textContent = "🌎 Community Mapped Courses";
+                    courseDropdown.appendChild(groupDiv);
+                }
+                filteredGlobals.forEach(k => {
+                    courseDropdown.appendChild(buildCourseOptionRow(k, globalCourses[k].name));
+                });
+            }
+        }
+
+        if (!hasResults) {
+            const typedName = filterText.trim();
+            if (typedName) {
+                courseDropdown.innerHTML = `<div style="padding:10px 12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No courses found for "${typedName.replace(/</g, '&lt;')}".</div>`;
+                const addDiv = document.createElement("div");
+                addDiv.className = "custom-select-option custom-select-add-option";
+                addDiv.textContent = `➕ Add "${typedName}" as a new course`;
+                addDiv.onclick = () => { addCustomCourse(typedName); };
+                courseDropdown.appendChild(addDiv);
+            } else {
+                courseDropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center;">No courses found.</div>`;
+            }
+        }
+    }
+
+    function selectCourse(id, name) {
+        courseHiddenSelect.value = id;
+        courseSearchInput.value = name;
+        courseDropdown.style.display = "none";
+        handleCourseChange(); 
+    }
+
+    courseSearchInput.addEventListener('focus', () => {
+        populateCourseDropdown(courseSearchInput.value);
+        courseDropdown.style.display = "block";
+    });
+
+    courseSearchInput.addEventListener('input', (e) => {
+        populateCourseDropdown(e.target.value);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('course-wrapper').contains(e.target)) {
+            courseDropdown.style.display = 'none';
+            const typedVal = courseSearchInput.value.trim();
+
+            if (typedVal === "") {
+                courseHiddenSelect.value = "";
+                return;
+            }
+
+            // If the typed text is an exact match for a known course, auto-select it
+            let foundId = null;
+            courseDirectory.forEach(g => {
+                g.items.forEach(i => {
+                    if (i.name.toLowerCase() === typedVal.toLowerCase()) foundId = i.id;
+                });
+            });
+            Object.keys(globalCourses).forEach(k => {
+                if (globalCourses[k].name.toLowerCase() === typedVal.toLowerCase()) foundId = k;
+            });
+
+            if (foundId) {
+                courseHiddenSelect.value = foundId;
+            } else if (getCourseNameById(courseHiddenSelect.value) !== typedVal) {
+                // Typed text doesn't match any known course or the previous selection -
+                // treat it as a brand-new course name instead of silently discarding it
+                courseHiddenSelect.value = "";
+                handleCourseChange();
+            }
+        }
+    });
+
+    function getCourseNameById(id) {
+        if (!id) return "";
+        for (let g of courseDirectory) {
+            for (let i of g.items) {
+                if (i.id === id) return i.name;
+            }
+        }
+        if (globalCourses[id]) return globalCourses[id].name;
+        if (id === 'thistle_27') return "Thistle Golf Club (NC - 27 Hole)";
+        return "";
+    }
+
+    const nineHoleLoops = {
+        thistle_27: {
+            cameron: { name: "Cameron Nine (Par 36)", data: [{par:4,hcp:7},{par:4,hcp:4},{par:4,hcp:5},{par:3,hcp:8},{par:5,hcp:3},{par:4,hcp:6},{par:4,hcp:2},{par:3,hcp:9},{par:5,hcp:1}] },
+            mackay: { name: "MacKay Nine (Par 36)", data: [{par:4,hcp:4},{par:4,hcp:5},{par:3,hcp:9},{par:4,hcp:7},{par:4,hcp:3},{par:3,hcp:8},{par:5,hcp:1},{par:4,hcp:6},{par:5,hcp:2}] },
+            stewart: { name: "Stewart Nine (Par 35)", data: [{par:4,hcp:9},{par:4,hcp:7},{par:3,hcp:6},{par:5,hcp:2},{par:3,hcp:8},{par:5,hcp:5},{par:4,hcp:1},{par:4,hcp:3},{par:3,hcp:4}] }
+        }
+    };
+
+    const coursePresets = {
+        caledonia: { name: "Caledonia Golf & Fish Club", data: [{hole:1,par:4,hcpIndex:12},{hole:2,par:5,hcpIndex:8},{hole:3,par:3,hcpIndex:14},{hole:4,par:4,hcpIndex:6},{hole:5,par:4,hcpIndex:2},{hole:6,par:3,hcpIndex:16},{hole:7,par:4,hcpIndex:4},{hole:8,par:5,hcpIndex:10},{hole:9,par:3,hcpIndex:18},{hole:10,par:5,hcpIndex:15},{hole:11,par:3,hcpIndex:13},{hole:12,par:4,hcpIndex:9},{hole:13,par:4,hcpIndex:5},{hole:14,par:4,hcpIndex:7},{hole:15,par:4,hcpIndex:3},{hole:16,par:4,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:4,hcpIndex:11}] },
+        trueblue: { name: "True Blue Golf Club", data: [{hole:1,par:5,hcpIndex:1},{hole:2,par:4,hcpIndex:11},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:13},{hole:6,par:4,hcpIndex:9},{hole:7,par:3,hcpIndex:17},{hole:8,par:4,hcpIndex:7},{hole:9,par:5,hcpIndex:3},{hole:10,par:5,hcpIndex:8},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:10},{hole:13,par:4,hcpIndex:14},{hole:14,par:3,hcpIndex:16},{hole:15,par:5,hcpIndex:4},{hole:16,par:3,hcpIndex:12},{hole:17,par:4,hcpIndex:2},{hole:18,par:4,hcpIndex:6}] },
+        pinelakes: { name: "Pine Lakes Country Club", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:3,hcpIndex:9},{hole:3,par:4,hcpIndex:1},{hole:4,par:4,hcpIndex:17},{hole:5,par:5,hcpIndex:3},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:13},{hole:8,par:3,hcpIndex:5},{hole:9,par:4,hcpIndex:11},{hole:10,par:5,hcpIndex:10},{hole:11,par:3,hcpIndex:18},{hole:12,par:4,hcpIndex:8},{hole:13,par:4,hcpIndex:4},{hole:14,par:4,hcpIndex:2},{hole:15,par:4,hcpIndex:16},{hole:16,par:3,hcpIndex:14},{hole:17,par:4,hcpIndex:12},{hole:18,par:4,hcpIndex:6}] },
+        pinehills: { name: "Myrtlewood - Pine Hills", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:13},{hole:3,par:5,hcpIndex:1},{hole:4,par:3,hcpIndex:15},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:4,hcpIndex:7},{hole:8,par:4,hcpIndex:3},{hole:9,par:5,hcpIndex:5},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:14},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:10},{hole:15,par:5,hcpIndex:2},{hole:16,par:4,hcpIndex:12},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        prestwick: { name: "Prestwick Country Club", data: [{hole:1,par:4,hcpIndex:13},{hole:2,par:5,hcpIndex:5},{hole:3,par:4,hcpIndex:1},{hole:4,par:3,hcpIndex:15},{hole:5,par:4,hcpIndex:11},{hole:6,par:5,hcpIndex:7},{hole:7,par:3,hcpIndex:17},{hole:8,par:4,hcpIndex:3},{hole:9,par:4,hcpIndex:9},{hole:10,par:4,hcpIndex:8},{hole:11,par:5,hcpIndex:10},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:14},{hole:14,par:4,hcpIndex:4},{hole:15,par:5,hcpIndex:2},{hole:16,par:4,hcpIndex:12},{hole:17,par:3,hcpIndex:16},{hole:18,par:4,hcpIndex:6}] },
+        manofwar: { name: "Man O' War Golf Club", data: [{hole:1,par:5,hcpIndex:3},{hole:2,par:3,hcpIndex:17},{hole:3,par:4,hcpIndex:9},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:5},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:13},{hole:8,par:5,hcpIndex:1},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:12},{hole:12,par:4,hcpIndex:6},{hole:13,par:5,hcpIndex:2},{hole:14,par:4,hcpIndex:10},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:14},{hole:17,par:3,hcpIndex:16},{hole:18,par:5,hcpIndex:4}] },
+        eaglespride_redblue: { name: "Eagle's Pride (Red/Blue)", data: [{hole:1,par:5,hcpIndex:7},{hole:2,par:3,hcpIndex:13},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:1},{hole:6,par:5,hcpIndex:9},{hole:7,par:4,hcpIndex:5},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:17},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:14},{hole:12,par:3,hcpIndex:18},{hole:13,par:4,hcpIndex:2},{hole:14,par:3,hcpIndex:16},{hole:15,par:4,hcpIndex:8},{hole:16,par:4,hcpIndex:10},{hole:17,par:4,hcpIndex:4},{hole:18,par:5,hcpIndex:6}] },
+        eaglespride_redgreen: { name: "Eagle's Pride (Red/Green)", data: [{hole:1,par:5,hcpIndex:7},{hole:2,par:3,hcpIndex:13},{hole:3,par:5,hcpIndex:3},{hole:4,par:4,hcpIndex:11},{hole:5,par:4,hcpIndex:1},{hole:6,par:5,hcpIndex:9},{hole:7,par:4,hcpIndex:5},{hole:8,par:3,hcpIndex:15},{hole:9,par:4,hcpIndex:17},{hole:10,par:4,hcpIndex:8},{hole:11,par:3,hcpIndex:10},{hole:12,par:4,hcpIndex:12},{hole:13,par:4,hcpIndex:4},{hole:14,par:5,hcpIndex:6},{hole:15,par:5,hcpIndex:2},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:16},{hole:18,par:4,hcpIndex:14}] },
+        swwa_tahoma_valley: { name: "Tahoma Valley Golf Course (Yelm)", data: [{hole:1,par:5,hcpIndex:4},{hole:2,par:5,hcpIndex:2},{hole:3,par:4,hcpIndex:6},{hole:4,par:3,hcpIndex:18},{hole:5,par:4,hcpIndex:14},{hole:6,par:3,hcpIndex:8},{hole:7,par:4,hcpIndex:10},{hole:8,par:4,hcpIndex:12},{hole:9,par:3,hcpIndex:16},{hole:10,par:4,hcpIndex:11},{hole:11,par:4,hcpIndex:7},{hole:12,par:5,hcpIndex:5},{hole:13,par:3,hcpIndex:13},{hole:14,par:4,hcpIndex:9},{hole:15,par:3,hcpIndex:15},{hole:16,par:5,hcpIndex:1},{hole:17,par:3,hcpIndex:17},{hole:18,par:5,hcpIndex:3}] },
+        swwa_camasmeadows: { name: "Camas Meadows Golf Club", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:3,hcpIndex:13},{hole:3,par:4,hcpIndex:9},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:15},{hole:6,par:4,hcpIndex:1},{hole:7,par:5,hcpIndex:11},{hole:8,par:3,hcpIndex:17},{hole:9,par:5,hcpIndex:5},{hole:10,par:4,hcpIndex:12},{hole:11,par:4,hcpIndex:6},{hole:12,par:5,hcpIndex:2},{hole:13,par:3,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:4,hcpIndex:4},{hole:17,par:3,hcpIndex:18},{hole:18,par:5,hcpIndex:10}] },
+        wa_chambers: { name: "Chambers Bay", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:9},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:13},{hole:5,par:4,hcpIndex:5},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:1},{hole:8,par:5,hcpIndex:17},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:4},{hole:11,par:4,hcpIndex:8},{hole:12,par:4,hcpIndex:18},{hole:13,par:5,hcpIndex:14},{hole:14,par:4,hcpIndex:2},{hole:15,par:3,hcpIndex:16},{hole:16,par:4,hcpIndex:10},{hole:17,par:3,hcpIndex:6},{hole:18,par:5,hcpIndex:12}] },
+        swwa_lewisriver: { name: "Lewis River Golf Course", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:4,hcpIndex:5},{hole:3,par:3,hcpIndex:13},{hole:4,par:4,hcpIndex:9},{hole:5,par:5,hcpIndex:1},{hole:6,par:4,hcpIndex:7},{hole:7,par:3,hcpIndex:3},{hole:8,par:4,hcpIndex:11},{hole:9,par:4,hcpIndex:17},{hole:10,par:5,hcpIndex:10},{hole:11,par:3,hcpIndex:16},{hole:12,par:5,hcpIndex:4},{hole:13,par:4,hcpIndex:8},{hole:14,par:4,hcpIndex:2},{hole:15,par:5,hcpIndex:12},{hole:16,par:4,hcpIndex:14},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        swwa_elkridge: { name: "Elk Ridge Golf Course", data: [{hole:1,par:4,hcpIndex:7},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:17},{hole:5,par:4,hcpIndex:1},{hole:6,par:3,hcpIndex:13},{hole:7,par:4,hcpIndex:5},{hole:8,par:4,hcpIndex:9},{hole:9,par:5,hcpIndex:11},{hole:10,par:5,hcpIndex:12},{hole:11,par:4,hcpIndex:14},{hole:12,par:4,hcpIndex:6},{hole:13,par:3,hcpIndex:10},{hole:14,par:4,hcpIndex:18},{hole:15,par:4,hcpIndex:2},{hole:16,par:3,hcpIndex:16},{hole:17,par:4,hcpIndex:4},{hole:18,par:4,hcpIndex:8}] },
+        or_indiancreek: { name: "Indian Creek Golf Course", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:13},{hole:3,par:4,hcpIndex:11},{hole:4,par:5,hcpIndex:5},{hole:5,par:3,hcpIndex:9},{hole:6,par:4,hcpIndex:15},{hole:7,par:4,hcpIndex:17},{hole:8,par:3,hcpIndex:7},{hole:9,par:5,hcpIndex:1},{hole:10,par:3,hcpIndex:18},{hole:11,par:5,hcpIndex:8},{hole:12,par:4,hcpIndex:4},{hole:13,par:4,hcpIndex:10},{hole:14,par:4,hcpIndex:14},{hole:15,par:3,hcpIndex:12},{hole:16,par:5,hcpIndex:6},{hole:17,par:4,hcpIndex:2},{hole:18,par:4,hcpIndex:16}] },
+        or_stonecreek: { name: "Stone Creek Golf Club", data: [{hole:1,par:4,hcpIndex:8},{hole:2,par:3,hcpIndex:18},{hole:3,par:4,hcpIndex:10},{hole:4,par:5,hcpIndex:2},{hole:5,par:4,hcpIndex:12},{hole:6,par:3,hcpIndex:16},{hole:7,par:4,hcpIndex:6},{hole:8,par:5,hcpIndex:4},{hole:9,par:4,hcpIndex:14},{hole:10,par:4,hcpIndex:9},{hole:11,par:5,hcpIndex:1},{hole:12,par:4,hcpIndex:11},{hole:13,par:4,hcpIndex:3},{hole:14,par:3,hcpIndex:15},{hole:15,par:4,hcpIndex:7},{hole:16,par:3,hcpIndex:17},{hole:17,par:4,hcpIndex:13},{hole:18,par:5,hcpIndex:5}] },
+        or_wildwood: { name: "Wildwood Golf Course", data: [{hole:1,par:5,hcpIndex:1},{hole:2,par:4,hcpIndex:7},{hole:3,par:3,hcpIndex:15},{hole:4,par:5,hcpIndex:5},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:13},{hole:7,par:4,hcpIndex:9},{hole:8,par:3,hcpIndex:3},{hole:9,par:5,hcpIndex:17},{hole:10,par:4,hcpIndex:16},{hole:11,par:4,hcpIndex:4},{hole:12,par:3,hcpIndex:12},{hole:13,par:4,hcpIndex:2},{hole:14,par:3,hcpIndex:10},{hole:15,par:5,hcpIndex:14},{hole:16,par:5,hcpIndex:8},{hole:17,par:4,hcpIndex:18},{hole:18,par:4,hcpIndex:6}] },
+        or_glendoveer_east: { name: "Glendoveer Golf Course (East)", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:5,hcpIndex:13},{hole:3,par:3,hcpIndex:9},{hole:4,par:5,hcpIndex:7},{hole:5,par:3,hcpIndex:1},{hole:6,par:4,hcpIndex:17},{hole:7,par:5,hcpIndex:3},{hole:8,par:4,hcpIndex:15},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:4},{hole:12,par:4,hcpIndex:10},{hole:13,par:3,hcpIndex:12},{hole:14,par:4,hcpIndex:16},{hole:15,par:5,hcpIndex:2},{hole:16,par:4,hcpIndex:18},{hole:17,par:5,hcpIndex:6},{hole:18,par:4,hcpIndex:14}] },
+        swwa_trimountain: { name: "Tri-Mountain Golf Course", data: [{hole:1,par:4,hcpIndex:3},{hole:2,par:4,hcpIndex:13},{hole:3,par:4,hcpIndex:1},{hole:4,par:4,hcpIndex:15},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:17},{hole:7,par:5,hcpIndex:9},{hole:8,par:4,hcpIndex:5},{hole:9,par:5,hcpIndex:7},{hole:10,par:4,hcpIndex:10},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:4},{hole:13,par:5,hcpIndex:12},{hole:14,par:4,hcpIndex:8},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:14},{hole:18,par:5,hcpIndex:6}] },
+        or_glendoveer_west: { name: "Glendoveer Golf Course (West)", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:4,hcpIndex:17},{hole:3,par:4,hcpIndex:5},{hole:4,par:3,hcpIndex:11},{hole:5,par:4,hcpIndex:13},{hole:6,par:4,hcpIndex:1},{hole:7,par:4,hcpIndex:9},{hole:8,par:4,hcpIndex:7},{hole:9,par:5,hcpIndex:3},{hole:10,par:4,hcpIndex:18},{hole:11,par:4,hcpIndex:4},{hole:12,par:3,hcpIndex:16},{hole:13,par:4,hcpIndex:10},{hole:14,par:4,hcpIndex:6},{hole:15,par:5,hcpIndex:14},{hole:16,par:4,hcpIndex:2},{hole:17,par:3,hcpIndex:8},{hole:18,par:4,hcpIndex:12}] },
+        
+        az_tpc_stadium: { name: "TPC Scottsdale (Stadium)", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:4,hcpIndex:5},{hole:3,par:5,hcpIndex:1},{hole:4,par:3,hcpIndex:15},{hole:5,par:4,hcpIndex:7},{hole:6,par:4,hcpIndex:11},{hole:7,par:3,hcpIndex:17},{hole:8,par:4,hcpIndex:3},{hole:9,par:4,hcpIndex:13},{hole:10,par:4,hcpIndex:8},{hole:11,par:4,hcpIndex:2},{hole:12,par:3,hcpIndex:16},{hole:13,par:5,hcpIndex:4},{hole:14,par:4,hcpIndex:10},{hole:15,par:5,hcpIndex:6},{hole:16,par:3,hcpIndex:18},{hole:17,par:4,hcpIndex:14},{hole:18,par:4,hcpIndex:12}] },
+        az_talking_oodham: { name: "Talking Stick Golf Club (O'odham)", data: [{hole:1,par:4,hcpIndex:15},{hole:2,par:5,hcpIndex:13},{hole:3,par:4,hcpIndex:1},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:3,hcpIndex:5},{hole:7,par:4,hcpIndex:9},{hole:8,par:3,hcpIndex:17},{hole:9,par:4,hcpIndex:7},{hole:10,par:4,hcpIndex:12},{hole:11,par:3,hcpIndex:6},{hole:12,par:4,hcpIndex:2},{hole:13,par:4,hcpIndex:16},{hole:14,par:4,hcpIndex:8},{hole:15,par:4,hcpIndex:14},{hole:16,par:3,hcpIndex:18},{hole:17,par:5,hcpIndex:4},{hole:18,par:4,hcpIndex:10}] },
+        az_wekopa_cholla: { name: "We-Ko-Pa Golf Club (Cholla)", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:5,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:9},{hole:5,par:3,hcpIndex:15},{hole:6,par:4,hcpIndex:11},{hole:7,par:4,hcpIndex:7},{hole:8,par:5,hcpIndex:3},{hole:9,par:4,hcpIndex:13},{hole:10,par:5,hcpIndex:4},{hole:11,par:3,hcpIndex:16},{hole:12,par:4,hcpIndex:8},{hole:13,par:4,hcpIndex:12},{hole:14,par:3,hcpIndex:18},{hole:15,par:4,hcpIndex:6},{hole:16,par:4,hcpIndex:14},{hole:17,par:5,hcpIndex:2},{hole:18,par:4,hcpIndex:10}] },
+        az_talking_piipaash: { name: "Talking Stick Golf Club (Piipaash)", data: [{hole:1,par:4,hcpIndex:13},{hole:2,par:4,hcpIndex:3},{hole:3,par:3,hcpIndex:7},{hole:4,par:4,hcpIndex:17},{hole:5,par:4,hcpIndex:1},{hole:6,par:4,hcpIndex:15},{hole:7,par:5,hcpIndex:9},{hole:8,par:4,hcpIndex:5},{hole:9,par:3,hcpIndex:11},{hole:10,par:4,hcpIndex:10},{hole:11,par:4,hcpIndex:8},{hole:12,par:4,hcpIndex:2},{hole:13,par:3,hcpIndex:16},{hole:14,par:5,hcpIndex:6},{hole:15,par:4,hcpIndex:4},{hole:16,par:5,hcpIndex:14},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:12}] },
+        
+        oaklane: { name: "Tradition at Oak Lane", data: [{hole:1,par:5,hcpIndex:1},{hole:2,par:4,hcpIndex:7},{hole:3,par:4,hcpIndex:3},{hole:4,par:3,hcpIndex:17},{hole:5,par:4,hcpIndex:9},{hole:6,par:3,hcpIndex:15},{hole:7,par:4,hcpIndex:11},{hole:8,par:4,hcpIndex:13},{hole:9,par:5,hcpIndex:5},{hole:10,par:4,hcpIndex:2},{hole:11,par:3,hcpIndex:10},{hole:12,par:4,hcpIndex:14},{hole:13,par:4,hcpIndex:16},{hole:14,par:5,hcpIndex:6},{hole:15,par:3,hcpIndex:18},{hole:16,par:4,hcpIndex:8},{hole:17,par:5,hcpIndex:12},{hole:18,par:4,hcpIndex:4}] },
+        orangehills: { name: "Orange Hills Country Club", data: [{hole:1,par:4,hcpIndex:9},{hole:2,par:5,hcpIndex:5},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:3},{hole:5,par:4,hcpIndex:11},{hole:6,par:4,hcpIndex:7},{hole:7,par:4,hcpIndex:1},{hole:8,par:4,hcpIndex:13},{hole:9,par:3,hcpIndex:15},{hole:10,par:3,hcpIndex:16},{hole:11,par:5,hcpIndex:10},{hole:12,par:4,hcpIndex:2},{hole:13,par:3,hcpIndex:18},{hole:14,par:4,hcpIndex:12},{hole:15,par:4,hcpIndex:4},{hole:16,par:4,hcpIndex:8},{hole:17,par:4,hcpIndex:6},{hole:18,par:5,hcpIndex:14}] },
+        grassyhill: { name: "Grassy Hill Country Club", data: [{hole:1,par:4,hcpIndex:5},{hole:2,par:4,hcpIndex:1},{hole:3,par:3,hcpIndex:17},{hole:4,par:4,hcpIndex:13},{hole:5,par:5,hcpIndex:3},{hole:6,par:3,hcpIndex:9},{hole:7,par:4,hcpIndex:11},{hole:8,par:4,hcpIndex:7},{hole:9,par:5,hcpIndex:15},{hole:10,par:3,hcpIndex:10},{hole:11,par:4,hcpIndex:6},{hole:12,par:4,hcpIndex:16},{hole:13,par:3,hcpIndex:12},{hole:14,par:4,hcpIndex:14},{hole:15,par:4,hcpIndex:2},{hole:16,par:5,hcpIndex:8},{hole:17,par:3,hcpIndex:18},{hole:18,par:4,hcpIndex:4}] }
+    };
+
+    function updateCustomCoursePars() {
+        let outPar = 0;
+        for(let i=1; i<=9; i++) {
+            let val = parseInt(document.getElementById(`c-par-${i}`).value);
+            if(!isNaN(val)) outPar += val;
+        }
+        let inPar = 0;
+        for(let i=10; i<=18; i++) {
+            let val = parseInt(document.getElementById(`c-par-${i}`).value);
+            if(!isNaN(val)) inPar += val;
+        }
+        const outEl = document.getElementById('c-par-out-val');
+        const inEl = document.getElementById('c-par-in-val');
+        const totEl = document.getElementById('c-par-tot-val');
+        if(outEl) outEl.textContent = outPar;
+        if(inEl) inEl.textContent = inPar;
+        if(totEl) totEl.textContent = outPar + inPar;
+    }
+
+    // --- SCORECARD PHOTO AUTOFILL (Beta) ---
+    // Runs entirely on-device via Tesseract.js - no server, no API key, no cost.
+    // Accuracy on real scorecards varies a lot (small grids, faint print, handwriting),
+    // so this only ever pre-fills the same editable grid above - nothing is saved
+    // to Firebase until the person reviews it and taps the normal Save button.
+    let tesseractLoaded = false;
+    let tesseractLoadingPromise = null;
+
+    function loadTesseractLib() {
+        if (tesseractLoaded && window.Tesseract) return Promise.resolve();
+        if (tesseractLoadingPromise) return tesseractLoadingPromise;
+        tesseractLoadingPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            s.onload = () => { tesseractLoaded = true; resolve(); };
+            s.onerror = () => reject(new Error('Failed to load the scanner library. Check your connection and try again.'));
+            document.head.appendChild(s);
+        });
+        return tesseractLoadingPromise;
+    }
+
+    function setOcrStatus(message, tone) {
+        const statusEl = document.getElementById('ocr-status');
+        if (!statusEl) return;
+        statusEl.style.display = 'block';
+        if (tone === 'error') {
+            statusEl.style.background = 'var(--danger-box-bg)';
+            statusEl.style.color = 'var(--accent-red)';
+        } else if (tone === 'success') {
+            statusEl.style.background = 'var(--nassau-box-bg)';
+            statusEl.style.color = 'var(--brand-green)';
+        } else {
+            statusEl.style.background = 'var(--nav-bg)';
+            statusEl.style.color = 'var(--text-main)';
+        }
+        statusEl.textContent = message;
+    }
+
+    // Looks for rows labeled "Par" and "HCP/Handicap/Index" in the raw OCR text,
+    // and falls back to guessing based on typical value ranges (pars 3-6, handicaps 1-18)
+    // if no explicit labels were recognized.
+    function parseScorecardText(text) {
+        const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const parLabelRegex = /\bpar\b/i;
+        const hcpLabelRegex = /\b(hcp|handicap|hdcp|h'?cap|index)\b/i;
+
+        let parNumbers = [];
+        let hcpNumbers = [];
+
+        lines.forEach(line => {
+            const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+            if (nums.length === 0) return;
+            if (parLabelRegex.test(line) && parNumbers.length < 18) {
+                parNumbers = parNumbers.concat(nums.filter(n => n >= 3 && n <= 6));
+            } else if (hcpLabelRegex.test(line) && hcpNumbers.length < 18) {
+                hcpNumbers = hcpNumbers.concat(nums.filter(n => n >= 1 && n <= 18));
+            }
+        });
+
+        // Fallback: no labeled rows found (or too few holes captured) - guess from value ranges
+        if (parNumbers.length < 9) {
+            lines.forEach(line => {
+                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 3 && n <= 6)) {
+                    if (nums.length > parNumbers.length) parNumbers = nums;
+                }
+            });
+        }
+        if (hcpNumbers.length < 9) {
+            lines.forEach(line => {
+                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
+                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 1 && n <= 18)) {
+                    if (nums.length > hcpNumbers.length) hcpNumbers = nums;
+                }
+            });
+        }
+
+        return { pars: parNumbers.slice(0, 18), hcps: hcpNumbers.slice(0, 18) };
+    }
+
+    function applyParsedScorecard(parsed) {
+        let parsFilled = 0, hcpsFilled = 0;
+        for (let i = 1; i <= 18; i++) {
+            const parEl = document.getElementById(`c-par-${i}`);
+            const hcpEl = document.getElementById(`c-hcp-${i}`);
+            if (parsed.pars[i - 1] !== undefined && parEl) { parEl.value = parsed.pars[i - 1]; parsFilled++; }
+            if (parsed.hcps[i - 1] !== undefined && hcpEl) { hcpEl.value = parsed.hcps[i - 1]; hcpsFilled++; }
+        }
+        updateCustomCoursePars();
+
+        if (parsFilled === 0 && hcpsFilled === 0) {
+            setOcrStatus('⚠️ Could not confidently read pars or handicaps from that photo. Please enter them manually below.', 'error');
+        } else {
+            setOcrStatus(`✅ Found ${parsFilled}/18 pars and ${hcpsFilled}/18 handicaps. Double-check every hole against your scorecard before saving - OCR can misread numbers.`, 'success');
+        }
+    }
+
+    async function handleScorecardPhoto(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        setOcrStatus('⏳ Loading scanner...', 'neutral');
+
+        try {
+            await loadTesseractLib();
+            setOcrStatus('🔍 Reading scorecard photo... this can take 10-20 seconds.', 'neutral');
+            const result = await Tesseract.recognize(file, 'eng');
+            const parsed = parseScorecardText(result && result.data ? result.data.text : '');
+            applyParsedScorecard(parsed);
+        } catch (err) {
+            console.error('Scorecard OCR error:', err);
+            setOcrStatus('⚠️ Could not read that photo. Please enter pars/handicaps manually below.', 'error');
+        } finally {
+            event.target.value = '';
+        }
+    }
+
+    function handleCourseChange() {
+        const courseKey = courseHiddenSelect.value;
+        const loopBox = document.getElementById("nine-loop-selector");
+        const lengthBox = document.getElementById("round-length-container");
+        
+        let isMapped = false;
+        let baseData = [];
+
+        if (nineHoleLoops[courseKey]) {
+            isMapped = true;
+            const loops = nineHoleLoops[courseKey];
+            const frontSelect = document.getElementById("front-nine-select");
+            const backSelect = document.getElementById("back-nine-select");
+            frontSelect.innerHTML = ""; backSelect.innerHTML = "";
+            
+            Object.keys(loops).forEach((key) => {
+                frontSelect.innerHTML += `<option value="${key}">${loops[key].name}</option>`;
+                backSelect.innerHTML += `<option value="${key}">${loops[key].name}</option>`;
+            });
+            backSelect.innerHTML += `<option value="none">-- None (Play 9 Holes) --</option>`;
+            
+            const loopKeys = Object.keys(loops);
+            frontSelect.selectedIndex = 0;
+            backSelect.selectedIndex = (loopKeys.length > 1) ? 1 : 0;
+            
+            loopBox.style.display = "block";
+            lengthBox.style.display = "none";
+        } else {
+            loopBox.style.display = "none";
+            lengthBox.style.display = "block";
+            
+            if (globalCourses[courseKey]) {
+                isMapped = true;
+                baseData = globalCourses[courseKey].data;
+            } else if (coursePresets[courseKey]) {
+                isMapped = true;
+                baseData = coursePresets[courseKey].data;
+            } else {
+                isMapped = false;
+                for(let i=1; i<=18; i++) baseData.push({hole: i, par: 4, hcpIndex: i});
+            }
+        }
+        
+        // Auto-fill Custom Course Grid
+        baseData.forEach(h => {
+            if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
+            if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+        });
+
+        updateCustomCoursePars();
+
+        // Smart Mapping Warning
+        const customContainer = document.getElementById('custom-course-container');
+        const customCheckbox = document.getElementById('enable-custom-course');
+        const warningText = document.getElementById('custom-course-warning');
+
+        if (!isMapped && courseKey !== "thistle_27" && courseSearchInput.value.trim() !== "") {
+            customCheckbox.checked = true;
+            customContainer.style.display = 'block';
+            warningText.innerHTML = "⚠️ <strong>COURSE NOT MAPPED!</strong><br>Please enter the Pars and Handicaps from your scorecard. We will save it to the global database so you never have to do it again.";
+            warningText.style.color = "var(--accent-red)";
+        } else {
+            customCheckbox.checked = false;
+            customContainer.style.display = 'none';
+            warningText.innerHTML = "Make quick adjustments from your phone if the course isn't mapped accurately.";
+            warningText.style.color = "var(--text-muted)";
+        }
+    }
+
+    // Combines a 9-hole loop's REAL difficulty ranking into the odd (front) or even (back) 
+    // slots of an 18-hole handicap chart -- the standard way courses combine modular nines.
+    function remapNineHandicaps(nineData, isFront) {
+        const withIdx = nineData.map((item, idx) => ({ par: item.par, hcp: item.hcp, origIdx: idx }));
+        const sortedByDifficulty = [...withIdx].sort((a, b) => a.hcp - b.hcp);
+        const rankMap = {};
+        sortedByDifficulty.forEach((item, rank) => {
+            rankMap[item.origIdx] = isFront ? (rank * 2) + 1 : (rank * 2) + 2;
+        });
+        return nineData.map((item, idx) => ({ par: item.par, hcpIndex: rankMap[idx] }));
+    }
+
+    function captureCourseDataGrid() {
+        let customData = [];
+        for(let i=1; i<=18; i++) {
+            let p = parseInt(document.getElementById(`c-par-${i}`).value) || 4;
+            let h = parseInt(document.getElementById(`c-hcp-${i}`).value) || i;
+            customData.push({ hole: i, par: p, hcpIndex: h });
+        }
+        return customData;
+    }
+
+    function captureCurrentPlayerInputs() {
+        const rows = document.querySelectorAll('.player-row');
+        const list = [];
+        const captureFormat = document.getElementById("game-format-select") ? document.getElementById("game-format-select").value : 'stroke';
+        const captureNassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
+        const captureTeamSize = (captureFormat === 'scramble') ? 4 : ((captureFormat === 'match' || (captureFormat === 'nassau' && captureNassauType === '1v1')) ? 1 : 2);
+        rows.forEach((row, idx) => {
+            const nameVal = row.querySelector('.p-name-input') ? row.querySelector('.p-name-input').value : "";
+            const hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
+            const teamVal = row.querySelector('.p-team-input') ? row.querySelector('.p-team-input').value : `Team ${Math.floor(idx / captureTeamSize) + 1}`;
+            const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
+            const moneyInput = row.querySelector('.p-money-input');
+            const moneyVal = moneyInput ? moneyInput.checked : true;
+            list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+        });
+        return list;
+    }
+
+    function renderPlayerList(forceLoad = false) {
+        const format = document.getElementById("game-format-select").value;
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
+        const headerRow = document.getElementById("player-header-row");
+        const listContainer = document.getElementById("player-list");
+        
+        let existingData = [];
+        if (forceLoad) {
+            existingData = storedPlayersTemp; 
+        } else {
+            existingData = captureCurrentPlayerInputs(); 
+        }
+
+        listContainer.innerHTML = "";
+
+        const showMoneyCheckbox = moneyFormats.includes(format);
+        const moneyHeaderHtml = showMoneyCheckbox ? `<span style="text-align:center; font-size:0.85rem;" title="Playing for money?">💰</span>` : "";
+
+        if (format === 'ryder') {
+            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
+            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
+        } else {
+            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
+        }
+
+        existingData.forEach((p, idx) => {
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false);
+        });
+    }
+
+    function handleFormatChange(forceLoad = false) {
+        const format = document.getElementById("game-format-select").value;
+        const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
+        
+        if (document.getElementById("hole-bet-settings")) {
+            document.getElementById("hole-bet-settings").style.display = formatsWithHoleBets.includes(format) ? "block" : "none";
+        }
+        if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
+        if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
+        if (document.getElementById("stableford-settings")) document.getElementById("stableford-settings").style.display = (format === "stableford") ? "block" : "none";
+        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (['match', 'bestball', 'scramble', 'ryder'].includes(format)) ? "block" : "none";
+        if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
+        
+        renderPlayerList(forceLoad);
+    }
+
+    function loadModeData(modeKey) {
+        db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            groupSizeOverrides = data.groupSizeOverrides || {};
+            if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
+            if (data.eventCategory) currentCategory = data.eventCategory;
+
+            if (data.activeCourseKey) {
+                courseHiddenSelect.value = data.activeCourseKey;
+                courseSearchInput.value = getCourseNameById(data.activeCourseKey) || data.courseName;
+            } else {
+                courseHiddenSelect.value = "";
+                courseSearchInput.value = "";
+            }
+            
+            handleCourseChange();
+
+            // Populate Grid with saved data if it exists
+            if (data.courseData && data.courseData.length > 0) {
+                data.courseData.forEach(h => {
+                    if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
+                    if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+                });
+                updateCustomCoursePars();
+            }
+
+            if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
+            
+            if (data.holeBetStake && document.getElementById("hole-bet-stake")) {
+                document.getElementById("hole-bet-stake").value = data.holeBetStake;
+                if (data.holeBetStake > 0) {
+                    document.getElementById("enable-hole-bet").checked = true;
+                    document.getElementById("hole-bet-stake-container").style.display = "block";
+                }
+            }
+
+            if (document.getElementById("enable-birdiegame")) {
+                document.getElementById("enable-birdiegame").checked = data.birdieGameEnabled === true;
+            }
+            if (document.getElementById("birdie-unit-val-admin")) {
+                document.getElementById("birdie-unit-val-admin").value = data.birdieUnitVal !== undefined ? data.birdieUnitVal : "";
+            }
+            if (document.getElementById("enable-kpgame")) {
+                document.getElementById("enable-kpgame").checked = data.kpGameEnabled === true;
+            }
+
+            if (data.matchScoring && document.getElementById("match-scoring")) { document.getElementById("match-scoring").value = data.matchScoring; syncToggle("match-scoring", "match-scoring-switch", "match-scoring-label-net", "match-scoring-label-gross", "net"); }
+            if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
+            if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
+            
+            if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
+            if (data.nassauScoring && document.getElementById("nassau-scoring")) { document.getElementById("nassau-scoring").value = data.nassauScoring; syncToggle("nassau-scoring", "nassau-scoring-switch", "nassau-scoring-label-net", "nassau-scoring-label-gross", "net"); }
+            if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
+            if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
+            if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
+            if (data.wolfLoneMult && document.getElementById("wolf-lone-mult")) document.getElementById("wolf-lone-mult").value = data.wolfLoneMult;
+            if (data.wolfBlindMult && document.getElementById("wolf-blind-mult")) document.getElementById("wolf-blind-mult").value = data.wolfBlindMult;
+            if (data.wolfTieRule && document.getElementById("wolf-tie-rule")) { document.getElementById("wolf-tie-rule").value = data.wolfTieRule; syncToggle("wolf-tie-rule", "wolf-tie-rule-switch", "wolf-tie-rule-label-carry", "wolf-tie-rule-label-void", "carry"); }
+            if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
+            if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
+            if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
+            if (data.stablefordScoring && document.getElementById("stableford-scoring")) { document.getElementById("stableford-scoring").value = data.stablefordScoring; syncToggle("stableford-scoring", "stableford-scoring-switch", "stableford-scoring-label-net", "stableford-scoring-label-gross", "net"); }
+            if (data.stablefordPoints) {
+                const sp = data.stablefordPoints;
+                if (sp.other !== undefined && document.getElementById("stableford-pts-other")) document.getElementById("stableford-pts-other").value = sp.other;
+                if (sp.bogey !== undefined && document.getElementById("stableford-pts-bogey")) document.getElementById("stableford-pts-bogey").value = sp.bogey;
+                if (sp.par !== undefined && document.getElementById("stableford-pts-par")) document.getElementById("stableford-pts-par").value = sp.par;
+                if (sp.birdie !== undefined && document.getElementById("stableford-pts-birdie")) document.getElementById("stableford-pts-birdie").value = sp.birdie;
+                if (sp.eagle !== undefined && document.getElementById("stableford-pts-eagle")) document.getElementById("stableford-pts-eagle").value = sp.eagle;
+                if (sp.albatross !== undefined && document.getElementById("stableford-pts-albatross")) document.getElementById("stableford-pts-albatross").value = sp.albatross;
+            }
+
+            if (data.players && data.players.length > 0) {
+                storedPlayersTemp = data.players;
+            } else {
+                storedPlayersTemp = []; 
+            }
+
+            document.getElementById("player-list").innerHTML = "";
+            if (storedPlayersTemp.length > 0) {
+                handleFormatChange(true);
+            } else {
+                addPlayerRow(); 
+            }
+            regenerateGroupLinks();
+        });
+    }
+
+    function parseHcpAdmin(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    // Converts the internal signed handicap number back to standard golf notation for display.
+    // Internally, plus-handicaps (better than scratch) are stored as negative numbers so the
+    // stroke math works out - but golfers always write/read them with a leading "+" (e.g. "+3.4"),
+    // never as a negative number. Regular handicaps display as a plain positive number, no sign.
+    function formatHcpDisplay(numericHcp) {
+        if (numericHcp === null || numericHcp === undefined || isNaN(numericHcp)) return '—';
+        const rounded = Math.round(numericHcp * 10) / 10;
+        const abs = Math.abs(rounded);
+        const absStr = (abs % 1 === 0) ? abs.toFixed(0) : abs.toFixed(1);
+        return rounded < 0 ? ('+' + absStr) : absStr;
+    }
+
+    function getStrokesAdmin(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function previewStrokes() {
+        const container = document.getElementById("strokes-preview-container");
+
+        // Pull the 18 hole-handicap (difficulty ranking) values currently in the course grid
+        const holeHcps = [];
+        for (let i = 1; i <= 18; i++) {
+            const el = document.getElementById(`c-hcp-${i}`);
+            const val = el && el.value ? parseInt(el.value, 10) : i;
+            holeHcps.push(val || i);
+        }
+        const hasAnyHcpData = holeHcps.some((v, idx) => document.getElementById(`c-hcp-${idx + 1}`) && document.getElementById(`c-hcp-${idx + 1}`).value);
+        if (!hasAnyHcpData) {
+            container.style.display = "block";
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:var(--accent-red);">⚠️ Select or enter a course with hole handicap (HCP) values first, so strokes can be calculated per hole.</p>`;
+            return;
+        }
+
+        const rows = document.querySelectorAll('.player-row');
+        if (rows.length === 0) {
+            container.style.display = "block";
+            container.innerHTML = `<p style="margin:0; font-size:0.85rem; color:var(--text-muted);">Add players first to preview strokes.</p>`;
+            return;
+        }
+
+        const playerResults = [];
+        rows.forEach(row => {
+            const nameEl = row.querySelector('.p-name-input');
+            const hcpEl = row.querySelector('.p-hcp-input');
+            const name = (nameEl && nameEl.value.trim()) || "Unnamed";
+            const numericHcp = parseHcpAdmin(hcpEl ? hcpEl.value : "");
+
+            let totalStrokes = 0;
+            const holesWithStrokes = [];
+            holeHcps.forEach((hcpIdx, i) => {
+                const s = getStrokesAdmin(hcpIdx, numericHcp);
+                totalStrokes += s;
+                if (s !== 0) holesWithStrokes.push({ hole: i + 1, strokes: s });
+            });
+
+            playerResults.push({ name, numericHcp, totalStrokes, holesWithStrokes });
+        });
+
+        // Lowest handicap in the field = the "scratch" player for this round's relative match-play convention
+        const lowestHcp = Math.min(...playerResults.map(p => p.numericHcp));
+
+        let html = `<div style="font-weight:bold; color:var(--brand-green); margin-bottom:8px; font-size:0.85rem;">Strokes Received (Full Course Net)</div>`;
+        playerResults.forEach(p => {
+            const holesList = p.holesWithStrokes.length > 0
+                ? p.holesWithStrokes.map(h => `#${h.hole}${h.strokes > 1 ? ` (${h.strokes}x)` : (h.strokes < 0 ? ' (gives)' : '')}`).join(', ')
+                : 'None (plays scratch on this course)';
+            html += `
+                <div style="padding:6px 0; border-bottom:1px solid #eee; font-size:0.8rem;">
+                    <strong>${p.name}</strong> (HCP ${formatHcpDisplay(p.numericHcp)}) — <strong>${p.totalStrokes}</strong> strokes<br>
+                    <span style="color:var(--text-muted); font-size:0.75rem;">Holes: ${holesList}</span>
+                </div>`;
+        });
+
+        if (playerResults.length >= 2) {
+            html += `<div style="font-weight:bold; color:var(--brand-green); margin-top:12px; margin-bottom:8px; font-size:0.85rem;">Suggested Match Strokes (vs. lowest HCP in group)</div>`;
+            playerResults.forEach(p => {
+                const relativeStrokes = Math.round(p.numericHcp - lowestHcp);
+                if (relativeStrokes > 0) {
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> would receive <strong>${relativeStrokes}</strong> strokes head-to-head against the lowest handicap in this group.</div>`;
+                } else {
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> plays scratch (lowest handicap in this group).</div>`;
+                }
+            });
+            html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
+        }
+
+        container.style.display = "block";
+        container.innerHTML = html;
+    }
+
+    const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
+
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true) {
+        const listContainer = document.getElementById("player-list");
+        const currentCount = document.querySelectorAll('.player-row').length + 1;
+        const format = document.getElementById("game-format-select").value || 'stroke';
+        const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
+        const teamSize = (format === 'scramble') ? 4 : ((format === 'match' || (format === 'nassau' && nassauType === '1v1')) ? 1 : 2);
+        const autoTeamIdx = Math.floor((currentCount - 1) / teamSize);
+        const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
+
+        let teamOptionsHtml = "";
+        teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
+
+        let baseColumns = "2fr 1fr";
+        let teamFieldHtml = "";
+        let squadFieldHtml = "";
+
+        if (format === 'ryder') {
+            baseColumns = "1.5fr 0.7fr 1fr 1fr";
+            teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
+            squadFieldHtml = `
+                <select class="p-squad-input">
+                    <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
+                    <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
+                </select>`;
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
+            baseColumns = "1.8fr 0.8fr 1.2fr";
+            teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
+        }
+
+        const showMoneyCheckbox = moneyFormats.includes(format);
+        let moneyCheckboxHtml = "";
+        if (showMoneyCheckbox) {
+            moneyCheckboxHtml = `<input type="checkbox" class="p-money-input" title="Playing for money?" ${playingForMoney !== false ? 'checked' : ''} style="width:20px; height:20px; cursor:pointer; justify-self:center; accent-color:var(--accent-teal);">`;
+        }
+
+        const row = document.createElement("div");
+        row.className = "player-row";
+        row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+        row.innerHTML = `
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
+            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
+            ${teamFieldHtml}
+            ${squadFieldHtml}
+            ${moneyCheckboxHtml}
+            <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
+        `;
+        listContainer.appendChild(row);
+        updateCount();
+    }
+
+    function updateCount() { 
+        document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
+        renderGroupDividers();
+        regenerateGroupLinks();
+    }
+
+    // --- CUSTOM GROUP SIZING ---
+    // overrides is sparse (0-based group index -> explicit size). Any group without an
+    // override defaults to 4 (or whatever's left), so pinning one group's size doesn't
+    // require touching the rest — they auto-adjust as players are added/removed.
+    function computeGroupSizes(playerCount, overrides) {
+        overrides = overrides || {};
+        let sizes = [];
+        let sum = 0;
+        let gIdx = 0;
+        while (sum < playerCount) {
+            let remaining = playerCount - sum;
+            let defaultSize = Math.min(4, remaining);
+            let ov = overrides[gIdx];
+            let sz = (ov !== undefined && ov > 0) ? Math.min(ov, remaining) : defaultSize;
+            sizes.push(sz);
+            sum += sz;
+            gIdx++;
+        }
+        return sizes;
+    }
+
+    function computeGroupBoundaries(playerCount, overrides) {
+        const sizes = computeGroupSizes(playerCount, overrides);
+        let boundaries = [];
+        let idx = 0;
+        sizes.forEach((size, i) => {
+            boundaries.push({ group: i + 1, startIdx: idx, size: size });
+            idx += size;
+        });
+        return boundaries;
+    }
+
+    function renderGroupDividers() {
+        const listContainer = document.getElementById("player-list");
+        if (!listContainer) return;
+
+        listContainer.querySelectorAll('.group-divider').forEach(el => el.remove());
+
+        const rows = Array.from(listContainer.querySelectorAll('.player-row'));
+        const playerCount = rows.length;
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
+
+        if (boundaries.length <= 1) return; // single group, no need to label it
+
+        boundaries.forEach((b, gIdx) => {
+            const divider = document.createElement("div");
+            divider.className = "group-divider";
+            divider.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:14px 0 8px 0;";
+            divider.innerHTML = `
+                <span style="font-weight:bold; color:var(--brand-green); font-size:0.85rem;">🏌️ Group ${b.group}</span>
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" onclick="adjustGroupSize(${gIdx}, -1)" style="width:26px; height:26px; border-radius:50%; border:1px solid var(--border-mid); background:var(--bg-card); color:var(--brand-green); font-weight:bold; cursor:pointer; font-size:1rem; line-height:1;">−</button>
+                    <span style="font-size:0.8rem; color:var(--text-muted); min-width:64px; text-align:center;">${b.size} player${b.size === 1 ? '' : 's'}</span>
+                    <button type="button" onclick="adjustGroupSize(${gIdx}, 1)" style="width:26px; height:26px; border-radius:50%; border:1px solid var(--border-mid); background:var(--bg-card); color:var(--brand-green); font-weight:bold; cursor:pointer; font-size:1rem; line-height:1;">+</button>
+                </span>
+            `;
+            const anchorRow = rows[b.startIdx];
+            if (anchorRow) listContainer.insertBefore(divider, anchorRow);
+        });
+    }
+
+    function adjustGroupSize(groupIdx, delta) {
+        const playerCount = document.querySelectorAll('.player-row').length;
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
+        const current = boundaries[groupIdx] ? boundaries[groupIdx].size : 4;
+        let newSize = current + delta;
+        newSize = Math.max(1, Math.min(6, newSize));
+        groupSizeOverrides[groupIdx] = newSize;
+        renderGroupDividers();
+        regenerateGroupLinks();
+    }
+
+    function regenerateGroupLinks() {
+        const box = document.getElementById('group-links-box');
+        const list = document.getElementById('group-links-list');
+        if (!box || !list) return;
+
+        const playerCount = document.querySelectorAll('.player-row').length;
+        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
+
+        if (!currentMode || boundaries.length <= 1) {
+            box.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+
+        box.style.display = 'block';
+        const baseHref = window.location.href.split('?')[0];
+        const scorecardBase = baseHref.replace('admin.html', 'index.html');
+        let html = '';
+        boundaries.forEach(b => {
+            const groupUrl = `${scorecardBase}?game=${currentMode}&group=${b.group}`;
+            html += `
+                <div class="group-link-row">
+                    <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
+
+    function copyGroupLink(url, groupNum) {
+        navigator.clipboard.writeText(url).then(() => alert(`Copied Group ${groupNum}'s scorekeeper link! Send this ONLY to that group.`));
+    }
+
+    function getCategoryIcon(type) {
+        if (type === 'marty') return '🎰';
+        if (type === 'myrtle') return '🏖️';
+        if (type === 'weekday') return '🏌️‍♂️';
+        return '🏆';
+    }
+
+    function saveSettings() {
+        try {
+            const saveBtn = document.getElementById("main-save-btn");
+            const originalText = saveBtn.innerText;
+            saveBtn.innerText = "⏳ Saving...";
+            saveBtn.disabled = true;
+
+            let courseKey = courseHiddenSelect.value;
+            let selectedCourseName = courseSearchInput.value.trim();
+
+            if (!courseKey && selectedCourseName) {
+                let foundId = null;
+                courseDirectory.forEach(g => {
+                    g.items.forEach(i => {
+                        if(i.name.toLowerCase() === selectedCourseName.toLowerCase()) foundId = i.id;
+                    });
+                });
+                
+                Object.keys(globalCourses).forEach(k => {
+                    if(globalCourses[k].name.toLowerCase() === selectedCourseName.toLowerCase()) foundId = k;
+                });
+
+                courseKey = foundId || "comm_" + selectedCourseName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            }
+
+            if (!courseKey && !selectedCourseName) { 
+                alert("⚠️ Please select or type a Golf Course name before saving!"); 
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return; 
+            }
+            
+            const gameFormat = document.getElementById("game-format-select").value;
+            if (!gameFormat) { alert("⚠️ Please select a Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
+
+            const rows = document.querySelectorAll('.player-row');
+            if (rows.length === 0) {
+                alert("⚠️ Please add at least one player to start the game!");
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return;
+            }
+
+            if (gameFormat === 'wolf' && rows.length !== 4) {
+                alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return;
+            }
+
+            const isEditing = document.getElementById('enable-custom-course').checked;
+            let finalCourseData = [];
+
+            if (isEditing) {
+                finalCourseData = captureCourseDataGrid();
+                db.ref(`global_courses/${courseKey}`).set({
+                    name: selectedCourseName,
+                    data: finalCourseData
+                });
+            } else {
+                if (nineHoleLoops[courseKey]) {
+                    const loops = nineHoleLoops[courseKey];
+                    const frontKey = document.getElementById("front-nine-select").value;
+                    const backKey = document.getElementById("back-nine-select").value;
+                    
+                    const frontRemapped = remapNineHandicaps(loops[frontKey].data, true);
+                    frontRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: item.hcpIndex }); });
+                    
+                    if (backKey !== "none") {
+                        const backRemapped = remapNineHandicaps(loops[backKey].data, false);
+                        backRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: item.hcpIndex }); });
+                        selectedCourseName = `${getCourseNameById(courseKey).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} / ${loops[backKey].name.split(' ')[0]})`;
+                    } else {
+                        selectedCourseName = `${getCourseNameById(courseKey).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
+                    }
+                } else if (globalCourses[courseKey]) {
+                    finalCourseData = globalCourses[courseKey].data;
+                } else if (coursePresets[courseKey]) {
+                    finalCourseData = coursePresets[courseKey].data;
+                } else {
+                    finalCourseData = captureCourseDataGrid();
+                }
+            }
+
+            // Universal 9-Hole Trim Logic
+            if (!nineHoleLoops[courseKey]) {
+                const roundLength = document.getElementById("round-length-select").value;
+                if (roundLength === "front") {
+                    finalCourseData = finalCourseData.filter(h => h.hole <= 9);
+                    selectedCourseName += " (Front 9)";
+                } else if (roundLength === "back") {
+                    finalCourseData = finalCourseData.filter(h => h.hole > 9);
+                    selectedCourseName += " (Back 9)";
+                }
+            }
+
+            const roundDay = document.getElementById("round-day-select").value;
+            const baseEventName = roundDay; 
+            const categoryIcon = getCategoryIcon(currentCategory);
+
+            const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
+
+            const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
+            const kpGameEnabled = document.getElementById("enable-kpgame") ? document.getElementById("enable-kpgame").checked : false;
+            const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
+
+            const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
+            const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
+            const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
+            const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
+            const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
+            const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
+            const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
+            const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 0;
+            const wolfLoneMult = document.getElementById("wolf-lone-mult") ? document.getElementById("wolf-lone-mult").value : "2";
+            const wolfBlindMult = document.getElementById("wolf-blind-mult") ? document.getElementById("wolf-blind-mult").value : "4";
+            const wolfTieRule = document.getElementById("wolf-tie-rule") ? document.getElementById("wolf-tie-rule").value : "carry";
+            const wolfLastPlaceRule = document.getElementById("wolf-lastplace-rule") ? document.getElementById("wolf-lastplace-rule").value : "off";
+            const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
+            const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
+            const stablefordScoring = document.getElementById("stableford-scoring") ? document.getElementById("stableford-scoring").value : "net";
+            const stablefordPoints = {
+                other: document.getElementById("stableford-pts-other") ? (parseInt(document.getElementById("stableford-pts-other").value, 10) || 0) : 0,
+                bogey: document.getElementById("stableford-pts-bogey") ? (parseInt(document.getElementById("stableford-pts-bogey").value, 10) || 0) : 1,
+                par: document.getElementById("stableford-pts-par") ? (parseInt(document.getElementById("stableford-pts-par").value, 10) || 0) : 2,
+                birdie: document.getElementById("stableford-pts-birdie") ? (parseInt(document.getElementById("stableford-pts-birdie").value, 10) || 0) : 3,
+                eagle: document.getElementById("stableford-pts-eagle") ? (parseInt(document.getElementById("stableford-pts-eagle").value, 10) || 0) : 5,
+                albatross: document.getElementById("stableford-pts-albatross") ? (parseInt(document.getElementById("stableford-pts-albatross").value, 10) || 0) : 10
+            };
+
+            const playersList = [];
+            rows.forEach((row, idx) => {
+                let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
+                let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
+                
+                const teamSelect = row.querySelector('.p-team-input');
+                const squadSelect = row.querySelector('.p-squad-input');
+                const moneyInput = row.querySelector('.p-money-input');
+
+                const teamVal = teamSelect ? teamSelect.value : "Team 1";
+                const squadVal = squadSelect ? squadSelect.value : "red";
+                const moneyVal = moneyInput ? moneyInput.checked : true;
+                
+                if (hcpVal !== "") {
+                    if (!hcpVal.startsWith("+")) {
+                        let numVal = parseFloat(hcpVal);
+                        if (isNaN(numVal)) numVal = 0;
+                        if (numVal > 36) numVal = 36;
+                        hcpVal = String(numVal);
+                    }
+                }
+
+                playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+            });
+
+            try {
+                localStorage.setItem('golfAppRoster', JSON.stringify(playersList));
+            } catch(e) {
+                console.warn("Could not save to local storage (likely Private Browsing)", e);
+            }
+
+            db.ref(`events/${currentMode}`).update({
+                eventName: baseEventName,
+                roundDay: roundDay,
+                eventCategory: currentCategory,
+                categoryIcon: categoryIcon,
+                activeCourseKey: courseKey,
+                courseName: selectedCourseName,
+                gameFormat: gameFormat,
+                holeBetStake: holeBetStake,
+                richHoleBet: null,
+                richHoleBetPresses: null,
+                richOverallBetPresses: null,
+                birdieGameEnabled: birdieGameEnabled,
+                kpGameEnabled: kpGameEnabled,
+                birdieUnitVal: birdieUnitVal,
+                matchScoring: matchScoring,
+                matchStake: matchStake,
+                matchPressRule: matchPressRule,
+                nassauType: nassauType,
+                nassauScoring: nassauScoring,
+                nassauStake: nassauStake,
+                nassauPressRule: nassauPressRule,
+                wolfPointVal: wolfPointVal,
+                wolfLoneMult: wolfLoneMult,
+                wolfBlindMult: wolfBlindMult,
+                wolfTieRule: wolfTieRule,
+                wolfLastPlaceRule: wolfLastPlaceRule,
+                stablefordPointVal: stablefordPointVal,
+                groupSizeOverrides: groupSizeOverrides,
+                stablefordScoring: stablefordScoring,
+                stablefordPoints: stablefordPoints,
+                dotPointVal: dotPointVal,
+                courseData: finalCourseData,
+                players: playersList
+            }).then(() => {
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+                window.location.href = `index.html?game=${currentMode}`;
+            }).catch((err) => { 
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+                alert(`Save error: ${err.message}`); 
+            });
+
+        } catch (e) {
+            alert(`JavaScript Error: ${e.message}`);
+            const saveBtn = document.getElementById("main-save-btn");
+            if(saveBtn) { saveBtn.innerText = "💾 Save & Start Round"; saveBtn.disabled = false; }
+        }
+    }
+
+    function endAndClearRound() {
+        if (confirm(`Are you sure you want to END the current game for Room ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
+            db.ref(`events/${currentMode}`).remove().then(() => {
+                localStorage.removeItem('lastRoomCode');
+                alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
+                window.location.href = "admin.html"; 
+            }).catch((err) => {
+                alert(`Error clearing game: ${err.message}`);
+            });
+        }
+    }
+
+    function generateQRCode() {
+        const baseHref = window.location.href.split('?')[0];
+        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: currentUrl, width: 140, height: 140,
+            colorDark : "#0f4c3a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
+        });
+    }
+
+    function copyAppUrl() {
+        const baseHref = window.location.href.split('?')[0];
+        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
+        navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
+    }
+
+    if (currentMode) {
+        generateQRCode();
+        db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            if (!data.players || data.players.length === 0) {
+                addPlayerRow(); 
+                regenerateGroupLinks();
+            } else {
+                loadModeData(currentMode);
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
