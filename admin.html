@@ -96,18 +96,6 @@
 
         .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
 
-        .setup-section { border: 1px solid var(--border-mid); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
-        .setup-section-header {
-            display: flex; align-items: center; justify-content: space-between; width: 100%;
-            background: var(--nav-bg); border: none; padding: 14px 16px; cursor: pointer;
-            font-size: 1rem; font-weight: bold; color: var(--brand-green); text-align: left;
-        }
-        .setup-section-header .ss-subtitle { font-size: 0.75rem; font-weight: normal; color: var(--text-muted); display: block; margin-top: 2px; }
-        .setup-section-chevron { font-size: 0.8rem; color: var(--text-muted); transition: transform 0.2s ease; flex-shrink: 0; margin-left: 10px; }
-        .setup-section-chevron.open { transform: rotate(180deg); }
-        .setup-section-body { padding: 16px; border-top: 1px solid var(--border-mid); }
-        .setup-section-body.collapsed { display: none; }
-
         /* Compact binary toggle switch - replaces two-option dropdowns */
         .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
         .toggle-row.toggle-row-center { justify-content: center; }
@@ -220,12 +208,6 @@
         <div class="room-badge" id="display-room-code">----</div>
     </div>
 
-    <div class="setup-section">
-        <button class="setup-section-header" onclick="toggleSetupSection('links')" type="button">
-            <span>📲 Share &amp; Group Links<span class="ss-subtitle">Invite link, QR code, per-group scorekeeper links</span></span>
-            <span class="setup-section-chevron" id="chevron-links">▼</span>
-        </button>
-        <div class="setup-section-body collapsed" id="body-links">
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
@@ -238,15 +220,7 @@
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
         <div id="group-links-list"></div>
     </div>
-        </div>
-    </div>
 
-    <div class="setup-section">
-        <button class="setup-section-header" onclick="toggleSetupSection('roundsetup')" type="button">
-            <span>🏌️ Round Setup<span class="ss-subtitle">Course, round length, day #</span></span>
-            <span class="setup-section-chevron open" id="chevron-roundsetup">▼</span>
-        </button>
-        <div class="setup-section-body" id="body-roundsetup">
     <div class="form-group">
         <label>Round / Day #</label>
         <select id="round-day-select">
@@ -362,15 +336,7 @@
             </div>
         </div>
     </div>
-        </div>
-    </div>
 
-    <div class="setup-section">
-        <button class="setup-section-header" onclick="toggleSetupSection('format')" type="button">
-            <span>🎮 Game Format &amp; Settings<span class="ss-subtitle">Pick a format, then its options appear here</span></span>
-            <span class="setup-section-chevron open" id="chevron-format">▼</span>
-        </button>
-        <div class="setup-section-body" id="body-format">
     <div class="form-group">
         <label>Game Format</label>
         <select id="game-format-select" onchange="handleFormatChange()">
@@ -576,15 +542,9 @@
             </div>
         </div>
     </div>
-        </div>
-    </div>
 
-    <div class="setup-section">
-        <button class="setup-section-header" onclick="toggleSetupSection('players')" type="button">
-            <span>👥 Players<span class="ss-subtitle" id="players-count-subtitle">Add everyone playing</span></span>
-            <span class="setup-section-chevron open" id="chevron-players">▼</span>
-        </button>
-        <div class="setup-section-body" id="body-players">
+    <hr style="border: 0; border-top: 1px solid var(--border-faint); margin: 20px 0;">
+
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
@@ -592,10 +552,8 @@
 
     <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
-        </div>
-    </div>
 
-    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save &amp; Start Round</button>
+    <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
 
     <div class="end-box">
         <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
@@ -625,23 +583,6 @@
             document.documentElement.classList.add('dark-mode');
         }
     })();
-
-    // --- COLLAPSIBLE SETUP SECTIONS ---
-    function toggleSetupSection(id) {
-        const body = document.getElementById('body-' + id);
-        const chevron = document.getElementById('chevron-' + id);
-        if (!body || !chevron) return;
-        const isOpen = !body.classList.contains('collapsed');
-        setSetupSectionState(id, !isOpen);
-    }
-
-    function setSetupSectionState(id, open) {
-        const body = document.getElementById('body-' + id);
-        const chevron = document.getElementById('chevron-' + id);
-        if (!body || !chevron) return;
-        body.classList.toggle('collapsed', !open);
-        chevron.classList.toggle('open', open);
-    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');
@@ -2108,17 +2049,8 @@
             if (!data.players || data.players.length === 0) {
                 addPlayerRow(); 
                 regenerateGroupLinks();
-                // Fresh round, nothing to share yet - HTML defaults (setup open, links closed) are already right.
             } else {
                 loadModeData(currentMode);
-                // Reopening a round that's already set up - what they usually want is the links,
-                // not to look at settings they already picked. Setup sections tuck away, links open up.
-                setSetupSectionState('links', true);
-                setSetupSectionState('roundsetup', false);
-                setSetupSectionState('format', false);
-                setSetupSectionState('players', false);
-                const subtitleEl = document.getElementById('players-count-subtitle');
-                if (subtitleEl && data.players) subtitleEl.textContent = `${data.players.length} player${data.players.length === 1 ? '' : 's'} added`;
             }
         });
     }
