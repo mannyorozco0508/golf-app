@@ -169,12 +169,10 @@
         }
         .hole-view-position { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
 
-        .finish-round-banner {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            background: linear-gradient(135deg, var(--brand-green), var(--accent-teal));
-            color: #fff; border: none; border-radius: 12px; padding: 14px; margin-bottom: 12px;
-            font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%;
-            box-shadow: 0 3px 8px var(--shadow-color);
+        .finish-round-nav-btn {
+            flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; border: none;
+            background: linear-gradient(135deg, var(--brand-green), var(--accent-teal)); color: #fff; cursor: pointer;
+            box-shadow: 0 2px 5px var(--shadow-color);
         }
         .finish-round-modal-content { max-width: 420px; }
         .fr-headline { text-align: center; font-size: 1.1rem; font-weight: bold; color: var(--brand-green); background: var(--nassau-box-bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; }
@@ -375,8 +373,6 @@
     <div class="group-filter-bar" id="group-filter-container"></div>
 
     <div class="hole-jump-nav" id="hole-jump-nav"></div>
-
-    <button class="finish-round-banner" id="finish-round-banner" style="display:none;" onclick="openFinishRoundModal()">🏁 Finish Round</button>
 
     <div class="view-mode-toggle">
         <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">🎯 Hole View</button>
@@ -676,10 +672,20 @@
 
         const row = document.getElementById(`hole-row-${currentViewedHole}`);
         const positionText = `Hole ${currentViewedHole} of ${holeNumbers.length}`;
+
+        const isLastHole = currentViewedHole === holeNumbers[holeNumbers.length - 1];
+        const filteredPlayers = window.__scFilteredPlayers || [];
+        const savedScores = currentData.scores || {};
+        const roundComplete = filteredPlayers.length > 0 && courseData.every(h => filteredPlayers.every(p => savedScores[`p${p.id}_h${h.hole}`] > 0));
+
+        const nextBtnHtml = (isLastHole && roundComplete)
+            ? `<button class="finish-round-nav-btn" onclick="openFinishRoundModal()">🏁 Finish Round</button>`
+            : `<button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>`;
+
         const navRowHtml = `<div class="hole-view-nav-row">
             <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
             <span class="hole-view-position">${positionText}</span>
-            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>
+            ${nextBtnHtml}
         </div>`;
 
         if (!row) {
@@ -840,14 +846,6 @@
     }
 
     // --- FINISH ROUND ---
-    function checkRoundComplete(filteredPlayers, courseData, savedScores) {
-        const banner = document.getElementById('finish-round-banner');
-        if (!banner) return;
-        if (!filteredPlayers.length || !courseData.length) { banner.style.display = 'none'; return; }
-        const allDone = courseData.every(h => filteredPlayers.every(p => savedScores[`p${p.id}_h${h.hole}`] > 0));
-        banner.style.display = allDone ? 'flex' : 'none';
-    }
-
     function getNavLinkHref(labelSubstring) {
         const links = Array.from(document.querySelectorAll('.nav-link'));
         const link = links.find(l => l.textContent.includes(labelSubstring));
@@ -1726,6 +1724,7 @@
             const size = b ? b.size : players.length;
             filteredPlayers = players.slice(startIdx, startIdx + size);
         }
+        window.__scFilteredPlayers = filteredPlayers;
 
         renderHoleJumpNav(courseData, savedScores, filteredPlayers);
 
@@ -2283,7 +2282,6 @@
             currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
         }
         if (currentViewMode === 'hole') renderHoleView();
-        checkRoundComplete(filteredPlayers, courseData, savedScores);
 
         buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc);
     }
