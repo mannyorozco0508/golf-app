@@ -102,6 +102,9 @@
         .modal-content { background: var(--modal-bg); border-radius: 12px; width: 100%; max-width: 420px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; color: var(--text-main); }
         .modal-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
+        .team-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; gap: 8px; }
+        .team-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.82rem; }
+        .btn-outline { background: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 6px 10px; font-size: 0.75rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
         .player-pick-badge { padding: 6px 10px; border-radius: 20px; border: 1px solid var(--border-mid); background: var(--nav-bg); font-size: 0.75rem; font-weight: bold; color: var(--text-muted); cursor: pointer; user-select: none; }
         .player-pick-badge.pick-a { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .player-pick-badge.pick-b { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); }
@@ -272,6 +275,18 @@
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap players to build each side — 1 vs 1 (2v2 for Match Play / Nassau only). First tap = Team A (green), second tap = Team B (navy).</div>
         <div id="sm-player-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
         <button class="btn-primary" onclick="saveSideMatch()">💾 Start Side Match</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="sidematch-links-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>✅ Side Match Created!</span>
+            <button class="close-modal" onclick="closeSideMatchLinksModal()">&times;</button>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
+        <div id="sm-links-list"></div>
+        <button class="btn-primary" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
     </div>
 </div>
 
@@ -619,6 +634,91 @@
         renderSideMatchPicker();
     }
 
+    // Same group-sizing logic used on Home/Scorecard, ported here so a freshly created Side Match
+    // can immediately hand back the correct scorecard link for each player involved.
+    function computeGroupSizes(playerCount, overrides) {
+        overrides = overrides || {};
+        let sizes = [];
+        let sum = 0;
+        let gIdx = 0;
+        while (sum < playerCount) {
+            let remaining = playerCount - sum;
+            let defaultSize = Math.min(4, remaining);
+            let ov = overrides[gIdx];
+            let sz = (ov !== undefined && ov > 0) ? Math.min(ov, remaining) : defaultSize;
+            sizes.push(sz);
+            sum += sz;
+            gIdx++;
+        }
+        return sizes;
+    }
+
+    function computeGroupBoundaries(playerCount, overrides) {
+        const sizes = computeGroupSizes(playerCount, overrides);
+        let boundaries = [];
+        let idx = 0;
+        sizes.forEach((size, i) => {
+            boundaries.push({ group: i + 1, startIdx: idx, size: size });
+            idx += size;
+        });
+        return boundaries;
+    }
+
+    function buildPlayerGroupMap() {
+        const players = currentData.players || [];
+        const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
+        const map = {};
+        boundaries.forEach(b => {
+            for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
+                if (players[i]) map[String(players[i].id)] = b.group;
+            }
+        });
+        return map;
+    }
+
+    function scorecardBaseUrl() {
+        return window.location.href.split('?')[0].replace('sidematches.html', 'index.html');
+    }
+
+    function openSideMatchLinksModal(teamAIds, teamBIds) {
+        const players = currentData.players || [];
+        const groupMap = buildPlayerGroupMap();
+        const isMultiGroup = players.length > 4;
+        const involvedIds = teamAIds.concat(teamBIds);
+
+        let html = '';
+        if (!isMultiGroup) {
+            html = `<div style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding:10px 0;">Only one group in this round — everyone already has score access via the main link.</div>`;
+        } else {
+            const seenGroups = new Set();
+            involvedIds.forEach(id => {
+                const group = groupMap[String(id)];
+                if (group === undefined || seenGroups.has(group)) return;
+                seenGroups.add(group);
+                const namesInGroup = involvedIds
+                    .filter(pid => groupMap[String(pid)] === group)
+                    .map(pid => { const p = players.find(pl => String(pl.id) === String(pid)); return p ? p.name.split(' ')[0] : '?'; })
+                    .join(' & ');
+                const url = `${scorecardBaseUrl()}?game=${currentMode}&group=${group}`;
+                html += `<div class="team-link-row">
+                    <span>🏌️ ${namesInGroup} — Group ${group}</span>
+                    <button class="btn-outline" onclick="copySideMatchLink('${url}')">📋 Copy</button>
+                </div>`;
+            });
+        }
+
+        document.getElementById('sm-links-list').innerHTML = html;
+        document.getElementById('sidematch-links-modal').style.display = 'flex';
+    }
+
+    function copySideMatchLink(url) {
+        navigator.clipboard.writeText(url).then(() => alert('✅ Link copied!')).catch(() => prompt('Copy this link:', url));
+    }
+
+    function closeSideMatchLinksModal() {
+        document.getElementById('sidematch-links-modal').style.display = 'none';
+    }
+
     function saveSideMatch() {
         const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
         const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
@@ -659,7 +759,10 @@
 
         const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${pushKey}`).set(payload)
-            .then(() => closeSideMatchModal())
+            .then(() => {
+                closeSideMatchModal();
+                openSideMatchLinksModal(teamAIds, teamBIds);
+            })
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
 
