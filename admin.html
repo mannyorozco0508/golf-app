@@ -257,6 +257,21 @@
             <input type="hidden" id="course-select" value="">
             <div class="custom-select-dropdown" id="course-dropdown"></div>
         </div>
+        <div id="new-course-prompt" style="margin-top:8px; font-size:0.8rem; color:var(--brand-navy); font-weight:bold; cursor:pointer;" onclick="showNewCourseForm()">
+            🔍 Don't see your course? <span style="text-decoration:underline;">+ Add it here</span>
+        </div>
+        <div id="new-course-form" style="display:none; margin-top:10px; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:12px;">
+            <label style="font-size:0.8rem;">New Course Name</label>
+            <input type="text" id="new-course-name-input" placeholder="e.g. Pebble Beach Golf Links" style="margin-bottom:8px;">
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Next you'll get the option to snap a photo of the scorecard (free scan tries to read the pars/handicaps for you) or just type them in by hand.</p>
+            <div style="background:var(--bg-card); border:1px solid var(--brand-green); border-radius:6px; padding:8px 10px; margin-bottom:8px; font-size:0.72rem; color:var(--brand-green); font-weight:bold;">
+                ✅ One-time only — once this course's pars &amp; handicaps are saved, they're stored for good. Every future round at this course (yours or anyone else's) will find it automatically, no re-entry ever needed.
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="wizard-btn-back" style="flex:1;" onclick="document.getElementById('new-course-form').style.display='none';">Cancel</button>
+                <button type="button" class="wizard-btn-next" style="flex:1;" onclick="submitNewCourseName()">Continue ▶</button>
+            </div>
+        </div>
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-next" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
@@ -1125,6 +1140,24 @@
             if (dist < nearestDist) { nearestDist = dist; nearest = groupName; }
         });
         return nearest;
+    }
+
+    function showNewCourseForm() {
+        document.getElementById('new-course-form').style.display = 'block';
+        document.getElementById('new-course-name-input').focus();
+    }
+
+    function submitNewCourseName() {
+        const name = document.getElementById('new-course-name-input').value.trim();
+        if (!name) { alert('⚠️ Enter a course name first.'); return; }
+        document.getElementById('new-course-form').style.display = 'none';
+        document.getElementById('new-course-name-input').value = '';
+        addCustomCourse(name);
+        // Scroll down to the course editor that just opened, since it can land below the fold.
+        setTimeout(() => {
+            const editor = document.getElementById('custom-course-container');
+            if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     }
 
     function addCustomCourse(name) {
