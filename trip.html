@@ -6,6 +6,7 @@
     <title>Trip Mode</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="money-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -87,6 +88,13 @@
         .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; }
         .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .val-pos { color: var(--accent-teal); }
+        .val-neg { color: var(--accent-red); }
+        .val-even { color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -157,6 +165,11 @@
     <div id="trip-leaderboard"></div>
 
     <hr class="section-divider">
+    <h3>💵 Trip Money Settlement</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Nets every linked round's main-format bet into one final "who pays who" list. Settle up for real over Venmo — this is just the math.</p>
+    <div id="trip-money-settlement"></div>
+
+    <hr class="section-divider">
     <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='trip.html'">➕ Start a Different Trip</button>
 </div>
 
@@ -185,23 +198,8 @@
         }
     });
 
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
-        } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
-        }
-    }
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
-    }
+    // getStrokes, parseHcp, and every money-calc engine live in money-engine.js
+    // (loaded above) so this page always agrees with each round's own Settle page.
 
     function generateTripCode() {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -285,72 +283,171 @@
         }).join('');
     }
 
-    // Pulls each linked round's course data + scores, sums gross/net strokes per player (matched by
-    // name), across every round in the trip. Works no matter what format each individual round used,
-    // since it's built directly from raw hole scores, not from any one format's settlement math.
-    function renderCumulativeLeaderboard() {
-        const container = document.getElementById('trip-leaderboard');
+    let cachedRoundResults = [];
+
+    // Fetches every linked round exactly once per refresh, then hands the same
+    // results to both the score leaderboard and the money settlement renderer -
+    // avoids double-reading Firebase for two views of the same underlying rounds.
+    function refreshTripComputations() {
+        const scoreContainer = document.getElementById('trip-leaderboard');
+        const moneyContainer = document.getElementById('trip-money-settlement');
         const rounds = tripData.rounds || {};
         const roundCodes = Object.keys(rounds);
+
         if (roundCodes.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the leaderboard.</div>`;
+            scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the leaderboard.</div>`;
+            moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the money settlement.</div>`;
             return;
         }
 
-        container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
 
-        Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({ code, data: s.val() || {} }))))
+        Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({ code, label: rounds[code].label, data: s.val() || {} }))))
             .then(results => {
-                const playerTotals = {}; // name -> { gross, net, roundsPlayed }
-
-                results.forEach(({ data }) => {
-                    const courseData = data.courseData || [];
-                    const scores = data.scores || {};
-                    const players = data.players || [];
-                    players.forEach(p => {
-                        let gross = 0, strokesOff = 0, holesPlayed = 0;
-                        courseData.forEach(h => {
-                            const v = scores[`p${p.id}_h${h.hole}`];
-                            if (v > 0) {
-                                gross += parseInt(v, 10);
-                                strokesOff += getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                                holesPlayed++;
-                            }
-                        });
-                        if (holesPlayed === 0) return; // didn't actually play this round
-                        const net = gross - strokesOff;
-                        const key = p.name.trim().toLowerCase();
-                        if (!playerTotals[key]) playerTotals[key] = { name: p.name, gross: 0, net: 0, roundsPlayed: 0 };
-                        playerTotals[key].gross += gross;
-                        playerTotals[key].net += net;
-                        playerTotals[key].roundsPlayed += 1;
-                    });
-                });
-
-                let rows = Object.values(playerTotals);
-                rows.sort((a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
-
-                if (rows.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered in any linked round yet.</div>`;
-                    return;
-                }
-
-                let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-                    <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">${lbMode === 'net' ? 'Net' : 'Gross'}</span>
-                </div>`;
-                rows.forEach((r, i) => {
-                    const score = lbMode === 'net' ? r.net : r.gross;
-                    html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
-                        <span class="lb-pos">${i + 1}</span>
-                        <span class="lb-team">${r.name}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
-                        <span class="lb-score">${score}</span>
-                    </div>`;
-                });
-                container.innerHTML = html;
+                cachedRoundResults = results;
+                renderCumulativeLeaderboard();
+                renderTripMoneySettlement();
             })
             .catch(err => {
-                container.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                scoreContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                moneyContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
             });
+    }
+
+    // Sums gross/net strokes per player (matched by name) across every linked round.
+    // Works no matter what format each individual round used, since it's built
+    // directly from raw hole scores, not from any one format's settlement math.
+    function renderCumulativeLeaderboard() {
+        const container = document.getElementById('trip-leaderboard');
+        if (cachedRoundResults.length === 0) return;
+
+        const playerTotals = {}; // name -> { gross, net, roundsPlayed }
+
+        cachedRoundResults.forEach(({ data }) => {
+            const courseData = data.courseData || [];
+            const scores = data.scores || {};
+            const players = data.players || [];
+            players.forEach(p => {
+                let gross = 0, strokesOff = 0, holesPlayed = 0;
+                courseData.forEach(h => {
+                    const v = scores[`p${p.id}_h${h.hole}`];
+                    if (v > 0) {
+                        gross += parseInt(v, 10);
+                        strokesOff += getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        holesPlayed++;
+                    }
+                });
+                if (holesPlayed === 0) return; // didn't actually play this round
+                const net = gross - strokesOff;
+                const key = p.name.trim().toLowerCase();
+                if (!playerTotals[key]) playerTotals[key] = { name: p.name, gross: 0, net: 0, roundsPlayed: 0 };
+                playerTotals[key].gross += gross;
+                playerTotals[key].net += net;
+                playerTotals[key].roundsPlayed += 1;
+            });
+        });
+
+        let rows = Object.values(playerTotals);
+        rows.sort((a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
+
+        if (rows.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered in any linked round yet.</div>`;
+            return;
+        }
+
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">${lbMode === 'net' ? 'Net' : 'Gross'}</span>
+        </div>`;
+        rows.forEach((r, i) => {
+            const score = lbMode === 'net' ? r.net : r.gross;
+            html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
+                <span class="lb-pos">${i + 1}</span>
+                <span class="lb-team">${r.name}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
+                <span class="lb-score">${score}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // Nets every linked round's main-format money result per player (via the shared
+    // computeRoundMoneyByPlayer engine), sums across the whole trip matched by name,
+    // then runs debt simplification into one minimal "who pays who" list.
+    function renderTripMoneySettlement() {
+        const container = document.getElementById('trip-money-settlement');
+        if (cachedRoundResults.length === 0) return;
+
+        const netByName = {}; // lowercased key -> { name, net }
+        const perRoundBreakdown = [];
+
+        cachedRoundResults.forEach(({ label, data }) => {
+            const courseData = data.courseData || [];
+            const savedScores = data.scores || {};
+            if (!data.players || data.players.length === 0) {
+                perRoundBreakdown.push({ label, formatLabel: '', rows: [], message: 'No players set up yet.' });
+                return;
+            }
+            const calc = computeRoundMoneyByPlayer(data, courseData, savedScores);
+            perRoundBreakdown.push({ label, formatLabel: calc.formatLabel, rows: calc.players, message: calc.message, splitNote: calc.splitNote });
+
+            calc.players.forEach(p => {
+                const key = p.name.trim().toLowerCase();
+                if (!netByName[key]) netByName[key] = { name: p.name, net: 0 };
+                netByName[key].net += (p.net || 0);
+            });
+        });
+
+        function fmtMoney(amt) {
+            if (amt > 0.005) return `<span class="val-pos">+$${amt.toFixed(2)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-$${Math.abs(amt).toFixed(2)}</span>`;
+            return `<span class="val-even">$0.00</span>`;
+        }
+
+        const netTotals = {};
+        Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
+        const transactions = simplifyDebts(netTotals);
+
+        let html = "";
+
+        html += `<div class="settle-card"><div class="settle-header">🏁 Final "Who Pays Who"</div>`;
+        if (transactions.length === 0) {
+            const msg = Object.keys(netByName).length > 0
+                ? 'Everyone is settled up — no money changes hands.'
+                : 'No money bets recorded yet across the linked rounds.';
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">${msg}</div>`;
+        } else {
+            transactions.forEach(t => {
+                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${t.amount.toFixed(2)}</span></div>`;
+            });
+        }
+        html += `</div>`;
+
+        if (Object.keys(netByName).length > 0) {
+            html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
+            Object.values(netByName).sort((a, b) => b.net - a.net).forEach(v => {
+                html += `<div class="ledger-row"><span>${v.name}</span><span>${fmtMoney(v.net)}</span></div>`;
+            });
+            html += `</div>`;
+        }
+
+        html += `<div class="settle-card"><div class="settle-header">Per-Round Breakdown</div>`;
+        perRoundBreakdown.forEach(r => {
+            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${r.label}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
+            if (r.rows.length === 0) {
+                html += `<div style="font-size:0.78rem; color:var(--text-muted); padding:4px 0;">${r.message || 'No money data yet.'}</div>`;
+            } else {
+                r.rows.forEach(row => {
+                    html += `<div class="ledger-row" style="margin-top:6px;"><span>${row.name}</span><span>${fmtMoney(row.net || 0)}</span></div>`;
+                });
+                if (r.message) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:4px 0 2px;">${r.message}</div>`;
+                if (r.splitNote) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:2px 0 4px;">${r.splitNote}</div>`;
+            }
+        });
+        html += `</div>`;
+
+        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Main-format bets only for now — Side Games, Side Matches, and one-off Side Bets aren't included yet.</div>`;
+
+        container.innerHTML = html;
     }
 
     function loadTrip(code) {
@@ -366,7 +463,7 @@
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-trip-name').textContent = `🧳 ${tripData.name}`;
             renderRoundsList();
-            renderCumulativeLeaderboard();
+            refreshTripComputations();
         });
     }
 
