@@ -170,6 +170,15 @@
     <div id="trip-money-settlement"></div>
 
     <hr class="section-divider">
+    <h3>🏅 Trip Awards</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Auto-computed from the scores already entered — nothing extra to fill in.</p>
+    <div id="trip-awards"></div>
+
+    <hr class="section-divider">
+    <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap</button>
+    <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:6px;">Standings, settlement, and awards in one message for the group chat.</p>
+
+    <hr class="section-divider">
     <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='trip.html'">➕ Start a Different Trip</button>
 </div>
 
@@ -284,34 +293,42 @@
     }
 
     let cachedRoundResults = [];
+    let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
+    let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
+    let cachedAwards = {};         // trip awards — reused by the share recap
 
     // Fetches every linked round exactly once per refresh, then hands the same
-    // results to both the score leaderboard and the money settlement renderer -
-    // avoids double-reading Firebase for two views of the same underlying rounds.
+    // results to the score leaderboard, money settlement, and awards renderers -
+    // avoids double-reading Firebase for three views of the same underlying rounds.
     function refreshTripComputations() {
         const scoreContainer = document.getElementById('trip-leaderboard');
         const moneyContainer = document.getElementById('trip-money-settlement');
+        const awardsContainer = document.getElementById('trip-awards');
         const rounds = tripData.rounds || {};
         const roundCodes = Object.keys(rounds);
 
         if (roundCodes.length === 0) {
             scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the leaderboard.</div>`;
             moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the money settlement.</div>`;
+            awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the awards.</div>`;
             return;
         }
 
         scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
         moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
 
         Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({ code, label: rounds[code].label, data: s.val() || {} }))))
             .then(results => {
                 cachedRoundResults = results;
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
+                renderTripAwards();
             })
             .catch(err => {
                 scoreContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
                 moneyContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                awardsContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
             });
     }
 
@@ -349,6 +366,7 @@
         });
 
         let rows = Object.values(playerTotals);
+        cachedPlayerTotals = rows;
         rows.sort((a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
 
         if (rows.length === 0) {
@@ -406,6 +424,7 @@
         const netTotals = {};
         Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
         const transactions = simplifyDebts(netTotals);
+        cachedMoneyTransactions = transactions;
 
         let html = "";
 
@@ -448,6 +467,162 @@
         html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Main-format bets only for now — Side Games, Side Matches, and one-off Side Bets aren't included yet.</div>`;
 
         container.innerHTML = html;
+    }
+
+    // Computes trip-wide awards straight from raw hole scores — no extra input required.
+    // Definitions (documented since these are judgment calls, not official rules):
+    //   Most Birdies    — most gross birdies (score = par - 1) across every linked round
+    //   Biggest Blow-Up — single worst score-vs-par on any one hole, trip-wide
+    //   Best Comeback   — biggest front-9-to-back-9 gross improvement in a single round
+    //   Sandbagger      — most net strokes under par, summed across the whole trip
+    function computeTripAwards(results) {
+        const birdieCounts = {};   // name -> count
+        const sandbaggerTotals = {}; // name -> net-to-par total (more negative = bigger sandbagger)
+        let blowUp = null;   // { name, label, hole, par, score, diff }
+        let comeback = null; // { name, label, frontGross, backGross, improvement }
+
+        results.forEach(({ label, data }) => {
+            const courseData = data.courseData || [];
+            const scores = data.scores || {};
+            const players = data.players || [];
+
+            players.forEach(p => {
+                let frontGross = 0, backGross = 0, frontHoles = 0, backHoles = 0;
+
+                courseData.forEach(h => {
+                    const v = scores[`p${p.id}_h${h.hole}`];
+                    if (!v || v <= 0) return;
+                    const gross = parseInt(v, 10);
+                    const par = parseInt(h.par, 10);
+                    const diff = gross - par;
+
+                    if (diff === -1) {
+                        birdieCounts[p.name] = (birdieCounts[p.name] || 0) + 1;
+                    }
+
+                    if (h.hole <= 9) { frontGross += gross; frontHoles++; }
+                    else { backGross += gross; backHoles++; }
+
+                    const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                    sandbaggerTotals[p.name] = (sandbaggerTotals[p.name] || 0) + ((gross - strokes) - par);
+
+                    if (!blowUp || diff > blowUp.diff) {
+                        blowUp = { name: p.name, label, hole: h.hole, par, score: gross, diff };
+                    }
+                });
+
+                if (frontHoles === 9 && backHoles === 9) {
+                    const improvement = frontGross - backGross; // positive = played better on the back nine
+                    if (improvement > 0 && (!comeback || improvement > comeback.improvement)) {
+                        comeback = { name: p.name, label, frontGross, backGross, improvement };
+                    }
+                }
+            });
+        });
+
+        let mostBirdies = null;
+        Object.keys(birdieCounts).forEach(name => {
+            if (birdieCounts[name] > 0 && (!mostBirdies || birdieCounts[name] > mostBirdies.count)) {
+                mostBirdies = { name, count: birdieCounts[name] };
+            }
+        });
+
+        let sandbagger = null;
+        Object.keys(sandbaggerTotals).forEach(name => {
+            if (sandbaggerTotals[name] < 0 && (!sandbagger || sandbaggerTotals[name] < sandbagger.netToPar)) {
+                sandbagger = { name, netToPar: sandbaggerTotals[name] };
+            }
+        });
+
+        return { mostBirdies, blowUp, comeback, sandbagger };
+    }
+
+    function renderTripAwards() {
+        const container = document.getElementById('trip-awards');
+        if (cachedRoundResults.length === 0) return;
+
+        const awards = computeTripAwards(cachedRoundResults);
+        cachedAwards = awards;
+
+        const cards = [];
+        if (awards.mostBirdies) {
+            cards.push({ emoji: '🐦', title: 'Most Birdies', line: `${awards.mostBirdies.name} — ${awards.mostBirdies.count} birdie${awards.mostBirdies.count === 1 ? '' : 's'}` });
+        }
+        if (awards.blowUp) {
+            cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole', line: `${awards.blowUp.name} — Hole ${awards.blowUp.hole} (Par ${awards.blowUp.par}, shot ${awards.blowUp.score}) on ${awards.blowUp.label}` });
+        }
+        if (awards.comeback) {
+            cards.push({ emoji: '📈', title: 'Best Comeback', line: `${awards.comeback.name} — ${awards.comeback.frontGross} on the front, ${awards.comeback.backGross} on the back (${awards.comeback.label})` });
+        }
+        if (awards.sandbagger) {
+            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${awards.sandbagger.name} — ${Math.abs(awards.sandbagger.netToPar)} net strokes under par for the trip` });
+        }
+
+        if (cards.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered yet — awards show up once rounds are underway.</div>`;
+            return;
+        }
+
+        let html = "";
+        cards.forEach(c => {
+            html += `<div class="ledger-row" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">${c.emoji} ${c.title}</span>
+                <span style="font-size:0.95rem;">${c.line}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // Builds the plain-text trip recap shared to the group chat — pulls from the
+    // caches populated by the leaderboard/settlement/awards renderers above, so
+    // it always matches exactly what's on screen with no recomputation.
+    function buildShareRecapText() {
+        let text = `🧳 ${tripData.name} — Trip Recap\n\n`;
+
+        text += `🏆 STANDINGS (Net)\n`;
+        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
+        if (netRows.length === 0) {
+            text += `No scores yet.\n`;
+        } else {
+            netRows.forEach((r, i) => { text += `${i + 1}. ${r.name} — ${r.net}\n`; });
+        }
+
+        text += `\n💵 FINAL SETTLEMENT\n`;
+        if (cachedMoneyTransactions.length === 0) {
+            text += `Everyone's settled up — no money changes hands.\n`;
+        } else {
+            cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${t.amount.toFixed(2)}\n`; });
+        }
+
+        const a = cachedAwards || {};
+        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+            text += `\n🏅 AWARDS\n`;
+            if (a.mostBirdies) text += `🐦 Most Birdies: ${a.mostBirdies.name} (${a.mostBirdies.count})\n`;
+            if (a.blowUp) text += `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
+            if (a.comeback) text += `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
+            if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name}\n`;
+        }
+
+        return text;
+    }
+
+    function shareRecap() {
+        if (cachedRoundResults.length === 0) {
+            alert('⚠️ Link at least one round with scores before sharing the recap.');
+            return;
+        }
+        const text = buildShareRecapText();
+        if (navigator.share) {
+            navigator.share({ title: `${tripData.name} Recap`, text: text }).catch(() => {});
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('📋 Recap copied to clipboard — paste it into your group chat.');
+            }).catch(() => {
+                alert(text);
+            });
+        } else {
+            alert(text);
+        }
     }
 
     function loadTrip(code) {
