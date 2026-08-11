@@ -220,6 +220,12 @@
     
     <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
+
+    <div class="lobby-divider"><span>OR</span></div>
+
+    <p style="font-size:0.75rem; color:var(--text-muted); margin: 0 0 8px 0;">Playing 36 today, or running the same setup again? Copy an existing round's course/format/side games as a starting point — you can still edit players before saving.</p>
+    <input type="text" id="duplicate-room-input" class="join-input" placeholder="GAME CODE TO COPY" maxlength="6">
+    <button class="btn-outline" onclick="duplicateRoom()">📋 Duplicate This Round's Setup</button>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -242,6 +248,10 @@
 
     <div id="trip-context-banner-wizard" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--brand-green); font-weight:bold;">
         🧳 <span id="trip-context-name-wizard">Loading trip...</span> — this round will link back to that trip once saved.
+    </div>
+
+    <div id="copy-from-banner" style="display:none; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--text-main);">
+        📋 <strong>Copied settings from your other round</strong> — course, format, and side games are pre-filled. Double-check <strong>Step 5: Players</strong> since who's playing today may be different.
     </div>
 
     <div class="share-box">
@@ -855,6 +865,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
     let tripLinkCode = urlParams.get('trip'); // present when this round is being set up FROM Trip Mode
+    let copyFromCode = urlParams.get('copyFrom'); // present when pre-filling from another round's setup
     let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
@@ -978,6 +989,27 @@
         let dest = `admin.html?game=${inputCode}`;
         if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
         window.location.href = dest;
+    }
+
+    // Generates a brand-new round but pre-fills its setup from an existing round (course,
+    // format, stakes, side games, starting roster) — built for 36-hole days and repeat
+    // weekly games where re-typing the same setup from scratch wastes time.
+    function duplicateRoom() {
+        const sourceCode = document.getElementById("duplicate-room-input").value.trim().toUpperCase();
+        if (sourceCode.length < 2) {
+            alert("⚠️ Enter the game code of the round you want to copy.");
+            return;
+        }
+        db.ref(`events/${sourceCode}`).once('value').then(snap => {
+            if (!snap.exists()) {
+                alert(`⚠️ No round found with code ${sourceCode}. Double-check the code and try again.`);
+                return;
+            }
+            const newCode = generateRoomCode();
+            let dest = `admin.html?game=${newCode}&copyFrom=${sourceCode}`;
+            if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+            window.location.href = dest;
+        }).catch(err => alert(`Error looking up that round: ${err.message}`));
     }
 
     const courseDirectory = [
@@ -2060,13 +2092,11 @@
             if (!gameFormat) { alert("⚠️ Please select a Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
 
             const rows = document.querySelectorAll('.player-row');
-            if (rows.length === 0) {
-                alert("⚠️ Please add at least one player to start the game!");
-                saveBtn.innerText = originalText; saveBtn.disabled = false;
-                return;
-            }
+            // Players are no longer required to save — lets you set up a whole trip's worth of
+            // rounds (course/format/side games) in advance and fill in who's actually playing
+            // later, since rosters often aren't locked until close to the round.
 
-            if (gameFormat === 'wolf' && rows.length !== 4) {
+            if (gameFormat === 'wolf' && rows.length > 0 && rows.length !== 4) {
                 alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
                 saveBtn.innerText = originalText; saveBtn.disabled = false;
                 return;
@@ -2277,8 +2307,17 @@
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
-                addPlayerRow(); 
-                regenerateGroupLinks();
+                if (copyFromCode) {
+                    // Pre-fill this brand-new round from another round's setup (course, format,
+                    // stakes, side games, and starting roster) instead of building from scratch —
+                    // the player list stays fully editable in Step 5 for whoever's actually in today.
+                    loadModeData(copyFromCode);
+                    const banner = document.getElementById('copy-from-banner');
+                    if (banner) banner.style.display = 'block';
+                } else {
+                    addPlayerRow();
+                    regenerateGroupLinks();
+                }
                 // Fresh round, nothing saved yet - starting at Step 1 (already done above) is right.
             } else {
                 loadModeData(currentMode);
