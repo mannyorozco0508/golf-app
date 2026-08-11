@@ -137,6 +137,15 @@
     <hr class="section-divider">
     <h3>🔗 Add a Round to This Trip</h3>
     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+
+    <div class="form-group" id="copy-from-round-group" style="display:none; margin-bottom:8px;">
+        <label>Start From (optional)</label>
+        <select id="copy-from-round-select">
+            <option value="">🆕 Blank round</option>
+        </select>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Copies course/format/side games from that round — handy for a 36-hole day. Players stay editable either way.</p>
+    </div>
+
     <button class="btn-primary" onclick="createRoundForTrip()">➕ Create New Round for This Trip</button>
 
     <div style="margin-top:14px; border-top:1px solid var(--border-light); padding-top:12px;">
@@ -245,7 +254,10 @@
     // admin.html reads that param and, when the round is saved, links itself back to this
     // trip automatically. No game code to copy, no coming back here to paste anything.
     function createRoundForTrip() {
-        window.location.href = `admin.html?trip=${currentTripCode}`;
+        const copyFrom = document.getElementById('copy-from-round-select').value;
+        let dest = `admin.html?trip=${currentTripCode}`;
+        if (copyFrom) dest += `&copyFrom=${copyFrom}`;
+        window.location.href = dest;
     }
 
     function linkRound() {
@@ -287,6 +299,19 @@
         const container = document.getElementById('rounds-list');
         const rounds = tripData.rounds || {};
         const roundCodes = Object.keys(rounds).sort((a, b) => (rounds[a].addedAt || 0) - (rounds[b].addedAt || 0));
+
+        const copyGroup = document.getElementById('copy-from-round-group');
+        const copySelect = document.getElementById('copy-from-round-select');
+        if (roundCodes.length === 0) {
+            copyGroup.style.display = 'none';
+        } else {
+            copyGroup.style.display = 'block';
+            const currentSelection = copySelect.value;
+            copySelect.innerHTML = '<option value="">🆕 Blank round</option>' +
+                roundCodes.map(code => `<option value="${code}">${rounds[code].label}</option>`).join('');
+            if (roundCodes.includes(currentSelection)) copySelect.value = currentSelection;
+        }
+
         if (roundCodes.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No rounds linked yet. Add one above.</div>`;
             return;
