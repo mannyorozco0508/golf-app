@@ -123,6 +123,18 @@
         .val-neg { color: var(--accent-red); }
         .val-even { color: var(--text-muted); }
 
+        .trip-section { border: 1px solid var(--border-mid); border-radius: 10px; margin-bottom: 14px; background: var(--bg-card); overflow: hidden; }
+        .trip-section summary {
+            list-style: none; cursor: pointer; padding: 14px 16px; font-weight: bold; font-size: 1rem;
+            color: var(--brand-green); display: flex; justify-content: space-between; align-items: center;
+            background: var(--nav-bg); -webkit-tap-highlight-color: transparent;
+        }
+        .trip-section summary::-webkit-details-marker { display: none; }
+        .trip-section summary::after { content: '▼'; font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s ease; margin-left: 10px; flex-shrink: 0; }
+        .trip-section[open] summary::after { transform: rotate(180deg); }
+        .trip-section-body { padding: 14px 16px; }
+        .trip-section-sub { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px 0; }
+
         #trip-itinerary-print-view { display: none; }
         @media print {
             body.printing-itinerary > *:not(#manage-screen) { display: none !important; }
@@ -138,6 +150,11 @@
     <div class="lobby-logo">🧳</div>
     <div class="lobby-title">Trip Mode</div>
     <p class="lobby-sub">Tie multiple rounds together into one trip — a running leaderboard across every day, not just one round at a time.</p>
+
+    <div id="resume-trip-container" style="display:none; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border-light);">
+        <span style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px; font-weight:bold; text-transform:uppercase;">Recent Trip Found</span>
+        <button class="btn-primary" style="background-color:var(--accent-teal);" onclick="resumeTrip()">▶️ Resume Trip (<span id="resume-trip-badge"></span>)</button>
+    </div>
 
     <button class="btn-primary" onclick="showCreateTripForm()">➕ Start a New Trip</button>
 
@@ -214,54 +231,71 @@
     </div>
 
     <hr class="section-divider">
-    <h3>📅 Rounds in This Trip</h3>
-    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:-8px;">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
-    <div id="rounds-list"></div>
-    <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
+
+    <details class="trip-section" open>
+        <summary>📅 Rounds in This Trip</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
+            <div id="rounds-list"></div>
+            <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
+        </div>
+    </details>
 
     <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
 
-    <hr class="section-divider">
-    <h3>🏆 Cumulative Leaderboard</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Totals across every linked round so far. Matches players by name across rounds.</p>
-    <div class="toggle-row">
-        <span class="toggle-label-sm active" id="lb-mode-label-gross" onclick="setLbMode('gross')">Gross</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="lb-mode-switch" onchange="setLbMode(this.checked ? 'net' : 'gross')">
-            <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label-sm" id="lb-mode-label-net" onclick="setLbMode('net')">Net</span>
-    </div>
-    <div id="trip-leaderboard"></div>
+    <details class="trip-section" open>
+        <summary>🏆 Cumulative Leaderboard</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Totals across every linked round so far. Matches players by name across rounds.</p>
+            <div class="toggle-row">
+                <span class="toggle-label-sm active" id="lb-mode-label-gross" onclick="setLbMode('gross')">Gross</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="lb-mode-switch" onchange="setLbMode(this.checked ? 'net' : 'gross')">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label-sm" id="lb-mode-label-net" onclick="setLbMode('net')">Net</span>
+            </div>
+            <div id="trip-leaderboard"></div>
+        </div>
+    </details>
 
-    <hr class="section-divider">
-    <h3>💵 Trip Money Settlement</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Nets every linked round's main-format bet into one final "who pays who" list. Settle up for real over Venmo — this is just the math.</p>
-    <div id="trip-money-settlement"></div>
+    <details class="trip-section">
+        <summary>💵 Trip Money Settlement</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Nets every linked round's main-format bet into one final "who pays who" list. Settle up for real over Venmo — this is just the math.</p>
+            <div id="trip-money-settlement"></div>
+        </div>
+    </details>
 
-    <hr class="section-divider">
-    <h3>🎖️ Points Race</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Add up across the trip for a season-style standings, separate from strokes or money. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
-    <div id="trip-points-race"></div>
+    <details class="trip-section">
+        <summary>🎖️ Points Race &amp; Prizes</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
+            <div id="trip-points-race"></div>
 
-    <hr class="section-divider">
-    <h3>🏆 Prize Payout Calculator</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set the pool and how many spots pay — this maps it straight onto the Points Race standings above. Ties split whatever prize money their tied spots add up to.</p>
-    <div class="form-group" style="margin-bottom:8px;">
-        <label>Total Pool ($)</label>
-        <input type="number" id="prize-pool-input" min="0" value="0" oninput="renderPrizeSpotInputs()">
-    </div>
-    <div class="form-group" style="margin-bottom:8px;">
-        <label>Paid Spots</label>
-        <input type="number" id="prize-spots-input" min="1" max="20" value="3" oninput="renderPrizeSpotInputs()">
-    </div>
-    <div id="prize-spot-amounts"></div>
-    <div id="prize-payout-results" style="margin-top:10px;"></div>
+            <hr class="section-divider" style="margin:18px 0;">
 
-    <hr class="section-divider">
-    <h3>🏅 Trip Awards</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Auto-computed from the scores already entered — nothing extra to fill in.</p>
-    <div id="trip-awards"></div>
+            <p class="trip-section-sub" style="margin-bottom:8px;"><strong>Prize Payout Calculator</strong> — set the pool and how many spots pay, and it maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label>Total Pool ($)</label>
+                <input type="number" id="prize-pool-input" min="0" value="0" oninput="renderPrizeSpotInputs()">
+            </div>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label>Paid Spots</label>
+                <input type="number" id="prize-spots-input" min="1" max="20" value="3" oninput="renderPrizeSpotInputs()">
+            </div>
+            <div id="prize-spot-amounts"></div>
+            <div id="prize-payout-results" style="margin-top:10px;"></div>
+        </div>
+    </details>
+
+    <details class="trip-section" open>
+        <summary>🏅 Trip Awards</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Auto-computed from the scores already entered — nothing extra to fill in.</p>
+            <div id="trip-awards"></div>
+        </div>
+    </details>
 
     <hr class="section-divider">
     <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap</button>
@@ -1401,6 +1435,7 @@
                 window.location.href = "trip.html";
                 return;
             }
+            localStorage.setItem('lastTripCode', code);
             document.getElementById('setup-screen').style.display = 'none';
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
@@ -1414,11 +1449,22 @@
         });
     }
 
+    function resumeTrip() {
+        const lastTrip = localStorage.getItem('lastTripCode');
+        if (lastTrip) window.location.href = `trip.html?trip=${lastTrip}`;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const tripParam = urlParams.get('trip');
     if (tripParam) {
         currentTripCode = tripParam.toUpperCase();
         loadTrip(currentTripCode);
+    } else {
+        const lastTrip = localStorage.getItem('lastTripCode');
+        if (lastTrip) {
+            document.getElementById('resume-trip-container').style.display = 'block';
+            document.getElementById('resume-trip-badge').textContent = lastTrip;
+        }
     }
 </script>
 </body>
