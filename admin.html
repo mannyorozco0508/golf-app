@@ -173,6 +173,12 @@
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
+
+    <div id="trip-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">🧳 Setting Up A Round For</div>
+        <div id="trip-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;">Loading trip...</div>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">This round will link itself back to the trip automatically once you finish setup.</div>
+    </div>
     
     <!-- SECRET BETA CONTROL PANEL -->
     <div id="secret-master-panel">
@@ -194,7 +200,7 @@
         <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="window.location.href='tournament.html'">🏆 Enter Tournament Mode</button>
 
         <h3 style="margin-top: 20px;">🧳 Trip Mode</h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">In development — cumulative leaderboard across multiple rounds.</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Link multiple rounds into one trip — cumulative leaderboard, money settlement, and awards across every day.</p>
         <button class="btn-primary" style="background-color: var(--brand-navy);" onclick="window.location.href='trip.html'">🧳 Enter Trip Mode</button>
 
         <div style="text-align: center; margin-top: 20px;">
@@ -232,6 +238,10 @@
     <div style="text-align: center; margin-top: 10px;">
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Active Game Code</span>
         <div class="room-badge" id="display-room-code">----</div>
+    </div>
+
+    <div id="trip-context-banner-wizard" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--brand-green); font-weight:bold;">
+        🧳 <span id="trip-context-name-wizard">Loading trip...</span> — this round will link back to that trip once saved.
     </div>
 
     <div class="share-box">
@@ -844,6 +854,7 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    let tripLinkCode = urlParams.get('trip'); // present when this round is being set up FROM Trip Mode
     let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
@@ -859,13 +870,29 @@
             document.getElementById("resume-container").style.display = "block";
             document.getElementById("resume-room-badge").textContent = lastRoom;
         }
+
+        if (tripLinkCode) {
+            document.getElementById("trip-context-banner").style.display = "block";
+            db.ref(`trips/${tripLinkCode}`).once('value').then(snap => {
+                const trip = snap.val();
+                document.getElementById("trip-context-name").textContent = trip ? trip.name : tripLinkCode;
+            });
+        }
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("admin-screen").style.display = "block";
         document.getElementById("display-room-code").textContent = currentMode;
         localStorage.setItem('lastRoomCode', currentMode);
-        
+
+        if (tripLinkCode) {
+            document.getElementById("trip-context-banner-wizard").style.display = "block";
+            db.ref(`trips/${tripLinkCode}`).once('value').then(snap => {
+                const trip = snap.val();
+                document.getElementById("trip-context-name-wizard").textContent = trip ? trip.name : tripLinkCode;
+            });
+        }
+
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
             let navHref = base + '?game=' + currentMode;
@@ -937,7 +964,9 @@
 
     function createRoom() {
         const newCode = generateRoomCode();
-        window.location.href = `admin.html?game=${newCode}`;
+        let dest = `admin.html?game=${newCode}`;
+        if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+        window.location.href = dest;
     }
 
     function joinRoom() {
@@ -946,7 +975,9 @@
             alert("⚠️ Please enter a valid game code.");
             return;
         }
-        window.location.href = `admin.html?game=${inputCode}`;
+        let dest = `admin.html?game=${inputCode}`;
+        if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+        window.location.href = dest;
     }
 
     const courseDirectory = [
@@ -2186,6 +2217,13 @@
                 dotPointVal: dotPointVal,
                 courseData: finalCourseData,
                 players: playersList
+            }).then(() => {
+                if (tripLinkCode) {
+                    return db.ref(`trips/${tripLinkCode}/rounds/${currentMode}`).set({
+                        label: selectedCourseName,
+                        addedAt: Date.now()
+                    });
+                }
             }).then(() => {
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
