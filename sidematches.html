@@ -192,6 +192,7 @@
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ New Side Match</button>
+        <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
         <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="window.print()">📄 Send Results PDF</button>
     </div>
 </div>
@@ -306,6 +307,57 @@
         <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
         <div id="sm-links-list"></div>
         <button class="btn-primary" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
+    </div>
+</div>
+
+<!-- Auto-Pair Club Day Modal -->
+<div class="modal-overlay" id="autopair-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>🏌️ Auto-Pair Whole Field</span>
+            <button class="close-modal" onclick="closeAutoPairModal()">&times;</button>
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Pairs every group against another group for 2v2 (or 1v1 where group sizes don't split evenly) — same Side Match engine, just built for everyone at once instead of one at a time. One shared bet applies to every matchup created here.</div>
+
+        <div class="control-group" style="margin-bottom:10px;">
+            <label>Format</label>
+            <select id="autopair-format">
+                <option value="match">Match Play (Overall)</option>
+                <option value="nassau">Nassau (F9 / B9 / 18)</option>
+            </select>
+        </div>
+        <div class="control-grid" style="margin-bottom:10px;">
+            <div class="control-group">
+                <label>Scoring</label>
+                <div class="toggle-row">
+                    <span class="toggle-label-sm active" id="autopair-scoring-label-net" onclick="setAutoPairScoring('net')">Net</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autopair-scoring-switch" onchange="setAutoPairScoring(this.checked ? 'gross' : 'net')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="autopair-scoring-label-gross" onclick="setAutoPairScoring('gross')">Gross</span>
+                </div>
+                <input type="hidden" id="autopair-scoring" value="net">
+            </div>
+            <div class="control-group">
+                <label>Stake ($)</label>
+                <input type="number" id="autopair-stake" value="20" min="0">
+            </div>
+        </div>
+        <div class="control-group" style="margin-bottom:14px;">
+            <label>Press Rule</label>
+            <select id="autopair-press-rule">
+                <option value="2down">Auto @ 2 Down</option>
+                <option value="1down">Auto @ 1 Down</option>
+                <option value="anytime">Press Any Hole</option>
+                <option value="none">No Press</option>
+            </select>
+        </div>
+
+        <div style="font-size:0.8rem; font-weight:bold; margin-bottom:6px;">Proposed Matchups</div>
+        <div id="autopair-preview" style="margin-bottom:14px;"></div>
+
+        <button class="btn-primary" onclick="confirmAutoPairCreate()">💾 Create All Matchups</button>
     </div>
 </div>
 
@@ -789,6 +841,154 @@
         if (!confirm("Remove this side match? This can't be undone.")) return;
         db.ref(`events/${currentMode}/sideMatches/${matchId}`).remove()
             .catch(err => alert(`Failed to remove: ${err.message}`));
+    }
+
+    // ============================================================================
+    // AUTO-PAIR WHOLE FIELD (Men's Club Day)
+    // Builds a full slate of cross-group Side Matches in one pass instead of
+    // requiring the admin to create each 2v2/1v1 matchup by hand. Reuses the exact
+    // same sideMatches data shape and calculateMatchEngine already used above —
+    // this is purely a bulk-creation shortcut, not a new match type.
+    // ============================================================================
+    let autoPairPreview = [];
+
+    // Pairs group A against group B by splitting each into 2-player teams (or a
+    // leftover 1-player team) and matching them up index-by-index, so every
+    // resulting matchup has an equal number of players per side. Anyone left
+    // over because the two groups were different sizes gets handed back rather
+    // than dropped — buildAutoPairMatchups pools leftovers from every pairing
+    // together at the end so nobody gets lost to a group-size mismatch.
+    function pairTwoGroups(groupA, groupB) {
+        let matchups = [];
+        let i = 0;
+        while (i < groupA.length && i < groupB.length) {
+            const remA = groupA.length - i;
+            const remB = groupB.length - i;
+            const teamSize = (remA >= 2 && remB >= 2) ? 2 : 1;
+            const teamA = groupA.slice(i, i + teamSize);
+            const teamB = groupB.slice(i, i + teamSize);
+            if (teamA.length === teamB.length && teamA.length > 0) {
+                matchups.push({ teamA, teamB });
+            }
+            i += teamSize;
+        }
+        const leftover = groupA.length > groupB.length ? groupA.slice(i) : (groupB.length > groupA.length ? groupB.slice(i) : []);
+        return { matchups, leftover };
+    }
+
+    function buildAutoPairMatchups() {
+        const players = currentData.players || [];
+        const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
+        if (boundaries.length < 2) return { matchups: [], note: 'Need at least 2 groups set up to auto-pair cross-group matches.', unmatchedCount: 0 };
+
+        const groups = boundaries.map(b => players.slice(b.startIdx, b.startIdx + b.size));
+        const half = Math.ceil(groups.length / 2);
+        const firstHalf = groups.slice(0, half);
+        const secondHalf = groups.slice(half);
+
+        let matchups = [];
+        let leftoverPool = [];
+        firstHalf.forEach((gA, i) => {
+            const gB = secondHalf[i];
+            if (gB) {
+                const result = pairTwoGroups(gA, gB);
+                matchups = matchups.concat(result.matchups);
+                leftoverPool = leftoverPool.concat(result.leftover);
+            } else {
+                leftoverPool = leftoverPool.concat(gA);
+            }
+        });
+
+        // Everyone left over from a group-size mismatch gets pooled and re-paired
+        // together here — prefer 2v2 while there's enough left, then fall back to 1v1.
+        while (leftoverPool.length >= 2) {
+            const teamSize = leftoverPool.length >= 4 ? 2 : 1;
+            if (leftoverPool.length < teamSize * 2) break;
+            const teamA = leftoverPool.splice(0, teamSize);
+            const teamB = leftoverPool.splice(0, teamSize);
+            matchups.push({ teamA, teamB });
+        }
+
+        const unmatchedCount = leftoverPool.length;
+        let note = '';
+        if (unmatchedCount > 0) {
+            note = `${unmatchedCount} player${unmatchedCount === 1 ? '' : 's'} couldn't be matched — odd number of total players means someone sits out the side-match slate this round.`;
+        } else if (players.length !== new Set(matchups.flatMap(m => m.teamA.concat(m.teamB)).map(p => p.id)).size) {
+            note = 'Group sizes didn\'t split evenly — some players ended up matched within their own group instead of crossing groups.';
+        }
+
+        return { matchups, note, unmatchedCount };
+    }
+
+    function setAutoPairScoring(val) {
+        document.getElementById('autopair-scoring').value = val;
+        document.getElementById('autopair-scoring-switch').checked = (val === 'gross');
+        document.getElementById('autopair-scoring-label-net').classList.toggle('active', val === 'net');
+        document.getElementById('autopair-scoring-label-gross').classList.toggle('active', val === 'gross');
+    }
+
+    function openAutoPairModal() {
+        const result = buildAutoPairMatchups();
+        autoPairPreview = result.matchups;
+        renderAutoPairPreview(result.note);
+        document.getElementById('autopair-modal').style.display = 'flex';
+    }
+
+    function closeAutoPairModal() {
+        document.getElementById('autopair-modal').style.display = 'none';
+    }
+
+    function renderAutoPairPreview(note) {
+        const container = document.getElementById('autopair-preview');
+        if (autoPairPreview.length === 0) {
+            container.innerHTML = `<div style="font-size:0.8rem; color:var(--accent-red);">${note || 'No matchups could be built from the current groups.'}</div>`;
+            return;
+        }
+        let html = "";
+        autoPairPreview.forEach(m => {
+            const aNames = m.teamA.map(p => p.name.split(' ')[0]).join(' / ');
+            const bNames = m.teamB.map(p => p.name.split(' ')[0]).join(' / ');
+            html += `<div style="display:flex; justify-content:space-between; padding:6px 10px; background:var(--nav-bg); border-radius:6px; margin-bottom:4px; font-size:0.85rem;">
+                <span>${aNames}</span><span style="color:var(--text-muted);">vs</span><span>${bNames}</span>
+            </div>`;
+        });
+        if (note) html += `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">${note}</div>`;
+        container.innerHTML = html;
+    }
+
+    function confirmAutoPairCreate() {
+        if (autoPairPreview.length === 0) {
+            alert("⚠️ No matchups to create.");
+            return;
+        }
+        const format = document.getElementById('autopair-format').value;
+        const scoring = document.getElementById('autopair-scoring').value;
+        const stake = parseFloat(document.getElementById('autopair-stake').value) || 0;
+        const pressRule = document.getElementById('autopair-press-rule').value;
+
+        if (stake <= 0) {
+            alert("⚠️ Set a stake above $0 — otherwise these matchups won't track any money.");
+            return;
+        }
+
+        let updates = {};
+        autoPairPreview.forEach(m => {
+            const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
+            updates[`sideMatches/${pushKey}`] = {
+                format, scoring,
+                teamAIds: m.teamA.map(p => p.id),
+                teamBIds: m.teamB.map(p => p.id),
+                stake, pressRule,
+                createdAt: Date.now()
+            };
+        });
+
+        db.ref(`events/${currentMode}`).update(updates)
+            .then(() => {
+                closeAutoPairModal();
+                alert(`✅ Created ${autoPairPreview.length} cross-group matchup${autoPairPreview.length === 1 ? '' : 's'}. Each player can find their match under Side Matches.`);
+            })
+            .catch(err => alert(`Failed to create matchups: ${err.message}`));
     }
 
     function pressSideMatch(matchId, baseId, nextHole) {
