@@ -135,17 +135,22 @@
     <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
 
     <hr class="section-divider">
-    <h3>🔗 Link a Round to This Trip</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Enter the game code from a round you've already created on Home, plus a short label like "Day 1 - Caledonia."</p>
-    <div class="form-group" style="margin-bottom:8px;">
-        <label>Game Code</label>
-        <input type="text" id="link-round-code" placeholder="e.g. A656" maxlength="6" style="text-transform:uppercase;">
+    <h3>🔗 Add a Round to This Trip</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+    <button class="btn-primary" onclick="createRoundForTrip()">➕ Create New Round for This Trip</button>
+
+    <div style="margin-top:14px; border-top:1px solid var(--border-light); padding-top:12px;">
+        <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 8px 0;">Already set up a round on Home before starting this trip? Link it manually instead:</p>
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Game Code</label>
+            <input type="text" id="link-round-code" placeholder="e.g. A656" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+            <label>Day Label</label>
+            <input type="text" id="link-round-label" placeholder="e.g. Day 1 - Caledonia">
+        </div>
+        <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
     </div>
-    <div class="form-group">
-        <label>Day Label</label>
-        <input type="text" id="link-round-label" placeholder="e.g. Day 1 - Caledonia">
-    </div>
-    <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
 
     <hr class="section-divider">
     <h3>📅 Rounds in This Trip</h3>
@@ -234,6 +239,13 @@
         const code = document.getElementById('join-trip-input').value.trim().toUpperCase();
         if (code.length < 2) { alert('⚠️ Enter a valid trip code.'); return; }
         window.location.href = `trip.html?trip=${code}`;
+    }
+
+    // Sends the admin straight into the round-setup wizard with this trip's code attached —
+    // admin.html reads that param and, when the round is saved, links itself back to this
+    // trip automatically. No game code to copy, no coming back here to paste anything.
+    function createRoundForTrip() {
+        window.location.href = `admin.html?trip=${currentTripCode}`;
     }
 
     function linkRound() {
