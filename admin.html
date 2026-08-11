@@ -1684,7 +1684,13 @@
         const defaultTeam = team || teamOptions[autoTeamIdx % teamOptions.length];
 
         let teamOptionsHtml = "";
-        teamOptions.forEach(t => { teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${t}</option>`; });
+        // The select column is narrow on phone width (there's already a "Team" header above
+        // it), so the visible option text is shortened to "T1"/"T2" to avoid clipping — the
+        // stored value stays the full "Team 1" string everywhere else in the app is unaffected.
+        teamOptions.forEach(t => {
+            const shortLabel = t.replace('Team ', 'T');
+            teamOptionsHtml += `<option value="${t}" ${t === defaultTeam ? 'selected' : ''}>${shortLabel}</option>`;
+        });
 
         let baseColumns = "2fr 1fr";
         let teamFieldHtml = "";
@@ -1693,10 +1699,12 @@
         if (format === 'ryder') {
             baseColumns = "1.5fr 0.7fr 1fr 1fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
+            // Same cramped-column issue as the Team select above — there's already a "Squad"
+            // header, so the color alone is enough; "Red"/"Blue" text was getting clipped.
             squadFieldHtml = `
                 <select class="p-squad-input">
-                    <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴 Red</option>
-                    <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵 Blue</option>
+                    <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴</option>
+                    <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵</option>
                 </select>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
             baseColumns = "1.8fr 0.8fr 1.2fr";
