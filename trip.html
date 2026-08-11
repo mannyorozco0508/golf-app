@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="money-engine.js"></script>
+    <script src="course-data.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -51,10 +52,16 @@
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
-        input[type="text"], input[type="number"] {
+        input[type="text"], input[type="number"], select {
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
+
+        .holes-toggle-btn {
+            flex: 1; padding: 10px 6px; border: 2px solid var(--border-mid); border-radius: 8px;
+            background: var(--bg-card); color: var(--text-main); font-size: 0.85rem; font-weight: bold; cursor: pointer;
+        }
+        .holes-toggle-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
@@ -112,7 +119,25 @@
             <label>Trip Name</label>
             <input type="text" id="trip-name-input" placeholder="e.g. Myrtle Beach 2026">
         </div>
-        <button class="btn-primary" onclick="createTrip()">💾 Create Trip</button>
+
+        <div class="form-group">
+            <label>How Many Days?</label>
+            <input type="number" id="trip-days-input" min="1" max="14" value="1" oninput="renderDayPlanner()">
+        </div>
+
+        <div id="day-planner"></div>
+
+        <div id="round-planner-section" style="display:none; margin-top:8px;">
+            <h3 style="margin-bottom:2px;">🗓️ Set Up Each Round</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Pick the course and a rough headcount now — you'll add real player names later. This just builds the skeleton so nothing's left to remember.</p>
+            <div id="round-planner"></div>
+        </div>
+
+        <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">🏗️ Build Trip &amp; All Rounds</button>
+
+        <div style="text-align:center; margin-top:12px;">
+            <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline;" onclick="createTripBlank()">Skip planning — just create an empty trip</span>
+        </div>
     </div>
 
     <div class="lobby-divider"><span>OR</span></div>
@@ -224,18 +249,214 @@
     // getStrokes, parseHcp, and every money-calc engine live in money-engine.js
     // (loaded above) so this page always agrees with each round's own Settle page.
 
-    function generateTripCode() {
+    // Same 4-character code format admin.html uses for game codes, so trip codes and
+    // bulk-built round codes are indistinguishable from ones created the normal way.
+    function generateRandomCode() {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let code = "";
         for (let i = 0; i < 4; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
         return code;
     }
 
-    function showCreateTripForm() {
-        document.getElementById('create-trip-form').style.display = 'block';
+    function generateTripCode() {
+        return generateRandomCode();
     }
 
-    function createTrip() {
+    function showCreateTripForm() {
+        document.getElementById('create-trip-form').style.display = 'block';
+        renderDayPlanner();
+    }
+
+    // ============================================================================
+    // TRIP PLANNING WIZARD
+    // Lets the whole trip skeleton get built in one shot: N days, 1 or 2 rounds
+    // per day (18 vs 36 holes), a real course per round, and a headcount that
+    // pre-builds that many blank player slots ("Player 1", "Player 2"...).
+    // Nobody's name gets typed here — that happens later, per round, whenever
+    // the actual roster is known. Add/remove players anytime from that round's
+    // own Admin setup, same as any other round.
+    // ============================================================================
+    let plannedDays = [];   // [{ roundsToday: 1 or 2 }, ...]
+    let roundConfigs = [];  // flattened per-round: [{ label, courseId, playerCount }, ...]
+
+    function renderDayPlanner() {
+        const daysInput = document.getElementById('trip-days-input');
+        let numDays = parseInt(daysInput.value, 10);
+        if (isNaN(numDays) || numDays < 1) numDays = 1;
+        if (numDays > 14) numDays = 14;
+        daysInput.value = numDays;
+
+        // Preserve each day's 18/36 choice when the day count changes instead of resetting everyone.
+        let newPlannedDays = [];
+        for (let i = 0; i < numDays; i++) {
+            newPlannedDays.push(plannedDays[i] || { roundsToday: 1 });
+        }
+        plannedDays = newPlannedDays;
+
+        const container = document.getElementById('day-planner');
+        let html = '';
+        plannedDays.forEach((d, i) => {
+            html += `<div class="settle-card" style="margin-bottom:10px;">
+                <div style="font-weight:bold; margin-bottom:8px; color:var(--brand-green);">Day ${i + 1}</div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 1 ? 'active' : ''}" onclick="setDayRounds(${i}, 1)">⛳ 18 Holes</button>
+                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 2 ? 'active' : ''}" onclick="setDayRounds(${i}, 2)">⛳⛳ 36 Holes</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+        renderRoundPlanner();
+    }
+
+    function setDayRounds(dayIndex, roundsToday) {
+        plannedDays[dayIndex].roundsToday = roundsToday;
+        renderDayPlanner();
+    }
+
+    function renderRoundPlanner() {
+        // Capture whatever's currently in the round-config form fields before rebuilding,
+        // so toggling a day's hole count elsewhere doesn't wipe course/headcount choices
+        // already made for other rounds.
+        roundConfigs.forEach((cfg, i) => {
+            const courseEl = document.getElementById(`round-course-${i}`);
+            const playersEl = document.getElementById(`round-players-${i}`);
+            if (courseEl) cfg.courseId = courseEl.value;
+            if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
+        });
+
+        let newFlat = [];
+        plannedDays.forEach((d, dayIdx) => {
+            for (let r = 0; r < d.roundsToday; r++) {
+                const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4 });
+            }
+        });
+        // Carry forward previously entered values by position — good enough for the common
+        // case of adjusting day count or 18-vs-36 without having re-pick everything.
+        newFlat.forEach((cfg, i) => {
+            if (roundConfigs[i]) {
+                cfg.courseId = roundConfigs[i].courseId || '';
+                cfg.playerCount = roundConfigs[i].playerCount || 4;
+            }
+        });
+        roundConfigs = newFlat;
+
+        const section = document.getElementById('round-planner-section');
+        const container = document.getElementById('round-planner');
+        if (roundConfigs.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        let html = '';
+        roundConfigs.forEach((cfg, i) => {
+            html += `<div class="settle-card" style="margin-bottom:10px;">
+                <div style="font-weight:bold; margin-bottom:8px;">${cfg.label}</div>
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label>Course</label>
+                    <select id="round-course-${i}">
+                        <option value="">-- Select Course --</option>
+                        ${buildCourseOptionsHtml(cfg.courseId)}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Players</label>
+                    <input type="number" id="round-players-${i}" min="0" max="40" value="${cfg.playerCount}">
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function buildCourseOptionsHtml(selectedId) {
+        let html = '';
+        courseDirectory.forEach(g => {
+            html += `<optgroup label="${g.group.replace(/"/g, '&quot;')}">`;
+            g.items.forEach(item => {
+                html += `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.name}</option>`;
+            });
+            html += `</optgroup>`;
+        });
+        return html;
+    }
+
+    // Firebase's global_courses is the live source of truth for a course's real hole data
+    // (see the course-data-override note in project memory) - falls back to the local
+    // seed data in course-data.js, then a flat placeholder if neither has it yet.
+    function resolveCourseData(courseId, globalCoursesData) {
+        if (globalCoursesData[courseId] && globalCoursesData[courseId].data) return globalCoursesData[courseId].data;
+        if (coursePresets[courseId]) return coursePresets[courseId].data;
+        let fallback = [];
+        for (let h = 1; h <= 18; h++) fallback.push({ hole: h, par: 4, hcpIndex: h });
+        return fallback;
+    }
+
+    function buildTrip() {
+        const name = document.getElementById('trip-name-input').value.trim();
+        if (!name) { alert('⚠️ Give your trip a name first.'); return; }
+        if (roundConfigs.length === 0) { alert('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
+
+        // Pull one final read of every field in case the last edit didn't fire onchange yet.
+        roundConfigs.forEach((cfg, i) => {
+            cfg.courseId = document.getElementById(`round-course-${i}`).value;
+            cfg.playerCount = parseInt(document.getElementById(`round-players-${i}`).value, 10) || 0;
+        });
+
+        if (roundConfigs.some(cfg => !cfg.courseId)) {
+            alert('⚠️ Pick a course for every round before building the trip.');
+            return;
+        }
+
+        const buildBtn = document.getElementById('build-trip-btn');
+        const originalText = buildBtn.innerText;
+        buildBtn.innerText = '⏳ Building...';
+        buildBtn.disabled = true;
+
+        db.ref('global_courses').once('value').then(snap => {
+            const globalCoursesData = snap.val() || {};
+            const tripCode = generateRandomCode();
+            const usedCodes = new Set([tripCode]);
+            let updates = {};
+            updates[`trips/${tripCode}/name`] = name;
+            updates[`trips/${tripCode}/createdAt`] = Date.now();
+
+            roundConfigs.forEach(cfg => {
+                let roundCode = generateRandomCode();
+                while (usedCodes.has(roundCode)) { roundCode = generateRandomCode(); }
+                usedCodes.add(roundCode);
+
+                const courseData = resolveCourseData(cfg.courseId, globalCoursesData);
+                const courseName = getCourseNameById(cfg.courseId, globalCoursesData) || 'Selected Course';
+                const players = [];
+                for (let p = 0; p < cfg.playerCount; p++) {
+                    players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
+                }
+
+                updates[`events/${roundCode}`] = {
+                    eventName: cfg.label,
+                    roundDay: cfg.label,
+                    eventCategory: 'weekend',
+                    categoryIcon: '⛳',
+                    activeCourseKey: cfg.courseId,
+                    courseName: courseName,
+                    gameFormat: 'stroke',
+                    courseData: courseData,
+                    players: players
+                };
+                updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
+            });
+
+            return db.ref().update(updates).then(() => tripCode);
+        }).then(tripCode => {
+            window.location.href = `trip.html?trip=${tripCode}`;
+        }).catch(err => {
+            buildBtn.innerText = originalText;
+            buildBtn.disabled = false;
+            alert(`Error building trip: ${err.message}`);
+        });
+    }
+
+    // Fallback for anyone who just wants an empty trip container with no upfront planning —
+    // the original one-field flow, still available for whenever that's genuinely what's wanted.
+    function createTripBlank() {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { alert('⚠️ Give your trip a name first.'); return; }
         const code = generateTripCode();
