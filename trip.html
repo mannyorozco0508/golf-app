@@ -241,7 +241,7 @@
 
     <hr class="section-divider">
     <h3>🎖️ Points Race</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Add up across the trip for a season-style standings, separate from strokes or money.</p>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Add up across the trip for a season-style standings, separate from strokes or money. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
     <div id="trip-points-race"></div>
 
     <hr class="section-divider">
@@ -1103,7 +1103,11 @@
             const courseData = data.courseData || [];
             const scores = data.scores || {};
             const players = data.players || [];
+            const totalHoles = courseData.length;
 
+            // Points only get awarded once a round is fully finished — ranking someone off a
+            // partial handful of holes (e.g. 3 or 9 of 18) would let a small, unrepresentative
+            // sample look artificially good or bad and distort the standings mid-round.
             let roundResults = [];
             players.forEach(p => {
                 let net = 0, holesPlayed = 0;
@@ -1114,10 +1118,10 @@
                         holesPlayed++;
                     }
                 });
-                if (holesPlayed > 0) roundResults.push({ name: p.name, net });
+                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net });
             });
 
-            if (roundResults.length === 0) return; // nobody's started this round yet
+            if (roundResults.length === 0) return; // nobody's finished this round yet
 
             roundResults.sort((a, b) => a.net - b.net);
             const fieldSize = roundResults.length;
