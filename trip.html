@@ -24,6 +24,9 @@
             --nav-bg: #f0f4f2;
             --shadow-color: rgba(0,0,0,0.08);
             --nassau-box-bg: #eef6f2;
+            --warn-bg: #fff4e5;
+            --warn-border: #e08a00;
+            --warn-text: #7a4a00;
         }
         html.dark-mode {
             --bg-page: #14181a;
@@ -40,6 +43,9 @@
             --nav-bg: #223028;
             --shadow-color: rgba(0,0,0,0.4);
             --nassau-box-bg: #1a2b24;
+            --warn-bg: #332508;
+            --warn-border: #c98a2b;
+            --warn-text: #f0b84f;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
         .container { max-width: 720px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
@@ -202,6 +208,8 @@
     <h3>📅 Rounds in This Trip</h3>
     <div id="rounds-list"></div>
 
+    <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
+
     <hr class="section-divider">
     <h3>🏆 Cumulative Leaderboard</h3>
     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Totals across every linked round so far. Matches players by name across rounds.</p>
@@ -277,6 +285,27 @@
     function showCreateTripForm() {
         document.getElementById('create-trip-form').style.display = 'block';
         renderDayPlanner();
+        if (globalCoursesCache === null) {
+            db.ref('global_courses').once('value').then(snap => {
+                globalCoursesCache = snap.val() || {};
+                renderRoundPlanner(); // refresh any already-drawn cards now that real mapping data is in
+            }).catch(() => { globalCoursesCache = {}; });
+        }
+    }
+
+    // null = not fetched yet (treat as "unknown", not "unmapped", to avoid a flash of false
+    // warnings before the read completes). {} once the fetch resolves either way.
+    let globalCoursesCache = null;
+
+    // A course counts as "mapped" if it has real hole-by-hole data from either source —
+    // the local seed set in course-data.js, or Firebase's live community database. Thistle's
+    // nine-hole loops always have real data by construction, so they're always mapped.
+    function isCourseMapped(courseId) {
+        if (!courseId) return true; // nothing selected yet — not this check's job to flag that
+        if (nineHoleLoops[courseId]) return true;
+        if (coursePresets[courseId]) return true;
+        if (globalCoursesCache && globalCoursesCache[courseId]) return true;
+        return globalCoursesCache === null ? true : false; // unknown yet -> don't falsely warn
     }
 
     // ============================================================================
@@ -404,6 +433,13 @@
                 </div>`;
             }
 
+            if (cfg.courseId && !loops && !isCourseMapped(cfg.courseId)) {
+                coursePickerHtml += `
+                <div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:10px; margin-bottom:8px; font-size:0.76rem; color:var(--warn-text);">
+                    ⚠️ <strong>This course hasn't been mapped yet</strong> — nobody's entered its real par/handicap layout. Building this round now will use placeholder data (Par 4 on every hole), which will throw off net scores and handicap strokes. After building, open this round from Home, tap the course again, and enter the real scorecard (or map it individually first, then use "Start From" to copy it in here).
+                </div>`;
+            }
+
             html += `<div class="settle-card" style="margin-bottom:10px;">
                 <div style="font-weight:bold; margin-bottom:8px;">${cfg.label}</div>
                 ${coursePickerHtml}
@@ -431,7 +467,8 @@
                 html += `<div class="course-picker-group-label">${g.group}</div>`;
                 matches.forEach(item => {
                     const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    html += `<div class="course-picker-option" onclick="selectRoundCourse(${i}, '${item.id}', '${safeName}')">${item.name}</div>`;
+                    const warnTag = isCourseMapped(item.id) ? '' : ` <span style="color:var(--warn-border); font-size:0.72rem; font-weight:bold;">⚠️ not mapped yet</span>`;
+                    html += `<div class="course-picker-option" onclick="selectRoundCourse(${i}, '${item.id}', '${safeName}')">${item.name}${warnTag}</div>`;
                 });
             }
         });
@@ -680,6 +717,7 @@
             scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the leaderboard.</div>`;
             moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the money settlement.</div>`;
             awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the awards.</div>`;
+            document.getElementById('trip-placeholder-warning').style.display = 'none';
             return;
         }
 
@@ -690,6 +728,7 @@
         Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({ code, label: rounds[code].label, data: s.val() || {} }))))
             .then(results => {
                 cachedRoundResults = results;
+                renderPlaceholderNameWarning(results);
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
                 renderTripAwards();
@@ -699,6 +738,34 @@
                 moneyContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
                 awardsContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
             });
+    }
+
+    // The trip planner pre-fills rounds with generic "Player 1", "Player 2"... slots meant
+    // to be renamed per round. Everything above matches players BY NAME across rounds, so if
+    // the same generic name is still sitting in two or more rounds, their scores/money would
+    // silently get merged as if they were the same real person. This catches that before it
+    // produces a confusing wrong number on the leaderboard or settlement.
+    function renderPlaceholderNameWarning(results) {
+        const banner = document.getElementById('trip-placeholder-warning');
+        const nameToRounds = {};
+        results.forEach(({ label, data }) => {
+            (data.players || []).forEach(p => {
+                const key = (p.name || '').trim().toLowerCase();
+                if (!/^player \d+$/.test(key)) return;
+                if (!nameToRounds[key]) nameToRounds[key] = new Set();
+                nameToRounds[key].add(label);
+            });
+        });
+
+        const collisions = Object.keys(nameToRounds).filter(key => nameToRounds[key].size > 1);
+        if (collisions.length === 0) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        const exampleRounds = Array.from(nameToRounds[collisions[0]]).join(', ');
+        banner.innerHTML = `⚠️ <strong>Rename placeholder players before trusting the totals below.</strong> "${collisions[0].replace(/^\w/, c => c.toUpperCase())}" appears in more than one round (${exampleRounds}) — since names are matched across rounds, they'll get counted as the same person until renamed. Open each round from Home to swap in real names.`;
+        banner.style.display = 'block';
     }
 
     // Sums gross/net strokes per player (matched by name) across every linked round.
