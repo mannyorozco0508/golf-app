@@ -63,6 +63,18 @@
         }
         .holes-toggle-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
+        .course-picker-wrapper { position: relative; }
+        .course-picker-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
+        .course-picker-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal);
+            border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        }
+        .course-picker-group-label { background: var(--bg-page); font-weight: bold; font-size: 0.72rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
+        .course-picker-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; color: var(--text-main); }
+        .course-picker-option:last-child { border-bottom: none; }
+        .course-picker-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .course-picker-empty { padding: 12px 14px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
 
@@ -122,7 +134,7 @@
 
         <div class="form-group">
             <label>How Many Days?</label>
-            <input type="number" id="trip-days-input" min="1" max="14" value="1" oninput="renderDayPlanner()">
+            <input type="number" id="trip-days-input" min="1" max="14" placeholder="e.g. 4" oninput="renderDayPlanner()">
         </div>
 
         <div id="day-planner"></div>
@@ -282,9 +294,10 @@
     function renderDayPlanner() {
         const daysInput = document.getElementById('trip-days-input');
         let numDays = parseInt(daysInput.value, 10);
-        if (isNaN(numDays) || numDays < 1) numDays = 1;
-        if (numDays > 14) numDays = 14;
-        daysInput.value = numDays;
+        if (isNaN(numDays) || numDays < 0) numDays = 0;
+        if (numDays > 14) { numDays = 14; daysInput.value = 14; }
+        // Never rewrite daysInput.value on the low end — doing so fights backspace/delete,
+        // since the field goes empty (NaN) for an instant while the user clears it to retype.
 
         // Preserve each day's 18/36 choice when the day count changes instead of resetting everyone.
         let newPlannedDays = [];
@@ -355,13 +368,17 @@
         let html = '';
         roundConfigs.forEach((cfg, i) => {
             const loops = nineHoleLoops[cfg.courseId];
+            const selectedName = cfg.courseId ? (getCourseNameById(cfg.courseId, {}) || cfg.courseId) : '';
             let coursePickerHtml = `
                 <div class="form-group" style="margin-bottom:8px;">
                     <label>Course</label>
-                    <select id="round-course-${i}" onchange="onRoundCourseChange(${i})">
-                        <option value="">-- Select Course --</option>
-                        ${buildCourseOptionsHtml(cfg.courseId)}
-                    </select>
+                    <div class="course-picker-wrapper">
+                        <input type="text" id="round-course-input-${i}" value="${selectedName.replace(/"/g, '&quot;')}"
+                               placeholder="-- Search / Select Course --" autocomplete="off"
+                               oninput="filterRoundCourseDropdown(${i})" onfocus="filterRoundCourseDropdown(${i})">
+                        <input type="hidden" id="round-course-${i}" value="${cfg.courseId}">
+                        <div class="course-picker-dropdown" id="round-course-dropdown-${i}"></div>
+                    </div>
                 </div>`;
 
             if (loops) {
@@ -399,26 +416,45 @@
         container.innerHTML = html;
     }
 
-    // Re-renders just this one round's card when its course changes, so picking a
-    // nine-hole-loop course (like Thistle) immediately reveals the Nine #1/#2 pickers.
-    function onRoundCourseChange(i) {
-        roundConfigs[i].courseId = document.getElementById(`round-course-${i}`).value;
+    // Filters the searchable course dropdown for round i as the person types — grouped by
+    // region, same directory the regular per-round Admin setup searches, so there's nothing
+    // to scroll through blindly for a ~150-course list.
+    function filterRoundCourseDropdown(i) {
+        const input = document.getElementById(`round-course-input-${i}`);
+        const dropdown = document.getElementById(`round-course-dropdown-${i}`);
+        const typed = input.value.trim().toLowerCase();
+
+        let html = '';
+        courseDirectory.forEach(g => {
+            const matches = g.items.filter(item => item.name.toLowerCase().includes(typed));
+            if (matches.length > 0) {
+                html += `<div class="course-picker-group-label">${g.group}</div>`;
+                matches.forEach(item => {
+                    const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += `<div class="course-picker-option" onclick="selectRoundCourse(${i}, '${item.id}', '${safeName}')">${item.name}</div>`;
+                });
+            }
+        });
+
+        dropdown.innerHTML = html || `<div class="course-picker-empty">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
+        dropdown.style.display = 'block';
+    }
+
+    // Selecting a course re-renders this round's card so a nine-hole-loop course (like
+    // Thistle) immediately reveals the Nine #1/#2 pickers.
+    function selectRoundCourse(i, id, name) {
+        roundConfigs[i].courseId = id;
         roundConfigs[i].frontNineKey = '';
         roundConfigs[i].backNineKey = '';
         renderRoundPlanner();
     }
 
-    function buildCourseOptionsHtml(selectedId) {
-        let html = '';
-        courseDirectory.forEach(g => {
-            html += `<optgroup label="${g.group.replace(/"/g, '&quot;')}">`;
-            g.items.forEach(item => {
-                html += `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.name}</option>`;
-            });
-            html += `</optgroup>`;
-        });
-        return html;
-    }
+    // Closes whichever course dropdown is open when the person taps anywhere else on the page.
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.course-picker-wrapper')) {
+            document.querySelectorAll('.course-picker-dropdown').forEach(d => d.style.display = 'none');
+        }
+    });
 
     // Firebase's global_courses is the live source of truth for a course's real hole data
     // (see the course-data-override note in project memory) - falls back to the local
