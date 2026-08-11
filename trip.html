@@ -480,6 +480,15 @@
     // Selecting a course re-renders this round's card so a nine-hole-loop course (like
     // Thistle) immediately reveals the Nine #1/#2 pickers.
     function selectRoundCourse(i, id, name) {
+        // Write straight to the DOM first — renderRoundPlanner's very first step re-reads these
+        // same fields to "preserve" whatever's currently on screen, so if we only updated the
+        // JS state and not the actual input, that re-read would stomp the selection right back
+        // to whatever stale value was already sitting in the hidden input (usually empty).
+        const hiddenEl = document.getElementById(`round-course-${i}`);
+        const textEl = document.getElementById(`round-course-input-${i}`);
+        if (hiddenEl) hiddenEl.value = id;
+        if (textEl) textEl.value = name;
+
         roundConfigs[i].courseId = id;
         roundConfigs[i].frontNineKey = '';
         roundConfigs[i].backNineKey = '';
