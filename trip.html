@@ -206,6 +206,7 @@
 
     <hr class="section-divider">
     <h3>📅 Rounds in This Trip</h3>
+    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:-8px;">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
     <div id="rounds-list"></div>
 
     <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
@@ -701,7 +702,10 @@
                     <div class="rc-label">${r.label}</div>
                     <div class="rc-sub">Game code: ${code}</div>
                 </div>
-                <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
+                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                    <a class="rc-link" href="admin.html?game=${code}">⚙️ Edit</a>
+                    <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
+                </div>
                 <span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>
             </div>`;
         }).join('');
