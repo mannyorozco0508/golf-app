@@ -1084,6 +1084,37 @@
         }
     }
 
+    // Total strokes for the round, low total wins the stake — the simpler alternative to
+    // calculateMatchEngine's hole-by-hole match play, used when a 1v1's Scoring Style is set
+    // to Stroke Play. No presses, exactly 2 players — mirrors Side Matches' stroke-play logic.
+    function calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, stake) {
+        if (players.length !== 2) return null;
+        const p1 = players[0], p2 = players[1];
+        let p1Total = 0, p2Total = 0, holesCompleted = 0;
+
+        courseData.forEach(h => {
+            const v1 = savedScores[`p${p1.id}_h${h.hole}`];
+            const v2 = savedScores[`p${p2.id}_h${h.hole}`];
+            if (v1 > 0 && v2 > 0) {
+                const s1 = scoringType === 'net' ? (parseInt(v1, 10) - getStrokes(h.hcpIndex, parseHcp(p1.hcp))) : parseInt(v1, 10);
+                const s2 = scoringType === 'net' ? (parseInt(v2, 10) - getStrokes(h.hcpIndex, parseHcp(p2.hcp))) : parseInt(v2, 10);
+                p1Total += s1;
+                p2Total += s2;
+                holesCompleted++;
+            }
+        });
+
+        const totalHoles = courseData.length;
+        const roundComplete = holesCompleted === totalHoles && totalHoles > 0;
+        let winner = null, t1TotalMoney = 0;
+        if (roundComplete) {
+            if (p1Total < p2Total) { winner = p1.id; t1TotalMoney = stake; }
+            else if (p2Total < p1Total) { winner = p2.id; t1TotalMoney = -stake; }
+        }
+
+        return { p1, p2, p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, t1TotalMoney };
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
@@ -1806,12 +1837,17 @@
 
         let hiloCalc = null;
         let matchCalc = null;
+        let strokeMatchCalc = null; // for a 1v1 (format 'match') set to Stroke Play scoring instead of Match Play
         let pressRuleUsed = "none";
         let stakeToUseVal = 0;
         let manualMatchPresses = [];
 
         if (gameFormat === 'hilo') {
             hiloCalc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+        } else if (gameFormat === 'match' && currentData.matchScoringStyle === 'stroke') {
+            // Total strokes, not hole-by-hole match play — a genuinely different model, so this
+            // skips calculateMatchEngine entirely rather than feeding it data it can't interpret.
+            strokeMatchCalc = calculateStrokeHeadToHead(moneyPlayers, courseData, savedScores, currentData.matchScoring || 'net', currentData.matchStake || 0);
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
             let pressRule = gameFormat === 'nassau' ? (currentData.nassauPressRule || "none") : (currentData.matchPressRule || "none");
             let nassauStake = currentData.nassauStake || 10;
@@ -2092,7 +2128,44 @@
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
 
-        if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
+        if (strokeMatchCalc) {
+            payoutBox.style.display = "block";
+            titleEl.textContent = "🥊 LIVE STROKE PLAY STATUS";
+
+            const s = strokeMatchCalc;
+            function fmtStrokeM(amt) {
+                if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
+                if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
+                return `<span class="val-even">$0</span>`;
+            }
+
+            if (s.holesCompleted === 0) {
+                statusEl.innerHTML = `<span class="ticker-part">Waiting for scores...</span>`;
+            } else {
+                const diff = s.p1Total - s.p2Total;
+                let leadText = diff === 0 ? "All Square" : (diff < 0 ? `${s.p1.name.split(' ')[0]} by ${Math.abs(diff)}` : `${s.p2.name.split(' ')[0]} by ${Math.abs(diff)}`);
+                const thruText = s.roundComplete ? " (FINAL)" : ` (Thru ${s.holesCompleted})`;
+                statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${leadText}</strong>${thruText}</span>`;
+            }
+
+            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${s.p1.name} vs ${s.p2.name})`;
+            document.getElementById("payout-rows-wrapper").innerHTML = `
+                <div class="payout-row">
+                    <span>Bet Type:</span>
+                    <span>$${currentData.matchStake || 0} Flat, Stroke Play</span>
+                </div>
+                <div class="payout-row">
+                    <span>${s.p1.name}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
+                    <span>${s.p2.name}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
+                </div>
+                <div class="payout-row" style="margin-top:8px;">
+                    <span>Total Ledger:</span>
+                    <span>${s.p1.name}: ${fmtStrokeM(s.t1TotalMoney)} | ${s.p2.name}: ${fmtStrokeM(-s.t1TotalMoney)}</span>
+                </div>
+                ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Settles once both players finish all ${s.totalHoles} holes — no presses in Stroke Play mode.</div>` : ''}
+            `;
+
+        } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
             payoutBox.style.display = "block";
             titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
             
@@ -2353,11 +2426,11 @@
         }
         if (currentViewMode === 'hole') renderHoleView();
 
-        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc);
+        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
-    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc) {
+    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc) {
         const courseName = currentData.courseName || "Golf Scorecard";
         const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         
@@ -2538,6 +2611,26 @@
             printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
                 <span><strong>Total Ledger:</strong></span>
                 <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
+            </div></div>`;
+        } else if (format === 'match' && strokeMatchCalc) {
+            printHtml += `<div class="pledger"><h3>💵 Game Ledger (1v1 — Stroke Play)</h3>`;
+
+            const s = strokeMatchCalc;
+            function fmtM(amt) {
+                if (amt > 0) return `+$${amt}`;
+                if (amt < 0) return `-$${Math.abs(amt)}`;
+                return `$0`;
+            }
+
+            printHtml += `<div class="pledger-row"><span><strong>Bet Type:</strong></span> <span>$${currentData.matchStake || 0} Flat, Stroke Play</span></div>`;
+            printHtml += `<div class="pledger-row"><span>${s.p1.name} Total:</span> <span>${s.holesCompleted > 0 ? s.p1Total : '-'}</span></div>`;
+            printHtml += `<div class="pledger-row"><span>${s.p2.name} Total:</span> <span>${s.holesCompleted > 0 ? s.p2Total : '-'}</span></div>`;
+            if (!s.roundComplete) {
+                printHtml += `<div class="pledger-row"><span style="color:#888;">Not yet final — thru ${s.holesCompleted} of ${s.totalHoles}.</span></div>`;
+            }
+            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
+                <span><strong>Total Ledger:</strong></span>
+                <span><strong>${s.p1.name}: ${fmtM(s.t1TotalMoney)} | ${s.p2.name}: ${fmtM(-s.t1TotalMoney)}</strong></span>
             </div></div>`;
         } else if (['match', 'bestball', 'scramble', 'ryder'].includes(format) && typeof matchCalc !== 'undefined' && matchCalc) {
             printHtml += `<div class="pledger"><h3>💵 Game Ledger (${format.toUpperCase()})</h3>`;
