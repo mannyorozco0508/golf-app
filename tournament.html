@@ -7,6 +7,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="course-data.js"></script>
+    <script src="tournament-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -73,6 +75,7 @@
         .custom-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal); border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px var(--shadow-color); }
         .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; }
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .custom-select-group { background: var(--nav-bg); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
 
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .format-card { border: 2px solid var(--border-mid); border-radius: 10px; padding: 12px; cursor: pointer; text-align: center; transition: all 0.15s ease; }
@@ -108,6 +111,31 @@
 
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
         .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
+
+        .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
+        .modal-overlay.open { display:flex; }
+        .modal-content { background: var(--bg-card); border-radius: 14px; padding: 20px; max-width: 400px; width:100%; max-height:85vh; overflow-y:auto; }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .modal-header span { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
+        .close-modal { background:none; border:none; font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0; line-height:1; }
+        .qr-box { display:flex; justify-content:center; padding:14px; background:#fff; border-radius:10px; margin-bottom:12px; }
+        .link-text-box { background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 10px; font-size: 0.8rem; word-break: break-all; color: var(--text-main); margin-bottom: 10px; user-select: all; }
+
+        .lb-row .tie-tag { font-size: 0.68rem; color: var(--text-muted); font-weight: normal; margin-left: 4px; }
+        .lb-hcp { font-size: 0.7rem; color: var(--text-muted); font-weight:normal; }
+
+        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .val-pos { color: var(--accent-teal); }
+        .val-even { color: var(--text-muted); }
+
+        #tournament-print-view { display: none; }
+        @media print {
+            body.printing-results > *:not(#manage-screen) { display: none !important; }
+            body.printing-results #manage-screen > *:not(#tournament-print-view) { display: none !important; }
+            body.printing-results #tournament-print-view { display: block !important; }
+        }
     </style>
 </head>
 <body>
@@ -115,8 +143,14 @@
 <div class="container" id="setup-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🏆</div>
-    <div class="lobby-title">Tournament Mode</div>
+    <div class="lobby-title">Tournament</div>
     <p class="lobby-sub">Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.</p>
+
+    <div id="trip-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">🧳 Setting Up A Tournament For</div>
+        <div id="trip-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;">Loading trip...</div>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">This tournament will link itself back to the trip automatically once you save it.</div>
+    </div>
 
     <div class="form-group">
         <label>Tournament Name</label>
@@ -168,15 +202,16 @@
         <input type="hidden" id="shamble-count-best" value="1">
     </div>
 
-    <div class="form-group" id="team-handicap-group">
-        <label>Team Handicap Allowance (strokes off final total, optional)</label>
-        <input type="number" id="t-handicap" value="0" min="0" placeholder="0">
+    <div class="form-group">
+        <label>Entry Fee per Team ($, optional)</label>
+        <input type="number" id="t-entry-fee" value="0" min="0" placeholder="0">
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Pool and payouts are calculated for you once teams are in — this is just the calculator, settle up for real however your event normally does.</p>
     </div>
 
     <hr class="section-divider">
 
     <h3>👥 Teams</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team gets 4 name slots. Leave any blank — 2 or 3 players on a team is totally fine.</p>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team gets 4 name slots (2-3 players is fine) and its own handicap — used to net the team's score against the field, not a flat number applied to everyone the same.</p>
     <div id="teams-list"></div>
     <button class="btn-add-team" onclick="addTeam()">➕ Add Team</button>
 
@@ -198,10 +233,11 @@
         </div>
         <h2 id="manage-t-name" style="text-align:center; font-size:1.3rem;"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
+        <p style="text-align:center; color:var(--brand-navy); font-size:0.9rem; font-weight:bold; margin-top:4px;" id="manage-t-pool"></p>
 
         <hr class="section-divider">
         <h3>🔒 Team Scorecard Links</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Send each team ONLY their own link. They can only enter their own team's scores.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Send each team ONLY their own link. They can only enter their own team's scores. Tap 📤 to get a QR code or copy the link.</p>
         <div id="team-links-list"></div>
 
         <hr class="section-divider">
@@ -215,9 +251,24 @@
                     <input type="text" id="new-team-p3" placeholder="Player 3 (optional)">
                     <input type="text" id="new-team-p4" placeholder="Player 4 (optional)">
                 </div>
+                <label style="margin-top:8px;">Team Handicap</label>
+                <input type="number" id="new-team-handicap" value="0" min="0">
                 <button class="btn-primary" onclick="saveNewTeam()">💾 Save Team &amp; Get Link</button>
             </div>
         </div>
+
+        <hr class="section-divider">
+        <h3>🧳 Link to a Trip</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">If this tournament is one day of a bigger trip, link it here — it'll show up alongside the trip's regular rounds.</p>
+        <div id="trip-link-status" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-bottom:10px; font-size:0.85rem; color:var(--brand-green); font-weight:bold; text-align:center;"></div>
+        <div class="form-group" id="trip-link-form">
+            <label>Trip Code</label>
+            <input type="text" id="link-trip-code" placeholder="e.g. CN52" maxlength="6" style="text-transform:uppercase;">
+            <button class="btn-outline" onclick="linkTournamentToTrip()">🔗 Link This Tournament</button>
+        </div>
+
+        <hr class="section-divider">
+        <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
 
         <hr class="section-divider">
         <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='tournament.html'">➕ Start a Different Tournament</button>
@@ -227,8 +278,34 @@
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
         <div id="leaderboard-list"></div>
+
+        <hr class="section-divider">
+        <h3>🏆 Prize Payout Calculator</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Paid Spots</label>
+            <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()">
+        </div>
+        <div id="payout-spot-amounts"></div>
+        <div id="payout-results" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="tournament-print-view"></div>
+</div>
+
+<!-- Share Team Link Modal -->
+<div class="modal-overlay" id="share-link-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="share-modal-title">Team Link</span>
+            <button class="close-modal" onclick="closeShareModal()">&times;</button>
+        </div>
+        <div class="qr-box" id="share-qr-box"></div>
+        <div class="link-text-box" id="share-link-text"></div>
+        <button class="btn-primary" onclick="copyShareLink()">📋 Copy Link</button>
     </div>
 </div>
+
 
 <script>
     const firebaseConfig = {
@@ -259,10 +336,12 @@
         }
     });
 
-    // --- COURSE SELECTION (reads the same global_courses database as regular rounds) ---
+    // --- COURSE SELECTION (searches the full course directory, same as Home/Trip — not just
+    // courses someone's already mapped, so a first-time tournament setup isn't a dead end) ---
     let globalCourses = {};
     let selectedCourseData = null;
     let selectedCourseName = "";
+    let selectedCourseKey = "";
 
     db.ref('global_courses').on('value', (snap) => {
         globalCourses = snap.val() || {};
@@ -272,24 +351,41 @@
 
     function filterCourseDropdown(filterText) {
         const dropdown = document.getElementById('course-dropdown');
-        const lower = filterText.toLowerCase();
-        const keys = Object.keys(globalCourses).filter(k => globalCourses[k].name.toLowerCase().includes(lower));
-        keys.sort((a, b) => globalCourses[a].name.localeCompare(globalCourses[b].name));
+        const typed = filterText.trim().toLowerCase();
 
-        if (keys.length === 0) {
-            dropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No mapped courses found. Map a course in a regular round first, then it'll show up here.</div>`;
-        } else {
-            dropdown.innerHTML = keys.map(k => `<div class="custom-select-option" onclick="pickCourse('${k}')">${globalCourses[k].name}</div>`).join('');
-        }
+        let html = '';
+        courseDirectory.forEach(g => {
+            const matches = g.items.filter(item => item.name.toLowerCase().includes(typed));
+            if (matches.length > 0) {
+                html += `<div class="custom-select-group">${g.group}</div>`;
+                matches.forEach(item => {
+                    const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += `<div class="custom-select-option" onclick="pickCourse('${item.id}', '${safeName}')">${item.name}</div>`;
+                });
+            }
+        });
+        dropdown.innerHTML = html || `<div style="padding:12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
         dropdown.style.display = 'block';
     }
 
-    function pickCourse(key) {
-        selectedCourseData = globalCourses[key].data;
-        selectedCourseName = globalCourses[key].name;
+    function pickCourse(key, name) {
+        selectedCourseKey = key;
+        selectedCourseName = name;
+        selectedCourseData = resolveTournamentCourseData(key);
         document.getElementById('course-search-input').value = selectedCourseName;
         document.getElementById('course-key').value = key;
         document.getElementById('course-dropdown').style.display = 'none';
+    }
+
+    // Firebase's global_courses is the live source of truth for real hole data — falls back
+    // to the local seed set in course-data.js, then a flat placeholder if neither has it yet
+    // (matches the same fallback order used by the trip planner).
+    function resolveTournamentCourseData(key) {
+        if (globalCourses[key] && globalCourses[key].data) return globalCourses[key].data;
+        if (coursePresets[key]) return coursePresets[key].data;
+        let fallback = [];
+        for (let h = 1; h <= 18; h++) fallback.push({ hole: h, par: 4, hcpIndex: h });
+        return fallback;
     }
 
     document.addEventListener('click', (e) => {
@@ -333,6 +429,8 @@
                 <input type="text" placeholder="Player 3 (optional)">
                 <input type="text" placeholder="Player 4 (optional)">
             </div>
+            <label style="margin-top:8px; font-size:0.8rem;">Team Handicap</label>
+            <input type="number" class="team-handicap-input" value="0" min="0">
         `;
         document.getElementById('teams-list').appendChild(wrapper);
     }
@@ -346,6 +444,7 @@
     }
 
     let currentCode = null;
+    let tripLinkCode = null; // present when this tournament is being set up FROM a trip
 
     function saveTournament() {
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
@@ -361,21 +460,24 @@
             teamNum++;
             const nameInput = block.querySelector('.team-name-input');
             const teamName = (nameInput && nameInput.value.trim()) || `Team ${teamNum}`;
-            teams[`team${teamNum}`] = { num: teamNum, name: teamName, players: players };
+            const hcpInput = block.querySelector('.team-handicap-input');
+            const teamHandicap = hcpInput ? (parseFloat(hcpInput.value) || 0) : 0;
+            teams[`team${teamNum}`] = { num: teamNum, name: teamName, players: players, handicap: teamHandicap };
         });
 
         if (teamNum === 0) { alert("⚠️ Add at least one team with a player name."); return; }
 
         currentCode = generateCode();
-        const handicap = parseFloat(document.getElementById('t-handicap').value) || 0;
         const shambleCountBest = parseInt(document.getElementById('shamble-count-best').value, 10) || 1;
+        const entryFee = parseFloat(document.getElementById('t-entry-fee').value) || 0;
 
         const payload = {
             name: name,
             format: selectedFormat,
             courseName: selectedCourseName,
+            activeCourseKey: selectedCourseKey,
             courseData: selectedCourseData,
-            teamHandicap: handicap,
+            entryFee: entryFee,
             shambleCountBest: shambleCountBest,
             teams: teams,
             createdAt: Date.now()
@@ -383,6 +485,10 @@
 
         db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
+            if (tripLinkCode) {
+                return db.ref(`trips/${tripLinkCode}/tournaments/${currentCode}`).set({ label: name, addedAt: Date.now() });
+            }
+        }).then(() => {
             window.location.href = `tournament.html?tourney=${currentCode}`;
         }).catch(err => alert(`Error saving tournament: ${err.message}`));
     }
@@ -403,19 +509,42 @@
             const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
             const names = t.players.join(', ');
             const teamName = t.name || `Team ${t.num}`;
-            return `<div class="team-link-row">
+            const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
+            return `<div class="team-link-row" style="flex-wrap:wrap;">
                 <span>🏌️ ${teamName} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
-                <button class="btn-outline" onclick="copyTeamLink('${url}', ${t.num})">📋 Copy</button>
+                <span style="display:flex; align-items:center; gap:6px;">
+                    <input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">
+                    <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
+                </span>
             </div>`;
         }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
     }
 
-    function copyTeamLink(url, num) {
-        navigator.clipboard.writeText(url).then(() => {
-            alert(`✅ Team ${num} link copied!`);
-        }).catch(() => {
-            prompt('Copy this link:', url);
-        });
+    function updateTeamHandicap(teamNum, val) {
+        const hcp = parseFloat(val) || 0;
+        db.ref(`tournaments/${currentCode}/teams/team${teamNum}/handicap`).set(hcp);
+    }
+
+    // Shows the team's link as both a QR code (scan on the tee) and selectable text with a
+    // real Copy button — no prompt() fallback, since that can silently fail on iOS home-screen
+    // apps and would leave someone with literally no way to get the link.
+    function openShareModal(url, teamName) {
+        document.getElementById('share-modal-title').textContent = `${teamName} — Scorecard Link`;
+        document.getElementById('share-link-text').textContent = url;
+        document.getElementById('share-qr-box').innerHTML = '';
+        new QRCode(document.getElementById('share-qr-box'), { text: url, width: 180, height: 180 });
+        document.getElementById('share-link-modal').classList.add('open');
+    }
+
+    function closeShareModal() {
+        document.getElementById('share-link-modal').classList.remove('open');
+    }
+
+    function copyShareLink() {
+        const url = document.getElementById('share-link-text').textContent;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(() => alert('✅ Link copied!')).catch(() => {});
+        }
     }
 
     function showAddTeamPanel() {
@@ -435,13 +564,15 @@
         const existingTeams = currentData.teams || {};
         const nextNum = Object.values(existingTeams).reduce((max, t) => Math.max(max, t.num), 0) + 1;
         const teamName = document.getElementById('new-team-name').value.trim() || `Team ${nextNum}`;
+        const teamHandicap = parseFloat(document.getElementById('new-team-handicap').value) || 0;
 
-        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, name: teamName, players: players }).then(() => {
+        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, name: teamName, players: players, handicap: teamHandicap }).then(() => {
             document.getElementById('new-team-name').value = '';
             document.getElementById('new-team-p1').value = '';
             document.getElementById('new-team-p2').value = '';
             document.getElementById('new-team-p3').value = '';
             document.getElementById('new-team-p4').value = '';
+            document.getElementById('new-team-handicap').value = '0';
             document.getElementById('add-team-panel').style.display = 'none';
         }).catch(err => alert(`Error adding team: ${err.message}`));
     }
@@ -451,6 +582,7 @@
         document.getElementById('manage-tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
         document.getElementById('tab-btn-setup').classList.toggle('active', tab === 'setup');
         document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
+        if (tab === 'leaderboard') renderLeaderboard();
     }
 
     function formatLabel(fmt) {
@@ -459,86 +591,164 @@
         return 'Scramble';
     }
 
-    // Works out a team's score for one hole, given whichever players have posted a score so far.
-    // Scramble doesn't use this (it's a single shared score already).
-    function computeTeamHoleScore(format, playerScores, shambleCountBest) {
-        if (playerScores.length === 0) return null;
-        if (format === 'bestball') {
-            return Math.min(...playerScores);
-        }
-        if (format === 'shamble') {
-            const n = shambleCountBest || 1;
-            const sorted = playerScores.slice().sort((a, b) => a - b);
-            const take = sorted.slice(0, Math.min(n, sorted.length));
-            return take.reduce((s, v) => s + v, 0);
-        }
-        return null;
-    }
+    // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
+    // computeTournamentPayouts now live in tournament-engine.js so this page and
+    // tournament-scorecard.html always agree on the math — including tie handling,
+    // which used to just silently rank tied teams apart instead of grouping them.
 
-    function computeTeamTotals(data, team) {
-        const format = data.format || 'scramble';
-        const courseData = data.courseData || [];
-        const scores = data.scores || {};
-        const shambleCountBest = data.shambleCountBest || 1;
-
-        let strokes = 0, thru = 0, parPlayed = 0;
-
-        courseData.forEach(h => {
-            if (format === 'scramble') {
-                const v = scores[`team${team.num}_h${h.hole}`];
-                if (v && v > 0) { strokes += parseInt(v, 10); thru++; parPlayed += h.par; }
-            } else {
-                const holeScores = [];
-                team.players.forEach((p, pIdx) => {
-                    const v = scores[`team${team.num}_p${pIdx}_h${h.hole}`];
-                    if (v && v > 0) holeScores.push(parseInt(v, 10));
-                });
-                const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
-                if (teamHoleScore !== null) { strokes += teamHoleScore; thru++; parPlayed += h.par; }
-            }
-        });
-
-        return { strokes, thru, parPlayed };
+    function poolTotal() {
+        const teams = currentData.teams || {};
+        const fee = currentData.entryFee || 0;
+        return fee * Object.keys(teams).length;
     }
 
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
-        const teams = currentData.teams || {};
-        const handicap = currentData.teamHandicap || 0;
-
-        let rows = Object.keys(teams).map(tid => {
-            const t = teams[tid];
-            const { strokes, thru, parPlayed } = computeTeamTotals(currentData, t);
-            const net = thru > 0 ? strokes - handicap : 0;
-            const toPar = thru > 0 ? net - parPlayed : null;
-            return { num: t.num, teamName: t.name || `Team ${t.num}`, strokes, thru, toPar, hasScores: thru > 0 };
-        });
-
-        rows.sort((a, b) => {
-            if (a.hasScores && !b.hasScores) return -1;
-            if (!a.hasScores && b.hasScores) return 1;
-            if (!a.hasScores && !b.hasScores) return a.num - b.num;
-            return a.toPar - b.toPar;
-        });
+        const rows = computeTournamentLeaderboard(currentData);
+        cachedLeaderboardRows = rows;
 
         if (rows.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams yet.</div>`;
+        } else {
+            let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+                <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+            </div>`;
+            const rankCounts = {};
+            rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
+            rows.forEach(r => {
+                const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+                const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
+                html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
+                    <span class="lb-pos">${r.rank || '-'}</span>
+                    <span class="lb-team">${r.teamName}${tieTag}</span>
+                    <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                    <span class="lb-score">${toParStr}</span>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        renderPayoutSpotInputs();
+    }
+
+    let cachedLeaderboardRows = [];
+
+    function renderPayoutSpotInputs() {
+        const spotsInput = document.getElementById('payout-spots-input');
+        let n = parseInt(spotsInput.value, 10);
+        if (isNaN(n) || n < 1) n = 1;
+        if (n > 20) { n = 20; spotsInput.value = 20; }
+
+        const pool = poolTotal();
+        const container = document.getElementById('payout-spot-amounts');
+        const subEl = document.getElementById('payout-pool-sub');
+        subEl.textContent = pool > 0
+            ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${Object.keys(currentData.teams || {}).length} teams). Set how many spots pay — ties split whatever their tied spots add up to.`
+            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate pool.`;
+
+        let existing = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`payout-spot-${i}`);
+            existing.push(el ? el.value : null);
+        }
+
+        let html = '';
+        for (let i = 0; i < n; i++) {
+            const defaultVal = existing[i] !== null ? existing[i] : (pool > 0 ? Math.round((pool / n) * 100) / 100 : 0);
+            html += `<div class="form-group" style="margin-bottom:6px;">
+                <label>${ordinal(i + 1)} Place ($)</label>
+                <input type="number" id="payout-spot-${i}" min="0" value="${defaultVal}" oninput="renderPayoutResults()">
+            </div>`;
+        }
+        container.innerHTML = html;
+        renderPayoutResults();
+    }
+
+    function renderPayoutResults() {
+        const resultsContainer = document.getElementById('payout-results');
+        if (!cachedLeaderboardRows || cachedLeaderboardRows.filter(r => r.hasScores).length === 0) {
+            resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — payouts will show once teams start posting.</div>`;
             return;
         }
 
-        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
-        </div>`;
-        rows.forEach((r, i) => {
-            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            html += `<div class="lb-row ${i === 0 && r.hasScores ? 'leader' : ''}">
-                <span class="lb-pos">${i + 1}</span>
-                <span class="lb-team">${r.teamName}</span>
-                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
-                <span class="lb-score">${toParStr}</span>
+        const n = parseInt(document.getElementById('payout-spots-input').value, 10) || 0;
+        let spotAmounts = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`payout-spot-${i}`);
+            spotAmounts.push(el ? parseFloat(el.value) || 0 : 0);
+        }
+
+        const payouts = computeTournamentPayouts(cachedLeaderboardRows, spotAmounts);
+        const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
+        const pool = poolTotal();
+
+        let html = '';
+        if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
+            html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
+                ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}.
             </div>`;
+        }
+
+        if (payouts.length === 0) {
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
+        } else {
+            payouts.forEach(p => {
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${p.teamName}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+            });
+        }
+        resultsContainer.innerHTML = html;
+    }
+
+    // --- TRIP LINKING ---
+    function linkTournamentToTrip() {
+        const code = document.getElementById('link-trip-code').value.trim().toUpperCase();
+        if (!code) { alert('⚠️ Enter the trip code.'); return; }
+        db.ref(`trips/${code}`).once('value').then(snap => {
+            if (!snap.exists()) { alert("⚠️ No trip found with that code."); return; }
+            return db.ref(`trips/${code}/tournaments/${currentCode}`).set({ label: currentData.name, addedAt: Date.now() }).then(() => {
+                db.ref(`tournaments/${currentCode}/tripCode`).set(code);
+            });
+        }).catch(err => alert(`Error linking to trip: ${err.message}`));
+    }
+
+    function renderTripLinkStatus() {
+        const statusEl = document.getElementById('trip-link-status');
+        const formEl = document.getElementById('trip-link-form');
+        if (currentData.tripCode) {
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = `🧳 Linked to trip <a href="trip.html?trip=${currentData.tripCode}" style="color:var(--brand-green);">${currentData.tripCode}</a>`;
+            formEl.style.display = 'none';
+        } else {
+            statusEl.style.display = 'none';
+            formEl.style.display = 'block';
+        }
+    }
+
+    // --- PRINT RESULTS (same browser-print-to-PDF pattern used across the rest of the app) ---
+    function buildResultsPrintView() {
+        const container = document.getElementById('tournament-print-view');
+        const rows = computeTournamentLeaderboard(currentData);
+        const pool = poolTotal();
+
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${currentData.name}</h1>
+            <p style="color:#666; margin-top:0;">${currentData.courseName} • ${formatLabel(currentData.format)}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
+            <table style="width:100%; border-collapse:collapse; margin-top:14px;">
+                <tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
+                    <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">Team</th><th style="padding:8px 4px;">Thru</th><th style="padding:8px 4px; text-align:right;">To Par</th>
+                </tr>`;
+        rows.forEach(r => {
+            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${r.teamName}</td><td style="padding:8px 4px;">${r.hasScores ? r.thru : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
         });
+        html += `</table>`;
         container.innerHTML = html;
+    }
+
+    function printTournamentResults() {
+        buildResultsPrintView();
+        document.body.classList.add('printing-results');
+        window.print();
+        window.addEventListener('afterprint', () => document.body.classList.remove('printing-results'), { once: true });
     }
 
     function loadTournament(code) {
@@ -554,18 +764,28 @@
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+            const pool = poolTotal();
+            document.getElementById('manage-t-pool').textContent = pool > 0 ? `💰 Pool: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
             renderTeamLinks();
+            renderTripLinkStatus();
             renderLeaderboard();
         });
     }
 
     const urlParams = new URLSearchParams(window.location.search);
     const tourneyParam = urlParams.get('tourney');
+    tripLinkCode = urlParams.get('trip');
     if (tourneyParam) {
         currentCode = tourneyParam.toUpperCase();
         loadTournament(currentCode);
+    } else if (tripLinkCode) {
+        document.getElementById('trip-context-banner').style.display = 'block';
+        db.ref(`trips/${tripLinkCode}`).once('value').then(snap => {
+            const trip = snap.val();
+            document.getElementById('trip-context-name').textContent = trip ? trip.name : tripLinkCode;
+        });
     }
 </script>
 </body>
