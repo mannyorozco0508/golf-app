@@ -361,6 +361,37 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
 // v1 scope: MAIN FORMAT bet only — Side Games, Side Matches, and one-off Side
 // Bets are NOT included yet. Everyone still scores normally regardless.
 // ============================================================================
+// Mirrors Side Matches' stroke-play overall bet — total strokes for the round, low total
+// wins the stake. Genuinely simpler than Match Play (no hole-by-hole win/loss, no presses),
+// which is exactly the point: some 1v1s are "just play me for the round," not a match.
+function calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, stake) {
+    if (players.length !== 2) return null;
+    const p1 = players[0], p2 = players[1];
+    let p1Total = 0, p2Total = 0, holesCompleted = 0;
+
+    courseData.forEach(h => {
+        const v1 = savedScores[`p${p1.id}_h${h.hole}`];
+        const v2 = savedScores[`p${p2.id}_h${h.hole}`];
+        if (v1 > 0 && v2 > 0) {
+            const s1 = scoringType === 'net' ? (parseInt(v1, 10) - getStrokes(h.hcpIndex, parseHcp(p1.hcp))) : parseInt(v1, 10);
+            const s2 = scoringType === 'net' ? (parseInt(v2, 10) - getStrokes(h.hcpIndex, parseHcp(p2.hcp))) : parseInt(v2, 10);
+            p1Total += s1;
+            p2Total += s2;
+            holesCompleted++;
+        }
+    });
+
+    const totalHoles = courseData.length;
+    const roundComplete = holesCompleted === totalHoles && totalHoles > 0;
+    let winner = null, t1TotalMoney = 0;
+    if (roundComplete) {
+        if (p1Total < p2Total) { winner = p1.id; t1TotalMoney = stake; }
+        else if (p2Total < p1Total) { winner = p2.id; t1TotalMoney = -stake; }
+    }
+
+    return { p1, p2, p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, t1TotalMoney };
+}
+
 function computeRoundMoneyByPlayer(data, courseData, savedScores) {
     const players = data.players || [];
     const gameFormat = data.gameFormat || 'stroke';
@@ -409,6 +440,33 @@ function computeRoundMoneyByPlayer(data, courseData, savedScores) {
         result.formatLabel = 'Stroke Play';
         result.message = 'No main-format money bet for Stroke Play.';
         result.players = moneyPlayers.map(p => ({ id: p.id, name: p.name, net: 0 }));
+        return result;
+    }
+
+    // A 1v1 set to Stroke Play scoring — total strokes, not hole-by-hole match play. Handled
+    // separately from the match-play engine below since the two models aren't compatible
+    // (no hole win/loss status, no presses, just a straight total comparison).
+    if (gameFormat === 'match' && data.matchScoringStyle === 'stroke') {
+        if (moneyPlayers.length !== 2) {
+            result.message = 'Stroke Play 1v1 requires exactly 2 players.';
+            return result;
+        }
+        const scoringType = data.matchScoring || 'net';
+        const matchStake = data.matchStake || 0;
+        const calc = calculateStrokeHeadToHead(moneyPlayers, courseData, savedScores, scoringType, matchStake);
+        if (!calc) {
+            result.message = 'Waiting for players and scores.';
+            return result;
+        }
+        result.valid = true;
+        result.formatLabel = '1v1 (Stroke Play)';
+        result.players = [
+            { id: calc.p1.id, name: calc.p1.name, net: calc.t1TotalMoney },
+            { id: calc.p2.id, name: calc.p2.name, net: -calc.t1TotalMoney }
+        ];
+        if (!calc.roundComplete) {
+            result.message = `Waiting for both players to finish — thru ${calc.holesCompleted} of ${calc.totalHoles}.`;
+        }
         return result;
     }
 
