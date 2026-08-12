@@ -476,7 +476,22 @@
         <div class="wizard-step-sub" id="step4-sub">Options specific to the format you picked.</div>
     <div class="form-group">
         <div id="match-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 Match Play Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 1v1 Options</label>
+
+            <div style="margin-bottom: 10px;">
+                <label style="font-size: 0.75rem;">Scoring Style</label>
+                <div class="toggle-row">
+                    <span class="toggle-label-sm active" id="match-style-label-match" onclick="setMatchScoringStyle('match')">Match Play</span>
+                    <label class="toggle-switch toggle-switch-sm">
+                        <input type="checkbox" id="match-style-switch" onchange="setMatchScoringStyle(this.checked ? 'stroke' : 'match')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="match-style-label-stroke" onclick="setMatchScoringStyle('stroke')">Stroke Play</span>
+                </div>
+                <input type="hidden" id="match-scoring-style" value="match">
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 4px 0 0 0;" id="match-style-explainer"><strong>Match Play:</strong> won or lost hole-by-hole — whoever's up the most holes when the round ends wins the bet. Supports presses. <strong>Stroke Play:</strong> total strokes for the round, low total wins — simpler, no presses, exactly 2 players.</p>
+            </div>
+
             <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.75rem;">Scoring Type</label>
@@ -495,18 +510,19 @@
                     <input type="number" id="match-stake" value="" min="0" placeholder="0">
                 </div>
             </div>
-            <p style="font-size: 0.7rem; color: var(--brand-navy); margin: 6px 0 0 0;"><strong>ℹ️ Match Play bet:</strong> this is won or lost hole-by-hole (whoever's up the most holes when the round ends wins the whole bet) — not based on total strokes like Stroke Play.</p>
-            <div style="margin-top: 10px;">
-                <label style="font-size: 0.75rem;">Auto-Press Rule</label>
-                <select id="match-press-rule">
-                    <option value="none">No Auto-Press</option>
-                    <option value="2down" selected>Auto @ 2 Down</option>
-                    <option value="1down">Auto @ 1 Down</option>
-                </select>
+            <div id="match-play-only-settings">
+                <div style="margin-top: 10px;">
+                    <label style="font-size: 0.75rem;">Auto-Press Rule</label>
+                    <select id="match-press-rule">
+                        <option value="none">No Auto-Press</option>
+                        <option value="2down" selected>Auto @ 2 Down</option>
+                        <option value="1down">Auto @ 1 Down</option>
+                    </select>
+                </div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
+                <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;"><strong>🔥 Manual Press:</strong> No matter which rule you pick above, a "Press" button is always available on the scorecard so you can start a press on any hole, any time.</p>
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
             </div>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
-            <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;"><strong>🔥 Manual Press:</strong> No matter which rule you pick above, a "Press" button is always available on the scorecard so you can start a press on any hole, any time.</p>
-            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
         </div>
 
         <div id="nassau-settings" class="extra-settings-box">
@@ -980,6 +996,13 @@
     function setMatchScoring(val) {
         document.getElementById('match-scoring').value = val;
         syncToggle('match-scoring', 'match-scoring-switch', 'match-scoring-label-net', 'match-scoring-label-gross', 'net');
+    }
+
+    function setMatchScoringStyle(val) {
+        document.getElementById('match-scoring-style').value = val;
+        syncToggle('match-scoring-style', 'match-style-switch', 'match-style-label-match', 'match-style-label-stroke', 'match');
+        const onlySettings = document.getElementById('match-play-only-settings');
+        if (onlySettings) onlySettings.style.display = (val === 'stroke') ? 'none' : 'block';
     }
 
     function setNassauScoring(val) {
@@ -1609,6 +1632,7 @@
             }
 
             if (data.matchScoring && document.getElementById("match-scoring")) { document.getElementById("match-scoring").value = data.matchScoring; syncToggle("match-scoring", "match-scoring-switch", "match-scoring-label-net", "match-scoring-label-gross", "net"); }
+            setMatchScoringStyle(data.matchScoringStyle === 'stroke' ? 'stroke' : 'match');
             if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
             if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
             
@@ -2049,6 +2073,7 @@
             const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
 
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
+            const matchScoringStyle = document.getElementById("match-scoring-style") ? document.getElementById("match-scoring-style").value : "match";
             const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
             const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
@@ -2119,6 +2144,7 @@
                 kpGameEnabled: kpGameEnabled,
                 birdieUnitVal: birdieUnitVal,
                 matchScoring: matchScoring,
+                matchScoringStyle: matchScoringStyle,
                 matchStake: matchStake,
                 matchPressRule: matchPressRule,
                 nassauType: nassauType,
