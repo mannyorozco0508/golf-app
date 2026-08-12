@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trip Mode</title>
+    <title>Trip</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="money-engine.js"></script>
@@ -148,7 +148,7 @@
 <div class="container" id="setup-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🧳</div>
-    <div class="lobby-title">Trip Mode</div>
+    <div class="lobby-title">Trip</div>
     <p class="lobby-sub">Tie multiple rounds together into one trip — a running leaderboard across every day, not just one round at a time.</p>
 
     <div id="resume-trip-container" style="display:none; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border-light);">
@@ -240,6 +240,16 @@
             <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
         </div>
     </details>
+
+    <details class="trip-section" id="tournaments-section" style="display:none;">
+        <summary>🏆 Tournaments in This Trip</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Tournament days run separately from regular rounds — their own team leaderboard and payouts, listed here just for easy access.</p>
+            <div id="tournaments-list"></div>
+        </div>
+    </details>
+
+    <button class="btn-outline" onclick="createTournamentForTrip()">🏆 Create a Tournament for This Trip</button>
 
     <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
 
@@ -697,6 +707,10 @@
     // Sends the admin straight into the round-setup wizard with this trip's code attached —
     // admin.html reads that param and, when the round is saved, links itself back to this
     // trip automatically. No game code to copy, no coming back here to paste anything.
+    function createTournamentForTrip() {
+        window.location.href = `tournament.html?trip=${currentTripCode}`;
+    }
+
     function createRoundForTrip() {
         const copyFrom = document.getElementById('copy-from-round-select').value;
         let dest = `admin.html?trip=${currentTripCode}`;
@@ -783,6 +797,32 @@
                     <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
                 </div>
                 <span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>
+            </div>`;
+        }).join('');
+    }
+
+    // Tournaments are informational links only — different data shape than regular rounds
+    // (team-based, not individual net scores), so they don't feed the trip's leaderboard,
+    // money settlement, or points race. This just makes them easy to find and open.
+    function renderTournamentsList() {
+        const section = document.getElementById('tournaments-section');
+        const container = document.getElementById('tournaments-list');
+        const tournaments = tripData.tournaments || {};
+        const codes = Object.keys(tournaments).sort((a, b) => (tournaments[a].addedAt || 0) - (tournaments[b].addedAt || 0));
+
+        if (codes.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = 'block';
+        container.innerHTML = codes.map(code => {
+            const t = tournaments[code];
+            return `<div class="round-card">
+                <div class="rc-info">
+                    <div class="rc-label">${t.label}</div>
+                    <div class="rc-sub">Tournament code: ${code}</div>
+                </div>
+                <a class="rc-link" href="tournament.html?tourney=${code}">Open ▶</a>
             </div>`;
         }).join('');
     }
@@ -1445,6 +1485,7 @@
                 renderPrizeSpotInputs(); // build the $ inputs once before points race tries to sync payouts against them
             }
             renderRoundsList();
+            renderTournamentsList();
             refreshTripComputations();
         });
     }
