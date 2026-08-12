@@ -28,6 +28,9 @@
             --shadow-color: rgba(0,0,0,0.08);
             --nassau-box-bg: #eef6f2;
             --danger-box-bg: #fff0f0;
+            --warn-bg: #fff4e5;
+            --warn-border: #e08a00;
+            --warn-text: #7a4a00;
         }
         html.dark-mode {
             --bg-page: #14181a;
@@ -50,6 +53,9 @@
             --shadow-color: rgba(0,0,0,0.4);
             --nassau-box-bg: #1a2b24;
             --danger-box-bg: #2b1c1e;
+            --warn-bg: #332508;
+            --warn-border: #c98a2b;
+            --warn-text: #f0b84f;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
         .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
@@ -137,7 +143,7 @@
         <div class="control-grid">
             <div class="control-group">
                 <label>Pot Format</label>
-                <select id="skins-pot-format" onchange="renderSkinsEngine()">
+                <select id="skins-pot-format" onchange="saveSkinsConfig()">
                     <option value="split">Gross & Net (Split Pot)</option>
                     <option value="gross">Gross Skins Only</option>
                     <option value="net">Net Skins Only</option>
@@ -145,8 +151,21 @@
             </div>
             <div class="control-group">
                 <label>Buy-In Per Player ($)</label>
-                <input type="number" id="skins-buyin" value="" min="0" onchange="renderSkinsEngine()" placeholder="0">
+                <input type="number" id="skins-buyin" value="" min="0" onchange="saveSkinsConfig()" placeholder="0">
             </div>
+        </div>
+
+        <div class="control-group" style="margin-top:10px;">
+            <label>Carry Over Ties</label>
+            <div class="toggle-row">
+                <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarryOver(false)">Void Tied Holes</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="skins-carry-switch" onchange="setSkinsCarryOver(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label-sm active" id="skins-carry-label-on" onclick="setSkinsCarryOver(true)">Carry Over</span>
+            </div>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Carry Over (traditional): a tied hole's value stacks onto the next hole until someone wins it outright. Void: a tied hole is just thrown out — simpler, but the group decides which one you actually play.</p>
         </div>
 
         <div id="skins-content">
@@ -460,6 +479,18 @@
             .catch(err => alert(`Failed to save buy-in: ${err.message}`));
     }
 
+    function saveSkinsConfig() {
+        const potFormat = document.getElementById("skins-pot-format").value;
+        const buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
+        db.ref(`events/${currentMode}`).update({ skinsPotFormat: potFormat, skinsBuyIn: buyIn })
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function setSkinsCarryOver(val) {
+        db.ref(`events/${currentMode}/skinsCarryOver`).set(val)
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
     function markKPWinner(hole, playerId) {
         db.ref(`events/${currentMode}/kpWinners/h${hole}`).set(playerId)
             .catch(err => alert(`Failed to save: ${err.message}`));
@@ -468,6 +499,58 @@
     function clearKPWinner(hole) {
         db.ref(`events/${currentMode}/kpWinners/h${hole}`).remove()
             .catch(err => alert(`Failed to clear: ${err.message}`));
+    }
+
+    // Extracts a hole's score list for one player set, used by both skin-computation modes.
+    function getSkinsHoleScores(players, savedScores, h) {
+        let holeScores = [];
+        players.forEach(p => {
+            let v = savedScores[`p${p.id}_h${h.hole}`];
+            if (v && v > 0) {
+                let gross = parseInt(v, 10);
+                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                holeScores.push({ id: p.id, name: p.name, gross, net });
+            }
+        });
+        return holeScores;
+    }
+
+    // VOID MODE: a tied hole is simply thrown out — no skin awarded, nothing carries forward.
+    function computeSkinsVoid(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScores(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: 1 });
+        });
+        return { skins, pendingUnits: 0 };
+    }
+
+    // CARRY-OVER MODE: each hole is worth a fixed base value (pot / total holes) set upfront.
+    // A tied hole's value stacks onto the next hole instead of vanishing, so the eventual
+    // winner takes the accumulated units — matches how a real carry-over skins game is priced,
+    // rather than the value per skin drifting based on how many holes happen to get decided.
+    function computeSkinsCarryOver(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        let carryUnits = 1;
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScores(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) {
+                skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: carryUnits });
+                carryUnits = 1;
+            } else {
+                carryUnits += 1;
+            }
+        });
+        const pendingUnits = carryUnits > 1 ? carryUnits - 1 : 0;
+        return { skins, pendingUnits };
     }
 
     function renderSkinsEngine() {
@@ -481,72 +564,64 @@
         const savedScores = currentData.scores || {};
         const container = document.getElementById("skins-content");
 
-        let potFormat = document.getElementById("skins-pot-format").value;
-        let buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
+        // Read config from the saved round data (shared across every device in the group) rather
+        // than the local browser's form fields — those used to never get saved anywhere, so two
+        // people looking at the same round on two phones could silently see two different pots.
+        const potFormat = currentData.skinsPotFormat || 'split';
+        const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
+        const carryOver = currentData.skinsCarryOver !== false; // default TRUE — the traditional rule
+
+        const potFormatEl = document.getElementById("skins-pot-format");
+        const buyInEl = document.getElementById("skins-buyin");
+        if (potFormatEl && document.activeElement !== potFormatEl) potFormatEl.value = potFormat;
+        if (buyInEl && document.activeElement !== buyInEl) buyInEl.value = buyIn;
+        document.getElementById("skins-carry-switch").checked = carryOver;
+        document.getElementById("skins-carry-label-off").classList.toggle('active', !carryOver);
+        document.getElementById("skins-carry-label-on").classList.toggle('active', carryOver);
+
         let totalPot = buyIn * players.length;
+        let grossPot = 0, netPot = 0;
+        if (potFormat === 'split') { grossPot = totalPot / 2; netPot = totalPot / 2; }
+        else if (potFormat === 'gross') { grossPot = totalPot; }
+        else if (potFormat === 'net') { netPot = totalPot; }
 
-        let grossPot = 0;
-        let netPot = 0;
+        const totalHoles = courseData.length;
+        const computeFn = carryOver ? computeSkinsCarryOver : computeSkinsVoid;
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(players, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(players, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
 
-        if (potFormat === 'split') {
-            grossPot = totalPot / 2;
-            netPot = totalPot / 2;
-        } else if (potFormat === 'gross') {
-            grossPot = totalPot;
-        } else if (potFormat === 'net') {
-            netPot = totalPot;
-        }
-
-        let grossSkins = [];
-        let netSkins = [];
-
-        courseData.forEach(h => {
-            let holeScores = [];
-            players.forEach(p => {
-                let v = savedScores[`p${p.id}_h${h.hole}`];
-                if (v && v > 0) {
-                    let gross = parseInt(v, 10);
-                    let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                    holeScores.push({ id: p.id, name: p.name, gross, net });
-                }
-            });
-
-            if (holeScores.length > 0) {
-                if (potFormat === 'split' || potFormat === 'gross') {
-                    let minGross = Math.min(...holeScores.map(s => s.gross));
-                    let grossWinners = holeScores.filter(s => s.gross === minGross);
-                    if (grossWinners.length === 1) {
-                        grossSkins.push({ hole: h.hole, par: h.par, player: grossWinners[0], score: minGross });
-                    }
-                }
-
-                if (potFormat === 'split' || potFormat === 'net') {
-                    let minNet = Math.min(...holeScores.map(s => s.net));
-                    let netWinners = holeScores.filter(s => s.net === minNet);
-                    if (netWinners.length === 1) {
-                        netSkins.push({ hole: h.hole, par: h.par, player: netWinners[0], score: minNet });
-                    }
-                }
-            }
-        });
-
-        let grossSkinValue = grossSkins.length > 0 ? (grossPot / grossSkins.length) : 0;
-        let netSkinValue = netSkins.length > 0 ? (netPot / netSkins.length) : 0;
+        // In Void mode the value per skin depends on how many holes actually got decided (the
+        // original behavior). In Carry-Over mode the value per hole is fixed upfront and units
+        // stack, so it's pot / total holes instead.
+        const grossSkinValue = carryOver
+            ? (totalHoles > 0 ? grossPot / totalHoles : 0)
+            : (grossResult.skins.length > 0 ? grossPot / grossResult.skins.length : 0);
+        const netSkinValue = carryOver
+            ? (totalHoles > 0 ? netPot / totalHoles : 0)
+            : (netResult.skins.length > 0 ? netPot / netResult.skins.length : 0);
 
         let playerStats = {};
-        players.forEach(p => {
-            playerStats[p.id] = { name: p.name, grossCount: 0, netCount: 0, payout: 0 };
-        });
+        players.forEach(p => { playerStats[p.id] = { name: p.name, grossCount: 0, netCount: 0, payout: 0 }; });
 
-        grossSkins.forEach(s => {
+        grossResult.skins.forEach(s => {
             playerStats[s.player.id].grossCount += 1;
-            playerStats[s.player.id].payout += grossSkinValue;
+            playerStats[s.player.id].payout += s.unitsWon * grossSkinValue;
+        });
+        netResult.skins.forEach(s => {
+            playerStats[s.player.id].netCount += 1;
+            playerStats[s.player.id].payout += s.unitsWon * netSkinValue;
         });
 
-        netSkins.forEach(s => {
-            playerStats[s.player.id].netCount += 1;
-            playerStats[s.player.id].payout += netSkinValue;
-        });
+        // Any carry still pending when the round ends has nowhere left to go — split it evenly
+        // across everyone so the full pot is always accounted for, instead of quietly vanishing.
+        if (carryOver && grossResult.pendingUnits > 0 && players.length > 0) {
+            const share = (grossResult.pendingUnits * grossSkinValue) / players.length;
+            players.forEach(p => playerStats[p.id].payout += share);
+        }
+        if (carryOver && netResult.pendingUnits > 0 && players.length > 0) {
+            const share = (netResult.pendingUnits * netSkinValue) / players.length;
+            players.forEach(p => playerStats[p.id].payout += share);
+        }
 
         let html = `
             <div class="pot-summary">
@@ -560,7 +635,7 @@
             html += `
                 <div class="pot-box">
                     <span class="pot-label">Gross Value</span>
-                    <span class="pot-val">$${grossSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ skin</span></span>
+                    <span class="pot-val">$${grossSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
                 </div>
             `;
         }
@@ -568,26 +643,36 @@
             html += `
                 <div class="pot-box">
                     <span class="pot-label">Net Value</span>
-                    <span class="pot-val">$${netSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ skin</span></span>
+                    <span class="pot-val">$${netSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
                 </div>
             `;
         }
         
         html += `</div>`; // End pot-summary
 
+        if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
+            const pendingParts = [];
+            if (grossResult.pendingUnits > 0) pendingParts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
+            if (netResult.pendingUnits > 0) pendingParts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
+            html += `<div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.8rem; color:var(--warn-text);">
+                🔄 Carrying: ${pendingParts.join(' and ')} tied and haven't been claimed yet — value is building for whoever wins the next hole outright. If the round ends before that happens, it splits evenly.
+            </div>`;
+        }
+
         // Render Gross Skins Table
         if (potFormat === 'split' || potFormat === 'gross') {
-            html += `<h3>Gross Skins Won (${grossSkins.length})</h3>`;
-            if (grossSkins.length === 0) {
+            html += `<h3>Gross Skins Won (${grossResult.skins.length})</h3>`;
+            if (grossResult.skins.length === 0) {
                 html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
             } else {
-                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th></tr></thead><tbody>`;
-                grossSkins.forEach(s => {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                grossResult.skins.forEach(s => {
                     html += `<tr>
                         <td>${s.hole}</td>
                         <td style="color:var(--text-muted);">${s.par}</td>
                         <td class="winner-name">${s.player.name}</td>
                         <td><span class="score-circle">${s.score}</span></td>
+                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * grossSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${grossSkinValue.toFixed(2)}`}</td>` : ''}
                     </tr>`;
                 });
                 html += `</tbody></table>`;
@@ -596,17 +681,18 @@
 
         // Render Net Skins Table
         if (potFormat === 'split' || potFormat === 'net') {
-            html += `<h3>Net Skins Won (${netSkins.length})</h3>`;
-            if (netSkins.length === 0) {
+            html += `<h3>Net Skins Won (${netResult.skins.length})</h3>`;
+            if (netResult.skins.length === 0) {
                 html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
             } else {
-                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th></tr></thead><tbody>`;
-                netSkins.forEach(s => {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                netResult.skins.forEach(s => {
                     html += `<tr>
                         <td>${s.hole}</td>
                         <td style="color:var(--text-muted);">${s.par}</td>
                         <td class="winner-name">${s.player.name}</td>
                         <td><span class="score-circle">${s.score}</span></td>
+                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * netSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${netSkinValue.toFixed(2)}`}</td>` : ''}
                     </tr>`;
                 });
                 html += `</tbody></table>`;
