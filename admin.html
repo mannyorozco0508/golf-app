@@ -30,6 +30,9 @@
             --shadow-color: rgba(0,0,0,0.08);
             --nassau-box-bg: #eef6f2;
             --danger-box-bg: #fff0f0;
+            --warn-bg: #fff4e5;
+            --warn-border: #e08a00;
+            --warn-text: #7a4a00;
         }
         html.dark-mode {
             --bg-page: #14181a;
@@ -52,6 +55,9 @@
             --shadow-color: rgba(0,0,0,0.4);
             --nassau-box-bg: #1a2b24;
             --danger-box-bg: #2b1c1e;
+            --warn-bg: #332508;
+            --warn-border: #c98a2b;
+            --warn-text: #f0b84f;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
         .container { max-width: 650px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
@@ -635,9 +641,10 @@
         <div class="wizard-step-title">👥 Step 5: Players</div>
         <div class="wizard-step-sub">Add everyone playing today.</div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
+    <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
-    <button class="btn-add" onclick="addPlayerRow()">➕ Add New Player</button>
+    <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
 
     <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
@@ -897,7 +904,11 @@
         document.getElementById("lobby-screen").style.display = "block";
         document.getElementById("admin-screen").style.display = "none";
         
-        const lastRoom = localStorage.getItem('lastRoomCode');
+        // ?fresh=1 (added automatically by the "Share App Link" button) skips this check
+        // entirely, so a link sent to a new tester always lands on a clean start screen
+        // instead of possibly showing a "Resume Game" pointing at someone else's round.
+        const skipResume = urlParams.get('fresh') === '1';
+        const lastRoom = skipResume ? null : localStorage.getItem('lastRoomCode');
         if (lastRoom) {
             document.getElementById("resume-container").style.display = "block";
             document.getElementById("resume-room-badge").textContent = lastRoom;
@@ -944,7 +955,10 @@
     }
 
     function shareMainApp() {
-        const baseUrl = window.location.href.split('?')[0];
+        // ?fresh=1 forces a clean landing screen for whoever opens this link, regardless of
+        // what's cached in that device's localStorage — a friend testing this for the first
+        // time shouldn't see "Resume Game" pointing at a round that isn't theirs.
+        const baseUrl = window.location.href.split('?')[0] + '?fresh=1';
         const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
@@ -1458,10 +1472,40 @@
         return list;
     }
 
-    function renderPlayerList(forceLoad = false) {
+    // Builds the header row and the 1v1-overflow warning based on the FINAL player count —
+    // shared by the batch rebuild in renderPlayerList and the single add/remove actions below,
+    // so the header never goes stale relative to however many rows are actually on screen.
+    function renderPlayerListHeaderAndWarning(existingDataLength) {
         const format = document.getElementById("game-format-select").value;
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const headerRow = document.getElementById("player-header-row");
+        const warningBox = document.getElementById("one-v-one-warning");
+        const showMoneyCheckbox = moneyFormats.includes(format);
+        const moneyHeaderHtml = showMoneyCheckbox ? `<span style="text-align:center; font-size:0.85rem;" title="Playing for money?">💰</span>` : "";
+
+        const isOneVOne = format === 'match' || (format === 'nassau' && nassauType === '1v1');
+        const oneVOneOverflow = isOneVOne && existingDataLength > 2;
+
+        if (oneVOneOverflow) {
+            warningBox.style.display = 'block';
+            warningBox.innerHTML = `⚠️ <strong>1v1 only supports exactly 2 players</strong> for this round's main bet — only the first two will actually be matched here, the rest will just score normally with no bet attached. For everyone else betting individually, use <strong>⚔️ Side Matches</strong> instead (set this round's format to Stroke Play, then set up each 1v1 from the Matches tab).`;
+        } else {
+            warningBox.style.display = 'none';
+        }
+
+        if (format === 'ryder') {
+            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
+            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
+        } else {
+            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
+        }
+    }
+
+    function renderPlayerList(forceLoad = false) {
         const listContainer = document.getElementById("player-list");
         
         let existingData = [];
@@ -1472,24 +1516,34 @@
         }
 
         listContainer.innerHTML = "";
-
-        const showMoneyCheckbox = moneyFormats.includes(format);
-        const moneyHeaderHtml = showMoneyCheckbox ? `<span style="text-align:center; font-size:0.85rem;" title="Playing for money?">💰</span>` : "";
-
-        if (format === 'ryder') {
-            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
-            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
-        } else {
-            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
-        }
+        renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false);
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length);
         });
+    }
+
+    // Adds one new blank row AND rebuilds the header/warning against the new final count — a
+    // plain append wouldn't catch the moment a 1v1 round crosses from 2 to 3 players, which
+    // would otherwise leave the header out of sync with the actual rows on screen.
+    function addNewPlayerAndRefresh() {
+        const existingData = captureCurrentPlayerInputs();
+        existingData.push({ name: '', hcp: '', team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
+        document.getElementById("player-list").innerHTML = "";
+        renderPlayerListHeaderAndWarning(existingData.length);
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        updateCount();
+    }
+
+    // Same idea in reverse — removing a player could drop a 1v1 round back to exactly 2
+    // players, which should hide the Team column again rather than leave it stale.
+    function removePlayerRowAndRefresh(btnEl) {
+        btnEl.closest('.player-row').remove();
+        const existingData = captureCurrentPlayerInputs();
+        document.getElementById("player-list").innerHTML = "";
+        renderPlayerListHeaderAndWarning(existingData.length);
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        updateCount();
     }
 
     function handleFormatChange(forceLoad = false) {
@@ -1703,9 +1757,15 @@
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
+        // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
+        // reflects however many rows have been added so far mid-loop, not the final total — the
+        // Team-hiding decision below needs the real final count, so callers building a full batch
+        // pass it explicitly; a single "Add New Player" click has no need to, since currentCount
+        // is already correct for that case.
+        const totalForDecision = knownTotalCount !== null ? knownTotalCount : currentCount;
         const format = document.getElementById("game-format-select").value || 'stroke';
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const teamSize = (format === 'scramble') ? 4 : ((format === 'match' || (format === 'nassau' && nassauType === '1v1')) ? 1 : 2);
@@ -1725,6 +1785,13 @@
         let teamFieldHtml = "";
         let squadFieldHtml = "";
 
+        // A true 1v1 (Match Play, or Nassau set to 1v1) only ever matches the first two players
+        // against each other — with exactly 2 players there's no decision to make, so the Team
+        // selector is hidden and the two players are auto-assigned (see captureCurrentPlayerInputs'
+        // fallback, which already produces the correct Team 1 / Team 2 when this isn't rendered).
+        const isOneVOne = format === 'match' || (format === 'nassau' && nassauType === '1v1');
+        const showTeamForOneVOne = isOneVOne && totalForDecision > 2;
+
         if (format === 'ryder') {
             baseColumns = "1.5fr 0.7fr 1fr 1fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
@@ -1735,7 +1802,7 @@
                     <option value="red" ${squad === 'red' ? 'selected' : ''}>🔴</option>
                     <option value="blue" ${squad === 'blue' ? 'selected' : ''}>🔵</option>
                 </select>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && (nassauType === 'team' || nassauType === '1v1')) || format === 'match') {
+        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || showTeamForOneVOne) {
             baseColumns = "1.8fr 0.8fr 1.2fr";
             teamFieldHtml = `<select class="p-team-input">${teamOptionsHtml}</select>`;
         }
@@ -1755,7 +1822,7 @@
             ${teamFieldHtml}
             ${squadFieldHtml}
             ${moneyCheckboxHtml}
-            <button class="btn-del" onclick="this.parentElement.remove(); updateCount();">✕</button>
+            <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
         listContainer.appendChild(row);
         updateCount();
