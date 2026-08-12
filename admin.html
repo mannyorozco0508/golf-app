@@ -165,6 +165,15 @@
         /* Secret Panel Styles */
         #secret-master-panel { display: none; background: var(--brand-navy); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
         #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Homepage widgets */
+        .home-widgets { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+        .home-widget { border: 2px solid var(--border-mid); border-radius: 12px; padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.15s ease; background: var(--bg-card); }
+        .home-widget.active { border-color: var(--brand-green); background: var(--nassau-box-bg); }
+        .home-widget .hw-icon { font-size: 1.7rem; }
+        .home-widget .hw-name { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; margin-top: 4px; }
+        .home-widget .hw-desc { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; line-height: 1.25; }
+        @media (max-width: 380px) { .home-widget .hw-desc { display: none; } }
     </style>
 </head>
 <body>
@@ -173,7 +182,25 @@
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
     <div class="lobby-title">GolfApp</div>
-    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4;">Create a private game for your foursome or trip, or join an existing one.</p>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
+
+    <div class="home-widgets">
+        <div class="home-widget active" id="hw-round" onclick="selectHomeWidget('round')">
+            <div class="hw-icon">⛳</div>
+            <div class="hw-name">Round</div>
+            <div class="hw-desc">One round, any format</div>
+        </div>
+        <div class="home-widget" id="hw-tournament" onclick="selectHomeWidget('tournament')">
+            <div class="hw-icon">🏆</div>
+            <div class="hw-name">Tournament</div>
+            <div class="hw-desc">Multi-team event</div>
+        </div>
+        <div class="home-widget" id="hw-trip" onclick="selectHomeWidget('trip')">
+            <div class="hw-icon">🧳</div>
+            <div class="hw-name">Trip</div>
+            <div class="hw-desc">Multiple rounds tied together</div>
+        </div>
+    </div>
 
     <div id="trip-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">🧳 Setting Up A Round For</div>
@@ -195,10 +222,6 @@
         <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
         <button class="btn-primary" style="background-color: var(--bg-card); color: var(--brand-navy);" onclick="shareMainApp()">📤 Share App Link</button>
-
-        <h3 style="margin-top: 20px;">🏆 Tournament Mode</h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">In development — multi-team events with a shared leaderboard.</p>
-        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="window.location.href='tournament.html'">🏆 Enter Tournament Mode</button>
 
         <div style="text-align: center; margin-top: 20px;">
             <span style="font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
@@ -962,6 +985,15 @@
 
     function toggleHoleBet() {
         document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
+    }
+
+    // Round is this page — tapping it just keeps the existing New/Resume/Join/Duplicate
+    // controls visible below. Tournament and Trip are separate setup flows entirely.
+    function selectHomeWidget(type) {
+        if (type === 'tournament') { window.location.href = 'tournament.html'; return; }
+        if (type === 'trip') { window.location.href = 'trip.html'; return; }
+        document.querySelectorAll('.home-widget').forEach(w => w.classList.remove('active'));
+        document.getElementById('hw-round').classList.add('active');
     }
 
     function generateRoomCode() {
