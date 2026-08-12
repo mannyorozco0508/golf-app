@@ -6,6 +6,7 @@
     <title>Tournament Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="tournament-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -177,19 +178,31 @@
         });
     }
 
-    // Works out a team's score for one hole from whichever players have posted a score so far.
-    function computeTeamHoleScore(format, playerScores, shambleCountBest) {
-        if (playerScores.length === 0) return null;
-        if (format === 'bestball') {
-            return Math.min(...playerScores);
-        }
-        if (format === 'shamble') {
-            const n = shambleCountBest || 1;
-            const sorted = playerScores.slice().sort((a, b) => a - b);
-            const take = sorted.slice(0, Math.min(n, sorted.length));
-            return take.reduce((s, v) => s + v, 0);
-        }
-        return null;
+    // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
+    // so this page and the organizer's tournament.html always agree on totals and standings.
+
+    function renderLeaderboard() {
+        const container = document.getElementById('leaderboard-list');
+        const rows = computeTournamentLeaderboard(currentData);
+
+        const rankCounts = {};
+        rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
+
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+        </div>`;
+        rows.forEach(r => {
+            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+            const isMe = r.num === myTeamNum;
+            const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;"> (tied)</span>' : '';
+            html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''} ${isMe ? 'me' : ''}">
+                <span class="lb-pos">${r.rank || '-'}</span>
+                <span class="lb-team">${r.teamName}${tieTag} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
+                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                <span class="lb-score">${toParStr}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
     }
 
     function saveHoleScore(holeNum, val) {
@@ -275,60 +288,6 @@
         const toParStr = toPar === null ? '' : (toPar === 0 ? 'E' : (toPar > 0 ? `+${toPar}` : toPar));
         document.getElementById('status-main').textContent = thru > 0 ? `Thru ${thru} — ${total} strokes` : `Enter Hole 1`;
         document.getElementById('status-sub').textContent = toPar === null ? 'Enter your team\'s score below to get started' : `${toParStr} to par`;
-    }
-
-    function renderLeaderboard() {
-        const container = document.getElementById('leaderboard-list');
-        const teams = currentData.teams || {};
-        const scores = currentData.scores || {};
-        const courseData = currentData.courseData || [];
-        const handicap = currentData.teamHandicap || 0;
-        const format = currentData.format || 'scramble';
-        const shambleCountBest = currentData.shambleCountBest || 1;
-
-        let rows = Object.keys(teams).map(tid => {
-            const t = teams[tid];
-            let strokes = 0, thru = 0, parPlayed = 0;
-            courseData.forEach(h => {
-                if (format === 'scramble') {
-                    const v = scores[`team${t.num}_h${h.hole}`];
-                    if (v && v > 0) { strokes += parseInt(v, 10); thru++; parPlayed += h.par; }
-                } else {
-                    const holeScores = [];
-                    t.players.forEach((p, pIdx) => {
-                        const v = scores[`team${t.num}_p${pIdx}_h${h.hole}`];
-                        if (v && v > 0) holeScores.push(parseInt(v, 10));
-                    });
-                    const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
-                    if (teamHoleScore !== null) { strokes += teamHoleScore; thru++; parPlayed += h.par; }
-                }
-            });
-            const net = thru > 0 ? strokes - handicap : 0;
-            const toPar = thru > 0 ? net - parPlayed : null;
-            return { num: t.num, teamName: t.name || `Team ${t.num}`, strokes, thru, toPar, hasScores: thru > 0 };
-        });
-
-        rows.sort((a, b) => {
-            if (a.hasScores && !b.hasScores) return -1;
-            if (!a.hasScores && b.hasScores) return 1;
-            if (!a.hasScores && !b.hasScores) return a.num - b.num;
-            return a.toPar - b.toPar;
-        });
-
-        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
-        </div>`;
-        rows.forEach((r, i) => {
-            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            const isMe = r.num === myTeamNum;
-            html += `<div class="lb-row ${i === 0 && r.hasScores ? 'leader' : ''} ${isMe ? 'me' : ''}">
-                <span class="lb-pos">${i + 1}</span>
-                <span class="lb-team">${r.teamName} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
-                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
-                <span class="lb-score">${toParStr}</span>
-            </div>`;
-        });
-        container.innerHTML = html;
     }
 </script>
 </body>
