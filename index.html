@@ -1644,6 +1644,33 @@
         return { p1, p2, p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, t1TotalMoney };
     }
 
+    // A Stroke Play press is a second (third, fourth...) independent Stroke Play wager that starts
+    // on a later hole and runs through the end of the round, coexisting with the original bet rather
+    // than replacing it. This is NOT a new scoring formula — it just calls calculateStrokeHeadToHead
+    // again with courseData filtered down to "hole >= startHole" and that press's own stake. Because
+    // each call is independently zero-sum and stateless (recomputed from raw savedScores every time),
+    // the combined result is automatically zero-sum too, and a score correction on any hole correctly
+    // ripples into exactly the wagers whose hole range includes that hole and no others.
+    function calculateStrokePressSet(players, courseData, savedScores, scoringType, originalStake, presses) {
+        if (players.length !== 2) return null;
+        const original = calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, originalStake);
+        if (!original) return null;
+
+        const pressResults = (presses || [])
+            .slice()
+            .sort((a, b) => a.startHole - b.startHole)
+            .map((pr, i) => {
+                const pressCourseData = courseData.filter(h => h.hole >= pr.startHole);
+                const calc = calculateStrokeHeadToHead(players, pressCourseData, savedScores, scoringType, pr.stake);
+                return Object.assign({ pressNum: i + 1, startHole: pr.startHole, stake: pr.stake }, calc);
+            });
+
+        let combinedT1Money = original.t1TotalMoney;
+        pressResults.forEach(pr => { combinedT1Money += pr.t1TotalMoney; });
+
+        return { p1: original.p1, p2: original.p2, original, pressResults, combinedT1Money };
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
         let teams = {};
         players.forEach(p => {
@@ -1854,6 +1881,20 @@
         if (!confirm(`Start a new press, starting hole ${nextHole}?`)) return;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId, startHole: nextHole })
+            .catch(err => alert(`Press failed to save: ${err.message}`));
+    }
+
+    // Stroke Play presses can be a different dollar amount than the original bet (or any other
+    // press) — the prompt defaults to the original stake so a plain "OK" reproduces the most
+    // common case ("press it for the same amount"), but any number can be typed over it.
+    function pressStrokeBet(nextHole) {
+        const defaultAmt = currentData.matchStake || 0;
+        const input = prompt(`New Stroke Play press starting hole ${nextHole} — how much?`, defaultAmt || "");
+        if (input === null || input.trim() === "") return;
+        const stake = parseFloat(input);
+        if (isNaN(stake) || stake <= 0) { alert("Please enter a valid dollar amount."); return; }
+        const pushKey = db.ref(`events/${currentMode}/strokePresses`).push().key;
+        db.ref(`events/${currentMode}/strokePresses/${pushKey}`).set({ startHole: nextHole, stake })
             .catch(err => alert(`Press failed to save: ${err.message}`));
     }
 
@@ -2448,6 +2489,8 @@
         let hiloCalc = null;
         let matchCalc = null;
         let strokeMatchCalc = null; // for a 1v1 (format 'match') set to Stroke Play scoring instead of Match Play
+        let strokePressResults = []; // each press's own independent calc, same shape as strokeMatchCalc plus startHole/stake/pressNum
+        let strokeCombinedT1Money = 0; // original + all presses, summed
         let pressRuleUsed = "none";
         let stakeToUseVal = 0;
         let manualMatchPresses = [];
@@ -2458,6 +2501,10 @@
             // Total strokes, not hole-by-hole match play — a genuinely different model, so this
             // skips calculateMatchEngine entirely rather than feeding it data it can't interpret.
             strokeMatchCalc = calculateStrokeHeadToHead(moneyPlayers, courseData, savedScores, currentData.matchScoring || 'net', currentData.matchStake || 0);
+            const strokePresses = currentData.strokePresses ? Object.values(currentData.strokePresses) : [];
+            const strokePressSet = calculateStrokePressSet(moneyPlayers, courseData, savedScores, currentData.matchScoring || 'net', currentData.matchStake || 0, strokePresses);
+            strokePressResults = strokePressSet ? strokePressSet.pressResults : [];
+            strokeCombinedT1Money = strokePressSet ? strokePressSet.combinedT1Money : 0;
         } else if (['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(gameFormat)) {
             let pressRule = gameFormat === 'nassau' ? (currentData.nassauPressRule || "none") : (currentData.matchPressRule || "none");
             let nassauStake = currentData.nassauStake || 10;
@@ -2748,15 +2795,50 @@
                 if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt)}</span>`;
                 return `<span class="val-even">$0</span>`;
             }
+            function strokeLeadText(p1Total, p2Total, holesCompleted, p1Name, p2Name) {
+                if (holesCompleted === 0) return "Waiting for scores...";
+                const diff = p1Total - p2Total;
+                return diff === 0 ? "All Square" : (diff < 0 ? `${p1Name.split(' ')[0]} leads by ${Math.abs(diff)}` : `${p2Name.split(' ')[0]} leads by ${Math.abs(diff)}`);
+            }
 
             if (s.holesCompleted === 0) {
                 statusEl.innerHTML = `<span class="ticker-part">Waiting for scores...</span>`;
             } else {
-                const diff = s.p1Total - s.p2Total;
-                let leadText = diff === 0 ? "All Square" : (diff < 0 ? `${s.p1.name.split(' ')[0]} by ${Math.abs(diff)}` : `${s.p2.name.split(' ')[0]} by ${Math.abs(diff)}`);
+                const leadText = strokeLeadText(s.p1Total, s.p2Total, s.holesCompleted, s.p1.name, s.p2.name);
                 const thruText = s.roundComplete ? " (FINAL)" : ` (Thru ${s.holesCompleted})`;
-                statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${leadText}</strong>${thruText}</span>`;
+                const pressCount = strokePressResults.length;
+                const pressSummary = pressCount > 0 ? ` <span style="color:#a8dadc; font-size:0.75rem;">+ ${pressCount} press${pressCount > 1 ? 'es' : ''}</span>` : '';
+                statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${leadText}</strong>${thruText}</span>${pressSummary}`;
             }
+
+            const nextPressHole = s.holesCompleted + 1;
+            const canPress = !s.roundComplete && nextPressHole <= s.totalHoles && !strokePressResults.some(pr => pr.startHole === nextPressHole);
+            const pressBtnHtml = canPress
+                ? `<button onclick="pressStrokeBet(${nextPressHole})" style="background:var(--brand-navy); color:white; border:none; border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
+                : '';
+
+            let pressRowsHtml = '';
+            strokePressResults.forEach(pr => {
+                const label = `Press ${pr.pressNum} · Hole ${pr.startHole} · $${pr.stake}`;
+                let statusText, moneyText;
+                if (pr.holesCompleted === 0) {
+                    statusText = 'Not started';
+                    moneyText = `<span style="color:var(--text-muted);">$${pr.stake} at stake</span>`;
+                } else if (pr.roundComplete) {
+                    const winnerName = pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name).split(' ')[0] : null;
+                    statusText = winnerName ? `FINAL — ${winnerName} won $${pr.stake}` : 'FINAL — Tied, no money';
+                    moneyText = `<span style="color:var(--accent-teal); font-weight:bold;">🔒 LOCKED</span>`;
+                } else {
+                    statusText = strokeLeadText(pr.p1Total, pr.p2Total, pr.holesCompleted, pr.p1.name, pr.p2.name) + ` (Thru ${pr.startHole - 1 + pr.holesCompleted})`;
+                    moneyText = `<span style="color:var(--text-muted);">$${pr.stake} at stake</span>`;
+                }
+                pressRowsHtml += `
+                    <div class="payout-row" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                        <div style="display:flex; justify-content:space-between; width:100%; font-size:0.75rem; color:var(--text-muted);"><span>${label}</span>${moneyText}</div>
+                        <div style="font-weight:bold;">${statusText}</div>
+                    </div>
+                `;
+            });
 
             document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${s.p1.name} vs ${s.p2.name})`;
             document.getElementById("payout-rows-wrapper").innerHTML = `
@@ -2768,11 +2850,13 @@
                     <span>${s.p1.name}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
                     <span>${s.p2.name}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
                 </div>
+                <div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>
+                ${pressRowsHtml}
                 <div class="payout-row" style="margin-top:8px;">
-                    <span>Total Ledger:</span>
-                    <span>${s.p1.name}: ${fmtStrokeM(s.t1TotalMoney)} | ${s.p2.name}: ${fmtStrokeM(-s.t1TotalMoney)}</span>
+                    <span>Combined Ledger:</span>
+                    <span>${s.p1.name}: ${fmtStrokeM(strokeCombinedT1Money)} | ${s.p2.name}: ${fmtStrokeM(-strokeCombinedT1Money)}</span>
                 </div>
-                ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Settles once both players finish all ${s.totalHoles} holes — no presses in Stroke Play mode.</div>` : ''}
+                ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Original bet settles once both players finish all ${s.totalHoles} holes.</div>` : ''}
             `;
 
         } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
@@ -3065,11 +3149,11 @@
         }
         if (currentViewMode === 'hole') renderHoleView();
 
-        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc);
+        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc, strokePressResults, strokeCombinedT1Money);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
-    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc) {
+    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc, strokePressResults, strokeCombinedT1Money) {
         const courseName = currentData.courseName || "Golf Scorecard";
         const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         
@@ -3263,15 +3347,18 @@
                 return `$0`;
             }
 
-            printHtml += `<div class="pledger-row"><span><strong>Bet Type:</strong></span> <span>$${currentData.matchStake || 0} Flat, Stroke Play</span></div>`;
-            printHtml += `<div class="pledger-row"><span>${s.p1.name} Total:</span> <span>${s.holesCompleted > 0 ? s.p1Total : '-'}</span></div>`;
-            printHtml += `<div class="pledger-row"><span>${s.p2.name} Total:</span> <span>${s.holesCompleted > 0 ? s.p2Total : '-'}</span></div>`;
+            printHtml += `<div class="pledger-row"><span><strong>Original — $${currentData.matchStake || 0} Flat, Stroke Play:</strong></span> <span>${s.p1.name} ${s.holesCompleted > 0 ? s.p1Total : '-'} | ${s.p2.name} ${s.holesCompleted > 0 ? s.p2Total : '-'}</span></div>`;
             if (!s.roundComplete) {
                 printHtml += `<div class="pledger-row"><span style="color:#888;">Not yet final — thru ${s.holesCompleted} of ${s.totalHoles}.</span></div>`;
             }
+            (strokePressResults || []).forEach(pr => {
+                const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
+                const prStatus = !pr.roundComplete ? `Not yet final — thru ${pr.holesCompleted} holes of this press` : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
+                printHtml += `<div class="pledger-row"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
+            });
             printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
-                <span><strong>Total Ledger:</strong></span>
-                <span><strong>${s.p1.name}: ${fmtM(s.t1TotalMoney)} | ${s.p2.name}: ${fmtM(-s.t1TotalMoney)}</strong></span>
+                <span><strong>Combined Ledger:</strong></span>
+                <span><strong>${s.p1.name}: ${fmtM(strokeCombinedT1Money)} | ${s.p2.name}: ${fmtM(-strokeCombinedT1Money)}</strong></span>
             </div></div>`;
         } else if (['match', 'bestball', 'scramble', 'ryder'].includes(format) && typeof matchCalc !== 'undefined' && matchCalc) {
             printHtml += `<div class="pledger"><h3>💵 Game Ledger (${format.toUpperCase()})</h3>`;
