@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = __dirname;
 const DEST = path.join(ROOT, 'www', 'app');
 
 // Exactly the production runtime files the app needs - no tests, no fallback/archive
