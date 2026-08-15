@@ -162,6 +162,16 @@
         .btn-primary:hover { background-color: #125d48; }
         .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+
+        .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
+        .modal-overlay.open { display:flex; }
+        .modal-content { background: var(--bg-card); border-radius: 14px; padding: 20px; max-width: 440px; width:100%; max-height:85vh; overflow-y:auto; }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .modal-header span { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
+        .close-modal { background:none; border:none; font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0; line-height:1; }
+        #paste-players-textarea { width:100%; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border-mid); font-family:inherit; font-size:1rem; resize:vertical; background:var(--bg-page); color:var(--text-main); }
+        #paste-players-textarea:focus { outline:2px solid var(--brand-green); border-color:var(--brand-green); }
+        .paste-flagged-line { background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:6px 10px; font-size:0.78rem; color:var(--warn-text); margin-top:4px; }
         .btn-outline:hover { background-color: var(--nav-bg); }
 
         /* Custom Course Grid Inputs */
@@ -173,13 +183,13 @@
         #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
 
         /* Homepage widgets */
-        .home-widgets { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 22px; }
-        .home-widget { border: 2px solid var(--border-mid); border-radius: 12px; padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.15s ease; background: var(--bg-card); }
+        .home-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+        .home-widget { border: 2px solid var(--border-mid); border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; transition: all 0.15s ease; background: var(--bg-card); min-height: 90px; display: flex; flex-direction: column; justify-content: center; font-family: inherit; outline: none; -webkit-tap-highlight-color: transparent; }
         .home-widget.active { border-color: var(--brand-green); background: var(--nassau-box-bg); }
-        .home-widget .hw-icon { font-size: 1.7rem; }
-        .home-widget .hw-name { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; margin-top: 4px; }
-        .home-widget .hw-desc { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; line-height: 1.25; }
-        @media (max-width: 380px) { .home-widget .hw-desc { display: none; } }
+        .home-widget .hw-icon { font-size: 1.9rem; }
+        .home-widget .hw-name { font-weight: bold; color: var(--brand-green); font-size: 0.92rem; margin-top: 5px; }
+        .home-widget .hw-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; line-height: 1.3; }
+        @media (max-width: 340px) { .home-widget .hw-desc { display: none; } }
     </style>
 </head>
 <body>
@@ -191,22 +201,29 @@
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
 
     <div class="home-widgets">
-        <div class="home-widget active" id="hw-round" onclick="selectHomeWidget('round')">
-            <div class="hw-icon">⛳</div>
-            <div class="hw-name">Round</div>
-            <div class="hw-desc">One round, any format</div>
-        </div>
-        <div class="home-widget" id="hw-tournament" onclick="selectHomeWidget('tournament')">
-            <div class="hw-icon">🏆</div>
-            <div class="hw-name">Tournament</div>
-            <div class="hw-desc">Multi-team event</div>
-        </div>
-        <div class="home-widget" id="hw-trip" onclick="selectHomeWidget('trip')">
+        <button type="button" class="home-widget" id="hw-trip" onclick="selectHomeWidget('trip')">
             <div class="hw-icon">🧳</div>
-            <div class="hw-name">Trip</div>
-            <div class="hw-desc">Multiple rounds tied together</div>
-        </div>
+            <div class="hw-name">Golf Trip</div>
+            <div class="hw-desc">Multiple rounds, games, teams, standings & money</div>
+        </button>
+        <button type="button" class="home-widget" id="hw-club" onclick="selectHomeWidget('club')">
+            <div class="hw-icon">🏆</div>
+            <div class="hw-name">Club Event</div>
+            <div class="hw-desc">Today's men's club or club competition</div>
+        </button>
+        <button type="button" class="home-widget" id="hw-tournament" onclick="selectHomeWidget('tournament')">
+            <div class="hw-icon">🎯</div>
+            <div class="hw-name">Tournament</div>
+            <div class="hw-desc">Scrambles, charity events & corporate outings</div>
+        </button>
+        <button type="button" class="home-widget active" id="hw-quick" onclick="selectHomeWidget('quick')">
+            <div class="hw-icon">🏌️</div>
+            <div class="hw-name">Quick Round</div>
+            <div class="hw-desc">Playing today? Set up in seconds</div>
+        </button>
     </div>
+
+    <div id="event-type-framing" style="display:none; text-align:center; font-size:0.82rem; color:var(--text-muted); margin:-10px 0 18px 0; line-height:1.4;"></div>
 
     <div id="trip-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">🧳 Setting Up A Round For</div>
@@ -435,23 +452,30 @@
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
         <div class="wizard-step-title">🎮 Step 3: Game Format</div>
-        <div class="wizard-step-sub">What are you playing today?</div>
+        <div class="wizard-step-sub" id="step3-sub">What are you playing today?</div>
     <div class="form-group">
         <label>Game Format</label>
         <select id="game-format-select" onchange="handleFormatChange()">
             <option value="" disabled selected>-- Select Game Format --</option>
-            <option value="stroke">Stroke Play (Gross & Net)</option>
-            <option value="match">🥊 1v1 Match Play (Gross & Net)</option>
-            <option value="hilo">♠️ Hi-Lo (Low Ball / High Ball)</option>
-            <option value="dots">🔴 Dot Game (Garbage/Junk)</option>
-            <option value="ryder">🏆 Ryder Cup Match Play (Red vs Blue)</option>
-            <option value="nassau">💵 Nassau Bet Tracker (Configurable $ Stake & Press)</option>
-            <option value="wolf">🐺 Wolf Game Tracker (Configurable $ per Point)</option>
-            <option value="bestball">2-Man Best Ball (Four-Ball)</option>
-            <option value="scramble">4-Man Scramble</option>
-            <option value="stableford">Net Stableford Points</option>
-            <option value="skins">🥩 Skins Game (Gross & Net)</option>
+            <optgroup label="Keep Score">
+                <option value="stroke">Stroke Play</option>
+                <option value="stableford">Stableford</option>
+            </optgroup>
+            <optgroup label="Play for Money">
+                <option value="nassau">Nassau</option>
+                <option value="skins">Skins</option>
+                <option value="wolf">Wolf</option>
+                <option value="match">Match Play</option>
+                <option value="dots">Dot Game</option>
+            </optgroup>
+            <optgroup label="Team Games">
+                <option value="bestball">Best Ball</option>
+                <option value="scramble">Scramble</option>
+                <option value="ryder">Ryder Cup</option>
+                <option value="hilo">Hi-Lo</option>
+            </optgroup>
         </select>
+        <p id="format-description" style="font-size:0.78rem; color:var(--text-muted); margin:6px 0 0 0; min-height:1.2em;"></p>
 
         <div id="hole-bet-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
@@ -661,6 +685,23 @@
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
+    <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
+
+    <div class="modal-overlay" id="paste-players-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📋 Paste Player List</span>
+                <button class="close-modal" onclick="closePastePlayersModal()" aria-label="Close">&times;</button>
+            </div>
+            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. Add a handicap after a comma if you have it — totally optional.</label>
+            <textarea id="paste-players-textarea" rows="8" placeholder="John Smith, 8
+Mike Jones, 12
+Robert Garcia
+Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
+            <div id="paste-preview-summary" style="font-size:0.82rem; margin:10px 0; color:var(--text-muted);"></div>
+            <button class="btn-primary" id="paste-players-commit-btn" onclick="commitPastedPlayers()" disabled>Add Players</button>
+        </div>
+    </div>
 
     <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
@@ -910,6 +951,7 @@
     let currentMode = urlParams.get('game');
     let tripLinkCode = urlParams.get('trip'); // present when this round is being set up FROM Trip Mode
     let copyFromCode = urlParams.get('copyFrom'); // present when pre-filling from another round's setup
+    let currentEventType = urlParams.get('eventType') || 'quick'; // 'club' or 'quick' — framing only, same Round engine either way
     let currentCategory = "weekend";
     
     let storedPlayersTemp = [];
@@ -1026,11 +1068,26 @@
 
     // Round is this page — tapping it just keeps the existing New/Resume/Join/Duplicate
     // controls visible below. Tournament and Trip are separate setup flows entirely.
+    // Club Event and Quick Round both use the existing Round engine underneath — same wizard,
+    // same data model — they only differ in framing/copy and which format gets suggested first.
+    // Trip and Tournament are genuinely separate flows and navigate away immediately.
+    let selectedEventType = 'quick';
+    const eventTypeFraming = {
+        club: "Club Event — nudges toward common club formats like Stroke Play, Skins, or Stableford. Every other format is still available in Step 3.",
+        quick: "Quick Round — just pick a course, add your group, choose a game, and go."
+    };
+
     function selectHomeWidget(type) {
         if (type === 'tournament') { window.location.href = 'tournament.html'; return; }
         if (type === 'trip') { window.location.href = 'trip.html'; return; }
+
+        selectedEventType = type; // 'club' or 'quick'
         document.querySelectorAll('.home-widget').forEach(w => w.classList.remove('active'));
-        document.getElementById('hw-round').classList.add('active');
+        document.getElementById(type === 'club' ? 'hw-club' : 'hw-quick').classList.add('active');
+
+        const framingEl = document.getElementById('event-type-framing');
+        framingEl.textContent = eventTypeFraming[type];
+        framingEl.style.display = 'block';
     }
 
     function generateRoomCode() {
@@ -1042,7 +1099,7 @@
 
     function createRoom() {
         const newCode = generateRoomCode();
-        let dest = `admin.html?game=${newCode}`;
+        let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
         if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
         window.location.href = dest;
     }
@@ -1558,6 +1615,92 @@
         updateCount();
     }
 
+    // --- PASTE-A-LIST BULK PLAYER ENTRY ---
+    // One player per line: "Name" or "Name, Handicap". The handicap is stored exactly as typed
+    // (e.g. "+2", "12.5") — same convention manual entry already uses — it's parsed later by
+    // parseHcpAdmin() at scoring/settlement time, never here. A line that reduces to an empty
+    // name (e.g. someone pasted ",8" with nothing before the comma) is flagged rather than
+    // silently creating a nameless player; everything else that's non-blank is accepted, since
+    // manual entry doesn't validate names either and duplicate names are already allowed.
+    function parsePlayerPasteText(text) {
+        const lines = text.split('\n');
+        let validPlayers = [];
+        let flaggedLines = [];
+        lines.forEach((rawLine, idx) => {
+            const line = rawLine.trim();
+            if (line === '') return; // blank line — skip silently, not an error
+
+            let name, hcp;
+            const commaIdx = line.indexOf(',');
+            if (commaIdx === -1) {
+                name = line;
+                hcp = '';
+            } else {
+                name = line.slice(0, commaIdx).trim();
+                hcp = line.slice(commaIdx + 1).trim();
+            }
+
+            if (name === '') {
+                flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' });
+                return;
+            }
+            validPlayers.push({ name, hcp });
+        });
+        return { validPlayers, flaggedLines };
+    }
+
+    function openPastePlayersModal() {
+        document.getElementById('paste-players-modal').classList.add('open');
+        document.getElementById('paste-players-textarea').focus();
+    }
+
+    function closePastePlayersModal() {
+        document.getElementById('paste-players-modal').classList.remove('open');
+    }
+
+    function previewPastedPlayers() {
+        const text = document.getElementById('paste-players-textarea').value;
+        const { validPlayers, flaggedLines } = parsePlayerPasteText(text);
+        const summaryEl = document.getElementById('paste-preview-summary');
+        const commitBtn = document.getElementById('paste-players-commit-btn');
+
+        if (validPlayers.length === 0 && flaggedLines.length === 0) {
+            summaryEl.innerHTML = '';
+            commitBtn.disabled = true;
+            return;
+        }
+
+        let html = `<strong style="color:var(--brand-green);">${validPlayers.length} player${validPlayers.length === 1 ? '' : 's'} ready to add</strong>`;
+        if (flaggedLines.length > 0) {
+            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
+            html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
+        }
+        summaryEl.innerHTML = html;
+        commitBtn.disabled = validPlayers.length === 0;
+    }
+
+    // Appends parsed players to whatever's already in the list — reuses the exact same
+    // capture/rebuild pipeline as a single manual add, just with multiple new entries pushed
+    // at once instead of one blank one. Existing players are never replaced or cleared.
+    function commitPastedPlayers() {
+        const text = document.getElementById('paste-players-textarea').value;
+        const { validPlayers } = parsePlayerPasteText(text);
+        if (validPlayers.length === 0) return;
+
+        const existingData = captureCurrentPlayerInputs();
+        validPlayers.forEach(p => {
+            existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
+        });
+        document.getElementById("player-list").innerHTML = "";
+        renderPlayerListHeaderAndWarning(existingData.length);
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        updateCount();
+
+        document.getElementById('paste-players-textarea').value = '';
+        document.getElementById('paste-preview-summary').innerHTML = '';
+        closePastePlayersModal();
+    }
+
     // Same idea in reverse — removing a player could drop a 1v1 round back to exactly 2
     // players, which should hide the Team column again rather than leave it stale.
     function removePlayerRowAndRefresh(btnEl) {
@@ -1569,8 +1712,28 @@
         updateCount();
     }
 
+    // Plain-English one-liners shown under the format picker — advanced configuration (stakes,
+    // press rules, scoring type) still lives in Step 4, unchanged; this is purely what shows
+    // before someone picks, so they know roughly what they're choosing without needing to
+    // already know the jargon.
+    const formatDescriptions = {
+        stroke: "Total strokes for the round — low score wins.",
+        stableford: "Earn points based on your score on each hole — high score wins.",
+        nassau: "Three matches in one — front 9, back 9, and the whole round.",
+        skins: "Win a hole outright (no ties) to win the skin.",
+        wolf: "Pick a partner each hole, or go it alone for bigger stakes.",
+        match: "Win more holes than your opponent — head to head.",
+        dots: "Earn dots for birdies, greenies, and other in-round moments.",
+        bestball: "Partner up — the better of your team's two scores counts.",
+        scramble: "Everyone tees off, pick the best shot, play from there — as a team.",
+        ryder: "Team vs. team match play, one side against the other.",
+        hilo: "Teams battle for both the low score and the high score on every hole."
+    };
+
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
+        const descEl = document.getElementById("format-description");
+        if (descEl) descEl.textContent = formatDescriptions[format] || "";
         const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
         
         if (document.getElementById("hole-bet-settings")) {
@@ -2217,6 +2380,25 @@
 
     renderWizardProgress();
     goToWizardStep(1);
+
+    // Step 3's sub-header reflects which entry card the organizer chose — Club Event nudges
+    // toward common club formats, Quick Round keeps it plain. Every format is still available
+    // in the dropdown either way; this only changes the framing text above it.
+    const step3SubEl = document.getElementById('step3-sub');
+    if (step3SubEl) {
+        step3SubEl.textContent = currentEventType === 'club'
+            ? "Common club formats: Stroke Play, Skins, Stableford. Every other format below still works too."
+            : "What are you playing today?";
+    }
+    // On the lobby screen itself (no game code yet), show the framing for the default
+    // Quick Round selection, matching whichever card starts active in the HTML.
+    if (!currentMode) {
+        const framingEl = document.getElementById('event-type-framing');
+        if (framingEl) {
+            framingEl.textContent = eventTypeFraming.quick;
+            framingEl.style.display = 'block';
+        }
+    }
 
     if (currentMode) {
         generateQRCode();
