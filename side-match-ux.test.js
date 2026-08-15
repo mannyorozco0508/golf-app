@@ -68,14 +68,17 @@ describe('sidematches.html — cross-group labeling (Part 11)', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], [0, 0, 0, 0, 0, 0, 0, 0]);
         setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, {});
-        assert.ok(sandbox.document.getElementById('sm-player-picker').innerHTML.includes('Group'));
+        const zoneA = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
+        const zoneB = sandbox.document.getElementById('sm-player-picker-b').innerHTML;
+        assert.ok(zoneA.includes('Group') && zoneB.includes('Group'), 'both side zones should show group labels once there are multiple groups');
     });
 
     test('group labels stay hidden for a single foursome — nothing to distinguish', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
         setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, {});
-        assert.ok(!sandbox.document.getElementById('sm-player-picker').innerHTML.includes('Group'));
+        const zoneA = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
+        assert.ok(!zoneA.includes('Group'));
     });
 });
 
@@ -151,21 +154,80 @@ describe('CROSS-GROUP SIDE MATCHES — 1v1 and 2v2 spanning two groups (Part 11/
     });
 });
 
-describe('DOCUMENTED FINDING — the picker\'s auto-balance-on-first-tap can prevent a specific desired grouping via simple re-tapping', () => {
-    test('tapping two players in sequence does not always let the second land on the same side as the first without an intermediate detour', () => {
-        // This documents existing (pre-batch, untouched) tap-cycling behavior discovered while
-        // building the new live feedback — not something this batch changed or was asked to fix.
-        // First tap on an unpicked player auto-balances to whichever side has fewer picks; a
-        // second tap on a DIFFERENT already-'b'-assigned player has no direct path back to 'a'
-        // except being removed and re-picked once the balance shifts.
+describe('FIXED THIS BATCH — the picker is now fully deterministic, no auto-balancing surprises', () => {
+    test('REGRESSION (was a bug, now fixed): two players can be placed on the SAME side directly, in exactly one tap each', () => {
+        // Previously: tapping two different unpicked players always auto-balanced them onto
+        // OPPOSITE sides, with no direct way to put them on the same side without a detour.
+        // This test proves that's no longer true — pickPlayerForSide is fully explicit about
+        // which side a tap targets, so "John + Mike" on the same side just works.
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['John', 'Mike'], [0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
         vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.toggleSideMatchPick(String(players[0].id)); // John: unset -> 'a' (auto-balance, 0<=0)
-        sandbox.toggleSideMatchPick(String(players[1].id)); // Mike: unset -> 'b' (auto-balance, 1<=0 is false)
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[1].id), 'a');
         const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[1].id]: 'b' }),
-            'confirms: two sequential taps on two different unpicked players always split them onto opposite sides, never the same side, by design of the existing auto-balance logic');
+        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[1].id]: 'a' }),
+            'both players should land on side "a" — exactly what was tapped, exactly two taps, no detour');
+    });
+
+    test('tapping a player already on a side, under that same side, removes them (toggle off)', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A'], [0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), '{}');
+    });
+
+    test('tapping a player already on side A, under side B, moves them there in one deliberate tap', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A'], [0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[0].id), 'b');
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), JSON.stringify({ [players[0].id]: 'b' }));
+    });
+
+    test('REGRESSION: attempting to overfill a side (3rd player, max is 2) changes nothing — no silent reassignment', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C'], [0, 0, 0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[1].id), 'a');
+        const beforeOverflow = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
+        sandbox.pickPlayerForSide(String(players[2].id), 'a'); // side a already has 2 — should be rejected
+        const afterOverflow = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
+        assert.equal(beforeOverflow, afterOverflow, 'state must be completely unchanged when a side is already full');
+        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('already has 2'));
+    });
+
+    test('Stroke Play format enforces a max of 1 per side, matching the engine\'s real 1v1-only constraint', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B'], [0, 0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        sandbox.__setElement('sm-format', 'stroke');
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[1].id), 'a'); // 2nd player to side a under stroke play — should be rejected
+        const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
+        assert.equal(state, JSON.stringify({ [players[0].id]: 'a' }));
+    });
+
+    test('ACCEPTANCE SCENARIO C: Manny+Mike vs John+Steve, created directly, no tricks, exactly 4 taps', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['Manny', 'John', 'Mike', 'Steve'], [0, 0, 0, 0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a'); // Manny
+        sandbox.pickPlayerForSide(String(players[2].id), 'a'); // Mike
+        sandbox.pickPlayerForSide(String(players[1].id), 'b'); // John
+        sandbox.pickPlayerForSide(String(players[3].id), 'b'); // Steve
+        const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
+        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[2].id]: 'a', [players[1].id]: 'b', [players[3].id]: 'b' }));
+        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('2v2'));
     });
 });
