@@ -127,6 +127,15 @@
         .live-action-more summary { font-size: 0.8rem; font-weight: bold; color: var(--accent-teal); cursor: pointer; margin-top: 8px; list-style: none; }
         .live-action-more summary::-webkit-details-marker { display: none; }
         .la-mini-row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 2px 0; }
+        .la-main-match { border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: var(--bg-card); }
+        .la-main-match.locked { border-color: var(--brand-green); }
+        .la-main-match-status { font-size: 0.95rem; font-weight: bold; }
+        .la-main-match-money { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+        .la-status-word { font-size: 0.68rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; }
+        .la-status-word.live { color: var(--brand-green); }
+        .la-status-word.losing { color: var(--accent-red); }
+        .la-status-word.as { color: #8a6d00; }
+        .la-status-word.final { color: var(--brand-green); }
 
         .val-pos { color: var(--accent-teal); }
         .val-neg { color: var(--accent-red); }
@@ -406,6 +415,7 @@
         <div id="live-action-box" class="live-action-box" style="display:none;">
             <div class="live-action-title" id="live-action-title">🔥 LIVE ACTION</div>
             <div class="bet-counts-row" id="live-action-counts"></div>
+            <div id="live-action-main-match"></div>
             <div id="live-action-press-ladder" class="press-ladder"></div>
             <div id="live-action-sidematches"></div>
             <div id="live-action-skins"></div>
@@ -834,11 +844,13 @@
                 mainGame = {
                     t1Name: calc.t1Name, t2Name: calc.t2Name,
                     segments: calc.activeMatches.filter(m => m.pressNum === 0).map(m => ({
-                        label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult), closed: m.closed
+                        label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult),
+                        closed: m.closed, allSquare: m.status === 0, stake: perSegStake
                     }))
                 };
                 presses = calc.activeMatches.filter(m => m.pressNum > 0).map(m => ({
-                    id: m.id, label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult), closed: m.closed
+                    id: m.id, label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult),
+                    closed: m.closed, allSquare: m.status === 0, stake: perSegStake
                 }));
                 calc.activeMatches.forEach(m => tallySegment(m, perSegStake));
             }
@@ -949,26 +961,72 @@
         if (c.winning > 0) chips += `<span class="bet-count-chip winning">${c.winning} Winning</span>`;
         if (c.allSquare > 0) chips += `<span class="bet-count-chip allsquare">${c.allSquare} All Square</span>`;
         if (c.losing > 0) chips += `<span class="bet-count-chip losing">${c.losing} Losing</span>`;
-        if (c.final > 0) chips += `<span class="bet-count-chip locked">${c.final} Final${summary.lockedTotal !== null ? ` — $${summary.lockedTotal}` : ''}</span>`;
+        if (c.final > 0) chips += `<span class="bet-count-chip locked">${c.final} Final${summary.lockedTotal !== null ? ` — $${summary.lockedTotal} Locked` : ''}</span>`;
         document.getElementById('live-action-counts').innerHTML = chips;
 
+        // Main Match gets its own section with greater visual weight than presses, matching
+        // "at stake" (unfinished) vs "locked"/"won" (mathematically closed) language throughout -
+        // an unfinished bet's stake is never presented as though it's already been won.
+        const mainMatchEl = document.getElementById('live-action-main-match');
+        if (summary.mainGame && summary.mainGame.segments.length > 0) {
+            mainMatchEl.innerHTML = `<div class="live-action-section-label">Main Match</div>` + summary.mainGame.segments.map(seg => {
+                const wordCls = seg.closed ? 'final' : (seg.allSquare ? 'as' : (seg.statusText.includes(summary.mainGame.t1Name) ? 'live' : 'losing'));
+                const word = seg.closed ? 'FINAL' : (seg.allSquare ? 'ALL SQUARE' : 'LIVE');
+                const moneyLine = seg.stake !== null
+                    ? (seg.closed ? (seg.allSquare ? 'Pushed — no money changes hands' : `+$${seg.stake} locked`) : (seg.allSquare ? `$${seg.stake} at stake` : `$${seg.stake} at stake`))
+                    : '';
+                return `<div class="la-main-match ${seg.closed ? 'locked' : ''}">
+                    <span class="la-status-word ${wordCls}">${seg.closed ? '🔒 ' : (seg.allSquare ? '🟡 ' : '🟢 ')}${word}</span>
+                    <div class="la-main-match-status">${seg.statusText === 'AS' ? 'All Square' : seg.statusText}${seg.label !== 'Overall Match' && summary.mainGame.segments.length > 1 ? ` <span style="font-weight:normal; color:var(--text-muted); font-size:0.78rem;">(${seg.label})</span>` : ''}</div>
+                    ${moneyLine ? `<div class="la-main-match-money">${moneyLine}</div>` : ''}
+                </div>`;
+            }).join('');
+        } else {
+            mainMatchEl.innerHTML = '';
+        }
+
+        // Presses get their own label and a compact count summary, then the ladder - matching
+        // the "PRESSES / 7 Total · 4 Locked · 3 Live" hierarchy, distinct from the main match above.
         const ladderEl = document.getElementById('live-action-press-ladder');
-        ladderEl.innerHTML = summary.presses.length > 0 ? summary.presses.map(p => {
-            const cls = p.closed ? 'locked' : (p.statusText === 'AS' ? 'allsquare' : '');
-            return `<span class="press-pill ${cls}">${p.id}: ${p.statusText}</span>`;
-        }).join('') : '';
+        if (summary.presses.length > 0) {
+            const lockedCount = summary.presses.filter(p => p.closed).length;
+            const liveCount = summary.presses.length - lockedCount;
+            const pillsHtml = summary.presses.map(p => {
+                const cls = p.closed ? 'locked' : (p.allSquare ? 'allsquare' : '');
+                return `<span class="press-pill ${cls}" title="${p.stake !== null ? (p.closed ? `+$${p.stake} locked` : `$${p.stake} at stake`) : ''}">${p.id}: ${p.statusText}</span>`;
+            }).join('');
+            // Touch devices can't hover to see the per-pill title tooltip, so the "at stake"
+            // total for the still-live presses is spelled out here too, not just on hover.
+            const liveStake = summary.presses.filter(p => !p.closed && p.stake !== null).reduce((s, p) => s + p.stake, 0);
+            const stakeLine = liveCount > 0 && liveStake > 0
+                ? `<div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">$${liveStake} at stake across ${liveCount} live press${liveCount === 1 ? '' : 'es'}</div>`
+                : '';
+            ladderEl.innerHTML = `<div class="live-action-section-label">Presses — ${summary.presses.length} Total · ${lockedCount} Locked · ${liveCount} Live</div><div class="press-ladder">${pillsHtml}</div>${stakeLine}`;
+        } else {
+            ladderEl.innerHTML = '';
+        }
 
         const smEl = document.getElementById('live-action-sidematches');
-        smEl.innerHTML = summary.sideMatchLines.length > 0 ? summary.sideMatchLines.map(sm => {
-            const cls = sm.closed ? 'locked' : (sm.statusText === 'AS' ? 'allsquare' : '');
-            return `<div style="margin-top:6px; font-size:0.82rem;">⚔️ <strong>${sm.t1Name}</strong> vs <strong>${sm.t2Name}</strong> — <span class="press-pill ${cls}" style="margin-left:2px;">${sm.statusText}${sm.thru ? ` thru ${sm.thru}` : ''}</span></div>`;
-        }).join('') : '';
+        if (summary.sideMatchLines.length > 0) {
+            smEl.innerHTML = `<div class="live-action-section-label">Side Bets</div>` + summary.sideMatchLines.map(sm => {
+                const cls = sm.closed ? 'locked' : (sm.statusText === 'AS' ? 'allsquare' : '');
+                const moneyText = sm.stake ? (sm.closed ? ` · +$${sm.stake} locked` : ` · $${sm.stake} at stake`) : '';
+                return `<div style="margin-top:6px; font-size:0.82rem;">⚔️ <strong>${sm.t1Name}</strong> vs <strong>${sm.t2Name}</strong> — <span class="press-pill ${cls}" style="margin-left:2px;">${sm.statusText}${sm.thru ? ` thru ${sm.thru}` : ''}</span>${moneyText}</div>`;
+            }).join('');
+        } else {
+            smEl.innerHTML = '';
+        }
 
         const skinsEl = document.getElementById('live-action-skins');
         if (summary.skinsSummary) {
             const s = summary.skinsSummary;
             let rows = s.players.map(p => `<div class="la-mini-row"><span>${p.name.split(' ')[0]}</span><strong>${p.won} won</strong></div>`).join('');
-            let carryLine = s.pendingUnits > 0 ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🔥 ${s.pendingUnits} skin${s.pendingUnits === 1 ? '' : 's'} carrying</div>` : '';
+            // Skins can't honestly show a "final" dollar figure mid-round - the per-skin value
+            // depends on how the carry chain resolves, which isn't settled until the round ends.
+            // Matches the same caution already used in the existing dedicated live Skins box.
+            let carryLine = s.pendingUnits > 0
+                ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🔥 ${s.pendingUnits} skin${s.pendingUnits === 1 ? '' : 's'} carrying — not final yet</div>`
+                : '';
             skinsEl.innerHTML = `<div class="live-action-section-label">Skins</div>${rows}${carryLine}`;
         } else {
             skinsEl.innerHTML = '';
