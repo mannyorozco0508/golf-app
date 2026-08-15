@@ -799,6 +799,44 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     </div>
 </div>
 
+<div class="container" id="round-ready-screen" style="display: none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo">✅</div>
+    <div class="lobby-title">Round Ready</div>
+    <p id="rr-course-sub" style="text-align:center; color:var(--text-muted); font-size:0.95rem; margin-bottom:20px;"></p>
+
+    <div id="rr-players-box" class="wizard-review-row" style="flex-direction:column; align-items:stretch; margin-bottom:14px;">
+        <span class="wr-label" style="margin-bottom:6px;">Players</span>
+        <div id="rr-players-list" style="font-size:0.9rem; line-height:1.6;"></div>
+    </div>
+
+    <div id="rr-main-game-box" style="display:none; margin-bottom:14px;">
+        <div class="wr-label" style="margin-bottom:4px;">Main Game</div>
+        <div id="rr-main-game-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></div>
+    </div>
+
+    <div id="rr-skins-box" style="display:none; margin-bottom:14px;">
+        <div class="wr-label" style="margin-bottom:4px;">Skins</div>
+        <div id="rr-skins-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></div>
+    </div>
+
+    <div id="rr-sidebets-box" style="display:none; margin-bottom:18px;">
+        <div class="wr-label" style="margin-bottom:4px;">Side Bets</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="rr-sidebets-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></span>
+            <span class="wizard-edit-link" onclick="goToSideBets()">Manage</span>
+        </div>
+    </div>
+
+    <button class="btn-primary" onclick="startScoring()" style="font-size:1.1rem; padding:16px;">▶️ START SCORING</button>
+    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;">➕ Add Side Bet</button>
+
+    <div class="lobby-divider"><span>OR</span></div>
+    <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
+    <button class="btn-outline" onclick="showRoundReadyLinks()">🔒 Group Links</button>
+    <div id="rr-links-box" style="display:none; margin-top:12px;"></div>
+</div>
+
 <script>
     // --- DYNAMIC BETA TIME BOMB ---
     const firebaseConfig = {
@@ -837,6 +875,108 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             html += `<div class="${cls}" onclick="goToWizardStep(${i})" title="${WIZARD_STEP_LABELS[i]}">${i}</div>`;
         }
         container.innerHTML = html;
+    }
+
+    // --- ROUND READY ---
+    // The moment between "round created" and "actually playing" — previously nonexistent
+    // (saveSettings redirected straight into the live scorecard with zero confirmation and no
+    // chance to add a side bet first). Reuses the exact same field names/defaults the Step 7
+    // review and Bets pages already use — no new data model, this is purely a summary view.
+    function showRoundReadyScreen(modeKey) {
+        document.getElementById('lobby-screen').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('round-ready-screen').style.display = 'block';
+
+        db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            renderRoundReady(data);
+        });
+    }
+
+    function renderRoundReady(data) {
+        document.getElementById('rr-course-sub').textContent = `${data.eventName || 'Round'} — ${data.courseName || 'Course TBD'}`;
+
+        const players = data.players || [];
+        document.getElementById('rr-players-list').innerHTML = players.length > 0
+            ? players.map(p => `${p.name}${p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${p.hcp})</span>` : ''}`).join('<br>')
+            : `<span style="color:var(--text-muted);">No players added yet</span>`;
+
+        // Main game — plain language, matching the exact same summary logic the review screen
+        // and player landing summary already use, so nothing here can disagree with either.
+        const format = data.gameFormat || 'stroke';
+        let mainGameText = '';
+        if (format === 'nassau') {
+            const pressMap = { '2down': 'Automatic press at 2 Down', '1down': 'Automatic press at 1 Down', 'anytime': 'Press available any hole', 'none': 'No presses' };
+            mainGameText = `$${data.nassauStake || 10} Nassau — ${pressMap[data.nassauPressRule] || 'No presses'}`;
+        } else if (format === 'match') {
+            mainGameText = `$${data.matchStake || 0} Match Play`;
+        } else if (format === 'wolf') {
+            mainGameText = `$${data.wolfPointVal || 0} per point Wolf`;
+        } else if (format === 'dots') {
+            mainGameText = `$${data.dotPointVal || 0} per dot`;
+        } else if (format === 'stableford' && data.stablefordPointVal > 0) {
+            mainGameText = `$${data.stablefordPointVal} per point Stableford`;
+        }
+        document.getElementById('rr-main-game-box').style.display = mainGameText ? 'block' : 'none';
+        document.getElementById('rr-main-game-text').textContent = mainGameText;
+
+        // Skins gets its own box since it's the round's main format when present but has its
+        // own dedicated setup fields distinct from "the bet" language above.
+        if (format === 'skins') {
+            const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
+            const carryOver = data.skinsCarryOver !== false;
+            document.getElementById('rr-skins-box').style.display = 'block';
+            document.getElementById('rr-skins-text').textContent = `$${buyIn} — ${carryOver ? 'Carry Over' : 'No Carry'}`;
+        } else {
+            document.getElementById('rr-skins-box').style.display = 'none';
+        }
+
+        const sideMatchCount = Object.keys(data.sideMatches || {}).length;
+        document.getElementById('rr-sidebets-box').style.display = sideMatchCount > 0 ? 'block' : 'none';
+        document.getElementById('rr-sidebets-text').textContent = `${sideMatchCount} active`;
+    }
+
+    function startScoring() {
+        window.location.href = `index.html?game=${currentMode}`;
+    }
+
+    // The wizard fields are still populated in memory from the round the organizer just
+    // created (no page reload happened between saving and landing on Round Ready) — so this
+    // just needs to switch which screen is visible, not re-fetch or repopulate anything.
+    function editRoundFromReady() {
+        document.getElementById('round-ready-screen').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'block';
+        goToWizardStep(7);
+    }
+
+    function goToSideBets() {
+        window.location.href = `sidematches.html?game=${currentMode}`;
+    }
+
+    function showRoundReadyLinks() {
+        const box = document.getElementById('rr-links-box');
+        db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
+            const data = snapshot.val() || {};
+            const players = data.players || [];
+            const boundaries = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
+            if (boundaries.length <= 1) {
+                box.style.display = 'block';
+                box.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.85rem;">One group — the round code itself works as the scorecard link for everyone.</div>`;
+                return;
+            }
+            const baseHref = window.location.href.split('?')[0];
+            const scorecardBase = baseHref.replace('admin.html', 'index.html');
+            let html = '';
+            boundaries.forEach(b => {
+                const groupUrl = `${scorecardBase}?game=${currentMode}&group=${b.group}`;
+                html += `<div class="group-link-row">
+                    <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
+                </div>`;
+            });
+            box.style.display = 'block';
+            box.innerHTML = html;
+        });
     }
 
     function goToWizardStep(n) {
@@ -2488,7 +2628,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }).then(() => {
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
-                window.location.href = `index.html?game=${currentMode}`;
+                showRoundReadyScreen(currentMode);
             }).catch((err) => { 
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
