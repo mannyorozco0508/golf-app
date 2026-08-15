@@ -1,0 +1,16 @@
+{
+  "name": "golfapp-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test harness for GolfApp. The app itself is plain HTML/CSS/JS with no build step - this file exists only so `npm test` and the Node test runner work.",
+  "scripts": {
+    "test": "node --test",
+    "mobile:sync": "node sync-mobile-web.js"
+  },
+  "devDependencies": {
+    "targaryen": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
