@@ -950,10 +950,11 @@
         if (gameFormat === 'match' && data.matchScoringStyle === 'stroke') {
             const scoringType = data.matchScoring || 'net';
             const matchStake = data.matchStake || 0;
-            const calc = calculateStrokeHeadToHead(moneyPlayers, courseData, savedScores, scoringType, matchStake);
+            const strokePresses = data.strokePresses ? Object.values(data.strokePresses) : [];
+            const pressSet = calculateStrokePressSet(moneyPlayers, courseData, savedScores, scoringType, matchStake, strokePresses);
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
 
-            if (!calc) {
+            if (!pressSet) {
                 container.innerHTML = `
                     <div class="settle-card">
                         <div class="settle-header">Final Ledger</div>
@@ -970,15 +971,24 @@
                 return `<span class="val-even">$0</span>`;
             }
 
+            const calc = pressSet.original;
+            let pressBreakdownHtml = '';
+            pressSet.pressResults.forEach(pr => {
+                const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
+                const prStatus = !pr.roundComplete
+                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
+                    : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
+                pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
+            });
+
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">Final Ledger — 1v1 (Stroke Play)</div>
-                    <div class="breakdown-item"><span>Bet Type:</span> <span>$${matchStake} Flat, Stroke Play</span></div>
-                    <div class="breakdown-item"><span>${calc.p1.name} Total:</span> <span>${calc.holesCompleted > 0 ? calc.p1Total : '-'}</span></div>
-                    <div class="breakdown-item"><span>${calc.p2.name} Total:</span> <span>${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
+                    <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${calc.p1.name} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${calc.p2.name} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
                     ${!calc.roundComplete ? `<div class="breakdown-item"><span style="color:#888;">Not yet final — thru ${calc.holesCompleted} of ${calc.totalHoles}.</span></div>` : ''}
-                    <div class="ledger-row" style="margin-top:10px;"><span>${calc.p1.name}</span>${fmtStrokeSettle(calc.t1TotalMoney)}</div>
-                    <div class="ledger-row"><span>${calc.p2.name}</span>${fmtStrokeSettle(-calc.t1TotalMoney)}</div>
+                    ${pressBreakdownHtml}
+                    <div class="ledger-row" style="margin-top:10px;"><span>${pressSet.p1.name}</span>${fmtStrokeSettle(pressSet.combinedT1Money)}</div>
+                    <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
                 </div>
                 ${sideHtml}
                 <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
