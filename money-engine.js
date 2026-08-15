@@ -392,6 +392,33 @@ function calculateStrokeHeadToHead(players, courseData, savedScores, scoringType
     return { p1, p2, p1Total, p2Total, holesCompleted, totalHoles, roundComplete, winner, t1TotalMoney };
 }
 
+// A Stroke Play press is a second (third, fourth...) independent Stroke Play wager that starts
+// on a later hole and runs through the end of the round, coexisting with the original bet rather
+// than replacing it. This is NOT a new scoring formula — it just calls calculateStrokeHeadToHead
+// again with courseData filtered down to "hole >= startHole" and that press's own stake. Because
+// each call is independently zero-sum and stateless (recomputed from raw savedScores every time),
+// the combined result is automatically zero-sum too, and a score correction on any hole correctly
+// ripples into exactly the wagers whose hole range includes that hole and no others.
+function calculateStrokePressSet(players, courseData, savedScores, scoringType, originalStake, presses) {
+    if (players.length !== 2) return null;
+    const original = calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, originalStake);
+    if (!original) return null;
+
+    const pressResults = (presses || [])
+        .slice()
+        .sort((a, b) => a.startHole - b.startHole)
+        .map((pr, i) => {
+            const pressCourseData = courseData.filter(h => h.hole >= pr.startHole);
+            const calc = calculateStrokeHeadToHead(players, pressCourseData, savedScores, scoringType, pr.stake);
+            return Object.assign({ pressNum: i + 1, startHole: pr.startHole, stake: pr.stake }, calc);
+        });
+
+    let combinedT1Money = original.t1TotalMoney;
+    pressResults.forEach(pr => { combinedT1Money += pr.t1TotalMoney; });
+
+    return { p1: original.p1, p2: original.p2, original, pressResults, combinedT1Money };
+}
+
 function computeRoundMoneyByPlayer(data, courseData, savedScores) {
     const players = data.players || [];
     const gameFormat = data.gameFormat || 'stroke';
@@ -466,19 +493,20 @@ function computeRoundMoneyByPlayer(data, courseData, savedScores) {
         }
         const scoringType = data.matchScoring || 'net';
         const matchStake = data.matchStake || 0;
-        const calc = calculateStrokeHeadToHead(moneyPlayers, courseData, savedScores, scoringType, matchStake);
-        if (!calc) {
+        const strokePresses = data.strokePresses ? Object.values(data.strokePresses) : [];
+        const pressSet = calculateStrokePressSet(moneyPlayers, courseData, savedScores, scoringType, matchStake, strokePresses);
+        if (!pressSet) {
             result.message = 'Waiting for players and scores.';
             return result;
         }
         result.valid = true;
         result.formatLabel = '1v1 (Stroke Play)';
         result.players = [
-            { id: calc.p1.id, name: calc.p1.name, net: calc.t1TotalMoney },
-            { id: calc.p2.id, name: calc.p2.name, net: -calc.t1TotalMoney }
+            { id: pressSet.p1.id, name: pressSet.p1.name, net: pressSet.combinedT1Money },
+            { id: pressSet.p2.id, name: pressSet.p2.name, net: -pressSet.combinedT1Money }
         ];
-        if (!calc.roundComplete) {
-            result.message = `Waiting for both players to finish — thru ${calc.holesCompleted} of ${calc.totalHoles}.`;
+        if (!pressSet.original.roundComplete) {
+            result.message = `Waiting for both players to finish — thru ${pressSet.original.holesCompleted} of ${pressSet.original.totalHoles}.`;
         }
         return result;
     }
