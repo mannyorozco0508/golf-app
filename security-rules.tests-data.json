@@ -1,0 +1,94 @@
+{
+  "root": {
+    "events": {
+      "ABCD": {
+        "gameFormat": "stroke",
+        "players": [{ "id": 101, "name": "Marty" }],
+        "courseData": [{ "hole": 1, "par": 4 }],
+        "scores": { "p101_h1": 4 }
+      }
+    },
+    "trips": {
+      "WXYZ": { "name": "Existing Trip" }
+    },
+    "tournaments": {
+      "QRST": { "name": "Existing Tourney" }
+    },
+    "global_courses": {
+      "pebble_beach": { "name": "Pebble Beach", "data": [] }
+    },
+    "app_settings": {
+      "beta_expiration": "2026-09-01T00:00:00"
+    }
+  },
+  "users": {
+    "nobody": null
+  },
+  "tests": {
+    "app_settings/beta_expiration": {
+      "canRead": ["nobody"],
+      "cannotWrite": [
+        { "auth": "nobody", "data": "2020-01-01T00:00:00" }
+      ]
+    },
+    "app_settings": {
+      "cannotWrite": [
+        { "auth": "nobody", "data": { "beta_expiration": "2020-01-01T00:00:00" } }
+      ]
+    },
+    "hacked_data": {
+      "cannotRead": ["nobody"],
+      "cannotWrite": [
+        { "auth": "nobody", "data": { "evil": true } }
+      ]
+    },
+    "events/GARBAGE": {
+      "cannotWrite": [
+        { "auth": "nobody", "data": "not-a-real-round" }
+      ],
+      "canWrite": [
+        { "auth": "nobody", "data": { "gameFormat": "stroke", "players": [], "courseData": [] } }
+      ]
+    },
+    "events/ABCD": {
+      "canRead": ["nobody"],
+      "canWrite": [
+        { "auth": "nobody", "data": null }
+      ]
+    },
+    "events/NEWCODE": {
+      "canWrite": [
+        { "auth": "nobody", "data": { "gameFormat": "stroke", "players": [], "courseData": [] } }
+      ]
+    },
+    "events/ABCD/scores/p101_h1": {
+      "canWrite": [
+        { "auth": "nobody", "data": 5 },
+        { "auth": "nobody", "data": null }
+      ]
+    },
+    "trips/WXYZ": {
+      "canRead": ["nobody"],
+      "canWrite": [
+        { "auth": "nobody", "data": { "name": "Renamed Trip" } }
+      ]
+    },
+    "tournaments/QRST": {
+      "canRead": ["nobody"],
+      "canWrite": [
+        { "auth": "nobody", "data": { "name": "Renamed Tourney" } }
+      ]
+    },
+    "global_courses": {
+      "canRead": ["nobody"],
+      "canWrite": [
+        { "auth": "nobody", "data": { "course_a": { "name": "A", "data": [] }, "course_b": { "name": "B", "data": [] } } }
+      ]
+    },
+    "global_courses/pebble_beach": {
+      "canWrite": [
+        { "auth": "nobody", "data": { "name": "Pebble Beach Updated", "data": [] } }
+      ]
+    }
+  }
+}
