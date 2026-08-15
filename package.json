@@ -1,11 +1,14 @@
 {
   "name": "golfapp-tests",
   "private": true,
-  "description": "Regression tests for GolfApp's money-critical golf logic. Zero dependencies — uses Node's built-in test runner (node:test) so this project stays vanilla JS with no build step, matching the app itself.",
+  "description": "Regression tests for GolfApp's money-critical golf logic, plus behavioral tests for the Firebase security rules. Node's built-in test runner (node:test) handles all the golf-logic tests with zero dependencies, matching the app itself. The one exception is `targaryen` (devDependency), a small pure-JS Firebase Realtime Database rules simulator used only by tests/security-rules.test.js — needed because security rules require real behavioral evaluation, not just reading the file. Run `npm install` once before `npm test`.",
   "scripts": {
     "test": "node --test tests/*.test.js"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "targaryen": "^3.1.0"
   }
 }
