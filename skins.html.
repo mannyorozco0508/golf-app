@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Skins & Action Game</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+            --warn-bg: #fff4e5;
+            --warn-border: #e08a00;
+            --warn-text: #7a4a00;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+            --warn-bg: #332508;
+            --warn-border: #c98a2b;
+            --warn-text: #f0b84f;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
+        /* Top Navigation Bar */
+        /* ---- App navigation ----------------------------------------------------
+           The "More" popover used to be position:absolute INSIDE .top-nav-bar,
+           which is an overflow-x:auto container. An overflow container clips
+           absolutely-positioned descendants on BOTH axes, so the menu was being
+           sliced off at the nav bar's own bottom edge — only a few pixels of it
+           ever appeared. The fix is structural, not a z-index bump: the pills
+           scroll inside .top-nav-bar, but the <details> now lives OUTSIDE that
+           scroller in .app-nav-wrap, which has no overflow, so nothing can clip
+           the menu. .app-nav-wrap is also the positioning context, so the menu
+           anchors to the nav row rather than to the scrolling strip. */
+        .app-nav-wrap {
+            position: relative; display: flex; align-items: center; gap: 6px;
+            padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
+        }
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
+        .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
+        .nav-more { position: static; flex: 0 0 auto; }
+        .nav-more > summary { list-style: none; cursor: pointer; }
+        .nav-more > summary::-webkit-details-marker { display: none; }
+        .nav-more-menu {
+            position: absolute; top: calc(100% + 2px); right: 0; z-index: 400;
+            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
+            padding: 8px; display: flex; flex-direction: column; gap: 6px;
+            min-width: 190px; max-width: calc(100vw - 24px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+        }
+        /* 48px rows: comfortable thumb targets for someone standing on a tee box. */
+        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; min-height: 48px; justify-content: flex-start; padding: 12px 14px; font-size: 0.95rem; }
+        /* Full-screen invisible catcher so a tap anywhere else closes the menu,
+           without needing a JS document listener that could fight with links. */
+        .nav-more[open] > summary::before {
+            content: ''; position: fixed; inset: 0; z-index: 399; background: transparent;
+        }
+        .nav-more[open] > summary { position: relative; z-index: 401; }
+
+        .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
+        
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .control-group label { display: block; font-size: 0.75rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
+        .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid var(--accent-teal); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; background: var(--bg-card); color: var(--text-main); }
+
+        .pot-summary { display: flex; justify-content: space-around; background: var(--brand-navy); color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+        .pot-box { display: flex; flex-direction: column; }
+        .pot-label { font-size: 0.7rem; text-transform: uppercase; color: #a8dadc; font-weight: bold; margin-bottom: 4px; }
+        .pot-val { font-size: 1.1rem; font-weight: bold; }
+
+        .skin-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; background: var(--bg-card); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px var(--shadow-color); }
+        .skin-table th, .skin-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); }
+        .skin-table th { background: var(--nav-bg); color: var(--brand-green); text-transform: uppercase; font-size: 0.75rem; }
+        .winner-name { font-weight: bold; color: var(--brand-navy); text-align: left; }
+        .score-circle { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; border: 2px solid var(--accent-red); color: var(--accent-red); font-weight: bold; font-size: 0.8rem; }
+        
+        .ledger-table th { background: var(--brand-navy); color: white; }
+        .val-pos { color: var(--accent-teal); font-weight: bold; }
+        .val-neg { color: var(--accent-red); font-weight: bold; }
+
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+        
+        /* MAGIC PDF HIDING CSS */
+        @media print {
+            body { background-color: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; padding: 0; }
+            .top-nav-bar, .btn-primary, .control-grid, .theme-toggle-btn { display: none !important; }
+            .action-card { border: 1px solid #ccc; background: #fff; }
+        }
+    </style>
+
+    <style>
+        /* Compact binary toggle switch - replaces two-option dropdowns */
+        .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .toggle-label-sm { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        .toggle-label-sm.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 20px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <!-- Top Navigation Bar -->
+    <div class="app-nav-wrap">
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
+        <a href="skins.html" class="top-nav-item active nav-link">💰 Bets</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Results</a>
+    </div>
+    <details class="nav-more" id="nav-more-menu-wrap">
+        <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
+        <div class="nav-more-menu">
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="trip.html" class="top-nav-item">🧳 Trip</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
+        </div>
+    </details>
+    </div>
+
+    <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+        Looking for a private bet between specific players (even across groups)? That's on <a href="sidematches.html" class="nav-link" style="color: var(--brand-navy); font-weight: bold;">⚔️ Matches</a> instead.
+    </div>
+
+    <h2 class="event-title" id="main-title">💰 Skins Tracker</h2>
+
+    <div class="action-card">
+        <div class="control-grid">
+            <div class="control-group">
+                <label>Pot Format</label>
+                <select id="skins-pot-format" onchange="saveSkinsConfig()">
+                    <option value="split">Gross & Net (Split Pot)</option>
+                    <option value="gross">Gross Skins Only</option>
+                    <option value="net">Net Skins Only</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Buy-In Per Player ($)</label>
+                <input type="number" id="skins-buyin" value="" min="0" onchange="saveSkinsConfig()" placeholder="0">
+            </div>
+        </div>
+
+        <div class="control-group" style="margin-top:10px;">
+            <label>Carry Over Ties</label>
+            <div class="toggle-row">
+                <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarryOver(false)">Void Tied Holes</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="skins-carry-switch" onchange="setSkinsCarryOver(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label-sm active" id="skins-carry-label-on" onclick="setSkinsCarryOver(true)">Carry Over</span>
+            </div>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Carry Over (traditional): a tied hole's value stacks onto the next hole until someone wins it outright. Void: a tied hole is just thrown out — simpler, but the group decides which one you actually play.</p>
+        </div>
+
+        <div id="skins-content">
+            <div style="text-align:center; padding:30px; color:var(--text-muted);">Calculating live skins...</div>
+        </div>
+    </div>
+
+    <div class="action-card" id="birdiegame-card" style="display:none;">
+        <h3>🐦 Birdie Game</h3>
+        <div class="control-grid">
+            <div class="control-group">
+                <label>$ Per Unit</label>
+                <input type="number" id="birdie-unit-val" value="" min="0" step="0.5" placeholder="0" onchange="saveBirdieConfig()">
+            </div>
+            <div class="control-group">
+                <label>Scoring</label>
+                <div class="toggle-row">
+                    <span class="toggle-label-sm active" id="birdie-scoring-label-gross" onclick="setBirdieScoring('gross')">Gross</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="birdie-scoring-switch" onchange="setBirdieScoring(this.checked ? 'net' : 'gross')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="birdie-scoring-label-net" onclick="setBirdieScoring('net')">Net</span>
+                </div>
+                <input type="hidden" id="birdie-scoring-type" value="gross">
+            </div>
+        </div>
+        <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:12px;">Birdie = 1 unit, Eagle = 2 units, Albatross = 3 units — figured out automatically from scores vs. par. Players unchecked "Playing for Money" on the Home page sit this one out.</span>
+        <div id="birdie-content">
+            <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating birdie game...</div>
+        </div>
+    </div>
+
+    <div class="action-card" id="kpgame-card" style="display:none;">
+        <h3>📍 Dollar Game (KPs)</h3>
+        <div class="control-grid">
+            <div class="control-group">
+                <label>Buy-In Per Player ($)</label>
+                <input type="number" id="kp-buyin" value="" min="0" step="0.5" placeholder="0" onchange="saveKPBuyIn()">
+            </div>
+        </div>
+        <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:12px;">Everyone chips in on each Par 3. Tap the winner for a hole once it's settled on the course — everyone else's dollar goes to them.</span>
+        <div id="kp-content">
+            <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating dollar game...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
+    if (new Date() > BETA_END_DATE) {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                <p style="color:var(--text-muted); font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+            </div>`;
+        throw new Error("Beta period expired.");
+    }
+    // ---------------------------------
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+    });
+    // ------------------
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+    let currentData = {};
+
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            let navHref = base + '?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) navHref += '&group=' + groupParam;
+            link.href = navHref;
+        });
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentData = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `💰 Skins (${currentData.eventName || "Live Round"})`;
+            renderSkinsEngine();
+            renderBirdieGame();
+            renderKPGame();
+        });
+    }
+
+    function parseHcp(hcpStr) {
+        if (!hcpStr) return 0;
+        const str = String(hcpStr).trim();
+        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
+        return parseFloat(str) || 0;
+    }
+
+    function getStrokes(hcpIndex, numericHcp) {
+        if (numericHcp >= 0) {
+            let strokes = Math.floor(numericHcp / 18);
+            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
+            return strokes;
+        } else {
+            const plusVal = Math.abs(numericHcp);
+            if (hcpIndex > (18 - plusVal)) return -1;
+            return 0;
+        }
+    }
+
+    function renderBirdieGame() {
+        const card = document.getElementById("birdiegame-card");
+        if (!currentData || !currentData.players) return;
+
+        if (currentData.birdieGameEnabled !== true) {
+            if (card) card.style.display = 'none';
+            return;
+        }
+        if (card) card.style.display = 'block';
+
+        const allPlayers = currentData.players || [];
+        const players = allPlayers.filter(p => p.playingForMoney !== false);
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
+        const container = document.getElementById("birdie-content");
+        if (!container) return;
+
+        const unitVal = currentData.birdieUnitVal !== undefined ? currentData.birdieUnitVal : 0;
+        const scoringType = currentData.birdieScoringType || 'gross';
+        const unitValEl = document.getElementById("birdie-unit-val");
+        const scoringTypeEl = document.getElementById("birdie-scoring-type");
+        if (unitValEl && document.activeElement !== unitValEl) unitValEl.value = unitVal;
+        if (scoringTypeEl && document.activeElement !== scoringTypeEl) {
+            scoringTypeEl.value = scoringType;
+            syncBirdieScoringToggle();
+        }
+
+        if (players.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">No players marked "Playing for Money" yet.</div>`;
+            return;
+        }
+
+        let stats = {};
+        players.forEach(p => stats[p.id] = { name: p.name, birdies: 0, eagles: 0, albatrosses: 0, units: 0 });
+
+        courseData.forEach(h => {
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v || v <= 0) return;
+                let score = parseInt(v, 10);
+                if (scoringType === 'net') score -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const under = parseInt(h.par) - score;
+                if (under >= 1) {
+                    stats[p.id].units += under;
+                    if (under === 1) stats[p.id].birdies++;
+                    else if (under === 2) stats[p.id].eagles++;
+                    else stats[p.id].albatrosses++;
+                }
+            });
+        });
+
+        const sorted = Object.values(stats).sort((a, b) => b.units - a.units);
+
+        let html = `<table class="skin-table ledger-table"><thead><tr>
+            <th style="text-align:left;">Player</th><th>Birdies</th><th>Eagles</th><th>Alb.</th><th>Units</th><th>$</th>
+        </tr></thead><tbody>`;
+        sorted.forEach(p => {
+            const money = p.units * unitVal;
+            html += `<tr>
+                <td class="winner-name">${p.name}</td>
+                <td>${p.birdies}</td>
+                <td>${p.eagles}</td>
+                <td>${p.albatrosses}</td>
+                <td>${p.units}</td>
+                <td class="${money > 0 ? 'val-pos' : ''}">$${money.toFixed(2)}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+    }
+
+    function renderKPGame() {
+        const card = document.getElementById("kpgame-card");
+        if (!currentData || !currentData.players) return;
+
+        if (currentData.kpGameEnabled !== true) {
+            if (card) card.style.display = 'none';
+            return;
+        }
+        if (card) card.style.display = 'block';
+
+        const allPlayers = currentData.players || [];
+        const players = allPlayers.filter(p => p.playingForMoney !== false);
+        const courseData = currentData.courseData || [];
+        const container = document.getElementById("kp-content");
+        if (!container) return;
+
+        if (players.length > 4) {
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--accent-red); font-size:0.85rem;">📍 The Dollar Game is set up for single-group rounds (4 players or fewer). This round has ${players.length} players marked "Playing for Money."</div>`;
+            return;
+        }
+        if (players.length < 2) {
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">Need at least 2 players marked "Playing for Money" to run the Dollar Game.</div>`;
+            return;
+        }
+
+        const buyIn = currentData.kpBuyIn !== undefined ? currentData.kpBuyIn : 0;
+        const kpBuyInEl = document.getElementById("kp-buyin");
+        if (kpBuyInEl && document.activeElement !== kpBuyInEl) kpBuyInEl.value = buyIn;
+        const kpHoles = courseData.filter(h => parseInt(h.par) === 3);
+        const kpWinners = currentData.kpWinners || {};
+
+        if (kpHoles.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">No Par 3 holes found on this course.</div>`;
+            return;
+        }
+
+        let playerMoney = {};
+        players.forEach(p => playerMoney[p.id] = 0);
+
+        let html = `<div style="margin-bottom:12px;">`;
+        kpHoles.forEach(h => {
+            const winnerId = kpWinners[`h${h.hole}`];
+            const winnerPlayer = winnerId ? players.find(p => String(p.id) === String(winnerId)) : null;
+            html += `<div style="padding:8px 0; border-bottom:1px solid var(--border-faint);">
+                <div style="font-weight:bold; margin-bottom:6px;">Hole ${h.hole} (Par 3)${winnerPlayer ? ` — 🏆 ${winnerPlayer.name} won $${(buyIn * (players.length - 1)).toFixed(2)}` : ''}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">`;
+            players.forEach(p => {
+                const isWinner = winnerPlayer && String(winnerId) === String(p.id);
+                html += `<button onclick="markKPWinner(${h.hole}, '${p.id}')" style="padding:6px 12px; border-radius:16px; border:1px solid var(--accent-teal); background:${isWinner ? 'var(--accent-teal)' : 'var(--bg-card)'}; color:${isWinner ? '#fff' : 'var(--text-main)'}; font-size:0.8rem; font-weight:bold; cursor:pointer;">${p.name.split(' ')[0]}</button>`;
+            });
+            if (winnerPlayer) {
+                html += `<button onclick="clearKPWinner(${h.hole})" style="padding:6px 12px; border-radius:16px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.8rem; cursor:pointer;">✕ Clear</button>`;
+            }
+            html += `</div></div>`;
+
+            if (winnerPlayer) {
+                playerMoney[winnerPlayer.id] += buyIn * (players.length - 1);
+                players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) playerMoney[p.id] -= buyIn; });
+            }
+        });
+        html += `</div>`;
+
+        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger (net)</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
+        players.forEach(p => {
+            const money = playerMoney[p.id] || 0;
+            const cls = money > 0 ? 'val-pos' : (money < 0 ? 'val-neg' : '');
+            const text = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
+            html += `<tr><td class="winner-name">${p.name}</td><td class="${cls}">${text}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+
+        container.innerHTML = html;
+    }
+
+    function syncBirdieScoringToggle() {
+        const val = document.getElementById('birdie-scoring-type').value;
+        document.getElementById('birdie-scoring-switch').checked = (val === 'net');
+        document.getElementById('birdie-scoring-label-gross').classList.toggle('active', val === 'gross');
+        document.getElementById('birdie-scoring-label-net').classList.toggle('active', val === 'net');
+    }
+
+    function setBirdieScoring(val) {
+        document.getElementById('birdie-scoring-type').value = val;
+        syncBirdieScoringToggle();
+        saveBirdieConfig();
+    }
+
+    function saveBirdieConfig() {
+        const unitVal = parseFloat(document.getElementById("birdie-unit-val").value) || 0;
+        const scoringType = document.getElementById("birdie-scoring-type").value;
+        db.ref(`events/${currentMode}`).update({ birdieUnitVal: unitVal, birdieScoringType: scoringType })
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function saveKPBuyIn() {
+        const val = parseFloat(document.getElementById("kp-buyin").value) || 0;
+        db.ref(`events/${currentMode}/kpBuyIn`).set(val)
+            .catch(err => alert(`Failed to save buy-in: ${err.message}`));
+    }
+
+    function saveSkinsConfig() {
+        const potFormat = document.getElementById("skins-pot-format").value;
+        const buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
+        db.ref(`events/${currentMode}`).update({ skinsPotFormat: potFormat, skinsBuyIn: buyIn })
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function setSkinsCarryOver(val) {
+        db.ref(`events/${currentMode}/skinsCarryOver`).set(val)
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function markKPWinner(hole, playerId) {
+        db.ref(`events/${currentMode}/kpWinners/h${hole}`).set(playerId)
+            .catch(err => alert(`Failed to save: ${err.message}`));
+    }
+
+    function clearKPWinner(hole) {
+        db.ref(`events/${currentMode}/kpWinners/h${hole}`).remove()
+            .catch(err => alert(`Failed to clear: ${err.message}`));
+    }
+
+    // Extracts a hole's score list for one player set, used by both skin-computation modes.
+    function getSkinsHoleScores(players, savedScores, h) {
+        let holeScores = [];
+        players.forEach(p => {
+            let v = savedScores[`p${p.id}_h${h.hole}`];
+            if (v && v > 0) {
+                let gross = parseInt(v, 10);
+                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                holeScores.push({ id: p.id, name: p.name, gross, net });
+            }
+        });
+        return holeScores;
+    }
+
+    // VOID MODE: a tied hole is simply thrown out — no skin awarded, nothing carries forward.
+    function computeSkinsVoid(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScores(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: 1 });
+        });
+        return { skins, pendingUnits: 0 };
+    }
+
+    // CARRY-OVER MODE: each hole is worth a fixed base value (pot / total holes) set upfront.
+    // A tied hole's value stacks onto the next hole instead of vanishing, so the eventual
+    // winner takes the accumulated units — matches how a real carry-over skins game is priced,
+    // rather than the value per skin drifting based on how many holes happen to get decided.
+    function computeSkinsCarryOver(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        let carryUnits = 1;
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScores(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) {
+                skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: carryUnits });
+                carryUnits = 1;
+            } else {
+                carryUnits += 1;
+            }
+        });
+        const pendingUnits = carryUnits > 1 ? carryUnits - 1 : 0;
+        return { skins, pendingUnits };
+    }
+
+    function renderSkinsEngine() {
+        if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) return;
+
+        const allPlayers = currentData.players || [];
+        // Only players opted in to money betting compete for skins - everyone still scores
+        // normally on the Scorecard tab, but a non-participant's score can't win or affect a skin.
+        const players = allPlayers.filter(p => p.playingForMoney !== false);
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
+        const container = document.getElementById("skins-content");
+
+        // Read config from the saved round data (shared across every device in the group) rather
+        // than the local browser's form fields — those used to never get saved anywhere, so two
+        // people looking at the same round on two phones could silently see two different pots.
+        const potFormat = currentData.skinsPotFormat || 'split';
+        const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
+        const carryOver = currentData.skinsCarryOver !== false; // default TRUE — the traditional rule
+
+        const potFormatEl = document.getElementById("skins-pot-format");
+        const buyInEl = document.getElementById("skins-buyin");
+        if (potFormatEl && document.activeElement !== potFormatEl) potFormatEl.value = potFormat;
+        if (buyInEl && document.activeElement !== buyInEl) buyInEl.value = buyIn;
+        document.getElementById("skins-carry-switch").checked = carryOver;
+        document.getElementById("skins-carry-label-off").classList.toggle('active', !carryOver);
+        document.getElementById("skins-carry-label-on").classList.toggle('active', carryOver);
+
+        let totalPot = buyIn * players.length;
+        let grossPot = 0, netPot = 0;
+        if (potFormat === 'split') { grossPot = totalPot / 2; netPot = totalPot / 2; }
+        else if (potFormat === 'gross') { grossPot = totalPot; }
+        else if (potFormat === 'net') { netPot = totalPot; }
+
+        const totalHoles = courseData.length;
+        const computeFn = carryOver ? computeSkinsCarryOver : computeSkinsVoid;
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(players, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(players, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+
+        // In Void mode the value per skin depends on how many holes actually got decided (the
+        // original behavior). In Carry-Over mode the value per hole is fixed upfront and units
+        // stack, so it's pot / total holes instead.
+        const grossSkinValue = carryOver
+            ? (totalHoles > 0 ? grossPot / totalHoles : 0)
+            : (grossResult.skins.length > 0 ? grossPot / grossResult.skins.length : 0);
+        const netSkinValue = carryOver
+            ? (totalHoles > 0 ? netPot / totalHoles : 0)
+            : (netResult.skins.length > 0 ? netPot / netResult.skins.length : 0);
+
+        let playerStats = {};
+        players.forEach(p => { playerStats[p.id] = { name: p.name, grossCount: 0, netCount: 0, payout: 0 }; });
+
+        grossResult.skins.forEach(s => {
+            playerStats[s.player.id].grossCount += 1;
+            playerStats[s.player.id].payout += s.unitsWon * grossSkinValue;
+        });
+        netResult.skins.forEach(s => {
+            playerStats[s.player.id].netCount += 1;
+            playerStats[s.player.id].payout += s.unitsWon * netSkinValue;
+        });
+
+        // Any carry still pending when the round ends has nowhere left to go — split it evenly
+        // across everyone so the full pot is always accounted for, instead of quietly vanishing.
+        if (carryOver && grossResult.pendingUnits > 0 && players.length > 0) {
+            const share = (grossResult.pendingUnits * grossSkinValue) / players.length;
+            players.forEach(p => playerStats[p.id].payout += share);
+        }
+        if (carryOver && netResult.pendingUnits > 0 && players.length > 0) {
+            const share = (netResult.pendingUnits * netSkinValue) / players.length;
+            players.forEach(p => playerStats[p.id].payout += share);
+        }
+
+        let html = `
+            <div class="pot-summary">
+                <div class="pot-box">
+                    <span class="pot-label">Total Pot</span>
+                    <span class="pot-val">$${totalPot.toFixed(2)}</span>
+                </div>
+        `;
+
+        if (potFormat === 'split' || potFormat === 'gross') {
+            html += `
+                <div class="pot-box">
+                    <span class="pot-label">Gross Value</span>
+                    <span class="pot-val">$${grossSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
+                </div>
+            `;
+        }
+        if (potFormat === 'split' || potFormat === 'net') {
+            html += `
+                <div class="pot-box">
+                    <span class="pot-label">Net Value</span>
+                    <span class="pot-val">$${netSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
+                </div>
+            `;
+        }
+        
+        html += `</div>`; // End pot-summary
+
+        if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
+            const pendingParts = [];
+            if (grossResult.pendingUnits > 0) pendingParts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
+            if (netResult.pendingUnits > 0) pendingParts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
+            html += `<div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.8rem; color:var(--warn-text);">
+                🔄 Carrying: ${pendingParts.join(' and ')} tied and haven't been claimed yet — value is building for whoever wins the next hole outright. If the round ends before that happens, it splits evenly.
+            </div>`;
+        }
+
+        // Render Gross Skins Table
+        if (potFormat === 'split' || potFormat === 'gross') {
+            html += `<h3>Gross Skins Won (${grossResult.skins.length})</h3>`;
+            if (grossResult.skins.length === 0) {
+                html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
+            } else {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                grossResult.skins.forEach(s => {
+                    html += `<tr>
+                        <td>${s.hole}</td>
+                        <td style="color:var(--text-muted);">${s.par}</td>
+                        <td class="winner-name">${s.player.name}</td>
+                        <td><span class="score-circle">${s.score}</span></td>
+                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * grossSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${grossSkinValue.toFixed(2)}`}</td>` : ''}
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        }
+
+        // Render Net Skins Table
+        if (potFormat === 'split' || potFormat === 'net') {
+            html += `<h3>Net Skins Won (${netResult.skins.length})</h3>`;
+            if (netResult.skins.length === 0) {
+                html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
+            } else {
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                netResult.skins.forEach(s => {
+                    html += `<tr>
+                        <td>${s.hole}</td>
+                        <td style="color:var(--text-muted);">${s.par}</td>
+                        <td class="winner-name">${s.player.name}</td>
+                        <td><span class="score-circle">${s.score}</span></td>
+                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * netSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${netSkinValue.toFixed(2)}`}</td>` : ''}
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        }
+
+        // Render Financial Ledger
+        let sortedPlayers = Object.values(playerStats).sort((a, b) => b.payout - a.payout);
+        
+        html += `<h3>💵 Final Payout Ledger</h3>
+            <table class="skin-table ledger-table">
+                <thead><tr>
+                    <th style="text-align:left;">Player</th>
+                    ${potFormat === 'split' || potFormat === 'gross' ? `<th>Gross</th>` : ''}
+                    ${potFormat === 'split' || potFormat === 'net' ? `<th>Net</th>` : ''}
+                    <th>Total Won</th>
+                </tr></thead>
+                <tbody>
+        `;
+
+        sortedPlayers.forEach(p => {
+            let moneyClass = p.payout > 0 ? 'val-pos' : '';
+            html += `<tr>
+                <td class="winner-name">${p.name}</td>
+                ${potFormat === 'split' || potFormat === 'gross' ? `<td>${p.grossCount}</td>` : ''}
+                ${potFormat === 'split' || potFormat === 'net' ? `<td>${p.netCount}</td>` : ''}
+                <td class="${moneyClass}">$${p.payout.toFixed(2)}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>
+            <button class="btn-primary" onclick="window.print()">📄 Save Payout as PDF</button>
+        `;
+
+        container.innerHTML = html;
+    }
+</script>
+
+</body>
+</html>
