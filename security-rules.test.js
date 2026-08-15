@@ -35,7 +35,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const REPO_ROOT = path.join(__dirname, '..');
+const REPO_ROOT = __dirname;
 const RULES_PATH = path.join(REPO_ROOT, 'database.rules.json');
 const TESTS_DATA_PATH = path.join(__dirname, 'security-rules.tests-data.json');
 const TARGARYEN_BIN = path.join(REPO_ROOT, 'node_modules', '.bin', 'targaryen');
