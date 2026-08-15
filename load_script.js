@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const REPO_ROOT = path.join(__dirname, '..', '..');
+const REPO_ROOT = path.join(__dirname, '..');
 
 // Minimal stand-ins so loading a whole <script> block doesn't throw just because
 // *other* functions in that file reference document/window/db. Unlike a single shared
@@ -60,6 +60,7 @@ function makeStubSandbox() {
         document: documentStub,
         window: {},
         navigator: { clipboard: { writeText() { return Promise.resolve(); } }, share: undefined },
+        location: { search: '', href: 'https://golf-app-5a5.pages.dev/index.html', pathname: '/index.html' },
         localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
         firebase: { initializeApp() {}, database() { return dbStub; } },
         db: dbStub,
