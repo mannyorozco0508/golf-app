@@ -1599,8 +1599,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length);
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true);
         });
+        updateCount();
     }
 
     // Adds one new blank row AND rebuilds the header/warning against the new final count — a
@@ -1611,7 +1612,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         existingData.push({ name: '', hcp: '', team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
         updateCount();
     }
 
@@ -1693,7 +1694,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
         updateCount();
 
         document.getElementById('paste-players-textarea').value = '';
@@ -1708,7 +1709,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
         updateCount();
     }
 
@@ -1944,7 +1945,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -2012,7 +2013,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
         listContainer.appendChild(row);
-        updateCount();
+        if (!deferRefresh) updateCount();
     }
 
     function updateCount() { 
