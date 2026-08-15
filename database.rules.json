@@ -1,0 +1,36 @@
+{
+  "rules": {
+    "events": {
+      "$eventCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren() || newData.val() === null"
+      }
+    },
+    "trips": {
+      "$tripCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren() || newData.val() === null"
+      }
+    },
+    "tournaments": {
+      "$tourneyCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren() || newData.val() === null"
+      }
+    },
+    "global_courses": {
+      ".read": true,
+      ".write": true,
+      "$courseId": {
+        ".validate": "newData.hasChildren() || newData.val() === null"
+      }
+    },
+    "app_settings": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}
