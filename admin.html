@@ -142,6 +142,9 @@
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         @media (max-width: 480px) { .grid-3col { grid-template-columns: 1fr; gap: 12px; } }
+        .grid-4col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+        .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
+        .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
         .share-box { background: var(--nassau-box-bg); border: 2px dashed var(--brand-green); border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
@@ -531,7 +534,13 @@
                 </div>
                 <div>
                     <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
-                    <input type="number" id="match-stake" value="" min="0" placeholder="0">
+                    <div class="grid-4col" id="match-stake-presets" style="margin-bottom:4px;">
+                        <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 5, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
+                        <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 10, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
+                        <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 20, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$20</button>
+                        <button type="button" class="preset-btn" onclick="focusCustomStake('match-stake', 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">Custom</button>
+                    </div>
+                    <input type="number" id="match-stake" value="" min="0" placeholder="0" oninput="clearStakePresetHighlight('match-stake-presets')">
                 </div>
             </div>
             <div id="match-play-only-settings">
@@ -571,17 +580,27 @@
                     </div>
                     <input type="hidden" id="nassau-scoring" value="net">
                 </div>
-                <div><label style="font-size: 0.75rem;">Base Bet ($)</label><input type="number" id="nassau-stake" value="10" min="1"></div>
+                <div>
+                    <label style="font-size: 0.75rem;">Base Bet ($)</label>
+                    <div class="grid-4col" id="nassau-stake-presets" style="margin-bottom:4px;">
+                        <button type="button" class="preset-btn active" onclick="setStakePreset('nassau-stake', 10, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
+                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 2, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$2</button>
+                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 5, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
+                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 20, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$20</button>
+                    </div>
+                    <input type="number" id="nassau-stake" value="10" min="1" oninput="clearStakePresetHighlight('nassau-stake-presets')">
+                </div>
             </div>
             <p style="font-size: 0.7rem; color: var(--brand-navy); margin: 6px 0 0 0;"><strong>ℹ️ Match Play bet:</strong> this is 3 separate hole-by-hole bets (Front 9, Back 9, Total 18) — each pays out on holes won, not total strokes like Stroke Play.</p>
             <div style="margin-top: 8px;">
                 <label style="font-size: 0.75rem;">Press Rule</label>
-                <select id="nassau-press-rule">
+                <select id="nassau-press-rule" onchange="updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation')">
                     <option value="2down">Auto @ 2 Down</option>
                     <option value="1down">Auto @ 1 Down</option>
                     <option value="anytime">Press Any Hole</option>
                     <option value="none">No Press</option>
                 </select>
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="nassau-press-explanation">Automatically starts a new bet on the next hole once a side falls 2 holes behind — the original bet keeps going too.</p>
             </div>
         </div>
 
@@ -604,6 +623,7 @@
                         <option value="3">3x Points</option>
                         <option value="4">4x Points</option>
                     </select>
+                    <p style="font-size:0.65rem; color:var(--text-muted); margin:3px 0 0 0;">Applies if the wolf wins. If the wolf loses a Blind call, the field splits 3 points either way.</p>
                 </div>
                 <div>
                     <label style="font-size: 0.8rem;">Tied Hole Rule</label>
@@ -669,6 +689,30 @@
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
             </div>
+        </div>
+
+        <div id="skins-settings" class="extra-settings-box">
+            <label style="color:var(--brand-green); margin-bottom: 6px;">🥩 Skins Options</label>
+            <label style="font-size: 0.75rem;">Skin Value — how much is each skin worth?</label>
+            <div class="grid-4col" id="skins-buyin-presets">
+                <button type="button" class="preset-btn" onclick="setSkinsPreset(1)">$1</button>
+                <button type="button" class="preset-btn" onclick="setSkinsPreset(2)">$2</button>
+                <button type="button" class="preset-btn" onclick="setSkinsPreset(5)">$5</button>
+                <button type="button" class="preset-btn" onclick="setSkinsPreset(10)">$10</button>
+            </div>
+            <input type="number" id="skins-buyin" value="0" min="0" style="margin-top:6px;" placeholder="Custom $ per skin" oninput="clearSkinsPresetHighlight()">
+
+            <label style="font-size: 0.75rem; margin-top:10px; display:block;">Ties — what happens when nobody wins a hole outright?</label>
+            <div class="toggle-row">
+                <span class="toggle-label-sm active" id="skins-carry-label-on" onclick="setSkinsCarrySetting(true)">Carry Over</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="skins-carry-switch" onchange="setSkinsCarrySetting(!this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarrySetting(false)">No Carry</span>
+            </div>
+            <input type="hidden" id="skins-carryover" value="true">
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="skins-carry-explanation">A tied skin's value moves to the next hole — whoever wins that hole wins both.</p>
         </div>
     </div>
         <div class="wizard-nav-row">
@@ -835,6 +879,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const roundLength = lengthSelect ? (lengthMap[lengthSelect.value] || 'Full 18 Holes') : 'Full 18 Holes';
         const formatSelect = document.getElementById('game-format-select');
         const formatLabel = formatSelect && formatSelect.selectedIndex >= 0 ? formatSelect.options[formatSelect.selectedIndex].text : 'Not selected';
+        const currentFormat = formatSelect ? formatSelect.value : '';
         const playerCount = document.getElementById('player-count') ? document.getElementById('player-count').textContent : '0';
         const birdieOn = document.getElementById('enable-birdiegame') && document.getElementById('enable-birdiegame').checked;
         const kpOn = document.getElementById('enable-kpgame') && document.getElementById('enable-kpgame').checked;
@@ -843,14 +888,43 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         else if (birdieOn) sideGamesText = 'Birdie Game';
         else if (kpOn) sideGamesText = 'KPs (Dollar Game)';
 
+        // The exact stake, in plain language, for whichever format is actually selected — so
+        // the review screen answers "how much are we playing for," not just "which game."
+        let stakeText = '';
+        if (currentFormat === 'nassau') {
+            const stake = document.getElementById('nassau-stake') ? document.getElementById('nassau-stake').value : '10';
+            const pressLabel = document.getElementById('nassau-press-rule') ? document.getElementById('nassau-press-rule').options[document.getElementById('nassau-press-rule').selectedIndex].text : '';
+            stakeText = `$${stake} — ${pressLabel}`;
+        } else if (currentFormat === 'match') {
+            const stake = document.getElementById('match-stake') ? (document.getElementById('match-stake').value || '0') : '0';
+            stakeText = `$${stake} flat bet`;
+        } else if (currentFormat === 'wolf') {
+            const val = document.getElementById('wolf-point-value') ? (document.getElementById('wolf-point-value').value || '0') : '0';
+            stakeText = `$${val} per point`;
+        } else if (currentFormat === 'dots') {
+            const val = document.getElementById('dot-point-value') ? (document.getElementById('dot-point-value').value || '0') : '0';
+            stakeText = `$${val} per dot`;
+        } else if (currentFormat === 'stableford') {
+            const val = document.getElementById('stableford-point-value') ? (document.getElementById('stableford-point-value').value || '0') : '0';
+            stakeText = `$${val} per point`;
+        }
+
         const rows = [
             ['Round', roundDay, 1],
             ['Course', courseName, 1],
             ['Length', roundLength, 2],
             ['Format', formatLabel, 3],
-            ['Players', `${playerCount} added`, 5],
-            ['Side Games', sideGamesText, 6],
         ];
+        if (stakeText) rows.push(['The Bet', stakeText, 4]);
+        if (currentFormat === 'skins') {
+            const buyIn = document.getElementById('skins-buyin') ? (document.getElementById('skins-buyin').value || '0') : '0';
+            const carryOn = document.getElementById('skins-carryover') ? document.getElementById('skins-carryover').value !== 'false' : true;
+            rows.push(['Skins', `$${buyIn} — ${carryOn ? 'Carry Over' : 'No Carry'}`, 4]);
+        }
+        rows.push(['Players', `${playerCount} added`, 5]);
+        rows.push(['Side Games', sideGamesText, 6]);
+        // Side Matches ($ bets like "Manny vs John") are set up on the Matches tab after the
+        // round is created — this screen can't summarize them yet since none exist at this point.
 
         container.innerHTML = rows.map(([label, value, step]) => `
             <div class="wizard-review-row">
@@ -1717,6 +1791,61 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // press rules, scoring type) still lives in Step 4, unchanged; this is purely what shows
     // before someone picks, so they know roughly what they're choosing without needing to
     // already know the jargon.
+    // --- STAKE PRESETS (Nassau, Match Play) ---
+    // Purely a UI shortcut — writes the exact same numeric value into the exact same existing
+    // input the engine already reads. No new stored fields, no new config model. Typing a
+    // custom value directly into the input is always available and always wins.
+    function setStakePreset(inputId, value, presetsContainerId) {
+        document.getElementById(inputId).value = value;
+        document.querySelectorAll(`#${presetsContainerId} .preset-btn`).forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+    function clearStakePresetHighlight(presetsContainerId) {
+        document.querySelectorAll(`#${presetsContainerId} .preset-btn`).forEach(b => b.classList.remove('active'));
+    }
+    function focusCustomStake(inputId, presetsContainerId) {
+        clearStakePresetHighlight(presetsContainerId);
+        const el = document.getElementById(inputId);
+        el.focus();
+        el.select();
+    }
+
+    // --- SKINS SETUP (Step 4) ---
+    // Writes to the exact same skinsBuyIn / skinsCarryOver fields skins.html already reads and
+    // writes after a round exists — this just gives the organizer a first, earlier place to set
+    // them, matching skins.html's own defaults exactly so neither page can disagree.
+    function setSkinsPreset(value) {
+        document.getElementById('skins-buyin').value = value;
+        document.querySelectorAll('#skins-buyin-presets .preset-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+    function clearSkinsPresetHighlight() {
+        document.querySelectorAll('#skins-buyin-presets .preset-btn').forEach(b => b.classList.remove('active'));
+    }
+    function setSkinsCarrySetting(isCarryOver) {
+        document.getElementById('skins-carryover').value = isCarryOver ? 'true' : 'false';
+        document.getElementById('skins-carry-switch').checked = !isCarryOver;
+        document.getElementById('skins-carry-label-on').classList.toggle('active', isCarryOver);
+        document.getElementById('skins-carry-label-off').classList.toggle('active', !isCarryOver);
+        document.getElementById('skins-carry-explanation').textContent = isCarryOver
+            ? "A tied skin's value moves to the next hole — whoever wins that hole wins both."
+            : "A tied hole is simply worth nothing — no skin is won, nothing carries forward.";
+    }
+
+    // --- NASSAU PRESS EXPLANATION ---
+    // Plain-English text for whichever of the engine's real 4 press-rule options is selected —
+    // no option here that the engine doesn't actually support.
+    const pressRuleExplanations = {
+        '2down': "Automatically starts a new bet on the next hole once a side falls 2 holes behind — the original bet keeps going too.",
+        '1down': "Automatically starts a new bet on the next hole once a side falls 1 hole behind — the original bet keeps going too.",
+        'anytime': "No automatic presses — but a \"Press\" button is always available on the scorecard so either side can start one on any hole, any time.",
+        'none': "No presses at all — just the original Front 9 / Back 9 / Overall bets, start to finish."
+    };
+    function updatePressRuleExplanation(selectId, explanationId) {
+        const val = document.getElementById(selectId).value;
+        document.getElementById(explanationId).textContent = pressRuleExplanations[val] || '';
+    }
+
     const formatDescriptions = {
         stroke: "Total strokes for the round — low score wins.",
         stableford: "Earn points based on your score on each hole — high score wins.",
@@ -1745,6 +1874,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (document.getElementById("stableford-settings")) document.getElementById("stableford-settings").style.display = (format === "stableford") ? "block" : "none";
         if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (['match', 'bestball', 'scramble', 'ryder'].includes(format)) ? "block" : "none";
         if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
+        if (document.getElementById("skins-settings")) document.getElementById("skins-settings").style.display = (format === "skins") ? "block" : "none";
         
         renderPlayerList(forceLoad);
     }
@@ -1810,6 +1940,23 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (data.wolfTieRule && document.getElementById("wolf-tie-rule")) { document.getElementById("wolf-tie-rule").value = data.wolfTieRule; syncToggle("wolf-tie-rule", "wolf-tie-rule-switch", "wolf-tie-rule-label-carry", "wolf-tie-rule-label-void", "carry"); }
             if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
+            if (document.getElementById("skins-buyin")) {
+                const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
+                document.getElementById("skins-buyin").value = buyIn;
+                document.querySelectorAll('#skins-buyin-presets .preset-btn').forEach(b => {
+                    b.classList.toggle('active', parseFloat(b.textContent.replace('$', '')) === buyIn);
+                });
+            }
+            if (document.getElementById("skins-carryover")) {
+                setSkinsCarrySetting(data.skinsCarryOver !== false);
+            }
+            if (document.getElementById("nassau-stake")) {
+                const nStake = data.nassauStake || 10;
+                document.querySelectorAll('#nassau-stake-presets .preset-btn').forEach(b => {
+                    b.classList.toggle('active', parseFloat((b.textContent || '').replace('$', '')) === nStake);
+                });
+            }
+            if (data.nassauPressRule) updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation');
             if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
             if (data.stablefordScoring && document.getElementById("stableford-scoring")) { document.getElementById("stableford-scoring").value = data.stablefordScoring; syncToggle("stableford-scoring", "stableford-scoring-switch", "stableford-scoring-label-net", "stableford-scoring-label-gross", "net"); }
             if (data.stablefordPoints) {
@@ -2250,6 +2397,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const wolfTieRule = document.getElementById("wolf-tie-rule") ? document.getElementById("wolf-tie-rule").value : "carry";
             const wolfLastPlaceRule = document.getElementById("wolf-lastplace-rule") ? document.getElementById("wolf-lastplace-rule").value : "off";
             const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
+            const skinsBuyIn = document.getElementById("skins-buyin") ? (parseFloat(document.getElementById("skins-buyin").value) || 0) : 0;
+            const skinsCarryOver = document.getElementById("skins-carryover") ? (document.getElementById("skins-carryover").value !== 'false') : true;
             const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
             const stablefordScoring = document.getElementById("stableford-scoring") ? document.getElementById("stableford-scoring").value : "net";
             const stablefordPoints = {
@@ -2325,6 +2474,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 stablefordScoring: stablefordScoring,
                 stablefordPoints: stablefordPoints,
                 dotPointVal: dotPointVal,
+                skinsBuyIn: skinsBuyIn,
+                skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
                 players: playersList
             }).then(() => {
