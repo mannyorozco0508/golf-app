@@ -361,6 +361,13 @@
         👁️ You're viewing read-only. To enter scores, ask whoever set up the round for <strong>your group's link</strong> — they can grab it from the Home tab.
     </div>
 
+    <div id="round-landing-summary" style="display:none; background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Playing With</div>
+        <div id="landing-group-names" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green); margin-bottom:10px;"></div>
+        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Today's Games</div>
+        <div id="landing-active-games" style="font-size:0.85rem;"></div>
+    </div>
+
     <div class="round-body-layout" id="round-body-layout">
     <div class="status-panel" id="status-panel">
         <div id="side-match-callout" style="display:none; margin-bottom: 10px;"></div>
@@ -660,6 +667,70 @@
     // specifically, since it was the single biggest "player can't tell what's going on" gap
     // found this batch. Hidden entirely for any other format; only shows when this round's
     // main game actually IS skins.
+    // Shown once when a player first opens their link (Part 10/11's "first 10 seconds" goal),
+    // then dismissible — this is explicitly NOT meant to persist above every hole (Part 14:
+    // score entry stays the dominant thing once a round is actually underway). Dismissal is
+    // remembered per round via localStorage, so it reappears for a genuinely new round but
+    // doesn't nag on every score entered in this one.
+    function renderLandingSummary(filteredPlayers, allPlayers) {
+        const box = document.getElementById('round-landing-summary');
+        if (!box) return;
+        const dismissKey = `landingDismissed_${currentMode}`;
+        if (localStorage.getItem(dismissKey) === '1') { box.style.display = 'none'; return; }
+
+        const namesHtml = filteredPlayers.map(p => p.name.split(' ')[0]).join(', ')
+            + ` <button onclick="localStorage.setItem('${dismissKey}','1'); document.getElementById('round-landing-summary').style.display='none';" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; cursor:pointer; text-decoration:underline; margin-left:6px;">Got it ✕</button>`;
+        document.getElementById('landing-group-names').innerHTML = namesHtml;
+
+        const gameFormat = currentData.gameFormat || 'stroke';
+        let gameLines = [];
+
+        if (gameFormat === 'nassau') {
+            const stake = currentData.nassauStake || 10;
+            const pressMap = { '2down': 'Automatic press at 2 Down', '1down': 'Automatic press at 1 Down', 'anytime': 'Press available any hole', 'none': 'No presses' };
+            gameLines.push(`💵 $${stake} Nassau — ${pressMap[currentData.nassauPressRule] || 'No presses'}`);
+        } else if (gameFormat === 'match') {
+            gameLines.push(`💵 $${currentData.matchStake || 0} Match Play`);
+        } else if (gameFormat === 'skins') {
+            const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
+            const carryOver = currentData.skinsCarryOver !== false;
+            gameLines.push(`🥩 $${buyIn} Skins — ${carryOver ? 'Carry Over' : 'No Carry'}`);
+        } else if (gameFormat === 'wolf') {
+            gameLines.push(`🐺 $${currentData.wolfPointVal || 0} per point Wolf`);
+        } else if (gameFormat === 'dots') {
+            gameLines.push(`🔴 $${currentData.dotPointVal || 0} per dot`);
+        } else if (gameFormat === 'stableford') {
+            const val = currentData.stablefordPointVal || 0;
+            if (val > 0) gameLines.push(`🎯 $${val} per point Stableford`);
+            else gameLines.push(`🎯 Stableford — points only, no money`);
+        } else if (gameFormat === 'stroke') {
+            gameLines.push(`⛳ Stroke Play`);
+        }
+
+        if (currentData.birdieGameEnabled) gameLines.push(`🐦 Birdie Game`);
+        if (currentData.kpGameEnabled) gameLines.push(`📍 KPs (Dollar Game)`);
+
+        const sideMatches = currentData.sideMatches || {};
+        const filteredIds = filteredPlayers.map(p => String(p.id));
+        const relevantSideMatches = Object.values(sideMatches).filter(sm => {
+            const teamAIds = (sm.teamAIds || []).map(String);
+            const teamBIds = (sm.teamBIds || []).map(String);
+            return teamAIds.some(id => filteredIds.includes(id)) || teamBIds.some(id => filteredIds.includes(id));
+        });
+        if (relevantSideMatches.length > 0) {
+            gameLines.push(`⚔️ ${relevantSideMatches.length} Side Bet${relevantSideMatches.length === 1 ? '' : 's'}`);
+        }
+
+        // A genuinely no-bet round (Stroke Play, nothing else enabled) stays plain rather than
+        // looking like a betting app with nothing to show — Part 12's explicit requirement.
+        const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && !currentData.kpGameEnabled && relevantSideMatches.length === 0;
+        document.getElementById('landing-active-games').innerHTML = isNoBetRound
+            ? `<span style="color:var(--text-muted);">Just for score — no bets this round</span>`
+            : gameLines.map(l => `<div style="padding:2px 0;">${l}</div>`).join('');
+
+        box.style.display = 'block';
+    }
+
     function renderSkinsLiveBox(players, courseData, savedScores) {
         const box = document.getElementById('skins-live-container');
         if (!box) return;
@@ -2001,6 +2072,7 @@
         }
         window.__scFilteredPlayers = filteredPlayers;
         renderActiveSideMatchCallout(filteredPlayers, players);
+        renderLandingSummary(filteredPlayers, players);
 
         renderHoleJumpNav(courseData, savedScores, filteredPlayers);
 
