@@ -452,15 +452,16 @@
 
             if (winnerPlayer) {
                 playerMoney[winnerPlayer.id] += buyIn * (players.length - 1);
+                players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) playerMoney[p.id] -= buyIn; });
             }
         });
         html += `</div>`;
 
-        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger (amount won)</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
+        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger (net)</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
         players.forEach(p => {
             const money = playerMoney[p.id] || 0;
-            const cls = money > 0 ? 'val-pos' : '';
-            const text = `$${money.toFixed(2)}`;
+            const cls = money > 0 ? 'val-pos' : (money < 0 ? 'val-neg' : '');
+            const text = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
             html += `<tr><td class="winner-name">${p.name}</td><td class="${cls}">${text}</td></tr>`;
         });
         html += `</tbody></table>`;
