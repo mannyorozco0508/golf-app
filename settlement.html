@@ -487,6 +487,161 @@
     // leave a golfer mentally adding up four separate cards to know what they actually owe.
     // Reuses the exact same engine calls the existing per-game rendering below already makes —
     // this is purely additive, none of that rendering logic is touched.
+    // Fills a real, confirmed gap: computeRoundMoneyByPlayer (money-engine.js) has no branch for
+    // 'skins' or 'hilo' as the MAIN format — a Skins or Hi-Lo round previously contributed
+    // nothing to Final Results / Who Pays Who at all. Deliberately NOT touching money-engine.js
+    // (the more protected canonical dispatcher) — these mirror the exact, already-tested formulas
+    // already used elsewhere (skins.html's renderSkinsEngine payout math; index.html's Hi-Lo
+    // ticker's (t1Points-t2Points)*holeBetStake) rather than inventing anything new.
+    function getSkinsHoleScoresForSettle(players, savedScores, h) {
+        let holeScores = [];
+        players.forEach(p => {
+            let v = savedScores[`p${p.id}_h${h.hole}`];
+            if (v && v > 0) {
+                let gross = parseInt(v, 10);
+                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                holeScores.push({ id: p.id, name: p.name, gross, net });
+            }
+        });
+        return holeScores;
+    }
+    function computeSkinsVoidForSettle(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) skins.push({ hole: h.hole, player: winners[0], unitsWon: 1 });
+        });
+        return { skins, pendingUnits: 0 };
+    }
+    function computeSkinsCarryOverForSettle(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        let carryUnits = 1;
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) { skins.push({ hole: h.hole, player: winners[0], unitsWon: carryUnits }); carryUnits = 1; }
+            else { carryUnits += 1; }
+        });
+        return { skins, pendingUnits: carryUnits > 1 ? carryUnits - 1 : 0 };
+    }
+
+    // Skins is a pot/ante game — every player pays in buyIn, winners split the pot. For a
+    // zero-sum settlement figure (comparable to every other game's net win/loss), this is
+    // payout MINUS what that player put into the pot, not the raw payout skins.html displays.
+    // Exact copy of index.html's calculateHiLoEngine — not reinvented, same math verbatim.
+    // This app has no shared-module system, so small engine functions are duplicated per file
+    // by established convention; this one simply didn't exist here before, needed to compute
+    // Hi-Lo's settlement contribution using the identical formula the live ticker already uses.
+    function calculateHiLoEngine(players, courseData, savedScores) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "Team 1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
+        let t1Key = teamKeys[0], t2Key = teamKeys[1];
+        let t1Players = teams[t1Key], t2Players = teams[t2Key];
+        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
+        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
+        let t1Points = 0, t2Points = 0;
+        let holeLog = {};
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1NetScores = [], t2NetScores = [];
+            t1Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) { let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp)); t1NetScores.push(s); }
+            });
+            t2Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) { let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp)); t2NetScores.push(s); }
+            });
+            if (t1NetScores.length > 0 && t2NetScores.length > 0) {
+                t1NetScores.sort((a, b) => a - b); t2NetScores.sort((a, b) => a - b);
+                let t1Low = t1NetScores[0], t2Low = t2NetScores[0];
+                let t1High = t1NetScores[t1NetScores.length - 1], t2High = t2NetScores[t2NetScores.length - 1];
+                let h1Won = null;
+                if (t1Low < t2Low) { t1Points += 0.5; h1Won = t1Name; }
+                else if (t2Low < t1Low) { t2Points += 0.5; h1Won = t2Name; }
+                let h2Won = null;
+                if (t1High < t2High) { t1Points += 0.5; h2Won = t1Name; }
+                else if (t2High < t1High) { t2Points += 0.5; h2Won = t2Name; }
+                holeLog[hNum] = { lowWinner: h1Won, highWinner: h2Won };
+            }
+        });
+        return { t1Name, t2Name, t1Points, t2Points, holeLog };
+    }
+
+    function computeSkinsSettlementNet(data, courseData, savedScores) {
+        const allPlayers = (data.players || []).filter(p => p.playingForMoney !== false);
+        const potFormat = data.skinsPotFormat || 'split';
+        const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
+        const carryOver = data.skinsCarryOver !== false;
+        const totalHoles = (courseData || []).length;
+        const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
+
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+
+        const totalPot = buyIn * allPlayers.length;
+        let grossPot = 0, netPot = 0;
+        if (potFormat === 'split') { grossPot = totalPot / 2; netPot = totalPot / 2; }
+        else if (potFormat === 'gross') { grossPot = totalPot; }
+        else if (potFormat === 'net') { netPot = totalPot; }
+
+        const grossSkinValue = carryOver ? (totalHoles > 0 ? grossPot / totalHoles : 0) : (grossResult.skins.length > 0 ? grossPot / grossResult.skins.length : 0);
+        const netSkinValue = carryOver ? (totalHoles > 0 ? netPot / totalHoles : 0) : (netResult.skins.length > 0 ? netPot / netResult.skins.length : 0);
+
+        let payout = {};
+        allPlayers.forEach(p => payout[p.id] = 0);
+        grossResult.skins.forEach(s => { payout[s.player.id] += s.unitsWon * grossSkinValue; });
+        netResult.skins.forEach(s => { payout[s.player.id] += s.unitsWon * netSkinValue; });
+        if (carryOver && grossResult.pendingUnits > 0 && allPlayers.length > 0) {
+            const share = (grossResult.pendingUnits * grossSkinValue) / allPlayers.length;
+            allPlayers.forEach(p => payout[p.id] += share);
+        }
+        if (carryOver && netResult.pendingUnits > 0 && allPlayers.length > 0) {
+            const share = (netResult.pendingUnits * netSkinValue) / allPlayers.length;
+            allPlayers.forEach(p => payout[p.id] += share);
+        }
+
+        let netByPlayerId = {};
+        allPlayers.forEach(p => { netByPlayerId[p.id] = payout[p.id] - buyIn; });
+        return netByPlayerId;
+    }
+
+    // Reuses the exact (t1Points - t2Points) * holeBetStake formula already used in index.html's
+    // live Hi-Lo ticker and print ledger — same split-evenly-among-teammates convention Nassau
+    // and Match Play already use elsewhere in this same file.
+    function computeHiLoSettlementNet(data, courseData, savedScores) {
+        const allPlayers = (data.players || []).filter(p => p.playingForMoney !== false);
+        const holeBet = data.holeBetStake || 0;
+        const calc = calculateHiLoEngine(allPlayers, courseData, savedScores);
+        let netByPlayerId = {};
+        if (!calc || holeBet <= 0) return netByPlayerId;
+
+        const t1Total = (calc.t1Points - calc.t2Points) * holeBet;
+        const teams = {};
+        allPlayers.forEach(p => { const k = p.team || 'Team 1'; if (!teams[k]) teams[k] = []; teams[k].push(p); });
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return netByPlayerId;
+        const t1Players = teams[teamKeys[0]], t2Players = teams[teamKeys[1]];
+        const t1Share = t1Players.length > 0 ? t1Total / t1Players.length : 0;
+        const t2Share = t2Players.length > 0 ? -t1Total / t2Players.length : 0;
+        t1Players.forEach(p => netByPlayerId[p.id] = t1Share);
+        t2Players.forEach(p => netByPlayerId[p.id] = t2Share);
+        return netByPlayerId;
+    }
+
     function computeCombinedNetTotals(data, courseData, savedScores) {
         const netByName = {}; // lowercased key -> { name, net }
         function addAmount(player, amount) {
@@ -497,11 +652,28 @@
         }
 
         const allPlayers = data.players || [];
+        const gameFormat = data.gameFormat || 'stroke';
 
-        // Main game — reuses the same canonical dispatcher every other format in the app relies on.
-        const mainResult = computeRoundMoneyByPlayer(data, courseData, savedScores);
-        if (mainResult.valid) {
-            mainResult.players.forEach(p => addAmount(p, p.net || 0));
+        // Main game — reuses the same canonical dispatcher every other format in the app relies
+        // on, EXCEPT Skins and Hi-Lo, which that dispatcher doesn't handle (confirmed gap, filled
+        // above using each format's own already-established formula, not new math).
+        if (gameFormat === 'skins') {
+            const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
+            Object.keys(skinsNet).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, skinsNet[pid]);
+            });
+        } else if (gameFormat === 'hilo') {
+            const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
+            Object.keys(hiloNet).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, hiloNet[pid]);
+            });
+        } else {
+            const mainResult = computeRoundMoneyByPlayer(data, courseData, savedScores);
+            if (mainResult.valid) {
+                mainResult.players.forEach(p => addAmount(p, p.net || 0));
+            }
         }
 
         // Birdie pool
@@ -510,6 +682,7 @@
             const p = allPlayers.find(pl => String(pl.id) === String(pid));
             addAmount(p, birdieTotals[pid]);
         });
+
 
         // KP / Dollar Game
         const kpResult = calculateKPGameTotalsForSettle(data, courseData);
@@ -609,6 +782,51 @@
         // everyone still scores normally regardless of this flag (team formats never show
         // this checkbox, so it's a no-op there and full teams stay intact).
         const moneyPlayers = players.filter(p => p.playingForMoney !== false);
+
+        if (gameFormat === 'skins') {
+            const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
+            const carryOver = data.skinsCarryOver !== false;
+            let ledgerHtml = "";
+            moneyPlayers.forEach(p => {
+                const money = skinsNet[p.id] || 0;
+                const moneyClass = money >= 0 ? "val-pos" : "val-neg";
+                const moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span><span class="${moneyClass}">${moneyText}</span></div>`;
+            });
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🥩 Final Skins Settlement (${carryOver ? 'Carry Over' : 'No Carry'})</div>
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">Net of each player's own buy-in — a positive number means they came out ahead overall, not just what they won from the pot.</p>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'hilo') {
+            const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
+            const calc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            let ledgerHtml = "";
+            moneyPlayers.forEach(p => {
+                const money = hiloNet[p.id] || 0;
+                const moneyClass = money >= 0 ? "val-pos" : "val-neg";
+                const moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span><span class="${moneyClass}">${moneyText}</span></div>`;
+            });
+            const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">♠️ Final Hi-Lo Settlement</div>
+                    ${pointsLine}
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            `;
+            return;
+        }
 
         if (gameFormat === 'wolf') {
             const wolfCalc = calcWolfEngine(data, courseData, savedScores);
