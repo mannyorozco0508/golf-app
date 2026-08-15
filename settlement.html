@@ -96,7 +96,7 @@
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item active nav-link">💸 Settle</a>
@@ -105,6 +105,8 @@
     </div>
 
     <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
+
+    <div id="combined-settlement-summary"></div>
 
     <div id="settle-content">
         <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
@@ -181,6 +183,7 @@
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
+            renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
         });
     }
@@ -461,6 +464,122 @@
         html += buildSideMatchesHtml(data, courseData, savedScores);
 
         return html;
+    }
+
+    // Combines every active money source in this round — main game, birdie pool, KP game, and
+    // every side match — into one net-per-player total, then runs it through the same
+    // simplifyDebts() Trip Mode already uses, so a round with several simultaneous bets doesn't
+    // leave a golfer mentally adding up four separate cards to know what they actually owe.
+    // Reuses the exact same engine calls the existing per-game rendering below already makes —
+    // this is purely additive, none of that rendering logic is touched.
+    function computeCombinedNetTotals(data, courseData, savedScores) {
+        const netByName = {}; // lowercased key -> { name, net }
+        function addAmount(player, amount) {
+            if (!player || !amount) return;
+            const key = player.name.trim().toLowerCase();
+            if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
+            netByName[key].net += amount;
+        }
+
+        const allPlayers = data.players || [];
+
+        // Main game — reuses the same canonical dispatcher every other format in the app relies on.
+        const mainResult = computeRoundMoneyByPlayer(data, courseData, savedScores);
+        if (mainResult.valid) {
+            mainResult.players.forEach(p => addAmount(p, p.net || 0));
+        }
+
+        // Birdie pool
+        const birdieTotals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
+        Object.keys(birdieTotals).forEach(pid => {
+            const p = allPlayers.find(pl => String(pl.id) === String(pid));
+            addAmount(p, birdieTotals[pid]);
+        });
+
+        // KP / Dollar Game
+        const kpResult = calculateKPGameTotalsForSettle(data, courseData);
+        Object.keys(kpResult.money || {}).forEach(pid => {
+            const p = allPlayers.find(pl => String(pl.id) === String(pid));
+            addAmount(p, kpResult.money[pid]);
+        });
+
+        // Side matches — same logic buildSideMatchesHtml already uses per match, just summed
+        // into the combined total instead of only shown in its own separate card. Team-based
+        // (2v2) matches split evenly between teammates, matching the same convention Trip
+        // Mode's money settlement already uses for team-level bets.
+        const sideMatches = data.sideMatches || {};
+        Object.keys(sideMatches).forEach(matchId => {
+            const sm = sideMatches[matchId];
+            const teamAPlayers = allPlayers.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id));
+            const teamBPlayers = allPlayers.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id));
+            const virtualPlayers = teamAPlayers.map(p => ({ ...p, team: "Team 1" })).concat(teamBPlayers.map(p => ({ ...p, team: "Team 2" })));
+            if (virtualPlayers.length < 2) return;
+
+            if (sm.format === 'stroke') {
+                const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
+                if (!p1 || !p2) return;
+                const holeConfig = { holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' };
+                const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
+                const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
+                const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], courseData, savedScores, holeConfig, holePresses) : null;
+                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], courseData, savedScores, overallConfig, overallPresses) : null;
+                const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
+                addAmount(p1, p1Total);
+                addAmount(p2, -p1Total);
+            } else {
+                const manualPresses = sm.presses ? Object.values(sm.presses) : [];
+                const calc = calculateMatchEngine(virtualPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                if (!calc) return;
+                const t1Share = calc.t1TotalMoney / teamAPlayers.length;
+                const t2Share = -calc.t1TotalMoney / teamBPlayers.length;
+                teamAPlayers.forEach(p => addAmount(p, t1Share));
+                teamBPlayers.forEach(p => addAmount(p, t2Share));
+            }
+        });
+
+        const netTotals = {};
+        Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
+        return { netByName, transactions: simplifyDebts(netTotals) };
+    }
+
+    function renderCombinedSummary(data, courseData, savedScores) {
+        const container = document.getElementById('combined-settlement-summary');
+        if (!container) return;
+        const players = data.players || [];
+        if (players.length === 0) { container.innerHTML = ''; return; }
+
+        const { netByName, transactions } = computeCombinedNetTotals(data, courseData, savedScores);
+        const totals = Object.values(netByName);
+
+        // Nothing to combine yet (no scores, no active bets) — stay quiet rather than show an
+        // empty "Final Results" card above the real per-game breakdowns below.
+        if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
+
+        function fmt(amt) {
+            if (amt > 0.005) return `<span class="val-pos">Won $${amt.toFixed(2)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">Owes $${Math.abs(amt).toFixed(2)}</span>`;
+            return `<span>Even</span>`;
+        }
+
+        const sorted = totals.slice().sort((a, b) => b.net - a.net);
+        let html = `<div class="settle-card" style="border: 2px solid var(--brand-green);">
+            <div class="settle-header">🏁 Final Results</div>`;
+        sorted.forEach(t => {
+            html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
+        });
+        html += `</div>`;
+
+        if (transactions.length > 0) {
+            html += `<div class="settle-card">
+                <div class="settle-header">🤝 Who Pays Who</div>`;
+            transactions.forEach(t => {
+                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${t.amount.toFixed(2)}</span></div>`;
+            });
+            html += `</div>`;
+        }
+
+        container.innerHTML = html;
     }
 
     function renderSettlement(data) {
