@@ -293,9 +293,26 @@
             </div>
         </div>
 
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap players to build each side — 1 vs 1 (2v2 for Match Play / Nassau only). First tap = Team A (green), second tap = Team B (navy).</div>
-        <div id="sm-player-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;"></div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap players to build each side — first tap puts them on one side (green), tap again to switch to the other (navy), tap a third time to remove them. 2v2 works for Match Play and Nassau only.</div>
+        <div id="sm-player-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+        <div id="sm-team-size-indicator" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin-bottom:8px;"></div>
+        <div id="sm-preview" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.85rem;"></div>
         <button class="btn-primary" onclick="saveSideMatch()">💾 Start Side Match</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="sidematch-delete-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>🗑️ Delete this side bet?</span>
+            <button class="close-modal" onclick="closeSideMatchDeleteModal()">&times;</button>
+        </div>
+        <div id="sm-delete-details" style="background:var(--bg-page); border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.9rem; text-align:center;"></div>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0;">This removes the bet and its result. This can't be undone.</p>
+        <div style="display:flex; gap:8px;">
+            <button class="btn-outline" style="flex:1;" onclick="closeSideMatchDeleteModal()">Cancel</button>
+            <button class="btn-danger-sm" style="flex:1; padding:12px;" onclick="confirmDeleteSideMatch()">Delete</button>
+        </div>
     </div>
 </div>
 
@@ -667,6 +684,7 @@
         document.getElementById("sm-stroke-fields").style.display = isStroke ? "block" : "none";
         document.getElementById("sm-stake-group").style.display = isStroke ? "none" : "block";
         document.getElementById("sm-press-rule-group").style.display = isStroke ? "none" : "block";
+        updateSideMatchPickerFeedback();
     }
 
     function renderSideMatchPicker() {
@@ -683,15 +701,80 @@
             });
         });
 
+        // Only worth labeling groups at all once there's more than one group to distinguish —
+        // for a single foursome, "Group 1" on every name would just be noise.
+        const groupMap = buildPlayerGroupMap();
+        const distinctGroups = new Set(Object.values(groupMap)).size;
+
         let html = "";
         players.forEach(p => {
             const side = sidematchPickState[p.id];
             const cls = side === 'a' ? 'pick-a' : (side === 'b' ? 'pick-b' : '');
             const cnt = existingCount[p.id] || 0;
             const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
-            html += `<div class="player-pick-badge ${cls}" onclick="toggleSideMatchPick('${p.id}')">${p.name.split(' ')[0]}${tag}</div>`;
+            const groupTag = distinctGroups > 1 ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${groupMap[String(p.id)] || '?'}</span>` : '';
+            html += `<div class="player-pick-badge ${cls}" onclick="toggleSideMatchPick('${p.id}')">${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
         });
         wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
+        updateSideMatchPickerFeedback();
+    }
+
+    // Live "1v1" / "2v2" / instruction text as picks change, rather than only finding out the
+    // combination is invalid after tapping Save — plus a compact preview of who's actually
+    // playing whom and, where handicaps apply, who receives strokes.
+    function updateSideMatchPickerFeedback() {
+        const indicator = document.getElementById('sm-team-size-indicator');
+        const preview = document.getElementById('sm-preview');
+        if (!indicator || !preview) return;
+
+        const players = currentData.players || [];
+        const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
+        const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
+        const format = document.getElementById('sm-format') ? document.getElementById('sm-format').value : 'match';
+
+        if (teamAIds.length === 0 && teamBIds.length === 0) {
+            indicator.textContent = 'Tap players above to build each side.';
+            preview.style.display = 'none';
+            return;
+        }
+        if (teamAIds.length !== teamBIds.length) {
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Uneven sides — pick the same number on each side.</span>`;
+            preview.style.display = 'none';
+            return;
+        }
+        if (format === 'stroke' && teamAIds.length > 1) {
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Stroke Play side action is 1v1 only.</span>`;
+            preview.style.display = 'none';
+            return;
+        }
+
+        const sizeLabel = teamAIds.length === 1 ? '1v1' : `${teamAIds.length}v${teamBIds.length}`;
+        indicator.innerHTML = `<span style="color:var(--brand-green);">✅ ${sizeLabel}</span>`;
+
+        const teamAPlayers = players.filter(p => teamAIds.includes(String(p.id)));
+        const teamBPlayers = players.filter(p => teamBIds.includes(String(p.id)));
+        const namesA = teamAPlayers.map(p => p.name.split(' ')[0]).join(' + ');
+        const namesB = teamBPlayers.map(p => p.name.split(' ')[0]).join(' + ');
+
+        // Stroke-index handicap preview — only meaningful for a genuine 1v1, matching exactly
+        // how getStrokes/parseHcp are already used everywhere else in this file, nothing new.
+        let strokeNote = '';
+        if (teamAIds.length === 1 && teamBPlayers[0] && teamAPlayers[0]) {
+            const hcpA = parseHcp(teamAPlayers[0].hcp), hcpB = parseHcp(teamBPlayers[0].hcp);
+            const courseData = currentData.courseData || [];
+            if (courseData.length > 0 && hcpA !== hcpB) {
+                let strokesTotal = 0;
+                courseData.forEach(h => {
+                    const sA = getStrokes(h.hcpIndex, hcpA), sB = getStrokes(h.hcpIndex, hcpB);
+                    strokesTotal += Math.abs(sA - sB) > 0 ? Math.max(sA, sB) - Math.min(sA, sB) : 0;
+                });
+                const higherHcpPlayer = hcpA > hcpB ? teamAPlayers[0] : teamBPlayers[0];
+                if (strokesTotal > 0) strokeNote = `<div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">${higherHcpPlayer.name.split(' ')[0]} receives ${strokesTotal} stroke${strokesTotal === 1 ? '' : 's'}</div>`;
+            }
+        }
+
+        preview.style.display = 'block';
+        preview.innerHTML = `<strong>${namesA}</strong> vs <strong>${namesB}</strong>${strokeNote}`;
     }
 
     function toggleSideMatchPick(playerId) {
@@ -838,10 +921,40 @@
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
 
+    let pendingDeleteMatchId = null;
+
     function deleteSideMatch(matchId) {
-        if (!confirm("Remove this side match? This can't be undone.")) return;
+        const sm = (currentData.sideMatches || {})[matchId];
+        const players = currentData.players || [];
+        pendingDeleteMatchId = matchId;
+
+        let detailsHtml = 'This side bet';
+        if (sm) {
+            const teamAIds = (sm.teamAIds || []).map(String);
+            const teamBIds = (sm.teamBIds || []).map(String);
+            const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
+            const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
+            const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : 'Match Play');
+            const stakeText = sm.format === 'stroke'
+                ? `$${sm.holeStake || 0}/hole, $${sm.overallStake || 0} overall`
+                : `$${sm.stake || 0}`;
+            detailsHtml = `<strong>${namesA || '?'} vs ${namesB || '?'}</strong><br><span style="color:var(--text-muted); font-size:0.8rem;">${formatLabel} • ${stakeText}</span>`;
+        }
+        document.getElementById('sm-delete-details').innerHTML = detailsHtml;
+        document.getElementById('sidematch-delete-modal').style.display = 'flex';
+    }
+
+    function closeSideMatchDeleteModal() {
+        pendingDeleteMatchId = null;
+        document.getElementById('sidematch-delete-modal').style.display = 'none';
+    }
+
+    function confirmDeleteSideMatch() {
+        if (!pendingDeleteMatchId) return;
+        const matchId = pendingDeleteMatchId;
         db.ref(`events/${currentMode}/sideMatches/${matchId}`).remove()
             .catch(err => alert(`Failed to remove: ${err.message}`));
+        closeSideMatchDeleteModal();
     }
 
     // ============================================================================
