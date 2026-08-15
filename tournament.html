@@ -112,6 +112,16 @@
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
         .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
 
+        .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .toggle-label-sm { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        .toggle-label-sm.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+
         .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
         .modal-overlay.open { display:flex; }
         .modal-content { background: var(--bg-card); border-radius: 14px; padding: 20px; max-width: 400px; width:100%; max-height:85vh; overflow-y:auto; }
@@ -214,6 +224,30 @@
     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team gets 4 name slots (2-3 players is fine) and its own handicap — used to net the team's score against the field, not a flat number applied to everyone the same.</p>
     <div id="teams-list"></div>
     <button class="btn-add-team" onclick="addTeam()">➕ Add Team</button>
+    <button class="btn-outline" onclick="openPasteTeamsModal()">📋 Paste Player List (builds teams for you)</button>
+
+    <div class="modal-overlay" id="paste-teams-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📋 Paste Player List</span>
+                <button class="close-modal" onclick="closePasteTeamsModal()" aria-label="Close">&times;</button>
+            </div>
+            <label for="paste-teams-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. Add a handicap after a comma if you have it — optional. We'll split the list into teams for you below.</label>
+            <textarea id="paste-teams-textarea" rows="8" placeholder="John Smith, 8
+Mike Jones, 12
+Robert Garcia
+Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border-mid); font-family:inherit; font-size:1rem; resize:vertical; background:var(--bg-page); color:var(--text-main);"></textarea>
+
+            <div class="form-group" style="margin-top:12px;">
+                <label>Team Size</label>
+                <input type="number" id="paste-team-size" value="4" min="1" max="4" oninput="previewPasteTeams()">
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="paste-team-size-hint"></p>
+            </div>
+
+            <div id="paste-teams-preview" style="margin:12px 0; font-size:0.85rem;"></div>
+            <button class="btn-primary" id="paste-teams-commit-btn" onclick="commitPasteTeams()" disabled>Create Teams</button>
+        </div>
+    </div>
 
     <button class="btn-primary" onclick="saveTournament()">💾 Save Tournament &amp; Get Team Links</button>
     <button class="btn-outline" onclick="window.location.href='admin.html'">← Back to Home</button>
@@ -234,6 +268,23 @@
         <h2 id="manage-t-name" style="text-align:center; font-size:1.3rem;"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
         <p style="text-align:center; color:var(--brand-navy); font-size:0.9rem; font-weight:bold; margin-top:4px;" id="manage-t-pool"></p>
+
+        <hr class="section-divider">
+        <h3>🚀 Starting Holes</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Leave this on Tee Time for a normal round where everyone starts on hole 1. Switch to Shotgun for a shotgun start — teams begin on assigned holes, all at once.</p>
+        <div class="toggle-row">
+            <span class="toggle-label-sm active" id="start-type-label-normal" onclick="setStartType('normal')">Tee Time</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="start-type-switch" onchange="setStartType(this.checked ? 'shotgun' : 'normal')">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label-sm" id="start-type-label-shotgun" onclick="setStartType('shotgun')">Shotgun</span>
+        </div>
+        <div id="shotgun-assignments-box" style="display:none; margin-top:12px;">
+            <button class="btn-outline" onclick="autoAssignShotgunHoles()">🔀 Auto-Assign Starting Holes</button>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 10px 0;">Fills every hole once before doubling any of them up — edit any team's assignment below afterward if you want it different.</p>
+            <div id="shotgun-assignments-list"></div>
+        </div>
 
         <hr class="section-divider">
         <h3>🔒 Team Scorecard Links</h3>
@@ -443,6 +494,148 @@
         return code;
     }
 
+    // --- PASTE-A-LIST → AUTO-BUILT TEAMS ---
+    // Same "Name" or "Name, Handicap" line format as the Round/Trip paste feature, for
+    // consistency — an organizer can paste the same list either place without reformatting.
+    // Individual handicaps ARE parsed here, but only to suggest a starting team handicap
+    // (a simple average) — the team data model only stores one handicap per team (matching
+    // manual team creation exactly), never a handicap per player, so nothing new is invented
+    // there. A line that reduces to an empty name is flagged, same rule as the Round paste.
+    function parseTeamsPasteText(text) {
+        const lines = text.split('\n');
+        let validPlayers = [];
+        let flaggedLines = [];
+        lines.forEach((rawLine, idx) => {
+            const line = rawLine.trim();
+            if (line === '') return;
+            let name, hcp;
+            const commaIdx = line.indexOf(',');
+            if (commaIdx === -1) { name = line; hcp = ''; }
+            else { name = line.slice(0, commaIdx).trim(); hcp = line.slice(commaIdx + 1).trim(); }
+            if (name === '') { flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' }); return; }
+            validPlayers.push({ name, hcp });
+        });
+        return { validPlayers, flaggedLines };
+    }
+
+    // Splits a flat player list into teams of teamSize, in order. A non-divisible remainder
+    // becomes one smaller final team rather than losing anyone or forcing an uneven split
+    // elsewhere — e.g. 99 players at size 4 gives 24 full teams and one team of 3.
+    function chunkPlayersIntoTeams(players, teamSize) {
+        let teams = [];
+        for (let i = 0; i < players.length; i += teamSize) {
+            teams.push(players.slice(i, i + teamSize));
+        }
+        return teams;
+    }
+
+    // A simple average of whatever handicaps were actually provided for that team — a
+    // starting suggestion the organizer can adjust, not a new scoring calculation. Teams
+    // with no handicaps provided at all default to 0, same as a manually-created team.
+    function suggestTeamHandicap(teamPlayers) {
+        const withHcp = teamPlayers.filter(p => p.hcp !== '' && !isNaN(parseFloat(p.hcp)));
+        if (withHcp.length === 0) return 0;
+        const sum = withHcp.reduce((s, p) => s + parseFloat(p.hcp), 0);
+        return Math.round(sum / withHcp.length);
+    }
+
+    function openPasteTeamsModal() {
+        const sizeInput = document.getElementById('paste-team-size');
+        const hintEl = document.getElementById('paste-team-size-hint');
+        const suggestedSize = selectedFormat === 'bestball' ? 2 : 4;
+        sizeInput.value = suggestedSize;
+        hintEl.textContent = selectedFormat === 'bestball'
+            ? "Best Ball is typically 2 players per team."
+            : "Scramble and Shamble are typically 4 players per team.";
+        document.getElementById('paste-teams-modal').classList.add('open');
+        previewPasteTeams();
+    }
+
+    function closePasteTeamsModal() {
+        document.getElementById('paste-teams-modal').classList.remove('open');
+    }
+
+    function previewPasteTeams() {
+        const text = document.getElementById('paste-teams-textarea').value;
+        const teamSize = Math.max(1, Math.min(4, parseInt(document.getElementById('paste-team-size').value, 10) || 4));
+        const { validPlayers, flaggedLines } = parseTeamsPasteText(text);
+        const previewEl = document.getElementById('paste-teams-preview');
+        const commitBtn = document.getElementById('paste-teams-commit-btn');
+
+        if (validPlayers.length === 0 && flaggedLines.length === 0) {
+            previewEl.innerHTML = '';
+            commitBtn.disabled = true;
+            return;
+        }
+
+        const teamChunks = chunkPlayersIntoTeams(validPlayers, teamSize);
+        const fullTeams = teamChunks.filter(t => t.length === teamSize).length;
+        const partialTeam = teamChunks.find(t => t.length > 0 && t.length < teamSize);
+
+        let html = `<strong style="color:var(--brand-green);">${validPlayers.length} player${validPlayers.length === 1 ? '' : 's'} found</strong> → `;
+        html += partialTeam
+            ? `${fullTeams} full team${fullTeams === 1 ? '' : 's'} of ${teamSize}, plus 1 team of ${partialTeam.length}`
+            : `${teamChunks.length} team${teamChunks.length === 1 ? '' : 's'} of ${teamSize}`;
+
+        if (flaggedLines.length > 0) {
+            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
+            html += `<div class="paste-flagged-line" style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:6px 10px; font-size:0.78rem; color:var(--warn-text); margin-top:8px;">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
+        }
+
+        html += `<div style="max-height:200px; overflow-y:auto; margin-top:10px; border:1px solid var(--border-mid); border-radius:8px; padding:8px;">`;
+        teamChunks.forEach((team, i) => {
+            html += `<div style="margin-bottom:8px; padding-bottom:8px; ${i < teamChunks.length - 1 ? 'border-bottom:1px solid var(--border-faint);' : ''}">
+                <strong>Team ${i + 1}</strong> — ${team.map(p => p.name).join(', ')}
+            </div>`;
+        });
+        html += `</div>`;
+
+        previewEl.innerHTML = html;
+        commitBtn.disabled = validPlayers.length === 0;
+    }
+
+    // Builds real .team-card DOM elements — the EXACT same structure addTeam() builds manually
+    // — and removes the one default blank card, so saveTournament() (unchanged) picks these up
+    // exactly as if they'd been typed in by hand. No parallel team-creation path, no changes
+    // needed to saveTournament() at all.
+    function commitPasteTeams() {
+        const text = document.getElementById('paste-teams-textarea').value;
+        const teamSize = Math.max(1, Math.min(4, parseInt(document.getElementById('paste-team-size').value, 10) || 4));
+        const { validPlayers } = parseTeamsPasteText(text);
+        if (validPlayers.length === 0) return;
+
+        const teamChunks = chunkPlayersIntoTeams(validPlayers, teamSize);
+        const teamsList = document.getElementById('teams-list');
+        teamsList.innerHTML = ''; // clear the single default blank card and anything from a previous paste
+        teamCount = 0;
+
+        teamChunks.forEach(teamPlayers => {
+            teamCount++;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'team-card';
+            wrapper.id = `team-block-${teamCount}`;
+            const suggestedHcp = suggestTeamHandicap(teamPlayers);
+            const playerInputsHtml = [0, 1, 2, 3].map(i =>
+                `<input type="text" value="${teamPlayers[i] ? teamPlayers[i].name : ''}" placeholder="${teamPlayers[i] ? '' : (i < 2 ? `Player ${i + 1}` : `Player ${i + 1} (optional)`)}">`
+            ).join('');
+            wrapper.innerHTML = `
+                <div class="team-card-header">
+                    <span class="team-label">Team ${teamCount}</span>
+                    <button class="btn-remove-team" onclick="document.getElementById('team-block-${teamCount}').remove()">✕ Remove</button>
+                </div>
+                <input type="text" class="team-name-input" placeholder="Team ${teamCount}" style="margin-bottom:8px;">
+                <div class="team-name-inputs">${playerInputsHtml}</div>
+                <label style="margin-top:8px; font-size:0.8rem;">Team Handicap</label>
+                <input type="number" class="team-handicap-input" value="${suggestedHcp}" min="0">
+            `;
+            teamsList.appendChild(wrapper);
+        });
+
+        closePasteTeamsModal();
+        document.getElementById('paste-teams-textarea').value = '';
+        document.getElementById('paste-teams-preview').innerHTML = '';
+    }
+
     let currentCode = null;
     let tripLinkCode = null; // present when this tournament is being set up FROM a trip
 
@@ -504,17 +697,86 @@
         const list = document.getElementById('team-links-list');
         const teams = currentData.teams || {};
         const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
+        const isShotgun = currentData.startType === 'shotgun';
         list.innerHTML = teamIds.map(tid => {
             const t = teams[tid];
             const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
             const names = t.players.join(', ');
             const teamName = t.name || `Team ${t.num}`;
             const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
+            const startBadge = (isShotgun && t.startingHole) ? `<span style="background:var(--nassau-box-bg); color:var(--brand-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:bold; margin-left:6px;">🚀 Hole ${t.startingHole}</span>` : '';
             return `<div class="team-link-row" style="flex-wrap:wrap;">
-                <span>🏌️ ${teamName} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
+                <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
                 <span style="display:flex; align-items:center; gap:6px;">
                     <input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">
                     <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
+                </span>
+            </div>`;
+        }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
+    }
+
+    // --- SHOTGUN STARTS (Tournament Mode only — never touches Round/Trip/Nassau/Skins) ---
+    // startType lives on the tournament itself ('normal' default via `!== 'shotgun'`, so an
+    // OLD tournament with no startType field at all is automatically treated as normal — no
+    // migration needed). startingHole lives per-team, purely additive; a team with none set
+    // just shows no starting-hole badge anywhere. Scoring never changes: computeTeamTotals
+    // already counts "holes with a score," not "highest hole number," so a team starting
+    // anywhere on the course totals correctly with zero changes to tournament-engine.js.
+    function setStartType(val) {
+        db.ref(`tournaments/${currentCode}/startType`).set(val).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // Round-robin: fills every hole once before doubling any of them, rather than pairing
+    // teams onto the front holes first — a more even spread across the whole course, and every
+    // assignment can still be edited individually afterward.
+    function computeShotgunAssignments(teamNums, totalHoles) {
+        let perHoleCount = {};
+        let raw = teamNums.map((num, i) => {
+            const holeNumber = (i % totalHoles) + 1;
+            const wave = Math.floor(i / totalHoles);
+            perHoleCount[holeNumber] = (perHoleCount[holeNumber] || 0) + 1;
+            return { num, holeNumber, wave };
+        });
+        return raw.map(a => ({
+            num: a.num,
+            label: perHoleCount[a.holeNumber] > 1 ? `${a.holeNumber}${String.fromCharCode(65 + a.wave)}` : `${a.holeNumber}`
+        }));
+    }
+
+    function autoAssignShotgunHoles() {
+        const teams = currentData.teams || {};
+        const teamNums = Object.values(teams).map(t => t.num).sort((a, b) => a - b);
+        if (teamNums.length === 0) { alert('⚠️ Add teams before assigning starting holes.'); return; }
+        const totalHoles = (currentData.courseData || []).length || 18;
+        const assignments = computeShotgunAssignments(teamNums, totalHoles);
+
+        let updates = {};
+        assignments.forEach(a => { updates[`teams/team${a.num}/startingHole`] = a.label; });
+        db.ref(`tournaments/${currentCode}`).update(updates).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function updateTeamStartingHole(teamNum, val) {
+        db.ref(`tournaments/${currentCode}/teams/team${teamNum}/startingHole`).set(val.trim()).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function renderShotgunAssignments() {
+        const box = document.getElementById('shotgun-assignments-box');
+        const list = document.getElementById('shotgun-assignments-list');
+        const isShotgun = currentData.startType === 'shotgun';
+        box.style.display = isShotgun ? 'block' : 'none';
+        if (!isShotgun) return;
+
+        const teams = currentData.teams || {};
+        const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
+        list.innerHTML = teamIds.map(tid => {
+            const t = teams[tid];
+            const teamName = t.name || `Team ${t.num}`;
+            const startVal = t.startingHole || '';
+            return `<div class="team-link-row">
+                <span>🏌️ ${teamName}</span>
+                <span style="display:flex; align-items:center; gap:6px;">
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Hole</span>
+                    <input type="text" value="${startVal}" placeholder="—" style="width:52px; padding:6px; font-size:0.85rem; text-align:center;" onchange="updateTeamStartingHole(${t.num}, this.value)">
                 </span>
             </div>`;
         }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
@@ -768,7 +1030,16 @@
             document.getElementById('manage-t-pool').textContent = pool > 0 ? `💰 Pool: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+
+            // A tournament created before this feature existed has no startType field at all —
+            // treated as 'normal' automatically, no migration needed.
+            const isShotgun = currentData.startType === 'shotgun';
+            document.getElementById('start-type-switch').checked = isShotgun;
+            document.getElementById('start-type-label-normal').classList.toggle('active', !isShotgun);
+            document.getElementById('start-type-label-shotgun').classList.toggle('active', isShotgun);
+
             renderTeamLinks();
+            renderShotgunAssignments();
             renderTripLinkStatus();
             renderLeaderboard();
         });
