@@ -95,6 +95,7 @@
 
     <div class="event-title" id="event-title"></div>
     <div class="event-sub" id="event-sub"></div>
+    <div id="starting-hole-banner" style="display:none; text-align:center; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:10px; margin-bottom:14px; font-weight:bold; color:var(--brand-green); font-size:1.05rem;"></div>
 
     <div id="tab-scorecard">
         <div class="team-roster-box" id="team-roster"></div>
@@ -162,6 +163,7 @@
     let currentCode = urlParams.get('tourney') ? urlParams.get('tourney').toUpperCase() : null;
     let myTeamNum = urlParams.get('team') ? parseInt(urlParams.get('team'), 10) : null;
     let currentData = {};
+    let hasAutoScrolled = false; // guards the shotgun starting-hole auto-scroll to fire once per page load
 
     if (!currentCode || !myTeamNum) {
         document.getElementById('error-content').style.display = 'block';
@@ -242,7 +244,7 @@
                 const key = `team${myTeamNum}_h${h.hole}`;
                 const v = scores[key];
                 if (v && v > 0) { thru++; total += parseInt(v, 10); parPlayed += h.par; }
-                html += `<div class="hole-row">
+                html += `<div class="hole-row" id="hole-row-${h.hole}">
                     <div class="hole-info">
                         <span class="hole-num">Hole ${h.hole}</span>
                         <span class="hole-par">Par ${h.par}</span>
@@ -272,7 +274,7 @@
                 if (teamHoleScore !== null) { thru++; total += teamHoleScore; parPlayed += h.par; }
                 const resultText = teamHoleScore === null ? '' : `Team: ${teamHoleScore}`;
 
-                html += `<div class="hole-row-multi">
+                html += `<div class="hole-row-multi" id="hole-row-${h.hole}">
                     <div class="hole-info-row">
                         <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span></span>
                         <span class="team-hole-result">${resultText}</span>
@@ -283,6 +285,24 @@
         }
 
         document.getElementById('holes-list').innerHTML = html;
+
+        // Starting hole is purely a display/navigation aid — the scored hole is always the
+        // real golf hole (hole 8 is still hole 8, stored the same way regardless of when it
+        // was entered). Auto-scroll only fires once per page load, not on every score-driven
+        // re-render, so a teammate entering a score elsewhere doesn't yank the view back.
+        const startBanner = document.getElementById('starting-hole-banner');
+        if (team.startingHole) {
+            startBanner.style.display = 'block';
+            startBanner.textContent = `🚀 Starting Hole: ${team.startingHole}`;
+            if (!hasAutoScrolled) {
+                hasAutoScrolled = true;
+                const startHoleNum = parseInt(team.startingHole, 10);
+                const targetRow = document.getElementById(`hole-row-${startHoleNum}`);
+                if (targetRow) setTimeout(() => targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+            }
+        } else {
+            startBanner.style.display = 'none';
+        }
 
         const toPar = thru > 0 ? total - parPlayed : null;
         const toParStr = toPar === null ? '' : (toPar === 0 ? 'E' : (toPar > 0 ? `+${toPar}` : toPar));
