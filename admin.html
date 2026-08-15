@@ -72,6 +72,16 @@
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
+        .nav-more { position: relative; flex: 0 0 auto; }
+        .nav-more summary { list-style: none; cursor: pointer; }
+        .nav-more summary::-webkit-details-marker { display: none; }
+        .nav-more-menu {
+            position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
+            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
+            padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 140px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+        }
+        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; }
 
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
@@ -281,11 +291,16 @@
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
-        <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
-        <a href="trip.html" class="top-nav-item">🧳 Trip</a>
-        <a href="admin.html" class="top-nav-item active nav-link">⚙️ Home</a>
+        <a href="settlement.html" class="top-nav-item nav-link">💸 Results</a>
+        <details class="nav-more" open>
+            <summary class="top-nav-item">⋯ More</summary>
+            <div class="nav-more-menu">
+                <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
+                <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+                <a href="trip.html" class="top-nav-item">🧳 Trip</a>
+                <a href="admin.html" class="top-nav-item active nav-link">⚙️ Home</a>
+            </div>
+        </details>
     </div>
 
     <div style="text-align: center; margin-top: 10px;">
