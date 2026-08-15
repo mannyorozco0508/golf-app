@@ -265,6 +265,126 @@ describe('LIVE ACTION — Birdie Pool / KP section (side games, independent of m
     });
 });
 
+describe('LIVE ACTION — Main Match hierarchy and at-stake/locked language (UX polish batch)', () => {
+    test('a FINAL main match shows locked language, never "at stake"', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(18);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        cd.forEach(h => { scores[`p${players[0].id}_h${h.hole}`] = 3; scores[`p${players[1].id}_h${h.hole}`] = 5; });
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 150, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-main-match').innerHTML;
+        assert.ok(html.includes('FINAL'));
+        assert.ok(html.includes('+$150 locked'));
+        assert.ok(!html.includes('at stake'), 'a mathematically closed bet must never say "at stake"');
+    });
+
+    test('REGRESSION: an unfinished main match shows "at stake", never presents the stake as already won', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(18);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        for (let h = 1; h <= 7; h++) { scores[`p${players[0].id}_h${h}`] = 4; scores[`p${players[1].id}_h${h}`] = 4; }
+        for (let h = 8; h <= 11; h++) { scores[`p${players[0].id}_h${h}`] = 3; scores[`p${players[1].id}_h${h}`] = 4; }
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 20, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-main-match').innerHTML;
+        assert.ok(html.includes('LIVE'));
+        assert.ok(html.includes('$20 at stake'));
+        assert.ok(!html.includes('locked'), 'an unfinished bet must never say the stake is locked/won');
+    });
+
+    test('all-square status shows the explicit text word "ALL SQUARE", not color alone', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(4);
+        const players = makePlayers(['A', 'B'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        cd.forEach(h => { scores[`p${players[0].id}_h${h.hole}`] = 4; scores[`p${players[1].id}_h${h.hole}`] = 4; });
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 50, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-main-match').innerHTML;
+        assert.ok(html.includes('ALL SQUARE'));
+    });
+
+    test('the Presses section header shows the Total/Locked/Live breakdown, matching the exact spec hierarchy', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(18);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        for (let h = 1; h <= 17; h++) { scores[`p${players[0].id}_h${h}`] = 3; scores[`p${players[1].id}_h${h}`] = 5; }
+        scores[`p${players[0].id}_h18`] = 4; scores[`p${players[1].id}_h18`] = 4;
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 150, matchPressRule: '2down', courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-press-ladder').innerHTML;
+        assert.ok(html.includes('8 Total'));
+        assert.ok(html.includes('Locked'));
+        assert.ok(html.includes('Live'));
+    });
+
+    test('live presses show an aggregate "at stake" total, since touch devices can\'t hover to see per-pill tooltips', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(18);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        for (let h = 1; h <= 3; h++) { scores[`p${players[0].id}_h${h}`] = 3; scores[`p${players[1].id}_h${h}`] = 5; }
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 20, matchPressRule: '2down', courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-press-ladder').innerHTML;
+        assert.ok(html.includes('at stake'), 'live presses must spell out the at-stake total visibly, not rely only on a hover tooltip');
+    });
+
+    test('Side Bets correctly show "at stake" vs "locked" language matching their own closed state', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(12);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        cd.forEach(h => { scores[`p${players[0].id}_h${h.hole}`] = 3; scores[`p${players[1].id}_h${h.hole}`] = 5; });
+        const sideMatches = { sm1: { format: 'match', scoring: 'net', teamAIds: [String(players[0].id)], teamBIds: [String(players[1].id)], stake: 20, pressRule: 'none' } };
+        withData(sandbox, { players, gameFormat: 'stroke', sideMatches, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-sidematches').innerHTML;
+        assert.ok(html.includes('locked'), 'a mathematically closed side match (Manny wins every hole thru 12 with 6 to play) should show locked language');
+    });
+
+    test('SCORE CORRECTION with the new hierarchy: correcting an earlier hole updates the Main Match section, not stale', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(18);
+        const players = makePlayers(['Manny', 'John'], [0, 0]);
+        players[0].team = 'Team 1'; players[1].team = 'Team 2'; players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        for (let h = 1; h <= 7; h++) { scores[`p${players[0].id}_h${h}`] = 3; scores[`p${players[1].id}_h${h}`] = 5; }
+        withData(sandbox, { players, gameFormat: 'match', matchStake: 150, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const before = sandbox.document.getElementById('live-action-main-match').innerHTML;
+
+        scores[`p${players[0].id}_h7`] = 6; scores[`p${players[1].id}_h7`] = 3;
+        sandbox.renderLiveActionSummary(players, players);
+        const after = sandbox.document.getElementById('live-action-main-match').innerHTML;
+        assert.notEqual(before, after, 'correcting hole 7 must visibly update the Main Match section on next render');
+    });
+
+    test('Skins never shows a "final" dollar figure mid-round - carry is honestly labeled not-yet-final', () => {
+        const sandbox = loadHtmlInlineScript('index.html');
+        const cd = makeCourseData(2);
+        const players = makePlayers(['A', 'B'], [0, 0]);
+        players.forEach(p => p.playingForMoney = true);
+        let scores = {};
+        cd.forEach(h => { scores[`p${players[0].id}_h${h.hole}`] = 4; scores[`p${players[1].id}_h${h.hole}`] = 4; });
+        withData(sandbox, { players, gameFormat: 'skins', skinsBuyIn: 5, skinsCarryOver: true, courseData: cd, scores });
+        sandbox.renderLiveActionSummary(players, players);
+        const html = sandbox.document.getElementById('live-action-skins').innerHTML;
+        assert.ok(!/\$\d/.test(html), 'skins must not show any dollar figure while the carry chain is still unresolved');
+        assert.ok(html.includes('not final yet') || html.includes('carrying'));
+    });
+});
+
 describe('LIVE ACTION UI RENDERING', () => {
     test('the box stays hidden entirely for a genuinely no-bet round', () => {
         const sandbox = loadHtmlInlineScript('index.html');
