@@ -1,0 +1,41 @@
+# --- Node / npm ---
+node_modules/
+npm-debug.log*
+
+# --- Generated web bundle for the native wrapper ---
+# www/app/ is regenerated from the canonical root HTML/JS files via `npm run mobile:sync`.
+# It is never a second source of truth and should never be committed or hand-edited.
+www/
+
+# --- iOS (Xcode) ---
+# ios/App/App.xcodeproj and other native project source ARE committed - only build
+# artifacts, user-specific state, and dependency caches are excluded here.
+ios/App/Pods/
+ios/App/output/
+ios/App/DerivedData/
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+ios/**/.DS_Store
+
+# --- Android (Gradle) ---
+# android/ native project source IS committed - only build output and machine-specific
+# local config are excluded.
+android/local.properties
+android/.gradle/
+android/**/build/
+android/captures/
+android/*.iml
+android/.idea/
+
+# --- Signing / secrets (never commit under any circumstance) ---
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.p8
+GoogleService-Info.plist
+google-services.json
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
