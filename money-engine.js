@@ -427,11 +427,24 @@ function computeRoundMoneyByPlayer(data, courseData, savedScores) {
     }
 
     if (gameFormat === 'dots') {
+        // calcDotsEngine's raw per-player unit totals are left completely untouched — they
+        // remain the correct source for live status ("Manny: 3 dots"). Only the dollar
+        // conversion changes here: each dot unit (positive or negative, e.g. a Snake) is worth
+        // its dollar value paid by EVERY OTHER player, matching how junk/garbage games are
+        // actually played and how "$X per dot" reads to a golfer — not an isolated credit with
+        // no corresponding payer. For player P: net = dotVal * (n * unitsP - totalUnitsAllPlayers).
+        // This is provably zero-sum for any combination of units across any number of players.
         const dotsCalc = calcDotsEngine(data, courseData, savedScores);
         const dotVal = data.dotPointVal || 0;
+        const n = moneyPlayers.length;
+        const totalUnits = moneyPlayers.reduce((s, p) => s + (dotsCalc.totals[p.id] || 0), 0);
         result.valid = true;
         result.formatLabel = 'Dot Game';
-        result.players = moneyPlayers.map(p => ({ id: p.id, name: p.name, net: (dotsCalc.totals[p.id] || 0) * dotVal }));
+        result.players = moneyPlayers.map(p => {
+            const units = dotsCalc.totals[p.id] || 0;
+            const net = n > 1 ? dotVal * (n * units - totalUnits) : 0;
+            return { id: p.id, name: p.name, net };
+        });
         return result;
     }
 
