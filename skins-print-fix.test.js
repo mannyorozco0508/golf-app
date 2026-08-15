@@ -43,7 +43,7 @@ describe('PRINT/PDF SKINS BUG FIX — the exact reproduction scenario from the a
     });
 
     test('STRUCTURAL: the print path in index.html actually calls the canonical carry-over-aware functions, not a reintroduced duplicate', () => {
-        const filePath = path.join(__dirname, '..', 'index.html');
+        const filePath = path.join(__dirname, 'index.html');
         const source = fs.readFileSync(filePath, 'utf8');
         const printSkinsStart = source.indexOf("} else if (format === 'skins') {");
         const printSkinsEnd = source.indexOf("if (currentData.birdieGameEnabled", printSkinsStart);
