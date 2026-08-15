@@ -1724,6 +1724,52 @@
             html += `<button onclick="saveWolfCall(${targetHole}, 'lone', null)" style="flex:1; padding:6px 10px; border-radius:14px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-size:0.72rem; font-weight:bold; cursor:pointer;">🐺 Lone Wolf</button>`;
             html += `<button onclick="saveWolfCall(${targetHole}, 'blind', null)" style="flex:1; padding:6px 10px; border-radius:14px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.72rem; font-weight:bold; cursor:pointer;">🙈 Blind Wolf</button>`;
             html += `</div>`;
+        } else {
+            // A call was just made for the most recent hole with a call — confirm the actual
+            // teams clearly rather than leaving it buried in the compact results list below,
+            // so nobody has to ask "wait, who's on whose side again?" before scores go in.
+            const decidedHoles = (courseData || []).slice().sort((a, b) => b.hole - a.hole);
+            const mostRecent = decidedHoles.find(h => wolfCalc.holeLog[h.hole] && wolfCalc.holeLog[h.hole].call);
+            if (mostRecent) {
+                const log = wolfCalc.holeLog[mostRecent.hole];
+                const loneMult = parseFloat(data.wolfLoneMult) || 2;
+                const blindMult = parseFloat(data.wolfBlindMult) || 4;
+                if (log.call === 'partner' && log.partnerId) {
+                    const partner = players.find(p => String(p.id) === String(log.partnerId));
+                    const opponents = players.filter(p => String(p.id) !== String(log.wolfId) && String(p.id) !== String(log.partnerId));
+                    html += `<div style="font-size:0.85rem; text-align:center; padding:6px 0;">
+                        <strong>${log.wolfName.split(' ')[0]} + ${partner ? partner.name.split(' ')[0] : '?'}</strong><br>
+                        <span style="color:var(--text-muted); font-size:0.75rem;">vs</span><br>
+                        <strong>${opponents.map(p => p.name.split(' ')[0]).join(' + ')}</strong><br>
+                        <span style="font-size:0.72rem; color:var(--text-muted);">Worth ${2 + wolfCalc.carryPending} point${(2 + wolfCalc.carryPending) === 1 ? '' : 's'} (Hole ${mostRecent.hole})</span>
+                    </div>`;
+                } else if (log.call === 'lone' || log.call === 'blind') {
+                    const opponents = players.filter(p => String(p.id) !== String(log.wolfId));
+                    const worth = (log.call === 'blind' ? blindMult : loneMult) + wolfCalc.carryPending;
+                    html += `<div style="font-size:0.85rem; text-align:center; padding:6px 0;">
+                        <strong>🐺 ${log.wolfName.split(' ')[0]} (${log.call === 'blind' ? 'Blind' : 'Lone'})</strong><br>
+                        <span style="color:var(--text-muted); font-size:0.75rem;">vs</span><br>
+                        <strong>${opponents.map(p => p.name.split(' ')[0]).join(' + ')}</strong><br>
+                        <span style="font-size:0.72rem; color:var(--text-muted);">Worth ${worth} point${worth === 1 ? '' : 's'} if the wolf wins (Hole ${mostRecent.hole})</span>
+                    </div>`;
+                }
+            }
+        }
+
+        // Upcoming rotation — who's the wolf on the next few holes, so the group doesn't have
+        // to keep recounting it manually. The last-place-picks-wolf rule (if on) only applies to
+        // holes 17-18 and depends on standings that haven't happened yet for holes still ahead,
+        // so those two are shown as TBD rather than guessed at.
+        const lastPlaceOn = data.wolfLastPlaceRule === 'on';
+        const allHolesSorted = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const upcoming = allHolesSorted.filter(h => !wolfCalc.holeLog[h.hole] || !wolfCalc.holeLog[h.hole].call).slice(0, 4);
+        if (upcoming.length > 0) {
+            let rotationHtml = upcoming.map(h => {
+                const isLastPlaceHole = lastPlaceOn && (h.hole === 17 || h.hole === 18);
+                const wolfName = isLastPlaceHole ? 'TBD — last place picks' : players[(h.hole - 1) % 4].name.split(' ')[0];
+                return `<span style="white-space:nowrap;">H${h.hole}: ${wolfName}</span>`;
+            }).join(' <span style="opacity:0.4;">→</span> ');
+            html += `<div style="font-size:0.68rem; color:var(--text-muted); margin-top:8px; padding-top:6px; border-top:1px solid var(--border-faint); display:flex; gap:6px; flex-wrap:wrap;">🔄 ${rotationHtml}</div>`;
         }
 
         // Recent hole results
@@ -2399,10 +2445,34 @@
                         let statusDesc = "All Square ($0)";
                         if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
                         else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
-                        
-                        let lockIcon = m.closed ? "🔒 " : "";
+
+                        // A closed segment already reflects a mathematically decided result
+                        // (m.finalResult, e.g. "3&2") — an open one is still live and could change.
+                        // Making that distinction visually obvious, not just a small lock icon,
+                        // is exactly what a golfer glancing at this mid-round needs to not
+                        // mistake a live lead for a settled result.
+                        let statusPrefix = m.closed
+                            ? `<span style="color:var(--text-muted); font-weight:bold; font-size:0.68rem;">✅ FINAL</span>`
+                            : `<span style="color:var(--accent-red); font-weight:bold; font-size:0.68rem;">🔴 LIVE</span>`;
+                        let finalNote = m.closed && m.finalResult ? ` — ${m.finalResult}` : '';
+
+                        // Was this press manually requested, or did it fire automatically? Cross-
+                        // references the same manualMatchPresses list the engine itself checks —
+                        // not new engine output, just reading the same input from the display side.
+                        let autoPressNote = '';
+                        if (m.pressNum > 0) {
+                            const wasManual = manualMatchPresses.some(mp => mp.baseId === m.baseId && mp.startHole === m.startHole);
+                            if (!wasManual && currentData.nassauPressRule && currentData.nassauPressRule !== 'none') {
+                                const threshold = currentData.nassauPressRule === '2down' ? '2 Down' : '1 Down';
+                                autoPressNote = `<div style="font-size:0.68rem; color:var(--text-muted); margin-top:1px;">🤖 Started automatically — the losing side went ${threshold}</div>`;
+                            }
+                        }
+
                         let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid var(--accent-teal); padding-left: 8px;" : "padding-left: 4px;";
-                        matchesListHtml += `<div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid var(--border-faint); padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}</span> <strong>${statusDesc}</strong></div>`;
+                        matchesListHtml += `<div style="width:100%; border-bottom:1px solid var(--border-faint); padding: 4px 0; ${indent}">
+                            <div style="display:flex; justify-content:space-between; align-items:center;"><span>${statusPrefix} ${m.label}</span> <strong>${statusDesc}${finalNote}</strong></div>
+                            ${autoPressNote}
+                        </div>`;
                     });
                 }
             });
@@ -2791,49 +2861,54 @@
             printHtml += `<div class="pledger"><h3>🥩 Skins Ledger</h3>`;
             // Only players opted in to money betting compete for skins in this printout
             const skinsPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
-            let grossSkins = [];
-            let netSkins = [];
-            courseData.forEach(h => {
-                let holeScores = [];
-                skinsPlayers.forEach(p => {
-                    let v = savedScores[`p${p.id}_h${h.hole}`];
-                    if (v && v > 0) {
-                        let gross = parseInt(v, 10);
-                        let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                        holeScores.push({ id: p.id, name: p.name, gross, net });
-                    }
-                });
-                if (holeScores.length > 0) {
-                    let minGross = Math.min(...holeScores.map(s => s.gross));
-                    let gWinners = holeScores.filter(s => s.gross === minGross);
-                    if (gWinners.length === 1) grossSkins.push({ hole: h.hole, name: gWinners[0].name.split(" ")[0], score: minGross });
-
-                    let minNet = Math.min(...holeScores.map(s => s.net));
-                    let nWinners = holeScores.filter(s => s.net === minNet);
-                    if (nWinners.length === 1) netSkins.push({ hole: h.hole, name: nWinners[0].name.split(" ")[0], score: minNet });
-                }
-            });
+            // Reuses the exact same canonical functions the live scorecard ticker already uses
+            // (computeSkinsVoidLive / computeSkinsCarryOverLive) — this used to be a third,
+            // independent copy that predated Carry-Over mode and always showed Void-style
+            // results regardless of the round's actual setting, a confirmed live-vs-print
+            // mismatch. No new calculation was written to fix this — same functions, same result.
+            const potFormat = currentData.skinsPotFormat || 'split';
+            const carryOver = currentData.skinsCarryOver !== false;
+            const computeFn = carryOver ? computeSkinsCarryOverLive : computeSkinsVoidLive;
+            const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(skinsPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+            const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(skinsPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
 
             let pSkins = {};
-            skinsPlayers.forEach(p => pSkins[p.name.split(" ")[0]] = { gross: 0, net: 0, gHoles: [], nHoles: [] });
-            grossSkins.forEach(s => { pSkins[s.name].gross++; pSkins[s.name].gHoles.push(s.hole); });
-            netSkins.forEach(s => { pSkins[s.name].net++; pSkins[s.name].nHoles.push(s.hole); });
+            skinsPlayers.forEach(p => pSkins[p.name.split(" ")[0]] = { gross: [], net: [] });
+            grossResult.skins.forEach(s => { pSkins[s.player.name.split(" ")[0]].gross.push({ hole: s.hole, units: s.unitsWon }); });
+            netResult.skins.forEach(s => { pSkins[s.player.name.split(" ")[0]].net.push({ hole: s.hole, units: s.unitsWon }); });
+
+            function fmtSkinList(list) {
+                return list.map(s => s.units > 1 ? `${s.hole} (${s.units} holes carried)` : `${s.hole}`).join(', ');
+            }
 
             let anySkins = false;
             skinsPlayers.forEach(p => {
                 let shortName = p.name.split(" ")[0];
                 let s = pSkins[shortName];
-                if (s.gross > 0 || s.net > 0) {
+                if (s.gross.length > 0 || s.net.length > 0) {
                     anySkins = true;
                     let details = [];
-                    if (s.gross > 0) details.push(`<strong>${s.gross} Gross</strong> (Holes: ${s.gHoles.join(', ')})`);
-                    if (s.net > 0) details.push(`<strong>${s.net} Net</strong> (Holes: ${s.nHoles.join(', ')})`);
+                    if (s.gross.length > 0) {
+                        const totalUnits = s.gross.reduce((sum, x) => sum + x.units, 0);
+                        details.push(`<strong>${totalUnits} Gross skin${totalUnits === 1 ? '' : 's'}</strong> (Hole: ${fmtSkinList(s.gross)})`);
+                    }
+                    if (s.net.length > 0) {
+                        const totalUnits = s.net.reduce((sum, x) => sum + x.units, 0);
+                        details.push(`<strong>${totalUnits} Net skin${totalUnits === 1 ? '' : 's'}</strong> (Hole: ${fmtSkinList(s.net)})`);
+                    }
                     printHtml += `<div class="pledger-row" style="flex-direction: column; margin-bottom: 8px;">
                         <span style="font-weight: bold; color: #1d3557; margin-bottom: 4px;">${shortName}</span>
                         <span style="font-size: 13px; color: #555;">${details.join(' <br> ')}</span>
                     </div>`;
                 }
             });
+
+            if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
+                const parts = [];
+                if (grossResult.pendingUnits > 0) parts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
+                if (netResult.pendingUnits > 0) parts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
+                printHtml += `<div class="pledger-row"><span style="font-size:13px; color:#888;">🔄 Still carrying at print time: ${parts.join(' and ')} tied, unclaimed — split evenly if the round ends this way.</span></div>`;
+            }
 
             if (!anySkins) {
                 printHtml += `<div class="pledger-row"><span>No skins won yet.</span></div>`;
