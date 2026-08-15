@@ -349,7 +349,7 @@
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Action</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="settlement.html" class="top-nav-item nav-link">💸 Settle</a>
@@ -374,6 +374,11 @@
         <div class="nassau-payout-box" id="nassau-payout-container">
             <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Standings</div>
             <div id="payout-rows-wrapper"></div>
+        </div>
+
+        <div class="nassau-payout-box" id="skins-live-container" style="display:none;">
+            <div class="nassau-payout-title">🥩 Skins — Current Status</div>
+            <div id="skins-live-rows"></div>
         </div>
 
         <div class="nassau-payout-box" id="kpgame-payout-container" style="display:none;">
@@ -651,6 +656,56 @@
 
     // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
     // otherwise there's no way to know a Side Match is even running without a special trip to Matches.
+    // Skins has zero live presence anywhere else on the scorecard today — this fills that gap
+    // specifically, since it was the single biggest "player can't tell what's going on" gap
+    // found this batch. Hidden entirely for any other format; only shows when this round's
+    // main game actually IS skins.
+    function renderSkinsLiveBox(players, courseData, savedScores) {
+        const box = document.getElementById('skins-live-container');
+        if (!box) return;
+        if (currentData.gameFormat !== 'skins') { box.style.display = 'none'; return; }
+
+        const potFormat = currentData.skinsPotFormat || 'split';
+        const carryOver = currentData.skinsCarryOver !== false;
+        const computeFn = carryOver ? computeSkinsCarryOverLive : computeSkinsVoidLive;
+
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(players, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(players, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+
+        const allSkins = [...grossResult.skins, ...netResult.skins];
+        if (allSkins.length === 0 && grossResult.pendingUnits === 0 && netResult.pendingUnits === 0) {
+            box.style.display = 'none';
+            return;
+        }
+        box.style.display = 'block';
+
+        let counts = {};
+        allSkins.forEach(s => { counts[s.player.name] = (counts[s.player.name] || 0) + 1; });
+        const sortedNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+        let html = `<div style="font-size:0.72rem; color:rgba(255,255,255,0.75); margin-bottom:6px;">Current status — not final until the round's done</div>`;
+        if (sortedNames.length > 0) {
+            html += sortedNames.map(name => `<div class="payout-row"><span>${name}</span><span>${counts[name]} skin${counts[name] === 1 ? '' : 's'}</span></div>`).join('');
+        } else {
+            html += `<div style="font-size:0.85rem; opacity:0.85;">No skins won outright yet.</div>`;
+        }
+
+        if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
+            const parts = [];
+            if (grossResult.pendingUnits > 0) parts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
+            if (netResult.pendingUnits > 0) parts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
+            html += `<div style="font-size:0.75rem; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.25);">🔄 Carrying: ${parts.join(' and ')} tied, not claimed yet — value is building for whoever wins the next hole.</div>`;
+        }
+
+        document.getElementById('skins-live-rows').innerHTML = html;
+    }
+
+    // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
+    // otherwise there's no way to know a Side Match is even running without a special trip to Matches.
+    // Shows real live status inline for Match Play/Nassau side bets (the common case, reusing the
+    // exact calculateMatchEngine already in this file) rather than just a "tap to view" link.
+    // Stroke Play side bets ($/hole, $/overall) keep the link-only behavior — that engine doesn't
+    // exist in this file, and duplicating it here for one line of inline text isn't worth the risk.
     function renderActiveSideMatchCallout(filteredPlayers, allPlayers) {
         const container = document.getElementById('side-match-callout');
         if (!container) return;
@@ -660,6 +715,8 @@
         const groupParam = urlParams.get('group');
         let smHref = `sidematches.html?game=${currentMode}`;
         if (groupParam) smHref += `&group=${groupParam}`;
+        const courseData = currentData.courseData || [];
+        const savedScores = currentData.scores || {};
 
         const lines = [];
         Object.keys(sideMatches).forEach(matchId => {
@@ -676,14 +733,33 @@
                 return p ? p.name.split(' ')[0] : '?';
             }).join(' & ');
 
-            lines.push(oppNames);
+            let statusText = 'Tap to view';
+            if (sm.format === 'match' || sm.format === 'nassau') {
+                const smPlayers = teamAIds.concat(teamBIds).map(id => {
+                    const p = allPlayers.find(pl => String(pl.id) === id);
+                    return p ? { ...p, team: teamAIds.includes(id) ? 'Team 1' : 'Team 2' } : null;
+                }).filter(Boolean);
+                if (smPlayers.length >= 2) {
+                    const calc = calculateMatchEngine(smPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, []);
+                    if (calc) {
+                        const finalSeg = calc.activeMatches.find(m => m.id === '18') || calc.activeMatches[calc.activeMatches.length - 1];
+                        if (finalSeg && calc.maxThru > 0) {
+                            statusText = finalSeg.closed
+                                ? `Final: ${finalSeg.finalResult || 'Decided'}`
+                                : formatMatchStatusText(finalSeg.status, calc.t1Name, calc.t2Name) + ` thru ${calc.maxThru}`;
+                        }
+                    }
+                }
+            }
+
+            lines.push({ opp: oppNames, statusText });
         });
 
         if (lines.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
 
         container.style.display = 'block';
-        container.innerHTML = lines.map(opp =>
-            `<a href="${smHref}" class="side-match-callout-link">⚔️ Side Match vs ${opp} <span class="side-match-callout-arrow">Tap to view ▶</span></a>`
+        container.innerHTML = lines.map(l =>
+            `<a href="${smHref}" class="side-match-callout-link">⚔️ vs ${l.opp} — <strong>${l.statusText}</strong> <span class="side-match-callout-arrow">Tap for details ▶</span></a>`
         ).join('');
     }
 
@@ -1087,6 +1163,57 @@
     // Total strokes for the round, low total wins the stake — the simpler alternative to
     // calculateMatchEngine's hole-by-hole match play, used when a 1v1's Scoring Style is set
     // to Stroke Play. No presses, exactly 2 players — mirrors Side Matches' stroke-play logic.
+    // Mirrors skins.html's tested Skins engine exactly — used only for the live "current
+    // status" box on the scorecard. Deliberately NOT touching the separate, older Skins logic
+    // in buildPrintScorecard() below (that copy predates Carry-Over mode and always shows Void
+    // results regardless of the round's actual setting — a real, pre-existing inconsistency,
+    // documented rather than silently fixed here since it's outside this batch's scope).
+    function getSkinsHoleScoresLive(players, savedScores, h) {
+        let holeScores = [];
+        players.forEach(p => {
+            let v = savedScores[`p${p.id}_h${h.hole}`];
+            if (v && v > 0) {
+                let gross = parseInt(v, 10);
+                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                holeScores.push({ id: p.id, name: p.name, gross, net });
+            }
+        });
+        return holeScores;
+    }
+
+    function computeSkinsVoidLive(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresLive(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) skins.push({ hole: h.hole, player: winners[0], unitsWon: 1 });
+        });
+        return { skins, pendingUnits: 0 };
+    }
+
+    function computeSkinsCarryOverLive(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        let carryUnits = 1;
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresLive(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) {
+                skins.push({ hole: h.hole, player: winners[0], unitsWon: carryUnits });
+                carryUnits = 1;
+            } else {
+                carryUnits += 1;
+            }
+        });
+        const pendingUnits = carryUnits > 1 ? carryUnits - 1 : 0;
+        return { skins, pendingUnits };
+    }
+
     function calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, stake) {
         if (players.length !== 2) return null;
         const p1 = players[0], p2 = players[1];
@@ -1834,6 +1961,7 @@
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
         const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
+        renderSkinsLiveBox(moneyPlayers, courseData, savedScores);
 
         let hiloCalc = null;
         let matchCalc = null;
