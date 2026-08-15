@@ -1609,13 +1609,16 @@
             .catch(err => alert(`Failed to clear: ${err.message}`));
     }
 
+    // Same rule as Dots/Junk, verified consistent — a stroke-under-par unit (birdie=1,
+    // eagle=2, already correctly weighted since "under" is the literal stroke count) is worth
+    // its dollar value paid by every other player, not an isolated credit with no payer.
     function calculateBirdieGameTotals(data, courseData, savedScores) {
         if (data.birdieGameEnabled !== true) return {};
         const players = (data.players || []).filter(p => p.playingForMoney !== false);
         const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 0;
         const scoringType = data.birdieScoringType || 'gross';
-        let totals = {};
-        players.forEach(p => totals[p.id] = 0);
+        let units = {};
+        players.forEach(p => units[p.id] = 0);
         (courseData || []).forEach(h => {
             players.forEach(p => {
                 const v = savedScores[`p${p.id}_h${h.hole}`];
@@ -1623,12 +1626,18 @@
                 let score = parseInt(v, 10);
                 if (scoringType === 'net') score -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
                 const under = parseInt(h.par) - score;
-                if (under >= 1) totals[p.id] += under * unitVal;
+                if (under >= 1) units[p.id] += under;
             });
         });
+        const n = players.length;
+        const totalUnits = players.reduce((s, p) => s + units[p.id], 0);
+        let totals = {};
+        players.forEach(p => { totals[p.id] = n > 1 ? unitVal * (n * units[p.id] - totalUnits) : 0; });
         return totals;
     }
 
+    // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
+    // Same rule, now complete on both sides: each KP win is paid by every other player.
     function calculateKPGameTotals(data, courseData) {
         if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
         const players = (data.players || []).filter(p => p.playingForMoney !== false);
@@ -1645,6 +1654,7 @@
             if (!winnerPlayer) return;
             wins[winnerPlayer.id] = (wins[winnerPlayer.id] || 0) + 1;
             money[winnerPlayer.id] += buyIn * (players.length - 1);
+            players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) money[p.id] -= buyIn; });
         });
         return { money, wins };
     }
@@ -2814,9 +2824,11 @@
                     });
                 });
                 
+                const printDotsN = filteredPlayers.length;
+                const printDotsTotalUnits = filteredPlayers.reduce((s, p) => s + (pDots[p.id] || 0), 0);
                 filteredPlayers.forEach(p => {
                     let pts = pDots[p.id] || 0;
-                    let money = pts * stake;
+                    let money = printDotsN > 1 ? stake * (printDotsN * pts - printDotsTotalUnits) : 0;
                     let moneyStr = money >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
                     printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts (${moneyStr})</strong></div>`;
                 });
