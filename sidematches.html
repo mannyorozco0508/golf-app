@@ -79,6 +79,9 @@
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .grid-4col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+        .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
+        .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
         .control-group label { display: block; font-size: 0.75rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
         .control-group input, .control-group select { width: 100%; padding: 8px; border: 1px solid var(--accent-teal); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; background: var(--bg-card); color: var(--text-main); }
 
@@ -245,7 +248,13 @@
             </div>
             <div class="control-group" id="sm-stake-group">
                 <label>Stake ($)</label>
-                <input type="number" id="sm-stake" value="20" min="0">
+                <div class="grid-4col" id="sm-stake-presets" style="margin-bottom:4px;">
+                    <button type="button" class="preset-btn" onclick="setSmStakePreset(5)" style="padding:6px 2px; font-size:0.75rem;">$5</button>
+                    <button type="button" class="preset-btn active" onclick="setSmStakePreset(20)" style="padding:6px 2px; font-size:0.75rem;">$20</button>
+                    <button type="button" class="preset-btn" onclick="setSmStakePreset(50)" style="padding:6px 2px; font-size:0.75rem;">$50</button>
+                    <button type="button" class="preset-btn" onclick="focusCustomStake('sm-stake', 'sm-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">Custom</button>
+                </div>
+                <input type="number" id="sm-stake" value="20" min="0" oninput="clearStakePresetHighlight('sm-stake-presets')">
             </div>
         </div>
         <div class="control-group" style="margin-bottom:10px;" id="sm-press-rule-group">
@@ -696,6 +705,24 @@
         document.getElementById('sm-segment-switch').checked = (val === 'frontback');
         document.getElementById('sm-segment-label-full').classList.toggle('active', val === 'full');
         document.getElementById('sm-segment-label-frontback').classList.toggle('active', val === 'frontback');
+    }
+
+    // Purely a UI shortcut — writes the exact same numeric value into the exact same existing
+    // stake input, matching the same pattern already established for Nassau/Match Play stake
+    // presets in admin.html. No new stored field, no new config model.
+    function setSmStakePreset(value) {
+        document.getElementById('sm-stake').value = value;
+        document.querySelectorAll('#sm-stake-presets .preset-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+    function clearStakePresetHighlight(presetsContainerId) {
+        document.querySelectorAll(`#${presetsContainerId} .preset-btn`).forEach(b => b.classList.remove('active'));
+    }
+    function focusCustomStake(inputId, presetsContainerId) {
+        clearStakePresetHighlight(presetsContainerId);
+        const el = document.getElementById(inputId);
+        el.focus();
+        el.select();
     }
 
     function onSideMatchFormatChange() {
