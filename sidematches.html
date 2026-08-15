@@ -123,6 +123,8 @@
         .player-pick-badge { padding: 6px 10px; border-radius: 20px; border: 1px solid var(--border-mid); background: var(--nav-bg); font-size: 0.75rem; font-weight: bold; color: var(--text-muted); cursor: pointer; user-select: none; }
         .player-pick-badge.pick-a { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .player-pick-badge.pick-b { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); }
+        .player-pick-badge.on-other-side { opacity: 0.45; }
+        .sm-side-zone-label { font-size: 0.72rem; font-weight: bold; text-transform: uppercase; color: var(--text-muted); margin: 10px 0 4px 0; }
 
         /* MAGIC PDF HIDING CSS */
         @media print {
@@ -293,9 +295,12 @@
             </div>
         </div>
 
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap players to build each side — first tap puts them on one side (green), tap again to switch to the other (navy), tap a third time to remove them. 2v2 works for Match Play and Nassau only.</div>
-        <div id="sm-player-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
-        <div id="sm-team-size-indicator" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin-bottom:8px;"></div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap a golfer under the side you want them on. Tap again to remove them, or tap them under the other side to move them there. 2v2 works for Match Play and Nassau only.</div>
+        <div class="sm-side-zone-label">Side 1 (green)</div>
+        <div id="sm-player-picker-a" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        <div class="sm-side-zone-label">Side 2 (navy)</div>
+        <div id="sm-player-picker-b" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        <div id="sm-team-size-indicator" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin-top:10px; margin-bottom:8px;"></div>
         <div id="sm-preview" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.85rem;"></div>
         <button class="btn-primary" onclick="saveSideMatch()">💾 Start Side Match</button>
     </div>
@@ -688,7 +693,6 @@
     }
 
     function renderSideMatchPicker() {
-        const wrapper = document.getElementById("sm-player-picker");
         const players = currentData.players || [];
         const sideMatches = currentData.sideMatches || {};
 
@@ -706,17 +710,55 @@
         const groupMap = buildPlayerGroupMap();
         const distinctGroups = new Set(Object.values(groupMap)).size;
 
-        let html = "";
-        players.forEach(p => {
-            const side = sidematchPickState[p.id];
-            const cls = side === 'a' ? 'pick-a' : (side === 'b' ? 'pick-b' : '');
-            const cnt = existingCount[p.id] || 0;
-            const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
-            const groupTag = distinctGroups > 1 ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${groupMap[String(p.id)] || '?'}</span>` : '';
-            html += `<div class="player-pick-badge ${cls}" onclick="toggleSideMatchPick('${p.id}')">${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
-        });
-        wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
+        function renderZone(containerId, side) {
+            const wrapper = document.getElementById(containerId);
+            if (!wrapper) return;
+            let html = "";
+            players.forEach(p => {
+                const currentSide = sidematchPickState[p.id];
+                const isOnThisSide = currentSide === side;
+                const isOnOtherSide = currentSide && currentSide !== side;
+                const cls = isOnThisSide ? (side === 'a' ? 'pick-a' : 'pick-b') : (isOnOtherSide ? 'on-other-side' : '');
+                const cnt = existingCount[p.id] || 0;
+                const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
+                const groupTag = distinctGroups > 1 ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${groupMap[String(p.id)] || '?'}</span>` : '';
+                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}', '${side}')">${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
+            });
+            wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
+        }
+
+        renderZone('sm-player-picker-a', 'a');
+        renderZone('sm-player-picker-b', 'b');
         updateSideMatchPickerFeedback();
+    }
+
+    // Fully deterministic — no auto-balancing, ever. Tapping a golfer under a side always does
+    // exactly one of three predictable things:
+    //   - not currently on either side -> assigned to the tapped side (unless that side is
+    //     already full, in which case nothing happens and a clear message explains why)
+    //   - already on the OTHER side -> moves to the tapped side (a deliberate one-tap move,
+    //     never a silent one — the organizer tapped that specific zone on purpose)
+    //   - already on THIS side -> removed (toggle off)
+    // Max 2 per side, matching the engine's actual 1v1/2v2-only support.
+    function pickPlayerForSide(playerId, side) {
+        const current = sidematchPickState[playerId];
+        const format = document.getElementById('sm-format') ? document.getElementById('sm-format').value : 'match';
+        const maxPerSide = format === 'stroke' ? 1 : 2;
+
+        if (current === side) {
+            delete sidematchPickState[playerId];
+        } else {
+            const sideCount = Object.values(sidematchPickState).filter(s => s === side).length;
+            if (sideCount >= maxPerSide) {
+                const label = side === 'a' ? 'Side 1' : 'Side 2';
+                const limitReason = format === 'stroke' ? 'Stroke Play side action is 1v1 only' : `${label} already has ${maxPerSide}`;
+                document.getElementById('sm-team-size-indicator').innerHTML = `<span style="color:var(--accent-red);">⚠️ ${limitReason} — remove someone from ${label} first.</span>`;
+                document.getElementById('sm-preview').style.display = 'none';
+                return; // no silent reassignment — nothing changes until the organizer frees up a spot
+            }
+            sidematchPickState[playerId] = side;
+        }
+        renderSideMatchPicker();
     }
 
     // Live "1v1" / "2v2" / instruction text as picks change, rather than only finding out the
@@ -775,18 +817,6 @@
 
         preview.style.display = 'block';
         preview.innerHTML = `<strong>${namesA}</strong> vs <strong>${namesB}</strong>${strokeNote}`;
-    }
-
-    function toggleSideMatchPick(playerId) {
-        const current = sidematchPickState[playerId];
-        if (!current) {
-            const aCount = Object.values(sidematchPickState).filter(s => s === 'a').length;
-            const bCount = Object.values(sidematchPickState).filter(s => s === 'b').length;
-            sidematchPickState[playerId] = (aCount <= bCount) ? 'a' : 'b';
-        }
-        else if (current === 'a') sidematchPickState[playerId] = 'b';
-        else delete sidematchPickState[playerId];
-        renderSideMatchPicker();
     }
 
     // Same group-sizing logic used on Home/Scorecard, ported here so a freshly created Side Match
