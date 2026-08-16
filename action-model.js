@@ -194,6 +194,48 @@ function addableGames(data) {
 }
 
 // ---------------------------------------------------------------------------
+// EVENT SCOPE — who has to finish a hole before we can honestly say what happened
+//
+// The scorecard shows one group, but a wager does not care about groups. Two ideas
+// were previously conflated: the players a golfer is LOOKING AT, and the players a
+// wager DEPENDS ON. Using the visible group as the participant set meant a 12-player
+// skins game announced a winner as soon as the first foursome finished the hole -
+// and priced the pot over 4 players instead of 12.
+//
+// Every game returned by getRoundGames() is a round-level wager: Skins, Dots,
+// Stableford and the main game all involve the whole money field. Side Matches are
+// the exception - they name their own two or four players - and are resolved
+// separately, which is what lets Manny vs Marty react immediately without waiting
+// for eight strangers.
+// ---------------------------------------------------------------------------
+
+// The players a round-level wager depends on: everyone in for money, regardless of
+// which group they are walking with.
+function fieldParticipants(data) {
+    return (data.players || []).filter(p => p.playingForMoney !== false);
+}
+
+// Have all the players this wager depends on finished this hole?
+//
+// Reads raw saved scores, never "which hole is showing". Groups play at different
+// speeds; group 1 can be on 12 while group 3 is on 6, and a hole 7 result becomes
+// knowable the moment the last participant posts hole 7 - whenever that happens.
+function participantsCompletedHole(participants, hole, savedScores) {
+    if (!participants || participants.length === 0) return false;
+    const scores = savedScores || {};
+    return participants.every(p => {
+        const v = scores[`p${p.id}_h${hole}`];
+        return v && v > 0;
+    });
+}
+
+// A wager only depends on holes inside its own range. A skins game that starts on
+// hole 5 must not wait for anybody to post holes 1-4.
+function gameCoversHole(game, courseData, hole) {
+    return gameHoles(game, courseData).some(h => h.hole === hole);
+}
+
+// ---------------------------------------------------------------------------
 // getRoundGames — THE normalized answer to "what are we playing today?"
 //
 // Returns, in display order: the main game first, then any additional games.
@@ -305,6 +347,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
-        gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames
+        gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
+        fieldParticipants, participantsCompletedHole, gameCoversHole
     };
 }
