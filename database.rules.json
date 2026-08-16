@@ -4,7 +4,12 @@
       "$eventCode": {
         ".read": true,
         ".write": true,
-        ".validate": "newData.hasChildren() || newData.val() === null"
+        ".validate": "newData.hasChildren() || newData.val() === null",
+        "scores": {
+          "$scoreKey": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 30 && $scoreKey.matches(/^p[0-9]+_h[0-9]+$/)"
+          }
+        }
       }
     },
     "trips": {
@@ -23,13 +28,17 @@
     },
     "global_courses": {
       ".read": true,
-      ".write": true,
       "$courseId": {
-        ".validate": "newData.hasChildren() || newData.val() === null"
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['name']) && newData.child('name').isString() && newData.child('name').val().length > 0"
       }
     },
     "app_settings": {
       ".read": true,
+      ".write": false
+    },
+    "$other": {
+      ".read": false,
       ".write": false
     }
   }
