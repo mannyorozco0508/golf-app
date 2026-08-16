@@ -246,6 +246,39 @@
         }
         @media print { .action-center { display: none !important; } }
 
+        .ar-range { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-muted); }
+        .add-action-btn {
+            width: 100%; padding: 10px; min-height: 44px; border-radius: 0 0 10px 10px;
+            border: none; border-top: 1px dashed var(--border-mid);
+            background: transparent; color: var(--brand-green);
+            font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit;
+        }
+        .add-action-panel { padding: 12px; border-top: 1px solid var(--border-mid); background: var(--nassau-box-bg); }
+        .aa-title { font-size: 0.85rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .aa-choice {
+            width: 100%; text-align: left; padding: 12px; min-height: 48px; margin-bottom: 6px;
+            border-radius: 10px; border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-family: inherit; font-size: 0.9rem; font-weight: bold; cursor: pointer;
+        }
+        .aa-choice small { display: block; font-weight: normal; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+        .aa-start {
+            margin: 10px 0; padding: 10px; border-radius: 8px; background: var(--bg-card);
+            border: 1px solid var(--brand-green); text-align: center;
+            font-size: 0.9rem; font-weight: bold; color: var(--brand-green);
+        }
+        .aa-amount-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+        .aa-amount-btn {
+            padding: 10px 4px; min-height: 44px; border-radius: 10px;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--brand-green); font-weight: bold; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+        }
+        .aa-cancel {
+            width: 100%; padding: 9px; min-height: 40px; border-radius: 10px;
+            border: 1px solid var(--border-mid); background: transparent;
+            color: var(--text-muted); font-weight: bold; cursor: pointer; font-family: inherit;
+        }
+        .aa-note { font-size: 0.72rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
+
         .group-links-btn { border-style: dashed !important; }
         .group-links-box {
             margin: 8px 0 12px; padding: 12px; border-radius: 12px;
@@ -1494,6 +1527,103 @@
     // turn calls the existing engines - nothing is computed here.
     let actionCenterOpen = false;
 
+
+    // ---- Add Action --------------------------------------------------------
+    // Lets the organizer start a new wager from the scorecard, mid-round, without
+    // going anywhere near setup. The app works out which holes it can safely cover
+    // and states that plainly before anything is written.
+    //
+    // Organizer only. A group scorekeeper opened their link to score their own
+    // foursome; changing what the whole round is playing for is not theirs to do.
+    // Gated on the same isOrganizerView() predicate Batch 1 established, and checked
+    // again at write time so removing the button in devtools achieves nothing.
+    let addActionOpen = false;
+    let addActionGame = null;
+
+    function canAddAction() {
+        if (typeof isOrganizerView === 'function' && !isOrganizerView()) return false;
+        if (typeof addableGames !== 'function') return false;
+        if (addableGames(currentData).length === 0) return false;
+        return addActionStartHole() !== null;
+    }
+
+    function addActionStartHole() {
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        return nextAddActionHole(currentData, courseData, currentData.scores || {});
+    }
+
+    function openAddAction() {
+        if (!canAddAction()) return;
+        addActionOpen = true;
+        addActionGame = null;
+        renderActionCenter();
+    }
+
+    function closeAddAction() {
+        addActionOpen = false;
+        addActionGame = null;
+        renderActionCenter();
+    }
+
+    function pickAddActionGame(format) {
+        addActionGame = format;
+        renderActionCenter();
+    }
+
+    function buildAddActionPanelHtml() {
+        const startHole = addActionStartHole();
+        if (startHole === null) return '';
+
+        if (!addActionGame) {
+            const choices = addableGames(currentData).map(format => {
+                const spec = ADDITIONAL_GAME_CATALOG[format];
+                return '<button type="button" class="aa-choice" onclick="pickAddActionGame(\'' + format + '\')">' +
+                    spec.icon + ' ' + spec.label +
+                    '<small>' + spec.blurb + '</small></button>';
+            }).join('');
+            return '<div class="add-action-panel">' +
+                '<div class="aa-title">Add Action</div>' + choices +
+                '<button type="button" class="aa-cancel" onclick="closeAddAction()">Cancel</button>' +
+                '</div>';
+        }
+
+        const spec = ADDITIONAL_GAME_CATALOG[addActionGame];
+        const amounts = [1, 2, 5, 10, 20, 50].map(v =>
+            '<button type="button" class="aa-amount-btn" onclick="confirmAddAction(' + v + ')">$' + v + '</button>'
+        ).join('');
+
+        return '<div class="add-action-panel">' +
+            '<div class="aa-title">' + spec.icon + ' ' + spec.label + '</div>' +
+            '<div class="aa-start">STARTS HOLE ' + startHole + '</div>' +
+            '<div class="bcd-meta" style="margin-bottom:8px;">Earlier holes don\'t count toward this one.</div>' +
+            '<div class="aa-amount-row">' + amounts + '</div>' +
+            '<button type="button" class="aa-cancel" onclick="closeAddAction()">Cancel</button>' +
+            '<div class="aa-note">' + spec.stakeLabel + '</div>' +
+            '</div>';
+    }
+
+    function confirmAddAction(amount) {
+        // Permission and start hole are BOTH re-read at the moment of the tap, so a
+        // score posted while the panel sat open can never leave a new wager pointing at
+        // a hole the group has already finished.
+        if (!canAddAction()) { closeAddAction(); alert('That game can no longer be added.'); return; }
+        const format = addActionGame;
+        const spec = ADDITIONAL_GAME_CATALOG[format];
+        if (!spec) { closeAddAction(); return; }
+
+        const startHole = addActionStartHole();
+        if (startHole === null) { closeAddAction(); alert('There are no holes left to play.'); return; }
+
+        const entry = Object.assign({}, spec.defaults, { enabled: true, startHole: startHole });
+        entry[spec.stakeField] = amount;
+
+        db.ref(`events/${currentMode}/additionalGames/${format}`).set(entry)
+            .catch(err => alert(`Couldn't add that game: ${err.message}`));
+
+        closeAddAction();
+        actionCenterOpen = true;
+    }
+
     function toggleActionCenter() {
         actionCenterOpen = !actionCenterOpen;
         renderActionCenter();
@@ -1522,7 +1652,8 @@
         const totalBets = games.length + side.length;
         // With a single game and no side action the bet strip below already says
         // everything - a second summary would just be noise.
-        if (totalBets === 0 || (games.length <= 1 && side.length === 0)) { mount.innerHTML = ''; return; }
+        if (totalBets === 0) { mount.innerHTML = ''; return; }
+        if (games.length <= 1 && side.length === 0 && !canAddAction()) { mount.innerHTML = ''; return; }
 
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
             '<span>\uD83D\uDD25 Today\'s Action</span>' +
@@ -1534,6 +1665,7 @@
         const row = r =>
             '<div class="action-row">' +
                 '<span class="ar-name">' + (r.icon ? r.icon + ' ' : '') + r.label + '</span>' +
+                (r.rangeText ? '<span class="ar-range">' + r.rangeText + '</span>' : '') +
                 '<span class="ar-status tone-' + (r.tone || 'even') + '">' + r.status + '</span>' +
                 '<span class="ar-stake">' + (r.stakeText || '') + '</span>' +
             '</div>';
@@ -1556,6 +1688,9 @@
         }
 
         body += '<div class="action-foot">Nothing is settled until the round is done \u2014 this is what\'s at stake.</div>';
+
+        if (addActionOpen) body += buildAddActionPanelHtml();
+        else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ ADD ACTION</button>';
 
         mount.innerHTML = '<div class="action-center">' + toggle + '<div class="action-body">' + body + '</div></div>';
     }
