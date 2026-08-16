@@ -434,11 +434,17 @@ describe('PERSONAL PRIORITIZATION — prioritized, never hidden', () => {
     });
 
     test('the collapsed bar stays one line and stays truthful', () => {
+        // WAVE 6: the "N yours" clause moved into the shared actionHeadline() rule so
+        // the headline is deterministic. The invariant is unchanged and now asserted
+        // at the rule itself.
         const fn = idx.slice(idx.indexOf(`'<span class="ac-count">'`), idx.indexOf(`'<span class="ac-count">'`) + 400);
-        assert.ok(/yours/.test(fn));
-        // A live money figure would contradict AT STAKE is not WON, so the summary
-        // counts wagers instead of claiming a position.
+        assert.ok(/headline/.test(fn));
         assert.ok(!/\$/.test(fn), 'the collapsed bar must not assert a money position mid-round');
+
+        const bs = read('bet-strip.js');
+        const rule = bs.slice(bs.indexOf('function actionHeadline'), bs.indexOf('function actionHeadline') + 400);
+        assert.ok(/yours/.test(rule));
+        assert.ok(!/\$\{?[a-z]*[Mm]oney|net/.test(rule), 'the headline must never claim a money position');
     });
 
     test('with no identity, the neutral ordering is preserved', () => {
