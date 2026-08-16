@@ -2203,6 +2203,16 @@
         const container = document.getElementById("group-filter-container");
         const boundaries = computeGroupBoundaries(playersCount, currentData.groupSizeOverrides || {});
 
+        // A group-locked scorekeeper gets no switcher at all. They opened this link to
+        // score their own foursome; offering "All Players" and every other group is
+        // temptation and confusion, and the badge above already says which group they
+        // are on. The organizer keeps the full selector.
+        if (hasGroupLock) {
+            container.innerHTML = '';
+            renderGroupLinksPanel();
+            return;
+        }
+
         let html = `<button class="group-btn ${selectedGroup === 'all' ? 'active' : ''}" onclick="filterGroup('all')">👥 All Players</button>`;
 
         if (boundaries.length > 1) {
@@ -2222,6 +2232,12 @@
     }
 
     function filterGroup(grp) {
+        // Locked to the assigned group regardless of how this is called. Removing the
+        // buttons is not enough on its own - this is reachable from the console.
+        if (hasGroupLock && String(grp) !== String(lockedGroup)) {
+            console.warn('This scorekeeper link is locked to Group ' + lockedGroup + '.');
+            return;
+        }
         selectedGroup = grp;
         renderScorecard();
     }
@@ -2255,7 +2271,46 @@
         }
     }
 
+    // ---- Group write guard --------------------------------------------------
+    // The single check every player-targeted write goes through.
+    //
+    // Until now the ONLY thing stopping a Group 1 scorekeeper from writing Group 2's
+    // scores was that the input rendered disabled. That is a UI state, not a rule:
+    // calling saveScore() from the console, or any future code path that forgets to
+    // check, wrote straight to Firebase. The guard now sits next to the write itself,
+    // so a caller cannot bypass it by not knowing about it.
+    //
+    // Deliberately independent of meId. Personal identity affects wording and
+    // ordering only; scoring scope comes from ?group= and nothing else.
+    function playerGroupOf(playerId) {
+        const map = window.__scPlayerGroupMap || {};
+        return map[playerId] !== undefined ? map[playerId] : null;
+    }
+
+    function canWritePlayer(playerId) {
+        // Organizer (no ?group=) may score anyone. This is the existing Batch 1 rule.
+        if (!hasGroupLock) {
+            const players = currentData.players || [];
+            const isMultiGroupRound = players.length > 4;
+            // A spectator on a multi-group round has no ?group= either, and must stay
+            // read-only - the same condition the scorecard already renders on.
+            return !isMultiGroupRound;
+        }
+        const grp = playerGroupOf(playerId);
+        if (grp === null) return true; // single-group round, no map built
+        return String(grp) === String(lockedGroup);
+    }
+
+    function rejectCrossGroupWrite(playerId) {
+        const players = currentData.players || [];
+        const p = players.find(pl => String(pl.id) === String(playerId));
+        console.warn('Blocked a score write outside this scorekeeper\'s group:', p ? p.name : playerId);
+        return false;
+    }
+
     function saveScore(playerId, holeNum, val) {
+        if (!canWritePlayer(playerId)) return rejectCrossGroupWrite(playerId);
+
         const intVal = parseInt(val, 10);
         const scoreKey = `p${playerId}_h${holeNum}`;
         const oldVal = (currentData.scores && currentData.scores[scoreKey] !== undefined) ? currentData.scores[scoreKey] : null;
@@ -2305,6 +2360,8 @@
     function undoAuditEntry(logKey) {
         const entry = currentData.auditLog && currentData.auditLog[logKey];
         if (!entry) return;
+        // Undo writes a score just like score entry does, so it needs the same guard.
+        if (!canWritePlayer(entry.playerId)) return rejectCrossGroupWrite(entry.playerId);
         const scoreKey = `p${entry.playerId}_h${entry.hole}`;
 
         if (entry.oldValue === null || entry.oldValue === undefined) {
@@ -2571,6 +2628,14 @@
     function closeDotsModal() { document.getElementById("dots-modal").style.display = "none"; }
 
     function saveDots() {
+        // Dots are stored one object per hole, so a cross-group entry would arrive
+        // inside an otherwise legitimate write. Strip anything outside this
+        // scorekeeper's group rather than rejecting the whole hole.
+        Object.keys(tempDots).forEach(key => {
+            const pid = key.replace(/^p/, '');
+            if (!canWritePlayer(pid)) { rejectCrossGroupWrite(pid); delete tempDots[key]; }
+        });
+
         db.ref(`events/${currentMode}/dots/h${currentDotHole}`).set(tempDots).then(() => {
             closeDotsModal();
         });
