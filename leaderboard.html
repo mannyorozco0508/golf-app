@@ -92,12 +92,12 @@
         }
         /* 48px rows: comfortable thumb targets for someone standing on a tee box. */
         .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; min-height: 48px; justify-content: flex-start; padding: 12px 14px; font-size: 0.95rem; }
-        /* Full-screen invisible catcher so a tap anywhere else closes the menu,
-           without needing a JS document listener that could fight with links. */
-        .nav-more[open] > summary::before {
-            content: ''; position: fixed; inset: 0; z-index: 399; background: transparent;
-        }
-        .nav-more[open] > summary { position: relative; z-index: 401; }
+        /* No invisible overlay here. An earlier version put a full-screen ::before on
+           <summary> to catch outside taps; because summary also carried a z-index it
+           formed a stacking context, and the catcher ended up painted OVER the menu,
+           silently swallowing every tap on Matches / Stats / Trip / Home. Outside-tap
+           closing is handled by a real listener in JS instead, which can actually close
+           the menu rather than merely block it. */
 
         /* Compact binary toggle switch - replaces two-button pill pairs */
         .toggle-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
@@ -670,6 +670,16 @@
             container.innerHTML = html;
         }
     }
+
+    // Close the "More" popover when a tap lands outside it. Native <details> already
+    // handles tapping the summary again, and navigating away closes it implicitly, so
+    // this only covers the tap-elsewhere case. Uses a plain listener rather than a CSS
+    // overlay: an overlay can block links but can never close anything.
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('details.nav-more[open]').forEach(function (d) {
+            if (!d.contains(e.target)) d.removeAttribute('open');
+        });
+    });
 </script>
 
 </body>
