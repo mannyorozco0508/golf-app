@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="course-data.js"></script>
+    <script src="action-model.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -776,9 +777,17 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">🐦 Step 6: Side Games</div>
-        <div class="wizard-step-sub">Optional — run independently of whatever format you picked. Now that players are added, pick who's in when you get to the Action tab.</div>
+        <div class="wizard-step-title">🔥 Step 6: More Action</div>
+        <div class="wizard-step-sub">Stack as much as you like on top of your main game. All optional.</div>
+
+        <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
+            <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Extra games that run right alongside your main game.</p>
+            <div id="stacked-games-list"></div>
+        </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
+            <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>🎯 Extras</strong></label>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side pots. Set up who's in on the Action tab.</p>
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
@@ -1083,8 +1092,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const carryOn = document.getElementById('skins-carryover') ? document.getElementById('skins-carryover').value !== 'false' : true;
             rows.push(['Skins', `$${buyIn} — ${carryOn ? 'Carry Over' : 'No Carry'}`, 4]);
         }
+        // Every additional game gets its own line, so nobody tees off unaware of a
+        // wager that is genuinely running.
+        Object.entries(captureAdditionalGames()).forEach(([format, cfg]) => {
+            const spec = ADDITIONAL_GAME_CATALOG[format];
+            rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}`, 6]);
+        });
         rows.push(['Players', `${playerCount} added`, 5]);
-        rows.push(['Side Games', sideGamesText, 6]);
+        rows.push(['Extras', sideGamesText, 6]);
         // Side Matches ($ bets like "Manny vs John") are set up on the Matches tab after the
         // round is created — this screen can't summarize them yet since none exist at this point.
 
@@ -1316,6 +1331,115 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // Describes the live wager in plain money terms. Nassau is three separate bets
     // (front 9, back 9, total 18), which is exactly the thing golfers forget - so the
     // maximum is spelled out rather than left to be worked out on the 18th green.
+
+    // ---- Additional games ("Also Playing") ---------------------------------
+    // Rendered from ADDITIONAL_GAME_CATALOG so the wizard and the money layer can
+    // never disagree about what is stackable. A game already chosen as the MAIN
+    // format is filtered out - a round cannot play the same game twice.
+    const STACK_PRESETS = [1, 2, 5, 10, 20, 50];
+
+    function renderStackedGames() {
+        const list = document.getElementById('stacked-games-list');
+        if (!list || typeof ADDITIONAL_GAME_CATALOG === 'undefined') return;
+        const mainFormat = document.getElementById('game-format-select').value || 'stroke';
+
+        const available = Object.keys(ADDITIONAL_GAME_CATALOG).filter(f => f !== mainFormat);
+        const sub = document.getElementById('stacked-games-sub');
+
+        if (available.length === 0) {
+            list.innerHTML = '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Nothing else to stack on this format.</p>';
+            return;
+        }
+        if (sub) {
+            sub.textContent = mainFormat && MAIN_GAME_LABELS[mainFormat]
+                ? `Extra games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
+                : 'Extra games that run right alongside your main game.';
+        }
+
+        list.innerHTML = available.map(format => {
+            const spec = ADDITIONAL_GAME_CATALOG[format];
+            const on = stackedGameState[format] && stackedGameState[format].enabled;
+            const amt = (stackedGameState[format] && stackedGameState[format].amount) || '';
+            const presetHtml = STACK_PRESETS.map(v =>
+                `<button type="button" class="preset-btn${String(amt) === String(v) ? ' active' : ''}" onclick="setStackAmount('${format}', ${v})" style="padding:6px 2px; font-size:0.75rem;">$${v}</button>`
+            ).join('');
+
+            return `<div style="border-top:1px solid var(--border-mid); padding-top:10px; margin-top:10px;">
+                <label style="color:var(--brand-green); margin-bottom:4px; display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9rem;">
+                    <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleStackedGame('${format}', this.checked)" style="width:18px; height:18px; margin:0;">
+                    <strong>${spec.icon} ${spec.label}</strong>
+                </label>
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:-2px 0 0 26px;">${spec.blurb}</p>
+                <div style="margin:8px 0 0 26px; display:${on ? 'block' : 'none'};">
+                    <label style="font-size:0.75rem;">${spec.stakeLabel}</label>
+                    <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; margin-bottom:4px;">${presetHtml}</div>
+                    <input type="number" min="0" step="0.5" placeholder="0" value="${amt}" style="max-width:140px;"
+                           oninput="setStackAmount('${format}', this.value, true)">
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    let stackedGameState = {};
+
+    function toggleStackedGame(format, on) {
+        if (!stackedGameState[format]) stackedGameState[format] = { amount: '' };
+        stackedGameState[format].enabled = !!on;
+        // Seed a sensible default the first time it's switched on, so a golfer who
+        // just wants "skins" doesn't have to think about the number.
+        if (on && (stackedGameState[format].amount === '' || stackedGameState[format].amount === undefined)) {
+            const spec = ADDITIONAL_GAME_CATALOG[format];
+            stackedGameState[format].amount = spec.defaults[spec.stakeField];
+        }
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    function setStackAmount(format, value, fromInput) {
+        if (!stackedGameState[format]) stackedGameState[format] = { enabled: true };
+        stackedGameState[format].amount = value;
+        if (!fromInput) renderStackedGames();
+        updateWizardReview();
+    }
+
+    // Builds the additionalGames node saved to Firebase. Each entry carries only its
+    // own config; getRoundGames() merges it over the round data at read time.
+    function captureAdditionalGames() {
+        const out = {};
+        const mainFormat = document.getElementById('game-format-select').value || 'stroke';
+        Object.keys(stackedGameState).forEach(format => {
+            const st = stackedGameState[format];
+            if (!st || !st.enabled) return;
+            if (format === mainFormat) return;
+            if (typeof ADDITIONAL_GAME_CATALOG === 'undefined' || !ADDITIONAL_GAME_CATALOG[format]) return;
+            const spec = ADDITIONAL_GAME_CATALOG[format];
+            const amount = parseFloat(st.amount);
+            const entry = Object.assign({}, spec.defaults, { enabled: true, startHole: 1 });
+            entry[spec.stakeField] = isNaN(amount) ? 0 : amount;
+            out[format] = entry;
+        });
+        return out;
+    }
+
+    // Restores the toggles when an existing round is reopened.
+    function loadAdditionalGames(data) {
+        stackedGameState = {};
+        const saved = (data && data.additionalGames) || {};
+        Object.keys(saved).forEach(format => {
+            if (typeof ADDITIONAL_GAME_CATALOG === 'undefined' || !ADDITIONAL_GAME_CATALOG[format]) return;
+            const spec = ADDITIONAL_GAME_CATALOG[format];
+            stackedGameState[format] = {
+                enabled: saved[format].enabled !== false,
+                amount: saved[format][spec.stakeField]
+            };
+        });
+        renderStackedGames();
+    }
+
+    function updateWizardReview() {
+        if (typeof renderWizardReview === 'function') renderWizardReview();
+    }
+
     function updateBetExplainers() {
         const perHoleOn = (document.getElementById('enable-hole-bet') || {}).checked;
         const perHole = parseFloat((document.getElementById('hole-bet-stake') || {}).value) || 0;
@@ -2075,6 +2199,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (document.getElementById("skins-settings")) document.getElementById("skins-settings").style.display = (format === "skins") ? "block" : "none";
         
         renderPlayerList(forceLoad);
+        renderStackedGames();
         // Keep the plain-English bet description in step with whichever format is showing,
         // including when a saved round is reopened rather than freshly configured.
         updateBetExplainers();
@@ -2133,6 +2258,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) { document.getElementById("nassau-scoring").value = data.nassauScoring; syncToggle("nassau-scoring", "nassau-scoring-switch", "nassau-scoring-label-net", "nassau-scoring-label-gross", "net"); }
+            loadAdditionalGames(data);
             if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
@@ -2654,6 +2780,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 richHoleBet: null,
                 richHoleBetPresses: null,
                 richOverallBetPresses: null,
+                // Games stacked on top of the main format. Absent on legacy rounds, which
+                // getRoundGames() correctly reads as a single-game round.
+                additionalGames: captureAdditionalGames(),
                 birdieGameEnabled: birdieGameEnabled,
                 kpGameEnabled: kpGameEnabled,
                 birdieUnitVal: birdieUnitVal,
