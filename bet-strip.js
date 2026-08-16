@@ -496,6 +496,45 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
             ? (sm.overallStake || sm.holeStake || 0)
             : (sm.stake || 0);
 
+        // LIVE STATUS, computed here rather than on the Matches tab. Previously these
+        // rows carried only "Stroke Play \u00B7 $50" and the scorecard's side-match
+        // callout said "Tap to view" with a link that navigated away - so the one thing
+        // a golfer actually wants to know, who's winning their own bet, was the one
+        // thing the scorecard would not tell them.
+        //
+        // No new mathematics: the side match is mapped onto the round shape buildBetStrip
+        // already understands, and its own engines produce the numbers.
+        const matchPlayers = a.concat(b)
+            .map(pid => allPlayers.find(pl => String(pl.id) === String(pid)))
+            .filter(Boolean);
+
+        let status = '', tone = 'idle', presses = [];
+        const cfg = sideMatchRoundConfig(sm, matchPlayers);
+        if (cfg) {
+            try {
+                // cfg.players carry the Team 1 / Team 2 tags; the untagged originals would
+                // leave a match with only one side and silently produce no status.
+                const strip = buildBetStrip(cfg, courseData, savedScores, cfg.players);
+                if (strip && strip.eligible && strip.chips.length > 0) {
+                    const live = strip.chips.find(c => !c.closed) || strip.chips[0];
+                    status = live.statusText;
+                    tone = live.tone;
+                    // A press on a side match gets its own row, exactly like the main
+                    // game's ladder - a golfer must be able to see how each one is going.
+                    presses = strip.chips.filter(c => c.short && c.short.charAt(0) === 'P').map(c => ({
+                        label: c.short,
+                        status: c.statusText,
+                        tone: c.tone,
+                        stakeText: c.stake > 0 ? `$${c.stake}` : '',
+                        rangeText: c.detail ? c.detail.rangeText : '',
+                        live: c.detail ? c.detail.live : !c.closed
+                    }));
+                }
+            } catch (e) {
+                console.error('Side match status failed:', e);
+            }
+        }
+
         rows.push({
             key: id,
             // Exposed so the scorecard can tell whose action this is without
@@ -503,6 +542,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
             playerIds: a.concat(b),
             label: `${a.map(nameOf).join('/')} vs ${b.map(nameOf).join('/')}`,
             format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
+            status, tone, presses,
             stakeText: stake > 0 ? `$${stake}` : ''
         });
     });
@@ -622,4 +662,45 @@ function actionHeadline(rows, myCount) {
     const carry = (rows || []).find(r => hasBigCarry(r));
     if (carry) return `${/(\d+)\s+riding/.exec(carry.status)[1]} skins riding`;
     return '';
+}
+
+
+// Maps a stored Side Match onto the round shape buildBetStrip already understands,
+// rather than teaching the presenter a second data format. Shared by the scorecard
+// rows and the end-of-hole recap so the two can never describe a match differently.
+function sideMatchRoundConfig(sm, matchPlayers) {
+    if (!sm || !matchPlayers || matchPlayers.length < 2) return null;
+    const teamA = (sm.teamAIds || []).map(String);
+    const tagged = matchPlayers.map(p => Object.assign({}, p, {
+        team: teamA.includes(String(p.id)) ? 'Team 1' : 'Team 2'
+    }));
+
+    if (sm.format === 'stroke') {
+        if (tagged.length !== 2) return null;
+        return {
+            gameFormat: 'match',
+            matchScoringStyle: 'stroke',
+            matchScoring: sm.scoring || 'gross',
+            matchStake: sm.overallStake || sm.holeStake || 0,
+            // Side match presses are stored as overallPresses and carry no per-press
+            // stake, so each inherits the original amount - the existing behaviour.
+            strokePresses: (sm.overallPresses ? Object.values(sm.overallPresses) : []).map(pr => ({
+                startHole: pr.startHole,
+                stake: pr.stake !== undefined ? pr.stake : (sm.overallStake || 0)
+            })),
+            players: tagged
+        };
+    }
+
+    return {
+        gameFormat: sm.format === 'nassau' ? 'nassau' : 'match',
+        matchScoring: sm.scoring || 'gross',
+        nassauScoring: sm.scoring || 'gross',
+        matchStake: sm.stake || 0,
+        nassauStake: sm.stake || 0,
+        matchPressRule: sm.pressRule || 'none',
+        nassauPressRule: sm.pressRule || 'none',
+        matchPresses: sm.presses ? Object.values(sm.presses) : [],
+        players: tagged
+    };
 }
