@@ -464,3 +464,47 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
 
     return rows;
 }
+
+// Wagers inside the main game that have already been decided — a Nassau front nine
+// that closed 4&2, a press that ran out of holes. They are reported separately so
+// Today's Action can acknowledge them once and then stop giving them space, without
+// hiding them from a golfer who wants to check.
+//
+// Status only. Nothing here settles money; the closed chips come from the same
+// engine that produced the live ones.
+function buildSettledRows(data, courseData, savedScores, scopedPlayers) {
+    const rows = [];
+    if (typeof getRoundGames !== 'function') return rows;
+
+    const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+    const scores = savedScores || {};
+    const players = (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
+        .filter(p => p.playingForMoney !== false);
+
+    getRoundGames(data).forEach(game => {
+        if (game.role !== 'main') return;
+        let strip;
+        try {
+            const gameCourse = (typeof gameHoles === 'function') ? gameHoles(game, holes) : holes;
+            strip = buildBetStrip(game.config, gameCourse, scores, players);
+        } catch (e) {
+            return;
+        }
+        if (!strip || !strip.eligible) return;
+        strip.chips.filter(c => c.closed).forEach(c => {
+            rows.push({
+                key: game.key + ':' + c.key,
+                label: c.detail && c.detail.title ? c.detail.title : c.short,
+                icon: '',
+                role: 'settled',
+                stake: c.stake,
+                rangeText: c.detail ? c.detail.rangeText : '',
+                stakeText: c.stake > 0 ? `$${c.stake}` : '',
+                status: c.statusText,
+                tone: 'final'
+            });
+        });
+    });
+
+    return rows;
+}
