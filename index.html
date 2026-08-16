@@ -6,6 +6,7 @@
     <title>Live Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="action-model.js"></script>
     <script src="bet-strip.js"></script>
     <style>
         :root {
@@ -200,6 +201,51 @@
            the scoring area to answer "how's the bet going / where do I press".
            Deliberately chips, not cards: seven presses must stay one scrollable
            row, never seven stacked boxes that bury the scorecard. */
+        /* ---- Today's Action -----------------------------------------------------
+           One short row per wager, collapsed by default behind a single summary line.
+           A golfer entering a 4 on hole 7 should never have to scroll past $500 of
+           betting information to reach the score box. */
+        .action-center { margin: 12px 0 4px; }
+        .action-toggle {
+            width: 100%; display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 10px 12px; min-height: 44px; border-radius: 10px;
+            border: 1px solid var(--border-mid); background: var(--nassau-box-bg);
+            color: var(--text-main); font-family: inherit; font-weight: bold;
+            font-size: 0.85rem; cursor: pointer; text-align: left;
+        }
+        .action-toggle .ac-count { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; }
+        .action-body {
+            margin-top: 8px; border: 1px solid var(--border-mid); border-radius: 10px;
+            background: var(--bg-card); overflow: hidden;
+        }
+        .action-section-label {
+            font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em;
+            font-weight: bold; color: var(--text-muted);
+            padding: 8px 12px 2px;
+        }
+        .action-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-top: 1px solid var(--border-light);
+        }
+        .action-row:first-of-type { border-top: none; }
+        .ar-name { flex: 0 0 auto; font-size: 0.82rem; font-weight: bold; color: var(--text-main); }
+        .ar-status {
+            flex: 1 1 auto; min-width: 0; text-align: right;
+            font-size: 0.82rem; font-weight: bold;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ar-stake { flex: 0 0 auto; font-size: 0.75rem; color: var(--text-muted); min-width: 34px; text-align: right; }
+        .ar-status.tone-up { color: var(--brand-green); }
+        .ar-status.tone-down { color: var(--accent-red); }
+        .ar-status.tone-even { color: var(--text-main); }
+        .ar-status.tone-final { color: var(--accent-teal); }
+        .ar-status.tone-idle { color: var(--text-muted); font-weight: normal; }
+        .action-foot {
+            padding: 8px 12px; border-top: 1px solid var(--border-light);
+            font-size: 0.72rem; color: var(--text-muted); text-align: center;
+        }
+        @media print { .action-center { display: none !important; } }
+
         .group-links-btn { border-style: dashed !important; }
         .group-links-box {
             margin: 8px 0 12px; padding: 12px; border-radius: 12px;
@@ -1403,6 +1449,7 @@
         // intended reading order: hole -> scores -> what's at stake -> press -> next.
         // The strip is a single scrollable chip row, so it stays a fixed height no
         // matter how many presses are running and never pushes scoring off screen.
+        html += '<div id="action-center-mount"></div>';
         html += '<div id="bet-strip-mount"></div>';
 
         html += navRowHtml;
@@ -1413,6 +1460,7 @@
         }
 
         container.innerHTML = html;
+        renderActionCenter();
         renderBetStrip();
     }
 
@@ -1437,6 +1485,79 @@
             console.error('Bet strip failed to build:', e);
             return null;
         }
+    }
+
+
+    // ---- Today's Action ----------------------------------------------------
+    // Collapsed to a single line by default; the golfer opens it when they want the
+    // detail. Every number comes from buildActionRows() in bet-strip.js, which in
+    // turn calls the existing engines - nothing is computed here.
+    let actionCenterOpen = false;
+
+    function toggleActionCenter() {
+        actionCenterOpen = !actionCenterOpen;
+        renderActionCenter();
+    }
+
+    function renderActionCenter() {
+        const mount = document.getElementById('action-center-mount');
+        if (!mount) return;
+
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const scoped = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+            ? window.__scFilteredPlayers
+            : (currentData.players || []);
+
+        let games = [], side = [];
+        try {
+            games = buildActionRows(currentData, courseData, savedScores, scoped);
+            side = buildSideActionRows(currentData, courseData, savedScores, scoped);
+        } catch (e) {
+            console.error('Action center failed to build:', e);
+            mount.innerHTML = '';
+            return;
+        }
+
+        const totalBets = games.length + side.length;
+        // With a single game and no side action the bet strip below already says
+        // everything - a second summary would just be noise.
+        if (totalBets === 0 || (games.length <= 1 && side.length === 0)) { mount.innerHTML = ''; return; }
+
+        const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
+            '<span>\uD83D\uDD25 Today\'s Action</span>' +
+            '<span class="ac-count">' + totalBets + ' live \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
+            '</button>';
+
+        if (!actionCenterOpen) { mount.innerHTML = '<div class="action-center">' + toggle + '</div>'; return; }
+
+        const row = r =>
+            '<div class="action-row">' +
+                '<span class="ar-name">' + (r.icon ? r.icon + ' ' : '') + r.label + '</span>' +
+                '<span class="ar-status tone-' + (r.tone || 'even') + '">' + r.status + '</span>' +
+                '<span class="ar-stake">' + (r.stakeText || '') + '</span>' +
+            '</div>';
+
+        let body = '';
+        const main = games.filter(g => g.role === 'main');
+        const extra = games.filter(g => g.role === 'additional');
+
+        if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
+        if (extra.length) body += '<div class="action-section-label">Also Playing</div>' + extra.map(row).join('');
+        if (side.length) {
+            body += '<div class="action-section-label">Side Action</div>';
+            body += side.map(sm =>
+                '<div class="action-row">' +
+                    '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
+                    '<span class="ar-status tone-idle">' + sm.format + '</span>' +
+                    '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
+                '</div>'
+            ).join('');
+        }
+
+        body += '<div class="action-foot">Nothing is settled until the round is done \u2014 this is what\'s at stake.</div>';
+
+        mount.innerHTML = '<div class="action-center">' + toggle + '<div class="action-body">' + body + '</div></div>';
     }
 
     function renderBetStrip() {
