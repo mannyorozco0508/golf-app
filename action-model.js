@@ -105,6 +105,95 @@ function mainGameStake(data) {
 }
 
 // ---------------------------------------------------------------------------
+// HOLE RANGES
+//
+// A game added mid-round must never reach backward into holes already played. The
+// mechanism is the same one calculateStrokePressSet has always used for presses:
+// hand the engine a FILTERED hole list rather than teaching it a new concept.
+// One Skins calculation, one Dots calculation - they simply see fewer holes.
+//
+// Two different filters are needed because the engines read holes differently:
+//   - Skins / Stableford iterate courseData  -> filter courseData
+//   - Dots iterates data.dots by hole key    -> filter that object
+// ---------------------------------------------------------------------------
+
+// The holes a given game actually covers. Uses the round's OWN configured hole
+// list, so a front-nine round yields H5-9 and a back-nine round yields H14-18 -
+// never an assumed H5-18.
+function gameHoles(game, courseData) {
+    const holes = courseData || [];
+    const start = (game && game.startHole) || 1;
+    if (start <= 1) return holes;
+    return holes.filter(h => h.hole >= start);
+}
+
+// Dot events are keyed "h4", "h11". Anything earned before the game existed is
+// dropped, so junk added on hole 5 cannot pay out for a greenie on hole 2.
+function scopeDotsToRange(dots, startHole) {
+    if (!dots || !startHole || startHole <= 1) return dots;
+    const out = {};
+    Object.keys(dots).forEach(key => {
+        const holeNum = parseInt(String(key).replace(/^h/i, ''), 10);
+        if (!isNaN(holeNum) && holeNum >= startHole) out[key] = dots[key];
+    });
+    return out;
+}
+
+// "H5-18" / "H5-9", or blank for a game that covers the whole round - there is no
+// point labelling every ordinary wager with a range nobody needs to think about.
+function gameRangeText(game, courseData) {
+    const holes = gameHoles(game, courseData);
+    if (holes.length === 0) return '';
+    const start = holes[0].hole;
+    const end = holes[holes.length - 1].hole;
+    const full = (courseData || []);
+    if (full.length > 0 && start === full[0].hole) return '';
+    return `H${start}\u2013${end}`;
+}
+
+// The first hole a NEW game can safely start on.
+//
+// A hole counts as finished only when EVERY player in the round has posted a score
+// on it - a whole-group wager cannot start on a hole some of the group has already
+// completed. Derived from the highest such hole, never from a count, so out-of-order
+// entry and non-standard starts stay correct. Returns null when the round has no
+// future hole left, which is what disables Add Action at the end.
+function nextAddActionHole(data, courseData, savedScores) {
+    const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+    if (holes.length === 0) return null;
+    const players = (data.players || []);
+    if (players.length === 0) return holes[0].hole;
+    const scores = savedScores || {};
+
+    let lastComplete = null;
+    holes.forEach(h => {
+        const everyone = players.every(p => {
+            const v = scores[`p${p.id}_h${h.hole}`];
+            return v && v > 0;
+        });
+        if (everyone) lastComplete = h.hole;
+    });
+
+    if (lastComplete === null) return holes[0].hole;
+    const next = holes.find(h => h.hole > lastComplete);
+    return next ? next.hole : null;
+}
+
+// Which games may still be added right now. A game already running - as the main
+// format or as an additional game - is excluded rather than allowed to become a
+// second identical wager, which would be a double-settlement risk.
+function addableGames(data) {
+    const mainFormat = (data && data.gameFormat) || 'stroke';
+    const running = (data && data.additionalGames) || {};
+    return Object.keys(ADDITIONAL_GAME_CATALOG).filter(format => {
+        if (format === mainFormat) return false;
+        const cfg = running[format];
+        if (cfg && cfg.enabled !== false) return false;
+        return true;
+    });
+}
+
+// ---------------------------------------------------------------------------
 // getRoundGames — THE normalized answer to "what are we playing today?"
 //
 // Returns, in display order: the main game first, then any additional games.
@@ -145,6 +234,13 @@ function getRoundGames(data) {
         delete merged.enabled;
         delete merged.startHole;
 
+        const startHole = cfg.startHole || 1;
+        // Dots reads its events from config, not from courseData, so its range has to
+        // be applied here rather than by filtering holes downstream.
+        if (format === 'dots' && startHole > 1) {
+            merged.dots = scopeDotsToRange(merged.dots, startHole);
+        }
+
         games.push({
             key: format,
             format: format,
@@ -157,7 +253,7 @@ function getRoundGames(data) {
             // live. NOT yet honoured by any scoring path - every game currently covers
             // the whole round - but the field exists so adding ranges later is a change
             // to the engines' inputs rather than a schema migration.
-            startHole: cfg.startHole || 1
+            startHole: startHole
         });
     });
 
@@ -208,6 +304,7 @@ function validateRoundGames(data) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
-        mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames
+        mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
+        gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames
     };
 }
