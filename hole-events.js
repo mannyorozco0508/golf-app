@@ -90,6 +90,15 @@ function nameFor(player, meId) {
     return firstName(player.name);
 }
 
+// Rewrites a status line the engines produced into second person. Works on whole
+// words only, so "Manny/Marty 2 UP" becomes "You/Marty 2 UP" - which keeps the golf
+// meaning of a TEAM wager intact. Saying "You 2 UP" there would imply a singles
+// match, so the partner's name is deliberately left in place.
+function personalize(text, meName) {
+    if (!text || !meName) return text;
+    return text.replace(new RegExp('(^|[^A-Za-z])' + meName + '(?![A-Za-z])', 'g'), '$1You');
+}
+
 function involvesMe(ids, meId) {
     if (!meId) return false;
     return (ids || []).some(id => String(id) === String(meId));
@@ -104,13 +113,25 @@ function buildHoleEvents(data, courseData, savedScores, hole, meId, scopedPlayer
     const players = (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
         .filter(p => p.playingForMoney !== false);
 
-    if (!isHoleComplete(players, hole, scores)) return [];
     if (typeof getRoundGames !== 'function') return [];
+
+    // The field a round-level wager actually depends on - NOT the group on screen.
+    const field = (typeof fieldParticipants === 'function')
+        ? fieldParticipants(data)
+        : players;
+
+    // Nothing at all can be said about a hole this group hasn't finished.
+    if (!isHoleComplete(players, hole, scores)) return [];
 
     const after = scoresThroughHole(scores, hole);
     const before = scoresBeforeHole(scores, hole);
     const events = [];
-    const push = (type, icon, text, opts) => {
+    const mePlayer = meId ? (data.players || []).find(p => String(p.id) === String(meId)) : null;
+    const meName = mePlayer ? firstName(mePlayer.name) : null;
+
+    // One place where every event becomes second person, so no call site can forget.
+    const push = (type, icon, rawText, opts) => {
+        const text = personalize(rawText, meName);
         events.push(Object.assign({
             type, icon, text,
             priority: EVENT_PRIORITY[type] || 99,
@@ -124,19 +145,30 @@ function buildHoleEvents(data, courseData, savedScores, hole, meId, scopedPlayer
         // A game that hasn't started yet cannot have produced an event on this hole.
         if (!gameCourse.some(h => h.hole === hole)) return;
 
+        // WHOLE-FIELD READINESS. A round-level wager is not knowable until every
+        // player in it has posted this hole. Truth beats immediacy: it is better for
+        // a skins result to appear a few minutes late than for the app to name a
+        // winner while eight golfers are still out on the course.
+        if (!participantsCompletedHole(field, hole, scores)) {
+            // Dots are a record of what a golfer was awarded on this hole, not a
+            // contested outcome, so they stay knowable for the players who have posted.
+            if (game.format === 'dots') dotsEvents(game, players, hole, meId, push);
+            return;
+        }
+
         if (game.format === 'skins') {
-            skinsEvents(game, gameCourse, after, before, players, hole, meId, push);
+            skinsEvents(game, gameCourse, after, before, field, hole, meId, push);
         } else if (game.format === 'dots') {
             dotsEvents(game, players, hole, meId, push);
         } else if (game.format === 'stableford') {
-            leaderEvents(game, gameCourse, after, before, players, meId, push, 'pts', '\uD83C\uDFAF');
+            leaderEvents(game, gameCourse, after, before, field, meId, push, 'pts', '\uD83C\uDFAF');
         } else if (game.role === 'main') {
-            mainGameEvents(game, gameCourse, after, before, players, meId, push);
+            mainGameEvents(game, gameCourse, after, before, field, meId, push);
         }
     });
 
     birdieEvents(data, holes, scores, players, hole, meId, push);
-    sideMatchEvents(data, holes, after, before, players, meId, push);
+    sideMatchEvents(data, holes, after, before, players, meId, push, hole);
 
     // Personal events win ties, so a golfer's own action floats above someone else's
     // at the same priority.
@@ -314,7 +346,7 @@ function birdieEvents(data, holes, scores, players, hole, meId, push) {
 
 // ---------------------------------------------------------------------------
 // Side action, with the golfer's own matches marked personal so they sort first.
-function sideMatchEvents(data, holes, scores, before, players, meId, push) {
+function sideMatchEvents(data, holes, scores, before, players, meId, push, hole) {
     if (typeof buildBetStrip !== 'function') return;
     const sideMatches = data.sideMatches || {};
     const all = data.players || [];
@@ -327,6 +359,11 @@ function sideMatchEvents(data, holes, scores, before, players, meId, push) {
 
         const matchPlayers = ids.map(pid => all.find(p => String(p.id) === String(pid))).filter(Boolean);
         if (matchPlayers.length < 2) return;
+
+        // GROUP-LOCAL READINESS. A side match names its own players, so it becomes
+        // knowable the moment THEY finish - it must never wait on unrelated groups.
+        if (typeof participantsCompletedHole === 'function' &&
+            !participantsCompletedHole(matchPlayers, hole, scores)) return;
 
         const cfg = sideMatchConfig(sm, matchPlayers);
         if (!cfg) return;
@@ -383,6 +420,6 @@ function sideMatchConfig(sm, matchPlayers) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         EVENT_PRIORITY, scoresBeforeHole, scoresThroughHole, isHoleComplete, nameFor,
-        buildHoleEvents, leaderOf
+        buildHoleEvents, leaderOf, personalize
     };
 }
