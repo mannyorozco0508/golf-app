@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="action-model.js"></script>
+    <script src="settlement-engine.js"></script>
     <script src="bet-strip.js"></script>
     <style>
         :root {
@@ -434,6 +435,52 @@
         .fr-player-score { text-align: right; font-size: 0.9rem; }
         .fr-player-score .fr-gross { font-weight: bold; color: var(--text-main); }
         .fr-player-score .fr-net { font-size: 0.75rem; color: var(--text-muted); }
+        /* Money first. This is the payoff for tracking eight wagers over four hours,
+           and it is read standing at the 18th green with the phone passed around. */
+        .fr-money-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: bold; color: var(--text-muted); margin: 4px 0 6px; }
+        .fr-money-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 12px; border-radius: 8px; margin-bottom: 4px; background: var(--nassau-box-bg);
+        }
+        .fr-money-name { font-size: 1rem; font-weight: bold; color: var(--text-main); }
+        .fr-money-val { font-size: 1.15rem; font-weight: bold; }
+        .fr-money-val.pos { color: var(--brand-green); }
+        .fr-money-val.neg { color: var(--accent-red); }
+        .fr-money-val.even { color: var(--text-muted); }
+        .fr-pay-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 12px; border-radius: 8px; margin-bottom: 4px;
+            background: var(--bg-card); border: 1px solid var(--border-mid);
+        }
+        .fr-pay-who { font-size: 0.92rem; font-weight: bold; color: var(--text-main); }
+        .fr-pay-amt { font-size: 0.98rem; font-weight: bold; color: var(--accent-red); }
+        .fr-empty { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 10px; }
+        .fr-warn {
+            background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+            border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.82rem;
+        }
+        .fr-warn strong { display: block; margin-bottom: 4px; font-size: 0.9rem; }
+        .fr-missing-row { padding: 3px 0; font-size: 0.8rem; }
+        .fr-breakdown > summary {
+            cursor: pointer; list-style: none; padding: 10px; margin-top: 12px;
+            border-radius: 8px; border: 1px solid var(--border-mid);
+            font-size: 0.85rem; font-weight: bold; color: var(--brand-green); text-align: center;
+        }
+        .fr-breakdown > summary::-webkit-details-marker { display: none; }
+
+        /* Settled wagers stop competing with live ones but stay inspectable. */
+        .settled-wrap > summary {
+            cursor: pointer; list-style: none;
+            padding: 8px 12px; border-top: 1px solid var(--border-light);
+            font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+            font-weight: bold; color: var(--text-muted);
+        }
+        .settled-wrap > summary::-webkit-details-marker { display: none; }
+        .final-flash {
+            padding: 8px 12px; border-top: 1px solid var(--border-light);
+            background: var(--nassau-box-bg); font-size: 0.82rem; font-weight: bold; color: var(--accent-teal);
+        }
+
         .fr-jump-links { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
         .fr-section-divider { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px 0; border-top: 1px dashed var(--border-mid); padding-top: 12px; }
         #fr-full-results .status-panel, #fr-full-results .live-ticker-box, #fr-full-results .nassau-payout-box { margin-bottom: 10px; }
@@ -652,11 +699,6 @@
             <div id="skins-live-rows"></div>
         </div>
 
-        <div class="nassau-payout-box" id="kpgame-payout-container" style="display:none;">
-            <div class="nassau-payout-title">📍 Dollar Game (KPs)</div>
-            <div id="kpgame-rows-wrapper"></div>
-        </div>
-
         <div class="nassau-payout-box" id="wolfcall-payout-container" style="display:none;">
             <div class="nassau-payout-title">🐺 Wolf Call</div>
             <div id="wolfcall-rows-wrapper"></div>
@@ -741,11 +783,22 @@
             <span>🏁 Round Complete!</span>
             <button class="close-modal" onclick="closeFinishRoundModal()">&times;</button>
         </div>
+        <div id="fr-incomplete-warning"></div>
         <div id="fr-headline" class="fr-headline"></div>
-        <div id="fr-player-list"></div>
 
-        <div class="fr-section-divider">💰 Full Results — All Games &amp; Presses</div>
-        <div id="fr-full-results"></div>
+        <div class="fr-money-title" id="fr-money-title">Final Money</div>
+        <div id="fr-final-money"></div>
+
+        <div class="fr-money-title">Who Pays Who</div>
+        <div id="fr-who-pays-who"></div>
+
+        <details class="fr-breakdown">
+            <summary>📊 View Bet Breakdown &amp; Scores</summary>
+            <div class="fr-section-divider">Final Scores</div>
+            <div id="fr-player-list"></div>
+            <div class="fr-section-divider">💰 All Games &amp; Presses</div>
+            <div id="fr-full-results"></div>
+        </details>
 
         <button class="btn-primary" style="margin-top: 14px;" onclick="window.print()">📄 Send Results PDF</button>
 
@@ -988,7 +1041,6 @@
         }
 
         if (currentData.birdieGameEnabled) gameLines.push(`🐦 Birdie Game`);
-        if (currentData.kpGameEnabled) gameLines.push(`📍 KPs (Dollar Game)`);
 
         const sideMatches = currentData.sideMatches || {};
         const filteredIds = filteredPlayers.map(p => String(p.id));
@@ -1003,7 +1055,7 @@
 
         // A genuinely no-bet round (Stroke Play, nothing else enabled) stays plain rather than
         // looking like a betting app with nothing to show — Part 12's explicit requirement.
-        const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && !currentData.kpGameEnabled && relevantSideMatches.length === 0;
+        const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0;
         document.getElementById('landing-active-games').innerHTML = isNoBetRound
             ? `<span style="color:var(--text-muted);">Just for score — no bets this round</span>`
             : gameLines.map(l => `<div style="padding:2px 0;">${l}</div>`).join('');
@@ -1123,10 +1175,9 @@
         }
 
         // --- Birdie Pool / KP (side games, independent of main format) ---
-        if (currentData.birdieGameEnabled || currentData.kpGameEnabled) {
+        if (currentData.birdieGameEnabled) {
             let birdieTotals = null, kpResult = null;
             if (currentData.birdieGameEnabled) birdieTotals = calculateBirdieGameTotals(currentData, courseData, savedScores);
-            if (currentData.kpGameEnabled) kpResult = calculateKPGameTotals(currentData, courseData);
             birdieKpSummary = {
                 birdie: birdieTotals ? moneyPlayers.map(p => ({ name: p.name, money: birdieTotals[p.id] || 0 })) : null,
                 kpWins: kpResult ? moneyPlayers.map(p => ({ name: p.name, wins: kpResult.wins[p.id] || 0, money: kpResult.money[p.id] || 0 })) : null
@@ -1448,8 +1499,11 @@
         const savedScores = currentData.scores || {};
         const roundComplete = filteredPlayers.length > 0 && courseData.every(h => filteredPlayers.every(p => savedScores[`p${p.id}_h${h.hole}`] > 0));
 
-        const nextBtnHtml = (isLastHole && roundComplete)
-            ? `<button class="finish-round-nav-btn" onclick="openFinishRoundModal()">🏁 Finish Round</button>`
+        // On the last hole there is ALWAYS an end-of-round action. Requiring a complete
+        // card meant one picked-up ball on hole 12 left a group standing on 18 with a
+        // Next button that went nowhere - at the exact moment they most wanted an answer.
+        const nextBtnHtml = isLastHole
+            ? `<button class="finish-round-nav-btn" onclick="openFinishRoundModal()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
             : `<button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>`;
 
         const navRowHtml = `<div class="hole-view-nav-row">
@@ -1526,6 +1580,10 @@
     // detail. Every number comes from buildActionRows() in bet-strip.js, which in
     // turn calls the existing engines - nothing is computed here.
     let actionCenterOpen = false;
+    // Which finished wagers have already had their one announcement. Deliberately
+    // in-memory only: this tracks what the golfer has SEEN, not money. Nothing about
+    // settlement depends on it, so a refresh costs at most a repeated notice.
+    const acknowledgedFinals = {};
 
 
     // ---- Add Action --------------------------------------------------------
@@ -1674,6 +1732,19 @@
         const main = games.filter(g => g.role === 'main');
         const extra = games.filter(g => g.role === 'additional');
 
+        // A wager that closes on hole 7 used to vanish silently as the row moved to the
+        // next live chip. It now gets one acknowledgement, then drops into a collapsed
+        // section so it stops competing for space without becoming uninspectable.
+        const settled = [];
+        try { settled.push.apply(settled, buildSettledRows(currentData, courseData, savedScores, scoped)); }
+        catch (e) { console.error('Settled rows failed:', e); }
+
+        const flash = settled.filter(r => !acknowledgedFinals[r.key]);
+        flash.forEach(r => { acknowledgedFinals[r.key] = true; });
+        if (flash.length) {
+            body += flash.map(r => '<div class="final-flash">\uD83D\uDD12 FINAL \u00B7 ' + r.label + ' \u2014 ' + r.status + '</div>').join('');
+        }
+
         if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
         if (extra.length) body += '<div class="action-section-label">Also Playing</div>' + extra.map(row).join('');
         if (side.length) {
@@ -1685,6 +1756,11 @@
                     '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
                 '</div>'
             ).join('');
+        }
+
+        if (settled.length) {
+            body += '<details class="settled-wrap"><summary>Already Settled \u00B7 ' + settled.length + '</summary>' +
+                settled.map(row).join('') + '</details>';
         }
 
         body += '<div class="action-foot">Nothing is settled until the round is done \u2014 this is what\'s at stake.</div>';
@@ -2057,6 +2133,102 @@
         return panel.innerHTML.replace(/\sid="[^"]*"/g, '');
     }
 
+
+    // ---- Final money -------------------------------------------------------
+    // THE canonical settlement, the same function Results and Trip use. Nothing here
+    // adds, splits or rounds money; it only formats what the engine returns. That is
+    // what guarantees the number at the 18th green matches the Results page.
+    function renderFinishRoundMoney() {
+        const moneyEl = document.getElementById('fr-final-money');
+        const payEl = document.getElementById('fr-who-pays-who');
+        const titleEl = document.getElementById('fr-money-title');
+        if (!moneyEl || !payEl) return;
+
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+
+        const missing = findMissingScores();
+        // Missing scores mean at least one wager cannot be settled honestly. The
+        // conservative rule applies: show the position, never call it FINAL, and never
+        // invent a score or a winner to fill the gap.
+        if (titleEl) titleEl.textContent = missing.length > 0 ? 'Money So Far \u2014 Not Final' : 'Final Money';
+
+        let result;
+        try {
+            result = computeCombinedNetTotals(currentData, courseData, savedScores);
+        } catch (e) {
+            console.error('Settlement failed:', e);
+            moneyEl.innerHTML = '<div class="fr-empty">Couldn\'t total the money \u2014 check the Results tab.</div>';
+            payEl.innerHTML = '';
+            return;
+        }
+
+        const totals = Object.values(result.netByName || {}).sort((a, b) => b.net - a.net);
+        if (totals.length === 0 || totals.every(t => Math.abs(t.net) < 0.005)) {
+            moneyEl.innerHTML = '<div class="fr-empty">No money changed hands today.</div>';
+            payEl.innerHTML = '';
+            return;
+        }
+
+        moneyEl.innerHTML = totals.map(t => {
+            const cls = t.net > 0.005 ? 'pos' : (t.net < -0.005 ? 'neg' : 'even');
+            const sign = t.net > 0.005 ? '+' : (t.net < -0.005 ? '\u2212' : '');
+            return '<div class="fr-money-row">' +
+                '<span class="fr-money-name">' + t.name + '</span>' +
+                '<span class="fr-money-val ' + cls + '">' + sign + '$' + Math.abs(t.net).toFixed(2) + '</span>' +
+                '</div>';
+        }).join('');
+
+        const tx = result.transactions || [];
+        payEl.innerHTML = tx.length === 0
+            ? '<div class="fr-empty">Everyone\'s square \u2014 nobody owes anybody.</div>'
+            : tx.map(t => '<div class="fr-pay-row">' +
+                '<span class="fr-pay-who">' + t.from + ' \u2192 ' + t.to + '</span>' +
+                '<span class="fr-pay-amt">$' + t.amount.toFixed(2) + '</span>' +
+                '</div>').join('');
+    }
+
+    // Every hole a scoring player still owes a score on. Used both to warn before
+    // finishing and to offer a direct route back to each gap.
+    function findMissingScores() {
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const players = window.__scFilteredPlayers || currentData.players || [];
+        const missing = [];
+        courseData.forEach(h => {
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v || v <= 0) missing.push({ hole: h.hole, player: p });
+            });
+        });
+        return missing;
+    }
+
+    function renderIncompleteWarning() {
+        const el = document.getElementById('fr-incomplete-warning');
+        if (!el) return;
+        const missing = findMissingScores();
+        if (missing.length === 0) { el.innerHTML = ''; return; }
+
+        const rows = missing.slice(0, 6).map(m =>
+            '<div class="fr-missing-row">Hole ' + m.hole + ' \u00B7 ' + m.player.name.split(' ')[0] +
+            ' <a href="#" onclick="jumpToMissingHole(' + m.hole + '); return false;" style="color:inherit;">fix</a></div>'
+        ).join('');
+        const more = missing.length > 6 ? '<div class="fr-missing-row">\u2026and ' + (missing.length - 6) + ' more</div>' : '';
+
+        el.innerHTML = '<div class="fr-warn">' +
+            '<strong>\u26A0\uFE0F ' + missing.length + ' score' + (missing.length === 1 ? '' : 's') + ' still missing</strong>' +
+            'Money below is where things stand, not a final settlement \u2014 some wagers can\'t be decided yet.' +
+            '<div style="margin-top:6px;">' + rows + more + '</div>' +
+            '</div>';
+    }
+
+    function jumpToMissingHole(hole) {
+        closeFinishRoundModal();
+        currentViewedHole = hole;
+        renderScorecard();
+    }
+
     function openFinishRoundModal() {
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const savedScores = currentData.scores || {};
@@ -2069,6 +2241,8 @@
         }
 
         const headlineEl = document.getElementById('ticker-status-val');
+        renderIncompleteWarning();
+        renderFinishRoundMoney();
         document.getElementById('fr-headline').textContent = headlineEl ? headlineEl.innerText : 'Round Complete!';
         document.getElementById('fr-full-results').innerHTML = cloneStatusPanelHtml();
 
@@ -2482,7 +2656,11 @@
             pressesByHole[m.startHole].push(m.label);
         });
 
-        return { t1Name, t2Name, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount, pressesByHole };
+        // t1Players/t2Players are part of the canonical shape in money-engine.js. This
+        // copy is declared later on the page and therefore SHADOWS that one, so anything
+        // calling computeRoundMoneyByPlayer from the scorecard - which Wave 4's Finish
+        // Round money does - gets this object. Omitting them crashed settlement outright.
+        return { t1Name, t2Name, t1Players, t2Players, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount, pressesByHole };
     }
 
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
@@ -2548,73 +2726,8 @@
         openPressPanel();
     }
 
-    function renderKPGameTally(data, courseData) {
-        const box = document.getElementById('kpgame-payout-container');
-        const wrapper = document.getElementById('kpgame-rows-wrapper');
-        if (!box || !wrapper) return;
 
-        if (data.kpGameEnabled !== true) {
-            box.style.display = 'none';
-            return;
-        }
 
-        const allPlayers = data.players || [];
-        const players = allPlayers.filter(p => p.playingForMoney !== false);
-        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
-
-        if (players.length < 2 || kpHoles.length === 0) {
-            box.style.display = 'none';
-            return;
-        }
-
-        if (players.length > 4) {
-            box.style.display = 'block';
-            wrapper.innerHTML = `<div style="font-size:0.8rem; color:var(--accent-red); padding:4px 0;">Set up for single-group rounds (4 players or fewer).</div>`;
-            return;
-        }
-
-        const kpWinners = data.kpWinners || {};
-        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 0;
-
-        let playerMoney = {};
-        players.forEach(p => playerMoney[p.id] = 0);
-
-        box.style.display = 'block';
-        let html = `<div style="margin-bottom:8px;">`;
-
-        kpHoles.forEach(h => {
-            const winnerId = kpWinners[`h${h.hole}`];
-            const winnerPlayer = winnerId ? players.find(p => String(p.id) === String(winnerId)) : null;
-            html += `<div style="padding:6px 0; border-bottom:1px solid var(--border-faint);">
-                <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">Hole ${h.hole} (Par 3)${winnerPlayer ? ` — 🏆 ${winnerPlayer.name.split(' ')[0]} +$${(buyIn * (players.length - 1)).toFixed(2)}` : ''}</div>
-                <div style="display:flex; flex-wrap:wrap; gap:5px;">`;
-            players.forEach(p => {
-                const isWinner = winnerPlayer && String(winnerId) === String(p.id);
-                html += `<button onclick="markKPWinner(${h.hole}, '${p.id}')" style="padding:4px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:${isWinner ? 'var(--accent-teal)' : 'var(--bg-card)'}; color:${isWinner ? '#fff' : 'var(--text-main)'}; font-size:0.72rem; font-weight:bold; cursor:pointer;">${p.name.split(' ')[0]}</button>`;
-            });
-            if (winnerPlayer) {
-                html += `<button onclick="clearKPWinner(${h.hole})" style="padding:4px 10px; border-radius:14px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.72rem; cursor:pointer;">✕</button>`;
-            }
-            html += `</div></div>`;
-
-            if (winnerPlayer) {
-                playerMoney[winnerPlayer.id] += buyIn * (players.length - 1);
-            }
-        });
-        html += `</div>`;
-
-        wrapper.innerHTML = html;
-    }
-
-    function markKPWinner(hole, playerId) {
-        db.ref(`events/${currentMode}/kpWinners/h${hole}`).set(playerId)
-            .catch(err => alert(`Failed to save: ${err.message}`));
-    }
-
-    function clearKPWinner(hole) {
-        db.ref(`events/${currentMode}/kpWinners/h${hole}`).remove()
-            .catch(err => alert(`Failed to clear: ${err.message}`));
-    }
 
     // Same rule as Dots/Junk, verified consistent — a stroke-under-par unit (birdie=1,
     // eagle=2, already correctly weighted since "under" is the literal stroke count) is worth
@@ -2645,26 +2758,6 @@
 
     // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
     // Same rule, now complete on both sides: each KP win is paid by every other player.
-    function calculateKPGameTotals(data, courseData) {
-        if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
-        const players = (data.players || []).filter(p => p.playingForMoney !== false);
-        if (players.length < 2 || players.length > 4) return { money: {}, wins: {} };
-        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
-        const kpWinners = data.kpWinners || {};
-        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 0;
-        let money = {}, wins = {};
-        players.forEach(p => { money[p.id] = 0; wins[p.id] = 0; });
-        kpHoles.forEach(h => {
-            const winnerId = kpWinners[`h${h.hole}`];
-            if (!winnerId) return;
-            const winnerPlayer = players.find(p => String(p.id) === String(winnerId));
-            if (!winnerPlayer) return;
-            wins[winnerPlayer.id] = (wins[winnerPlayer.id] || 0) + 1;
-            money[winnerPlayer.id] += buyIn * (players.length - 1);
-            players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) money[p.id] -= buyIn; });
-        });
-        return { money, wins };
-    }
 
     // --- WOLF GAME ENGINE ---
     // Exact copy of money-engine.js's calcDotsEngine - not reinvented. This file has no
@@ -2965,8 +3058,7 @@
         if (!row) return;
 
         const showBirdie = data.birdieGameEnabled === true;
-        const showKP = data.kpGameEnabled === true;
-        if (!showBirdie && !showKP) { row.style.display = 'none'; return; }
+        if (!showBirdie) { row.style.display = 'none'; return; }
 
         const allPlayers = data.players || [];
         let lines = [];
@@ -2977,15 +3069,6 @@
             if (moneyPlayersB.length > 0) {
                 const text = moneyPlayersB.map(p => `${p.name.split(' ')[0]}: <strong>$${(birdieTotals[p.id] || 0).toFixed(2)}</strong>`).join(' &nbsp;|&nbsp; ');
                 lines.push(`🐦 Birdies (won): ${text}`);
-            }
-        }
-
-        if (showKP) {
-            const kpResult = calculateKPGameTotals(data, courseData);
-            const moneyPlayersK = allPlayers.filter(p => p.playingForMoney !== false);
-            if (moneyPlayersK.length >= 2 && moneyPlayersK.length <= 4) {
-                const text = moneyPlayersK.map(p => `${p.name.split(' ')[0]}: <strong>$${(kpResult.money[p.id] || 0).toFixed(2)}</strong>`).join(' &nbsp;|&nbsp; ');
-                lines.push(`📍 KPs (won): ${text}`);
             }
         }
 
@@ -3791,7 +3874,6 @@
 
         renderLiveActionSummary(filteredPlayers, players);
 
-        renderKPGameTally(currentData, courseData);
         renderWolfCallBox(currentData, courseData, savedScores);
         renderCombinedTally(currentData, courseData, savedScores);
 
@@ -4110,20 +4192,6 @@
                 printHtml += `<div class="pledger"><h3>🐦 Birdie Game (amount won)</h3>`;
                 moneyPlayersB.forEach(p => {
                     printHtml += `<div class="pledger-row"><span>${p.name}</span><span>$${(birdieTotals[p.id] || 0).toFixed(2)}</span></div>`;
-                });
-                printHtml += `</div>`;
-            }
-        }
-
-        // Dollar Game (KP) ledger — independent of gameFormat, shown whenever it's turned on
-        if (currentData.kpGameEnabled === true) {
-            const kpResult = calculateKPGameTotals(currentData, courseData);
-            const moneyPlayersK = (currentData.players || []).filter(p => p.playingForMoney !== false);
-            if (moneyPlayersK.length >= 2 && moneyPlayersK.length <= 4) {
-                printHtml += `<div class="pledger"><h3>📍 Dollar Game / KPs (amount won)</h3>`;
-                moneyPlayersK.forEach(p => {
-                    const wins = kpResult.wins[p.id] || 0;
-                    printHtml += `<div class="pledger-row"><span>${p.name}${wins > 0 ? ` (${wins} KP${wins > 1 ? 's' : ''})` : ''}</span><span>$${(kpResult.money[p.id] || 0).toFixed(2)}</span></div>`;
                 });
                 printHtml += `</div>`;
             }
