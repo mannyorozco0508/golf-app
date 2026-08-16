@@ -169,9 +169,14 @@
            moves to a side panel next to it on wider screens (tablet/iPad and up) */
         .round-body-layout { display: block; }
         .status-panel { margin-bottom: 4px; }
-        @media (min-width: 900px) {
+        /* ONE intentional breakpoint. Below this the scorecard is a single column -
+           every phone, and iPad portrait at 768/820. The rail only appears where it can
+           exist WITHOUT narrowing scoring: at 1000px a 280px rail still leaves the
+           scorecard ~700px. The old 900px threshold split an iPad landscape into
+           roughly half a scorecard. */
+        @media (min-width: 1000px) {
             .round-body-layout { display: flex; flex-direction: row-reverse; gap: 18px; align-items: flex-start; }
-            .status-panel { flex: 0 0 300px; position: sticky; top: 12px; margin-bottom: 0; }
+            .status-panel { flex: 0 0 280px; position: sticky; top: 12px; margin-bottom: 0; }
             .scorecard-main { flex: 1 1 auto; min-width: 0; }
         }
 
@@ -208,7 +213,12 @@
             padding: 8px 12px; border-top: 1px solid var(--border-light);
         }
         .action-row:first-of-type { border-top: none; }
-        .ar-name { flex: 0 0 auto; font-size: 0.82rem; font-weight: bold; color: var(--text-main); }
+        /* Truncates rather than forcing the row wide. "Marty/John vs Manny/Steve" at
+           360px would otherwise overflow the card. */
+        .ar-name {
+            flex: 0 1 auto; min-width: 0; font-size: 0.82rem; font-weight: bold;
+            color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
         .ar-status {
             flex: 1 1 auto; min-width: 0; text-align: right;
             font-size: 0.82rem; font-weight: bold;
@@ -477,7 +487,8 @@
         .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
         .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 14px; margin-bottom: 4px; border-top: 1px solid var(--border-faint); }
         .hole-view-nav-btn {
-            flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px;
+            flex: 1 1 0; min-width: 0; min-height: 48px; padding: 12px 8px;
+            font-size: 0.95rem; font-weight: bold; border-radius: 10px;
             border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); cursor: pointer;
         }
         .hole-view-position { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
@@ -562,8 +573,11 @@
         .card-table th { background: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
 
         /* Input Fix for iOS Double Tap */
+        /* PHONE FIRST: 48x48. The old 44x40 was under the 44px minimum on the short
+           axis, and this is the single most-tapped control in the app - hit by someone
+           walking, in a cart, in sunlight, one-handed. */
         .score-input-wrapper {
-            position: relative; display: inline-block; width: 44px; height: 40px;
+            position: relative; display: inline-block; width: 48px; height: 48px;
             background-color: var(--bg-card); border-radius: 6px;
         }
         .score-input {
