@@ -667,3 +667,136 @@ describe('HOLE PICKER — replacing the 1-18 circle strip', () => {
         assert.ok(/@media print \{ \.hole-picker/.test(idx));
     });
 });
+
+// ---------------------------------------------------------------------------
+// SCORECARD CLEANUP — one betting summary, no empty cards
+// ---------------------------------------------------------------------------
+describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
+    const idx = read('index.html');
+
+    function busyRound(opts) {
+        const o = opts || {};
+        const cd = makeCourseData(18);
+        const p = makePlayers(['Marty', 'John', 'Manny', 'Steve'], [0, 0, 0, 0]);
+        p[0].team = 'Team 1'; p[1].team = 'Team 1';
+        p[2].team = 'Team 2'; p[3].team = 'Team 2';
+        const scores = {};
+        cd.slice(0, o.thru || 15).forEach((h, i) => p.forEach((pl, pi) => {
+            scores[`p${pl.id}_h${h.hole}`] = h.par + (pi === 0 && i % 3 === 0 ? -1 : pi % 2);
+        }));
+        const data = {
+            gameFormat: 'stroke', players: p, courseData: cd, scores,
+            additionalGames: o.bare ? {} : {
+                skins: { enabled: true, skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross' },
+                dots: { enabled: true, dotPointVal: 2 }
+            },
+            dots: { h4: { [`p${p[0].id}`]: ['birdie'] } },
+            birdieGameEnabled: !o.bare, birdieUnitVal: 5, birdieScoringType: 'gross',
+            sideMatches: o.bare ? {} : {
+                mj: {
+                    format: 'stroke', scoring: 'gross', overallStake: 50, holeStake: 0,
+                    tieRule: 'push', overallMode: 'stroke', segment: 'full',
+                    teamAIds: [String(p[0].id)], teamBIds: [String(p[1].id)],
+                    overallPresses: { a: { startHole: 9, stake: 100 } }
+                }
+            }
+        };
+        return { cd, p, scores, data };
+    }
+
+    function render(opts) {
+        const sb = loadHtmlInlineScript('index.html', PAGE);
+        const { data, p } = busyRound(opts);
+        vm.runInContext(`currentData = ${JSON.stringify(data)};` +
+            `window.__scFilteredPlayers = currentData.players; currentViewedHole = 15;` +
+            `meId = '${p[0].id}'; actionCenterOpen = true;` +
+            `renderActionCenter(); renderBetStrip(); renderHoleRecap();`, sb);
+        const g = id => { const el = sb.document.getElementById(id); return el ? el.innerHTML : ''; };
+        return {
+            action: g('action-center-mount'),
+            strip: g('bet-strip-mount'),
+            recap: g('hole-recap-mount'),
+            all: ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].map(g).join('')
+        };
+    }
+
+    test('REGRESSION: a side match appears exactly ONCE across the whole scorecard', () => {
+        // It used to appear in the callout bar, in the LIVE ACTION dashboard, AND in
+        // Today's Action - three boxes telling a golfer the same thing.
+        const out = render();
+        const count = (out.all.match(/Marty vs John|You vs John/g) || []).length;
+        assert.equal(count, 1, `the side match is presented ${count} times`);
+    });
+
+    test('REGRESSION: Birdie money appears exactly once, in Today\'s Action', () => {
+        const out = render();
+        assert.ok(/Birdie Game/.test(out.action), 'the birdie wager lost its home');
+        assert.equal((out.all.match(/Birdie Game/g) || []).length, 1);
+    });
+
+    test('Skins appears once', () => {
+        const out = render();
+        assert.equal((out.all.match(/Skins/g) || []).length, 1);
+    });
+
+    test('there is exactly one betting summary heading', () => {
+        const out = render();
+        assert.ok(/Today\u2019s Action|Today's Action/.test(out.action));
+        assert.ok(!/LIVE ACTION/.test(out.all), 'a second dashboard is back');
+    });
+
+    test('every live wager type still has a row — nothing was lost', () => {
+        const out = render().action;
+        ['Skins', 'Dots', 'Birdie Game', 'John'].forEach(t =>
+            assert.ok(out.includes(t), `missing from Today's Action: ${t}`));
+    });
+
+    test('the side match press ladder survived the cleanup', () => {
+        const out = render().action;
+        assert.ok(/press-row/.test(out), 'presses must stay nested under their parent');
+        assert.ok(/H9\u201318/.test(out));
+    });
+
+    test('EMPTY STATES: a round with no side action renders no empty boxes', () => {
+        const out = render({ bare: true }).all;
+        ['Your Action', 'Other Action', 'Side Action', 'Already Settled', 'Birdie Game']
+            .forEach(t => assert.ok(!out.includes(t), `empty panel rendered: ${t}`));
+    });
+
+    test('the event recap is still separate from Today\'s Action', () => {
+        // "What just happened" and "where everything stands" are different questions and
+        // should not be merged into one panel.
+        const idxSrc = read('index.html');
+        assert.ok(/function renderHoleRecap/.test(idxSrc));
+        assert.ok(/function renderActionCenter/.test(idxSrc));
+        const recapMount = idxSrc.indexOf(`id="hole-recap-mount"`);
+        const actionMount = idxSrc.indexOf(`id="action-center-mount"`);
+        assert.ok(recapMount > -1 && actionMount > recapMount, 'recap sits above the action summary');
+    });
+
+    test('score entry still comes before any betting panel', () => {
+        const idxSrc = read('index.html');
+        const scores = idxSrc.indexOf('class="score-input"');
+        const recap = idxSrc.indexOf(`html += '<div id="hole-recap-mount">`);
+        const action = idxSrc.indexOf(`html += '<div id="action-center-mount">`);
+        const nav = idxSrc.indexOf('html += navRowHtml;');
+        assert.ok(scores > -1 && recap < action && action < nav,
+            'order must stay hole -> scores -> recap -> action -> navigation');
+    });
+
+    test('hole navigation is untouched', () => {
+        assert.ok(/toggleHolePicker\(\)/.test(idx));
+        assert.ok(/hole-jump-open/.test(idx));
+        assert.ok(/function jumpToHole/.test(idx));
+    });
+
+    test('the tablet/desktop side panel still exists for wide screens', () => {
+        assert.ok(/\.round-body-layout/.test(idx));
+        assert.ok(/class="status-panel"/.test(idx));
+    });
+
+    test('no money engine was touched by a layout batch', () => {
+        ['money-engine.js', 'settlement-engine.js'].forEach(f =>
+            assert.ok(!/renderActionCenter|sideRow|buildActionRows/.test(read(f)), `${f} changed`));
+    });
+});
