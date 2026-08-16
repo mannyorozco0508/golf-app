@@ -469,57 +469,123 @@ describe('SCORE CORRECTIONS — everything still derives from raw scores', () =>
         Object.keys(a).forEach(k => assert.ok(Math.abs(a[k] - b[k]) < ZERO, k));
     });
 
-    test('a half-played stacked round balances once skins is out of the picture', () => {
-        // Skins is excluded here for a documented reason - see the KNOWN BEHAVIOUR test
-        // below. Every other game in the stack balances correctly mid-round.
+    test('a half-played stacked round balances, skins included', () => {
         const { data, cd, players } = stackedRound();
-        const noSkins = Object.assign({}, data, { additionalGames: { dots: { enabled: true, dotPointVal: 2 } } });
         const partial = {};
         cd.slice(0, 6).forEach(h => players.forEach(p => { partial[`p${p.id}_h${h.hole}`] = h.par; }));
-        const c = settle.computeCombinedNetTotals(Object.assign({}, noSkins, { scores: partial }), cd, partial);
+        const c = settle.computeCombinedNetTotals(Object.assign({}, data, { scores: partial }), cd, partial);
         assert.ok(Math.abs(sumOf(c)) < ZERO, `mid-round stack summed to ${sumOf(c)}`);
     });
 });
 
-describe('KNOWN BEHAVIOUR — skins mid-round is not zero-sum (pre-existing, documented)', () => {
-    // NOT introduced by Stack the Action. Verified identical on the pre-Wave-1 repo.
+describe('SKINS — mid-round money is at stake, never already lost', () => {
+    // This was a real, pre-existing defect, fixed deliberately (product decision):
+    // every player was charged the FULL buy-in from the first score entered, while the
+    // pot for holes not yet played had been awarded to nobody. Mid-round totals summed
+    // negative and every golfer showed as down money on skins nobody had won.
     //
-    // computeSkinsSettlementNet debits every player their share of the pot as soon as
-    // scoring starts, but money for skins that are still CARRYING has not been awarded
-    // to anyone. Mid-round the sum is therefore negative - money appears destroyed.
-    //
-    // On a COMPLETED round it is correctly zero-sum, so real settlement is unaffected.
-    // The open question is a product one, not a maths one: mid-round, should a carried
-    // pot show everyone already down their buy-in, or should undecided money be held
-    // out until it is actually won? The second reading matches the app's own
-    // "AT STAKE is not WON" rule. Pinned here so the behaviour cannot drift silently
-    // while the decision is outstanding.
+    // A player is now charged only for the holes actually played. On a completed round
+    // nothing changes at all - which is what these tests exist to guarantee.
     const cd = makeCourseData(18);
     const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
-    const cfg = { gameFormat: 'skins', players, courseData: cd, skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', skinsPotFormat: 'gross' };
+    const base = { gameFormat: 'skins', players, courseData: cd, skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', skinsPotFormat: 'gross' };
+    const net = scores => settle.computeSkinsSettlementNet(Object.assign({ scores }, base), cd, scores);
+    const total = n => Object.values(n).reduce((s, v) => s + v, 0);
 
-    test('a COMPLETED skins round is zero-sum — real settlement is correct', () => {
+    function tiedThrough(holes) {
         const scores = {};
-        cd.forEach((h, i) => players.forEach((p, pi) => { scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i < 5 ? -1 : 0); }));
-        const net = settle.computeSkinsSettlementNet(Object.assign({ scores }, cfg), cd, scores);
-        const sum = Object.values(net).reduce((s, v) => s + v, 0);
-        assert.ok(Math.abs(sum) < ZERO, `completed skins summed to ${sum}`);
+        cd.slice(0, holes).forEach(h => players.forEach(p => { scores[`p${p.id}_h${h.hole}`] = h.par; }));
+        return scores;
+    }
+
+    test('REGRESSION: a half-played round with everything carrying is zero-sum', () => {
+        const n = net(tiedThrough(6));
+        assert.ok(Math.abs(total(n)) < ZERO, `six tied holes summed to ${total(n)}`);
+    });
+
+    test('REGRESSION: nobody is shown as down money on skins nobody has won', () => {
+        const n = net(tiedThrough(6));
+        Object.values(n).forEach(v => assert.ok(Math.abs(v) < ZERO,
+            `a carried pot must be AT STAKE, not lost - player showed ${v}`));
+    });
+
+    test('a round with no scores at all costs nobody anything', () => {
+        const n = net({});
+        assert.ok(Math.abs(total(n)) < ZERO);
+        Object.values(n).forEach(v => assert.ok(Math.abs(v) < ZERO));
+    });
+
+    test('mid-round, a golfer who has actually won skins is up and the rest are down', () => {
+        const scores = {};
+        cd.slice(0, 6).forEach((h, i) => players.forEach((p, pi) => {
+            scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i < 2 ? -1 : 0);
+        }));
+        const n = net(scores);
+        assert.ok(Math.abs(total(n)) < ZERO, 'still zero-sum');
+        assert.ok(n[players[0].id] > ZERO, 'the skin winner should be up');
+        players.slice(1).forEach(p => assert.ok(n[p.id] < -ZERO, 'the others should be down'));
+    });
+
+    test('the stake charged grows as more holes are played', () => {
+        const winAt = holes => {
+            const scores = {};
+            cd.slice(0, holes).forEach((h, i) => players.forEach((p, pi) => {
+                scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i === 0 ? -1 : 0);
+            }));
+            return net(scores);
+        };
+        const early = winAt(3), later = winAt(12);
+        assert.ok(later[players[0].id] > early[players[0].id],
+            'one skin is worth more of the pot once more holes have been played');
+        [early, later].forEach(n => assert.ok(Math.abs(total(n)) < ZERO));
+    });
+
+    test('a COMPLETED round settles to exactly what it always did', () => {
+        // The guarantee that matters: final money is untouched by this change.
+        const scores = {};
+        cd.forEach((h, i) => players.forEach((p, pi) => {
+            scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i < 5 ? -1 : 0);
+        }));
+        const n = net(scores);
+        assert.ok(Math.abs(total(n)) < ZERO);
+        assert.ok(Math.abs(n[players[0].id] - 4.1666666) < 0.01, `winner got ${n[players[0].id]}, expected 4.17`);
+        players.slice(1).forEach(p => assert.ok(Math.abs(n[p.id] + 1.3888888) < 0.01, `loser got ${n[p.id]}, expected -1.39`));
     });
 
     test('a completed round where every hole ties awards nothing and costs nobody', () => {
-        const scores = {};
-        cd.forEach(h => players.forEach(p => { scores[`p${p.id}_h${h.hole}`] = h.par; }));
-        const net = settle.computeSkinsSettlementNet(Object.assign({ scores }, cfg), cd, scores);
-        assert.ok(Math.abs(Object.values(net).reduce((s, v) => s + v, 0)) < ZERO);
+        const n = net(tiedThrough(18));
+        assert.ok(Math.abs(total(n)) < ZERO);
+        Object.values(n).forEach(v => assert.ok(Math.abs(v) < ZERO));
     });
 
-    test('mid-round, carried pot money is currently shown as already lost', () => {
+    test('a split gross/net pot stays zero-sum at every stage', () => {
+        [3, 9, 18].forEach(holes => {
+            const scores = {};
+            cd.slice(0, holes).forEach((h, i) => players.forEach((p, pi) => {
+                scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i % 4 === 0 ? -1 : 0);
+            }));
+            const cfg = Object.assign({ scores }, base, { skinsPotFormat: 'split' });
+            const n = settle.computeSkinsSettlementNet(cfg, cd, scores);
+            assert.ok(Math.abs(total(n)) < ZERO, `split pot thru ${holes} summed to ${total(n)}`);
+        });
+    });
+
+    test('non-carry-over skins are untouched — that mode was already zero-sum', () => {
         const scores = {};
-        cd.slice(0, 6).forEach(h => players.forEach(p => { scores[`p${p.id}_h${h.hole}`] = h.par; }));
-        const net = settle.computeSkinsSettlementNet(Object.assign({ scores }, cfg), cd, scores);
-        const sum = Object.values(net).reduce((s, v) => s + v, 0);
-        assert.ok(sum < -ZERO, 'if this now balances, the behaviour changed - update the report');
-        Object.values(net).forEach(v => assert.ok(v < 0, 'every player is currently debited'));
+        cd.slice(0, 6).forEach((h, i) => players.forEach((p, pi) => {
+            scores[`p${p.id}_h${h.hole}`] = h.par + (pi === 0 && i < 2 ? -1 : 0);
+        }));
+        const cfg = Object.assign({ scores }, base, { skinsCarryOver: false });
+        const n = settle.computeSkinsSettlementNet(cfg, cd, scores);
+        assert.ok(Math.abs(total(n)) < ZERO);
+    });
+
+    test('a mid-round STACKED round including skins is now fully zero-sum', () => {
+        const { data, cd: scd, players: sp } = stackedRound();
+        const partial = {};
+        scd.slice(0, 6).forEach(h => sp.forEach(p => { partial[`p${p.id}_h${h.hole}`] = h.par; }));
+        const c = settle.computeCombinedNetTotals(Object.assign({}, data, { scores: partial }), scd, partial);
+        assert.ok(Math.abs(sumOf(c)) < ZERO, `mid-round stack summed to ${sumOf(c)}`);
     });
 });
 
