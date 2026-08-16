@@ -351,6 +351,29 @@
         }
     }
 
+    // Settles ONE game from getRoundGames() and returns { playerId: net }.
+    //
+    // Skins and Hi-Lo are dispatched directly because computeRoundMoneyByPlayer does
+    // not handle them (a long-standing, documented gap). Everything else goes through
+    // that canonical dispatcher untouched. No new golf math lives here - this function
+    // only chooses which existing engine to call.
+    function computeGameNetByPlayerId(game, courseData, savedScores) {
+        const cfg = game.config;
+        const out = {};
+
+        if (game.format === 'skins') {
+            return computeSkinsSettlementNet(cfg, courseData, savedScores);
+        }
+        if (game.format === 'hilo') {
+            return computeHiLoSettlementNet(cfg, courseData, savedScores);
+        }
+
+        const result = computeRoundMoneyByPlayer(cfg, courseData, savedScores);
+        if (!result.valid) return out;
+        result.players.forEach(p => { out[p.id] = p.net || 0; });
+        return out;
+    }
+
     function computeCombinedNetTotals(data, courseData, savedScores) {
         const netByName = {}; // lowercased key -> { name, net }
         function addAmount(player, amount) {
@@ -361,29 +384,23 @@
         }
 
         const allPlayers = data.players || [];
-        const gameFormat = data.gameFormat || 'stroke';
 
-        // Main game — reuses the same canonical dispatcher every other format in the app relies
-        // on, EXCEPT Skins and Hi-Lo, which that dispatcher doesn't handle (confirmed gap, filled
-        // above using each format's own already-established formula, not new math).
-        if (gameFormat === 'skins') {
-            const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
-            Object.keys(skinsNet).forEach(pid => {
+        // Every game this round is playing — the main game plus any additional games
+        // stacked on top of it. getRoundGames() in action-model.js normalises a legacy
+        // single-gameFormat round to a one-item list, so this loop settles old and new
+        // rounds through exactly the same path.
+        //
+        // Each game is settled by the SAME engines that have always settled it; only the
+        // config handed in differs. Adding a game therefore cannot change what any other
+        // game pays, and the zero-sum guarantee of each engine composes: a sum of
+        // zero-sum results is itself zero-sum.
+        getRoundGames(data).forEach(game => {
+            const gameNet = computeGameNetByPlayerId(game, courseData, savedScores);
+            Object.keys(gameNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
-                addAmount(p, skinsNet[pid]);
+                addAmount(p, gameNet[pid]);
             });
-        } else if (gameFormat === 'hilo') {
-            const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
-            Object.keys(hiloNet).forEach(pid => {
-                const p = allPlayers.find(pl => String(pl.id) === String(pid));
-                addAmount(p, hiloNet[pid]);
-            });
-        } else {
-            const mainResult = computeRoundMoneyByPlayer(data, courseData, savedScores);
-            if (mainResult.valid) {
-                mainResult.players.forEach(p => addAmount(p, p.net || 0));
-            }
-        }
+        });
 
         // Birdie pool
         const birdieTotals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
