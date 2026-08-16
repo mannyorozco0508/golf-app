@@ -306,7 +306,12 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
 
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     const scores = savedScores || {};
-    const players = (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
+    // A round-level wager involves the whole money field, not the group on screen.
+    // Pricing skins over the visible four in a 12-player round produced both a wrong
+    // pot and a wrong winner, and made this row disagree with the hole recap.
+    const players = (typeof fieldParticipants === 'function')
+        ? fieldParticipants(data)
+        : (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
         .filter(p => p.playingForMoney !== false);
 
     getRoundGames(data).forEach(game => {
@@ -518,7 +523,12 @@ function buildSettledRows(data, courseData, savedScores, scopedPlayers) {
 
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     const scores = savedScores || {};
-    const players = (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
+    // A round-level wager involves the whole money field, not the group on screen.
+    // Pricing skins over the visible four in a 12-player round produced both a wrong
+    // pot and a wrong winner, and made this row disagree with the hole recap.
+    const players = (typeof fieldParticipants === 'function')
+        ? fieldParticipants(data)
+        : (scopedPlayers && scopedPlayers.length > 0 ? scopedPlayers : (data.players || []))
         .filter(p => p.playingForMoney !== false);
 
     getRoundGames(data).forEach(game => {
@@ -547,4 +557,69 @@ function buildSettledRows(data, courseData, savedScores, scopedPlayers) {
     });
 
     return rows;
+}
+
+
+// ---------------------------------------------------------------------------
+// ACTION ORDERING
+//
+// With eight wagers running, a fixed main/additional/side order stops being useful.
+// Rows are scored on relevance and state so the list is stable and predictable: the
+// same board always sorts the same way, and it only reshuffles when the golf changes.
+//
+// Deliberately NOT a factor: the size of the wager. Ranking by dollars would quietly
+// turn Today's Action into an advertisement for betting more.
+// ---------------------------------------------------------------------------
+const ACTION_RANK = {
+    JUST_CHANGED: 0,
+    CLOSE_TO_DONE: 1,
+    BIG_CARRY: 2,
+    LIVE: 3,
+    IDLE: 4
+};
+
+// "Close to done" only where it means something. A match 2 up with holes running out
+// is genuinely on the brink; a stroke total with ten to play is not, and inventing
+// closeness for it would be noise dressed as insight.
+function isCloseToDone(row) {
+    if (!row || !row.status) return false;
+    const m = /^\S+(?:\/\S+)?\s+(\d+)\s+UP$/.exec(row.status);
+    return !!m && parseInt(m[1], 10) >= 2;
+}
+
+function hasBigCarry(row) {
+    const m = /(\d+)\s+riding/.exec((row && row.status) || '');
+    return !!m && parseInt(m[1], 10) >= 3;
+}
+
+// changedKeys: row keys whose state moved on the hole just completed. Ephemeral,
+// passed in per render - never stored, never written to Firebase.
+function rankActionRow(row, changedKeys) {
+    if (changedKeys && changedKeys[row.key]) return ACTION_RANK.JUST_CHANGED;
+    if (isCloseToDone(row)) return ACTION_RANK.CLOSE_TO_DONE;
+    if (hasBigCarry(row)) return ACTION_RANK.BIG_CARRY;
+    if (row.tone === 'idle') return ACTION_RANK.IDLE;
+    return ACTION_RANK.LIVE;
+}
+
+// Stable sort: equal ranks keep their original order, so the board never jitters
+// while a golfer is reading it.
+function sortActionRows(rows, changedKeys) {
+    return (rows || [])
+        .map((row, i) => ({ row, i, rank: rankActionRow(row, changedKeys) }))
+        .sort((a, b) => (a.rank - b.rank) || (a.i - b.i))
+        .map(x => x.row);
+}
+
+// The one extra clause on the collapsed bar. Fixed priority order, so it never
+// cycles or becomes a moving headline:
+//   1. how much of the action is yours   2. a big carry   3. nothing
+//
+// It never states a live money position. Mid-round a golfer's total mixes settled and
+// unsettled wagers, so "+$23" would break AT STAKE is not WON. A count is honest.
+function actionHeadline(rows, myCount) {
+    if (myCount > 0) return `${myCount} yours`;
+    const carry = (rows || []).find(r => hasBigCarry(r));
+    if (carry) return `${/(\d+)\s+riding/.exec(carry.status)[1]} skins riding`;
+    return '';
 }
