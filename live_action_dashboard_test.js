@@ -230,7 +230,7 @@ describe('LIVE ACTION — Skins section (reuses the existing live carry-over/voi
     });
 });
 
-describe('LIVE ACTION — Birdie Pool / KP section (side games, independent of main format)', () => {
+describe('LIVE ACTION — Birdie Pool section (side games, independent of main format)', () => {
     test('birdie pool money is zero-sum and correctly attributed', () => {
         const sandbox = loadHtmlInlineScript('index.html');
         const cd = makeCourseData(3);
@@ -243,15 +243,10 @@ describe('LIVE ACTION — Birdie Pool / KP section (side games, independent of m
         assert.equal(sum, 0);
     });
 
-    test('KP wins display correctly when enabled', () => {
-        const sandbox = loadHtmlInlineScript('index.html');
-        const cd = [{ hole: 1, par: 3, hcpIndex: 1 }];
-        const players = makePlayers(['Manny', 'John'], [0, 0]);
-        players.forEach(p => p.playingForMoney = true);
-        withData(sandbox, { players, gameFormat: 'stroke', kpGameEnabled: true, kpBuyIn: 5, kpWinners: { h1: String(players[0].id) }, courseData: cd, scores: {} });
-        const summary = sandbox.buildLiveActionSummary(players, players);
-        assert.equal(summary.birdieKpSummary.kpWins.find(p => p.name === 'Manny').wins, 1);
-    });
+    // REMOVED IN WAVE 4: Dollar Game / KP was retired from the product, so there is no
+    // longer a live KP section to display. The calculation survives in
+    // settlement-engine.js as a legacy reader for historical rounds only - covered by
+    // the legacy tests in wave4_finish_test.js rather than here.
 
     test('the dashboard appears even with ONLY a birdie pool active - no main game, no side match required', () => {
         const sandbox = loadHtmlInlineScript('index.html');
