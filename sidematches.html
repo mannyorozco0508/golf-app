@@ -928,7 +928,13 @@
     }
 
     function scorecardBaseUrl() {
-        return window.location.href.split('?')[0].replace('sidematches.html', 'index.html');
+        // Built from the directory, not by replacing a filename. Cloudflare Pages serves
+        // this page as ".../sidematches", so a filename replace finds nothing and quietly
+        // returns THIS page's URL - which is how group links ended up pointing at the
+        // wrong page. See the same fix in admin.html.
+        const loc = window.location;
+        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
+        return loc.origin + dir + 'index.html';
     }
 
     function openSideMatchLinksModal(teamAIds, teamBIds) {
