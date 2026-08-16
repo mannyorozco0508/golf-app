@@ -799,10 +799,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             </div>
 
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
-                <input type="checkbox" id="enable-kpgame" style="width: 18px; height: 18px; margin: 0;">
-                <strong>📍 Dollar Game (KPs)</strong>
-            </label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 0 26px;">Closest-to-the-pin on Par 3s. Every other player pays the buy-in to whoever's closest on each one. Set up on the Action tab.</p>
         </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(6)">◀ Back</button>
@@ -1053,11 +1049,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const currentFormat = formatSelect ? formatSelect.value : '';
         const playerCount = document.getElementById('player-count') ? document.getElementById('player-count').textContent : '0';
         const birdieOn = document.getElementById('enable-birdiegame') && document.getElementById('enable-birdiegame').checked;
-        const kpOn = document.getElementById('enable-kpgame') && document.getElementById('enable-kpgame').checked;
+        // Dollar Game / KP was retired from the product - nothing can switch it on.
         let sideGamesText = 'None';
-        if (birdieOn && kpOn) sideGamesText = 'Birdie Game + KPs';
-        else if (birdieOn) sideGamesText = 'Birdie Game';
-        else if (kpOn) sideGamesText = 'KPs (Dollar Game)';
+        if (birdieOn) sideGamesText = 'Birdie Game';
 
         // The exact stake, in plain language, for whichever format is actually selected — so
         // the review screen answers "how much are we playing for," not just "which game."
@@ -2247,9 +2241,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (document.getElementById("birdie-unit-val-admin")) {
                 document.getElementById("birdie-unit-val-admin").value = data.birdieUnitVal !== undefined ? data.birdieUnitVal : "";
             }
-            if (document.getElementById("enable-kpgame")) {
-                document.getElementById("enable-kpgame").checked = data.kpGameEnabled === true;
-            }
+            // A legacy round may still carry kpGameEnabled. It is deliberately never read
+            // back into a control, so reopening an old round cannot resurrect the feature.
 
             if (data.matchScoring && document.getElementById("match-scoring")) { document.getElementById("match-scoring").value = data.matchScoring; syncToggle("match-scoring", "match-scoring-switch", "match-scoring-label-net", "match-scoring-label-gross", "net"); }
             setMatchScoringStyle(data.matchScoringStyle === 'stroke' ? 'stroke' : 'match');
@@ -2707,7 +2700,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
 
             const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
-            const kpGameEnabled = document.getElementById("enable-kpgame") ? document.getElementById("enable-kpgame").checked : false;
             const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
 
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
@@ -2784,7 +2776,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // getRoundGames() correctly reads as a single-game round.
                 additionalGames: captureAdditionalGames(),
                 birdieGameEnabled: birdieGameEnabled,
-                kpGameEnabled: kpGameEnabled,
                 birdieUnitVal: birdieUnitVal,
                 matchScoring: matchScoring,
                 matchScoringStyle: matchScoringStyle,
