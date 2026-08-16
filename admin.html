@@ -1968,7 +1968,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const headerRow = document.getElementById("player-header-row");
         const warningBox = document.getElementById("one-v-one-warning");
         const showMoneyCheckbox = moneyFormats.includes(format);
-        const moneyHeaderHtml = showMoneyCheckbox ? `<span style="text-align:center; font-size:0.85rem;" title="Playing for money?">💰</span>` : "";
+        const moneyHeaderHtml = showMoneyCheckbox
+            ? `<span style="text-align:center; font-size:0.62rem; line-height:1.1; font-weight:bold; color:var(--brand-green);" title="In the round-wide group games">GROUP<br>GAMES</span>`
+            : "";
 
         const isOneVOne = format === 'match' || (format === 'nassau' && nassauType === '1v1');
         const oneVOneOverflow = isOneVOne && existingDataLength > 2;
@@ -1981,15 +1983,34 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
 
         if (format === 'ryder') {
-            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
-            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
-            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
         }
+        renderGroupGamesHint(showMoneyCheckbox);
+    }
+
+    // One line, under the player list. The rule it explains is genuinely non-obvious:
+    // unchecking a golfer removes them from the ROUND-WIDE games only. Their Side
+    // Matches are unaffected, because a Side Match names its own players.
+    function renderGroupGamesHint(show) {
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        let hint = document.getElementById('group-games-hint');
+        if (!show) { if (hint) hint.remove(); return; }
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'group-games-hint';
+            hint.style.cssText = 'font-size:0.72rem; color:var(--text-muted); line-height:1.4; margin:8px 2px 0;';
+            list.parentNode.insertBefore(hint, list.nextSibling);
+        }
+        hint.innerHTML = 'Uncheck a golfer if they\'re playing the round but sitting out the group-wide bets '
+            + '(Skins, Dots, Birdies, the main bet). <strong>Side Matches choose their own players separately.</strong>';
     }
 
     function renderPlayerList(forceLoad = false) {
@@ -2483,12 +2504,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const showMoneyCheckbox = moneyFormats.includes(format);
         let moneyCheckboxHtml = "";
         if (showMoneyCheckbox) {
-            moneyCheckboxHtml = `<input type="checkbox" class="p-money-input" title="Playing for money?" ${playingForMoney !== false ? 'checked' : ''} style="width:20px; height:20px; cursor:pointer; justify-self:center; accent-color:var(--accent-teal);">`;
+            moneyCheckboxHtml = `<input type="checkbox" class="p-money-input" title="In the round-wide group games (Skins, Dots, Birdies, main bet). Side Matches pick their own players." ${playingForMoney !== false ? 'checked' : ''} style="width:24px; height:24px; cursor:pointer; justify-self:center; accent-color:var(--accent-teal);">`;
         }
 
         const row = document.createElement("div");
         row.className = "player-row";
-        row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 30px" : "") + " 38px";
+        row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
