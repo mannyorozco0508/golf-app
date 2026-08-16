@@ -498,12 +498,16 @@
         <div id="hole-bet-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
-                <strong>💵 Enable Per-Hole Bet Option</strong>
+                <strong>💵 Pay by the hole instead</strong>
             </label>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 0 26px;">Off: you win a set amount for winning the match. On: you win that amount times how many holes you finish ahead.</p>
             <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
                 <div class="grid-2col">
-                    <div><label style="font-size: 0.8rem;">Bet Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1"></div>
+                    <div><label style="font-size: 0.8rem;">Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1" oninput="updateBetExplainers()"></div>
                 </div>
+                <p style="font-size: 0.72rem; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; margin: 10px 0 0 0;">
+                    ⚠️ This replaces the set match amount — you're playing for this per-hole figure only.
+                </p>
             </div>
         </div>
     </div>
@@ -548,14 +552,14 @@
                     <input type="hidden" id="match-scoring" value="net">
                 </div>
                 <div>
-                    <label style="font-size: 0.75rem;">Flat Match Bet ($)</label>
+                    <label style="font-size: 0.75rem;" id="match-stake-label">Match Bet ($)</label>
                     <div class="grid-4col" id="match-stake-presets" style="margin-bottom:4px;">
                         <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 5, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 10, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 20, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$20</button>
                         <button type="button" class="preset-btn" onclick="focusCustomStake('match-stake', 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">Custom</button>
                     </div>
-                    <input type="number" id="match-stake" value="" min="0" placeholder="0" oninput="clearStakePresetHighlight('match-stake-presets')">
+                    <input type="number" id="match-stake" value="" min="0" placeholder="0" oninput="clearStakePresetHighlight('match-stake-presets'); updateBetExplainers();">
                 </div>
             </div>
             <div id="match-play-only-settings">
@@ -569,7 +573,7 @@
                 </div>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
                 <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;"><strong>🔥 Manual Press:</strong> No matter which rule you pick above, a "Press" button is always available on the scorecard so you can start a press on any hole, any time.</p>
-                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;"><em>If "Enable Per-Hole Bet" is checked above, it will override this flat bet.</em></div>
+                <p style="font-size: 0.72rem; color: var(--brand-navy); margin: 6px 0 0 0;" id="match-bet-explainer"></p>
             </div>
         </div>
 
@@ -596,17 +600,17 @@
                     <input type="hidden" id="nassau-scoring" value="net">
                 </div>
                 <div>
-                    <label style="font-size: 0.75rem;">Base Bet ($)</label>
+                    <label style="font-size: 0.75rem;" id="nassau-stake-label">Nassau Bet ($)</label>
                     <div class="grid-4col" id="nassau-stake-presets" style="margin-bottom:4px;">
                         <button type="button" class="preset-btn active" onclick="setStakePreset('nassau-stake', 10, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 2, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$2</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 5, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 20, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$20</button>
                     </div>
-                    <input type="number" id="nassau-stake" value="10" min="1" oninput="clearStakePresetHighlight('nassau-stake-presets')">
+                    <input type="number" id="nassau-stake" value="10" min="1" oninput="clearStakePresetHighlight('nassau-stake-presets'); updateBetExplainers();">
                 </div>
             </div>
-            <p style="font-size: 0.7rem; color: var(--brand-navy); margin: 6px 0 0 0;"><strong>ℹ️ Match Play bet:</strong> this is 3 separate hole-by-hole bets (Front 9, Back 9, Total 18) — each pays out on holes won, not total strokes like Stroke Play.</p>
+            <p style="font-size: 0.72rem; color: var(--brand-navy); margin: 6px 0 0 0;" id="nassau-bet-explainer"></p>
             <div style="margin-top: 8px;">
                 <label style="font-size: 0.75rem;">Press Rule</label>
                 <select id="nassau-press-rule" onchange="updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation')">
@@ -923,7 +927,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         let mainGameText = '';
         if (format === 'nassau') {
             const pressMap = { '2down': 'Automatic press at 2 Down', '1down': 'Automatic press at 1 Down', 'anytime': 'Press available any hole', 'none': 'No presses' };
-            mainGameText = `$${data.nassauStake || 10} Nassau — ${pressMap[data.nassauPressRule] || 'No presses'}`;
+            const nHoleBet = data.holeBetStake || 0;
+            const nBetText = nHoleBet > 0 ? `$${nHoleBet} per hole Nassau` : `$${data.nassauStake || 10} Nassau`;
+            mainGameText = `${nBetText} — ${pressMap[data.nassauPressRule] || 'No presses'}`;
         } else if (format === 'match') {
             mainGameText = `$${data.matchStake || 0} Match Play`;
         } else if (format === 'wolf') {
@@ -1293,7 +1299,42 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function toggleHoleBet() {
-        document.getElementById('hole-bet-stake-container').style.display = document.getElementById('enable-hole-bet').checked ? 'block' : 'none';
+        const on = document.getElementById('enable-hole-bet').checked;
+        document.getElementById('hole-bet-stake-container').style.display = on ? 'block' : 'none';
+        // The two bets are mutually exclusive in the engine, so make that visible:
+        // grey the set-amount inputs rather than leaving them looking editable and live.
+        ['nassau-stake', 'nassau-stake-presets', 'nassau-stake-label',
+         'match-stake', 'match-stake-presets', 'match-stake-label'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.opacity = on ? '0.4' : '1';
+            el.style.pointerEvents = on ? 'none' : 'auto';
+        });
+        updateBetExplainers();
+    }
+
+    // Describes the live wager in plain money terms. Nassau is three separate bets
+    // (front 9, back 9, total 18), which is exactly the thing golfers forget - so the
+    // maximum is spelled out rather than left to be worked out on the 18th green.
+    function updateBetExplainers() {
+        const perHoleOn = (document.getElementById('enable-hole-bet') || {}).checked;
+        const perHole = parseFloat((document.getElementById('hole-bet-stake') || {}).value) || 0;
+
+        const nEl = document.getElementById('nassau-bet-explainer');
+        if (nEl) {
+            const nStake = parseFloat((document.getElementById('nassau-stake') || {}).value) || 0;
+            nEl.innerHTML = (perHoleOn && perHole > 0)
+                ? `<strong>💵 $${perHole} per hole Nassau.</strong> Three bets — front 9, back 9, and all 18. Each pays $${perHole} for every hole you finish ahead, so a 3-up win on the front is $${perHole * 3}.`
+                : `<strong>💵 $${nStake} Nassau.</strong> Three bets — front 9, back 9, and all 18. Win all three and you win $${nStake * 3}. Margin doesn't matter: 1 up pays the same as 5 up.`;
+        }
+
+        const mEl = document.getElementById('match-bet-explainer');
+        if (mEl) {
+            const mStake = parseFloat((document.getElementById('match-stake') || {}).value) || 0;
+            mEl.innerHTML = (perHoleOn && perHole > 0)
+                ? `<strong>💵 $${perHole} per hole.</strong> You win $${perHole} for every hole you finish ahead — win by 3 and that's $${perHole * 3}.`
+                : `<strong>💵 $${mStake} match.</strong> Win the match and you win $${mStake}, whether it's 1 up or 6 up.`;
+        }
     }
 
     // Round is this page — tapping it just keeps the existing New/Resume/Join/Duplicate
@@ -1955,6 +1996,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         document.getElementById(inputId).value = value;
         document.querySelectorAll(`#${presetsContainerId} .preset-btn`).forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
+        updateBetExplainers();
     }
     function clearStakePresetHighlight(presetsContainerId) {
         document.querySelectorAll(`#${presetsContainerId} .preset-btn`).forEach(b => b.classList.remove('active'));
@@ -2033,6 +2075,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (document.getElementById("skins-settings")) document.getElementById("skins-settings").style.display = (format === "skins") ? "block" : "none";
         
         renderPlayerList(forceLoad);
+        // Keep the plain-English bet description in step with whichever format is showing,
+        // including when a saved round is reopened rather than freshly configured.
+        updateBetExplainers();
     }
 
     function loadModeData(modeKey) {
