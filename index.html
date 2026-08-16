@@ -676,17 +676,26 @@
 </div>
 
 <script>
-    // --- DYNAMIC BETA TIME BOMB ---
+    // --- BETA NOTICE (non-blocking) ---
+    // This used to be a kill switch: past BETA_END_DATE it wiped document.body and
+    // threw, so the whole app - live scores, settlement, everything - disappeared the
+    // moment a hardcoded date rolled over. A date passing must never take a working
+    // round offline on the course, so the block is gone. The date now only drives a
+    // dismissible banner, and even that never prevents play.
     const BETA_END_DATE = new Date("2026-09-01T00:00:00");
-    if (new Date() > BETA_END_DATE) {
-        document.body.innerHTML = `
-            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
-                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
-                <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
-            </div>`;
-        throw new Error("Beta period expired.");
+    const betaPeriodEnded = new Date() > BETA_END_DATE;
+    function renderBetaNotice() {
+        if (!betaPeriodEnded) return;
+        if (localStorage.getItem('betaNoticeDismissed') === '1') return;
+        const bar = document.createElement('div');
+        bar.id = 'beta-notice-bar';
+        bar.style.cssText = 'background:#fff8e1; border:1px solid #e6c200; border-radius:8px; padding:8px 12px; margin:0 0 10px 0; font-size:0.78rem; color:#5c4600; display:flex; align-items:center; justify-content:space-between; gap:10px;';
+        bar.innerHTML = '<span>\u26F3 You\'re on a beta build \u2014 everything still works, we\'re just still polishing.</span>'
+            + '<button onclick="localStorage.setItem(\'betaNoticeDismissed\',\'1\'); this.parentElement.remove();" style="background:none; border:none; color:#5c4600; font-weight:bold; cursor:pointer; font-size:0.78rem;">\u2715</button>';
+        const host = document.querySelector('.container') || document.body;
+        host.insertBefore(bar, host.firstChild);
     }
+    document.addEventListener('DOMContentLoaded', renderBetaNotice);
     // ---------------------------------
 
     const firebaseConfig = {
@@ -1584,7 +1593,15 @@
     // them - a real problem when someone forgets to send one from the first tee.
     let groupLinksPanelOpen = false;
 
+    // The single definition of "is this the organizer". A ?group=N link is a scoped
+    // scorekeeper link; the unparameterised round URL is the organizer's. Every
+    // organizer-only control checks this one predicate rather than each re-deriving it.
+    function isOrganizerView() {
+        return !hasGroupLock;
+    }
+
     function toggleGroupLinksPanel() {
+        if (!isOrganizerView()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
         renderGroupLinksPanel();
     }
@@ -1592,6 +1609,10 @@
     function renderGroupLinksPanel() {
         const panel = document.getElementById('group-links-panel');
         if (!panel) return;
+        // Checked here as well as at the button, so deleting the gate in devtools or
+        // calling this directly from the console still produces nothing. This is not a
+        // CSS hide - the markup is never generated for a scorekeeper.
+        if (!isOrganizerView()) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
         if (!groupLinksPanelOpen) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
 
         const players = currentData.players || [];
@@ -1656,7 +1677,12 @@
             boundaries.forEach(b => {
                 html += `<button class="group-btn ${selectedGroup === b.group ? 'active' : ''}" onclick="filterGroup(${b.group})">Group ${b.group}</button>`;
             });
-            html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">📋 Group Links</button>`;
+            // Organizer only. A scorekeeper opened their group's link precisely so they
+            // could score THEIR foursome; handing them every other group's privileged
+            // URL from inside that page defeats the point of scoping links at all.
+            if (isOrganizerView()) {
+                html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">📋 Group Links</button>`;
+            }
         }
 
         container.innerHTML = html;
