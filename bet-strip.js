@@ -382,11 +382,19 @@ function gameStatusLine(game, holes, scores, players) {
 }
 
 // Skins reads in skins language: who has how many, and how many are riding.
-function skinsStatus(cfg, holes, scores, players) {
+// The one walk through the holes that decides skins. Both the status line and the
+// end-of-hole recap read this, so a golfer can never be told one thing by the row
+// and another by the recap.
+//
+// Returns structured state, not text: who holds how many, what is riding, which hole
+// each skin was decided on, and what a skin is worth. Nothing is stored - it is
+// rebuilt from raw scores every time, so a correction simply produces a new answer.
+function skinsState(cfg, holes, scores, players) {
     const scoringKey = (cfg.skinsScoring === 'net') ? 'net' : 'gross';
     const carryOver = cfg.skinsCarryOver !== false;
     const won = {};
-    let carry = 1, decided = 0;
+    const awards = [];      // { hole, playerId, units }
+    let carry = 1, lastDecidedHole = null;
 
     holes.forEach(h => {
         const entries = players.map(p => {
@@ -395,25 +403,54 @@ function skinsStatus(cfg, holes, scores, players) {
             const strokes = getStrokes(parseHcp(p.handicap), h.hcp, players.length);
             return { p, gross: raw, net: raw - strokes };
         }).filter(Boolean);
+        // A skin cannot be decided until everyone who is in it has posted.
         if (entries.length === 0 || entries.length < players.length) return;
 
         const min = Math.min(...entries.map(e => e[scoringKey]));
         const winners = entries.filter(e => e[scoringKey] === min);
         if (winners.length === 1) {
-            won[winners[0].p.id] = (won[winners[0].p.id] || 0) + (carryOver ? carry : 1);
+            const units = carryOver ? carry : 1;
+            won[winners[0].p.id] = (won[winners[0].p.id] || 0) + units;
+            awards.push({ hole: h.hole, playerId: winners[0].p.id, units });
             carry = 1;
-            decided++;
+            lastDecidedHole = h.hole;
         } else if (carryOver) {
             carry += 1;
         }
     });
 
-    const holders = players
-        .filter(p => won[p.id] > 0)
-        .sort((a, b) => won[b.id] - won[a.id])
-        .map(p => `${shortName(p.name)} ${won[p.id]}`);
+    // What one skin is worth. Under carry-over the pot is spread across the wager's
+    // own hole range, which is what makes "3 riding = $60" an honest number rather
+    // than a guess. Mirrors computeSkinsSettlementNet's own arithmetic.
+    const buyIn = cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 0;
+    const pot = buyIn * players.length;
+    const skinValue = carryOver
+        ? (holes.length > 0 ? pot / holes.length : 0)
+        : (awards.length > 0 ? pot / awards.length : 0);
 
-    const riding = carryOver && carry > 1 ? `${carry - 1} riding` : '';
+    return {
+        won, awards, carryOver, lastDecidedHole,
+        riding: carryOver && carry > 1 ? carry - 1 : 0,
+        skinValue
+    };
+}
+
+function skinsStatus(cfg, holes, scores, players) {
+    const st = skinsState(cfg, holes, scores, players);
+    const holders = players
+        .filter(p => st.won[p.id] > 0)
+        .sort((a, b) => st.won[b.id] - st.won[a.id])
+        .map(p => `${shortName(p.name)} ${st.won[p.id]}`);
+
+    // "3 riding" tells a golfer nothing. "3 riding \u00B7 $60" changes how the next
+    // hole gets played, and the value is real - it comes from the same pot arithmetic
+    // settlement uses.
+    let riding = '';
+    if (st.riding > 0) {
+        const val = st.riding * st.skinValue;
+        riding = val > 0 ? `${st.riding} riding \u00B7 $${val.toFixed(0)}` : `${st.riding} riding`;
+    }
+
     if (holders.length === 0) {
         return { text: riding ? `All square \u00B7 ${riding}` : 'No skins yet', tone: riding ? 'even' : 'idle' };
     }
@@ -456,6 +493,9 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
 
         rows.push({
             key: id,
+            // Exposed so the scorecard can tell whose action this is without
+            // re-deriving membership from the raw side match.
+            playerIds: a.concat(b),
             label: `${a.map(nameOf).join('/')} vs ${b.map(nameOf).join('/')}`,
             format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
             stakeText: stake > 0 ? `$${stake}` : ''
