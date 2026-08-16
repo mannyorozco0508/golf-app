@@ -249,6 +249,11 @@
         @media print { .action-center { display: none !important; } }
 
         .ar-range { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-muted); }
+        /* A press belongs to the wager above it, so it is indented rather than given
+           equal weight in the list. */
+        .action-row.press-row { padding-left: 26px; background: var(--nassau-box-bg); }
+        .action-row.press-row .ar-name { font-size: 0.74rem; color: var(--text-muted); }
+        .action-row.press-row .ar-status { font-size: 0.78rem; }
 
         /* ---- End-of-hole recap --------------------------------------------------
            Sits between score entry and Prev/Next, capped at three lines. A golfer
@@ -1488,7 +1493,11 @@
 
         container.style.display = 'block';
         container.innerHTML = lines.map(l =>
-            `<a href="${smHref}" class="side-match-callout-link">⚔️ vs ${l.opp} — <strong>${l.statusText}</strong> <span class="side-match-callout-arrow">Tap for details ▶</span></a>`
+            // Deliberately NOT a link any more. Today's Action now carries the live
+            // status of every side match inline, so this is a heads-up that the action
+            // exists - not a reason to leave scoring. The Matches tab still owns
+            // creating and editing a side match.
+            `<div class="side-match-callout-link" style="cursor:default;">⚔️ vs ${l.opp} — <strong>${l.statusText}</strong></div>`
         ).join('');
     }
 
@@ -1909,6 +1918,25 @@
 
         if (!actionCenterOpen) { mount.innerHTML = '<div class="action-center">' + toggle + '</div>'; return; }
 
+        // A side match reads like the main game now: who's winning, what it's worth, and
+        // a row per press underneath. Nothing here computes money - buildSideActionRows
+        // produced it from the same engines the Matches tab uses.
+        const sideRow = sm =>
+            '<div class="action-row">' +
+                '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
+                (sm.status
+                    ? '<span class="ar-status tone-' + (sm.tone || 'idle') + '">' + sm.status + '</span>'
+                    : '<span class="ar-status tone-idle">' + sm.format + '</span>') +
+                '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
+            '</div>' +
+            (sm.presses || []).map(pr =>
+                '<div class="action-row press-row">' +
+                    '<span class="ar-name">' + pr.label + '</span>' +
+                    (pr.rangeText ? '<span class="ar-range">' + pr.rangeText + '</span>' : '') +
+                    '<span class="ar-status tone-' + (pr.tone || 'even') + '">' + pr.status + '</span>' +
+                    '<span class="ar-stake">' + (pr.stakeText || '') + '</span>' +
+                '</div>').join('');
+
         const row = r =>
             '<div class="action-row">' +
                 '<span class="ar-name">' + (r.icon ? r.icon + ' ' : '') + r.label + '</span>' +
@@ -1940,21 +1968,13 @@
         if (mySide.length) {
             body += '<div class="action-section-label">Your Action</div>';
             body += mySide.map(sm =>
-                '<div class="action-row">' +
-                    '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
-                    '<span class="ar-status tone-idle">' + sm.format + '</span>' +
-                    '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
-                '</div>'
+                sideRow(sm)
             ).join('');
         }
         if (otherSide.length) {
             body += '<div class="action-section-label">' + (mySide.length ? 'Other Action' : 'Side Action') + '</div>';
             body += otherSide.map(sm =>
-                '<div class="action-row">' +
-                    '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
-                    '<span class="ar-status tone-idle">' + sm.format + '</span>' +
-                    '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
-                '</div>'
+                sideRow(sm)
             ).join('');
         }
 
