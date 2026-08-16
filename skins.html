@@ -237,20 +237,6 @@
             <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating birdie game...</div>
         </div>
     </div>
-
-    <div class="action-card" id="kpgame-card" style="display:none;">
-        <h3>📍 Dollar Game (KPs)</h3>
-        <div class="control-grid">
-            <div class="control-group">
-                <label>Buy-In Per Player ($)</label>
-                <input type="number" id="kp-buyin" value="" min="0" step="0.5" placeholder="0" onchange="saveKPBuyIn()">
-            </div>
-        </div>
-        <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:12px;">Everyone chips in on each Par 3. Tap the winner for a hole once it's settled on the course — everyone else's dollar goes to them.</span>
-        <div id="kp-content">
-            <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating dollar game...</div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -325,7 +311,6 @@
             document.getElementById("main-title").textContent = `💰 Skins (${currentData.eventName || "Live Round"})`;
             renderSkinsEngine();
             renderBirdieGame();
-            renderKPGame();
         });
     }
 
@@ -419,79 +404,6 @@
         container.innerHTML = html;
     }
 
-    function renderKPGame() {
-        const card = document.getElementById("kpgame-card");
-        if (!currentData || !currentData.players) return;
-
-        if (currentData.kpGameEnabled !== true) {
-            if (card) card.style.display = 'none';
-            return;
-        }
-        if (card) card.style.display = 'block';
-
-        const allPlayers = currentData.players || [];
-        const players = allPlayers.filter(p => p.playingForMoney !== false);
-        const courseData = currentData.courseData || [];
-        const container = document.getElementById("kp-content");
-        if (!container) return;
-
-        if (players.length > 4) {
-            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--accent-red); font-size:0.85rem;">📍 The Dollar Game is set up for single-group rounds (4 players or fewer). This round has ${players.length} players marked "Playing for Money."</div>`;
-            return;
-        }
-        if (players.length < 2) {
-            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">Need at least 2 players marked "Playing for Money" to run the Dollar Game.</div>`;
-            return;
-        }
-
-        const buyIn = currentData.kpBuyIn !== undefined ? currentData.kpBuyIn : 0;
-        const kpBuyInEl = document.getElementById("kp-buyin");
-        if (kpBuyInEl && document.activeElement !== kpBuyInEl) kpBuyInEl.value = buyIn;
-        const kpHoles = courseData.filter(h => parseInt(h.par) === 3);
-        const kpWinners = currentData.kpWinners || {};
-
-        if (kpHoles.length === 0) {
-            container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.85rem;">No Par 3 holes found on this course.</div>`;
-            return;
-        }
-
-        let playerMoney = {};
-        players.forEach(p => playerMoney[p.id] = 0);
-
-        let html = `<div style="margin-bottom:12px;">`;
-        kpHoles.forEach(h => {
-            const winnerId = kpWinners[`h${h.hole}`];
-            const winnerPlayer = winnerId ? players.find(p => String(p.id) === String(winnerId)) : null;
-            html += `<div style="padding:8px 0; border-bottom:1px solid var(--border-faint);">
-                <div style="font-weight:bold; margin-bottom:6px;">Hole ${h.hole} (Par 3)${winnerPlayer ? ` — 🏆 ${winnerPlayer.name} won $${(buyIn * (players.length - 1)).toFixed(2)}` : ''}</div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">`;
-            players.forEach(p => {
-                const isWinner = winnerPlayer && String(winnerId) === String(p.id);
-                html += `<button onclick="markKPWinner(${h.hole}, '${p.id}')" style="padding:6px 12px; border-radius:16px; border:1px solid var(--accent-teal); background:${isWinner ? 'var(--accent-teal)' : 'var(--bg-card)'}; color:${isWinner ? '#fff' : 'var(--text-main)'}; font-size:0.8rem; font-weight:bold; cursor:pointer;">${p.name.split(' ')[0]}</button>`;
-            });
-            if (winnerPlayer) {
-                html += `<button onclick="clearKPWinner(${h.hole})" style="padding:6px 12px; border-radius:16px; border:1px solid var(--accent-red); background:var(--bg-card); color:var(--accent-red); font-size:0.8rem; cursor:pointer;">✕ Clear</button>`;
-            }
-            html += `</div></div>`;
-
-            if (winnerPlayer) {
-                playerMoney[winnerPlayer.id] += buyIn * (players.length - 1);
-                players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) playerMoney[p.id] -= buyIn; });
-            }
-        });
-        html += `</div>`;
-
-        html += `<h3 style="margin-top:16px;">💵 Dollar Game Ledger (net)</h3><table class="skin-table ledger-table"><thead><tr><th style="text-align:left;">Player</th><th>Total</th></tr></thead><tbody>`;
-        players.forEach(p => {
-            const money = playerMoney[p.id] || 0;
-            const cls = money > 0 ? 'val-pos' : (money < 0 ? 'val-neg' : '');
-            const text = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
-            html += `<tr><td class="winner-name">${p.name}</td><td class="${cls}">${text}</td></tr>`;
-        });
-        html += `</tbody></table>`;
-
-        container.innerHTML = html;
-    }
 
     function syncBirdieScoringToggle() {
         const val = document.getElementById('birdie-scoring-type').value;
@@ -513,11 +425,6 @@
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
 
-    function saveKPBuyIn() {
-        const val = parseFloat(document.getElementById("kp-buyin").value) || 0;
-        db.ref(`events/${currentMode}/kpBuyIn`).set(val)
-            .catch(err => alert(`Failed to save buy-in: ${err.message}`));
-    }
 
     function saveSkinsConfig() {
         const potFormat = document.getElementById("skins-pot-format").value;
@@ -531,15 +438,7 @@
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
 
-    function markKPWinner(hole, playerId) {
-        db.ref(`events/${currentMode}/kpWinners/h${hole}`).set(playerId)
-            .catch(err => alert(`Failed to save: ${err.message}`));
-    }
 
-    function clearKPWinner(hole) {
-        db.ref(`events/${currentMode}/kpWinners/h${hole}`).remove()
-            .catch(err => alert(`Failed to clear: ${err.message}`));
-    }
 
     // Extracts a hole's score list for one player set, used by both skin-computation modes.
     function getSkinsHoleScores(players, savedScores, h) {
