@@ -209,10 +209,27 @@ describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
         assert.match(render(true, data, players), /Nothing is settled until the round is done/);
     });
 
-    test('a single-game round shows nothing — the bet strip below already says it', () => {
+    test('a single-game round still offers a way to add action to it', () => {
+        // CHANGED IN WAVE 3, deliberately. A one-game round used to render nothing here
+        // because the bet strip below already said everything. But + ADD ACTION lives in
+        // this bar, and without it an organizer playing a plain Nassau would have no way
+        // to add skins mid-round. The summary now appears whenever there is either
+        // something to see or something to add.
         const legacy = Object.assign({}, data, { sideMatches: {} });
         delete legacy.additionalGames;
-        assert.equal(render(false, legacy, players), '', 'a redundant summary is just noise');
+        const out = render(false, legacy, players);
+        assert.ok(out.includes('action-toggle'), 'the bar must exist to host + ADD ACTION');
+    });
+
+    test('a finished single-game round with nothing left to add shows nothing', () => {
+        // With no future hole, canAddAction() is false, so the bar correctly disappears
+        // and a one-game round adds no noise above the score boxes.
+        const done = Object.assign({}, data, { sideMatches: {} });
+        delete done.additionalGames;
+        const scores = {};
+        done.courseData.forEach(h => done.players.forEach(p => { scores[`p${p.id}_h${h.hole}`] = h.par; }));
+        done.scores = scores;
+        assert.equal(render(false, done, players), '');
     });
 
     test('a broken round degrades to empty instead of taking down score entry', () => {
