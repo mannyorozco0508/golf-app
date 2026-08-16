@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
-const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'settlement-engine.js']);
+const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
 describe('SETTLEMENT INTEGRATION GAP — Skins as main format (confirmed bug, now fixed)', () => {
     test('REGRESSION: the exact bug-reproduction scenario — hole1 tie, hole2 tie, hole3 outright win — now correctly appears in Combined Settlement', () => {
