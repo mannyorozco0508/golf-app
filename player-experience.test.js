@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { loadHtmlInlineScript, loadJsFile } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers, buildScores } = require('./helpers/fixtures.js');
 
-const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js']);
+const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'settlement-engine.js']);
 const { computeCombinedNetTotals } = settlement;
 
 describe('settlement.html — computeCombinedNetTotals (the new "Final Results" / "Who Pays Who" combiner)', () => {
