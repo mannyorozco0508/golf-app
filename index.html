@@ -130,7 +130,6 @@
         
         .payout-row { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 6px 10px; background: var(--bg-card); border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border-mid); font-size: 1rem; font-weight: bold; color: var(--text-main); }
         @media (max-width: 400px) { .payout-row { flex-direction: column; text-align: center; gap: 4px; } }
-        .live-action-box { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
         .live-action-title { font-weight: bold; color: var(--brand-green); font-size: 0.95rem; margin-bottom: 8px; }
         .live-action-section-label { font-size: 0.72rem; text-transform: uppercase; font-weight: bold; color: var(--text-muted); margin: 10px 0 4px 0; }
         .bet-counts-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
@@ -165,13 +164,6 @@
             -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
         .group-filter-bar::-webkit-scrollbar { display: none; }
-        .side-match-callout-link {
-            display: flex; align-items: center; justify-content: space-between; gap: 8px;
-            background: var(--brand-navy); color: #fff; border-radius: 8px; padding: 10px 14px;
-            text-decoration: none; font-size: 0.85rem; font-weight: bold; margin-bottom: 6px;
-        }
-        .side-match-callout-link:last-child { margin-bottom: 0; }
-        .side-match-callout-arrow { font-size: 0.9rem; opacity: 0.8; flex-shrink: 0; }
 
         /* Round body layout: status panel stacks above the scorecard on phones,
            moves to a side panel next to it on wider screens (tablet/iPad and up) */
@@ -734,24 +726,17 @@
 
     <div class="round-body-layout" id="round-body-layout">
     <div class="status-panel" id="status-panel">
-        <div id="side-match-callout" style="display:none; margin-bottom: 10px;"></div>
+    <!-- The side-match callout bar lived here. Every side match now appears in
+         Today's Action with live status and its own press ladder, so this was the
+         same information a second time. -->
 
-        <div id="live-action-box" class="live-action-box" style="display:none;">
-            <div class="live-action-title" id="live-action-title">🔥 LIVE ACTION</div>
-            <div class="bet-counts-row" id="live-action-counts"></div>
-            <div id="live-action-main-match"></div>
-            <div id="live-action-press-ladder" class="press-ladder"></div>
-            <div id="live-action-sidematches"></div>
-            <div id="live-action-skins"></div>
-            <div id="live-action-wolf"></div>
-            <div id="live-action-dots"></div>
-            <div id="live-action-sidegames"></div>
-        </div>
+        <!-- The LIVE ACTION dashboard lived here: a full second betting summary
+             beside Today's Action. Consolidated rather than kept in parallel - one
+             clear answer to "where do my bets stand" is worth more than two. -->
 
         <div class="live-ticker-box">
             <div class="ticker-title" id="ticker-title-label">LIVE STATUS</div>
             <div class="ticker-status" id="ticker-status-val">Enter Hole 1 Scores Below...</div>
-            <div id="combined-tally-row" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.25); font-size:0.95rem;"></div>
         </div>
 
         <details class="live-action-more" id="detailed-breakdown-wrapper">
@@ -762,10 +747,6 @@
         </div>
         </details>
 
-        <div class="nassau-payout-box" id="skins-live-container" style="display:none;">
-            <div class="nassau-payout-title">🥩 Skins — Current Status</div>
-            <div id="skins-live-rows"></div>
-        </div>
 
         <div class="nassau-payout-box" id="wolfcall-payout-container" style="display:none;">
             <div class="nassau-payout-title">🐺 Wolf Call</div>
@@ -1143,310 +1124,7 @@
     //
     // "Locked" vs "Live" comes directly from each segment's own .closed flag (calculateMatchEngine
     // already tracks this correctly per the money-integrity audit) - never inferred or guessed.
-    function buildLiveActionSummary(filteredPlayers, allPlayers) {
-        const gameFormat = currentData.gameFormat || 'stroke';
-        const courseData = currentData.courseData || [];
-        const savedScores = currentData.scores || {};
-        const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
 
-        let betCounts = { winning: 0, allSquare: 0, losing: 0, final: 0 };
-        let lockedTotal = 0;
-        let hasLockedTotal = false;
-        let mainGame = null;
-        let presses = [];
-        let sideMatchLines = [];
-        let skinsSummary = null;
-        let wolfSummary = null;
-        let dotsSummary = null;
-        let birdieKpSummary = null;
-
-        function tallySegment(seg, stakeForSeg) {
-            if (seg.closed) {
-                betCounts.final++;
-                if (typeof stakeForSeg === 'number' && seg.status !== 0) {
-                    hasLockedTotal = true;
-                    lockedTotal += stakeForSeg;
-                }
-            } else if (seg.status === 0) {
-                betCounts.allSquare++;
-            } else if (seg.status > 0) {
-                betCounts.winning++;
-            } else {
-                betCounts.losing++;
-            }
-        }
-
-        // --- Main Game: Match Play / Nassau, including presses ---
-        if ((gameFormat === 'match' || gameFormat === 'nassau') && moneyPlayers.length >= 2) {
-            const scoringType = currentData.matchScoringStyle === 'stroke' ? 'net' : (currentData.nassauScoring || currentData.matchScoring || 'net');
-            const pressRule = gameFormat === 'nassau' ? (currentData.nassauPressRule || 'none') : (currentData.matchPressRule || 'none');
-            const stake = gameFormat === 'nassau' ? (currentData.nassauStake || 0) : (currentData.matchStake || 0);
-            const holeBet = currentData.holeBetStake || 0;
-            const manualPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
-            const teamPlayers = moneyPlayers.map(p => ({ ...p, team: p.team || 'Team 1' }));
-            const calc = calculateMatchEngine(teamPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses);
-
-            if (calc && calc.activeMatches && calc.activeMatches.length > 0) {
-                const perSegStake = holeBet > 0 ? null : stake;
-                mainGame = {
-                    t1Name: calc.t1Name, t2Name: calc.t2Name,
-                    segments: calc.activeMatches.filter(m => m.pressNum === 0).map(m => ({
-                        label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult),
-                        closed: m.closed, allSquare: m.status === 0, stake: perSegStake
-                    }))
-                };
-                presses = calc.activeMatches.filter(m => m.pressNum > 0).map(m => ({
-                    id: m.id, label: m.label, statusText: formatMatchPill(m.status, calc.t1Name, calc.t2Name, m.closed, m.finalResult),
-                    closed: m.closed, allSquare: m.status === 0, stake: perSegStake
-                }));
-                calc.activeMatches.forEach(m => tallySegment(m, perSegStake));
-            }
-        }
-
-        // --- Wolf ---
-        if (gameFormat === 'wolf' && moneyPlayers.length === 4) {
-            const wolfCalc = calcWolfEngine(currentData, courseData, savedScores);
-            const wolfPointVal = currentData.wolfPointVal || 0;
-            const sortedHoles = courseData.slice().sort((a, b) => a.hole - b.hole);
-            const currentHoleLog = sortedHoles.map(h => wolfCalc.holeLog[h.hole]).reverse().find(l => l);
-            wolfSummary = {
-                currentWolfName: currentHoleLog ? currentHoleLog.wolfName : null,
-                currentHole: currentHoleLog ? currentHoleLog.hole : null,
-                totals: moneyPlayers.map(p => ({ name: p.name, points: wolfCalc.totals[p.id] || 0, money: wolfPointVal > 0 ? (wolfCalc.totals[p.id] || 0) * wolfPointVal : null }))
-            };
-        }
-
-        // --- Dots / Junk ---
-        if (gameFormat === 'dots' && moneyPlayers.length > 0) {
-            const dotsCalc = calcDotsEngine(currentData, courseData, savedScores);
-            const dotVal = currentData.dotPointVal || 0;
-            const n = moneyPlayers.length;
-            const totalUnits = moneyPlayers.reduce((s, p) => s + (dotsCalc.totals[p.id] || 0), 0);
-            dotsSummary = moneyPlayers.map(p => {
-                const units = dotsCalc.totals[p.id] || 0;
-                return { name: p.name, units, money: (dotVal > 0 && n > 1) ? dotVal * (n * units - totalUnits) : null };
-            });
-        }
-
-        // --- Skins (uses the same live carry-over/void functions already driving the dedicated Skins box) ---
-        if (gameFormat === 'skins' && moneyPlayers.length >= 2) {
-            const carryOver = currentData.skinsCarryOver !== false;
-            const potFormat = currentData.skinsPotFormat || 'split';
-            const scoreKey = potFormat === 'net' ? 'net' : 'gross';
-            const fn = carryOver ? computeSkinsCarryOverLive : computeSkinsVoidLive;
-            const result = fn(moneyPlayers, courseData, savedScores, scoreKey);
-            let wonCounts = {};
-            moneyPlayers.forEach(p => wonCounts[p.id] = 0);
-            result.skins.forEach(s => { wonCounts[s.player.id] = (wonCounts[s.player.id] || 0) + s.unitsWon; });
-            skinsSummary = {
-                carryOver, pendingUnits: result.pendingUnits,
-                players: moneyPlayers.map(p => ({ name: p.name, won: wonCounts[p.id] || 0 }))
-            };
-        }
-
-        // --- Birdie Pool / KP (side games, independent of main format) ---
-        if (currentData.birdieGameEnabled) {
-            let birdieTotals = null, kpResult = null;
-            if (currentData.birdieGameEnabled) birdieTotals = calculateBirdieGameTotals(currentData, courseData, savedScores);
-            birdieKpSummary = {
-                birdie: birdieTotals ? moneyPlayers.map(p => ({ name: p.name, money: birdieTotals[p.id] || 0 })) : null,
-                kpWins: kpResult ? moneyPlayers.map(p => ({ name: p.name, wins: kpResult.wins[p.id] || 0, money: kpResult.money[p.id] || 0 })) : null
-            };
-        }
-
-        // --- Side Matches (1v1/2v2, independent of main format) ---
-        const sideMatches = currentData.sideMatches || {};
-        const filteredIds = filteredPlayers.map(p => String(p.id));
-        Object.values(sideMatches).forEach(sm => {
-            const teamAIds = (sm.teamAIds || []).map(String);
-            const teamBIds = (sm.teamBIds || []).map(String);
-            if (!teamAIds.some(id => filteredIds.includes(id)) && !teamBIds.some(id => filteredIds.includes(id))) return;
-            if (sm.format !== 'match' && sm.format !== 'nassau') return;
-            const smPlayers = teamAIds.concat(teamBIds).map(id => {
-                const p = allPlayers.find(pl => String(pl.id) === id);
-                return p ? { ...p, team: teamAIds.includes(id) ? 'Team 1' : 'Team 2' } : null;
-            }).filter(Boolean);
-            if (smPlayers.length < 2) return;
-            const calc = calculateMatchEngine(smPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, []);
-            if (!calc) return;
-            const finalSeg = calc.activeMatches.find(m => m.id === '18') || calc.activeMatches[calc.activeMatches.length - 1];
-            if (!finalSeg || calc.maxThru === 0) return;
-            sideMatchLines.push({
-                t1Name: calc.t1Name, t2Name: calc.t2Name, stake: sm.stake || 0,
-                statusText: formatMatchPill(finalSeg.status, calc.t1Name, calc.t2Name, finalSeg.closed, finalSeg.finalResult),
-                thru: calc.maxThru, closed: finalSeg.closed
-            });
-            tallySegment(finalSeg, sm.stake || 0);
-        });
-
-        return {
-            gameFormat, betCounts, lockedTotal: hasLockedTotal ? lockedTotal : null,
-            mainGame, presses, sideMatchLines, skinsSummary, wolfSummary, dotsSummary, birdieKpSummary
-        };
-    }
-
-    // Renders the aggregated summary into the compact UI. Hides entirely for a no-bet round,
-    // shows bet-count chips (over a projected dollar figure, since counts stay honest across
-    // mixed formats without needing a cross-game total that isn't always mathematically
-    // defensible) and a compact non-stacking press ladder otherwise.
-    function renderLiveActionSummary(filteredPlayers, allPlayers) {
-        const box = document.getElementById('live-action-box');
-        if (!box) return;
-
-        const summary = buildLiveActionSummary(filteredPlayers, allPlayers);
-        const hasAnyAction = summary.mainGame || summary.sideMatchLines.length > 0 || summary.skinsSummary || summary.wolfSummary || summary.dotsSummary || summary.birdieKpSummary;
-
-        if (!hasAnyAction) {
-            box.style.display = 'none';
-            return;
-        }
-        box.style.display = 'block';
-
-        const c = summary.betCounts;
-        let chips = '';
-        if (c.winning > 0) chips += `<span class="bet-count-chip winning">${c.winning} Winning</span>`;
-        if (c.allSquare > 0) chips += `<span class="bet-count-chip allsquare">${c.allSquare} All Square</span>`;
-        if (c.losing > 0) chips += `<span class="bet-count-chip losing">${c.losing} Losing</span>`;
-        if (c.final > 0) chips += `<span class="bet-count-chip locked">${c.final} Final${summary.lockedTotal !== null ? ` — $${summary.lockedTotal} Locked` : ''}</span>`;
-        document.getElementById('live-action-counts').innerHTML = chips;
-
-        // Main Match gets its own section with greater visual weight than presses, matching
-        // "at stake" (unfinished) vs "locked"/"won" (mathematically closed) language throughout -
-        // an unfinished bet's stake is never presented as though it's already been won.
-        const mainMatchEl = document.getElementById('live-action-main-match');
-        if (summary.mainGame && summary.mainGame.segments.length > 0) {
-            mainMatchEl.innerHTML = `<div class="live-action-section-label">Main Match</div>` + summary.mainGame.segments.map(seg => {
-                const wordCls = seg.closed ? 'final' : (seg.allSquare ? 'as' : (seg.statusText.includes(summary.mainGame.t1Name) ? 'live' : 'losing'));
-                const word = seg.closed ? 'FINAL' : (seg.allSquare ? 'ALL SQUARE' : 'LIVE');
-                const moneyLine = seg.stake !== null
-                    ? (seg.closed ? (seg.allSquare ? 'Pushed — no money changes hands' : `+$${seg.stake} locked`) : (seg.allSquare ? `$${seg.stake} at stake` : `$${seg.stake} at stake`))
-                    : '';
-                return `<div class="la-main-match ${seg.closed ? 'locked' : ''}">
-                    <span class="la-status-word ${wordCls}">${seg.closed ? '🔒 ' : (seg.allSquare ? '🟡 ' : '🟢 ')}${word}</span>
-                    <div class="la-main-match-status">${seg.statusText === 'AS' ? 'All Square' : seg.statusText}${seg.label !== 'Overall Match' && summary.mainGame.segments.length > 1 ? ` <span style="font-weight:normal; color:var(--text-muted); font-size:0.78rem;">(${seg.label})</span>` : ''}</div>
-                    ${moneyLine ? `<div class="la-main-match-money">${moneyLine}</div>` : ''}
-                </div>`;
-            }).join('');
-        } else {
-            mainMatchEl.innerHTML = '';
-        }
-
-        // Presses get their own label and a compact count summary, then the ladder - matching
-        // the "PRESSES / 7 Total · 4 Locked · 3 Live" hierarchy, distinct from the main match above.
-        const ladderEl = document.getElementById('live-action-press-ladder');
-        if (summary.presses.length > 0) {
-            const lockedCount = summary.presses.filter(p => p.closed).length;
-            const liveCount = summary.presses.length - lockedCount;
-            const pillsHtml = summary.presses.map(p => {
-                const cls = p.closed ? 'locked' : (p.allSquare ? 'allsquare' : '');
-                return `<span class="press-pill ${cls}" title="${p.stake !== null ? (p.closed ? `+$${p.stake} locked` : `$${p.stake} at stake`) : ''}">${p.id}: ${p.statusText}</span>`;
-            }).join('');
-            // Touch devices can't hover to see the per-pill title tooltip, so the "at stake"
-            // total for the still-live presses is spelled out here too, not just on hover.
-            const liveStake = summary.presses.filter(p => !p.closed && p.stake !== null).reduce((s, p) => s + p.stake, 0);
-            const stakeLine = liveCount > 0 && liveStake > 0
-                ? `<div style="font-size:0.76rem; color:var(--text-muted); margin-top:4px;">$${liveStake} at stake across ${liveCount} live press${liveCount === 1 ? '' : 'es'}</div>`
-                : '';
-            ladderEl.innerHTML = `<div class="live-action-section-label">Presses — ${summary.presses.length} Total · ${lockedCount} Locked · ${liveCount} Live</div><div class="press-ladder">${pillsHtml}</div>${stakeLine}`;
-        } else {
-            ladderEl.innerHTML = '';
-        }
-
-        const smEl = document.getElementById('live-action-sidematches');
-        if (summary.sideMatchLines.length > 0) {
-            smEl.innerHTML = `<div class="live-action-section-label">Side Bets</div>` + summary.sideMatchLines.map(sm => {
-                const cls = sm.closed ? 'locked' : (sm.statusText === 'AS' ? 'allsquare' : '');
-                const moneyText = sm.stake ? (sm.closed ? ` · +$${sm.stake} locked` : ` · $${sm.stake} at stake`) : '';
-                return `<div style="margin-top:6px; font-size:0.82rem;">⚔️ <strong>${sm.t1Name}</strong> vs <strong>${sm.t2Name}</strong> — <span class="press-pill ${cls}" style="margin-left:2px;">${sm.statusText}${sm.thru ? ` thru ${sm.thru}` : ''}</span>${moneyText}</div>`;
-            }).join('');
-        } else {
-            smEl.innerHTML = '';
-        }
-
-        const skinsEl = document.getElementById('live-action-skins');
-        if (summary.skinsSummary) {
-            const s = summary.skinsSummary;
-            let rows = s.players.map(p => `<div class="la-mini-row"><span>${p.name.split(' ')[0]}</span><strong>${p.won} won</strong></div>`).join('');
-            // Skins can't honestly show a "final" dollar figure mid-round - the per-skin value
-            // depends on how the carry chain resolves, which isn't settled until the round ends.
-            // Matches the same caution already used in the existing dedicated live Skins box.
-            let carryLine = s.pendingUnits > 0
-                ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🔥 ${s.pendingUnits} skin${s.pendingUnits === 1 ? '' : 's'} carrying — not final yet</div>`
-                : '';
-            skinsEl.innerHTML = `<div class="live-action-section-label">Skins</div>${rows}${carryLine}`;
-        } else {
-            skinsEl.innerHTML = '';
-        }
-
-        const wolfEl = document.getElementById('live-action-wolf');
-        if (summary.wolfSummary) {
-            const w = summary.wolfSummary;
-            let header = w.currentWolfName ? `<div style="font-size:0.82rem;">🐺 <strong>${w.currentWolfName.split(' ')[0]}</strong> is Wolf (Hole ${w.currentHole})</div>` : '';
-            let rows = w.totals.map(t => `<div class="la-mini-row"><span>${t.name.split(' ')[0]}</span><strong>${t.points > 0 ? '+' : ''}${t.points}${t.money !== null ? ` (${t.money >= 0 ? '+' : ''}$${t.money})` : ''}</strong></div>`).join('');
-            wolfEl.innerHTML = `<div class="live-action-section-label">Wolf</div>${header}${rows}`;
-        } else {
-            wolfEl.innerHTML = '';
-        }
-
-        const dotsEl = document.getElementById('live-action-dots');
-        if (summary.dotsSummary) {
-            let rows = summary.dotsSummary.map(d => `<div class="la-mini-row"><span>${d.name.split(' ')[0]}</span><strong>${d.units > 0 ? '+' : ''}${d.units}${d.money !== null ? ` (${d.money >= 0 ? '+' : ''}$${d.money})` : ''}</strong></div>`).join('');
-            dotsEl.innerHTML = `<div class="live-action-section-label">Dots / Junk</div>${rows}`;
-        } else {
-            dotsEl.innerHTML = '';
-        }
-
-        const sideGamesEl = document.getElementById('live-action-sidegames');
-        if (summary.birdieKpSummary) {
-            const bk = summary.birdieKpSummary;
-            let html = `<div class="live-action-section-label">Side Action</div>`;
-            if (bk.birdie) html += bk.birdie.map(p => `<div class="la-mini-row"><span>${p.name.split(' ')[0]}</span><strong>${p.money >= 0 ? '+' : ''}$${p.money}</strong></div>`).join('');
-            if (bk.kpWins) html += bk.kpWins.filter(p => p.wins > 0).map(p => `<div class="la-mini-row"><span>${p.name.split(' ')[0]} (KP)</span><strong>${p.wins} win${p.wins === 1 ? '' : 's'}</strong></div>`).join('');
-            sideGamesEl.innerHTML = html;
-        } else {
-            sideGamesEl.innerHTML = '';
-        }
-    }
-
-    function renderSkinsLiveBox(players, courseData, savedScores) {
-        const box = document.getElementById('skins-live-container');
-        if (!box) return;
-        if (currentData.gameFormat !== 'skins') { box.style.display = 'none'; return; }
-
-        const potFormat = currentData.skinsPotFormat || 'split';
-        const carryOver = currentData.skinsCarryOver !== false;
-        const computeFn = carryOver ? computeSkinsCarryOverLive : computeSkinsVoidLive;
-
-        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(players, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
-        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(players, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
-
-        const allSkins = [...grossResult.skins, ...netResult.skins];
-        if (allSkins.length === 0 && grossResult.pendingUnits === 0 && netResult.pendingUnits === 0) {
-            box.style.display = 'none';
-            return;
-        }
-        box.style.display = 'block';
-
-        let counts = {};
-        allSkins.forEach(s => { counts[s.player.name] = (counts[s.player.name] || 0) + 1; });
-        const sortedNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-
-        let html = `<div style="font-size:0.72rem; color:rgba(255,255,255,0.75); margin-bottom:6px;">Current status — not final until the round's done</div>`;
-        if (sortedNames.length > 0) {
-            html += sortedNames.map(name => `<div class="payout-row"><span>${name}</span><span>${counts[name]} skin${counts[name] === 1 ? '' : 's'}</span></div>`).join('');
-        } else {
-            html += `<div style="font-size:0.85rem; opacity:0.85;">No skins won outright yet.</div>`;
-        }
-
-        if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
-            const parts = [];
-            if (grossResult.pendingUnits > 0) parts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
-            if (netResult.pendingUnits > 0) parts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
-            html += `<div style="font-size:0.75rem; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.25);">🔄 Carrying: ${parts.join(' and ')} tied, not claimed yet — value is building for whoever wins the next hole.</div>`;
-        }
-
-        document.getElementById('skins-live-rows').innerHTML = html;
-    }
 
     // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
     // otherwise there's no way to know a Side Match is even running without a special trip to Matches.
@@ -1454,66 +1132,6 @@
     // exact calculateMatchEngine already in this file) rather than just a "tap to view" link.
     // Stroke Play side bets ($/hole, $/overall) keep the link-only behavior — that engine doesn't
     // exist in this file, and duplicating it here for one line of inline text isn't worth the risk.
-    function renderActiveSideMatchCallout(filteredPlayers, allPlayers) {
-        const container = document.getElementById('side-match-callout');
-        if (!container) return;
-
-        const sideMatches = currentData.sideMatches || {};
-        const filteredIds = filteredPlayers.map(p => String(p.id));
-        const groupParam = urlParams.get('group');
-        let smHref = `sidematches.html?game=${currentMode}`;
-        if (groupParam) smHref += `&group=${groupParam}`;
-        const courseData = currentData.courseData || [];
-        const savedScores = currentData.scores || {};
-
-        const lines = [];
-        Object.keys(sideMatches).forEach(matchId => {
-            const sm = sideMatches[matchId];
-            const teamAIds = (sm.teamAIds || []).map(String);
-            const teamBIds = (sm.teamBIds || []).map(String);
-            const onTeamA = teamAIds.some(id => filteredIds.includes(id));
-            const onTeamB = teamBIds.some(id => filteredIds.includes(id));
-            if (!onTeamA && !onTeamB) return;
-
-            const oppIds = onTeamA ? teamBIds : teamAIds;
-            const oppNames = oppIds.map(id => {
-                const p = allPlayers.find(pl => String(pl.id) === id);
-                return p ? p.name.split(' ')[0] : '?';
-            }).join(' & ');
-
-            let statusText = 'Tap to view';
-            if (sm.format === 'match' || sm.format === 'nassau') {
-                const smPlayers = teamAIds.concat(teamBIds).map(id => {
-                    const p = allPlayers.find(pl => String(pl.id) === id);
-                    return p ? { ...p, team: teamAIds.includes(id) ? 'Team 1' : 'Team 2' } : null;
-                }).filter(Boolean);
-                if (smPlayers.length >= 2) {
-                    const calc = calculateMatchEngine(smPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, []);
-                    if (calc) {
-                        const finalSeg = calc.activeMatches.find(m => m.id === '18') || calc.activeMatches[calc.activeMatches.length - 1];
-                        if (finalSeg && calc.maxThru > 0) {
-                            statusText = finalSeg.closed
-                                ? `Final: ${finalSeg.finalResult || 'Decided'}`
-                                : formatMatchStatusText(finalSeg.status, calc.t1Name, calc.t2Name) + ` thru ${calc.maxThru}`;
-                        }
-                    }
-                }
-            }
-
-            lines.push({ opp: oppNames, statusText });
-        });
-
-        if (lines.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
-
-        container.style.display = 'block';
-        container.innerHTML = lines.map(l =>
-            // Deliberately NOT a link any more. Today's Action now carries the live
-            // status of every side match inline, so this is a heads-up that the action
-            // exists - not a reason to leave scoring. The Matches tab still owns
-            // creating and editing a side match.
-            `<div class="side-match-callout-link" style="cursor:default;">⚔️ vs ${l.opp} — <strong>${l.statusText}</strong></div>`
-        ).join('');
-    }
 
     // Replaces the old 1-18 circle strip. Same jump, same played/unplayed shading,
     // but opened on demand from inside the scorecard card - so it cannot be overlapped
@@ -2073,6 +1691,10 @@
         let body = '';
         const main = games.filter(g => g.role === 'main');
         const extra = games.filter(g => g.role === 'additional');
+        // Wagers that run alongside any format - currently the Birdie Game, which moved
+        // here from the standings panel. A separate section so a per-hole side pot is not
+        // mistaken for one of the round's games.
+        const extras = games.filter(g => g.role === 'extra');
 
         // A wager that closes on hole 7 used to vanish silently as the row moved to the
         // next live chip. It now gets one acknowledgement, then drops into a collapsed
@@ -2090,6 +1712,8 @@
         if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
         if (extra.length) body += '<div class="action-section-label">Also Playing</div>' +
             sortActionRows(extra, changedKeys).map(row).join('');
+        if (extras.length) body += '<div class="action-section-label">Extras</div>' +
+            extras.map(row).join('');
         if (mySide.length) {
             body += '<div class="action-section-label">Your Action</div>';
             body += mySide.map(sm =>
@@ -3452,29 +3076,6 @@
         return money;
     }
 
-    function renderCombinedTally(data, courseData, savedScores) {
-        const row = document.getElementById('combined-tally-row');
-        if (!row) return;
-
-        const showBirdie = data.birdieGameEnabled === true;
-        if (!showBirdie) { row.style.display = 'none'; return; }
-
-        const allPlayers = data.players || [];
-        let lines = [];
-
-        if (showBirdie) {
-            const birdieTotals = calculateBirdieGameTotals(data, courseData, savedScores);
-            const moneyPlayersB = allPlayers.filter(p => p.playingForMoney !== false);
-            if (moneyPlayersB.length > 0) {
-                const text = moneyPlayersB.map(p => `${p.name.split(' ')[0]}: <strong>$${(birdieTotals[p.id] || 0).toFixed(2)}</strong>`).join(' &nbsp;|&nbsp; ');
-                lines.push(`🐦 Birdies (won): ${text}`);
-            }
-        }
-
-        if (lines.length === 0) { row.style.display = 'none'; return; }
-        row.style.display = 'block';
-        row.innerHTML = lines.join('<br>');
-    }
 
     // ------------------
 
@@ -3608,14 +3209,12 @@
             filteredPlayers = players.slice(startIdx, startIdx + size);
         }
         window.__scFilteredPlayers = filteredPlayers;
-        renderActiveSideMatchCallout(filteredPlayers, players);
         renderLandingSummary(filteredPlayers, players);
 
 
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
         const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
-        renderSkinsLiveBox(moneyPlayers, courseData, savedScores);
 
         let hiloCalc = null;
         let matchCalc = null;
@@ -4270,10 +3869,8 @@
         const detailedWrapper = document.getElementById('detailed-breakdown-wrapper');
         if (detailedWrapper) detailedWrapper.style.display = payoutBox.style.display;
 
-        renderLiveActionSummary(filteredPlayers, players);
 
         renderWolfCallBox(currentData, courseData, savedScores);
-        renderCombinedTally(currentData, courseData, savedScores);
 
         // On first load, land on the first hole that's missing a score - not always hole 1,
         // so picking back up mid-round drops you right where scoring left off.
