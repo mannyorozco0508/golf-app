@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="money-engine.js"></script>
+<script src="settlement-engine.js"></script>
     <script src="course-data.js"></script>
     <style>
         :root {
@@ -991,10 +992,28 @@
                 perRoundBreakdown.push({ label, formatLabel: '', rows: [], message: 'No players set up yet.' });
                 return;
             }
-            const calc = computeRoundMoneyByPlayer(data, courseData, savedScores);
-            perRoundBreakdown.push({ label, formatLabel: calc.formatLabel, rows: calc.players, message: calc.message, splitNote: calc.splitNote });
+            // THE canonical single-round money picture - main game + Skins + Hi-Lo +
+            // Birdie Pool + KPs + every Side Match - identical to what this round's own
+            // Results page shows. Trip totals are now the sum of finalized round
+            // settlements, not a narrower second opinion about what counts as money.
+            const combined = computeCombinedNetTotals(data, courseData, savedScores);
 
-            calc.players.forEach(p => {
+            // The main-format label is still useful context in the per-round breakdown,
+            // but it no longer decides what money is counted.
+            const mainCalc = computeRoundMoneyByPlayer(data, courseData, savedScores);
+            const rows = Object.values(combined.netByName)
+                .filter(v => Math.abs(v.net) > 0.005)
+                .map(v => ({ name: v.name, net: v.net }));
+
+            perRoundBreakdown.push({
+                label,
+                formatLabel: mainCalc.formatLabel,
+                rows,
+                message: rows.length === 0 ? 'No money settled in this round yet.' : '',
+                splitNote: mainCalc.splitNote
+            });
+
+            rows.forEach(p => {
                 const key = p.name.trim().toLowerCase();
                 if (!netByName[key]) netByName[key] = { name: p.name, net: 0 };
                 netByName[key].net += (p.net || 0);
