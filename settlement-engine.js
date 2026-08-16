@@ -97,8 +97,37 @@
             allPlayers.forEach(p => payout[p.id] += share);
         }
 
+        // MID-ROUND STAKE PRORATION (carry-over skins only).
+        //
+        // Each player used to be charged the FULL buy-in from the first score entered,
+        // while the pot for holes NOT YET PLAYED had been awarded to nobody. Mid-round
+        // the totals therefore summed negative - money looked destroyed - and every
+        // golfer showed as already down their share of skins nobody had won yet. That
+        // contradicts the app's own rule that money AT STAKE is not money LOST.
+        //
+        // A player is now charged only for the portion of the pot that is actually in
+        // play: the holes that have been played. Under carry-over every played hole
+        // contributes exactly one unit, either won outright or carried forward, so
+        // (unitsWon + pendingUnits) IS the number of holes played.
+        //
+        // On a COMPLETED round played === total, the multiplier is 1, and every result
+        // is bit-for-bit what it has always been. This changes in-progress display only,
+        // never final settlement.
+        //
+        // Non-carry-over ("void") skins are deliberately untouched: that mode already
+        // distributes its whole pot across decided holes and is already zero-sum.
+        function playedUnits(result) {
+            return result.skins.reduce((sum, s) => sum + s.unitsWon, 0) + (result.pendingUnits || 0);
+        }
+        const grossInPlay = (carryOver && totalHoles > 0) ? Math.min(playedUnits(grossResult) / totalHoles, 1) : 1;
+        const netInPlay = (carryOver && totalHoles > 0) ? Math.min(playedUnits(netResult) / totalHoles, 1) : 1;
+
+        const n = allPlayers.length;
+        const grossStake = n > 0 ? (grossPot / n) * grossInPlay : 0;
+        const netStake = n > 0 ? (netPot / n) * netInPlay : 0;
+
         let netByPlayerId = {};
-        allPlayers.forEach(p => { netByPlayerId[p.id] = payout[p.id] - buyIn; });
+        allPlayers.forEach(p => { netByPlayerId[p.id] = payout[p.id] - grossStake - netStake; });
         return netByPlayerId;
     }
 
