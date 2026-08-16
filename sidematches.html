@@ -292,7 +292,7 @@
         </div>
 
         <div id="sm-stroke-fields" style="display:none;">
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke Play side action is 1v1 only. Leave a $ field at 0 to skip that bet — presses on both are added any time from the match card.</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke Play side action works 1v1 or 2v2 — a 2v2 side uses best ball, the same as every other team format here. Leave a $ field at 0 to skip that bet; presses are added any time from the match card.</div>
             <div class="control-grid" style="margin-bottom:10px;">
                 <div class="control-group">
                     <label>$ Per Hole</label>
@@ -817,7 +817,7 @@
             const sideCount = Object.values(sidematchPickState).filter(s => s === side).length;
             if (sideCount >= maxPerSide) {
                 const label = side === 'a' ? 'Side 1' : 'Side 2';
-                const limitReason = format === 'stroke' ? 'Stroke Play side action is 1v1 only' : `${label} already has ${maxPerSide}`;
+                const limitReason = `${label} already has ${maxPerSide}`;
                 document.getElementById('sm-team-size-indicator').innerHTML = `<span style="color:var(--accent-red);">⚠️ ${limitReason} — remove someone from ${label} first.</span>`;
                 document.getElementById('sm-preview').style.display = 'none';
                 return; // no silent reassignment — nothing changes until the organizer frees up a spot
@@ -850,11 +850,8 @@
             preview.style.display = 'none';
             return;
         }
-        if (format === 'stroke' && teamAIds.length > 1) {
-            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Stroke Play side action is 1v1 only.</span>`;
-            preview.style.display = 'none';
-            return;
-        }
+        // 2v2 Stroke Play is supported: the engine takes the whole side and scores it
+        // best ball, and settlement splits the stake evenly between teammates.
 
         const sizeLabel = teamAIds.length === 1 ? '1v1' : `${teamAIds.length}v${teamBIds.length}`;
         indicator.innerHTML = `<span style="color:var(--brand-green);">✅ ${sizeLabel}</span>`;
@@ -987,10 +984,6 @@
         }
         if (teamAIds.length > 2) {
             alert("⚠️ Side matches support 1v1 or 2v2 only.");
-            return;
-        }
-        if (format === 'stroke' && (teamAIds.length !== 1 || teamBIds.length !== 1)) {
-            alert("⚠️ Stroke Play side action ($/hole, $/overall) is 1v1 only.");
             return;
         }
 
