@@ -335,9 +335,14 @@ describe('ACTION ORDERING — deterministic, relevance-based', () => {
     });
 
     test('ordering state is never persisted', () => {
+        // Scoped to recentlyChangedKeys itself. The previous slice ran to
+        // toggleActionCenter, which now has the side-match press code between it and
+        // this function - that code legitimately writes a press to Firebase.
         const idx = read('index.html');
-        const fn = idx.slice(idx.indexOf('function recentlyChangedKeys'), idx.indexOf('function toggleActionCenter'));
+        const start = idx.indexOf('function recentlyChangedKeys');
+        const fn = idx.slice(start, idx.indexOf('\n    }', start));
         assert.ok(!/db\.ref|localStorage/.test(fn), 'bet order must not reach Firebase');
+        assert.ok(/buildHoleEvents/.test(fn), 'sanity: the right function was captured');
     });
 
     test('the recap and the ordering share one derivation', () => {
