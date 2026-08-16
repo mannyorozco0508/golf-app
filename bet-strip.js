@@ -344,6 +344,38 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         if (row.status) rows.push(row);
     });
 
+    // Extras: wagers that run alongside every format rather than being a format.
+    // Birdie previously appeared ONLY in the standings panel, bolted onto Current Group
+    // Scores, which is both the wrong home for a wager and the reason that panel could
+    // not just be removed. It belongs with the rest of the action.
+    // Uses the CANONICAL birdie calculation from settlement-engine.js, not index.html's
+    // page-local copy - a shared presenter should not depend on a function that only
+    // exists on one page.
+    if (data.birdieGameEnabled === true && typeof calculateBirdieGameTotalsForSettle === 'function') {
+        try {
+            const totals = calculateBirdieGameTotalsForSettle(data, holes, scores);
+            const leader = topBy(players, p => totals[p.id] || 0);
+            const unit = data.birdieUnitVal || 0;
+            rows.push({
+                key: 'birdie',
+                label: 'Birdie Game',
+                icon: '\uD83D\uDC26',
+                role: 'extra',
+                stake: unit,
+                rangeText: '',
+                stakeText: unit > 0 ? `$${unit}` : '',
+                // Mid-round this is a position, not winnings - the wording stays "up",
+                // never a settled dollar total.
+                status: (leader && leader.value > 0)
+                    ? `${shortName(leader.player.name)} up $${leader.value.toFixed(0)}`
+                    : 'No birdies yet',
+                tone: (leader && leader.value > 0) ? 'up' : 'idle'
+            });
+        } catch (e) {
+            console.error('Birdie row failed:', e);
+        }
+    }
+
     return rows;
 }
 
