@@ -331,7 +331,12 @@
         const p1 = players[0], p2 = players[1];
 
         if (config.overallMode === 'stroke') {
-            function segmentTotals(startHole) {
+            // PER-PRESS STAKES. Every segment used to settle at config.overallStake, so a
+            // side match pressed for $100 still paid the original $50 - a press could
+            // change the holes but never the money, which is the whole point of pressing.
+            // The stake is now an argument, defaulting to the original for any press
+            // stored without one (every press created before this change).
+            function segmentTotals(startHole, segStake) {
                 let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
                 courseData.forEach(h => {
                     if (h.hole < startHole) return;
@@ -344,18 +349,21 @@
                         holesCompleted++;
                     }
                 });
+                const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
                 const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
                 let winner = null, money = 0;
                 if (roundComplete) {
-                    if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
-                    else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
+                    if (p1Total < p2Total) { winner = p1.name; money = stake; }
+                    else if (p2Total < p1Total) { winner = p2.name; money = stake; }
                 }
                 const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
-                return { startHole, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
+                return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
             }
 
             const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
-            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole), { pressNum: i + 1 }));
+            const pressSegs = (presses || []).slice()
+                .sort((a, b) => a.startHole - b.startHole)
+                .map((pr, i) => Object.assign(segmentTotals(pr.startHole, pr.stake), { pressNum: i + 1 }));
 
             let p1Money = base.p1Money;
             pressSegs.forEach(seg => { p1Money += seg.p1Money; });
