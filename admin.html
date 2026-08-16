@@ -991,11 +991,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 box.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.85rem;">One group — the round code itself works as the scorecard link for everyone.</div>`;
                 return;
             }
-            const baseHref = window.location.href.split('?')[0];
-            const scorecardBase = baseHref.replace('admin.html', 'index.html');
+
             let html = '';
             boundaries.forEach(b => {
-                const groupUrl = `${scorecardBase}?game=${currentMode}&group=${b.group}`;
+                const groupUrl = scorecardUrlFor(currentMode, b.group);
                 html += `<div class="group-link-row">
                     <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
                     <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
@@ -1193,6 +1192,25 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // -------------------------
 
     const urlParams = new URLSearchParams(window.location.search);
+    // ---- Defensive redirect -------------------------------------------------
+    // A ?group= parameter means "scorekeeper for that group" everywhere else in the
+    // app, and admin has no organizer use for it - it only ever forwarded the value to
+    // nav links. So anyone arriving here with one either followed an old link built by
+    // the bug above, or typed it. Either way, admin is the wrong page for them: it
+    // shows the setup wizard and the panel listing every group's privileged link.
+    //
+    // Sending them to the scorecard costs the organizer nothing (their own link has no
+    // ?group=) and closes the route that leaked the other groups' links.
+    (function redirectGroupScorekeeper() {
+        const gameParam = urlParams.get('game');
+        const groupParam = urlParams.get('group');
+        if (!gameParam || !groupParam) return;
+        const loc = window.location;
+        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
+        loc.replace(loc.origin + dir + 'index.html?game=' + encodeURIComponent(gameParam) +
+            '&group=' + encodeURIComponent(groupParam));
+    })();
+
     let currentMode = urlParams.get('game');
     let tripLinkCode = urlParams.get('trip'); // present when this round is being set up FROM Trip Mode
     let copyFromCode = urlParams.get('copyFrom'); // present when pre-filling from another round's setup
@@ -2576,11 +2594,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
 
         box.style.display = 'block';
-        const baseHref = window.location.href.split('?')[0];
-        const scorecardBase = baseHref.replace('admin.html', 'index.html');
+
         let html = '';
         boundaries.forEach(b => {
-            const groupUrl = `${scorecardBase}?game=${currentMode}&group=${b.group}`;
+            const groupUrl = scorecardUrlFor(currentMode, b.group);
             html += `
                 <div class="group-link-row">
                     <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
@@ -2589,6 +2606,33 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             `;
         });
         list.innerHTML = html;
+    }
+
+    // ---- Player-facing URL builder -----------------------------------------
+    // ROOT CAUSE OF THE ADMIN-LINK BUG.
+    //
+    // Every group and spectator link used to be built with:
+    //     window.location.href.split('?')[0].replace('admin.html', 'index.html')
+    //
+    // Cloudflare Pages serves clean URLs, so this page is actually loaded as
+    // ".../admin", not ".../admin.html". The replace found nothing, returned the admin
+    // URL unchanged, and every "scorekeeper" link came out as /admin?game=X&group=2 -
+    // dropping a golfer onto the setup wizard, where the panel listing EVERY group's
+    // privileged link was sitting in plain sight.
+    //
+    // Built from the directory now, so it works whether the page is served as
+    // /admin, /admin.html, or from a subdirectory.
+    function playerPageUrl(page) {
+        const loc = window.location;
+        // Drop the final path segment if it is this page; keep the directory.
+        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
+        return loc.origin + dir + page;
+    }
+
+    function scorecardUrlFor(gameCode, groupNum) {
+        let url = playerPageUrl('index.html') + '?game=' + gameCode;
+        if (groupNum !== undefined && groupNum !== null) url += '&group=' + groupNum;
+        return url;
     }
 
     function copyGroupLink(url, groupNum) {
@@ -2836,8 +2880,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function generateQRCode() {
-        const baseHref = window.location.href.split('?')[0];
-        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
+        const currentUrl = scorecardUrlFor(currentMode);
         document.getElementById("qrcode").innerHTML = "";
         new QRCode(document.getElementById("qrcode"), {
             text: currentUrl, width: 140, height: 140,
@@ -2846,8 +2889,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function copyAppUrl() {
-        const baseHref = window.location.href.split('?')[0];
-        const currentUrl = baseHref.replace('admin.html', 'index.html') + `?game=${currentMode}`;
+        const currentUrl = scorecardUrlFor(currentMode);
         navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
     }
 
