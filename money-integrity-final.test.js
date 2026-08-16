@@ -4,7 +4,7 @@ const { loadHtmlInlineScript, loadJsFile } = require('./helpers/load-script.js')
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const engine = loadJsFile('money-engine.js');
-const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'settlement-engine.js']);
+const settlement = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const skinsPage = loadHtmlInlineScript('skins.html');
 const ix = loadHtmlInlineScript('index.html');
 
