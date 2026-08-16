@@ -441,26 +441,6 @@
     }
 
     // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
-    function calculateKPGameTotalsForSettle(data, courseData) {
-        if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
-        const players = (data.players || []).filter(p => p.playingForMoney !== false);
-        if (players.length < 2 || players.length > 4) return { money: {}, wins: {} };
-        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
-        const kpWinners = data.kpWinners || {};
-        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 0;
-        let money = {}, wins = {};
-        players.forEach(p => { money[p.id] = 0; wins[p.id] = 0; });
-        kpHoles.forEach(h => {
-            const winnerId = kpWinners[`h${h.hole}`];
-            if (!winnerId) return;
-            const winnerPlayer = players.find(p => String(p.id) === String(winnerId));
-            if (!winnerPlayer) return;
-            wins[winnerPlayer.id] = (wins[winnerPlayer.id] || 0) + 1;
-            money[winnerPlayer.id] += buyIn * (players.length - 1);
-            players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) money[p.id] -= buyIn; });
-        });
-        return { money, wins };
-    }
 
     // Cross-group Side Matches (from the ⚔️ Matches tab) — always shown regardless of primary format
     function buildSideMatchesHtml(data, courseData, savedScores) {
@@ -528,18 +508,6 @@
             }
         }
 
-        if (data.kpGameEnabled === true) {
-            const result = calculateKPGameTotalsForSettle(data, courseData);
-            const players = (data.players || []).filter(p => p.playingForMoney !== false);
-            if (players.length >= 2 && players.length <= 4) {
-                html += `<div class="settle-card"><div class="settle-header">📍 Dollar Game / KPs (amount won)</div>`;
-                players.forEach(p => {
-                    const wins = result.wins[p.id] || 0;
-                    html += `<div class="ledger-row"><span>${p.name}${wins > 0 ? ` (${wins} KP${wins > 1 ? 's' : ''})` : ''}</span><span>$${(result.money[p.id] || 0).toFixed(2)}</span></div>`;
-                });
-                html += `</div>`;
-            }
-        }
 
         html += buildSideMatchesHtml(data, courseData, savedScores);
 
