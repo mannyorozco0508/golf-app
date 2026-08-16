@@ -113,12 +113,30 @@
 
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
         
+        /* ---- The Receipt --------------------------------------------------------
+           A vertical block per match: the original wager, every press with its start
+           hole and stake, who won each segment, and the net. Designed to be read on a
+           phone in a group chat, not printed as a spreadsheet. */
+        .receipt-match { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin: 10px 0; background: var(--bg-card); }
+        .receipt-title { font-size: 1rem; font-weight: bold; color: var(--text-main); }
+        .receipt-sub { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        .receipt-seg { padding: 8px 0; border-top: 1px solid var(--border-faint); }
+        .receipt-seg-head { display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: bold; color: var(--text-main); }
+        .receipt-seg-meta { font-size: 0.72rem; color: var(--text-muted); }
+        .receipt-seg-result { font-size: 0.85rem; color: var(--text-main); margin-top: 2px; }
+        .receipt-seg-money { font-size: 0.85rem; font-weight: bold; color: var(--brand-green); }
+        .receipt-net { margin-top: 10px; padding-top: 8px; border-top: 2px solid var(--border-mid); font-size: 0.92rem; font-weight: bold; color: var(--brand-green); }
+        .receipt-each { font-weight: normal; font-size: 0.78rem; color: var(--text-muted); }
+
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
             .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn { display: none !important; }
             .settle-card { border: 1px solid #ccc; background: #fff; }
+            /* A match's story must not break across a page - the whole point is that a
+               golfer can read one block and see how the money happened. */
+            .receipt-match { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ccc; background: #fff; }
         }
     </style>
 </head>
@@ -252,6 +270,38 @@
     // Same rule, now complete on both sides: each KP win is paid by every other player.
 
     // Cross-group Side Matches (from the ⚔️ Matches tab) — always shown regardless of primary format
+    // THE RECEIPT, per match. Reads buildSideMatchReceipts() in settlement-engine.js -
+    // the same engines settlement itself uses - so the story and the total can never
+    // disagree. Deliberately a vertical list, not a table: this gets opened in a group
+    // chat on a phone.
+    function buildReceiptBlock(matchId, data, courseData, savedScores) {
+        if (typeof buildSideMatchReceipts !== 'function') return '';
+        const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
+        if (!r) return '';
+
+        let html = `<div class="receipt-match">`;
+        html += `<div class="receipt-title">${r.nameA} vs ${r.nameB}</div>`;
+        html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
+
+        r.segments.forEach(seg => {
+            html += `<div class="receipt-seg">`;
+            html += `<div class="receipt-seg-head"><span>${seg.label}</span><span>$${seg.stake}</span></div>`;
+            html += `<div class="receipt-seg-meta">Holes ${seg.startHole}\u2013${seg.endHole}</div>`;
+            html += `<div class="receipt-seg-result">${seg.result}</div>`;
+            if (seg.winner && seg.money > 0) {
+                html += `<div class="receipt-seg-money">${seg.winner} +$${seg.money}</div>`;
+            }
+            html += `</div>`;
+        });
+
+        html += `<div class="receipt-net">MATCH NET \u00B7 ` +
+            (r.netTo ? `${r.netTo} +$${r.netAmount.toFixed(2)}` : 'Push \u2014 nobody pays') +
+            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${Math.abs(r.perPlayerA).toFixed(2)} each)</span>` : '') +
+            `</div>`;
+        html += `</div>`;
+        return html;
+    }
+
     function buildSideMatchesHtml(data, courseData, savedScores) {
         const sideMatches = data.sideMatches || {};
         const matchIds = Object.keys(sideMatches);
@@ -283,18 +333,14 @@
                 const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], courseData, savedScores, overallConfig, overallPresses) : null;
                 const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
 
-                rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); padding-top:8px; border-top:1px dashed var(--border-faint);"><span>${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]} — Stroke Play</span><span></span></div>`;
-                rows += `<div class="ledger-row"><span>${p1.name}</span><span>${fmtSideM(p1Total)}</span></div>`;
-                rows += `<div class="ledger-row"><span>${p2.name}</span><span>${fmtSideM(-p1Total)}</span></div>`;
+                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
                 const calc = calculateMatchEngine(virtualPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
                 if (!calc) return;
                 const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
 
-                rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); padding-top:8px; border-top:1px dashed var(--border-faint);"><span>${calc.t1Name} vs ${calc.t2Name} — ${formatLabel}</span><span></span></div>`;
-                rows += `<div class="ledger-row"><span>${calc.t1Name}</span><span>${fmtSideM(calc.t1TotalMoney)}</span></div>`;
-                rows += `<div class="ledger-row"><span>${calc.t2Name}</span><span>${fmtSideM(-calc.t1TotalMoney)}</span></div>`;
+                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             }
         });
 
