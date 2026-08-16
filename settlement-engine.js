@@ -390,14 +390,22 @@
         const cfg = game.config;
         const out = {};
 
+        // A game added mid-round only covers holes from its start hole onward. The
+        // engines are not taught about ranges - they are simply handed a shorter hole
+        // list, exactly as calculateStrokePressSet has always done for presses. For a
+        // Skins wager over H5-18 that means 14 holes IS its whole round: units, carries,
+        // pot share and the played-hole proration all scale to the wager's own range
+        // rather than to an 18-hole round it was never part of.
+        const holes = (typeof gameHoles === 'function') ? gameHoles(game, courseData) : courseData;
+
         if (game.format === 'skins') {
-            return computeSkinsSettlementNet(cfg, courseData, savedScores);
+            return computeSkinsSettlementNet(cfg, holes, savedScores);
         }
         if (game.format === 'hilo') {
-            return computeHiLoSettlementNet(cfg, courseData, savedScores);
+            return computeHiLoSettlementNet(cfg, holes, savedScores);
         }
 
-        const result = computeRoundMoneyByPlayer(cfg, courseData, savedScores);
+        const result = computeRoundMoneyByPlayer(cfg, holes, savedScores);
         if (!result.valid) return out;
         result.players.forEach(p => { out[p.id] = p.net || 0; });
         return out;
