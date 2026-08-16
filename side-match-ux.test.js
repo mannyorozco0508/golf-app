@@ -36,14 +36,19 @@ describe('sidematches.html — live team-size feedback (Part 4/2)', () => {
         assert.equal(sandbox.document.getElementById('sm-preview').style.display, 'none');
     });
 
-    test('REGRESSION: Stroke Play format correctly restricts to 1v1, matching the engine\'s real constraint', () => {
+    test('Stroke Play now accepts 2v2 — the engine constraint that forced 1v1 is fixed', () => {
+        // This used to assert "1v1 only". That restriction existed because the settlement
+        // engine's stroke branch took teamAPlayers[0] and teamBPlayers[0], so a 2v2 would
+        // have settled two golfers and silently dropped the other two. The engine now
+        // takes the whole side and scores it best ball, so the restriction is gone.
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
         setStateAndRender(sandbox, { players, courseData: makeCourseData(18) },
             { [players[0].id]: 'a', [players[1].id]: 'a', [players[2].id]: 'b', [players[3].id]: 'b' }, 'stroke');
         sandbox.updateSideMatchPickerFeedback();
         const indicator = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
-        assert.ok(indicator.includes('1v1 only'));
+        assert.ok(!indicator.includes('1v1 only'), 'the restriction should be gone');
+        assert.ok(indicator.includes('2v2'), `expected a 2v2 preview, got: ${indicator}`);
     });
 
     test('a genuine handicap difference in a 1v1 shows the correct stroke count in the preview', () => {
