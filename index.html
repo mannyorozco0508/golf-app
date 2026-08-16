@@ -2151,6 +2151,8 @@
         const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
         if (boundaries.length <= 1) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
 
+        // This page IS the scorecard, so its own URL is the right base. Deliberately not
+        // a filename replace - that pattern is what broke the admin links on clean URLs.
         const base = window.location.href.split('?')[0];
         let rows = boundaries.map(b => {
             const url = `${base}?game=${currentMode}&group=${b.group}`;
