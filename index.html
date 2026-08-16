@@ -9,6 +9,7 @@
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="bet-strip.js"></script>
+    <script src="hole-events.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -248,6 +249,56 @@
         @media print { .action-center { display: none !important; } }
 
         .ar-range { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-muted); }
+
+        /* ---- End-of-hole recap --------------------------------------------------
+           Sits between score entry and Prev/Next, capped at three lines. A golfer
+           should read it in a glance while walking to the next tee - it is not a
+           screen, and it never blocks entering or correcting a score. */
+        .hole-recap {
+            margin: 10px 0 2px; border-radius: 10px;
+            border: 1px solid var(--accent-teal); background: var(--nassau-box-bg);
+            overflow: hidden;
+        }
+        .hr-title {
+            padding: 7px 12px; font-size: 0.7rem; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--accent-teal); border-bottom: 1px solid var(--border-light);
+        }
+        .hr-event {
+            display: flex; align-items: center; gap: 8px;
+            padding: 7px 12px; font-size: 0.85rem; color: var(--text-main);
+        }
+        .hr-event + .hr-event { border-top: 1px solid var(--border-light); }
+        .hr-event.personal { font-weight: bold; }
+        .hr-icon { flex: 0 0 auto; }
+        .hr-more {
+            width: 100%; padding: 7px; min-height: 34px;
+            border: none; border-top: 1px dashed var(--border-mid);
+            background: transparent; color: var(--text-muted);
+            font-size: 0.74rem; font-weight: bold; cursor: pointer; font-family: inherit;
+        }
+        @media print { .hole-recap, .whoami-panel { display: none !important; } }
+        @media (prefers-reduced-motion: no-preference) {
+            .hole-recap { animation: recapIn 180ms ease-out; }
+        }
+        @keyframes recapIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* One tap, once per round per device. Not a profile, not an account. */
+        .whoami-panel {
+            margin: 10px 0; padding: 12px; border-radius: 10px;
+            border: 1px dashed var(--border-mid); background: var(--bg-card);
+        }
+        .whoami-title { font-size: 0.85rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .whoami-btn {
+            width: 100%; padding: 11px; min-height: 44px; margin-bottom: 6px;
+            border-radius: 10px; border: 1px solid var(--border-mid);
+            background: var(--nav-bg); color: var(--brand-green);
+            font-weight: bold; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+        }
+        .whoami-skip {
+            width: 100%; padding: 8px; border: none; background: transparent;
+            color: var(--text-muted); font-size: 0.76rem; cursor: pointer; font-family: inherit;
+        }
         .add-action-btn {
             width: 100%; padding: 10px; min-height: 44px; border-radius: 0 0 10px 10px;
             border: none; border-top: 1px dashed var(--border-mid);
@@ -1536,6 +1587,8 @@
         // intended reading order: hole -> scores -> what's at stake -> press -> next.
         // The strip is a single scrollable chip row, so it stays a fixed height no
         // matter how many presses are running and never pushes scoring off screen.
+        html += '<div id="whoami-mount"></div>';
+        html += '<div id="hole-recap-mount"></div>';
         html += '<div id="action-center-mount"></div>';
         html += '<div id="bet-strip-mount"></div>';
 
@@ -1547,6 +1600,8 @@
         }
 
         container.innerHTML = html;
+        renderWhoAmI();
+        renderHoleRecap();
         renderActionCenter();
         renderBetStrip();
     }
@@ -1687,6 +1742,103 @@
         renderActionCenter();
     }
 
+
+    // ---- Who's holding the phone? ------------------------------------------
+    // Personalisation ONLY. Identity never grants a permission: organizer rights
+    // still come from isOrganizerView(), and group scoping still comes from ?group.
+    // Someone editing ?me= in the URL changes whose name reads "You" and nothing else.
+    //
+    // Read from ?me= if the organizer's link carried it, otherwise remembered per
+    // ROUND per device, so last week's identity can never leak into today's round.
+    const meStorageKey = () => `golfapp_me_${currentMode}`;
+    let meId = urlParams.get('me') || null;
+    let whoAmIDismissed = false;
+
+    function loadStoredMe() {
+        try { return localStorage.getItem(meStorageKey()); } catch (e) { return null; }
+    }
+    function storeMe(id) {
+        try { localStorage.setItem(meStorageKey(), String(id)); } catch (e) { /* private mode */ }
+    }
+
+    // A stale or invented id must degrade to the neutral experience, never break it.
+    function resolvedMeId() {
+        const candidate = meId || loadStoredMe();
+        if (!candidate) return null;
+        const players = currentData.players || [];
+        const match = players.find(p => String(p.id) === String(candidate));
+        return match ? String(match.id) : null;
+    }
+
+    function setMe(id) {
+        meId = String(id);
+        storeMe(id);
+        renderScorecard();
+    }
+    function skipWhoAmI() {
+        whoAmIDismissed = true;
+        renderWhoAmI();
+        renderHoleRecap();
+        renderActionCenter();
+    }
+
+    function renderWhoAmI() {
+        const mount = document.getElementById('whoami-mount');
+        if (!mount) return;
+        const scoped = window.__scFilteredPlayers || currentData.players || [];
+        // Asked once, only where it can actually help, and always skippable.
+        if (resolvedMeId() || whoAmIDismissed || scoped.length < 2) { mount.innerHTML = ''; return; }
+
+        mount.innerHTML = '<div class="whoami-panel">' +
+            '<div class="whoami-title">\uD83D\uDC4B Which one are you?</div>' +
+            scoped.map(p => '<button type="button" class="whoami-btn" onclick="setMe(\'' + p.id + '\')">' +
+                p.name.split(' ')[0] + '</button>').join('') +
+            '<button type="button" class="whoami-skip" onclick="skipWhoAmI()">Skip \u2014 just show everything</button>' +
+            '</div>';
+    }
+
+    // ---- End-of-hole recap -------------------------------------------------
+    // Everything comes from buildHoleEvents(), which rebuilds both sides of the
+    // comparison from raw scores. Re-rendering produces the same answer, so a
+    // Firebase listener firing five times cannot announce a skin five times, and a
+    // corrected score simply produces a corrected recap.
+    let recapExpanded = false;
+    const RECAP_LIMIT = 3;
+
+    function renderHoleRecap() {
+        const mount = document.getElementById('hole-recap-mount');
+        if (!mount) return;
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const scoped = window.__scFilteredPlayers || currentData.players || [];
+
+        let events = [];
+        try {
+            events = buildHoleEvents(currentData, courseData, currentData.scores || {},
+                currentViewedHole, resolvedMeId(), scoped);
+        } catch (e) {
+            console.error('Hole recap failed:', e);
+            mount.innerHTML = '';
+            return;
+        }
+        if (events.length === 0) { mount.innerHTML = ''; return; }
+
+        const shown = recapExpanded ? events : events.slice(0, RECAP_LIMIT);
+        const hidden = events.length - shown.length;
+
+        mount.innerHTML = '<div class="hole-recap">' +
+            '<div class="hr-title">Hole ' + currentViewedHole + ' complete</div>' +
+            shown.map(e => '<div class="hr-event' + (e.personal ? ' personal' : '') + '">' +
+                '<span class="hr-icon">' + e.icon + '</span><span>' + e.text + '</span></div>').join('') +
+            (hidden > 0 ? '<button type="button" class="hr-more" onclick="toggleRecap()">+ ' + hidden + ' more</button>' : '') +
+            (recapExpanded && events.length > RECAP_LIMIT ? '<button type="button" class="hr-more" onclick="toggleRecap()">Show less</button>' : '') +
+            '</div>';
+    }
+
+    function toggleRecap() {
+        recapExpanded = !recapExpanded;
+        renderHoleRecap();
+    }
+
     function renderActionCenter() {
         const mount = document.getElementById('action-center-mount');
         if (!mount) return;
@@ -1707,6 +1859,15 @@
             return;
         }
 
+        // When we know who's holding the phone, their own action leads. Nothing is
+        // hidden - Other Action still lists everything - it is purely an ordering.
+        const me = resolvedMeId();
+        const mySide = [], otherSide = [];
+        side.forEach(sm => {
+            const ids = (sm.playerIds || []).map(String);
+            (me && ids.includes(String(me)) ? mySide : otherSide).push(sm);
+        });
+
         const totalBets = games.length + side.length;
         // With a single game and no side action the bet strip below already says
         // everything - a second summary would just be noise.
@@ -1715,7 +1876,9 @@
 
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
             '<span>\uD83D\uDD25 Today\'s Action</span>' +
-            '<span class="ac-count">' + totalBets + ' live \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
+            '<span class="ac-count">' + totalBets + ' live' +
+                (me && mySide.length > 0 ? ' \u00B7 ' + mySide.length + ' yours' : '') +
+                ' \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
             '</button>';
 
         if (!actionCenterOpen) { mount.innerHTML = '<div class="action-center">' + toggle + '</div>'; return; }
@@ -1747,9 +1910,19 @@
 
         if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
         if (extra.length) body += '<div class="action-section-label">Also Playing</div>' + extra.map(row).join('');
-        if (side.length) {
-            body += '<div class="action-section-label">Side Action</div>';
-            body += side.map(sm =>
+        if (mySide.length) {
+            body += '<div class="action-section-label">Your Action</div>';
+            body += mySide.map(sm =>
+                '<div class="action-row">' +
+                    '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
+                    '<span class="ar-status tone-idle">' + sm.format + '</span>' +
+                    '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
+                '</div>'
+            ).join('');
+        }
+        if (otherSide.length) {
+            body += '<div class="action-section-label">' + (mySide.length ? 'Other Action' : 'Side Action') + '</div>';
+            body += otherSide.map(sm =>
                 '<div class="action-row">' +
                     '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
                     '<span class="ar-status tone-idle">' + sm.format + '</span>' +
