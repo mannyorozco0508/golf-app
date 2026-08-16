@@ -260,9 +260,30 @@
         return gross - getStrokes(courseHole.hcpIndex, parseHcp(player.hcp));
     }
 
+    // Team hole score, BEST BALL - the same convention calculateMatchEngine has always
+    // used for every 2v2 format in this app (Match Play, Nassau, Best Ball, Ryder). Not a
+    // new rule invented for Stroke: the lowest single score on the side counts, net or
+    // gross per the match's own scoring setting.
+    //
+    // Returns null until every player on the side has posted, so a half-scored team can
+    // never win or lose a hole - the same participant-readiness principle as Wave 6.
+    function sideHoleScore(sidePlayers, hole, holeObj, scoringType, savedScores) {
+        let best = null;
+        for (let i = 0; i < sidePlayers.length; i++) {
+            const s = getRichHoleBetScore(sidePlayers[i], hole, holeObj, scoringType, savedScores);
+            if (s === null) return null;
+            if (best === null || s < best) best = s;
+        }
+        return best;
+    }
+
     function calculateHoleBetEngine(players, courseData, savedScores, config, presses) {
         if (!config || config.holeEnabled === false || players.length < 2) return null;
         const p1 = players[0], p2 = players[1];
+
+        // Same side resolution as the overall bet: one player or a whole team.
+        const sideA = (config.sideA && config.sideA.length) ? config.sideA : [p1];
+        const sideB = (config.sideB && config.sideB.length) ? config.sideB : [p2];
         const sortedPresses = (presses || []).slice().sort((a, b) => a.fromHole - b.fromHole);
 
         function getStake(holeNum) {
@@ -289,8 +310,8 @@
         segments.forEach(seg => {
             let carry = 0;
             seg.holes.forEach(h => {
-                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
                 if (s1 === null || s2 === null) return;
                 lastPlayedHole = Math.max(lastPlayedHole, h.hole);
 
@@ -330,6 +351,14 @@
         if (!config || config.overallEnabled === false || players.length < 2) return null;
         const p1 = players[0], p2 = players[1];
 
+        // 2v2: config.sideA / sideB carry the full teams. Falling back to the first player
+        // of each keeps every existing 1v1 caller working untouched. THIS IS THE FIX for
+        // the defect where a 2v2 stroke match settled only two of the four golfers.
+        const sideA = (config.sideA && config.sideA.length) ? config.sideA : [p1];
+        const sideB = (config.sideB && config.sideB.length) ? config.sideB : [p2];
+        const nameA = sideA.map(p => p.name.split(' ')[0]).join(' / ');
+        const nameB = sideB.map(p => p.name.split(' ')[0]).join(' / ');
+
         if (config.overallMode === 'stroke') {
             // PER-PRESS STAKES. Every segment used to settle at config.overallStake, so a
             // side match pressed for $100 still paid the original $50 - a press could
@@ -341,8 +370,8 @@
                 courseData.forEach(h => {
                     if (h.hole < startHole) return;
                     totalHolesInSeg++;
-                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                    const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                    const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
                     if (s1 !== null && s2 !== null) {
                         p1Total += s1;
                         p2Total += s2;
@@ -353,11 +382,13 @@
                 const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
                 let winner = null, money = 0;
                 if (roundComplete) {
-                    if (p1Total < p2Total) { winner = p1.name; money = stake; }
-                    else if (p2Total < p1Total) { winner = p2.name; money = stake; }
+                    if (p1Total < p2Total) { winner = nameA; money = stake; }
+                    else if (p2Total < p1Total) { winner = nameB; money = stake; }
                 }
-                const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
-                return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
+                const segP1Money = winner === nameA ? money : (winner === nameB ? -money : 0);
+                return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg,
+                         roundComplete, winner, p1Money: segP1Money, nameA, nameB,
+                         endHole: courseData.length ? courseData[courseData.length - 1].hole : startHole };
             }
 
             const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
@@ -377,8 +408,8 @@
                 let status = 0;
                 courseData.forEach(h => {
                     if (h.hole < startHole) return;
-                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
+                    const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                    const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
                     if (s1 !== null && s2 !== null) {
                         if (s1 < s2) status += 1;
                         else if (s2 < s1) status -= 1;
@@ -431,6 +462,115 @@
         if (!result.valid) return out;
         result.players.forEach(p => { out[p.id] = p.net || 0; });
         return out;
+    }
+
+
+    // ========================================================================
+    // THE RECEIPT — per-match breakdown
+    //
+    // Returns the STORY behind each side match: the original wager, every press with
+    // its start hole and stake, who won each segment, and the match net. Settlement
+    // itself already knew all of this; it just threw it away and kept the total, which
+    // is why nobody could answer "why do I owe Marty $200?".
+    //
+    // NO NEW MATHEMATICS. Every figure comes from calculateOverallBetEngine and
+    // calculateHoleBetEngine - the same calls computeCombinedNetTotals makes. If a
+    // number here ever disagreed with settlement, it would be a bug in this function,
+    // not a second opinion about the money.
+    // ========================================================================
+    function buildSideMatchReceipts(data, courseData, savedScores) {
+        const allPlayers = (data.players || []);
+        const sideMatches = data.sideMatches || {};
+        const receipts = [];
+
+        Object.keys(sideMatches).forEach(matchId => {
+            const sm = sideMatches[matchId];
+            const teamA = allPlayers.filter(p => (sm.teamAIds || []).map(String).includes(String(p.id)));
+            const teamB = allPlayers.filter(p => (sm.teamBIds || []).map(String).includes(String(p.id)));
+            if (teamA.length === 0 || teamB.length === 0) return;
+
+            const nameA = teamA.map(p => p.name.split(' ')[0]).join(' / ');
+            const nameB = teamB.map(p => p.name.split(' ')[0]).join(' / ');
+            const isTeam = teamA.length > 1 || teamB.length > 1;
+            const firstHole = courseData.length ? Math.min.apply(null, courseData.map(h => h.hole)) : 1;
+            const lastHole = courseData.length ? Math.max.apply(null, courseData.map(h => h.hole)) : 18;
+
+            const receipt = {
+                matchId, nameA, nameB, isTeam,
+                teamA: teamA.map(p => p.name), teamB: teamB.map(p => p.name),
+                format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
+                scoring: (sm.scoring || 'net') === 'net' ? 'Net' : 'Gross',
+                segments: [], net: 0, netTo: null
+            };
+
+            if (sm.format === 'stroke') {
+                const sides = { sideA: teamA, sideB: teamB };
+                const cfg = Object.assign({
+                    overallEnabled: (sm.overallStake || 0) > 0,
+                    overallStake: sm.overallStake || 0,
+                    overallMode: sm.overallMode || 'stroke',
+                    scoringType: sm.scoring || 'net'
+                }, sides);
+                const presses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+                const calc = cfg.overallEnabled
+                    ? calculateOverallBetEngine([teamA[0], teamB[0]], courseData, savedScores, cfg, presses)
+                    : null;
+                if (!calc) return;
+
+                const describe = (seg, label) => {
+                    const margin = Math.abs(seg.p1Total - seg.p2Total);
+                    let result;
+                    if (!seg.roundComplete) result = 'Not finished';
+                    else if (!seg.winner) result = 'Tied \u2014 push';
+                    else result = `${seg.winner} by ${margin} stroke${margin === 1 ? '' : 's'}`;
+                    return {
+                        label,
+                        startHole: seg.startHole,
+                        endHole: seg.endHole !== undefined ? seg.endHole : lastHole,
+                        stake: seg.stake,
+                        result,
+                        winner: seg.roundComplete ? seg.winner : null,
+                        money: Math.abs(seg.p1Money),
+                        toSideA: seg.p1Money > 0
+                    };
+                };
+
+                receipt.segments.push(describe(calc.base, 'Original'));
+                (calc.pressSegs || []).forEach((seg, i) =>
+                    receipt.segments.push(describe(seg, `Press ${i + 1}`)));
+                receipt.net = calc.p1Money;
+            } else {
+                // Match Play / Nassau: the engine reports its own segments and presses.
+                const virtual = teamA.map(p => Object.assign({}, p, { team: 'Team 1' }))
+                    .concat(teamB.map(p => Object.assign({}, p, { team: 'Team 2' })));
+                const presses = sm.presses ? Object.values(sm.presses) : [];
+                const calc = calculateMatchEngine(virtual, courseData, savedScores,
+                    sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses);
+                if (!calc) return;
+                (calc.activeMatches || []).forEach(m => {
+                    receipt.segments.push({
+                        label: m.pressNum > 0 ? `Press ${m.pressNum}` : (m.label || 'Original'),
+                        startHole: m.startHole, endHole: m.endHole, stake: sm.stake || 0,
+                        result: m.closed && m.finalResult ? m.finalResult
+                            : (m.status === 0 ? 'All square' : `${m.status > 0 ? calc.t1Name : calc.t2Name} ${Math.abs(m.status)} up`),
+                        winner: m.closed ? (m.status > 0 ? calc.t1Name : (m.status < 0 ? calc.t2Name : null)) : null,
+                        money: sm.stake || 0,
+                        toSideA: m.status > 0
+                    });
+                });
+                receipt.net = calc.t1TotalMoney;
+            }
+
+            receipt.netTo = receipt.net > 0 ? nameA : (receipt.net < 0 ? nameB : null);
+            receipt.netAmount = Math.abs(receipt.net);
+            // Per-player money, so a 2v2 receipt can state what each golfer owes rather
+            // than leaving them to divide a team figure.
+            receipt.perPlayerA = teamA.length ? receipt.net / teamA.length : 0;
+            receipt.perPlayerB = teamB.length ? -receipt.net / teamB.length : 0;
+            receipts.push(receipt);
+        });
+
+        return receipts;
     }
 
     function computeCombinedNetTotals(data, courseData, savedScores) {
@@ -492,15 +632,23 @@
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
-                const holeConfig = { holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' };
-                const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
+                // REGRESSION FIX: this used to pass only [p1, p2], so a 2v2 stroke match
+                // settled two golfers and silently dropped the other two - money that was
+                // not zero-sum. The whole side goes to the engine now.
+                const sides = { sideA: teamAPlayers, sideB: teamBPlayers };
+                const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' }, sides);
+                const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
                 const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], courseData, savedScores, holeConfig, holePresses) : null;
                 const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], courseData, savedScores, overallConfig, overallPresses) : null;
-                const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
-                addAmount(p1, p1Total);
-                addAmount(p2, -p1Total);
+                const sideTotal = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
+                // The stake is PER SIDE, split evenly between teammates - the same
+                // convention 2v2 Match Play and Nassau have always used below.
+                const aShare = sideTotal / teamAPlayers.length;
+                const bShare = -sideTotal / teamBPlayers.length;
+                teamAPlayers.forEach(p => addAmount(p, aShare));
+                teamBPlayers.forEach(p => addAmount(p, bShare));
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
                 const calc = calculateMatchEngine(virtualPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
