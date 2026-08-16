@@ -173,20 +173,6 @@
         .side-match-callout-link:last-child { margin-bottom: 0; }
         .side-match-callout-arrow { font-size: 0.9rem; opacity: 0.8; flex-shrink: 0; }
 
-        .hole-jump-nav {
-            display: flex; gap: 4px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;
-            -webkit-overflow-scrolling: touch; scrollbar-width: none;
-            position: sticky; top: 0; z-index: 15; background: var(--bg-card);
-        }
-        .hole-jump-nav::-webkit-scrollbar { display: none; }
-        .hole-jump-btn {
-            flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-mid);
-            background: var(--nav-bg); color: var(--brand-green); font-size: 0.75rem; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
-        .hole-jump-btn.played { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
-        .hole-jump-divider { flex: 0 0 auto; width: 1px; background: var(--border-mid); margin: 2px 4px; }
-
         /* Round body layout: status panel stacks above the scorecard on phones,
            moves to a side panel next to it on wider screens (tablet/iPad and up) */
         .round-body-layout { display: block; }
@@ -251,6 +237,32 @@
         .ar-range { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-muted); }
         /* A press belongs to the wager above it, so it is indented rather than given
            equal weight in the list. */
+        /* Wraps rather than scrolling horizontally - the old strip scrolled, which is
+           how holes 14-18 ended up under the Live Action panel. */
+        .hole-picker {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin: 8px 0 2px; padding: 10px; border-radius: 10px;
+            background: var(--nassau-box-bg); border: 1px solid var(--border-mid);
+        }
+        .hole-pick-btn {
+            flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-weight: bold; font-size: 0.85rem;
+            cursor: pointer; font-family: inherit;
+        }
+        .hole-pick-btn.played { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+        .hole-pick-btn.here { outline: 2px solid var(--accent-teal); outline-offset: 1px; }
+        .hole-jump-open {
+            background: none; border: none; font: inherit; color: inherit;
+            cursor: pointer; padding: 4px 8px; min-height: 34px;
+        }
+        @media print { .hole-picker { display: none !important; } }
+
+        .side-press-btn {
+            flex: 0 0 auto; margin-left: 6px; padding: 4px 9px; min-height: 30px;
+            border-radius: 14px; border: 1px solid var(--accent-red);
+            background: var(--bg-card); font-size: 0.8rem; cursor: pointer; font-family: inherit;
+        }
         .action-row.press-row { padding-left: 26px; background: var(--nassau-box-bg); }
         .action-row.press-row .ar-name { font-size: 0.74rem; color: var(--text-muted); }
         .action-row.press-row .ar-status { font-size: 0.78rem; }
@@ -765,7 +777,11 @@
     <div class="group-filter-bar" id="group-filter-container"></div>
     <div id="group-links-panel" style="display:none;"></div>
 
-    <div class="hole-jump-nav" id="hole-jump-nav"></div>
+    <!-- The 1-18 circle strip lived here. It was clickable hole navigation plus a
+         progress indicator, but on tablet widths the Live Action panel overlapped its
+         later numbers, making holes 14-18 unreachable. The jump moved onto the
+         "Hole N of 18" label in the Prev/Next row, which sits inside the scorecard
+         card and cannot be covered. -->
 
     <div class="view-mode-toggle">
         <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">🎯 Hole View</button>
@@ -1033,15 +1049,13 @@
         return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
-    // Scrolls to the hole card itself (skipping past the status panel above it), landing just below
-    // the sticky 1-18 strip so the hole header isn't hidden underneath it.
+    // Scrolls to the hole card itself, skipping past the status panel above it. The old
+    // offset compensated for the sticky 1-18 strip, which no longer exists.
     function scrollToHoleCard() {
         const target = document.getElementById('hole-view-card');
-        const navEl = document.getElementById('hole-jump-nav');
         if (!target) return;
-        const navHeight = navEl ? navEl.offsetHeight : 0;
         const targetTop = target.getBoundingClientRect().top + window.pageYOffset;
-        window.scrollTo({ top: targetTop - navHeight - 8, behavior: 'smooth' });
+        window.scrollTo({ top: targetTop - 8, behavior: 'smooth' });
     }
 
     // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
@@ -1501,7 +1515,30 @@
         ).join('');
     }
 
+    // Replaces the old 1-18 circle strip. Same jump, same played/unplayed shading,
+    // but opened on demand from inside the scorecard card - so it cannot be overlapped
+    // by the Live Action panel at tablet widths, and it costs no permanent space.
+    let holePickerOpen = false;
+
+    function toggleHolePicker() {
+        holePickerOpen = !holePickerOpen;
+        renderHoleView();
+    }
+
+    function buildHolePickerHtml(courseData, savedScores, filteredPlayers) {
+        if (!holePickerOpen) return '';
+        const sorted = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (sorted.length === 0) return '';
+        const btns = sorted.map(h => {
+            const played = (filteredPlayers || []).some(p => savedScores[`p${p.id}_h${h.hole}`] > 0);
+            const here = h.hole === currentViewedHole;
+            return `<button type="button" class="hole-pick-btn${played ? ' played' : ''}${here ? ' here' : ''}" onclick="jumpToHole(${h.hole})">${h.hole}</button>`;
+        }).join('');
+        return `<div class="hole-picker">${btns}</div>`;
+    }
+
     function jumpToHole(holeNum) {
+        holePickerOpen = false;
         if (currentViewMode === 'hole') {
             currentViewedHole = holeNum;
             renderHoleView();
@@ -1568,7 +1605,7 @@
 
         const navRowHtml = `<div class="hole-view-nav-row">
             <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
-            <span class="hole-view-position">${positionText}</span>
+            <button type="button" class="hole-view-position hole-jump-open" onclick="toggleHolePicker()">${positionText} \u25BE</button>
             ${nextBtnHtml}
         </div>`;
 
@@ -1602,6 +1639,7 @@
         html += '<div id="bet-strip-mount"></div>';
 
         html += navRowHtml;
+        html += buildHolePickerHtml(courseData, savedScores, filteredPlayers);
 
         if (window.__scHasMatchColumn && cells[cells.length - 1]) {
             const betsHtml = cells[cells.length - 1].innerHTML.trim();
@@ -1762,6 +1800,87 @@
             if (e.type === 'LEAD_CHANGE' || e.type === 'MATCH_TIED' || e.type === 'PRESS_STARTED') keys.main = true;
         });
         return keys;
+    }
+
+    // ---- Side match presses -------------------------------------------------
+    // PERMISSION, stated plainly: a side match press is IN-ROUND ACTION on one specific
+    // wager, not round configuration. Requiring the organizer would mean phoning them
+    // from the 9th tee to press a $50 bet, which nobody will do - so any holder of a
+    // scorekeeper link for a group containing a participant may press that match.
+    //
+    // This is Option B, and it is a deliberate trade. Group links are shared credentials,
+    // not identity: the app cannot prove "Marty is Marty" without real auth, so it cannot
+    // restrict this to participants only. It does NOT widen anything else - round setup,
+    // Add Action and Group Links all remain organizer-only, and a scorekeeper still
+    // cannot press a match belonging entirely to another group, because such a match is
+    // never rendered for them.
+    let sidePressOpen = null;
+    let sidePressCustom = false;
+
+    function canPressSideMatch() {
+        // Organizer, or a scorekeeper holding a group link. A read-only spectator on a
+        // multi-group round has neither and may not press.
+        if (typeof isOrganizerView === 'function' && isOrganizerView()) {
+            const players = currentData.players || [];
+            return players.length <= 4 || hasGroupLock;
+        }
+        return !!hasGroupLock;
+    }
+
+    function openSidePress(key) { sidePressOpen = key; sidePressCustom = false; renderActionCenter(); }
+    function closeSidePress() { sidePressOpen = null; sidePressCustom = false; renderActionCenter(); }
+    function showSidePressCustom() { sidePressCustom = true; renderActionCenter(); }
+
+    function buildSidePressPanel(sm) {
+        const base = sm.pressStake || 0;
+        const presets = [];
+        if (base > 0) presets.push({ label: 'Same $' + base, amt: base });
+        [25, 50, 100, 200].forEach(v => { if (v !== base && presets.length < 4) presets.push({ label: '$' + v, amt: v }); });
+
+        const presetHtml = presets.map((p, i) =>
+            '<button type="button" class="pp-amount-btn' + (i === 0 ? ' primary' : '') +
+            '" onclick="confirmSidePress(\'' + sm.key + '\', ' + p.amt + ')">' + p.label + '</button>'
+        ).join('');
+
+        const customHtml = sidePressCustom
+            ? '<div class="pp-custom-row">' +
+                '<input type="number" inputmode="decimal" id="side-press-amt" placeholder="Amount" min="1" step="1">' +
+                '<button type="button" class="pp-amount-btn primary" style="flex:0 0 auto;" onclick="confirmSidePressCustom(\'' + sm.key + '\')">START</button>' +
+              '</div>'
+            : '<div class="pp-amount-row"><button type="button" class="pp-amount-btn" onclick="showSidePressCustom()">Custom\u2026</button></div>';
+
+        return '<div class="press-panel">' +
+            '<div class="pp-title">\uD83D\uDD25 Press this match</div>' +
+            '<div class="bcd-meta">' + sm.label + ' \u00B7 ' + sm.format + ' \u00B7 original $' + base + '</div>' +
+            '<div class="pp-start">NEW PRESS STARTS HOLE ' + sm.nextPressHole + '</div>' +
+            '<div class="pp-amount-row">' + presetHtml + '</div>' +
+            customHtml +
+            '<button type="button" class="pp-cancel" onclick="closeSidePress()">Cancel</button>' +
+            '</div>';
+    }
+
+    function confirmSidePressCustom(key) {
+        const el = document.getElementById('side-press-amt');
+        const amt = el ? parseFloat(el.value) : NaN;
+        if (isNaN(amt) || amt <= 0) { alert('Enter a dollar amount above 0.'); return; }
+        confirmSidePress(key, amt);
+    }
+
+    function confirmSidePress(key, stake) {
+        // Permission and start hole are both re-read at the moment of the tap, so a score
+        // posted while the panel sat open cannot leave a press on a finished hole.
+        if (!canPressSideMatch()) { closeSidePress(); return; }
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const scoped = window.__scFilteredPlayers || currentData.players || [];
+        const fresh = buildSideActionRows(currentData, courseData, currentData.scores || {}, scoped)
+            .find(r => r.key === key);
+        if (!fresh || !fresh.canPress) { closeSidePress(); alert('That match can no longer be pressed.'); return; }
+
+        const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/overallPresses`).push().key;
+        db.ref(`events/${currentMode}/sideMatches/${key}/overallPresses/${pushKey}`)
+            .set({ startHole: fresh.nextPressHole, stake: stake })
+            .catch(err => alert(`Press failed to save: ${err.message}`));
+        closeSidePress();
     }
 
     function toggleActionCenter() {
@@ -1928,7 +2047,13 @@
                     ? '<span class="ar-status tone-' + (sm.tone || 'idle') + '">' + sm.status + '</span>'
                     : '<span class="ar-status tone-idle">' + sm.format + '</span>') +
                 '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
+                // Each match carries its OWN press button, so a golfer running two side
+                // bets can never be unsure which one he is pressing.
+                (sm.canPress && canPressSideMatch()
+                    ? '<button type="button" class="side-press-btn" onclick="openSidePress(\'' + sm.key + '\')">\uD83D\uDD25</button>'
+                    : '') +
             '</div>' +
+            (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '') +
             (sm.presses || []).map(pr =>
                 '<div class="action-row press-row">' +
                     '<span class="ar-name">' + pr.label + '</span>' +
@@ -2123,19 +2248,6 @@
         closePressPanel();
     }
 
-    function renderHoleJumpNav(courseData, savedScores, filteredPlayers) {
-        const nav = document.getElementById('hole-jump-nav');
-        if (!nav || !courseData || courseData.length === 0) { if (nav) nav.innerHTML = ''; return; }
-
-        const sorted = courseData.slice().sort((a, b) => a.hole - b.hole);
-        let html = '';
-        sorted.forEach((h, i) => {
-            const played = filteredPlayers.some(p => savedScores[`p${p.id}_h${h.hole}`] > 0);
-            html += `<div class="hole-jump-btn ${played ? 'played' : ''}" onclick="jumpToHole(${h.hole})">${h.hole}</div>`;
-            if (h.hole === 9 && sorted.length > 9) html += `<div class="hole-jump-divider"></div>`;
-        });
-        nav.innerHTML = html;
-    }
 
 
     // ---- Group scorekeeper links -------------------------------------------
@@ -3499,7 +3611,6 @@
         renderActiveSideMatchCallout(filteredPlayers, players);
         renderLandingSummary(filteredPlayers, players);
 
-        renderHoleJumpNav(courseData, savedScores, filteredPlayers);
 
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
