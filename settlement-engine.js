@@ -2,7 +2,7 @@
 // GolfApp — Settlement Engine (CANONICAL)
 //
 // The complete money picture for ONE finished round: the main game, plus Skins,
-// Hi-Lo, the Birdie Pool, KPs, and every Side Match. computeCombinedNetTotals()
+// Hi-Lo, the Birdie Pool and every Side Match. computeCombinedNetTotals()
 // is the single source of truth for "what did each golfer win or lose today".
 //
 // WHY THIS FILE EXISTS
@@ -217,6 +217,20 @@
         return totals;
     }
 
+    // RETIRED FEATURE - LEGACY COMPATIBILITY ONLY.
+    //
+    // Dollar Game / KP was removed from the product. Every path that could create,
+    // edit or display it is gone: setup, the Action tab picker, the scorecard picker,
+    // Results, Stats and print.
+    //
+    // This calculation deliberately remains, because settlement is always recomputed
+    // from raw data - no final money is ever stored. Deleting it would silently rewrite
+    // the money of every historical round that played KP, so a golfer reopening an old
+    // round would see totals the group never actually settled on.
+    //
+    // It is unreachable for anything new: it returns immediately unless kpGameEnabled
+    // is true, and nothing in the product can set that flag any more. Do not add a
+    // caller. Do not re-expose it in UI.
     function calculateKPGameTotalsForSettle(data, courseData) {
         if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
         const players = (data.players || []).filter(p => p.playingForMoney !== false);
@@ -447,7 +461,8 @@
         });
 
 
-        // KP / Dollar Game
+        // Legacy KP money, for historical rounds only (see the note on the function).
+        // A round created today has no kpGameEnabled flag, so this contributes nothing.
         const kpResult = calculateKPGameTotalsForSettle(data, courseData);
         Object.keys(kpResult.money || {}).forEach(pid => {
             const p = allPlayers.find(pl => String(pl.id) === String(pid));
