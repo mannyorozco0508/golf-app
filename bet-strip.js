@@ -535,8 +535,35 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
             }
         }
 
+        // PRESS ELIGIBILITY, per side match.
+        //
+        // Start hole comes from the LAST HOLE BOTH PARTICIPANTS HAVE FINISHED, not from
+        // the viewing group's progress. Marty in group 1 may be through 9 while Steve in
+        // group 2 is through 8; a press starting hole 10 would silently swallow a hole
+        // Steve has not played. Same participant-scope rule Wave 6 established.
+        let canPress = false, nextPressHole = null, pressStake = 0;
+        if (sm.format === 'stroke' && matchPlayers.length === 2) {
+            const holes = (courseData || []).slice().sort((x, y) => x.hole - y.hole);
+            let lastBothDone = 0;
+            holes.forEach(h => {
+                const both = matchPlayers.every(pl => {
+                    const v = (savedScores || {})[`p${pl.id}_h${h.hole}`];
+                    return v && v > 0;
+                });
+                if (both) lastBothDone = h.hole;
+            });
+            const finalHole = holes.length ? holes[holes.length - 1].hole : 0;
+            const next = lastBothDone + 1;
+            const existing = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+            canPress = next <= finalHole && !existing.some(pr => pr.startHole === next);
+            nextPressHole = canPress ? next : null;
+            pressStake = sm.overallStake || sm.holeStake || 0;
+        }
+
         rows.push({
             key: id,
+            canPress, nextPressHole, pressStake,
+            format_: sm.format,
             // Exposed so the scorecard can tell whose action this is without
             // re-deriving membership from the raw side match.
             playerIds: a.concat(b),
