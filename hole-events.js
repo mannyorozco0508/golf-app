@@ -365,13 +365,19 @@ function sideMatchEvents(data, holes, scores, before, players, meId, push, hole)
         if (typeof participantsCompletedHole === 'function' &&
             !participantsCompletedHole(matchPlayers, hole, scores)) return;
 
-        const cfg = sideMatchConfig(sm, matchPlayers);
+        // One shared mapper (bet-strip.js), so the recap and the scorecard row can
+        // never describe the same match differently.
+        const cfg = (typeof sideMatchRoundConfig === 'function')
+            ? sideMatchRoundConfig(sm, matchPlayers)
+            : sideMatchConfig(sm, matchPlayers);
         if (!cfg) return;
 
         let now, prev;
         try {
-            now = buildBetStrip(cfg, holes, scores, matchPlayers);
-            prev = buildBetStrip(cfg, holes, before, matchPlayers);
+            // cfg.players are the team-tagged copies; passing the untagged originals
+            // leaves a match with only one side and yields no chips at all.
+            now = buildBetStrip(cfg, holes, scores, cfg.players);
+            prev = buildBetStrip(cfg, holes, before, cfg.players);
         } catch (e) { return; }
         if (!now || !now.eligible || now.chips.length === 0) return;
 
