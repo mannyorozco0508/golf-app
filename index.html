@@ -1737,6 +1737,24 @@
         actionCenterOpen = true;
     }
 
+    // Reuses the Wave 5 event layer rather than diffing separately, so the recap and
+    // the ordering can never disagree about what just happened.
+    function recentlyChangedKeys(courseData, savedScores, scoped) {
+        const keys = {};
+        if (typeof buildHoleEvents !== 'function') return keys;
+        let events = [];
+        try {
+            events = buildHoleEvents(currentData, courseData, savedScores,
+                currentViewedHole, resolvedMeId(), scoped);
+        } catch (e) { return keys; }
+        events.forEach(e => {
+            if (e.type === 'SKIN_WON' || e.type === 'SKINS_CARRIED') keys.skins = true;
+            if (e.type === 'DOTS') keys.dots = true;
+            if (e.type === 'LEAD_CHANGE' || e.type === 'MATCH_TIED' || e.type === 'PRESS_STARTED') keys.main = true;
+        });
+        return keys;
+    }
+
     function toggleActionCenter() {
         actionCenterOpen = !actionCenterOpen;
         renderActionCenter();
@@ -1849,10 +1867,14 @@
             ? window.__scFilteredPlayers
             : (currentData.players || []);
 
-        let games = [], side = [];
+        let games = [], side = [], changedKeys = {};
         try {
             games = buildActionRows(currentData, courseData, savedScores, scoped);
             side = buildSideActionRows(currentData, courseData, savedScores, scoped);
+            // What moved on the hole in view, so it can rise briefly within its
+            // section. Recomputed every render and never stored - bet order is a
+            // presentation concern, not something that belongs in Firebase.
+            changedKeys = recentlyChangedKeys(courseData, savedScores, scoped);
         } catch (e) {
             console.error('Action center failed to build:', e);
             mount.innerHTML = '';
@@ -1868,6 +1890,10 @@
             (me && ids.includes(String(me)) ? mySide : otherSide).push(sm);
         });
 
+        // One deterministic extra clause, from the shared rule - never a live money
+        // figure, which mid-round would mix settled and unsettled wagers.
+        const headline = actionHeadline(games, mySide.length);
+
         const totalBets = games.length + side.length;
         // With a single game and no side action the bet strip below already says
         // everything - a second summary would just be noise.
@@ -1877,7 +1903,7 @@
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
             '<span>\uD83D\uDD25 Today\'s Action</span>' +
             '<span class="ac-count">' + totalBets + ' live' +
-                (me && mySide.length > 0 ? ' \u00B7 ' + mySide.length + ' yours' : '') +
+                (headline ? ' \u00B7 ' + headline : '') +
                 ' \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
             '</button>';
 
@@ -1909,7 +1935,8 @@
         }
 
         if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
-        if (extra.length) body += '<div class="action-section-label">Also Playing</div>' + extra.map(row).join('');
+        if (extra.length) body += '<div class="action-section-label">Also Playing</div>' +
+            sortActionRows(extra, changedKeys).map(row).join('');
         if (mySide.length) {
             body += '<div class="action-section-label">Your Action</div>';
             body += mySide.map(sm =>
