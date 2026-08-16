@@ -636,3 +636,113 @@ describe('END-TO-END RENDER — the real production renderer, in a stubbed DOM',
         assert.equal(sb.document.getElementById('bet-strip-mount').innerHTML, '');
     });
 });
+
+describe('NAVIGATION — the More menu is actually clickable', () => {
+    NAV_PAGES.forEach(page => {
+        const html = fs.readFileSync(path.join(REPO_ROOT, page), 'utf8');
+
+        test(`${page} has no full-screen overlay sitting on top of the menu links`, () => {
+            // REGRESSION: a ::before catcher on <summary> combined with z-index on that
+            // same <summary> put an invisible fixed-position layer ABOVE .nav-more-menu,
+            // because z-index on summary creates a stacking context its own pseudo-element
+            // is painted inside. Every link in the menu became untappable.
+            assert.ok(!/\.nav-more\[open\]\s*>\s*summary::before/.test(html),
+                `${page} still has the blocking ::before overlay`);
+            assert.ok(!/\.nav-more\[open\]\s*>\s*summary\s*\{[^}]*z-index/.test(html),
+                `${page} still puts a stacking context on summary`);
+        });
+
+        test(`${page} closes the menu with a real listener, not a CSS overlay`, () => {
+            assert.ok(html.includes(`details.nav-more[open]`),
+                `${page} has no outside-tap close handler`);
+            assert.ok(/removeAttribute\('open'\)/.test(html),
+                `${page} never actually closes the menu`);
+        });
+
+        test(`${page} keeps the menu itself above ordinary page content`, () => {
+            const rule = html.slice(html.indexOf('.nav-more-menu {'), html.indexOf('}', html.indexOf('.nav-more-menu {')));
+            const z = /z-index:\s*(\d+)/.exec(rule);
+            assert.ok(z && Number(z[1]) >= 100, 'the popover needs a z-index above normal content');
+        });
+    });
+});
+
+describe('SCORECARD — group scorekeeper links are reachable mid-round', () => {
+    const idx = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
+
+    test('a Group Links button renders alongside the group filters', () => {
+        assert.ok(idx.includes('toggleGroupLinksPanel()'), 'no group links button found');
+        assert.ok(idx.includes('group-links-btn'));
+    });
+
+    test('the button lives outside the dismissible "Playing With" box', () => {
+        // That box is dismissed permanently via localStorage, so links parked inside it
+        // would disappear for good the first time someone tidied it away.
+        const landingStart = idx.indexOf('id="round-landing-summary"');
+        const landingEnd = idx.indexOf('round-body-layout', landingStart);
+        const landingBlock = idx.slice(landingStart, landingEnd);
+        assert.ok(!landingBlock.includes('toggleGroupLinksPanel'),
+            'the links must not be inside a box the golfer can permanently dismiss');
+    });
+
+    test('links use the same ?game=CODE&group=N pattern admin generates', () => {
+        assert.ok(idx.includes('?game=${currentMode}&group=${b.group}'));
+    });
+
+    test('links are only offered when the round actually has multiple groups', () => {
+        const fn = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
+        assert.ok(/boundaries\.length <= 1/.test(fn), 'a single-group round should show nothing');
+    });
+
+    test('copying falls back when the clipboard API is unavailable', () => {
+        // navigator.clipboard requires a secure context and rejects silently in some
+        // iOS webviews; without the textarea fallback the button would appear to work
+        // and copy nothing.
+        assert.ok(idx.includes('function fallbackCopy'));
+        assert.ok(idx.includes("document.execCommand('copy')"));
+    });
+
+    test('the links panel is hidden in print/PDF output', () => {
+        assert.ok(/@media print \{ \.group-links-box/.test(idx));
+    });
+});
+
+describe('BET CLARITY — the app never advertises a wager nobody is playing for', () => {
+    const idx = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
+    const adm = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
+
+    test('REGRESSION: the scorecard banner reports the per-hole bet when one is set', () => {
+        // money-engine.js ignores the flat stake entirely when holeBet > 0. The banner
+        // used to print the flat figure regardless, so a round played at $50/hole told
+        // every player in the group "$20 Nassau".
+        const fn = idx.slice(idx.indexOf("if (gameFormat === 'nassau')"), idx.indexOf("} else if (gameFormat === 'skins')"));
+        assert.ok(/holeBet > 0/.test(fn), 'the banner still ignores the per-hole bet');
+        assert.ok(/per hole Nassau/.test(fn));
+    });
+
+    test('Round Ready also reports the per-hole bet rather than the replaced flat one', () => {
+        assert.ok(adm.includes('per hole Nassau'), 'Round Ready still shows a dead flat stake');
+    });
+
+    test('"Base Bet" is gone — golfers do not use that term', () => {
+        assert.ok(!/Base Bet/.test(adm), '"Base Bet" is still on screen somewhere');
+        assert.ok(adm.includes('Nassau Bet ($)'));
+    });
+
+    test('the per-hole option states plainly that it replaces the set amount', () => {
+        assert.ok(/This replaces the set match amount/.test(adm),
+            'the trade-off between the two bets must be visible, not silent');
+    });
+
+    test('turning on the per-hole bet disables the now-dead set-amount inputs', () => {
+        const fn = adm.slice(adm.indexOf('function toggleHoleBet'), adm.indexOf('function updateBetExplainers'));
+        assert.ok(/pointerEvents/.test(fn), 'the replaced input should not still look editable');
+        assert.ok(/nassau-stake/.test(fn) && /match-stake/.test(fn));
+    });
+
+    test('the Nassau explainer spells out the three-bet structure and the maximum', () => {
+        const fn = adm.slice(adm.indexOf('function updateBetExplainers'), adm.indexOf('function updateBetExplainers') + 2000);
+        assert.ok(/front 9, back 9, and all 18/.test(fn), 'Nassau being three bets is the thing golfers forget');
+        assert.ok(/nStake \* 3/.test(fn), 'the most you can win should be stated, not calculated on the 18th green');
+    });
+});
