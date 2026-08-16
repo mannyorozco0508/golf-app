@@ -310,18 +310,25 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         .filter(p => p.playingForMoney !== false);
 
     getRoundGames(data).forEach(game => {
+        // A game added mid-round shows its range, so nobody has to remember when it
+        // started. A game covering the whole round shows nothing - "H1-18" on every
+        // ordinary wager is noise.
+        const rangeText = (typeof gameRangeText === 'function') ? gameRangeText(game, holes) : '';
         const row = {
             key: game.key,
             label: game.label,
             icon: game.icon || '',
             role: game.role,
             stake: game.stake,
+            rangeText: rangeText,
             stakeText: game.stake > 0 ? `$${game.stake}` : '',
             status: '',
             tone: 'even'
         };
         try {
-            const st = gameStatusLine(game, holes, scores, players);
+            // Each game sees only its own holes.
+            const gameCourse = (typeof gameHoles === 'function') ? gameHoles(game, holes) : holes;
+            const st = gameStatusLine(game, gameCourse, scores, players);
             row.status = st.text;
             row.tone = st.tone;
         } catch (e) {
