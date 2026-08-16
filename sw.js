@@ -5,8 +5,22 @@
 //
 // Bump this version string any time you want to force everyone's cached shell
 // to refresh (e.g. after a big update). Old caches are cleaned up automatically.
-const CACHE_VERSION = 'golfapp-v1';
+// WHY THIS VERSION MOVED
+//
+// It sat at 'golfapp-v1' through every batch of this project. The fetch handler is
+// network-first, so an online browser does get fresh files - but an installed PWA on
+// iOS routinely paints from cache first, and anything already stored under a cache key
+// that never changes is never invalidated. That is how a device kept rendering a
+// scorecard whose markup had been deleted from the repo weeks earlier.
+//
+// Bumping the key makes the activate handler delete every older cache outright, so the
+// next launch is guaranteed to be the deployed build. Bump it whenever the app shell
+// changes in a way people must see.
+const CACHE_VERSION = 'golfapp-v2-scorecard-cleanup';
 
+// Every file the shell actually needs. The old list predated the shared engine files
+// and the pages added since, so those were only ever cached opportunistically at
+// runtime - fine online, useless on the first offline launch at a remote course.
 const SHELL_FILES = [
     './index.html',
     './admin.html',
@@ -14,7 +28,17 @@ const SHELL_FILES = [
     './skins.html',
     './stats.html',
     './settlement.html',
+    './sidematches.html',
+    './trip.html',
+    './instructions.html',
     './shared.html',
+    // Shared engines. index.html cannot render a scorecard without these.
+    './money-engine.js',
+    './settlement-engine.js',
+    './action-model.js',
+    './bet-strip.js',
+    './hole-events.js',
+    './course-data.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
