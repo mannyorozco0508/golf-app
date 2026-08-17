@@ -422,10 +422,10 @@ describe('IDENTITY — personalization, never authorization', () => {
 describe('PERSONAL PRIORITIZATION — prioritized, never hidden', () => {
     const idx = read('index.html');
 
-    test('the golfer\'s own side action is listed first, under Your Action', () => {
-        assert.ok(/Your Action/.test(idx));
-        const at = idx.indexOf('Your Action');
-        assert.ok(idx.indexOf('Other Action', at) > at, 'Other Action must follow, not vanish');
+    test('the golfer\'s own side action is listed first, under My Matches', () => {
+        assert.ok(/My Matches/.test(idx));
+        const at = idx.indexOf('My Matches');
+        assert.ok(idx.indexOf('Other Matches', at) > at, 'Other Matches must follow, not vanish');
     });
 
     test('other action is still shown in full', () => {
@@ -496,7 +496,8 @@ describe('SCORECARD RENDER', () => {
 
     test('the collapsed bar reports how much of the action is yours', () => {
         const { p } = four();
-        assert.match(render(`meId='${p[0].id}'; actionCenterOpen=false;`).action, /1 yours/);
+        // The summary counts MATCHES now: "1 match · winning 1" rather than "1 yours".
+        assert.match(render(`meId='${p[0].id}'; actionCenterOpen=false;`).action, /1 match/);
     });
 
     test('the recap sits between score entry and Prev/Next', () => {
@@ -545,7 +546,7 @@ describe('EARLIER WAVES PRESERVED', () => {
     });
 
     test('Wave 2/3 Today\'s Action and Add Action survive', () => {
-        ['Main Game', 'Also Playing', '+ ADD ACTION'].forEach(t => assert.ok(idx.includes(t)));
+        ['Group Games', 'Group Games', '+ ADD ACTION'].forEach(t => assert.ok(idx.includes(t)));
     });
 
     test('Dollar Game stayed retired', () => {
