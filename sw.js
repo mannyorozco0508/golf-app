@@ -16,7 +16,7 @@
 // Bumping the key makes the activate handler delete every older cache outright, so the
 // next launch is guaranteed to be the deployed build. Bump it whenever the app shell
 // changes in a way people must see.
-const CACHE_VERSION = 'golfapp-v2-scorecard-cleanup';
+const CACHE_VERSION = 'golfapp-v3-score-marks';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -33,6 +33,7 @@ const SHELL_FILES = [
     './instructions.html',
     './shared.html',
     // Shared engines. index.html cannot render a scorecard without these.
+    './score-marks.js',
     './money-engine.js',
     './settlement-engine.js',
     './action-model.js',
