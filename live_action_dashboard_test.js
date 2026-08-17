@@ -2,15 +2,15 @@
 // RETIRED — the LIVE ACTION dashboard no longer exists.
 //
 // This file tested buildLiveActionSummary() and the panel it rendered: a full
-// second betting summary that sat beside Today's Action and answered the same
+// second betting summary that sat beside My Round and answered the same
 // questions. Two dashboards meant a golfer had to work out which one was
-// authoritative, so the panel was consolidated into Today's Action rather than
+// authoritative, so the panel was consolidated into My Round rather than
 // kept in parallel.
 //
 // The INFORMATION was not removed - only the duplicate presentation of it. What
 // this file used to cover is now covered by the tests listed against each item
 // below, and the checks in this file assert that each one still has a home. If a
-// game ever stops appearing in Today's Action, these fail.
+// game ever stops appearing in My Round, these fail.
 //
 //   locked vs live language        -> scorecard_action_test.js (LIVE VS FINAL)
 //   main match + press ladder      -> scorecard_action_test.js (STROKE PLAY PRESSES)
@@ -54,7 +54,7 @@ describe('LIVE ACTION — retired, and genuinely gone', () => {
     });
 
     test('Today\'s Action is the single betting summary that survived', () => {
-        assert.ok(/Today\\'s Action/.test(idx) || idx.includes("Today\\'s Action"));
+        assert.ok(idx.includes('My Round'));
         assert.ok(/function renderActionCenter/.test(idx));
     });
 });
