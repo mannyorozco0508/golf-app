@@ -660,7 +660,68 @@
             }
         });
 
+        // WHOLE-DOLLAR SETTLEMENT.
+        //
+        // Every engine above keeps full precision - skins pots divide by the field, 2v2
+        // stakes halve, presses stack - and that precision is correct. But golfers do not
+        // hand each other 74 cents on the 18th green, and "you owe me $50.74" is not a
+        // sentence anyone wants to say.
+        //
+        // Rounding happens exactly once, HERE, after every wager has been combined.
+        // Rounding each bet on the way in would change the math; rounding the final
+        // position does not - it only decides how the last dollar falls.
+        const wholeDollar = roundNetTotalsToWholeDollars(netByName);
+
         const netTotals = {};
-        Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
-        return { netByName, transactions: simplifyDebts(netTotals) };
+        Object.values(wholeDollar).forEach(v => { netTotals[v.name] = v.net; });
+        // Who Pays Who runs from the ROUNDED balances, so a transaction can never carry
+        // cents the ledger above it does not show.
+        return { netByName: wholeDollar, exact: netByName, transactions: simplifyDebts(netTotals) };
+    }
+
+    // Largest-remainder allocation. Rounding each balance independently can leave the
+    // table $1 up or $1 down - money invented or destroyed - so any drift is pushed onto
+    // the players whose own rounding moved furthest, which is the fairest place for it.
+    //
+    // Deterministic: ties break on name, so the same round always produces the same
+    // answer on every device and every render.
+    function roundNetTotalsToWholeDollars(netByName) {
+        const keys = Object.keys(netByName);
+        if (keys.length === 0) return netByName;
+
+        const rows = keys.map(k => {
+            const exact = netByName[k].net;
+            const rounded = Math.round(exact);
+            return { key: k, name: netByName[k].name, exact, rounded, drift: rounded - exact };
+        });
+
+        let total = rows.reduce((s, r) => s + r.rounded, 0);
+
+        // total > 0 means we handed out a dollar nobody won; < 0 means one went missing.
+        while (Math.abs(total) > 0.0001) {
+            const takeAway = total > 0;
+            const candidates = rows.filter(r => {
+                if (takeAway) {
+                    // Never turn a winner into a loser, or push someone below zero who
+                    // did not lose anything.
+                    return r.rounded - 1 >= Math.min(0, Math.floor(r.exact));
+                }
+                return r.rounded + 1 <= Math.max(0, Math.ceil(r.exact));
+            });
+            const pool = candidates.length > 0 ? candidates : rows;
+
+            // Whoever gained most from rounding gives the dollar back, and vice versa.
+            pool.sort((a, b) => takeAway
+                ? (b.drift - a.drift) || a.name.localeCompare(b.name)
+                : (a.drift - b.drift) || a.name.localeCompare(b.name));
+
+            const target = pool[0];
+            target.rounded += takeAway ? -1 : 1;
+            target.drift = target.rounded - target.exact;
+            total += takeAway ? -1 : 1;
+        }
+
+        const out = {};
+        rows.forEach(r => { out[r.key] = { name: r.name, net: r.rounded }; });
+        return out;
     }
