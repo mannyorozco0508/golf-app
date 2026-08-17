@@ -58,6 +58,10 @@ function render(groupLocked) {
         hasGroupLock = ${groupLocked}; lockedGroup = ${groupLocked ? 1 : 'null'};
         selectedGroup = ${groupLocked ? 1 : "'all'"};
         currentViewedHole = 7; meId = '${p[0].id}'; actionCenterOpen = true;
+        // Match cards collapse by default now, so open them - this is what a golfer does
+        // when he wants the press detail, and it is where the PRESS button lives.
+        Object.keys(currentData.sideMatches || {}).forEach(k => expandedMatches[k] = true);
+        groupGamesOpen = true;
         renderActionCenter(); renderHoleRecap(); renderGroupFilters(4); renderGroupLinksPanel();
     `, sb);
     const g = id => { const e = sb.document.getElementById(id); return e ? e.innerHTML : ''; };
