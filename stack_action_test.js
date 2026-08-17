@@ -377,10 +377,20 @@ describe('BACKWARD COMPATIBILITY — existing rounds cannot become collateral da
                 if (r.valid) r.players.forEach(p => { expected[p.id] = p.net || 0; });
             }
 
+            // Final settlement is now allocated in WHOLE DOLLARS (see
+            // roundNetTotalsToWholeDollars): golfers do not exchange 78 cents. The
+            // underlying engine result is unchanged - what is asserted here is that the
+            // combined total still rounds to the engine's exact figure, and that the
+            // direction of every balance is preserved.
             data.players.forEach(p => {
                 const got = now[p.name.toLowerCase()] || 0;
                 const want = expected[p.id] || 0;
-                assert.ok(Math.abs(got - want) < ZERO, `${format}/${p.name}: ${got} !== ${want}`);
+                assert.ok(Math.abs(got - want) <= 1,
+                    `${format}/${p.name}: ${got} is more than a dollar from ${want}`);
+                assert.ok(Number.isInteger(got), `${format}/${p.name}: ${got} is not whole dollars`);
+                if (Math.abs(want) > 1) {
+                    assert.equal(Math.sign(got), Math.sign(want), `${format}/${p.name}: direction flipped`);
+                }
             });
             assert.ok(Math.abs(Object.values(now).reduce((s, v) => s + v, 0)) < ZERO,
                 `legacy ${format} lost zero-sum`);
