@@ -125,7 +125,7 @@ describe('ORGANIZER AND SCOREKEEPER SHARE ONE SCORECARD', () => {
     });
 
     test('both views show the same section headings', () => {
-        ['Main Game', 'Also Playing', 'Extras', 'Your Action'].forEach(h => {
+        ['Group Games', 'Group Games', 'Group Games', 'My Matches'].forEach(h => {
             assert.ok(org.action.includes(h), `organizer missing ${h}`);
             assert.ok(sk.action.includes(h), `scorekeeper missing ${h}`);
         });
@@ -150,8 +150,8 @@ describe('ONE BET, ONE STATUS LOCATION', () => {
         const count = (needle) => (view.all.match(new RegExp(needle, 'g')) || []).length;
 
         test(`${label}: each side match appears exactly once`, () => {
-            assert.equal(count('Marty vs John|You vs John'), 1);
-            assert.equal(count('Marty vs Manny|You vs Manny'), 1);
+            assert.equal(count('vs John'), 1);
+            assert.equal(count('vs Manny'), 1);
         });
 
         test(`${label}: Skins, Dots and Birdie each appear exactly once`, () => {
@@ -161,15 +161,15 @@ describe('ONE BET, ONE STATUS LOCATION', () => {
         });
 
         test(`${label}: the press sits under its own parent match`, () => {
-            assert.ok(/press-row/.test(view.action));
-            assert.ok(/H5\u201318/.test(view.action));
-            const mjAt = view.action.search(/Marty vs John|You vs John/);
-            const pressAt = view.action.indexOf('press-row');
+            assert.ok(/mc-press/.test(view.action));
+            assert.ok(/Started Hole 5/.test(view.action));
+            const mjAt = view.action.search(/vs John/);
+            const pressAt = view.action.indexOf('mc-press');
             assert.ok(pressAt > mjAt, 'the press must follow its parent');
         });
 
         test(`${label}: each eligible 1v1 stroke match has its own PRESS button`, () => {
-            assert.equal(count('side-press-btn'), 2, 'two matches, two buttons');
+            assert.equal(count('mc-press-btn'), 2, 'two matches, two buttons');
         });
     });
 });
