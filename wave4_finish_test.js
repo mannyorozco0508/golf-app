@@ -209,10 +209,11 @@ describe('FINISH ROUND — money first, from the canonical engine only', () => {
         const { data, cd, scores } = stacked();
         const canonical = netOf(settle.computeCombinedNetTotals(data, cd, scores));
         const out = finish();
+        // Settlement is whole dollars now, so the modal prints "$55" not "$55.00".
         Object.keys(canonical).forEach(k => {
             const name = k.charAt(0).toUpperCase() + k.slice(1);
-            const amt = Math.abs(canonical[k]).toFixed(2);
             if (Math.abs(canonical[k]) > ZERO) {
+                const amt = String(Math.abs(canonical[k]));
                 assert.ok(out.money.includes(amt), `${name}'s $${amt} is not what the modal shows`);
             }
         });
@@ -224,7 +225,7 @@ describe('FINISH ROUND — money first, from the canonical engine only', () => {
         const out = finish();
         tx.forEach(t => {
             assert.ok(out.pays.includes(t.from) && out.pays.includes(t.to));
-            assert.ok(out.pays.includes(t.amount.toFixed(2)));
+            assert.ok(out.pays.includes(String(t.amount)), `$${t.amount} missing from Who Pays Who`);
         });
     });
 
@@ -248,12 +249,16 @@ describe('FINISH ROUND — money first, from the canonical engine only', () => {
         assert.match(sb.document.getElementById('fr-final-money').innerHTML, /No money changed hands/);
     });
 
-    test('bet breakdown and scores are still reachable, just secondary', () => {
+    test('the duplicate bet breakdown was removed in favour of the Receipt', () => {
+        // It cloned the live status panel and the score list. The Receipt now carries the
+        // full press timeline AND the scorecard, so this was a strictly worse copy of
+        // both - and it made golfers wonder which screen held the real money.
         const idx = read('index.html');
-        assert.ok(/View Bet Breakdown/.test(idx));
-        const money = idx.indexOf('id="fr-final-money"');
-        const breakdown = idx.indexOf('<details class="fr-breakdown">');
-        assert.ok(money > -1 && breakdown > money, 'money must come before the breakdown in the modal');
+        const code = idx.replace(/<!--[\s\S]*?-->/g, '')
+            .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+        assert.ok(!/View Bet Breakdown/.test(code), 'the duplicate breakdown is back');
+        assert.ok(!/fr-breakdown/.test(code), 'the panel itself must be gone');
+        assert.ok(/Round Receipt/.test(code), 'the Receipt must be the detail route');
     });
 });
 
@@ -444,10 +449,18 @@ describe('WAVE 2 / WAVE 3 BEHAVIOUR IS PRESERVED', () => {
         assert.ok(Math.abs(sumOf(settle.computeCombinedNetTotals(data, cd, scores))) < ZERO);
     });
 
-    test('the scorecard loads the canonical settlement engine, and after action-model', () => {
+    test('REGRESSION: the scorecard loads EVERY engine settlement-engine.js depends on', () => {
+        // settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and
+        // index.html carries inline copies of neither. Without money-engine.js the modal
+        // threw on every round and told the golfer to check another tab. Asserted as a
+        // dependency ORDER so the graph, not just the presence of a tag, is protected.
         const idx = read('index.html');
-        assert.ok(idx.includes('<script src="settlement-engine.js"></script>'));
-        assert.ok(idx.indexOf('action-model.js') < idx.indexOf('settlement-engine.js'));
+        ['money-engine.js', 'action-model.js', 'settlement-engine.js'].forEach(f =>
+            assert.ok(idx.includes(`<script src="${f}"></script>`), `${f} is not loaded`));
+        const tagAt = f => idx.indexOf(`<script src="${f}"></script>`);
+        assert.ok(tagAt('money-engine.js') < tagAt('settlement-engine.js'),
+            'money-engine.js must load first');
+        assert.ok(tagAt('action-model.js') < tagAt('settlement-engine.js'));
     });
 
     test('REGRESSION: the scorecard\'s match engine returns the canonical shape', () => {
