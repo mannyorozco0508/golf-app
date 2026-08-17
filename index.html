@@ -3041,25 +3041,21 @@
     // lets the golfer-facing string be asserted directly in tests with no DOM and no
     // second copy of the renderer. renderScorecard() is the only caller.
 
-    // Every press on the card collapses to ONE line: how many there are, and where
-    // the newest STILL-OPEN press stands. Closed presses are counted but never
-    // re-narrated - their final result is already in My Matches and the Receipt.
+    // The Full Card states HOW MANY presses exist on this hole. Nothing else.
     //
-    // Dialect is never mixed. A Match Play press is "2 up"; a Stroke Play press
-    // leads "by 2 strokes". A golfer should never have to translate between the two,
-    // and "2 up" is simply wrong language for a total-strokes wager.
-    function buildPressSummaryText(count, lead, t1Name, t2Name, dialect) {
+    // It used to append a status ("4 presses . all square"), and that reads as though
+    // the four presses were collectively all square. They are not: press #1 might be
+    // won, #2 lost, #3 tied and #4 still live. One status word cannot honestly stand
+    // for four independent wagers, and the Full Card is the wrong surface to unpack
+    // that. My Matches answers "how is each press doing?" live, and the Round Receipt
+    // answers it afterwards, press by press.
+    //
+    // A count needs no dialect. "4 presses" is equally true of Match Play and Stroke
+    // Play, so the format-specific wording that used to live here is gone rather than
+    // duplicated - the MAIN match pill still carries its own correct dialect.
+    function buildPressSummaryText(count) {
         if (!count || count < 1) return '';
-        const label = count + ' press' + (count === 1 ? '' : 'es');
-        // No open press left: every press is decided. Say so once, and leave the
-        // detail to the two surfaces that own it.
-        if (lead === null || lead === undefined) return label + ' \u00B7 final';
-        if (lead === 0) return label + ' \u00B7 ' + (dialect === 'stroke' ? 'level' : 'all square');
-        const who = lead > 0 ? t1Name : t2Name;
-        const n = Math.abs(lead);
-        return dialect === 'stroke'
-            ? label + ' \u00B7 ' + who + ' by ' + n + ' stroke' + (n === 1 ? '' : 's')
-            : label + ' \u00B7 ' + who + ' ' + n + ' up';
+        return count + ' press' + (count === 1 ? '' : 'es');
     }
 
     // Builds the whole cell. o.matchPillText / o.holeWinnerText are formatted by the
@@ -3102,7 +3098,7 @@
 
         let html = '<div class="match-status-cell">' + inner + '</div>';
 
-        const summary = buildPressSummaryText(o.pressCount, o.pressLead, o.t1Name, o.t2Name, o.dialect);
+        const summary = buildPressSummaryText(o.pressCount);
         if (summary) html += '<div class="match-press-summary">' + summary + '</div>';
 
         return html;
@@ -3600,8 +3596,9 @@
         let strokeMatchCalc = null; // for a 1v1 (format 'match') set to Stroke Play scoring instead of Match Play
         let strokePressResults = []; // each press's own independent calc, same shape as strokeMatchCalc plus startHole/stake/pressNum
         let strokeCombinedT1Money = 0; // original + all presses, summed
-        let pressRuleUsed = "none";
-        let stakeToUseVal = 0;
+        // pressRuleUsed / stakeToUseVal lived here only to feed the per-hole as-of engine
+        // re-run that produced the Full Card's press STATUS text. That text is gone, so
+        // the copies are too.
         let manualMatchPresses = [];
 
         if (gameFormat === 'hilo') {
@@ -3621,8 +3618,6 @@
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
             manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
-            pressRuleUsed = pressRule;
-            stakeToUseVal = stakeToUse;
             matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
         }
 
@@ -3796,57 +3791,25 @@
                     holeWinnerText = log.holeWinner;
                 }
 
-                // ONE press summary line, replacing the old one-badge-per-press wall.
+                // HOW MANY presses are running on this hole. That is the whole question
+                // now, and it is answered by reading start holes off the registry the
+                // page already built - no engine work at all.
                 //
-                // The as-of engine re-run is now gated on a press ACTUALLY having started
-                // by this hole. It used to be gated on globalBets, which always contains
-                // the main match starting at hole 1 - so a round with no presses at all
-                // still paid for a full engine run on all 18 rows for nothing.
-                let pressCount = 0, pressLead = null, pressDialect = 'match';
-                let pressT1 = matchCalc ? matchCalc.t1Name : '', pressT2 = matchCalc ? matchCalc.t2Name : '';
-
-                // As-of state is produced by hiding the scores that have not happened yet,
-                // NOT by shortening the course. Truncating courseData told the engine the
-                // round ended on this hole, so on hole 9 every wager looked closed out and
-                // then "reopened" on hole 10. The course is still 18 holes; only the card
-                // is partly blank.
-                const scoresThru = {};
-                moneyPlayers.forEach(p => courseData.forEach(c => {
-                    if (c.hole > h.hole) return;
-                    const k = `p${p.id}_h${c.hole}`;
-                    if (savedScores[k] !== undefined) scoresThru[k] = savedScores[k];
-                }));
-
-                const startedPressBets = globalBets.filter(b => !b.isPrimaryMatch && b.startHole <= h.hole);
-                if (matchCalc && startedPressBets.length > 0) {
-                    const prFilter = manualMatchPresses.filter(mp => mp.startHole <= h.hole);
-                    const asOfMatchCalc = calculateMatchEngine(moneyPlayers, courseData, scoresThru, scoringType, gameFormat, pressRuleUsed, stakeToUseVal, holeBet, prFilter);
-                    const segs = asOfMatchCalc
-                        ? asOfMatchCalc.activeMatches.filter(m => m.pressNum > 0).slice().sort((a, b) => a.startHole - b.startHole)
-                        : [];
-                    pressCount = segs.length;
-                    // The newest press still in play is the one a golfer can still affect.
-                    const openPresses = segs.filter(m => !m.closed);
-                    pressLead = openPresses.length > 0 ? openPresses[openPresses.length - 1].status : null;
-                } else if (strokeMatchCalc && strokePressResults.length > 0) {
-                    // Stroke Play keeps its own dialect all the way through.
-                    pressDialect = 'stroke';
-                    pressT1 = strokeMatchCalc.p1.name.split(' ')[0];
-                    pressT2 = strokeMatchCalc.p2.name.split(' ')[0];
-                    const startedStroke = strokePressResults.filter(pr => pr.startHole <= h.hole);
-                    if (startedStroke.length > 0) {
-                        const allStrokePresses = currentData.strokePresses ? Object.values(currentData.strokePresses) : [];
-                        const asOfSet = calculateStrokePressSet(
-                            moneyPlayers, courseData, scoresThru,
-                            currentData.matchScoring || 'net', currentData.matchStake || 0,
-                            allStrokePresses.filter(pr => pr.startHole <= h.hole));
-                        const prs = asOfSet ? asOfSet.pressResults : [];
-                        pressCount = prs.length;
-                        const openStroke = prs.filter(pr => !pr.roundComplete);
-                        const newest = openStroke.length > 0 ? openStroke[openStroke.length - 1] : null;
-                        // Fewer strokes wins, so a positive lead for side 1 is p2 minus p1.
-                        pressLead = newest ? (newest.p2Total - newest.p1Total) : null;
-                    }
+                // This replaced a full calculateMatchEngine() (or calculateStrokePressSet())
+                // re-run on every row from the first press onward, plus a per-row rebuild of
+                // a truncated scores object. All of that existed ONLY to work out where the
+                // newest open press stood, which the Full Card no longer says.
+                //
+                // A press counts on this hole when it has actually STARTED. That is
+                // startHole <= this hole - not "has been triggered". Under an automatic
+                // press rule the engine creates the segment on the hole the trigger fires
+                // and sets its startHole to the NEXT hole, so the old as-of count reported
+                // a press one hole before it began. See the batch report.
+                let pressCount = 0;
+                if (matchCalc) {
+                    pressCount = globalBets.filter(b => !b.isPrimaryMatch && b.startHole <= h.hole).length;
+                } else if (strokeMatchCalc) {
+                    pressCount = strokePressResults.filter(pr => pr.startHole <= h.hole).length;
                 }
 
                 rowHtml += `<td>${buildMatchBetsCell({
@@ -3855,8 +3818,7 @@
                     wolfLog: (gameFormat === 'wolf' && wolfCalc) ? wolfCalc.holeLog[h.hole] : null,
                     stablefordParts, dots: dotsInfo,
                     matchPillText, holeWinnerText,
-                    pressCount, pressLead, dialect: pressDialect,
-                    t1Name: pressT1, t2Name: pressT2
+                    pressCount
                 })}</td>`;
             }
 
