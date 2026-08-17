@@ -128,6 +128,20 @@
         .receipt-net { margin-top: 10px; padding-top: 8px; border-top: 2px solid var(--border-mid); font-size: 0.92rem; font-weight: bold; color: var(--brand-green); }
         .receipt-each { font-weight: normal; font-size: 0.78rem; color: var(--text-muted); }
 
+        .receipt-head { text-align: center; margin-bottom: 14px; }
+        .receipt-head-course { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; }
+        .receipt-head-date { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+        .receipt-head-format { font-size: 0.8rem; color: var(--text-main); margin-top: 2px; }
+
+        /* The one wide element. It scrolls inside its own card so the money sections
+           above it stay a single readable column on a phone. */
+        .receipt-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .receipt-table { border-collapse: collapse; width: 100%; font-size: 0.72rem; }
+        .receipt-table th, .receipt-table td { padding: 5px 4px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); }
+        .receipt-table th { background: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .receipt-table .rt-name { text-align: left; white-space: nowrap; padding-right: 8px; }
+        .receipt-table .rt-sec { background: var(--nassau-box-bg); font-weight: bold; }
+
         /* MAGIC PDF HIDING CSS */
         @media print {
             body { background-color: white; padding: 0; }
@@ -137,6 +151,13 @@
             /* A match's story must not break across a page - the whole point is that a
                golfer can read one block and see how the money happened. */
             .receipt-match { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ccc; background: #fff; }
+            /* Money must not split across pages either - a Who Pays Who list broken after
+               one row is exactly the sort of thing that starts an argument. */
+            .settle-card { break-inside: avoid; page-break-inside: avoid; }
+            .receipt-head { break-after: avoid; page-break-after: avoid; }
+            /* The scorecard is the only section allowed its own page. */
+            .receipt-card-wide { break-before: auto; page-break-inside: auto; }
+            .receipt-card-scroll { overflow-x: visible; }
         }
     </style>
 </head>
@@ -274,6 +295,88 @@
     // the same engines settlement itself uses - so the story and the total can never
     // disagree. Deliberately a vertical list, not a table: this gets opened in a group
     // chat on a phone.
+    // ---- THE RECEIPT: header + scorecard ------------------------------------
+    // These are the only two things the retired index.html print path had that this
+    // document did not. Everything else it produced - game ledgers for the main format,
+    // Wolf, Stableford, Nassau, Skins, Birdie - the Receipt already covered, and covered
+    // better, because it also shows side matches and press timelines.
+    // Sets a useful document title so the saved PDF names itself after the round rather
+    // than the page, then restores it - the title is what most browsers use as the
+    // default filename.
+    function printReceipt() {
+        const course = ((currentData && currentData.courseName) || 'Golf Round')
+            .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const d = new Date();
+        const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const previous = document.title;
+        document.title = `${course}-${stamp}-Receipt`;
+        window.print();
+        setTimeout(() => { document.title = previous; }, 1000);
+    }
+
+    function buildReceiptHeader() {
+        const course = (currentData && currentData.courseName) || 'Golf Round';
+        const date = new Date().toLocaleDateString('en-US',
+            { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        const fmtName = { stroke: 'Stroke Play', nassau: 'Nassau', match: 'Match Play',
+            skins: 'Skins', dots: 'Dots / Junk', wolf: 'Wolf', stableford: 'Stableford',
+            hilo: 'Hi-Lo', bestball: '2-Man Best Ball', scramble: 'Scramble', ryder: 'Ryder Cup' };
+        const gameFormat = (currentData && currentData.gameFormat) || 'stroke';
+        const scoring = (currentData && (currentData.nassauScoring || currentData.matchScoring)) || '';
+        const sub = (fmtName[gameFormat] || gameFormat) + (scoring ? ' \u00B7 ' + (scoring === 'net' ? 'Net' : 'Gross') : '');
+
+        return `<div class="receipt-head">
+            <div class="receipt-head-course">${course}</div>
+            <div class="receipt-head-date">${date}</div>
+            <div class="receipt-head-format">${sub}</div>
+        </div>`;
+    }
+
+    // The full 18-hole grid, preserved from the retired print path. Deliberately the one
+    // wide element in the document: a scorecard is inherently tabular, and it sits last
+    // so the money sections above it stay a readable single column on a phone.
+    function buildReceiptScorecard() {
+        const data = currentData || {};
+        const courseData = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const players = data.players || [];
+        const scores = data.scores || {};
+        if (courseData.length === 0 || players.length === 0) return '';
+
+        const front = courseData.filter(h => h.hole <= 9);
+        const back = courseData.filter(h => h.hole > 9);
+        const hasFront = front.length > 0, hasBack = back.length > 0;
+
+        const cell = (v, cls) => `<td${cls ? ` class="${cls}"` : ''}>${v}</td>`;
+        let html = `<div class="settle-card receipt-card-wide">
+            <div class="settle-header">\uD83D\uDCCB Full Scorecard</div>
+            <div class="receipt-card-scroll"><table class="receipt-table">`;
+
+        // HOLE + PAR rows
+        const headRow = (label, vals, outVal, inVal, total) => {
+            let r = `<tr><th class="rt-name">${label}</th>`;
+            if (hasFront) { front.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasBack) r += `<th class="rt-sec">${outVal}</th>`; }
+            if (hasBack) { back.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasFront) r += `<th class="rt-sec">${inVal}</th>`; }
+            return r + `<th class="rt-sec">${total}</th></tr>`;
+        };
+        const outPar = front.reduce((s, h) => s + (h.par || 0), 0);
+        const inPar = back.reduce((s, h) => s + (h.par || 0), 0);
+        html += headRow('HOLE', h => h.hole, 'OUT', 'IN', 'TOT');
+        html += headRow('PAR', h => h.par, outPar, inPar, outPar + inPar);
+
+        players.forEach(p => {
+            const get = h => scores[`p${p.id}_h${h.hole}`] || null;
+            const sum = list => list.reduce((s, h) => s + (get(h) || 0), 0);
+            const o = sum(front), i = sum(back);
+            let r = `<tr><td class="rt-name">${p.name}</td>`;
+            if (hasFront) { front.forEach(h => { r += cell(get(h) || '\u2013'); }); if (hasBack) r += cell(o || '\u2013', 'rt-sec'); }
+            if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013'); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
+            r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
+            html += r;
+        });
+
+        return html + `</table></div></div>`;
+    }
+
     function buildReceiptBlock(matchId, data, courseData, savedScores) {
         if (typeof buildSideMatchReceipts !== 'function') return '';
         const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
@@ -426,7 +529,12 @@
         }
 
         const sorted = totals.slice().sort((a, b) => b.net - a.net);
-        let html = `<div class="settle-card" style="border: 2px solid var(--brand-green);">
+
+        // The round this document belongs to. Only the retired print path carried this,
+        // which meant a shared Receipt had no course or date on it.
+        let html = buildReceiptHeader();
+
+        html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
             <div class="settle-header">🏁 Final Results</div>`;
         sorted.forEach(t => {
             html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
@@ -441,6 +549,10 @@
             });
             html += `</div>`;
         }
+
+        // Scores come LAST. The money story is what a golfer opens this for; an
+        // 18-hole grid before it buries the answer.
+        html += buildReceiptScorecard();
 
         container.innerHTML = html;
     }
@@ -475,7 +587,7 @@
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -498,7 +610,7 @@
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -532,7 +644,7 @@
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -562,7 +674,7 @@
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -592,7 +704,7 @@
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -600,7 +712,7 @@
         if (gameFormat === 'stroke') {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
             if (sideHtml) {
-                container.innerHTML = sideHtml + `<button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>`;
+                container.innerHTML = sideHtml + `<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>`;
             } else {
                 container.innerHTML = `
                     <div class="settle-card">
@@ -656,7 +768,7 @@
                     <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
                 </div>
                 ${sideHtml}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -669,7 +781,7 @@
                     <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
                 </div>
                 ${sideHtml}
-                <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -691,7 +803,7 @@
                     <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
                 </div>
                 ${sideHtml}
-                ${sideHtml ? '<button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>' : ''}
+                ${sideHtml ? '<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>' : ''}
             `;
             return;
         }
@@ -766,7 +878,7 @@
             </div>
             ${sideHtml}
 
-            <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
         `;
     }
 </script>
