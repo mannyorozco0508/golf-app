@@ -553,24 +553,38 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
         const progress = matchProgress(matchPlayers, courseData, savedScores);
 
         let status = '', sentence = '', tone = 'idle', presses = [];
+        let decided = 0, atStake = 0;
 
-        if (sm.format === 'stroke' && isTeam) {
-            // 2v2 STROKE. buildBetStrip's stroke path needs exactly two players, so this
-            // row used to render no status at all while settlement paid out correctly.
-            // Same engine settlement uses; best ball, no new math.
+        if (sm.format === 'stroke') {
+            // ONE path for 1v1 and 2v2. calculateOverallBetEngine takes a side of one or
+            // many, and unlike buildBetStrip it reports money per segment - which is what
+            // a net position needs. Same engine settlement uses; best ball for a team.
             const calc = teamStrokeStatus(sm, teamA, teamB, courseData, savedScores);
             if (calc) {
+                const meSide = iAmInB ? -1 : 1;
                 const st = segToStatus(calc.base, sideAName, sideBName);
-                status = st.text; tone = st.tone;
+                status = st.text;
+                tone = iAmInB ? flipTone(st.tone) : st.tone;
                 sentence = strokeSentence(status, iAmInA ? sideAName : (iAmInB ? sideBName : null));
+
+                const tally = seg => {
+                    if (seg.roundComplete) decided += seg.p1Money * meSide;
+                    // AT STAKE is not WON. A stroke wager decides nothing until its last
+                    // hole, so an undecided segment contributes its stake to the amount
+                    // riding - never to a money position.
+                    else atStake += seg.stake || 0;
+                };
+                tally(calc.base);
+
                 presses = (calc.pressSegs || []).map((seg, i) => {
+                    tally(seg);
                     const ps = segToStatus(seg, sideAName, sideBName);
                     return {
                         label: `Press #${i + 1}`,
                         startedText: `Started Hole ${seg.startHole}`,
                         status: ps.text,
                         sentence: strokeSentence(ps.text, iAmInA ? sideAName : (iAmInB ? sideBName : null)),
-                        tone: ps.tone,
+                        tone: iAmInB ? flipTone(ps.tone) : ps.tone,
                         stakeText: seg.stake > 0 ? `$${seg.stake}` : '',
                         live: !seg.roundComplete
                     };
@@ -587,6 +601,9 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                         tone = live.tone;
                         const speak = strip.mode === 'stroke' ? strokeSentence : matchSentence;
                         sentence = speak(status, meName);
+                        strip.chips.forEach(c => {
+                            if (c.closed) decided += 0; else atStake += c.stake || 0;
+                        });
                         presses = strip.chips.filter(c => c.short && c.short.charAt(0) === 'P').map((c, i) => ({
                             label: `Press #${i + 1}`,
                             startedText: c.detail && c.detail.startHole ? `Started Hole ${c.detail.startHole}` : '',
@@ -621,6 +638,13 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
             label, isTeam, mine: !!(iAmInA || iAmInB),
             format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
             status, sentence, tone, presses,
+            // Money DECIDED so far, from this golfer's point of view, and the amount
+            // still riding. Kept separate so a headline can never call an unfinished
+            // wager won.
+            netMoney: decided, atStake,
+            netText: decided > 0 ? `You're up $${Math.abs(decided)}`
+                : (decided < 0 ? `You're down $${Math.abs(decided)}`
+                : (atStake > 0 ? `$${atStake} at stake` : '')),
             thru: progress.thru,
             thruText: progress.thru > 0 ? `Through Hole ${progress.thru}` : 'Not started',
             waitingOn: progress.waitingOn,
@@ -859,4 +883,13 @@ function actionHeadline(rows, myCount) {
     const carry = (rows || []).find(r => hasBigCarry(r));
     if (carry) return `${/(\d+)\s+riding/.exec(carry.status)[1]} skins riding`;
     return '';
+}
+
+
+// A status is computed from side A's point of view. A golfer on side B is looking at
+// the same match from the other end, so the colour has to flip with them.
+function flipTone(tone) {
+    if (tone === 'up') return 'down';
+    if (tone === 'down') return 'up';
+    return tone;
 }
