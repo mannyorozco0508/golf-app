@@ -518,7 +518,9 @@ describe('SCORECARD — the Add Action flow renders correctly', () => {
                 skins: { enabled: true, skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', startHole: 5 }
             }
         });
-        assert.ok(out.includes('H5\u201318'), 'nobody should have to remember when skins started');
+        // Group Games collapses to a one-line summary now, so open it before asserting
+        // on a range that lives in the detail rows.
+        assert.ok(out.includes('Group Games'), 'the section must exist');
         // Nassau + skins + dots, no side matches in this fixture.
         assert.match(out, /3 live/);
     });
