@@ -506,107 +506,264 @@ function topBy(players, valueFn) {
 
 // Compact per-golfer view of the side action in this group. Status only — the
 // Matches tab remains the place to create or change a side match.
-function buildSideActionRows(data, courseData, savedScores, scopedPlayers) {
+function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId) {
     const rows = [];
     const sideMatches = data.sideMatches || {};
     const scopedIds = (scopedPlayers || []).map(p => String(p.id));
     const allPlayers = data.players || [];
+    const mePlayer = meId ? allPlayers.find(p => String(p.id) === String(meId)) : null;
+    const meName = mePlayer ? shortName(mePlayer.name) : null;
+
+    // "You" wherever the golfer appears, so the match row speaks the same way the
+    // end-of-hole recap already does. Previously the recap said "You win 3 skins" while
+    // the row directly beneath it said "Marty vs John".
     const nameOf = id => {
         const p = allPlayers.find(pl => String(pl.id) === String(id));
-        return p ? shortName(p.name) : '';
+        if (!p) return '';
+        return (meId && String(p.id) === String(meId)) ? 'You' : shortName(p.name);
     };
 
     Object.keys(sideMatches).forEach(id => {
         const sm = sideMatches[id];
         const a = (sm.teamAIds || []).map(String);
         const b = (sm.teamBIds || []).map(String);
-        // Only side action involving this group — a golfer entering scores should not
-        // be shown other foursomes' bets.
+        // Only side action involving this group - a golfer entering scores should not be
+        // shown other foursomes' bets.
         if (!a.concat(b).some(pid => scopedIds.includes(pid))) return;
 
         const stake = sm.format === 'stroke'
             ? (sm.overallStake || sm.holeStake || 0)
             : (sm.stake || 0);
 
-        // LIVE STATUS, computed here rather than on the Matches tab. Previously these
-        // rows carried only "Stroke Play \u00B7 $50" and the scorecard's side-match
-        // callout said "Tap to view" with a link that navigated away - so the one thing
-        // a golfer actually wants to know, who's winning their own bet, was the one
-        // thing the scorecard would not tell them.
-        //
-        // No new mathematics: the side match is mapped onto the round shape buildBetStrip
-        // already understands, and its own engines produce the numbers.
-        const matchPlayers = a.concat(b)
-            .map(pid => allPlayers.find(pl => String(pl.id) === String(pid)))
-            .filter(Boolean);
+        const teamA = a.map(pid => allPlayers.find(p => String(p.id) === String(pid))).filter(Boolean);
+        const teamB = b.map(pid => allPlayers.find(p => String(p.id) === String(pid))).filter(Boolean);
+        const matchPlayers = teamA.concat(teamB);
+        const isTeam = teamA.length > 1 || teamB.length > 1;
 
-        let status = '', tone = 'idle', presses = [];
-        const cfg = sideMatchRoundConfig(sm, matchPlayers);
-        if (cfg) {
-            try {
-                // cfg.players carry the Team 1 / Team 2 tags; the untagged originals would
-                // leave a match with only one side and silently produce no status.
-                const strip = buildBetStrip(cfg, courseData, savedScores, cfg.players);
-                if (strip && strip.eligible && strip.chips.length > 0) {
-                    const live = strip.chips.find(c => !c.closed) || strip.chips[0];
-                    status = live.statusText;
-                    tone = live.tone;
-                    // A press on a side match gets its own row, exactly like the main
-                    // game's ladder - a golfer must be able to see how each one is going.
-                    presses = strip.chips.filter(c => c.short && c.short.charAt(0) === 'P').map(c => ({
-                        label: c.short,
-                        status: c.statusText,
-                        tone: c.tone,
-                        stakeText: c.stake > 0 ? `$${c.stake}` : '',
-                        rangeText: c.detail ? c.detail.rangeText : '',
-                        live: c.detail ? c.detail.live : !c.closed
-                    }));
+        // "vs John" when it's Marty's own match; the full pairing otherwise.
+        const sideAName = a.map(nameOf).join(' / ');
+        const sideBName = b.map(nameOf).join(' / ');
+        const iAmInA = meId && a.includes(String(meId));
+        const iAmInB = meId && b.includes(String(meId));
+        let label;
+        if (!isTeam && iAmInA) label = `vs ${sideBName}`;
+        else if (!isTeam && iAmInB) label = `vs ${sideAName}`;
+        else label = `${sideAName} vs ${sideBName}`;
+
+        const progress = matchProgress(matchPlayers, courseData, savedScores);
+
+        let status = '', sentence = '', tone = 'idle', presses = [];
+
+        if (sm.format === 'stroke' && isTeam) {
+            // 2v2 STROKE. buildBetStrip's stroke path needs exactly two players, so this
+            // row used to render no status at all while settlement paid out correctly.
+            // Same engine settlement uses; best ball, no new math.
+            const calc = teamStrokeStatus(sm, teamA, teamB, courseData, savedScores);
+            if (calc) {
+                const st = segToStatus(calc.base, sideAName, sideBName);
+                status = st.text; tone = st.tone;
+                sentence = strokeSentence(status, iAmInA ? sideAName : (iAmInB ? sideBName : null));
+                presses = (calc.pressSegs || []).map((seg, i) => {
+                    const ps = segToStatus(seg, sideAName, sideBName);
+                    return {
+                        label: `Press #${i + 1}`,
+                        startedText: `Started Hole ${seg.startHole}`,
+                        status: ps.text,
+                        sentence: strokeSentence(ps.text, iAmInA ? sideAName : (iAmInB ? sideBName : null)),
+                        tone: ps.tone,
+                        stakeText: seg.stake > 0 ? `$${seg.stake}` : '',
+                        live: !seg.roundComplete
+                    };
+                });
+            }
+        } else {
+            const cfg = sideMatchRoundConfig(sm, matchPlayers);
+            if (cfg) {
+                try {
+                    const strip = buildBetStrip(cfg, courseData, savedScores, cfg.players);
+                    if (strip && strip.eligible && strip.chips.length > 0) {
+                        const live = strip.chips.find(c => !c.closed) || strip.chips[0];
+                        status = live.statusText;
+                        tone = live.tone;
+                        const speak = strip.mode === 'stroke' ? strokeSentence : matchSentence;
+                        sentence = speak(status, meName);
+                        presses = strip.chips.filter(c => c.short && c.short.charAt(0) === 'P').map((c, i) => ({
+                            label: `Press #${i + 1}`,
+                            startedText: c.detail && c.detail.startHole ? `Started Hole ${c.detail.startHole}` : '',
+                            status: c.statusText,
+                            sentence: speak(c.statusText, meName),
+                            tone: c.tone,
+                            stakeText: c.stake > 0 ? `$${c.stake}` : '',
+                            live: c.detail ? c.detail.live : !c.closed
+                        }));
+                    }
+                } catch (e) {
+                    console.error('Side match status failed:', e);
                 }
-            } catch (e) {
-                console.error('Side match status failed:', e);
             }
         }
 
-        // PRESS ELIGIBILITY, per side match.
-        //
-        // Start hole comes from the LAST HOLE BOTH PARTICIPANTS HAVE FINISHED, not from
-        // the viewing group's progress. Marty in group 1 may be through 9 while Steve in
-        // group 2 is through 8; a press starting hole 10 would silently swallow a hole
-        // Steve has not played. Same participant-scope rule Wave 6 established.
-        let canPress = false, nextPressHole = null, pressStake = 0;
-        if (sm.format === 'stroke' && matchPlayers.length === 2) {
+        // Press eligibility. Start hole comes from the last hole EVERY participant has
+        // finished, so a cross-group press can never swallow a hole someone hasn't played.
+        let canPress = false, nextPressHole = null;
+        if (sm.format === 'stroke') {
             const holes = (courseData || []).slice().sort((x, y) => x.hole - y.hole);
-            let lastBothDone = 0;
-            holes.forEach(h => {
-                const both = matchPlayers.every(pl => {
-                    const v = (savedScores || {})[`p${pl.id}_h${h.hole}`];
-                    return v && v > 0;
-                });
-                if (both) lastBothDone = h.hole;
-            });
             const finalHole = holes.length ? holes[holes.length - 1].hole : 0;
-            const next = lastBothDone + 1;
+            const next = progress.thru + 1;
             const existing = sm.overallPresses ? Object.values(sm.overallPresses) : [];
             canPress = next <= finalHole && !existing.some(pr => pr.startHole === next);
             nextPressHole = canPress ? next : null;
-            pressStake = sm.overallStake || sm.holeStake || 0;
         }
 
         rows.push({
             key: id,
-            canPress, nextPressHole, pressStake,
-            format_: sm.format,
-            // Exposed so the scorecard can tell whose action this is without
-            // re-deriving membership from the raw side match.
             playerIds: a.concat(b),
-            label: `${a.map(nameOf).join('/')} vs ${b.map(nameOf).join('/')}`,
+            label, isTeam, mine: !!(iAmInA || iAmInB),
             format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
-            status, tone, presses,
+            status, sentence, tone, presses,
+            thru: progress.thru,
+            thruText: progress.thru > 0 ? `Through Hole ${progress.thru}` : 'Not started',
+            waitingOn: progress.waitingOn,
+            canPress, nextPressHole, pressStake: stake,
             stakeText: stake > 0 ? `$${stake}` : ''
         });
     });
 
     return rows;
+}
+
+// ============================================================================
+// MARTY MODE — full sentences instead of developer shorthand
+//
+// Every figure below already existed. What was missing was the sentence: the app
+// computed "Marty +4" and left the golfer to work out that + means ahead, that the
+// unit is strokes, and that "H6-18" describes a press start hole.
+// ============================================================================
+
+// "You lead by 4 strokes" / "John leads by 2 strokes" / "Tied".
+// Reads the same status strings the engines already produce, so a wording change in
+// an engine can never silently desync this.
+function strokeSentence(statusText, meName) {
+    if (!statusText) return '';
+    if (/^TIED$/i.test(statusText)) return 'Tied';
+    if (/NOT STARTED/i.test(statusText)) return 'Not started';
+    const m = /^(\S+(?:\s*\/\s*\S+)?)\s+\+(\d+)$/.exec(statusText);
+    if (!m) return statusText;
+    const who = m[1], by = parseInt(m[2], 10);
+    const unit = by === 1 ? 'stroke' : 'strokes';
+    if (meName && who === meName) return `You lead by ${by} ${unit}`;
+    if (/\//.test(who)) return `${who} lead by ${by} ${unit}`;
+    return `${who} leads by ${by} ${unit}`;
+}
+
+// "You are 2 up" / "John is 3 up" / "All square". Match Play only.
+function matchSentence(statusText, meName) {
+    if (!statusText) return '';
+    if (/ALL SQUARE/i.test(statusText)) return 'All square';
+    const m = /^(\S+(?:\s*\/\s*\S+)?)\s+(\d+)\s+UP$/i.exec(statusText);
+    if (!m) return statusText;
+    const who = m[1], by = parseInt(m[2], 10);
+    if (meName && who === meName) return `You are ${by} up`;
+    if (/\//.test(who)) return `${who} are ${by} up`;
+    return `${who} is ${by} up`;
+}
+
+// The last hole EVERY participant in this match has finished, and whether anyone is
+// still out. This number was already being computed for press eligibility and then
+// discarded - surfacing it is what makes a cross-group match honest.
+function matchProgress(matchPlayers, courseData, savedScores) {
+    const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+    const scores = savedScores || {};
+    const posted = p => {
+        let last = 0;
+        holes.forEach(h => { const v = scores[`p${p.id}_h${h.hole}`]; if (v && v > 0) last = h.hole; });
+        return last;
+    };
+    const each = matchPlayers.map(p => ({ p, thru: posted(p) }));
+    const thru = each.reduce((m, x) => Math.min(m, x.thru), Infinity);
+    const behind = each.filter(x => x.thru < Math.max.apply(null, each.map(y => y.thru)));
+    return {
+        thru: thru === Infinity ? 0 : thru,
+        // Named so the golfer knows WHO to wait on, not just that something is pending.
+        waitingOn: behind.length > 0 ? behind.map(x => shortName(x.p.name)).join(', ') : null
+    };
+}
+
+// 2v2 stroke status, via the SAME engine settlement uses. No new math: the team hole
+// score is best ball, exactly as calculateOverallBetEngine computes it.
+function teamStrokeStatus(sm, teamA, teamB, courseData, savedScores) {
+    if (typeof calculateOverallBetEngine !== 'function') return null;
+    const cfg = {
+        overallEnabled: true,
+        overallStake: sm.overallStake || sm.holeStake || 0,
+        overallMode: 'stroke',
+        scoringType: sm.scoring || 'net',
+        sideA: teamA, sideB: teamB
+    };
+    const presses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+    try {
+        return calculateOverallBetEngine([teamA[0], teamB[0]], courseData, savedScores, cfg, presses);
+    } catch (e) {
+        console.error('2v2 status failed:', e);
+        return null;
+    }
+}
+
+function segToStatus(seg, nameA, nameB) {
+    if (!seg || seg.holesCompleted === 0) return { text: 'NOT STARTED', tone: 'idle' };
+    const diff = seg.p1Total - seg.p2Total;
+    if (diff === 0) return { text: 'TIED', tone: 'even' };
+    const who = diff < 0 ? nameA : nameB;
+    return { text: `${who} +${Math.abs(diff)}`, tone: diff < 0 ? 'up' : 'down' };
+}
+
+// ---------------------------------------------------------------------------
+const ACTION_RANK = {
+    JUST_CHANGED: 0,
+    CLOSE_TO_DONE: 1,
+    BIG_CARRY: 2,
+    LIVE: 3,
+    IDLE: 4
+};
+
+// Maps a stored Side Match onto the round shape buildBetStrip already understands,
+// rather than teaching the presenter a second data format. Shared by the scorecard
+// rows and the end-of-hole recap so the two can never describe a match differently.
+function sideMatchRoundConfig(sm, matchPlayers) {
+    if (!sm || !matchPlayers || matchPlayers.length < 2) return null;
+    const teamA = (sm.teamAIds || []).map(String);
+    const tagged = matchPlayers.map(p => Object.assign({}, p, {
+        team: teamA.includes(String(p.id)) ? 'Team 1' : 'Team 2'
+    }));
+
+    if (sm.format === 'stroke') {
+        if (tagged.length !== 2) return null;
+        return {
+            gameFormat: 'match',
+            matchScoringStyle: 'stroke',
+            matchScoring: sm.scoring || 'gross',
+            matchStake: sm.overallStake || sm.holeStake || 0,
+            // Side match presses are stored as overallPresses and carry no per-press
+            // stake, so each inherits the original amount - the existing behaviour.
+            strokePresses: (sm.overallPresses ? Object.values(sm.overallPresses) : []).map(pr => ({
+                startHole: pr.startHole,
+                stake: pr.stake !== undefined ? pr.stake : (sm.overallStake || 0)
+            })),
+            players: tagged
+        };
+    }
+
+    return {
+        gameFormat: sm.format === 'nassau' ? 'nassau' : 'match',
+        matchScoring: sm.scoring || 'gross',
+        nassauScoring: sm.scoring || 'gross',
+        matchStake: sm.stake || 0,
+        nassauStake: sm.stake || 0,
+        matchPressRule: sm.pressRule || 'none',
+        nassauPressRule: sm.pressRule || 'none',
+        matchPresses: sm.presses ? Object.values(sm.presses) : [],
+        players: tagged
+    };
 }
 
 // Wagers inside the main game that have already been decided — a Nassau front nine
@@ -658,25 +815,6 @@ function buildSettledRows(data, courseData, savedScores, scopedPlayers) {
     return rows;
 }
 
-
-// ---------------------------------------------------------------------------
-// ACTION ORDERING
-//
-// With eight wagers running, a fixed main/additional/side order stops being useful.
-// Rows are scored on relevance and state so the list is stable and predictable: the
-// same board always sorts the same way, and it only reshuffles when the golf changes.
-//
-// Deliberately NOT a factor: the size of the wager. Ranking by dollars would quietly
-// turn Today's Action into an advertisement for betting more.
-// ---------------------------------------------------------------------------
-const ACTION_RANK = {
-    JUST_CHANGED: 0,
-    CLOSE_TO_DONE: 1,
-    BIG_CARRY: 2,
-    LIVE: 3,
-    IDLE: 4
-};
-
 // "Close to done" only where it means something. A match 2 up with holes running out
 // is genuinely on the brink; a stroke total with ten to play is not, and inventing
 // closeness for it would be noise dressed as insight.
@@ -721,45 +859,4 @@ function actionHeadline(rows, myCount) {
     const carry = (rows || []).find(r => hasBigCarry(r));
     if (carry) return `${/(\d+)\s+riding/.exec(carry.status)[1]} skins riding`;
     return '';
-}
-
-
-// Maps a stored Side Match onto the round shape buildBetStrip already understands,
-// rather than teaching the presenter a second data format. Shared by the scorecard
-// rows and the end-of-hole recap so the two can never describe a match differently.
-function sideMatchRoundConfig(sm, matchPlayers) {
-    if (!sm || !matchPlayers || matchPlayers.length < 2) return null;
-    const teamA = (sm.teamAIds || []).map(String);
-    const tagged = matchPlayers.map(p => Object.assign({}, p, {
-        team: teamA.includes(String(p.id)) ? 'Team 1' : 'Team 2'
-    }));
-
-    if (sm.format === 'stroke') {
-        if (tagged.length !== 2) return null;
-        return {
-            gameFormat: 'match',
-            matchScoringStyle: 'stroke',
-            matchScoring: sm.scoring || 'gross',
-            matchStake: sm.overallStake || sm.holeStake || 0,
-            // Side match presses are stored as overallPresses and carry no per-press
-            // stake, so each inherits the original amount - the existing behaviour.
-            strokePresses: (sm.overallPresses ? Object.values(sm.overallPresses) : []).map(pr => ({
-                startHole: pr.startHole,
-                stake: pr.stake !== undefined ? pr.stake : (sm.overallStake || 0)
-            })),
-            players: tagged
-        };
-    }
-
-    return {
-        gameFormat: sm.format === 'nassau' ? 'nassau' : 'match',
-        matchScoring: sm.scoring || 'gross',
-        nassauScoring: sm.scoring || 'gross',
-        matchStake: sm.stake || 0,
-        nassauStake: sm.stake || 0,
-        matchPressRule: sm.pressRule || 'none',
-        nassauPressRule: sm.pressRule || 'none',
-        matchPresses: sm.presses ? Object.values(sm.presses) : [],
-        players: tagged
-    };
 }
