@@ -199,8 +199,12 @@ describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
 
     test('expanded, every game and side match is listed under a clear heading', () => {
         const out = render(true, data, players);
-        ['Main Game', 'Also Playing', 'Side Action'].forEach(h =>
-            assert.ok(out.includes(h), `missing section: ${h}`));
+        // Sections were renamed to the way a golfer thinks: one Group Games heading for
+        // everything the field is in, My Matches / Other Matches for personal action.
+        // Without an identified golfer there is no "My Matches" - side action falls
+        // under the neutral "Side Matches" heading, which is the correct fallback.
+        assert.ok(out.includes('Group Games'), 'missing Group Games');
+        assert.ok(/My Matches|Side Matches/.test(out), 'missing the side action heading');
         ['Nassau', 'Skins', 'Dots', 'Marty vs John', 'Manny vs Steve'].forEach(n =>
             assert.ok(out.includes(n), `missing row: ${n}`));
     });
@@ -259,7 +263,7 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     test('Step 6 offers additional games alongside the extras', () => {
         assert.ok(adm.includes('Step 6: More Action'));
         assert.ok(adm.includes('stacked-games-list'));
-        assert.ok(adm.includes('Also Playing'));
+        assert.ok(adm.includes('Also Playing'), 'the setup wizard keeps its own wording');
         assert.ok(adm.includes('\uD83C\uDFAF Extras'), 'the birdie/KP extras keep their own heading');
     });
 
