@@ -10,7 +10,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 function layered() {
     const sb = loadJsFile('action-model.js');
-    ['money-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
+    ['money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
         vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -302,7 +302,7 @@ describe('EVERY GAME VISIBLE FROM THE SCORECARD', () => {
         const out = render(true);
         // Matches are cards now, not table rows. Splitting on the card marker isolates
         // each one; the first fragment is everything before the first card.
-        const cards = out.split('class="match-card"').slice(1);
+        const cards = out.split('class="match-card').slice(1);
         assert.ok(cards.length > 0, 'no match cards rendered');
         cards.forEach(r => assert.ok(/mc-status tone-(up|down|even|final)/.test(r),
             'a side match rendered with no live status'));
