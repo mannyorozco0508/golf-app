@@ -613,19 +613,21 @@ describe('SIDE MATCH PRESS — UI and permissions', () => {
 
     test('permission and start hole are re-read at the moment of the tap', () => {
         const fn = idx.slice(idx.indexOf('function confirmSidePress(key, stake)'), idx.indexOf('function toggleActionCenter'));
-        assert.ok(/if \(!canPressSideMatch\(\)\)/.test(fn));
+        assert.ok(/if \(!canPressSideMatch\(sideMatchById\(key\)\)\)/.test(fn));
         assert.ok(/buildSideActionRows/.test(fn), 'a stale start hole must not be written');
     });
 
-    test('OPTION B: anyone viewing the round can press a match shown to them', () => {
+    test('the press rule is explicit: organizer any, group its own, bare link none', () => {
         // Changed deliberately. Requiring the organizer or a ?group= link meant a golfer
         // on a plain shared link - holding four of his own bets - had no press button at
         // all. Matches shown are already scoped to the viewer's group, so this widens
         // nothing else; the stated limitation is that links are not identity.
-        const fn = idx.slice(idx.indexOf('function canPressSideMatch'), idx.indexOf('function openSidePress'));
-        assert.ok(/return true;/.test(fn));
-        assert.ok(/links are shared credentials, not identity/.test(fn),
-            'the trade-off must be documented at the decision point');
+        // Was a blanket `return true`, which let a bare spectator link press every match
+        // in the round. Now checked against the stored match's actual participants.
+        const fn = idx.slice(idx.indexOf('function canPressSideMatch'), idx.indexOf('function sideMatchById'));
+        assert.ok(/hasGroupLock/.test(fn));
+        assert.ok(/teamAIds/.test(fn), 'it must read the match participants');
+        assert.ok(!/meId/.test(fn));
     });
 
     test('REGRESSION: pressing does not widen any other permission', () => {
