@@ -128,8 +128,11 @@ describe('bet-strip.js — eligibility (press button shown only where pressing i
         const scores = postScores(p, cd, { 1: [4, 5] });
         const m = S.buildBetStrip({ gameFormat: 'nassau', players: p, nassauStake: 10, nassauScoring: 'gross', nassauPressRule: 'none' }, cd, scores, p);
         assert.equal(m.eligible, true);
-        const keys = m.chips.filter(c => !c.key.startsWith('P')).map(c => c.short).join(',');
-        assert.equal(keys, 'F9,B9,TOT', 'collapsing Nassau to one chip would hide two real wagers');
+        // "TOT" was the last piece of shorthand in the Nassau strip. Nassau's legs
+        // already have perfectly good golf names, so they are spelled out.
+        const keys = m.chips.filter(c => !c.isPress).map(c => c.short).join(',');
+        assert.equal(keys, 'Front 9,Back 9,Total', 'collapsing Nassau to one chip would hide two real wagers');
+        assert.ok(!keys.includes('TOT,') && !keys.endsWith('TOT'), 'TOT shorthand must not reach a golfer');
     });
 });
 
@@ -250,13 +253,22 @@ describe('bet-strip.js — press start hole is always the next UNPLAYED hole', (
 describe('bet-strip.js — presses appear, stay compact, and carry their own amount', () => {
     const cd = makeCourseData(18);
 
-    test('ONE press produces MAIN + P1', () => {
+    // BEHAVIOUR CHANGE (Full Card / Receipt UX batch): chip labels are the words a
+    // golfer reads, so they are plain language now. The chip KEY is unchanged ('MAIN',
+    // 'P1') because it is internal wiring for toggleBetChip(). Each assertion below
+    // additionally proves the old shorthand is GONE, which the original did not.
+    test('ONE press produces Main Bet + Press #1, and no bare \'P1\' shorthand', () => {
         const players = martyBud();
         const byHole = {};
         for (let h = 1; h <= 9; h++) byHole[h] = [4, 5];
         const data = strokeRound({ players, strokePresses: { a: { startHole: 6, stake: 50 } } });
         const m = S.buildBetStrip(data, cd, postScores(players, cd, byHole), players);
-        assert.equal(m.chips.map(c => c.short).join(','), 'MAIN,P1');
+        assert.equal(m.chips.map(c => c.short).join(','), 'Main Bet,Press #1');
+        // Compared as strings: chips come from a vm realm, so deepEqual would fail on
+        // Array prototype identity rather than on content.
+        assert.equal(m.chips.map(c => c.key).join(','), 'MAIN,P1', 'internal keys must not drift');
+        assert.equal(m.chips.map(c => c.isPress).join(','), 'false,true');
+        m.chips.forEach(c => assert.doesNotMatch(c.short, /^P\d+$|^MAIN$/, `shorthand leaked: ${c.short}`));
         assert.equal(m.pressCount, 1);
     });
 
@@ -269,7 +281,8 @@ describe('bet-strip.js — presses appear, stay compact, and carry their own amo
             strokePresses: { a: { startHole: 6, stake: 50 }, b: { startHole: 10, stake: 100 }, c: { startHole: 14, stake: 200 } }
         });
         const m = S.buildBetStrip(data, cd, postScores(players, cd, byHole), players);
-        assert.equal(m.chips.map(c => c.short).join(','), 'MAIN,P1,P2,P3');
+        assert.equal(m.chips.map(c => c.short).join(','), 'Main Bet,Press #1,Press #2,Press #3');
+        m.chips.forEach(c => assert.doesNotMatch(c.short, /^P\d+$|^MAIN$/, `shorthand leaked: ${c.short}`));
         assert.equal(m.chips.map(c => c.detail.stake).join(','), '50,50,100,200');
     });
 
@@ -393,20 +406,23 @@ describe('ACCEPTANCE — Marty vs Bud, Stroke Play with three presses, standing 
     });
     const model = S.buildBetStrip(data, cd, scenarioScores(players), players);
 
-    test('the strip reads MAIN / P1 / P2 / P3 with the exact expected statuses', () => {
-        assert.equal(model.chips.map(c => c.short).join(','), 'MAIN,P1,P2,P3');
+    test('the strip reads Main Bet / Press #1-3 with the exact expected statuses', () => {
+        assert.equal(model.chips.map(c => c.short).join(','), 'Main Bet,Press #1,Press #2,Press #3');
         assert.equal(model.chips[0].statusText, 'Marty +3');
         assert.equal(model.chips[1].statusText, 'Marty +1');
         assert.equal(model.chips[2].statusText, 'Bud +2');
         assert.equal(model.chips[3].statusText, 'TIED');
     });
 
-    test('tapping P2 shows Press 2, $100, started H10, Bud ahead, $100 at stake', () => {
+    // "H10-18" was developer shorthand. What a golfer needs from a press is when it
+    // STARTED; the end is always the end of the match.
+    test('tapping Press #2 shows Press #2, $100, Started Hole 10, Bud ahead, $100 at stake', () => {
         const p2 = model.chips[2].detail;
-        assert.equal(p2.title, 'Press 2');
+        assert.equal(p2.title, 'Press #2');
         assert.equal(p2.stake, 100);
         assert.equal(p2.startHole, 10);
-        assert.equal(p2.rangeText, 'H10\u201318');
+        assert.equal(p2.rangeText, 'Started Hole 10');
+        assert.doesNotMatch(p2.rangeText, /H\d/, 'H-prefixed hole shorthand must not reach a golfer');
         assert.match(p2.stateLabel, /LIVE/);
         assert.equal(p2.statusLine, 'Bud leads by 2');
         assert.equal(p2.moneyLine, '$100 AT STAKE');
@@ -596,10 +612,13 @@ describe('END-TO-END RENDER — the real production renderer, in a stubbed DOM',
 
     test('renders four chips with correct statuses and a visible PRESS button', () => {
         const out = html();
-        assert.ok(out.includes('>MAIN</span><span class="bc-status">Marty +3<'));
-        assert.ok(out.includes('>P1</span><span class="bc-status">Marty +1<'));
-        assert.ok(out.includes('>P2</span><span class="bc-status">Bud +2<'));
-        assert.ok(out.includes('>P3</span><span class="bc-status">TIED<'));
+        assert.ok(out.includes('>Main Bet</span><span class="bc-status">Marty +3<'));
+        assert.ok(out.includes('>Press #1</span><span class="bc-status">Marty +1<'));
+        assert.ok(out.includes('>Press #2</span><span class="bc-status">Bud +2<'));
+        assert.ok(out.includes('>Press #3</span><span class="bc-status">TIED<'));
+        // The rendered strip must carry no developer shorthand at all.
+        ['>MAIN<', '>P1<', '>P2<', '>P3<'].forEach(bad =>
+            assert.ok(!out.includes(bad), `shorthand ${bad} reached the golfer-facing strip`));
         assert.ok(out.includes('class="bet-press-btn"'), 'PRESS must be on the scorecard, not behind a menu');
     });
 
@@ -607,12 +626,13 @@ describe('END-TO-END RENDER — the real production renderer, in a stubbed DOM',
         assert.ok(html().includes(`onclick="toggleBetChip('P2')"`));
     });
 
-    test('tapping P2 expands its detail in place, with LIVE + AT STAKE wording', () => {
+    test('tapping Press #2 expands its detail in place, with LIVE + AT STAKE wording', () => {
         const sb = renderScenario();
         vm.runInContext(`toggleBetChip('P2');`, sb);
         const out = sb.document.getElementById('bet-strip-mount').innerHTML;
-        assert.ok(out.includes('Press 2'));
-        assert.ok(out.includes('H10\u201318 \u00B7 $100'));
+        assert.ok(out.includes('Press #2'));
+        assert.ok(out.includes('Started Hole 10 \u00B7 $100'));
+        assert.ok(!/H10\u201318/.test(out), 'the H10-18 range shorthand must be gone');
         assert.ok(out.includes('Bud leads by 2'));
         assert.ok(out.includes('$100 AT STAKE'));
         assert.ok(!/won/i.test(out.slice(out.indexOf('bet-chip-detail'))), 'a live press must never read as won');
