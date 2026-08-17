@@ -52,7 +52,11 @@ describe('STROKE PLAY PRESSES — the engine was and is intact', () => {
 
     test('all three presses exist alongside the original', () => {
         const strip = BS.buildBetStrip(data, cd, scores, p);
-        assert.equal(strip.chips.map(c => c.short).join(','), 'MAIN,P1,P2,P3');
+        // BEHAVIOUR CHANGE: chip labels are golfer-facing language now. Keys, which are
+        // internal, are asserted separately so a label change can never silently break
+        // the click wiring.
+        assert.equal(strip.chips.map(c => c.short).join(','), 'Main Bet,Press #1,Press #2,Press #3');
+        assert.equal(strip.chips.map(c => c.key).join(','), 'MAIN,P1,P2,P3');
         assert.equal(strip.pressCount, 3);
     });
 
@@ -61,11 +65,17 @@ describe('STROKE PLAY PRESSES — the engine was and is intact', () => {
         assert.equal(strip.chips.map(c => c.detail.stake).join(','), '50,50,100,200');
     });
 
-    test('each press covers only its own holes', () => {
+    // Start hole is the fact that matters and the fact that differs; the end is always
+    // the end of the match. startHole is asserted numerically so this still proves each
+    // press covers only its own holes, independently of the wording.
+    test('each press covers only its own holes, stated in plain English', () => {
         const strip = BS.buildBetStrip(data, cd, scores, p);
-        assert.equal(strip.chips[1].detail.rangeText, 'H6\u201318');
-        assert.equal(strip.chips[2].detail.rangeText, 'H10\u201318');
-        assert.equal(strip.chips[3].detail.rangeText, 'H14\u201318');
+        assert.equal(strip.chips.slice(1).map(c => c.detail.startHole).join(','), '6,10,14');
+        assert.equal(strip.chips[1].detail.rangeText, 'Started Hole 6');
+        assert.equal(strip.chips[2].detail.rangeText, 'Started Hole 10');
+        assert.equal(strip.chips[3].detail.rangeText, 'Started Hole 14');
+        strip.chips.forEach(c =>
+            assert.doesNotMatch(c.detail.rangeText, /H\d/, 'H-prefixed shorthand must not reach a golfer'));
     });
 
     test('presses are genuinely independent — P3 can favour the other golfer', () => {
