@@ -206,8 +206,14 @@ describe('MARTY MODE — the scorecard', () => {
     function render(meId, expandAll) {
         const sb = loadHtmlInlineScript('index.html', PAGE);
         const o = martyRound();
+        // Marty is a Group 1 scorekeeper. A bare link on an 8-player round is a
+        // spectator context now, and correctly cannot press.
+        const gmap = {};
+        o.p.forEach((pl, i) => { gmap[pl.id] = i < 4 ? 1 : (i < 6 ? 2 : 3); });
         vm.runInContext(`currentData = ${JSON.stringify(o.data)};` +
+            `window.__scPlayerGroupMap = ${JSON.stringify(gmap)};` +
             `window.__scFilteredPlayers = currentData.players.slice(0, 4); currentViewedHole = 12;` +
+            `hasGroupLock = true; lockedGroup = 1;` +
             (meId ? `meId = '${meId}';` : '') +
             (expandAll ? `Object.keys(currentData.sideMatches).forEach(k => expandedMatches[k] = true);` : '') +
             `actionCenterOpen = true; renderActionCenter();`, sb);
@@ -218,7 +224,7 @@ describe('MARTY MODE — the scorecard', () => {
         const out = render(martyRound().p[0].id, true);
         assert.match(out, /vs John/);
         assert.match(out, /You lead by \d+ strokes?/);
-        assert.match(out, /Through Hole 12/);
+        assert.match(out, /Thru 12/);
         assert.match(out, /Press #1 \u00B7 \$50 \u00B7 Started Hole 6/);
     });
 
@@ -232,7 +238,7 @@ describe('MARTY MODE — the scorecard', () => {
         const out = render(martyRound().p[0].id);
         assert.match(out, /vs John/);
         assert.match(out, /You lead by \d+ strokes?/);
-        assert.match(out, /Through Hole 12/);
+        assert.match(out, /Thru 12/);
         assert.match(out, /2 presses/);
         assert.ok(!/Started Hole 6/.test(out), 'press detail should be behind a tap');
     });
@@ -306,11 +312,17 @@ describe('MARTY MODE — nothing was broken to get here', () => {
         assert.ok(/isOrganizerView\(\)/.test(fn));
     });
 
-    test('the Option B trade-off is documented at the decision point', () => {
+    test('the press permission RULE is stated at the decision point', () => {
+        // Replaced the blanket Option B. The rule is now explicit and enforced twice:
+        // organizer any, group link only its own matches, bare link none.
         const idx = read('index.html');
-        const fn = idx.slice(idx.indexOf('function canPressSideMatch'), idx.indexOf('function openSidePress'));
-        assert.ok(/links are shared credentials, not identity/.test(fn));
-        assert.ok(/does NOT widen anything else/.test(fn));
+        // The rule comment sits above the declaration, so widen the window to include it.
+        const at = idx.indexOf('function canPressSideMatch');
+        const fn = idx.slice(Math.max(0, at - 1400), idx.indexOf('function sideMatchById'));
+        assert.ok(/THE RULE, stated once and enforced twice/.test(fn));
+        assert.ok(/teamAIds/.test(fn), 'it must read the match participants');
+        assert.ok(/hasGroupLock/.test(fn), 'it must distinguish a group link from a bare one');
+        assert.ok(!/meId/.test(fn), 'identity must not appear in a permission check');
     });
 });
 
@@ -321,8 +333,12 @@ describe('COLLAPSED CARDS — four matches fit one screen', () => {
     function render(state) {
         const sb = loadHtmlInlineScript('index.html', PAGE);
         const o = martyRound();
+        const gmap = {};
+        o.p.forEach((pl, i) => { gmap[pl.id] = i < 4 ? 1 : (i < 6 ? 2 : 3); });
         vm.runInContext(`currentData = ${JSON.stringify(o.data)};` +
+            `window.__scPlayerGroupMap = ${JSON.stringify(gmap)};` +
             `window.__scFilteredPlayers = currentData.players.slice(0, 4); currentViewedHole = 12;` +
+            `hasGroupLock = true; lockedGroup = 1;` +
             `meId = '${o.p[0].id}'; actionCenterOpen = true; ${state || ''} renderActionCenter();`, sb);
         return sb.document.getElementById('action-center-mount').innerHTML;
     }
@@ -340,7 +356,7 @@ describe('COLLAPSED CARDS — four matches fit one screen', () => {
         const out = render();
         assert.match(out, /vs John/);
         assert.match(out, /You lead by \d+ strokes?/);
-        assert.match(out, /Through Hole 12/);
+        assert.match(out, /Thru 12/);
         assert.match(out, /\$\d+ at stake/);
     });
 
@@ -388,8 +404,12 @@ describe('COLLAPSED CARDS — four matches fit one screen', () => {
         const sb = loadHtmlInlineScript('index.html', PAGE);
         const o = martyRound();
         const one = { a: o.data.sideMatches.a };
+        const gmap = {};
+        o.p.forEach((pl, i) => { gmap[pl.id] = i < 4 ? 1 : (i < 6 ? 2 : 3); });
         vm.runInContext(`currentData = ${JSON.stringify(Object.assign({}, o.data, { sideMatches: one }))};` +
+            `window.__scPlayerGroupMap = ${JSON.stringify(gmap)};` +
             `window.__scFilteredPlayers = currentData.players.slice(0, 4); currentViewedHole = 12;` +
+            `hasGroupLock = true; lockedGroup = 1;` +
             `meId = '${o.p[0].id}'; actionCenterOpen = true; renderActionCenter();`, sb);
         assert.match(sb.document.getElementById('action-center-mount').innerHTML, /Started Hole 6/);
     });
@@ -413,7 +433,8 @@ describe('MONEY POSITION — decided vs at stake', () => {
         rows.forEach(r => {
             assert.equal(r.netMoney, 0, `${r.label} claims decided money mid-round`);
             assert.ok(r.atStake > 0, `${r.label} should show money riding`);
-            assert.match(r.netText, /at stake/);
+            assert.match(r.netText, /at stake|your share/,
+                'a 2v2 participant now sees his own share alongside the team total');
         });
     });
 
