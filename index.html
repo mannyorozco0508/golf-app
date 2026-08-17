@@ -803,9 +803,9 @@
     </div>
 
     <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
-        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">📤 Export Scorecard</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Generate a traditional horizontal PDF scorecard to save or text out.</span>
-        <button class="btn-primary" style="margin-top: 0;" onclick="window.print()">📄 Send Results PDF</button>
+        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🧾 Round Receipt</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">One document with the money, every match and press, and the full scorecard.</span>
+        <button class="btn-primary" style="margin-top: 0;" onclick="openReceipt()">🧾 Round Receipt</button>
     </div>
 
     <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
@@ -867,7 +867,7 @@
             <div id="fr-full-results"></div>
         </details>
 
-        <button class="btn-primary" style="margin-top: 14px;" onclick="window.print()">📄 Send Results PDF</button>
+        <button class="btn-primary" style="margin-top: 14px;" onclick="openReceipt()">🧾 Round Receipt</button>
 
         <div id="fr-jump-links" class="fr-jump-links"></div>
         <button class="fr-close-btn" onclick="closeFinishRoundModal()">Got It, Keep Playing</button>
@@ -2256,6 +2256,15 @@
         closeFinishRoundModal();
         currentViewedHole = hole;
         renderScorecard();
+    }
+
+    // ONE DOCUMENT. index.html used to generate its own scorecard PDF with no side
+    // matches on it at all - so which button a golfer tapped decided whether their
+    // presses existed. Every export now opens the Receipt on the Results page, which is
+    // the single canonical record of the round.
+    function openReceipt() {
+        const groupParam = urlParams.get('group');
+        window.location.href = 'settlement.html?game=' + currentMode + (groupParam ? '&group=' + groupParam : '');
     }
 
     function openFinishRoundModal() {
@@ -3895,319 +3904,9 @@
         }
         if (currentViewMode === 'hole') renderHoleView();
 
-        buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc, strokePressResults, strokeCombinedT1Money);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---
-    function buildPrintScorecard(filteredPlayers, courseData, savedScores, matchCalc, hiloCalc, wolfCalc, stablefordCalc, strokeMatchCalc, strokePressResults, strokeCombinedT1Money) {
-        const courseName = currentData.courseName || "Golf Scorecard";
-        const dateString = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-        
-        let hasFront = courseData.some(h => h.hole <= 9);
-        let hasBack = courseData.some(h => h.hole > 9);
-
-        let printHtml = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h1 style="margin: 0; font-size: 24px; color: #0f4c3a; text-transform: uppercase; letter-spacing: 1px;">${courseName}</h1>
-                <p style="margin: 5px 0 0 0; font-size: 16px; color: #555; font-weight: bold;">${dateString}</p>
-            </div>
-            <table class="ptable">
-        `;
-
-        // HOLE ROW
-        printHtml += `<tr><th style="text-align:left; width: 140px; font-size: 16px;">HOLE</th>`;
-        if (hasFront) {
-            courseData.filter(h=>h.hole<=9).forEach(h => printHtml += `<th>${h.hole}</th>`);
-            if (hasBack) printHtml += `<th class="section-col">OUT</th>`;
-        }
-        if (hasBack) {
-            courseData.filter(h=>h.hole>9).forEach(h => printHtml += `<th>${h.hole}</th>`);
-            if (hasFront) printHtml += `<th class="section-col">IN</th>`;
-        }
-        printHtml += `<th class="section-col">TOTAL</th></tr>`;
-        
-        // PAR ROW
-        let outPar = 0, inPar = 0;
-        courseData.forEach(h => { if(h.hole<=9) outPar+=parseInt(h.par); else if(h.hole<=18) inPar+=parseInt(h.par); });
-        
-        printHtml += `<tr><th style="text-align:left; font-size: 16px;">PAR</th>`;
-        if (hasFront) {
-            courseData.filter(h=>h.hole<=9).forEach(h => printHtml += `<th>${h.par}</th>`);
-            if (hasBack) printHtml += `<th class="section-col">${outPar}</th>`;
-        }
-        if (hasBack) {
-            courseData.filter(h=>h.hole>9).forEach(h => printHtml += `<th>${h.par}</th>`);
-            if (hasFront) printHtml += `<th class="section-col">${inPar}</th>`;
-        }
-        printHtml += `<th class="section-col">${outPar+inPar}</th></tr>`;
-
-        // PLAYER ROWS
-        filteredPlayers.forEach(p => {
-            let outScore = 0, inScore = 0;
-            printHtml += `<tr><td style="text-align:left; font-weight:bold; font-size: 16px;">${p.name.split(" ")[0]}</td>`;
-            
-            if (hasFront) {
-                courseData.filter(h=>h.hole<=9).forEach(h => {
-                    let v = savedScores[`p${p.id}_h${h.hole}`];
-                    if (v && v > 0) {
-                        let score = parseInt(v, 10);
-                        outScore += score;
-                        let diff = score - parseInt(h.par);
-                        let shape = diff === -1 ? `<div class="pcircle1"></div>` : (diff <= -2 ? `<div class="pcircle1"></div><div class="pcircle2"></div>` : '');
-                        printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
-                    } else printHtml += `<td></td>`;
-                });
-                if (hasBack) printHtml += `<td class="section-col">${outScore > 0 ? outScore : ''}</td>`;
-            }
-            if (hasBack) {
-                courseData.filter(h=>h.hole>9).forEach(h => {
-                    let v = savedScores[`p${p.id}_h${h.hole}`];
-                    if (v && v > 0) {
-                        let score = parseInt(v, 10);
-                        inScore += score;
-                        let diff = score - parseInt(h.par);
-                        let shape = diff === -1 ? `<div class="pcircle1"></div>` : (diff <= -2 ? `<div class="pcircle1"></div><div class="pcircle2"></div>` : '');
-                        printHtml += `<td><div class="pscore">${score}${shape}</div></td>`;
-                    } else printHtml += `<td></td>`;
-                });
-                if (hasFront) printHtml += `<td class="section-col">${inScore > 0 ? inScore : ''}</td>`;
-            }
-            printHtml += `<td class="section-col">${(outScore+inScore) > 0 ? (outScore+inScore) : ''}</td></tr>`;
-        });
-        
-        printHtml += `</table>`;
-
-        // --- DYNAMIC PAYOUT LEDGER ---
-        const format = currentData.gameFormat;
-        
-        if (format === 'dots' || format === 'hilo') {
-            const stake = format === 'dots' ? (currentData.dotPointVal || 0) : (currentData.holeBetStake || 0);
-            printHtml += `<div class="pledger"><h3>💰 Game Ledger (${format.toUpperCase()})</h3>`;
-            
-            if (format === 'dots' && currentData.dots) {
-                let pDots = {};
-                filteredPlayers.forEach(p => pDots[p.id] = 0);
-                Object.values(currentData.dots).forEach(holeDots => {
-                    Object.keys(holeDots).forEach(pKey => {
-                        let pid = pKey.replace('p', '');
-                        if (pDots[pid] !== undefined) {
-                            holeDots[pKey].forEach(dotType => {
-                                pDots[pid] += (dotType === 'snake' ? -1 : 1);
-                            });
-                        }
-                    });
-                });
-                
-                const printDotsN = filteredPlayers.length;
-                const printDotsTotalUnits = filteredPlayers.reduce((s, p) => s + (pDots[p.id] || 0), 0);
-                filteredPlayers.forEach(p => {
-                    let pts = pDots[p.id] || 0;
-                    let money = printDotsN > 1 ? stake * (printDotsN * pts - printDotsTotalUnits) : 0;
-                    let moneyStr = money >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
-                    printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts (${moneyStr})</strong></div>`;
-                });
-            } 
-            else if (format === 'hilo' && typeof hiloCalc !== 'undefined' && hiloCalc) {
-                let t1Money = (hiloCalc.t1Points - hiloCalc.t2Points) * stake;
-                let t1Str = t1Money >= 0 ? `+$${t1Money}` : `-$${Math.abs(t1Money)}`;
-                let t2Str = -t1Money >= 0 ? `+$${-t1Money}` : `-$${Math.abs(-t1Money)}`;
-                printHtml += `<div class="pledger-row"><span>${hiloCalc.t1Name}</span><strong>${hiloCalc.t1Points} pts (${t1Str})</strong></div>`;
-                printHtml += `<div class="pledger-row"><span>${hiloCalc.t2Name}</span><strong>${hiloCalc.t2Points} pts (${t2Str})</strong></div>`;
-            }
-            
-            printHtml += `</div>`;
-        } else if (format === 'wolf' && typeof wolfCalc !== 'undefined' && wolfCalc) {
-            const wolfStake = currentData.wolfPointVal || 0;
-            const wolfMoneyPlayersP = filteredPlayers.filter(p => p.playingForMoney !== false);
-            const wolfMoneyP = calcPointSettlement(wolfMoneyPlayersP, wolfCalc.totals, wolfStake);
-            printHtml += `<div class="pledger"><h3>🐺 Game Ledger (WOLF)</h3>`;
-            filteredPlayers.forEach(p => {
-                let pts = wolfCalc.totals[p.id] || 0;
-                let moneyStr = '';
-                if (p.playingForMoney !== false && wolfStake) {
-                    let m = wolfMoneyP[p.id] || 0;
-                    moneyStr = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
-                }
-                printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts${moneyStr}</strong></div>`;
-            });
-            printHtml += `</div>`;
-        } else if (format === 'stableford' && typeof stablefordCalc !== 'undefined' && stablefordCalc) {
-            const sfStake = currentData.stablefordPointVal || 0;
-            const sfMoneyPlayersP = filteredPlayers.filter(p => p.playingForMoney !== false);
-            const sfMoneyP = calcPointSettlement(sfMoneyPlayersP, stablefordCalc.totals, sfStake);
-            printHtml += `<div class="pledger"><h3>🎯 Game Ledger (STABLEFORD)</h3>`;
-            filteredPlayers.forEach(p => {
-                let pts = stablefordCalc.totals[p.id] || 0;
-                let moneyStr = '';
-                if (p.playingForMoney !== false && sfStake) {
-                    let m = sfMoneyP[p.id] || 0;
-                    moneyStr = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
-                }
-                printHtml += `<div class="pledger-row"><span>${p.name}</span><strong>${pts} pts${moneyStr}</strong></div>`;
-            });
-            printHtml += `</div>`;
-        } else if (format === 'nassau' && typeof matchCalc !== 'undefined' && matchCalc) {
-            printHtml += `<div class="pledger"><h3>💵 Game Ledger (NASSAU)</h3>`;
-            
-            let matchesListHtml = "";
-            let stake = currentData.nassauStake || 10;
-            
-            ['F9', 'B9', '18'].forEach(bId => {
-                let groupMatches = matchCalc.activeMatches.filter(m => m.baseId === bId);
-                if(groupMatches.length > 0) {
-                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
-                    if (!hasBack || !hasFront) groupLabel = 'Match';
-                    matchesListHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:12px; text-transform:uppercase; margin-top:8px;">${groupLabel} Bets</div>`;
-                    
-                    groupMatches.forEach(m => {
-                        let statusDesc = "All Square ($0)";
-                        if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
-                        else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
-                        
-                        let lockIcon = m.closed ? "🔒 " : "";
-                        let indent = m.pressNum > 0 ? "margin-left: 12px; padding-left: 8px;" : "padding-left: 4px;";
-                        matchesListHtml += `<div class="pledger-row" style="${indent}"><span>${lockIcon}${m.label}</span> <strong>${statusDesc}</strong></div>`;
-                    });
-                }
-            });
-            
-            let t1Money = matchCalc.t1TotalMoney;
-            function fmtM(amt) {
-                if (amt > 0) return `+$${amt}`;
-                if (amt < 0) return `-$${Math.abs(amt)}`;
-                return `$0`;
-            }
-
-            printHtml += matchesListHtml;
-            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
-                <span><strong>Total Ledger:</strong></span>
-                <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
-            </div></div>`;
-        } else if (format === 'match' && strokeMatchCalc) {
-            printHtml += `<div class="pledger"><h3>💵 Game Ledger (1v1 — Stroke Play)</h3>`;
-
-            const s = strokeMatchCalc;
-            function fmtM(amt) {
-                if (amt > 0) return `+$${amt}`;
-                if (amt < 0) return `-$${Math.abs(amt)}`;
-                return `$0`;
-            }
-
-            printHtml += `<div class="pledger-row"><span><strong>Original — $${currentData.matchStake || 0} Flat, Stroke Play:</strong></span> <span>${s.p1.name} ${s.holesCompleted > 0 ? s.p1Total : '-'} | ${s.p2.name} ${s.holesCompleted > 0 ? s.p2Total : '-'}</span></div>`;
-            if (!s.roundComplete) {
-                printHtml += `<div class="pledger-row"><span style="color:#888;">Not yet final — thru ${s.holesCompleted} of ${s.totalHoles}.</span></div>`;
-            }
-            (strokePressResults || []).forEach(pr => {
-                const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
-                const prStatus = !pr.roundComplete ? `Not yet final — thru ${pr.holesCompleted} holes of this press` : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
-                printHtml += `<div class="pledger-row"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
-            });
-            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
-                <span><strong>Combined Ledger:</strong></span>
-                <span><strong>${s.p1.name}: ${fmtM(strokeCombinedT1Money)} | ${s.p2.name}: ${fmtM(-strokeCombinedT1Money)}</strong></span>
-            </div></div>`;
-        } else if (['match', 'bestball', 'scramble', 'ryder'].includes(format) && typeof matchCalc !== 'undefined' && matchCalc) {
-            printHtml += `<div class="pledger"><h3>💵 Game Ledger (${format.toUpperCase()})</h3>`;
-            
-            let t1Money = matchCalc.t1TotalMoney;
-            function fmtM(amt) {
-                if (amt > 0) return `+$${amt}`;
-                if (amt < 0) return `-$${Math.abs(amt)}`;
-                return `$0`;
-            }
-            
-            let betTypeStr = currentData.holeBetStake > 0 ? `$${currentData.holeBetStake} Per Hole` : `$${currentData.matchStake || 0} Flat Match`;
-            
-            printHtml += `<div class="pledger-row"><span><strong>Bet Type:</strong></span> <span>${betTypeStr}</span></div>`;
-
-            let printBets = buildBetEntries(matchCalc, courseData);
-            printBets.forEach((b, i) => { b.num = i + 1; });
-            let matchBetsHtml = "";
-            printBets.filter(b => b.key && b.key.indexOf('match-') === 0).forEach(b => {
-                let betLabel = b.isPrimaryMatch ? `Bet ${b.num} (Base Match)` : `Bet ${b.num} (Press, Hole ${b.startHole})`;
-                matchBetsHtml += `<div class="pledger-row" style="${b.isPrimaryMatch ? '' : 'margin-left:16px;'}"><span>${betLabel}</span> <strong>${b.statusFull}</strong></div>`;
-            });
-            printHtml += matchBetsHtml;
-
-            printHtml += `<div class="pledger-row" style="margin-top:12px; border-top:2px solid #ccc; padding-top:8px;">
-                <span><strong>Total Ledger:</strong></span>
-                <span><strong>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</strong></span>
-            </div></div>`;
-        } else if (format === 'skins') {
-            printHtml += `<div class="pledger"><h3>🥩 Skins Ledger</h3>`;
-            // Only players opted in to money betting compete for skins in this printout
-            const skinsPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
-            // Reuses the exact same canonical functions the live scorecard ticker already uses
-            // (computeSkinsVoidLive / computeSkinsCarryOverLive) — this used to be a third,
-            // independent copy that predated Carry-Over mode and always showed Void-style
-            // results regardless of the round's actual setting, a confirmed live-vs-print
-            // mismatch. No new calculation was written to fix this — same functions, same result.
-            const potFormat = currentData.skinsPotFormat || 'split';
-            const carryOver = currentData.skinsCarryOver !== false;
-            const computeFn = carryOver ? computeSkinsCarryOverLive : computeSkinsVoidLive;
-            const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(skinsPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
-            const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(skinsPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
-
-            let pSkins = {};
-            skinsPlayers.forEach(p => pSkins[p.name.split(" ")[0]] = { gross: [], net: [] });
-            grossResult.skins.forEach(s => { pSkins[s.player.name.split(" ")[0]].gross.push({ hole: s.hole, units: s.unitsWon }); });
-            netResult.skins.forEach(s => { pSkins[s.player.name.split(" ")[0]].net.push({ hole: s.hole, units: s.unitsWon }); });
-
-            function fmtSkinList(list) {
-                return list.map(s => s.units > 1 ? `${s.hole} (${s.units} holes carried)` : `${s.hole}`).join(', ');
-            }
-
-            let anySkins = false;
-            skinsPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
-                let s = pSkins[shortName];
-                if (s.gross.length > 0 || s.net.length > 0) {
-                    anySkins = true;
-                    let details = [];
-                    if (s.gross.length > 0) {
-                        const totalUnits = s.gross.reduce((sum, x) => sum + x.units, 0);
-                        details.push(`<strong>${totalUnits} Gross skin${totalUnits === 1 ? '' : 's'}</strong> (Hole: ${fmtSkinList(s.gross)})`);
-                    }
-                    if (s.net.length > 0) {
-                        const totalUnits = s.net.reduce((sum, x) => sum + x.units, 0);
-                        details.push(`<strong>${totalUnits} Net skin${totalUnits === 1 ? '' : 's'}</strong> (Hole: ${fmtSkinList(s.net)})`);
-                    }
-                    printHtml += `<div class="pledger-row" style="flex-direction: column; margin-bottom: 8px;">
-                        <span style="font-weight: bold; color: #1d3557; margin-bottom: 4px;">${shortName}</span>
-                        <span style="font-size: 13px; color: #555;">${details.join(' <br> ')}</span>
-                    </div>`;
-                }
-            });
-
-            if (carryOver && (grossResult.pendingUnits > 0 || netResult.pendingUnits > 0)) {
-                const parts = [];
-                if (grossResult.pendingUnits > 0) parts.push(`${grossResult.pendingUnits} gross hole${grossResult.pendingUnits === 1 ? '' : 's'}`);
-                if (netResult.pendingUnits > 0) parts.push(`${netResult.pendingUnits} net hole${netResult.pendingUnits === 1 ? '' : 's'}`);
-                printHtml += `<div class="pledger-row"><span style="font-size:13px; color:#888;">🔄 Still carrying at print time: ${parts.join(' and ')} tied, unclaimed — split evenly if the round ends this way.</span></div>`;
-            }
-
-            if (!anySkins) {
-                printHtml += `<div class="pledger-row"><span>No skins won yet.</span></div>`;
-            }
-            
-            printHtml += `</div>`;
-        }
-
-        // Birdie Game ledger — independent of gameFormat, shown whenever it's turned on
-        if (currentData.birdieGameEnabled === true) {
-            const birdieTotals = calculateBirdieGameTotals(currentData, courseData, savedScores);
-            const moneyPlayersB = (currentData.players || []).filter(p => p.playingForMoney !== false);
-            if (moneyPlayersB.length > 0) {
-                printHtml += `<div class="pledger"><h3>🐦 Birdie Game (amount won)</h3>`;
-                moneyPlayersB.forEach(p => {
-                    printHtml += `<div class="pledger-row"><span>${p.name}</span><span>$${(birdieTotals[p.id] || 0).toFixed(2)}</span></div>`;
-                });
-                printHtml += `</div>`;
-            }
-        }
-
-        document.getElementById("print-area").innerHTML = printHtml;
-    }
 
     // Close the "More" popover when a tap lands outside it. Native <details> already
     // handles tapping the summary again, and navigating away closes it implicitly, so
