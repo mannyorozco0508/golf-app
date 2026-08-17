@@ -272,8 +272,29 @@
         .match-card {
             padding: 10px 12px; border-top: 1px solid var(--border-light);
         }
+        /* The whole headline is the tap target - 44px minimum, full card width, so it
+           can be hit walking without looking. */
+        .mc-headline {
+            display: block; width: 100%; min-height: 44px; padding: 0;
+            border: none; background: none; text-align: left; font-family: inherit; cursor: pointer;
+        }
+        .mc-line1 { display: flex; align-items: baseline; gap: 8px; }
+        .mc-line2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 1px; }
+        .mc-arrow { flex: 0 0 auto; margin-left: auto; color: var(--text-muted); font-size: 0.9rem; }
+        .mc-money { flex: 0 0 auto; font-size: 0.78rem; color: var(--text-muted); }
+        .mc-money.pos { color: var(--brand-green); font-weight: bold; }
+        .mc-money.neg { color: var(--accent-red); font-weight: bold; }
+        .match-card.open { background: var(--nassau-box-bg); }
+        .section-toggle {
+            display: flex; align-items: center; justify-content: space-between; width: 100%;
+            border: none; background: none; font-family: inherit; cursor: pointer;
+            min-height: 40px; text-align: left;
+        }
+        .sec-arrow { color: var(--text-muted); font-size: 0.9rem; }
+        .section-summary { padding: 4px 12px 10px; font-size: 0.8rem; color: var(--text-muted); }
+
         .mc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-        .mc-name { font-size: 0.9rem; font-weight: bold; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mc-name { flex: 0 1 auto; min-width: 0; font-size: 0.9rem; font-weight: bold; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mc-stake { flex: 0 0 auto; font-size: 0.8rem; color: var(--text-muted); }
         .mc-status { font-size: 0.95rem; font-weight: bold; margin-top: 2px; }
         .mc-status.tone-up { color: var(--brand-green); }
@@ -1451,6 +1472,25 @@
 
     // Reuses the Wave 5 event layer rather than diffing separately, so the recap and
     // the ordering can never disagree about what just happened.
+    // Which side matches moved on the hole in view. Derived from buildHoleEvents so the
+    // recap and the auto-expansion can never disagree about what just happened.
+    function changedSideMatchKeys(courseData, savedScores, scoped) {
+        const keys = {};
+        if (typeof buildHoleEvents !== 'function') return keys;
+        let events = [];
+        try {
+            events = buildHoleEvents(currentData, courseData, savedScores,
+                currentViewedHole, resolvedMeId(), scoped);
+        } catch (e) { return keys; }
+        const moved = events.some(e =>
+            e.type === 'LEAD_CHANGE' || e.type === 'WAGER_FINAL' || e.type === 'PRESS_STARTED');
+        if (!moved) return keys;
+        // The event layer reports that side action changed, not which match; opening the
+        // golfer's own matches is the useful interpretation of that.
+        Object.keys(currentData.sideMatches || {}).forEach(k => { keys[k] = true; });
+        return keys;
+    }
+
     function recentlyChangedKeys(courseData, savedScores, scoped) {
         const keys = {};
         if (typeof buildHoleEvents !== 'function') return keys;
@@ -1479,6 +1519,38 @@
     // Add Action and Group Links all remain organizer-only, and a scorekeeper still
     // cannot press a match belonging entirely to another group, because such a match is
     // never rendered for them.
+    // Which match cards the golfer has opened. In-memory only: this is what they have
+    // LOOKED AT, not money, so a refresh costing an expansion is no loss.
+    const expandedMatches = {};
+    let groupGamesOpen = false;
+
+    function toggleGroupGames() {
+        groupGamesOpen = !groupGamesOpen;
+        renderActionCenter();
+    }
+
+    function toggleMatchCard(key) {
+        expandedMatches[key] = !expandedMatches[key];
+        renderActionCenter();
+    }
+
+    // A card opens on its own when it would be annoying to have to hunt for it:
+    // something changed on the hole in view, it can be pressed, or it has finished.
+    // Set per render: with a single match there is nothing to scroll past, so it opens.
+    let soloMatch = false;
+
+    function isMatchExpanded(sm) {
+        if (expandedMatches[sm.key] !== undefined) return expandedMatches[sm.key];
+        if (sidePressOpen === sm.key) return true;
+        // Deliberately NOT "can be pressed". Almost every live match can be pressed, so
+        // using that as a trigger opened all four of Marty's cards and collapsed nothing.
+        if (sm.justChanged) return true;
+        if (sm.finished) return true;
+        // One match has nothing to compete with, so there is no reason to hide it.
+        if (soloMatch) return true;
+        return false;
+    }
+
     let sidePressOpen = null;
     let sidePressCustom = false;
 
@@ -1672,6 +1744,13 @@
             // section. Recomputed every render and never stored - bet order is a
             // presentation concern, not something that belongs in Firebase.
             changedKeys = recentlyChangedKeys(courseData, savedScores, scoped);
+            // Auto-expand inputs. justChanged comes from the SAME event derivation the
+            // hole recap uses, so a card cannot open for a change the recap did not report.
+            const changedMatchKeys = changedSideMatchKeys(courseData, savedScores, scoped);
+            side.forEach(sm => {
+                sm.justChanged = !!changedMatchKeys[sm.key];
+                sm.finished = sm.presses.every(pr => !pr.live) && sm.atStake === 0 && sm.netMoney !== 0;
+            });
         } catch (e) {
             console.error('Action center failed to build:', e);
             mount.innerHTML = '';
@@ -1705,6 +1784,8 @@
             headline = actionHeadline(games, 0);
         }
 
+        soloMatch = side.length === 1;
+
         const totalBets = games.length + side.length;
         // With a single game and no side action the bet strip below already says
         // everything - a second summary would just be noise.
@@ -1725,20 +1806,45 @@
         // A match reads as a sentence now. Every figure here already existed - what was
         // missing was saying it out loud: "Marty +4" required knowing that + means ahead,
         // that the unit is strokes, and that "H6-18" was a press start hole.
-        const sideRow = sm =>
-            '<div class="match-card">' +
-                '<div class="mc-head">' +
-                    '<span class="mc-name">\u2694\uFE0F ' + sm.label + '</span>' +
-                    '<span class="mc-stake">' + (sm.stakeText || '') + '</span>' +
-                '</div>' +
-                (sm.sentence
-                    ? '<div class="mc-status tone-' + (sm.tone || 'idle') + '">' + sm.sentence + '</div>'
-                    : '<div class="mc-status tone-idle">' + sm.format + '</div>') +
-                // Naming who we are waiting on turns a stale-looking number into an
-                // explanation. Groups play at different speeds and that is normal.
-                '<div class="mc-thru">' + (sm.thruText || '') +
-                    (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') + '</div>' +
-                (sm.presses || []).map(pr =>
+        // A match is a card that COLLAPSES to one line. Marty's round produced 15 rows
+        // before Prev/Next - correct, and too much to read walking to a tee. The headline
+        // answers "how am I doing"; the detail is one tap away and never lost.
+        //
+        // AUTO-EXPANDED, because these are the moments a golfer would be annoyed to have
+        // to hunt for: something just changed on this hole, the match can be pressed, or
+        // it has finished. Everything else opens on demand.
+        const sideRow = sm => {
+            const open = isMatchExpanded(sm);
+            const arrow = open ? '\u25BE' : '\u203A';
+            const money = sm.netText
+                ? '<span class="mc-money' + (sm.netMoney > 0 ? ' pos' : (sm.netMoney < 0 ? ' neg' : '')) + '">' + sm.netText + '</span>'
+                : '';
+
+            let html = '<div class="match-card' + (open ? ' open' : '') + '">' +
+                '<button type="button" class="mc-headline" onclick="toggleMatchCard(\'' + sm.key + '\')">' +
+                    '<span class="mc-line1">' +
+                        '<span class="mc-name">\u2694\uFE0F ' + sm.label + '</span>' +
+                        '<span class="mc-stake">' + (sm.stakeText || '') + '</span>' +
+                        '<span class="mc-arrow">' + arrow + '</span>' +
+                    '</span>' +
+                    '<span class="mc-line2">' +
+                        '<span class="mc-status tone-' + (sm.tone || 'idle') + '">' +
+                            (sm.sentence || sm.format) + '</span>' +
+                        money +
+                    '</span>' +
+                    // Thru and waiting stay on the COLLAPSED line: a cross-group match
+                    // looking stale is exactly the thing a golfer needs explained without
+                    // having to open anything.
+                    '<span class="mc-thru">' + (sm.thruText || '') +
+                        (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') +
+                        (!open && sm.presses.length
+                            ? ' \u00B7 ' + sm.presses.length + ' press' + (sm.presses.length === 1 ? '' : 'es')
+                            : '') +
+                    '</span>' +
+                '</button>';
+
+            if (open) {
+                html += (sm.presses || []).map(pr =>
                     '<div class="mc-press">' +
                         '<span class="mcp-label">' + pr.label +
                             (pr.stakeText ? ' \u00B7 ' + pr.stakeText : '') +
@@ -1746,12 +1852,14 @@
                         '</span>' +
                         '<span class="mcp-status tone-' + (pr.tone || 'even') + '">' +
                             (pr.sentence || pr.status) + '</span>' +
-                    '</div>').join('') +
-                (sm.canPress && canPressSideMatch()
+                    '</div>').join('');
+                html += (sm.canPress && canPressSideMatch()
                     ? '<button type="button" class="mc-press-btn" onclick="openSidePress(\'' + sm.key + '\')">\uD83D\uDD25 PRESS</button>'
-                    : '') +
-                (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '') +
-            '</div>';
+                    : '');
+                html += (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '');
+            }
+            return html + '</div>';
+        };
 
         const row = r =>
             '<div class="action-row">' +
@@ -1792,8 +1900,16 @@
             .concat(sortActionRows(extra, changedKeys))
             .concat(extras);
         if (groupRows.length) {
-            body += '<div class="action-section-label">\uD83C\uDFC6 Group Games</div>' +
-                groupRows.map(row).join('');
+            // One line when closed: a golfer glances at group games far less often than
+            // at his own match, and four rows of them push everything else down.
+            const summary = groupRows.map(g => (g.icon ? g.icon + ' ' : '') + g.label).join(' \u00B7 ');
+            body += '<button type="button" class="action-section-label section-toggle" onclick="toggleGroupGames()">' +
+                '\uD83C\uDFC6 Group Games' +
+                '<span class="sec-arrow">' + (groupGamesOpen ? '\u25BE' : '\u203A') + '</span>' +
+                '</button>';
+            body += groupGamesOpen
+                ? groupRows.map(row).join('')
+                : '<div class="section-summary">' + summary + '</div>';
         }
         if (mySide.length) {
             body += '<div class="action-section-label">\u2694\uFE0F My Matches</div>';
