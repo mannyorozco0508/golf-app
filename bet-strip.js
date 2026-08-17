@@ -144,9 +144,12 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
 
             chips.push({
                 key, short, statusText, tone, closed: calc.roundComplete, stake: chipStake,
+                isPress: key !== 'MAIN',
                 detail: {
-                    title: key === 'MAIN' ? 'Main Bet' : `Press ${short.replace('P', '')}`,
-                    rangeText: `H${startHole}\u2013${finalHole}`,
+                    title: key === 'MAIN' ? 'Main Bet' : `Press #${key.replace('P', '')}`,
+                    // "H6-18" is developer shorthand. What a golfer needs to know about a
+                    // press is when it STARTED - the end is always the end of the match.
+                    rangeText: `Started Hole ${startHole}`,
                     startHole, stake: chipStake, live,
                     stateLabel: live ? '\uD83D\uDFE2 LIVE' : '\uD83D\uDD12 FINAL',
                     statusLine: resultLine,
@@ -157,8 +160,8 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
         }
 
         const firstHole = holes[0].hole;
-        strokeChip('MAIN', 'MAIN', set.original, stake, firstHole);
-        set.pressResults.forEach(pr => strokeChip(`P${pr.pressNum}`, `P${pr.pressNum}`, pr, pr.stake, pr.startHole));
+        strokeChip('MAIN', 'Main Bet', set.original, stake, firstHole);
+        set.pressResults.forEach(pr => strokeChip(`P${pr.pressNum}`, `Press #${pr.pressNum}`, pr, pr.stake, pr.startHole));
 
         const lastPlayed = lastPlayedHoleFor([[players[0]], [players[1]]], holes, scores);
         const nextPressHole = lastPlayed + 1;
@@ -223,9 +226,10 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
 
         chips.push({
             key: m.id, short, statusText, tone, closed: m.closed, stake: chipStake,
+            isPress: m.pressNum > 0,
             detail: {
                 title: titleText,
-                rangeText: `H${m.startHole}\u2013${m.endHole}`,
+                rangeText: `Started Hole ${m.startHole}`,
                 startHole: m.startHole, stake: chipStake, live: !m.closed,
                 stateLabel,
                 statusLine: m.closed && m.finalResult ? m.finalResult : statusText,
@@ -239,14 +243,16 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
     // three, and collapsing them into one "MAIN" would hide two real wagers — so
     // each gets its own short label (F9 / B9 / TOT).
     if (bases.length === 1) {
-        matchChip(bases[0], 'MAIN', bases[0].label || 'Main Match');
+        matchChip(bases[0], 'Main Bet', bases[0].label || 'Main Match');
     } else {
         bases.forEach(m => {
-            const short = m.id === 'F9' ? 'F9' : (m.id === 'B9' ? 'B9' : 'TOT');
+            const short = m.id === 'F9' ? 'Front 9' : (m.id === 'B9' ? 'Back 9' : 'Total');
             matchChip(m, short, m.label || short);
         });
     }
-    presses.forEach((m, i) => matchChip(m, `P${i + 1}`, m.label || `Press ${i + 1}`));
+    // The engine's own label is "Press 2 (Hole 5)". The start hole is already stated
+    // in rangeText, so the chip title says only which press this is.
+    presses.forEach((m, i) => matchChip(m, `Press #${i + 1}`, `Press #${i + 1}`));
 
     // A press is only possible while at least one base segment is still open and
     // there's a hole left to press onto.
@@ -604,7 +610,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                         strip.chips.forEach(c => {
                             if (c.closed) decided += 0; else atStake += c.stake || 0;
                         });
-                        presses = strip.chips.filter(c => c.short && c.short.charAt(0) === 'P').map((c, i) => ({
+                        presses = strip.chips.filter(c => c.isPress).map((c, i) => ({
                             label: `Press #${i + 1}`,
                             startedText: c.detail && c.detail.startHole ? `Started Hole ${c.detail.startHole}` : '',
                             status: c.statusText,
