@@ -213,6 +213,13 @@
     <div id="settle-content">
         <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
     </div>
+
+    <!-- THE FULL SCORECARD IS LAST, and it is last in the MARKUP, not merely last in
+         whatever order the render functions happen to run. It used to be appended to
+         the end of #combined-settlement-summary, which put an 18-hole grid between
+         Who Pays Who and the Group Games / Side Matches that explain those numbers -
+         the scorecard interrupted the money story instead of closing it. -->
+    <div id="receipt-scorecard"></div>
 </div>
 
 <script>
@@ -287,6 +294,7 @@
             document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
+            renderReceiptScorecard();
         });
     }
 
@@ -336,10 +344,43 @@
         setTimeout(() => { document.title = previous; }, 1000);
     }
 
-    // Settlement is allocated in whole dollars, so ".00" is noise. A fraction here would
-    // mean the allocator failed, so it is shown rather than quietly hidden.
+    // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------
+    //
+    // Settlement is allocated in whole dollars, so ".00" is noise. But a fraction is
+    // never chopped off either: an explanatory per-game figure that genuinely lands on
+    // $12.50 must print $12.50. The Receipt EXPLAINS the money; it must not restate it
+    // as something tidier than it is. So: whole value -> no decimals, true fraction ->
+    // shown honestly. A fraction appearing in canonical settlement would mean the
+    // allocator failed, and that should be visible, not hidden.
     function fmtWhole(n) {
         return Number.isInteger(n) ? String(n) : n.toFixed(2);
+    }
+
+    // The sign belongs in front of the dollar sign. "$-210" is not how money is
+    // written anywhere outside a spreadsheet.
+    function fmtSigned(n) {
+        if (n > 0) return `+$${fmtWhole(n)}`;
+        if (n < 0) return `-$${fmtWhole(Math.abs(n))}`;
+        return '$0';
+    }
+
+    // Same rule, wrapped in the colour classes the ledger rows already use.
+    function fmtSignedHtml(n) {
+        if (n > 0) return `<span class="val-pos">${fmtSigned(n)}</span>`;
+        if (n < 0) return `<span class="val-neg">${fmtSigned(n)}</span>`;
+        return `<span class="val-even">$0</span>`;
+    }
+
+    // The engine's segment labels are canonical DATA ("Original", "Press 1") and are
+    // deliberately not renamed there. This is the presentation layer translating them
+    // into what a golfer reads. Nassau's own segment names pass straight through,
+    // because "Front 9" is already plain golf English.
+    function receiptSegLabel(label) {
+        // 'Original' (Stroke Play) and 'Overall Match' (Match Play) are the same thing
+        // to a golfer: the bet that was there before anybody pressed.
+        if (/^(original|overall match)$/i.test(label || '')) return 'Original Bet';
+        const m = /^press\s+(\d+)/i.exec(label || '');
+        return m ? `Press #${m[1]}` : (label || '');
     }
 
     function buildReceiptHeader() {
@@ -426,18 +467,18 @@
 
         r.segments.forEach(seg => {
             html += `<div class="receipt-seg">`;
-            html += `<div class="receipt-seg-head"><span>${seg.label}</span><span>$${seg.stake}</span></div>`;
-            html += `<div class="receipt-seg-meta">Holes ${seg.startHole}\u2013${seg.endHole}</div>`;
+            html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
+            html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
             html += `<div class="receipt-seg-result">${seg.result}</div>`;
             if (seg.winner && seg.money > 0) {
-                html += `<div class="receipt-seg-money">${seg.winner} +$${seg.money}</div>`;
+                html += `<div class="receipt-seg-money">${seg.winner} +$${fmtWhole(seg.money)}</div>`;
             }
             html += `</div>`;
         });
 
         html += `<div class="receipt-net">MATCH NET \u00B7 ` +
-            (r.netTo ? `${r.netTo} +$${r.netAmount.toFixed(2)}` : 'Push \u2014 nobody pays') +
-            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${Math.abs(r.perPlayerA).toFixed(2)} each)</span>` : '') +
+            (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
+            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
             `</div>`;
         html += `</div>`;
         return html;
@@ -449,14 +490,10 @@
         if (matchIds.length === 0) return "";
 
         const players = data.players || [];
-        function fmtSideM(amt) {
-            // FINAL MONEY is what actually changes hands, so it prints whole dollars.
-            // The per-game rows below keep their exact figures - they explain the
-            // canonical math rather than stating what anyone owes.
-            if (amt > 0) return `<span class="val-pos">+$${fmtWhole(amt)}</span>`;
-            if (amt < 0) return `<span class="val-neg">-$${fmtWhole(Math.abs(amt))}</span>`;
-            return `<span>$0.00</span>`;
-        }
+        // FINAL MONEY is what actually changes hands, so it prints whole dollars.
+        // The per-game rows keep their exact figures - they explain the canonical
+        // math rather than stating what anyone owes.
+        const fmtSideM = fmtSignedHtml;
 
         let rows = "";
         matchIds.sort((a, b) => (sideMatches[a].createdAt || 0) - (sideMatches[b].createdAt || 0)).forEach(matchId => {
@@ -501,7 +538,9 @@
             if (players.length > 0) {
                 html += `<div class="settle-card"><div class="settle-header">🐦 Birdie Game (amount won)</div>`;
                 players.forEach(p => {
-                    html += `<div class="ledger-row"><span>${p.name}</span><span>$${(totals[p.id] || 0).toFixed(2)}</span></div>`;
+                    // Was `$${n.toFixed(2)}` on the raw signed number, which printed a
+                    // loss as "$-210.00". Signed properly, and without phantom cents.
+                    html += `<div class="ledger-row"><span>${p.name}</span>${fmtSignedHtml(totals[p.id] || 0)}</div>`;
                 });
                 html += `</div>`;
             }
@@ -564,8 +603,8 @@
         if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
 
         function fmt(amt) {
-            if (amt > 0.005) return `<span class="val-pos">Won $${amt.toFixed(2)}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">Owes $${Math.abs(amt).toFixed(2)}</span>`;
+            if (amt > 0.005) return `<span class="val-pos">Won $${fmtWhole(amt)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">Owes $${fmtWhole(Math.abs(amt))}</span>`;
             return `<span>Even</span>`;
         }
 
@@ -591,11 +630,16 @@
             html += `</div>`;
         }
 
-        // Scores come LAST. The money story is what a golfer opens this for; an
-        // 18-hole grid before it buries the answer.
-        html += buildReceiptScorecard();
-
         container.innerHTML = html;
+    }
+
+    // Scores come LAST. The money story is what a golfer opens this document for, and
+    // the grid is the reference you check afterwards - so it renders into its own
+    // container, which sits after every money section in the markup.
+    function renderReceiptScorecard() {
+        const el = document.getElementById('receipt-scorecard');
+        if (!el) return;
+        el.innerHTML = buildReceiptScorecard();
     }
 
     function renderSettlement(data) {
@@ -617,9 +661,7 @@
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = skinsNet[p.id] || 0;
-                const moneyClass = money >= 0 ? "val-pos" : "val-neg";
-                const moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span><span class="${moneyClass}">${moneyText}</span></div>`;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
             });
             container.innerHTML = `
                 <div class="settle-card">
@@ -639,9 +681,7 @@
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = hiloNet[p.id] || 0;
-                const moneyClass = money >= 0 ? "val-pos" : "val-neg";
-                const moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span><span class="${moneyClass}">${moneyText}</span></div>`;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
             });
             const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
             container.innerHTML = `
@@ -664,13 +704,10 @@
             moneyPlayers.forEach(p => {
                 let pts = wolfCalc.totals[p.id] || 0;
                 let money = wolfMoney[p.id] || 0;
-                let moneyClass = money >= 0 ? "val-pos" : "val-neg";
-                let moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
-
                 ledgerHtml += `
                     <div class="ledger-row">
                         <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
-                        <span class="${moneyClass}">${moneyText}</span>
+                        ${fmtSignedHtml(money)}
                     </div>
                 `;
             });
@@ -698,13 +735,10 @@
             moneyPlayers.forEach(p => {
                 let pts = sfCalc.totals[p.id] || 0;
                 let money = sfMoney[p.id] || 0;
-                let moneyClass = money >= 0 ? "val-pos" : "val-neg";
-                let moneyText = money >= 0 ? `+$${money.toFixed(2)}` : `-$${Math.abs(money).toFixed(2)}`;
-
                 ledgerHtml += `
                     <div class="ledger-row">
                         <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
-                        <span class="${moneyClass}">${moneyText}</span>
+                        ${fmtSignedHtml(money)}
                     </div>
                 `;
             });
@@ -728,13 +762,10 @@
             moneyPlayers.forEach(p => {
                 let pts = dotsCalc.totals[p.id] || 0;
                 let money = pts * dotVal;
-                let moneyClass = pts >= 0 ? "val-pos" : "val-neg";
-                let moneyText = pts >= 0 ? `+$${money}` : `-$${Math.abs(money)}`;
-                
                 ledgerHtml += `
                     <div class="ledger-row">
                         <span>${p.name} (${pts} Dots):</span>
-                        <span class="${moneyClass}">${moneyText}</span>
+                        ${fmtSignedHtml(money)}
                     </div>
                 `;
             });
@@ -783,11 +814,7 @@
                 return;
             }
 
-            function fmtStrokeSettle(amt) {
-                if (amt > 0) return `<span class="val-pos">+$${amt.toFixed(2)}</span>`;
-                if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt).toFixed(2)}</span>`;
-                return `<span class="val-even">$0</span>`;
-            }
+            const fmtStrokeSettle = fmtSignedHtml;
 
             const calc = pressSet.original;
             let pressBreakdownHtml = '';
@@ -890,11 +917,7 @@
         }
 
         let t1Total = matchData.t1TotalMoney;
-        function formatMoney(amount) {
-            if (amount > 0) return `<span class="val-pos">+$${amount}</span>`;
-            if (amount < 0) return `<span class="val-neg">-$${Math.abs(amount)}</span>`;
-            return `<span class="val-even">$0</span>`;
-        }
+        const formatMoney = fmtSignedHtml;
 
         const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
 
