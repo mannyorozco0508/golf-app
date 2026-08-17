@@ -1554,21 +1554,51 @@
     let sidePressOpen = null;
     let sidePressCustom = false;
 
-    function canPressSideMatch() {
-        // OPTION B, and a deliberate trade. Previously only the organizer or a ?group=
-        // scorekeeper could press, which meant Marty - on a plain shared link, holding
-        // four of his own bets - had no press button at all. The feature existed for him
-        // and excluded him.
-        //
-        // Anyone viewing this round may now press a match that is visible to them. The
-        // limitation, stated plainly: links are shared credentials, not identity, so the
-        // app cannot prove the tapper is Marty. It does NOT widen anything else - round
-        // setup, Add Action, Group Links and cross-group score writes are unchanged, and
-        // a match belonging entirely to another group is never rendered here to press.
-        return true;
+    // ---- Press permission ---------------------------------------------------
+    // THE RULE, stated once and enforced twice:
+    //   Organizer (no ?group=, single-group round)   -> any eligible match
+    //   Group scorekeeper (?group=N)                 -> only a match containing a
+    //                                                   player from group N
+    //   Bare / spectator link on a multi-group round -> none
+    //
+    // This replaced `return true`. Nothing was actually checking permission before: the
+    // only thing producing any correct behaviour was an accident of scoping - a group
+    // link's filtered player list happened to exclude other groups' matches, so the
+    // press write returned early. That is a side effect, not a rule, and it left a bare
+    // spectator link able to press every match in the round.
+    //
+    // ?me= is deliberately absent here. Personal identity changes wording and ordering
+    // only; it must never grant a permission, because a link is not proof of identity.
+    function canPressSideMatch(sideMatch) {
+        const players = currentData.players || [];
+        const isMultiGroupRound = players.length > 4;
+
+        if (!hasGroupLock) {
+            // A single-group round has no meaningful spectator distinction - the bare
+            // link IS the organizer's. On a multi-group round the same URL is what
+            // spectators hold, so it grants nothing. Same condition the scorecard already
+            // uses to decide whether score inputs are editable.
+            return !isMultiGroupRound;
+        }
+
+        // A group scorekeeper may press a match their foursome has a stake in, and only
+        // that. A match between two other groups is none of their business.
+        if (!sideMatch) return false;
+        const ids = (sideMatch.teamAIds || []).concat(sideMatch.teamBIds || []).map(String);
+        const map = window.__scPlayerGroupMap || {};
+        return ids.some(pid => String(map[pid]) === String(lockedGroup));
     }
 
-    function openSidePress(key) { sidePressOpen = key; sidePressCustom = false; renderActionCenter(); }
+    // The raw STORED match, so permission is checked against the real participants
+    // rather than against whatever happens to be rendered on screen.
+    function sideMatchById(key) {
+        return (currentData.sideMatches || {})[key] || null;
+    }
+
+    function openSidePress(key) {
+        if (!canPressSideMatch(sideMatchById(key))) return;
+        sidePressOpen = key; sidePressCustom = false; renderActionCenter();
+    }
     function closeSidePress() { sidePressOpen = null; sidePressCustom = false; renderActionCenter(); }
     function showSidePressCustom() { sidePressCustom = true; renderActionCenter(); }
 
@@ -1610,7 +1640,11 @@
     function confirmSidePress(key, stake) {
         // Permission and start hole are both re-read at the moment of the tap, so a score
         // posted while the panel sat open cannot leave a press on a finished hole.
-        if (!canPressSideMatch()) { closeSidePress(); return; }
+        if (!canPressSideMatch(sideMatchById(key))) {
+            console.warn('Blocked a press outside this scorekeeper\'s group:', key);
+            closeSidePress();
+            return;
+        }
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const scoped = window.__scFilteredPlayers || currentData.players || [];
         const fresh = buildSideActionRows(currentData, courseData, currentData.scores || {}, scoped)
@@ -1835,7 +1869,7 @@
                     // Thru and waiting stay on the COLLAPSED line: a cross-group match
                     // looking stale is exactly the thing a golfer needs explained without
                     // having to open anything.
-                    '<span class="mc-thru">' + (sm.thruText || '') +
+                    '<span class="mc-thru">' + (sm.thruShort || sm.thruText || '') +
                         (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') +
                         (!open && sm.presses.length
                             ? ' \u00B7 ' + sm.presses.length + ' press' + (sm.presses.length === 1 ? '' : 'es')
@@ -1853,7 +1887,7 @@
                         '<span class="mcp-status tone-' + (pr.tone || 'even') + '">' +
                             (pr.sentence || pr.status) + '</span>' +
                     '</div>').join('');
-                html += (sm.canPress && canPressSideMatch()
+                html += (sm.canPress && canPressSideMatch(sideMatchById(sm.key))
                     ? '<button type="button" class="mc-press-btn" onclick="openSidePress(\'' + sm.key + '\')">\uD83D\uDD25 PRESS</button>'
                     : '');
                 html += (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '');
@@ -1929,7 +1963,9 @@
                 settled.map(row).join('') + '</details>';
         }
 
-        body += '<div class="action-foot">Nothing is settled until the round is done \u2014 this is what\'s at stake.</div>';
+        // The old footer restated what every card's own line already says ("at stake"),
+        // and at 390px it wrapped to two rows for no gain.
+        body += '<div class="action-foot">Nothing here is settled yet.</div>';
 
         if (addActionOpen) body += buildAddActionPanelHtml();
         else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ ADD ACTION</button>';
