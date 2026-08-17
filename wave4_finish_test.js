@@ -432,9 +432,13 @@ describe('EARLY-FINALIZED WAGERS — announced once, then out of the way', () =>
 
 // ---------------------------------------------------------------------------
 describe('WAVE 2 / WAVE 3 BEHAVIOUR IS PRESERVED', () => {
-    test('Today\'s Action still shows main, additional and side action', () => {
+    test('the round summary still covers group games and side action', () => {
+        // Sections were renamed for Marty Mode: one "Group Games" heading for everything
+        // the field is in, and "My Matches" / "Other Matches" / "Side Matches" for
+        // personal action depending on whether the golfer has been identified.
         const idx = read('index.html');
-        ['Main Game', 'Also Playing', 'Side Action'].forEach(h => assert.ok(idx.includes(h)));
+        ['Group Games', 'My Matches', 'Other Matches', 'Side Matches'].forEach(h =>
+            assert.ok(idx.includes(h), `missing heading: ${h}`));
     });
 
     test('Add Action and its organizer gate survive', () => {
