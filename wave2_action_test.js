@@ -210,7 +210,9 @@ describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
     });
 
     test('it says plainly that nothing is settled yet', () => {
-        assert.match(render(true, data, players), /Nothing is settled until the round is done/);
+        // Shortened: every card's own line already says "at stake", so the long sentence
+        // was restating it and wrapping to two rows at 390px.
+        assert.match(render(true, data, players), /Nothing here is settled yet/);
     });
 
     test('a single-game round still offers a way to add action to it', () => {
