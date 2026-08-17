@@ -37,10 +37,11 @@ function cell(sandbox, opts) {
     return sandbox.window.__cell;
 }
 
-function summary(sandbox, count, lead, t1, t2, dialect) {
-    vm.runInContext(
-        `window.__sum = buildPressSummaryText(${JSON.stringify(count)}, ${JSON.stringify(lead)}, ` +
-        `${JSON.stringify(t1)}, ${JSON.stringify(t2)}, ${JSON.stringify(dialect)});`, sandbox);
+// The helper takes a COUNT and nothing else now. Extra arguments are passed in the
+// negative tests below to prove they cannot influence the output.
+function summary(sandbox, count, ...rest) {
+    const args = [count].concat(rest).map(a => JSON.stringify(a)).join(', ');
+    vm.runInContext(`window.__sum = buildPressSummaryText(${args});`, sandbox);
     return sandbox.window.__sum;
 }
 
@@ -53,42 +54,61 @@ describe('THE PRESS SUMMARY — one line, correct dialect, no shorthand', () => 
         assert.equal(summary(sb, null, null, 'Manny', 'John', 'match'), '');
     });
 
-    test('MATCH PLAY dialect: "3 presses . Manny 2 up"', () => {
-        assert.equal(summary(sb, 3, 2, 'Manny', 'John', 'match'), '3 presses \u00B7 Manny 2 up');
-        assert.equal(summary(sb, 1, -1, 'Manny', 'John', 'match'), '1 press \u00B7 John 1 up');
-        assert.equal(summary(sb, 2, 0, 'Manny', 'John', 'match'), '2 presses \u00B7 all square');
+    // BEHAVIOUR CHANGE: the Full Card used to append a press STATUS
+    // ("4 presses . all square"). That reads as though the four presses were
+    // collectively all square, when in reality #1 may be won, #2 lost, #3 tied and
+    // #4 still live. One status word cannot honestly stand for four independent
+    // wagers. The count is the only thing the Full Card claims now.
+    test('it states a COUNT and nothing else', () => {
+        assert.equal(summary(sb, 1), '1 press');
+        assert.equal(summary(sb, 2), '2 presses');
+        assert.equal(summary(sb, 3), '3 presses');
+        assert.equal(summary(sb, 4), '4 presses');
+        assert.equal(summary(sb, 11), '11 presses');
     });
 
-    test('STROKE PLAY dialect never borrows Match Play "up"', () => {
-        const s = summary(sb, 3, 2, 'Marty', 'Bud', 'stroke');
-        assert.equal(s, '3 presses \u00B7 Marty by 2 strokes');
-        assert.ok(!/\bup\b/.test(s), 'a total-strokes wager is not "2 up"');
-        assert.equal(summary(sb, 1, 1, 'Marty', 'Bud', 'stroke'), '1 press \u00B7 Marty by 1 stroke');
-        // "all square" is Match Play. Stroke Play says level.
-        assert.equal(summary(sb, 2, 0, 'Marty', 'Bud', 'stroke'), '2 presses \u00B7 level');
+    test('singular / plural grammar is correct', () => {
+        assert.equal(summary(sb, 1), '1 press');
+        assert.ok(summary(sb, 2).endsWith('presses'));
     });
 
-    test('the two dialects can never produce the same sentence for the same state', () => {
-        assert.notEqual(summary(sb, 2, 3, 'A', 'B', 'match'), summary(sb, 2, 3, 'A', 'B', 'stroke'));
-        assert.notEqual(summary(sb, 2, 0, 'A', 'B', 'match'), summary(sb, 2, 0, 'A', 'B', 'stroke'));
+    test('NO status language survives, in any vocabulary', () => {
+        // The exact words the old implementation could emit, plus the Stroke Play set.
+        const banned = [/all square/i, /\bfinal\b/i, /\bup\b/i, /\bdown\b/i, /\btied\b/i,
+            /\blevel\b/i, /\bstrokes?\b/i, /\blead/i, /\bwon\b/i, /\blost\b/i, /&/];
+        for (let n = 0; n <= 12; n++) {
+            const s = summary(sb, n);
+            banned.forEach(re => assert.doesNotMatch(s, re, `status language "${re}" survived in "${s}"`));
+        }
     });
 
-    test('when every press is decided it says so ONCE, and re-narrates nothing', () => {
-        const s = summary(sb, 4, null, 'Manny', 'John', 'match');
-        assert.equal(s, '4 presses \u00B7 final');
-        // No 6&5-style result, no per-press breakdown: that lives in My Matches
-        // and the Receipt, which is the whole point of the change.
-        assert.ok(!/&/.test(s));
-        assert.ok(!/up/.test(s));
+    test('NO player name can reach the summary, even if one is passed in', () => {
+        // Proves the removal is structural rather than a caller that merely stopped
+        // supplying names: the helper ignores everything after the count.
+        ['Manny', 'John', 'Marty', 'Bud'].forEach(name => {
+            const s = summary(sb, 3, 2, name, name, 'match');
+            assert.ok(!s.includes(name), `player name "${name}" reached the Full Card`);
+        });
+        assert.equal(summary(sb, 3, 2, 'Manny', 'John', 'match'), '3 presses');
+        assert.equal(summary(sb, 3, 2, 'Marty', 'Bud', 'stroke'), '3 presses');
     });
 
-    test('no press summary in any dialect contains developer shorthand', () => {
-        [['match', 2], ['stroke', 2], ['match', 0], ['stroke', -3], ['match', null]].forEach(([d, lead]) => {
-            const s = summary(sb, 3, lead, 'Manny', 'John', d);
+    test('a count needs no dialect — Match Play and Stroke Play read identically', () => {
+        // Deliberately the OPPOSITE of the old assertion. The dialect split belonged to
+        // status wording; a count is equally true of both formats, so a divergence here
+        // would mean format-specific language crept back in.
+        assert.equal(summary(sb, 3, 2, 'A', 'B', 'match'), summary(sb, 3, 2, 'A', 'B', 'stroke'));
+        assert.equal(summary(sb, 2, 0, 'A', 'B', 'match'), summary(sb, 2, 0, 'A', 'B', 'stroke'));
+        assert.equal(summary(sb, 4, null, 'A', 'B', 'match'), summary(sb, 4, null, 'A', 'B', 'stroke'));
+    });
+
+    test('no press summary contains developer shorthand', () => {
+        for (let n = 0; n <= 12; n++) {
+            const s = summary(sb, n);
             assert.doesNotMatch(s, /\bP[123]\b/, `press shorthand in "${s}"`);
             assert.doesNotMatch(s, /\bH\d+\b/, `hole shorthand in "${s}"`);
             assert.doesNotMatch(s, /\bBet \d/, `bet-number shorthand in "${s}"`);
-        });
+        }
     });
 });
 
@@ -98,8 +118,7 @@ describe('THE MATCH & BETS CELL — a scorecard cell, not a ledger', () => {
     const busy = {
         gameFormat: 'match', hole: 15,
         matchPillText: 'Manny 8&7', holeWinnerText: 'Halved',
-        pressCount: 4, pressLead: 3, dialect: 'match',
-        t1Name: 'Manny', t2Name: 'John'
+        pressCount: 4
     };
 
     test('a 4-press hole renders ONE summary line, not one badge per press', () => {
@@ -108,7 +127,10 @@ describe('THE MATCH & BETS CELL — a scorecard cell, not a ledger', () => {
         // Main match pill + hole winner pill. Nothing else.
         assert.equal(pills, 2, `expected 2 pills, got ${pills}: ${html}`);
         assert.equal((html.match(/match-press-summary/g) || []).length, 1);
-        assert.ok(html.includes('4 presses \u00B7 Manny 3 up'));
+        // BEHAVIOUR CHANGE: a bare count, with no status appended.
+        const line = /<div class="match-press-summary">([^<]*)<\/div>/.exec(html);
+        assert.ok(line, 'the summary line is missing');
+        assert.equal(line[1], '4 presses');
     });
 
     test('REGRESSION: the pill-fire badge wall is gone entirely', () => {
@@ -147,17 +169,21 @@ describe('THE MATCH & BETS CELL — a scorecard cell, not a ledger', () => {
     });
 
     test('CLOSED presses are counted but never re-narrated on later holes', () => {
-        // Holes 13-18 of the audit fixture: every press has closed. Previously each of
-        // those six rows reprinted "Bet 2 (Manny 6&5)" and friends verbatim.
+        // Holes 13-18 of the audit fixture: every press has closed. Originally each of
+        // those six rows reprinted "Bet 2 (Manny 6&5)" and friends verbatim. Now not
+        // even the word "final" appears - only the count.
         const holes = [13, 14, 15, 16, 17, 18].map(h =>
-            cell(sb, Object.assign({}, busy, { hole: h, pressLead: null })));
+            cell(sb, Object.assign({}, busy, { hole: h })));
         holes.forEach(html => {
-            assert.ok(html.includes('4 presses \u00B7 final'));
-            assert.ok(!/6&5|6&4|4&2/.test(html), 'a closed press result was stamped again');
+            const line = /<div class="match-press-summary">([^<]*)<\/div>/.exec(html);
+            assert.equal(line[1], '4 presses');
+            assert.ok(!/6&5|6&4|4&2/.test(html.replace(/pill-main">[^<]*/, '')),
+                'a closed press result was stamped again');
+            assert.ok(!/\bfinal\b/i.test(line[1]), 'lifecycle language belongs in My Matches');
             assert.equal((html.match(/class="status-pill/g) || []).length, 2);
         });
-        // Every one of those rows is the same short line, which is the proof that the
-        // card no longer grows a taller wall of history the further you read.
+        // Identical on every row: the card cannot grow a taller wall of history the
+        // further down you read.
         assert.equal(new Set(holes).size, 1);
     });
 
@@ -208,10 +234,26 @@ describe('THE PRODUCTION PATH — one renderer, no second copy', () => {
         assert.ok(!/betNumByKey/.test(code), 'the Bet-number registry that mislabelled presses is back');
     });
 
-    test('the as-of engine re-run is gated on a press ACTUALLY having started', () => {
+    // BEHAVIOUR CHANGE: the per-hole as-of engine re-run existed ONLY to work out where
+    // the newest open press stood, for status text the Full Card no longer prints. The
+    // count comes off the registry's start holes, so the re-run is gone entirely - not
+    // merely gated. This is a stronger assertion than the gate it replaces.
+    test('NO per-hole as-of engine re-run survives in the Full Card path', () => {
         const fn = code.slice(code.indexOf('function renderScorecard'));
-        assert.ok(/startedPressBets\.length > 0/.test(fn),
-            'a round with no presses must not pay for 18 extra engine runs');
+        assert.ok(!/scoresThru/.test(fn), 'the truncated-scores rebuild is back');
+        assert.ok(!/asOfMatchCalc|asOfSet/.test(fn), 'an as-of engine call is back');
+        // Comments are stripped first: this must assert on CODE, not on prose that
+        // happens to name the functions it is explaining the removal of.
+        const row = fn.slice(fn.indexOf('courseData.forEach'))
+            .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+        assert.ok(!/calculateMatchEngine\(/.test(row), 'the match engine is being re-run per hole');
+        assert.ok(!/calculateStrokePressSet\(/.test(row), 'the stroke engine is being re-run per hole');
+    });
+
+    test('the press count is DERIVED from start holes, so it counts only running presses', () => {
+        const fn = code.slice(code.indexOf('function renderScorecard'));
+        assert.ok(/globalBets\.filter\(b => !b\.isPrimaryMatch && b\.startHole <= h\.hole\)\.length/.test(fn));
+        assert.ok(/strokePressResults\.filter\(pr => pr\.startHole <= h\.hole\)\.length/.test(fn));
     });
 
     test('the live match ticker names presses as presses, not by bet number', () => {
@@ -226,6 +268,103 @@ describe('THE PRODUCTION PATH — one renderer, no second copy', () => {
         const helpers = code.slice(start, code.indexOf('function pressMatchBet'));
         ['db.ref', 'simplifyDebts', 'computeCombinedNetTotals', 'getStrokes', 'parseHcp']
             .forEach(t => assert.ok(!helpers.includes(t), `${t} must not appear in a display helper`));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// A press counts on a hole when it has STARTED. Under an automatic press rule the
+// engine creates the segment on the hole the trigger fires and sets its startHole to
+// the NEXT hole, so an as-of segment count reports a press one hole before it begins.
+// Deriving from startHole is both free and correct.
+describe('PRESS COUNT — only presses that have actually started', () => {
+    const sb = idx();
+
+    function autoPressCounts() {
+        const cd = makeCourseData(18);
+        const P = makePlayers(['Manny', 'Marty', 'John'], [0, 6, 12]);
+        P[0].team = 'Team 1'; P[1].team = 'Team 2'; P[2].team = 'Team 2';
+        P.forEach(p => { p.playingForMoney = true; });
+        const S = {};
+        cd.forEach(h => P.forEach((p, pi) => {
+            S[`p${p.id}_h${h.hole}`] = h.par - (pi === 0 ? 1 : 0) + (pi === 2 ? 1 : 0);
+        }));
+        vm.runInContext(`{
+            var P = ${JSON.stringify(P)}, CD = ${JSON.stringify(cd)}, S = ${JSON.stringify(S)};
+            var full = calculateMatchEngine(P, CD, S, 'net', 'match', '2down', 50, 0, []);
+            var gb = buildBetEntries(full, CD);
+            window.__pc = CD.map(function (h) {
+                return {
+                    hole: h.hole,
+                    derived: gb.filter(function (b) { return !b.isPrimaryMatch && b.startHole <= h.hole; }).length,
+                    starts: gb.filter(function (b) { return !b.isPrimaryMatch; }).map(function (b) { return b.startHole; })
+                };
+            });
+        }`, sb);
+        return sb.window.__pc;
+    }
+
+    test('a press is not counted on the hole BEFORE it starts', () => {
+        const rows = autoPressCounts();
+        const starts = rows[0].starts;
+        assert.ok(starts.length > 0, 'the fixture must auto-generate presses');
+        starts.forEach(sh => {
+            const before = rows.find(r => r.hole === sh - 1);
+            const on = rows.find(r => r.hole === sh);
+            if (before) {
+                assert.ok(before.derived < on.derived,
+                    `a press starting on hole ${sh} was already counted on hole ${sh - 1}`);
+            }
+        });
+    });
+
+    test('the count never decreases as the round goes on', () => {
+        const rows = autoPressCounts();
+        rows.reduce((prev, r) => {
+            assert.ok(r.derived >= prev, `count fell at hole ${r.hole}`);
+            return r.derived;
+        }, 0);
+    });
+
+    test('the count equals exactly the presses whose start hole has been reached', () => {
+        const rows = autoPressCounts();
+        rows.forEach(r => {
+            assert.equal(r.derived, r.starts.filter(sh => sh <= r.hole).length);
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('FROZEN — the surfaces that OWN press detail are untouched', () => {
+    test('My Matches still names every press, with stake and start hole', () => {
+        const bs = read('bet-strip.js');
+        assert.ok(/Press #\$\{i \+ 1\}/.test(bs), 'My Matches must still name each press');
+        assert.ok(/Started Hole \$\{seg\.startHole\}/.test(bs), 'and state its start hole');
+        assert.ok(/rangeText: `Started Hole \$\{m\.startHole\}`/.test(bs));
+        assert.ok(/matchChip\(bases\[0\], 'Main Bet'/.test(bs), 'the Bet Status strip is unchanged');
+        assert.ok(/`Press #\$\{i \+ 1\}`/.test(bs));
+    });
+
+    test('My Matches still reports live press STATUS — the thing the Full Card gave up', () => {
+        const bs = read('bet-strip.js');
+        assert.ok(/statusText/.test(bs) && /AT STAKE/.test(bs));
+        assert.ok(/strokeStatusWords|matchStatusWords/.test(bs),
+            'the per-format status vocabulary must still live here');
+    });
+
+    test('the Receipt still tells the complete press history', () => {
+        const st = read('settlement.html');
+        const fn = st.slice(st.indexOf('function buildReceiptBlock'), st.indexOf('function buildSideMatchesHtml'));
+        assert.ok(/receiptSegLabel\(seg\.label\)/.test(fn));
+        assert.ok(/Started Hole \$\{seg\.startHole\}/.test(fn));
+        assert.ok(/seg\.result/.test(fn));
+        assert.ok(/MATCH NET/.test(fn));
+    });
+
+    test('press CREATION and start-hole logic were not touched', () => {
+        const code = read('index.html');
+        assert.ok(/function pressMatchBet/.test(code));
+        assert.ok(/startHole: hNum \+ 1/.test(code), 'the engine still starts a press on the next hole');
+        assert.ok(/function confirmMatchPress|function openPressPanel/.test(code));
     });
 });
 
