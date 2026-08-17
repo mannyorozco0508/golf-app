@@ -266,6 +266,36 @@
         }
         @media print { .hole-picker { display: none !important; } }
 
+        /* ---- Match card ---------------------------------------------------------
+           A match is a small card, not a table row: name and stake, one plain sentence,
+           progress, then its presses. Reads top-to-bottom on a phone in one glance. */
+        .match-card {
+            padding: 10px 12px; border-top: 1px solid var(--border-light);
+        }
+        .mc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .mc-name { font-size: 0.9rem; font-weight: bold; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mc-stake { flex: 0 0 auto; font-size: 0.8rem; color: var(--text-muted); }
+        .mc-status { font-size: 0.95rem; font-weight: bold; margin-top: 2px; }
+        .mc-status.tone-up { color: var(--brand-green); }
+        .mc-status.tone-down { color: var(--accent-red); }
+        .mc-status.tone-even, .mc-status.tone-final { color: var(--text-main); }
+        .mc-status.tone-idle { color: var(--text-muted); font-weight: normal; }
+        .mc-thru { font-size: 0.74rem; color: var(--text-muted); margin-top: 1px; }
+        .mc-press {
+            display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+            margin: 5px 0 0 12px; padding-left: 8px; border-left: 2px solid var(--border-mid);
+        }
+        .mcp-label { font-size: 0.74rem; color: var(--text-muted); }
+        .mcp-status { font-size: 0.78rem; font-weight: bold; text-align: right; }
+        .mcp-status.tone-up { color: var(--brand-green); }
+        .mcp-status.tone-down { color: var(--accent-red); }
+        .mc-press-btn {
+            margin-top: 8px; padding: 8px 14px; min-height: 40px; border-radius: 20px;
+            border: 1px solid var(--accent-red); background: var(--bg-card);
+            color: var(--accent-red); font-weight: bold; font-size: 0.8rem;
+            cursor: pointer; font-family: inherit;
+        }
+
         .side-press-btn {
             flex: 0 0 auto; margin-left: 6px; padding: 4px 9px; min-height: 30px;
             border-radius: 14px; border: 1px solid var(--accent-red);
@@ -1453,13 +1483,17 @@
     let sidePressCustom = false;
 
     function canPressSideMatch() {
-        // Organizer, or a scorekeeper holding a group link. A read-only spectator on a
-        // multi-group round has neither and may not press.
-        if (typeof isOrganizerView === 'function' && isOrganizerView()) {
-            const players = currentData.players || [];
-            return players.length <= 4 || hasGroupLock;
-        }
-        return !!hasGroupLock;
+        // OPTION B, and a deliberate trade. Previously only the organizer or a ?group=
+        // scorekeeper could press, which meant Marty - on a plain shared link, holding
+        // four of his own bets - had no press button at all. The feature existed for him
+        // and excluded him.
+        //
+        // Anyone viewing this round may now press a match that is visible to them. The
+        // limitation, stated plainly: links are shared credentials, not identity, so the
+        // app cannot prove the tapper is Marty. It does NOT widen anything else - round
+        // setup, Add Action, Group Links and cross-group score writes are unchanged, and
+        // a match belonging entirely to another group is never rendered here to press.
+        return true;
     }
 
     function openSidePress(key) { sidePressOpen = key; sidePressCustom = false; renderActionCenter(); }
@@ -1633,7 +1667,7 @@
         let games = [], side = [], changedKeys = {};
         try {
             games = buildActionRows(currentData, courseData, savedScores, scoped);
-            side = buildSideActionRows(currentData, courseData, savedScores, scoped);
+            side = buildSideActionRows(currentData, courseData, savedScores, scoped, resolvedMeId());
             // What moved on the hole in view, so it can rise briefly within its
             // section. Recomputed every render and never stored - bet order is a
             // presentation concern, not something that belongs in Firebase.
@@ -1655,7 +1689,21 @@
 
         // One deterministic extra clause, from the shared rule - never a live money
         // figure, which mid-round would mix settled and unsettled wagers.
-        const headline = actionHeadline(games, mySide.length);
+        // "8 live" counted rows. This counts MATCHES and says how they are going - the
+        // question a golfer actually has before deciding whether to open the panel.
+        const winning = mySide.filter(m => m.tone === 'up').length;
+        const losing = mySide.filter(m => m.tone === 'down').length;
+        const pressTally = mySide.reduce((n, m) => n + (m.presses ? m.presses.length : 0), 0);
+        let headline;
+        if (mySide.length > 0) {
+            const bits = [mySide.length + ' match' + (mySide.length === 1 ? '' : 'es')];
+            if (winning) bits.push('winning ' + winning);
+            if (losing) bits.push('losing ' + losing);
+            if (pressTally) bits.push(pressTally + ' press' + (pressTally === 1 ? '' : 'es'));
+            headline = bits.join(' \u00B7 ');
+        } else {
+            headline = actionHeadline(games, 0);
+        }
 
         const totalBets = games.length + side.length;
         // With a single game and no side action the bet strip below already says
@@ -1664,9 +1712,8 @@
         if (games.length <= 1 && side.length === 0 && !canAddAction()) { mount.innerHTML = ''; return; }
 
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
-            '<span>\uD83D\uDD25 Today\'s Action</span>' +
-            '<span class="ac-count">' + totalBets + ' live' +
-                (headline ? ' \u00B7 ' + headline : '') +
+            '<span>\uD83D\uDD25 My Round</span>' +
+            '<span class="ac-count">' + (headline || totalBets + ' live') +
                 ' \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
             '</button>';
 
@@ -1675,27 +1722,36 @@
         // A side match reads like the main game now: who's winning, what it's worth, and
         // a row per press underneath. Nothing here computes money - buildSideActionRows
         // produced it from the same engines the Matches tab uses.
+        // A match reads as a sentence now. Every figure here already existed - what was
+        // missing was saying it out loud: "Marty +4" required knowing that + means ahead,
+        // that the unit is strokes, and that "H6-18" was a press start hole.
         const sideRow = sm =>
-            '<div class="action-row">' +
-                '<span class="ar-name">\u2694\uFE0F ' + sm.label + '</span>' +
-                (sm.status
-                    ? '<span class="ar-status tone-' + (sm.tone || 'idle') + '">' + sm.status + '</span>'
-                    : '<span class="ar-status tone-idle">' + sm.format + '</span>') +
-                '<span class="ar-stake">' + (sm.stakeText || '') + '</span>' +
-                // Each match carries its OWN press button, so a golfer running two side
-                // bets can never be unsure which one he is pressing.
+            '<div class="match-card">' +
+                '<div class="mc-head">' +
+                    '<span class="mc-name">\u2694\uFE0F ' + sm.label + '</span>' +
+                    '<span class="mc-stake">' + (sm.stakeText || '') + '</span>' +
+                '</div>' +
+                (sm.sentence
+                    ? '<div class="mc-status tone-' + (sm.tone || 'idle') + '">' + sm.sentence + '</div>'
+                    : '<div class="mc-status tone-idle">' + sm.format + '</div>') +
+                // Naming who we are waiting on turns a stale-looking number into an
+                // explanation. Groups play at different speeds and that is normal.
+                '<div class="mc-thru">' + (sm.thruText || '') +
+                    (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') + '</div>' +
+                (sm.presses || []).map(pr =>
+                    '<div class="mc-press">' +
+                        '<span class="mcp-label">' + pr.label +
+                            (pr.stakeText ? ' \u00B7 ' + pr.stakeText : '') +
+                            (pr.startedText ? ' \u00B7 ' + pr.startedText : '') +
+                        '</span>' +
+                        '<span class="mcp-status tone-' + (pr.tone || 'even') + '">' +
+                            (pr.sentence || pr.status) + '</span>' +
+                    '</div>').join('') +
                 (sm.canPress && canPressSideMatch()
-                    ? '<button type="button" class="side-press-btn" onclick="openSidePress(\'' + sm.key + '\')">\uD83D\uDD25</button>'
+                    ? '<button type="button" class="mc-press-btn" onclick="openSidePress(\'' + sm.key + '\')">\uD83D\uDD25 PRESS</button>'
                     : '') +
-            '</div>' +
-            (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '') +
-            (sm.presses || []).map(pr =>
-                '<div class="action-row press-row">' +
-                    '<span class="ar-name">' + pr.label + '</span>' +
-                    (pr.rangeText ? '<span class="ar-range">' + pr.rangeText + '</span>' : '') +
-                    '<span class="ar-status tone-' + (pr.tone || 'even') + '">' + pr.status + '</span>' +
-                    '<span class="ar-stake">' + (pr.stakeText || '') + '</span>' +
-                '</div>').join('');
+                (sidePressOpen === sm.key ? buildSidePressPanel(sm) : '') +
+            '</div>';
 
         const row = r =>
             '<div class="action-row">' +
@@ -1726,19 +1782,27 @@
             body += flash.map(r => '<div class="final-flash">\uD83D\uDD12 FINAL \u00B7 ' + r.label + ' \u2014 ' + r.status + '</div>').join('');
         }
 
-        if (main.length) body += '<div class="action-section-label">Main Game</div>' + main.map(row).join('');
-        if (extra.length) body += '<div class="action-section-label">Also Playing</div>' +
-            sortActionRows(extra, changedKeys).map(row).join('');
-        if (extras.length) body += '<div class="action-section-label">Extras</div>' +
-            extras.map(row).join('');
+        // GROUP GAMES: one heading for everything the whole field is in. Three separate
+        // sections (Main Game / Also Playing / Extras) described the data model, not the
+        // way a golfer thinks about it.
+        //
+        // A main game with nothing to report is dropped entirely - "Stroke Play: In
+        // progress" is a row that costs a line and says nothing.
+        const groupRows = main.filter(g => g.status && g.status !== 'In progress')
+            .concat(sortActionRows(extra, changedKeys))
+            .concat(extras);
+        if (groupRows.length) {
+            body += '<div class="action-section-label">\uD83C\uDFC6 Group Games</div>' +
+                groupRows.map(row).join('');
+        }
         if (mySide.length) {
-            body += '<div class="action-section-label">Your Action</div>';
+            body += '<div class="action-section-label">\u2694\uFE0F My Matches</div>';
             body += mySide.map(sm =>
                 sideRow(sm)
             ).join('');
         }
         if (otherSide.length) {
-            body += '<div class="action-section-label">' + (mySide.length ? 'Other Action' : 'Side Action') + '</div>';
+            body += '<div class="action-section-label">' + (mySide.length ? 'Other Matches' : '\u2694\uFE0F Side Matches') + '</div>';
             body += otherSide.map(sm =>
                 sideRow(sm)
             ).join('');
