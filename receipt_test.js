@@ -249,7 +249,13 @@ describe('RESULTS PAGE renders the receipt', () => {
     test('it shows the original, each press, and the match net', () => {
         const fn = st.slice(st.indexOf('function buildReceiptBlock'), st.indexOf('function buildSideMatchesHtml'));
         assert.ok(/seg\.label/.test(fn));
-        assert.ok(/Holes \$\{seg\.startHole\}/.test(fn));
+        // BEHAVIOUR CHANGE: "Holes 10-18" became "Started Hole 10". The end hole is
+        // always the end of the match, so it carried no information; the start hole is
+        // the fact that distinguishes one press from another. The segment label is now
+        // also translated for golfers (Original -> Original Bet, Press 1 -> Press #1).
+        assert.ok(/Started Hole \$\{seg\.startHole\}/.test(fn));
+        assert.ok(!/Holes \$\{seg\.startHole\}/.test(fn), 'the old range shorthand must be gone');
+        assert.ok(/receiptSegLabel\(seg\.label\)/.test(fn), 'segment labels must go through the golfer-facing translator');
         assert.ok(/MATCH NET/.test(fn));
     });
 
@@ -386,10 +392,29 @@ describe('THE RECEIPT — header and scorecard moved across', () => {
         assert.ok(/data\.players/.test(fn) && /data\.scores/.test(fn));
     });
 
-    test('scores come LAST, after the money', () => {
-        const money = st.indexOf('\uD83C\uDFC1 Final Results');
-        const card = st.indexOf('html += buildReceiptScorecard();');
-        assert.ok(money > -1 && card > money, 'an 18-hole grid before the money buries the answer');
+    // BEHAVIOUR CHANGE: this used to compare two positions in the SOURCE, which only
+    // proved the scorecard was appended last inside #combined-settlement-summary. It
+    // was - but that container is followed by #settle-content, which holds Group Games
+    // and Side Matches, so the grid actually landed in the MIDDLE of the money story.
+    // The assertion now reads the MARKUP order of the containers themselves, which is
+    // what a reader and a printer actually see.
+    test('scores come LAST — the scorecard container follows every money container', () => {
+        const body = st.slice(st.indexOf('<body>'));
+        const summary = body.indexOf('id="combined-settlement-summary"');
+        const content = body.indexOf('id="settle-content"');
+        const card = body.indexOf('id="receipt-scorecard"');
+        assert.ok(summary > -1 && content > -1 && card > -1, 'all three receipt containers must exist');
+        assert.ok(content > summary, 'Group Games / Side Matches follow Final Money and Who Pays Who');
+        assert.ok(card > content, 'an 18-hole grid before the money buries the answer');
+    });
+
+    test('the scorecard is emitted ONCE, into the trailing container only', () => {
+        const calls = (st.match(/(?<!function )buildReceiptScorecard\(\)/g) || []).length;
+        assert.equal(calls, 1, 'a second call would duplicate the grid or reorder it');
+        const fn = st.slice(st.indexOf('function renderReceiptScorecard'), st.indexOf('function renderSettlement'));
+        assert.ok(/getElementById\('receipt-scorecard'\)/.test(fn));
+        const combined = st.slice(st.indexOf('function renderCombinedSummary'), st.indexOf('function renderReceiptScorecard'));
+        assert.ok(!/buildReceiptScorecard/.test(combined), 'the money summary must no longer emit the grid');
     });
 
     test('the header sits above Final Results', () => {
