@@ -314,6 +314,12 @@
         setTimeout(() => { document.title = previous; }, 1000);
     }
 
+    // Settlement is allocated in whole dollars, so ".00" is noise. A fraction here would
+    // mean the allocator failed, so it is shown rather than quietly hidden.
+    function fmtWhole(n) {
+        return Number.isInteger(n) ? String(n) : n.toFixed(2);
+    }
+
     function buildReceiptHeader() {
         const course = (currentData && currentData.courseName) || 'Golf Round';
         const date = new Date().toLocaleDateString('en-US',
@@ -412,8 +418,11 @@
 
         const players = data.players || [];
         function fmtSideM(amt) {
-            if (amt > 0) return `<span class="val-pos">+$${amt.toFixed(2)}</span>`;
-            if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt).toFixed(2)}</span>`;
+            // FINAL MONEY is what actually changes hands, so it prints whole dollars.
+            // The per-game rows below keep their exact figures - they explain the
+            // canonical math rather than stating what anyone owes.
+            if (amt > 0) return `<span class="val-pos">+$${fmtWhole(amt)}</span>`;
+            if (amt < 0) return `<span class="val-neg">-$${fmtWhole(Math.abs(amt))}</span>`;
             return `<span>$0.00</span>`;
         }
 
@@ -545,7 +554,7 @@
             html += `<div class="settle-card">
                 <div class="settle-header">🤝 Who Pays Who</div>`;
             transactions.forEach(t => {
-                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${t.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtWhole(t.amount)}</span></div>`;
             });
             html += `</div>`;
         }
