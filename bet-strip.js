@@ -642,11 +642,21 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
             // still riding. Kept separate so a headline can never call an unfinished
             // wager won.
             netMoney: decided, atStake,
-            netText: decided > 0 ? `You're up $${Math.abs(decided)}`
-                : (decided < 0 ? `You're down $${Math.abs(decided)}`
-                : (atStake > 0 ? `$${atStake} at stake` : '')),
+            // MONEY WORDING.
+            //
+            // A 2v2 stake is PER SIDE and splits evenly between teammates, so "$300 at
+            // stake" on Marty's phone was double what he personally stood to win or lose.
+            // A participant sees his own share first, with the team total for context; a
+            // neutral viewer sees the team figure only, because "your share" would be a
+            // lie to someone who is not in the match.
+            netText: sideMoneyText(decided, atStake, isTeam, !!(iAmInA || iAmInB),
+                iAmInA ? teamA.length : (iAmInB ? teamB.length : Math.max(teamA.length, teamB.length))),
             thru: progress.thru,
             thruText: progress.thru > 0 ? `Through Hole ${progress.thru}` : 'Not started',
+            // The collapsed line carries progress, a waiting state and a press count, and
+            // at 390px "Through Hole 10 · waiting on Manny, Ryan · 1 press" wrapped to two
+            // rows. "Thru" is what golfers say anyway.
+            thruShort: progress.thru > 0 ? `Thru ${progress.thru}` : 'Not started',
             waitingOn: progress.waitingOn,
             canPress, nextPressHole, pressStake: stake,
             stakeText: stake > 0 ? `$${stake}` : ''
@@ -892,4 +902,41 @@ function flipTone(tone) {
     if (tone === 'up') return 'down';
     if (tone === 'down') return 'up';
     return tone;
+}
+
+
+// The live money line for a side match.
+//
+// DISPLAY ONLY - this reads figures the engines already produced and never alters a
+// settlement. The per-player share mirrors the split computeCombinedNetTotals applies:
+// a side's money divided evenly between its members.
+function sideMoneyText(decided, atStake, isTeam, isParticipant, mySideSize) {
+    if (decided > 0) {
+        if (isTeam && isParticipant) {
+            const share = decided / (mySideSize || 1);
+            return `You're up $${fmtMoney(share)} \u00B7 $${fmtMoney(decided)} team`;
+        }
+        return `You're up $${fmtMoney(decided)}`;
+    }
+    if (decided < 0) {
+        const amt = Math.abs(decided);
+        if (isTeam && isParticipant) {
+            const share = amt / (mySideSize || 1);
+            return `You're down $${fmtMoney(share)} \u00B7 $${fmtMoney(amt)} team`;
+        }
+        return `You're down $${fmtMoney(amt)}`;
+    }
+    if (atStake <= 0) return '';
+
+    if (!isTeam) return `$${fmtMoney(atStake)} at stake`;
+    if (isParticipant) {
+        const share = atStake / (mySideSize || 1);
+        return `$${fmtMoney(share)} your share \u00B7 $${fmtMoney(atStake)} team`;
+    }
+    // Neutral viewer: never "your share" for a match they are not in.
+    return `$${fmtMoney(atStake)} team action`;
+}
+
+function fmtMoney(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
