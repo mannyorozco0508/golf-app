@@ -366,7 +366,7 @@ describe('INCOMPLETE SCORES — no dead end, and no invented money', () => {
 describe('EARLY-FINALIZED WAGERS — announced once, then out of the way', () => {
     const BS = (() => {
         const sb = loadJsFile('action-model.js');
-        ['money-engine.js', 'bet-strip.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
+        ['money-engine.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         return sb;
     })();
 
