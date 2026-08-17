@@ -202,8 +202,8 @@ describe('SIDE MATCHES — live status without leaving the scorecard', () => {
         const { cd, p, scores, data } = sideRound(true);
         const row = BS.buildSideActionRows(data, cd, scores, p).find(r => r.format === 'Stroke Play');
         assert.equal(row.presses.length, 1);
-        assert.equal(row.presses[0].label, 'P1');
-        assert.equal(row.presses[0].rangeText, 'H9\u201318');
+        assert.equal(row.presses[0].label, 'Press #1');
+        assert.equal(row.presses[0].startedText, 'Started Hole 9');
         assert.ok(row.presses[0].status.length > 0);
     });
 
@@ -287,20 +287,24 @@ describe('EVERY GAME VISIBLE FROM THE SCORECARD', () => {
 
     test('the main game, both additional games and both side matches all appear', () => {
         const out = render(true);
-        ['Nassau', 'Skins', 'Dots', 'Manny vs Marty', 'Manny vs John'].forEach(n =>
-            assert.ok(out.includes(n) || out.includes(n.replace('Manny', 'You')), `missing: ${n}`));
+        // Labels are personalised now: Manny's own matches read "vs Marty".
+        ['Skins', 'Dots', 'vs Marty', 'vs John'].forEach(n =>
+            assert.ok(out.includes(n), `missing: ${n}`));
     });
 
     test('every section heading is present', () => {
         const out = render(true);
-        ['Main Game', 'Also Playing', 'Your Action'].forEach(h =>
+        ['Group Games', 'Group Games', 'My Matches'].forEach(h =>
             assert.ok(out.includes(h), `missing section: ${h}`));
     });
 
     test('each side match shows a status, not just a format label', () => {
         const out = render(true);
-        const rows = out.split('action-row').filter(r => /\u2694/.test(r));
-        rows.forEach(r => assert.ok(/ar-status tone-(up|down|even|final)/.test(r),
+        // Matches are cards now, not table rows. Splitting on the card marker isolates
+        // each one; the first fragment is everything before the first card.
+        const cards = out.split('class="match-card"').slice(1);
+        assert.ok(cards.length > 0, 'no match cards rendered');
+        cards.forEach(r => assert.ok(/mc-status tone-(up|down|even|final)/.test(r),
             'a side match rendered with no live status'));
     });
 
@@ -311,9 +315,10 @@ describe('EVERY GAME VISIBLE FROM THE SCORECARD', () => {
             `window.__scFilteredPlayers = currentData.players; currentViewedHole = 12;` +
             `meId = '${p[0].id}'; actionCenterOpen = false; renderActionCenter();`, sb);
         const out = sb.document.getElementById('action-center-mount').innerHTML;
-        assert.match(out, /live/);
+        assert.match(out, /\d+ match/, 'the bar counts matches, not rows');
         assert.ok(!/action-body/.test(out), 'collapsed must stay collapsed');
         assert.ok(!/\$\d+ ?(up|down)/i.test(out), 'no live money position on the bar');
+        assert.match(out, /\d+ match/, 'the bar should count matches, not rows');
     });
 });
 
@@ -455,7 +460,7 @@ describe('SIDE MATCH PRESSES — independent stakes, per match', () => {
         const rows = BS.buildSideActionRows(data, cd, scores, p);
         const mj = rows.find(r => r.label === 'Marty vs John');
         assert.equal(mj.presses.map(x => x.stakeText).join(','), '$50,$100');
-        assert.equal(mj.presses.map(x => x.rangeText).join(','), 'H9\u201318,H12\u201318');
+        assert.equal(mj.presses.map(x => x.startedText).join(','), 'Started Hole 9,Started Hole 12');
         assert.equal(rows.find(r => r.label === 'Marty vs Steve').presses[0].stakeText, '$200');
     });
 
@@ -588,7 +593,7 @@ describe('SIDE MATCH PRESS — UI and permissions', () => {
 
     test('the press button sits on the match row it belongs to', () => {
         const fn = idx.slice(idx.indexOf('const sideRow = sm =>'), idx.indexOf('const row = r =>'));
-        assert.ok(/side-press-btn/.test(fn));
+        assert.ok(/mc-press-btn/.test(fn));
         assert.ok(/openSidePress\(/.test(fn));
         assert.ok(/sm\.key/.test(fn), 'the button must identify WHICH match it presses');
     });
@@ -612,10 +617,15 @@ describe('SIDE MATCH PRESS — UI and permissions', () => {
         assert.ok(/buildSideActionRows/.test(fn), 'a stale start hole must not be written');
     });
 
-    test('a spectator on a multi-group round cannot press', () => {
+    test('OPTION B: anyone viewing the round can press a match shown to them', () => {
+        // Changed deliberately. Requiring the organizer or a ?group= link meant a golfer
+        // on a plain shared link - holding four of his own bets - had no press button at
+        // all. Matches shown are already scoped to the viewer's group, so this widens
+        // nothing else; the stated limitation is that links are not identity.
         const fn = idx.slice(idx.indexOf('function canPressSideMatch'), idx.indexOf('function openSidePress'));
-        assert.ok(/hasGroupLock/.test(fn));
-        assert.ok(/players\.length <= 4/.test(fn), 'a multi-group bare link is read-only');
+        assert.ok(/return true;/.test(fn));
+        assert.ok(/links are shared credentials, not identity/.test(fn),
+            'the trade-off must be documented at the decision point');
     });
 
     test('REGRESSION: pressing does not widen any other permission', () => {
@@ -722,9 +732,9 @@ describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
 
     test('REGRESSION: a side match appears exactly ONCE across the whole scorecard', () => {
         // It used to appear in the callout bar, in the LIVE ACTION dashboard, AND in
-        // Today's Action - three boxes telling a golfer the same thing.
+        // My Round - three boxes telling a golfer the same thing.
         const out = render();
-        const count = (out.all.match(/Marty vs John|You vs John/g) || []).length;
+        const count = (out.all.match(/vs John/g) || []).length;
         assert.equal(count, 1, `the side match is presented ${count} times`);
     });
 
@@ -741,25 +751,25 @@ describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
 
     test('there is exactly one betting summary heading', () => {
         const out = render();
-        assert.ok(/Today\u2019s Action|Today's Action/.test(out.action));
+        assert.ok(/Today\u2019s Action|My Round/.test(out.action));
         assert.ok(!/LIVE ACTION/.test(out.all), 'a second dashboard is back');
     });
 
     test('every live wager type still has a row — nothing was lost', () => {
         const out = render().action;
         ['Skins', 'Dots', 'Birdie Game', 'John'].forEach(t =>
-            assert.ok(out.includes(t), `missing from Today's Action: ${t}`));
+            assert.ok(out.includes(t), `missing from My Round: ${t}`));
     });
 
     test('the side match press ladder survived the cleanup', () => {
         const out = render().action;
-        assert.ok(/press-row/.test(out), 'presses must stay nested under their parent');
-        assert.ok(/H9\u201318/.test(out));
+        assert.ok(/mc-press/.test(out), 'presses must stay nested under their parent');
+        assert.ok(/Started Hole 9/.test(out));
     });
 
     test('EMPTY STATES: a round with no side action renders no empty boxes', () => {
         const out = render({ bare: true }).all;
-        ['Your Action', 'Other Action', 'Side Action', 'Already Settled', 'Birdie Game']
+        ['My Matches', 'Other Matches', 'Side Action', 'Already Settled', 'Birdie Game']
             .forEach(t => assert.ok(!out.includes(t), `empty panel rendered: ${t}`));
     });
 
