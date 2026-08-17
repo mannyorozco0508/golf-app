@@ -316,7 +316,7 @@ describe('ACTION ORDERING — deterministic, relevance-based', () => {
     });
 
     test('REGRESSION: stake size is NOT a ranking factor', () => {
-        // Ranking by dollars would turn Today's Action into an advert for betting more.
+        // Ranking by dollars would turn My Round into an advert for betting more.
         const bs = read('bet-strip.js');
         const fn = bs.slice(bs.indexOf('function rankActionRow'), bs.indexOf('function sortActionRows'));
         assert.ok(!/stake/.test(fn), 'ordering must be about relevance, not wager size');
@@ -432,9 +432,9 @@ describe('EARLIER WAVES PRESERVED', () => {
         assert.ok(/Which one are you/.test(idx));
     });
 
-    test('Your Action still leads and Other Action is still shown in full', () => {
+    test('My Matches still leads and Other Matches is still shown in full', () => {
         const idx = read('index.html');
-        const at = idx.indexOf('Your Action');
-        assert.ok(at > -1 && idx.indexOf('Other Action', at) > at);
+        const at = idx.indexOf('My Matches');
+        assert.ok(at > -1 && idx.indexOf('Other Matches', at) > at);
     });
 });
