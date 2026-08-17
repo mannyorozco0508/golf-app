@@ -328,3 +328,112 @@ describe('GROUP GAMES vs SIDE MATCHES — the distinction holds', () => {
         assert.ok(Math.abs(sumOf(settle.computeCombinedNetTotals(data, cd, scores))) < ZERO);
     });
 });
+
+// ---------------------------------------------------------------------------
+// ONE RECEIPT EVERYWHERE
+// ---------------------------------------------------------------------------
+describe('ONE DOCUMENT — the competing print path is retired', () => {
+    const idx = read('index.html');
+    const st = read('settlement.html');
+    const code = src => src.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+
+    test('REGRESSION: index.html no longer builds a document of its own', () => {
+        // It produced a scorecard with game ledgers but NO side matches at all, so which
+        // button a golfer tapped decided whether their presses appeared.
+        assert.ok(!/function buildPrintScorecard/.test(code(idx)));
+        assert.ok(!/buildPrintScorecard\(/.test(code(idx)));
+    });
+
+    test('every scorecard export routes to the one Receipt', () => {
+        assert.ok(/function openReceipt/.test(idx));
+        assert.ok(/settlement\.html\?game=/.test(idx.slice(idx.indexOf('function openReceipt'), idx.indexOf('function openFinishRoundModal'))));
+        assert.ok(!/Send Results PDF/.test(idx), 'the old export label survives');
+    });
+
+    test('the export button carries the group so a scorekeeper stays scoped', () => {
+        const fn = idx.slice(idx.indexOf('function openReceipt'), idx.indexOf('function openFinishRoundModal'));
+        assert.ok(/groupParam/.test(fn));
+    });
+
+    test('one consistent label across the app', () => {
+        assert.ok(!/Save \/ Share as PDF/.test(st), 'the old label survives');
+        assert.ok(/Print \/ Save Receipt/.test(st));
+        assert.ok(/Round Receipt/.test(idx));
+    });
+
+    test('the saved file names itself after the round', () => {
+        const fn = st.slice(st.indexOf('function printReceipt'), st.indexOf('function buildReceiptHeader'));
+        assert.ok(/document\.title =/.test(fn));
+        assert.ok(/Receipt/.test(fn));
+        assert.ok(/setTimeout/.test(fn), 'the page title must be restored afterwards');
+    });
+});
+
+describe('THE RECEIPT — header and scorecard moved across', () => {
+    const st = read('settlement.html');
+
+    test('it identifies the round: course, date and format', () => {
+        const fn = st.slice(st.indexOf('function buildReceiptHeader'), st.indexOf('function buildReceiptScorecard'));
+        assert.ok(/courseName/.test(fn));
+        assert.ok(/toLocaleDateString/.test(fn));
+        assert.ok(/gameFormat/.test(fn));
+    });
+
+    test('the full scorecard survived the retirement', () => {
+        const fn = st.slice(st.indexOf('function buildReceiptScorecard'), st.indexOf('function buildReceiptBlock'));
+        ['HOLE', 'PAR', 'OUT', 'IN', 'TOT'].forEach(h =>
+            assert.ok(fn.includes(h), `the score grid lost its ${h} row`));
+        assert.ok(/data\.players/.test(fn) && /data\.scores/.test(fn));
+    });
+
+    test('scores come LAST, after the money', () => {
+        const money = st.indexOf('\uD83C\uDFC1 Final Results');
+        const card = st.indexOf('html += buildReceiptScorecard();');
+        assert.ok(money > -1 && card > money, 'an 18-hole grid before the money buries the answer');
+    });
+
+    test('the header sits above Final Results', () => {
+        // "Who Pays Who" appears in a comment earlier in the file, so anchor on the
+        // header call and the Final Results card that follows it.
+        const at = st.indexOf('let html = buildReceiptHeader();');
+        const fn = st.slice(at, at + 400);
+        assert.ok(/Final Results/.test(fn), 'the header must be emitted before the money');
+    });
+
+    test('the scorecard is the ONLY wide element; money stays one column', () => {
+        const css = st.slice(st.indexOf('.receipt-head {'), st.indexOf('/* MAGIC PDF'));
+        assert.ok(/\.receipt-card-scroll \{ overflow-x: auto/.test(css),
+            'the grid must scroll inside its own card');
+        const moneyCss = st.slice(st.indexOf('.receipt-match {'), st.indexOf('.receipt-each'));
+        assert.ok(!/table|grid-template-columns/.test(moneyCss));
+    });
+
+    test('the score grid degrades to nothing rather than an empty table', () => {
+        const fn = st.slice(st.indexOf('function buildReceiptScorecard'), st.indexOf('function buildReceiptBlock'));
+        assert.ok(/courseData\.length === 0 \|\| players\.length === 0\) return ''/.test(fn));
+    });
+});
+
+describe('PRINT PAGINATION', () => {
+    const st = read('settlement.html');
+    const printCss = st.slice(st.indexOf('@media print'), st.length);
+
+    test('a side match never splits across a page', () => {
+        assert.ok(/\.receipt-match \{[^}]*page-break-inside: avoid/.test(printCss));
+    });
+
+    test('Final Money and Who Pays Who do not split either', () => {
+        // A Who Pays Who list broken after one row is how arguments start.
+        assert.ok(/\.settle-card \{[^}]*page-break-inside: avoid/.test(printCss));
+    });
+
+    test('the header stays with what follows it', () => {
+        assert.ok(/\.receipt-head \{[^}]*page-break-after: avoid/.test(printCss));
+    });
+
+    test('the wide scorecard is allowed to flow, so no huge blank pages', () => {
+        assert.ok(/\.receipt-card-wide \{[^}]*page-break-inside: auto/.test(printCss));
+        assert.ok(/\.receipt-card-scroll \{ overflow-x: visible/.test(printCss),
+            'a scrolling element would clip in print');
+    });
+});
