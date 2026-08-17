@@ -721,6 +721,15 @@
         .pill-press { background-color: var(--danger-box-bg); color: var(--accent-red); border: 1px solid var(--accent-red); }
         .pill-fire { background-color: var(--accent-red); color: #ffffff; border: 1px solid var(--accent-red); font-weight: bold; }
         
+        /* ONE quiet line under the match pill, deliberately lighter than the scores.
+           This replaced a stack of up to five red/green badges per row - the Full Card
+           is a scorecard, and the badges were shouting over the thing being read. */
+        .match-press-summary {
+            margin-top: 3px; padding: 2px 3px; font-size: 0.68rem; font-weight: bold;
+            color: var(--text-muted); text-align: center; line-height: 1.35;
+            white-space: normal; overflow-wrap: anywhere;
+        }
+
         .press-btn {
             background-color: var(--bg-card); color: var(--accent-teal); border: 1px solid var(--accent-teal);
             padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold;
@@ -3016,6 +3025,89 @@
         return bases.concat(presses);
     }
 
+    // ---- FULL CARD: the Match & Bets cell (pure, and therefore testable) -----
+    //
+    // The Full Card answers ONE question: "what did everybody shoot?" It is not the
+    // betting dashboard. My Matches is that during the round; the Round Receipt is
+    // that afterwards.
+    //
+    // Before these helpers existed, the cell stamped one badge per wager per hole.
+    // A 4-press match printed up to SIX pills on a single row, and reprinted a
+    // press's FINAL result on every hole after it closed - "Bet 2 (Manny 6&5)" six
+    // times down the card. That is one fact restated six times, not information,
+    // and it buried the scores the card exists to show.
+    //
+    // These are pure on purpose: plain data in, the exact production HTML out. That
+    // lets the golfer-facing string be asserted directly in tests with no DOM and no
+    // second copy of the renderer. renderScorecard() is the only caller.
+
+    // Every press on the card collapses to ONE line: how many there are, and where
+    // the newest STILL-OPEN press stands. Closed presses are counted but never
+    // re-narrated - their final result is already in My Matches and the Receipt.
+    //
+    // Dialect is never mixed. A Match Play press is "2 up"; a Stroke Play press
+    // leads "by 2 strokes". A golfer should never have to translate between the two,
+    // and "2 up" is simply wrong language for a total-strokes wager.
+    function buildPressSummaryText(count, lead, t1Name, t2Name, dialect) {
+        if (!count || count < 1) return '';
+        const label = count + ' press' + (count === 1 ? '' : 'es');
+        // No open press left: every press is decided. Say so once, and leave the
+        // detail to the two surfaces that own it.
+        if (lead === null || lead === undefined) return label + ' \u00B7 final';
+        if (lead === 0) return label + ' \u00B7 ' + (dialect === 'stroke' ? 'level' : 'all square');
+        const who = lead > 0 ? t1Name : t2Name;
+        const n = Math.abs(lead);
+        return dialect === 'stroke'
+            ? label + ' \u00B7 ' + who + ' by ' + n + ' stroke' + (n === 1 ? '' : 's')
+            : label + ' \u00B7 ' + who + ' ' + n + ' up';
+    }
+
+    // Builds the whole cell. o.matchPillText / o.holeWinnerText are formatted by the
+    // caller through formatMatchPill(), unchanged - the main match pill is not what
+    // was broken here, so it is passed through exactly as before.
+    function buildMatchBetsCell(o) {
+        const pill = (cls, text) => '<span class="status-pill ' + cls + '">' + text + '</span>';
+        let inner = '';
+
+        if (o.gameFormat === 'hilo' && o.hiloLog) {
+            inner += pill('pill-main', 'Low: ' + (o.hiloLog.lowWinner || 'Halved'));
+            inner += pill('pill-press', 'High: ' + (o.hiloLog.highWinner || 'Halved'));
+        } else if (o.gameFormat === 'dots') {
+            const d = o.dots || { count: 0, allowed: false };
+            const cls = d.count > 0 ? 'dots-btn has-dots' : 'dots-btn';
+            const label = d.count > 0 ? '\uD83D\uDD34 Dots (' + d.count + ')' : '\uD83D\uDD34 Add Dots';
+            const attrs = d.allowed
+                ? 'onclick="openDotsModal(' + o.hole + ')"'
+                : 'disabled style="opacity:0.5; cursor:not-allowed;"';
+            inner += '<button class="' + cls + '" ' + attrs + '>' + label + '</button>';
+        } else if (o.gameFormat === 'wolf' && o.wolfLog) {
+            const log = o.wolfLog;
+            if (log.call) {
+                const callTag = log.call === 'partner' ? '\uD83E\uDD1D' : (log.call === 'blind' ? '\uD83D\uDE48' : '\uD83D\uDC3A');
+                const statusTxt = !log.resolved
+                    ? (log.winner === 'tie' ? 'Tied' : 'Pending')
+                    : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
+                inner += pill('pill-main', callTag + ' ' + log.wolfName.split(' ')[0]);
+                inner += pill('pill-press', statusTxt);
+            } else {
+                inner += pill('pill-main', '\uD83D\uDC3A ' + log.wolfName.split(' ')[0]);
+            }
+        } else if (o.gameFormat === 'stableford' && o.stablefordParts && o.stablefordParts.length) {
+            inner += '<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">' +
+                o.stablefordParts.join(' \u00B7 ') + '</span>';
+        } else if (o.matchPillText) {
+            inner += pill('pill-main', o.matchPillText);
+            if (o.holeWinnerText) inner += pill('pill-press', o.holeWinnerText);
+        }
+
+        let html = '<div class="match-status-cell">' + inner + '</div>';
+
+        const summary = buildPressSummaryText(o.pressCount, o.pressLead, o.t1Name, o.t2Name, o.dialect);
+        if (summary) html += '<div class="match-press-summary">' + summary + '</div>';
+
+        return html;
+    }
+
     // Kept for the detailed "View All Action" panel. The scorecard's own PRESS
     // button goes through confirmMatchPress() instead. No confirm() dialog here:
     // blocking dialogs are unreliable inside an installed PWA, and the inline
@@ -3544,12 +3636,13 @@
         const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo', 'wolf', 'stableford'].includes(gameFormat));
         window.__scHasMatchColumn = showMatchColumn;
 
-        // --- GLOBAL BET REGISTRY: Bet 1 = Match, Bet 2+ = presses in the order they started ---
+        // --- GLOBAL BET REGISTRY ---
+        // Previously each entry also carried a display number where the MAIN match was
+        // "Bet 1", making the first press "Bet 2". Golfers were shown that number, so a
+        // press was labelled one higher than it actually was. Presses are now numbered
+        // as presses wherever they are named, and the registry is ordering only.
         const firstCourseHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
         let globalBets = buildBetEntries(matchCalc, courseData);
-        globalBets.forEach((b, i) => { b.num = i + 1; });
-        let betNumByKey = {};
-        globalBets.forEach(b => { betNumByKey[b.key] = b.num; });
 
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
@@ -3672,43 +3765,23 @@
             });
 
             if (showMatchColumn) {
-                let matchCellHtml = `<div class="match-status-cell">`;
-                
-                if (gameFormat === 'hilo' && hiloCalc && hiloCalc.holeLog[h.hole]) {
-                    const log = hiloCalc.holeLog[h.hole];
-                    matchCellHtml += `<span class="status-pill pill-main">Low: ${log.lowWinner || 'Halved'}</span>`;
-                    matchCellHtml += `<span class="status-pill pill-press">High: ${log.highWinner || 'Halved'}</span>`;
-                } else if (gameFormat === 'dots') {
+                let matchPillText = '', holeWinnerText = '', stablefordParts = null, dotsInfo = null;
+
+                if (gameFormat === 'dots') {
                     const holeDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
                     let dotCount = 0;
                     Object.values(holeDots).forEach(arr => dotCount += arr.length);
-                    const dotBtnClass = dotCount > 0 ? "dots-btn has-dots" : "dots-btn";
-                    const dotBtnLabel = dotCount > 0 ? `🔴 Dots (${dotCount})` : "🔴 Add Dots";
-                    const dotsAllowed = !isMultiGroupRound || hasGroupLock;
-                    const dotBtnAttrs = dotsAllowed ? `onclick="openDotsModal(${h.hole})"` : `disabled style="opacity:0.5; cursor:not-allowed;"`;
-                    matchCellHtml += `<button class="${dotBtnClass}" ${dotBtnAttrs}>${dotBtnLabel}</button>`;
-                } else if (gameFormat === 'wolf' && wolfCalc && wolfCalc.holeLog[h.hole]) {
-                    const log = wolfCalc.holeLog[h.hole];
-                    if (log.call) {
-                        const callTag = log.call === 'partner' ? '🤝' : (log.call === 'blind' ? '🙈' : '🐺');
-                        const statusTxt = !log.resolved ? (log.winner === 'tie' ? 'Tied' : 'Pending') : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
-                        matchCellHtml += `<span class="status-pill pill-main">${callTag} ${log.wolfName.split(' ')[0]}</span>`;
-                        matchCellHtml += `<span class="status-pill pill-press">${statusTxt}</span>`;
-                    } else {
-                        matchCellHtml += `<span class="status-pill pill-main">🐺 ${log.wolfName.split(' ')[0]}</span>`;
-                    }
+                    dotsInfo = { count: dotCount, allowed: !isMultiGroupRound || hasGroupLock };
                 } else if (gameFormat === 'stableford' && stablefordCalc && stablefordCalc.holeLog[h.hole]) {
                     const log = stablefordCalc.holeLog[h.hole];
-                    const parts = Object.keys(log).map(pid => {
+                    stablefordParts = Object.keys(log).map(pid => {
                         const pl = players.find(pp => String(pp.id) === String(pid));
                         return pl ? `${pl.name.split(' ')[0]}: ${log[pid].pts}` : null;
                     }).filter(Boolean);
-                    if (parts.length) matchCellHtml += `<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">${parts.join(' · ')}</span>`;
                 } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
-                    const statusPillText = formatMatchPill(log.totMatch, matchCalc.t1Name, matchCalc.t2Name, log.totClosed, log.totRes);
-                    matchCellHtml += `<span class="status-pill pill-main">${statusPillText}</span>`;
-                    matchCellHtml += `<span class="status-pill pill-press">${log.holeWinner}</span>`;
+                    matchPillText = formatMatchPill(log.totMatch, matchCalc.t1Name, matchCalc.t2Name, log.totClosed, log.totRes);
+                    holeWinnerText = log.holeWinner;
                 } else if (gameFormat === 'nassau' && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
                     const isF9 = h.hole <= 9;
@@ -3718,36 +3791,73 @@
                     if (!hasFront) segLabel = "Match";
                     const isClosed = isF9 ? log.f9Closed : log.b9Closed;
                     const finalRes = isF9 ? log.f9Res : log.b9Res;
-                    
-                    const statusPillText = formatMatchPill(segMatch, matchCalc.t1Name, matchCalc.t2Name, isClosed, finalRes);
-                    matchCellHtml += `<span class="status-pill pill-main">${segLabel}: ${statusPillText}</span>`;
-                    matchCellHtml += `<span class="status-pill pill-press">${log.holeWinner}</span>`;
+
+                    matchPillText = `${segLabel}: ${formatMatchPill(segMatch, matchCalc.t1Name, matchCalc.t2Name, isClosed, finalRes)}`;
+                    holeWinnerText = log.holeWinner;
                 }
 
-                matchCellHtml += `</div>`;
+                // ONE press summary line, replacing the old one-badge-per-press wall.
+                //
+                // The as-of engine re-run is now gated on a press ACTUALLY having started
+                // by this hole. It used to be gated on globalBets, which always contains
+                // the main match starting at hole 1 - so a round with no presses at all
+                // still paid for a full engine run on all 18 rows for nothing.
+                let pressCount = 0, pressLead = null, pressDialect = 'match';
+                let pressT1 = matchCalc ? matchCalc.t1Name : '', pressT2 = matchCalc ? matchCalc.t2Name : '';
 
-                let betBadgesHtml = '';
-                if (globalBets.some(b => b.startHole <= h.hole)) {
-                    let holeTrunc = courseData.filter(c => c.hole <= h.hole);
-                    let asOfMatchCalc = null;
-                    if (matchCalc) {
-                        let prFilter = manualMatchPresses.filter(mp => mp.startHole <= h.hole);
-                        asOfMatchCalc = calculateMatchEngine(moneyPlayers, holeTrunc, savedScores, scoringType, gameFormat, pressRuleUsed, stakeToUseVal, holeBet, prFilter);
+                // As-of state is produced by hiding the scores that have not happened yet,
+                // NOT by shortening the course. Truncating courseData told the engine the
+                // round ended on this hole, so on hole 9 every wager looked closed out and
+                // then "reopened" on hole 10. The course is still 18 holes; only the card
+                // is partly blank.
+                const scoresThru = {};
+                moneyPlayers.forEach(p => courseData.forEach(c => {
+                    if (c.hole > h.hole) return;
+                    const k = `p${p.id}_h${c.hole}`;
+                    if (savedScores[k] !== undefined) scoresThru[k] = savedScores[k];
+                }));
+
+                const startedPressBets = globalBets.filter(b => !b.isPrimaryMatch && b.startHole <= h.hole);
+                if (matchCalc && startedPressBets.length > 0) {
+                    const prFilter = manualMatchPresses.filter(mp => mp.startHole <= h.hole);
+                    const asOfMatchCalc = calculateMatchEngine(moneyPlayers, courseData, scoresThru, scoringType, gameFormat, pressRuleUsed, stakeToUseVal, holeBet, prFilter);
+                    const segs = asOfMatchCalc
+                        ? asOfMatchCalc.activeMatches.filter(m => m.pressNum > 0).slice().sort((a, b) => a.startHole - b.startHole)
+                        : [];
+                    pressCount = segs.length;
+                    // The newest press still in play is the one a golfer can still affect.
+                    const openPresses = segs.filter(m => !m.closed);
+                    pressLead = openPresses.length > 0 ? openPresses[openPresses.length - 1].status : null;
+                } else if (strokeMatchCalc && strokePressResults.length > 0) {
+                    // Stroke Play keeps its own dialect all the way through.
+                    pressDialect = 'stroke';
+                    pressT1 = strokeMatchCalc.p1.name.split(' ')[0];
+                    pressT2 = strokeMatchCalc.p2.name.split(' ')[0];
+                    const startedStroke = strokePressResults.filter(pr => pr.startHole <= h.hole);
+                    if (startedStroke.length > 0) {
+                        const allStrokePresses = currentData.strokePresses ? Object.values(currentData.strokePresses) : [];
+                        const asOfSet = calculateStrokePressSet(
+                            moneyPlayers, courseData, scoresThru,
+                            currentData.matchScoring || 'net', currentData.matchStake || 0,
+                            allStrokePresses.filter(pr => pr.startHole <= h.hole));
+                        const prs = asOfSet ? asOfSet.pressResults : [];
+                        pressCount = prs.length;
+                        const openStroke = prs.filter(pr => !pr.roundComplete);
+                        const newest = openStroke.length > 0 ? openStroke[openStroke.length - 1] : null;
+                        // Fewer strokes wins, so a positive lead for side 1 is p2 minus p1.
+                        pressLead = newest ? (newest.p2Total - newest.p1Total) : null;
                     }
-                    let asOfEntries = buildBetEntries(asOfMatchCalc, courseData);
-                    asOfEntries.sort((a, b) => (betNumByKey[a.key] || 999) - (betNumByKey[b.key] || 999));
-                    asOfEntries.forEach(b => {
-                        const num = betNumByKey[b.key];
-                        if (!num) return;
-                        if (b.isPrimaryMatch) return; // skip base Match bet - already shown by the M/T UP pill above
-                        betBadgesHtml += `<span class="status-pill pill-fire">🔥 Bet ${num} (${b.statusFull})</span>`;
-                    });
-                }
-                if (betBadgesHtml) {
-                    matchCellHtml += `<div class="match-status-cell" style="margin-top:2px;">${betBadgesHtml}</div>`;
                 }
 
-                rowHtml += `<td>${matchCellHtml}</td>`;
+                rowHtml += `<td>${buildMatchBetsCell({
+                    gameFormat, hole: h.hole,
+                    hiloLog: (gameFormat === 'hilo' && hiloCalc) ? hiloCalc.holeLog[h.hole] : null,
+                    wolfLog: (gameFormat === 'wolf' && wolfCalc) ? wolfCalc.holeLog[h.hole] : null,
+                    stablefordParts, dots: dotsInfo,
+                    matchPillText, holeWinnerText,
+                    pressCount, pressLead, dialect: pressDialect,
+                    t1Name: pressT1, t2Name: pressT2
+                })}</td>`;
             }
 
             rowHtml += `</tr>`;
@@ -3892,8 +4002,14 @@
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
             const thruText = (t18.closed || matchCalc.maxThru === 0) ? "" : ` (Thru ${matchCalc.maxThru})`;
+            // "Bet 2" here meant Press #1 - an off-by-one no golfer could be expected to
+            // decode. Presses are counted as presses.
+            let tickerPressNum = 0;
             const betsLine = globalBets.length > 0
-                ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">${globalBets.map(b => `Bet ${b.num}: <strong style="color:#fff;">${b.statusPlain}</strong>`).join(' &nbsp;|&nbsp; ')}</div>`
+                ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">${globalBets.map(b => {
+                    const lbl = b.isPrimaryMatch ? 'Main Bet' : `Press #${++tickerPressNum}`;
+                    return `${lbl}: <strong style="color:#fff;">${b.statusPlain}</strong>`;
+                }).join(' &nbsp;|&nbsp; ')}</div>`
                 : '';
             statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${betsLine}`;
             
