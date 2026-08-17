@@ -6,6 +6,12 @@
     <title>Live Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and this
+         page carries inline copies of neither. Without this tag Final Money threw on
+         every single round - the try/catch turned it into "Couldn't total the money -
+         check the Results tab", which is why the end of the round sent golfers away
+         from the one screen that should have answered everything. -->
+    <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="bet-strip.js"></script>
@@ -532,12 +538,6 @@
         }
         .fr-warn strong { display: block; margin-bottom: 4px; font-size: 0.9rem; }
         .fr-missing-row { padding: 3px 0; font-size: 0.8rem; }
-        .fr-breakdown > summary {
-            cursor: pointer; list-style: none; padding: 10px; margin-top: 12px;
-            border-radius: 8px; border: 1px solid var(--border-mid);
-            font-size: 0.85rem; font-weight: bold; color: var(--brand-green); text-align: center;
-        }
-        .fr-breakdown > summary::-webkit-details-marker { display: none; }
 
         /* Settled wagers stop competing with live ones but stay inspectable. */
         .settled-wrap > summary {
@@ -552,7 +552,14 @@
             background: var(--nassau-box-bg); font-size: 0.82rem; font-weight: bold; color: var(--accent-teal);
         }
 
-        .fr-jump-links { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .fr-jump-links { display: flex; justify-content: center; gap: 18px; margin-top: 16px; }
+        /* Stats and Leaderboard are secondary. The Receipt is the answer; these are
+           somewhere to wander afterwards, and should not compete with it. */
+        .fr-jump-small {
+            background: none !important; border: none !important; padding: 4px 2px !important;
+            font-size: 0.82rem !important; color: var(--text-muted) !important;
+            text-decoration: underline;
+        }
         .fr-section-divider { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px 0; border-top: 1px dashed var(--border-mid); padding-top: 12px; }
         #fr-full-results .status-panel, #fr-full-results .live-ticker-box, #fr-full-results .nassau-payout-box { margin-bottom: 10px; }
         .fr-jump-link {
@@ -859,18 +866,14 @@
         <div class="fr-money-title">Who Pays Who</div>
         <div id="fr-who-pays-who"></div>
 
-        <details class="fr-breakdown">
-            <summary>📊 View Bet Breakdown &amp; Scores</summary>
-            <div class="fr-section-divider">Final Scores</div>
-            <div id="fr-player-list"></div>
-            <div class="fr-section-divider">💰 All Games &amp; Presses</div>
-            <div id="fr-full-results"></div>
-        </details>
+        <!-- "View Bet Breakdown & Scores" lived here: a clone of the live status panel
+             plus a score list. The Receipt now carries the full press timeline and the
+             scorecard, so this was a strictly worse second copy of both. One document. -->
 
         <button class="btn-primary" style="margin-top: 14px;" onclick="openReceipt()">🧾 Round Receipt</button>
 
         <div id="fr-jump-links" class="fr-jump-links"></div>
-        <button class="fr-close-btn" onclick="closeFinishRoundModal()">Got It, Keep Playing</button>
+        <button class="fr-close-btn" onclick="closeFinishRoundModal()">Done</button>
     </div>
 </div>
 
@@ -2167,6 +2170,12 @@
     // THE canonical settlement, the same function Results and Trip use. Nothing here
     // adds, splits or rounds money; it only formats what the engine returns. That is
     // what guarantees the number at the 18th green matches the Results page.
+    // Whole dollars with no trailing zeros. A fraction only appears if something has
+    // gone wrong upstream, and in that case it should be visible, not rounded away.
+    function fmtWhole(n) {
+        return Number.isInteger(n) ? String(n) : n.toFixed(2);
+    }
+
     function renderFinishRoundMoney() {
         const moneyEl = document.getElementById('fr-final-money');
         const payEl = document.getElementById('fr-who-pays-who');
@@ -2204,7 +2213,9 @@
             const sign = t.net > 0.005 ? '+' : (t.net < -0.005 ? '\u2212' : '');
             return '<div class="fr-money-row">' +
                 '<span class="fr-money-name">' + t.name + '</span>' +
-                '<span class="fr-money-val ' + cls + '">' + sign + '$' + Math.abs(t.net).toFixed(2) + '</span>' +
+                // Settlement is whole dollars, so ".00" is noise. Any residual fraction
+                // would be a bug worth seeing, so it is shown rather than hidden.
+                '<span class="fr-money-val ' + cls + '">' + sign + '$' + fmtWhole(Math.abs(t.net)) + '</span>' +
                 '</div>';
         }).join('');
 
@@ -2213,7 +2224,7 @@
             ? '<div class="fr-empty">Everyone\'s square \u2014 nobody owes anybody.</div>'
             : tx.map(t => '<div class="fr-pay-row">' +
                 '<span class="fr-pay-who">' + t.from + ' \u2192 ' + t.to + '</span>' +
-                '<span class="fr-pay-amt">$' + t.amount.toFixed(2) + '</span>' +
+                '<span class="fr-pay-amt">$' + fmtWhole(t.amount) + '</span>' +
                 '</div>').join('');
     }
 
@@ -2305,10 +2316,13 @@
         });
         document.getElementById('fr-player-list').innerHTML = listHtml;
 
+        // Stats and Leaderboard only, as quiet text links. "View Settle" was removed: it
+        // resolved to '#' because getNavLinkHref searched the nav for "Settle" and the
+        // nav reads "Results" - a dead button since the nav was renamed. There is no
+        // separate Settle page either; settlement.html IS Results IS the Receipt.
         document.getElementById('fr-jump-links').innerHTML = `
-            <a class="fr-jump-link" href="${getNavLinkHref('Settle')}">💸 View Settle</a>
-            <a class="fr-jump-link" href="${getNavLinkHref('Stats')}">📊 View Stats</a>
-            <a class="fr-jump-link" href="${getNavLinkHref('Leaderboard')}">🏆 View Leaderboard</a>
+            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Stats')}">📊 Stats</a>
+            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Leaderboard')}">🏆 Leaderboard</a>
         `;
 
         document.getElementById('finish-round-modal-overlay').style.display = 'flex';
@@ -3682,8 +3696,11 @@
             let f9 = matchCalc.activeMatches.find(m => m.id === 'F9');
             let b9 = matchCalc.activeMatches.find(m => m.id === 'B9');
 
-            let activePresses = matchCalc.activeMatches.filter(m => m.pressNum > 0).length;
-            let pressText = activePresses > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${activePresses} Active Presses</div>` : "";
+            // "Active" is only true mid-round. By hole 18 every press has resolved, so the
+            // word contradicted the result printed directly above it. The COUNT was always
+            // correct - activeMatches means "presses that exist", not "unsettled".
+            let pressCount = matchCalc.activeMatches.filter(m => m.pressNum > 0).length;
+            let pressText = pressCount > 0 ? `<div style="font-size: 0.8rem; color:#a8dadc; width:100%; margin-top:4px;">+ ${pressCount} press${pressCount === 1 ? '' : 'es'}</div>` : "";
 
             if (hasFront && hasBack) {
                 const f9Str = formatMatchPill(f9.status, matchCalc.t1Name, matchCalc.t2Name, f9.closed, f9.finalResult);
