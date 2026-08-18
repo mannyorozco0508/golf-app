@@ -835,7 +835,9 @@
     <div id="round-landing-summary" style="display:none; background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
         <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Playing With</div>
         <div id="landing-group-names" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green); margin-bottom:10px;"></div>
-        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Today's Games</div>
+        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Scoring</div>
+        <div id="landing-scoring" style="font-size:0.9rem; font-weight:bold; color:var(--brand-green); margin-bottom:10px;"></div>
+        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); margin-bottom:4px;">Action</div>
         <div id="landing-active-games" style="font-size:0.85rem;"></div>
     </div>
 
@@ -1217,6 +1219,13 @@
 
         // A genuinely no-bet round (Stroke Play, nothing else enabled) stays plain rather than
         // looking like a betting app with nothing to show — Part 12's explicit requirement.
+        // A player sees the same two-layer answer the organizer saw on Round Ready: how
+        // the round is scored, then what money is running. The stored key is untouched.
+        const scoringEl = document.getElementById('landing-scoring');
+        if (scoringEl) {
+            scoringEl.textContent = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play';
+        }
+
         const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0;
         document.getElementById('landing-active-games').innerHTML = isNoBetRound
             ? `<span style="color:var(--text-muted);">Just for score — no bets this round</span>`
