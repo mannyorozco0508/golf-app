@@ -252,9 +252,9 @@
         <div class="control-group" style="margin-bottom:10px;">
             <label>Format</label>
             <select id="sm-format" onchange="onSideMatchFormatChange()">
-                <option value="match">Match Play (Overall)</option>
-                <option value="nassau">Nassau (F9 / B9 / 18)</option>
-                <option value="stroke">Stroke Play ($/Hole + $/Overall)</option>
+                <option value="match">Match Play Bet (Overall)</option>
+                <option value="nassau">Nassau Bet (F9 / B9 / 18)</option>
+                <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
             </select>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
@@ -330,16 +330,17 @@
                 </div>
             </div>
             <div class="control-group" style="margin-bottom:10px;">
-                <label>Segment</label>
+                <label>Carry Across The Turn</label>
                 <div class="toggle-row">
-                    <span class="toggle-label-sm active" id="sm-segment-label-full" onclick="setSmSegment('full')">Full 18</span>
+                    <span class="toggle-label-sm active" id="sm-segment-label-full" onclick="setSmSegment('full')">Carry All 18</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="sm-segment-switch" onchange="setSmSegment(this.checked ? 'frontback' : 'full')">
                         <span class="toggle-slider"></span>
                     </label>
-                    <span class="toggle-label-sm" id="sm-segment-label-frontback" onclick="setSmSegment('frontback')">Split Front/Back</span>
+                    <span class="toggle-label-sm" id="sm-segment-label-frontback" onclick="setSmSegment('frontback')">Reset At 10</span>
                 </div>
                 <input type="hidden" id="sm-segment" value="full">
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Only affects tied holes when Tied Hole is set to Carry. "Reset At 10" starts the carry fresh on the back nine instead of letting it build all round.</p>
             </div>
         </div>
 
