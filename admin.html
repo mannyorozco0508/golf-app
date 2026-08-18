@@ -470,28 +470,28 @@
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">🎮 Step 3: Game Format</div>
-        <div class="wizard-step-sub" id="step3-sub">What are you playing today?</div>
+        <div class="wizard-step-title">⛳ Step 3: How Are We Playing?</div>
+        <div class="wizard-step-sub" id="step3-sub">How the round is scored. Money games get added in Step 6.</div>
     <div class="form-group">
-        <label>Game Format</label>
+        <label>Scoring Format</label>
         <select id="game-format-select" onchange="handleFormatChange()">
-            <option value="" disabled selected>-- Select Game Format --</option>
-            <optgroup label="Keep Score">
+            <option value="" disabled selected>-- Select Scoring Format --</option>
+            <optgroup label="Just Keeping Score">
                 <option value="stroke">Stroke Play</option>
                 <option value="stableford">Stableford</option>
             </optgroup>
-            <optgroup label="Play for Money">
-                <option value="nassau">Nassau</option>
-                <option value="skins">Skins</option>
-                <option value="wolf">Wolf</option>
-                <option value="match">Match Play</option>
-                <option value="dots">Dot Game</option>
-            </optgroup>
-            <optgroup label="Team Games">
+            <optgroup label="Team Formats">
                 <option value="bestball">Best Ball</option>
                 <option value="scramble">Scramble</option>
                 <option value="ryder">Ryder Cup</option>
                 <option value="hilo">Hi-Lo</option>
+                <option value="wolf">Wolf</option>
+            </optgroup>
+            <optgroup label="Money Game As The Main Game">
+                <option value="nassau">Nassau</option>
+                <option value="match">Match Play</option>
+                <option value="skins">Skins</option>
+                <option value="dots">Dot Game</option>
             </optgroup>
         </select>
         <p id="format-description" style="font-size:0.78rem; color:var(--text-muted); margin:6px 0 0 0; min-height:1.2em;"></p>
@@ -777,12 +777,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">🔥 Step 6: More Action</div>
-        <div class="wizard-step-sub">Stack as much as you like on top of your main game. All optional.</div>
+        <div class="wizard-step-title">💰 Step 6: What's The Action?</div>
+        <div class="wizard-step-sub">Money games that run alongside your scoring format. All optional — skip this if you're just keeping score.</div>
 
         <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Extra games that run right alongside your main game.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
             <div id="stacked-games-list"></div>
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
@@ -835,21 +835,27 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <div id="rr-players-list" style="font-size:0.9rem; line-height:1.6;"></div>
     </div>
 
-    <div id="rr-main-game-box" style="display:none; margin-bottom:14px;">
-        <div class="wr-label" style="margin-bottom:4px;">Main Game</div>
-        <div id="rr-main-game-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></div>
+    <!-- Round Ready answers the two questions a golfer actually has, in the order they
+         ask them: how are we scoring, and what's the money? Scoring always shows - a plain
+         Stroke Play round used to display nothing at all here. -->
+    <div id="rr-scoring-box" style="margin-bottom:14px;">
+        <div class="wr-label" style="margin-bottom:4px;">Scoring</div>
+        <div id="rr-scoring-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></div>
     </div>
 
-    <div id="rr-skins-box" style="display:none; margin-bottom:14px;">
-        <div class="wr-label" style="margin-bottom:4px;">Skins</div>
-        <div id="rr-skins-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></div>
+    <div id="rr-action-box" style="display:none; margin-bottom:18px;">
+        <div class="wr-label" style="margin-bottom:4px;">Action</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+            <div id="rr-action-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green); line-height:1.6;"></div>
+            <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Manage</span>
+        </div>
     </div>
 
-    <div id="rr-sidebets-box" style="display:none; margin-bottom:18px;">
-        <div class="wr-label" style="margin-bottom:4px;">Side Bets</div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span id="rr-sidebets-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green);"></span>
-            <span class="wizard-edit-link" onclick="goToSideBets()">Manage</span>
+    <div id="rr-noaction-box" style="display:none; margin-bottom:18px;">
+        <div class="wr-label" style="margin-bottom:4px;">Action</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <span style="font-size:0.9rem; color:var(--text-muted);">Just keeping score — no money games</span>
+            <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Add</span>
         </div>
     </div>
 
@@ -926,41 +932,56 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             ? players.map(p => `${p.name}${p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${p.hcp})</span>` : ''}`).join('<br>')
             : `<span style="color:var(--text-muted);">No players added yet</span>`;
 
-        // Main game — plain language, matching the exact same summary logic the review screen
-        // and player landing summary already use, so nothing here can disagree with either.
+        // SCORING vs ACTION.
+        //
+        // The stored key is still `gameFormat` and nothing about it changed - this only
+        // decides how the round is DESCRIBED. Formats like Nassau and Match Play are both
+        // at once: they organise the scoring AND carry the wager, so they honestly appear
+        // in both lists rather than being forced into one.
         const format = data.gameFormat || 'stroke';
-        let mainGameText = '';
+        const scoringLabel = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+        document.getElementById('rr-scoring-text').textContent = scoringLabel;
+
+        const actionLines = [];
+
+        // The main format's own money, where it has any. Stroke Play, Best Ball, Scramble,
+        // Ryder and Hi-Lo produce no line here because they carry no inherent wager.
         if (format === 'nassau') {
             const pressMap = { '2down': 'Automatic press at 2 Down', '1down': 'Automatic press at 1 Down', 'anytime': 'Press available any hole', 'none': 'No presses' };
             const nHoleBet = data.holeBetStake || 0;
             const nBetText = nHoleBet > 0 ? `$${nHoleBet} per hole Nassau` : `$${data.nassauStake || 10} Nassau`;
-            mainGameText = `${nBetText} — ${pressMap[data.nassauPressRule] || 'No presses'}`;
+            actionLines.push(`${nBetText} — ${pressMap[data.nassauPressRule] || 'No presses'}`);
         } else if (format === 'match') {
-            mainGameText = `$${data.matchStake || 0} Match Play`;
+            actionLines.push(`$${data.matchStake || 0} Match Play`);
         } else if (format === 'wolf') {
-            mainGameText = `$${data.wolfPointVal || 0} per point Wolf`;
+            actionLines.push(`$${data.wolfPointVal || 0} per point Wolf`);
         } else if (format === 'dots') {
-            mainGameText = `$${data.dotPointVal || 0} per dot`;
+            actionLines.push(`$${data.dotPointVal || 0} per dot`);
         } else if (format === 'stableford' && data.stablefordPointVal > 0) {
-            mainGameText = `$${data.stablefordPointVal} per point Stableford`;
-        }
-        document.getElementById('rr-main-game-box').style.display = mainGameText ? 'block' : 'none';
-        document.getElementById('rr-main-game-text').textContent = mainGameText;
-
-        // Skins gets its own box since it's the round's main format when present but has its
-        // own dedicated setup fields distinct from "the bet" language above.
-        if (format === 'skins') {
+            actionLines.push(`$${data.stablefordPointVal} per point Stableford`);
+        } else if (format === 'skins') {
             const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
-            const carryOver = data.skinsCarryOver !== false;
-            document.getElementById('rr-skins-box').style.display = 'block';
-            document.getElementById('rr-skins-text').textContent = `$${buyIn} — ${carryOver ? 'Carry Over' : 'No Carry'}`;
-        } else {
-            document.getElementById('rr-skins-box').style.display = 'none';
+            actionLines.push(`$${buyIn} Skins — ${data.skinsCarryOver !== false ? 'Carry Over' : 'No Carry'}`);
         }
+
+        // Stacked games come from getRoundGames() rather than being re-derived here, so this
+        // summary can never disagree with what settlement actually pays out.
+        if (typeof getRoundGames === 'function') {
+            getRoundGames(data).filter(g => g.role === 'additional').forEach(g => {
+                actionLines.push(typeof describeGame === 'function' ? describeGame(g) : g.label);
+            });
+        }
+
+        if (data.birdieGameEnabled) actionLines.push('Birdie Game');
 
         const sideMatchCount = Object.keys(data.sideMatches || {}).length;
-        document.getElementById('rr-sidebets-box').style.display = sideMatchCount > 0 ? 'block' : 'none';
-        document.getElementById('rr-sidebets-text').textContent = `${sideMatchCount} active`;
+        if (sideMatchCount > 0) {
+            actionLines.push(`${sideMatchCount} Side Bet${sideMatchCount === 1 ? '' : 's'}`);
+        }
+
+        document.getElementById('rr-action-box').style.display = actionLines.length > 0 ? 'block' : 'none';
+        document.getElementById('rr-noaction-box').style.display = actionLines.length > 0 ? 'none' : 'block';
+        document.getElementById('rr-action-text').innerHTML = actionLines.map(l => `<div>${l}</div>`).join('');
     }
 
     function startScoring() {
@@ -1364,8 +1385,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
         if (sub) {
             sub.textContent = mainFormat && MAIN_GAME_LABELS[mainFormat]
-                ? `Extra games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
-                : 'Extra games that run right alongside your main game.';
+                ? `Money games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
+                : 'Money games that run right alongside your scoring format.';
         }
 
         list.innerHTML = available.map(format => {
@@ -2699,7 +2720,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }
             
             const gameFormat = document.getElementById("game-format-select").value;
-            if (!gameFormat) { alert("⚠️ Please select a Game Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
+            if (!gameFormat) { alert("⚠️ Please select a Scoring Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
 
             const rows = document.querySelectorAll('.player-row');
             // Players are no longer required to save — lets you set up a whole trip's worth of
@@ -2924,7 +2945,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     if (step3SubEl) {
         step3SubEl.textContent = currentEventType === 'club'
             ? "Common club formats: Stroke Play, Skins, Stableford. Every other format below still works too."
-            : "What are you playing today?";
+            : "How the round is scored. Money games get added in Step 6.";
     }
     // On the lobby screen itself (no game code yet), show the framing for the default
     // Quick Round selection, matching whichever card starts active in the HTML.
