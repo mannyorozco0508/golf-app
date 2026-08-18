@@ -262,11 +262,32 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
         assert.ok(adm.includes('<script src="action-model.js"></script>'));
     });
 
+    // BEHAVIOUR CHANGE (Scoring vs Action, phase 1): Step 6 is now named for the layer it
+    // represents rather than for being "more" of the previous step. Step 3 asks how the
+    // round is scored; Step 6 asks what the money is.
     test('Step 6 offers additional games alongside the extras', () => {
-        assert.ok(adm.includes('Step 6: More Action'));
+        assert.ok(adm.includes("Step 6: What's The Action?"));
+        assert.ok(!adm.includes('Step 6: More Action'), 'the old undifferentiated wording is gone');
         assert.ok(adm.includes('stacked-games-list'));
         assert.ok(adm.includes('Also Playing'), 'the setup wizard keeps its own wording');
         assert.ok(adm.includes('\uD83C\uDFAF Extras'), 'the birdie/KP extras keep their own heading');
+    });
+
+    test('Step 3 asks how the round is SCORED, not what the game is', () => {
+        assert.ok(adm.includes('Step 3: How Are We Playing?'));
+        assert.ok(adm.includes('<label>Scoring Format</label>'));
+        assert.ok(!adm.includes('Step 3: Game Format'), 'the old conflated heading is gone');
+        // The stored key is untouched - this is wording only, never a schema change.
+        assert.ok(adm.includes('id="game-format-select"'), 'the stored gameFormat key must not be renamed');
+    });
+
+    test('the format list no longer implies every option is the same kind of thing', () => {
+        assert.ok(adm.includes('<optgroup label="Just Keeping Score">'));
+        assert.ok(adm.includes('<optgroup label="Team Formats">'));
+        assert.ok(adm.includes('<optgroup label="Money Game As The Main Game">'));
+        // Nothing was removed from setup in this phase - clarifying, not migrating.
+        ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf', 'nassau', 'match', 'skins', 'dots']
+            .forEach(f => assert.ok(adm.includes(`value="${f}"`), `${f} must still be offered`));
     });
 
     test('the choices are driven by the shared catalog, not a hardcoded list', () => {
