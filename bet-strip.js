@@ -321,6 +321,13 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         .filter(p => p.playingForMoney !== false);
 
     getRoundGames(data).forEach(game => {
+        // Each wager has its OWN field. A participant-scoped skins game between three
+        // of eight golfers must be priced, decided and displayed over those three only,
+        // so the players list is resolved per game rather than once for the round.
+        const gamePlayers = (typeof fieldParticipants === 'function' && game.config)
+            ? fieldParticipants(game.config)
+            : players;
+
         // A game added mid-round shows its range, so nobody has to remember when it
         // started. A game covering the whole round shows nothing - "H1-18" on every
         // ordinary wager is noise.
@@ -339,7 +346,7 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         try {
             // Each game sees only its own holes.
             const gameCourse = (typeof gameHoles === 'function') ? gameHoles(game, holes) : holes;
-            const st = gameStatusLine(game, gameCourse, scores, players);
+            const st = gameStatusLine(game, gameCourse, scores, gamePlayers);
             row.status = st.text;
             row.tone = st.tone;
         } catch (e) {
@@ -443,7 +450,15 @@ function skinsState(cfg, holes, scores, players) {
         const entries = players.map(p => {
             const raw = scores[`p${p.id}_h${h.hole}`];
             if (!raw || raw <= 0) return null;
-            const strokes = getStrokes(parseHcp(p.handicap), h.hcp, players.length);
+            // CANONICAL SIGNATURE: getStrokes(holeHandicapIndex, playerHandicap).
+            //
+            // This line previously read getStrokes(parseHcp(p.handicap), h.hcp, N) - the
+            // two arguments the wrong way round, against two field names this app does
+            // not use (`p.handicap` and `h.hcp` are both undefined; the real fields are
+            // `p.hcp` and `h.hcpIndex`), plus a third argument getStrokes does not take.
+            // Every golfer therefore received ZERO strokes and Net skins silently paid
+            // out on gross scores. Now identical to settlement's own allocation.
+            const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
             return { p, gross: raw, net: raw - strokes };
         }).filter(Boolean);
         // A skin cannot be decided until everyone who is in it has posted.
