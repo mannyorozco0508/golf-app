@@ -65,7 +65,13 @@
     }
 
     function computeSkinsSettlementNet(data, courseData, savedScores) {
-        const allPlayers = (data.players || []).filter(p => p.playingForMoney !== false);
+        // The wager's own field. For a round-wide skins game this is everyone playing
+        // for money, exactly as before; for a participant-scoped game it is only the
+        // golfers named on it. Everyone else is not in this pot at all - they cannot
+        // win a skin, cannot break a tie, and neither pay nor receive a cent.
+        const allPlayers = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
         const potFormat = data.skinsPotFormat || 'split';
         const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
         const carryOver = data.skinsCarryOver !== false;
