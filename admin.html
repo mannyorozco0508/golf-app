@@ -1408,9 +1408,99 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; margin-bottom:4px;">${presetHtml}</div>
                     <input type="number" min="0" step="0.5" placeholder="0" value="${amt}" style="max-width:140px;"
                            oninput="setStackAmount('${format}', this.value, true)">
+                    ${format === 'skins' ? renderSkinsExtras() : ''}
                 </div>
             </div>`;
         }).join('');
+    }
+
+    // SKINS-ONLY CONTROLS: ties, and who is actually in it.
+    //
+    // The stake is a BUY-IN PER GOLFER, not a price per skin - that is what
+    // computeSkinsSettlementNet does with the number (pot = buyIn x players), so the
+    // label says so. Getting this backwards would misstate real money between friends.
+    function renderSkinsExtras() {
+        const st = stackedGameState.skins || {};
+        const carry = st.carryOver !== false;
+        const players = collectWizardPlayers();
+        const chosen = skinsChosenIds();
+
+        const pot = (parseFloat(st.amount) || 0) * (chosen.length || players.length);
+        const potLine = pot > 0
+            ? `$${pot % 1 === 0 ? pot : pot.toFixed(2)} total pot`
+            : '';
+
+        const chips = players.map(pl => {
+            const on = chosen.includes(String(pl.id));
+            return `<button type="button" onclick="toggleSkinsPlayer('${String(pl.id)}')"
+                style="padding:8px 12px; min-height:44px; border-radius:20px; font-size:0.82rem; cursor:pointer;
+                       border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
+                       background:${on ? 'var(--brand-green)' : 'transparent'};
+                       color:${on ? '#fff' : 'var(--text-muted)'};">
+                ${on ? '\u2713 ' : ''}${pl.name}</button>`;
+        }).join('');
+
+        return `
+            <div style="margin-top:12px;">
+                <label style="font-size:0.75rem;">Ties</label>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" onclick="setSkinsCarry(true)"
+                        style="flex:1; min-height:44px; border-radius:8px; font-size:0.8rem; cursor:pointer;
+                               border:1px solid ${carry ? 'var(--brand-green)' : 'var(--border-mid)'};
+                               background:${carry ? 'var(--brand-green)' : 'transparent'};
+                               color:${carry ? '#fff' : 'var(--text-muted)'};">Carry Over</button>
+                    <button type="button" onclick="setSkinsCarry(false)"
+                        style="flex:1; min-height:44px; border-radius:8px; font-size:0.8rem; cursor:pointer;
+                               border:1px solid ${!carry ? 'var(--brand-green)' : 'var(--border-mid)'};
+                               background:${!carry ? 'var(--brand-green)' : 'transparent'};
+                               color:${!carry ? '#fff' : 'var(--text-muted)'};">No Carry</button>
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <label style="font-size:0.75rem;">Who's in?</label>
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:0 0 6px 0;">
+                    Everyone's in by default \u2014 tap to take someone out. ${potLine}</p>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">${chips || '<span style="font-size:0.75rem; color:var(--text-muted);">Add players in Step 5 first.</span>'}</div>
+            </div>`;
+    }
+
+    // Players currently entered in the wizard, in the same shape the round will save.
+    function collectWizardPlayers() {
+        if (typeof captureCurrentPlayerInputs === 'function') {
+            try { return captureCurrentPlayerInputs() || []; } catch (e) { /* fall through */ }
+        }
+        return [];
+    }
+
+    // The selection, defaulting to EVERYONE. Opt-out rather than opt-in: the common
+    // case is the whole group, so the fast path is zero taps. Opt-in would be one tap
+    // per golfer every round, and a half-finished selection would silently create a
+    // wager missing somebody. Nobody is ever ADDED without the organizer seeing them
+    // listed here, so opt-out cannot quietly enrol a stranger either.
+    function skinsChosenIds() {
+        const st = stackedGameState.skins || {};
+        const players = collectWizardPlayers();
+        const allIds = players.map(p => String(p.id));
+        if (!Array.isArray(st.participantIds)) return allIds;
+        // Drop ids for golfers who have since been removed from the round.
+        return st.participantIds.map(String).filter(id => allIds.includes(id));
+    }
+
+    function toggleSkinsPlayer(id) {
+        if (!stackedGameState.skins) stackedGameState.skins = { enabled: true, amount: '' };
+        const current = skinsChosenIds();
+        const key = String(id);
+        const next = current.includes(key) ? current.filter(x => x !== key) : current.concat([key]);
+        stackedGameState.skins.participantIds = next;
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    function setSkinsCarry(on) {
+        if (!stackedGameState.skins) stackedGameState.skins = { enabled: true, amount: '' };
+        stackedGameState.skins.carryOver = !!on;
+        renderStackedGames();
+        updateWizardReview();
     }
 
     let stackedGameState = {};
@@ -1449,6 +1539,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const amount = parseFloat(st.amount);
             const entry = Object.assign({}, spec.defaults, { enabled: true, startHole: 1 });
             entry[spec.stakeField] = isNaN(amount) ? 0 : amount;
+
+            if (format === 'skins') {
+                entry.skinsCarryOver = st.carryOver !== false;
+                // participantIds is written ONLY when the organizer actually narrowed the
+                // field. A whole-group game saves nothing, so it stays byte-identical to
+                // every skins game saved before this feature existed.
+                const chosen = skinsChosenIds();
+                const everyone = collectWizardPlayers().map(p => String(p.id));
+                if (chosen.length > 0 && chosen.length < everyone.length) {
+                    entry.participantIds = chosen;
+                }
+            }
             out[format] = entry;
         });
         return out;
@@ -1465,6 +1567,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 enabled: saved[format].enabled !== false,
                 amount: saved[format][spec.stakeField]
             };
+            if (format === 'skins') {
+                stackedGameState.skins.carryOver = saved.skins.skinsCarryOver !== false;
+                if (Array.isArray(saved.skins.participantIds)) {
+                    stackedGameState.skins.participantIds = saved.skins.participantIds.map(String);
+                }
+            }
         });
         renderStackedGames();
     }
