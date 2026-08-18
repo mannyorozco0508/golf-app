@@ -145,11 +145,18 @@ function buildHoleEvents(data, courseData, savedScores, hole, meId, scopedPlayer
         // A game that hasn't started yet cannot have produced an event on this hole.
         if (!gameCourse.some(h => h.hole === hole)) return;
 
+        // THIS wager's own field, not the round's. A three-golfer skins game inside an
+        // eight-golfer round is decided the moment those three post - it must not wait
+        // on five golfers who are not in it, and their scores can never change it.
+        const gameField = (typeof fieldParticipants === 'function' && game.config)
+            ? fieldParticipants(game.config)
+            : field;
+
         // WHOLE-FIELD READINESS. A round-level wager is not knowable until every
         // player in it has posted this hole. Truth beats immediacy: it is better for
         // a skins result to appear a few minutes late than for the app to name a
         // winner while eight golfers are still out on the course.
-        if (!participantsCompletedHole(field, hole, scores)) {
+        if (!participantsCompletedHole(gameField, hole, scores)) {
             // Dots are a record of what a golfer was awarded on this hole, not a
             // contested outcome, so they stay knowable for the players who have posted.
             if (game.format === 'dots') dotsEvents(game, players, hole, meId, push);
@@ -157,13 +164,13 @@ function buildHoleEvents(data, courseData, savedScores, hole, meId, scopedPlayer
         }
 
         if (game.format === 'skins') {
-            skinsEvents(game, gameCourse, after, before, field, hole, meId, push);
+            skinsEvents(game, gameCourse, after, before, gameField, hole, meId, push);
         } else if (game.format === 'dots') {
             dotsEvents(game, players, hole, meId, push);
         } else if (game.format === 'stableford') {
-            leaderEvents(game, gameCourse, after, before, field, meId, push, 'pts', '\uD83C\uDFAF');
+            leaderEvents(game, gameCourse, after, before, gameField, meId, push, 'pts', '\uD83C\uDFAF');
         } else if (game.role === 'main') {
-            mainGameEvents(game, gameCourse, after, before, field, meId, push);
+            mainGameEvents(game, gameCourse, after, before, gameField, meId, push);
         }
     });
 
