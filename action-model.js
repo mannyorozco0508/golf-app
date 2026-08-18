@@ -211,8 +211,31 @@ function addableGames(data) {
 
 // The players a round-level wager depends on: everyone in for money, regardless of
 // which group they are walking with.
+// WHO IS ACTUALLY IN THIS WAGER.
+//
+// Called two ways, and the difference matters:
+//   fieldParticipants(roundData)   -> everyone playing for money (the legacy meaning)
+//   fieldParticipants(game.config) -> only the golfers named on THAT game
+//
+// getRoundGames() merges an additional game's stored config over the round data, so a
+// `participantIds` saved on the game arrives here inside game.config while the round
+// data itself never carries one. That is what lets one filter serve both callers
+// without a flag: a round-level call simply has no participantIds to find.
+//
+// Absent, non-array or empty is deliberately read as "everybody". Every additional
+// game saved before this field existed means the whole field, and a game that quietly
+// paid nobody would be a worse failure than one that paid everybody. The setup UI
+// never writes an empty array - it requires at least two golfers.
+//
+// IDs are compared as strings and matched against the real player list, so an id for
+// a golfer who was later removed simply drops out rather than throwing. Names are
+// never used: two golfers called Mike must stay distinguishable.
 function fieldParticipants(data) {
-    return (data.players || []).filter(p => p.playingForMoney !== false);
+    const eligible = (data.players || []).filter(p => p.playingForMoney !== false);
+    const ids = data && data.participantIds;
+    if (!Array.isArray(ids) || ids.length === 0) return eligible;
+    const wanted = ids.map(String);
+    return eligible.filter(p => wanted.includes(String(p.id)));
 }
 
 // Have all the players this wager depends on finished this hole?
@@ -311,8 +334,16 @@ function roundHasStackedAction(data) {
 // Human summary for Round Ready and the scorecard, e.g. "Skins \u00B7 $5".
 function describeGame(game) {
     if (!game) return '';
-    if (game.stake > 0) return `${game.label} \u00B7 $${game.stake}`;
-    return game.label;
+    const base = game.stake > 0 ? `${game.label} \u00B7 $${game.stake}` : game.label;
+    if (!game.config || !Array.isArray(game.config.participantIds)) return base;
+
+    // A scoped wager must say WHO is in it, or the summary is actively misleading -
+    // "$10 Skins" on a six-golfer round reads as all six. Names up to four, because
+    // beyond that the line stops being scannable and a count is more useful.
+    const inIt = fieldParticipants(game.config);
+    if (inIt.length === 0) return base;
+    if (inIt.length > 4) return `${base} \u00B7 ${inIt.length} players`;
+    return `${base} \u00B7 ${inIt.map(p => String(p.name).split(' ')[0]).join(' \u00B7 ')}`;
 }
 
 // Rejects nonsensical or contradictory setups BEFORE a round is saved, so a bad
