@@ -414,10 +414,36 @@ describe('PERMISSIONS — identity is still not authorization', () => {
 });
 
 describe('EARLIER WAVES PRESERVED', () => {
-    test('the money engines were not touched', () => {
+    // BEHAVIOUR CHANGE (participant-scoped Skins): this used to ban fieldParticipants
+    // from settlement-engine.js alongside the genuine PRESENTATION helpers. That was
+    // right when fieldParticipants only fed the Live Action dashboard. It now answers a
+    // money question - WHICH GOLFERS ARE IN THIS WAGER - and settlement cannot pay a
+    // scoped skins game without asking it. It is the same category as gameHoles, which
+    // answers "which holes is this wager over" and which settlement-engine has always
+    // called. The ban therefore narrows to what it was really protecting: display
+    // helpers, and golf math.
+    test('no PRESENTATION helper leaked into the money engines', () => {
         ['money-engine.js', 'settlement-engine.js'].forEach(f => {
-            assert.ok(!/fieldParticipants|sortActionRows|actionHeadline/.test(read(f)), `${f} was modified`);
+            assert.ok(!/sortActionRows|actionHeadline|buildActionRows|skinsStatus/.test(read(f)),
+                `${f} gained a display helper`);
         });
+    });
+
+    test('money-engine.js remains free of the round-model layer entirely', () => {
+        // The lowest engine stays a pure calculator - it takes players and holes as
+        // arguments and asks nothing about how a round was configured.
+        const me = read('money-engine.js');
+        assert.ok(!/fieldParticipants|gameHoles|getRoundGames/.test(me));
+    });
+
+    test('settlement-engine uses the round-model functions defensively, never assuming load order', () => {
+        const se = read('settlement-engine.js');
+        // Both are optional globals from action-model.js. A missing one must degrade to
+        // the previous whole-field / whole-course behaviour rather than throw mid-round.
+        assert.ok(/typeof gameHoles === 'function'/.test(se));
+        assert.ok(/typeof fieldParticipants === 'function'/.test(se));
+        assert.ok(/\(data\.players \|\| \[\]\)\.filter\(p => p\.playingForMoney !== false\)/.test(se),
+            'the legacy whole-field fallback must remain');
     });
 
     test('Wave 4 Finish Round and Already Settled survive', () => {
