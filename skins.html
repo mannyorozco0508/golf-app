@@ -663,7 +663,9 @@
         });
 
         html += `</tbody></table>
-            <button class="btn-primary" onclick="window.print()">📄 Save Payout as PDF</button>
+            <!-- This page cannot see participant-scoped Skins games, so its own payout was never
+                 a safe authoritative receipt. The canonical Receipt settles every wager. -->
+            <a class="btn-primary nav-link" href="settlement.html" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
         `;
 
         container.innerHTML = html;
