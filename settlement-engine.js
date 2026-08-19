@@ -127,13 +127,27 @@
         // is bit-for-bit what it has always been. This changes in-progress display only,
         // never final settlement.
         //
-        // Non-carry-over ("void") skins are deliberately untouched: that mode already
-        // distributes its whole pot across decided holes and is already zero-sum.
+        // Non-carry-over ("void") skins distribute the whole pot across the holes that
+        // were WON OUTRIGHT - which is zero-sum as long as at least one hole was won.
+        //
+        // P0 FIX (found by the Quick Round real-world audit): if NO skin was won at all -
+        // every hole halved - skinValue correctly became 0 and nobody was paid, but the
+        // buy-in was still charged at the full rate. Three golfers in a $20 void game
+        // each went -$20 and the $60 pot simply disappeared. Money must never vanish.
+        //
+        // The stake is now charged in proportion to the pot actually distributed, which
+        // is what the carry-over branch above has always done. When any skin is won the
+        // multiplier is 1 and every existing result is bit-for-bit unchanged; when none
+        // is won it is 0 and the buy-ins are refunded, which is what golfers do anyway.
         function playedUnits(result) {
             return result.skins.reduce((sum, s) => sum + s.unitsWon, 0) + (result.pendingUnits || 0);
         }
-        const grossInPlay = (carryOver && totalHoles > 0) ? Math.min(playedUnits(grossResult) / totalHoles, 1) : 1;
-        const netInPlay = (carryOver && totalHoles > 0) ? Math.min(playedUnits(netResult) / totalHoles, 1) : 1;
+        const grossInPlay = (carryOver && totalHoles > 0)
+            ? Math.min(playedUnits(grossResult) / totalHoles, 1)
+            : (grossResult.skins.length > 0 ? 1 : 0);
+        const netInPlay = (carryOver && totalHoles > 0)
+            ? Math.min(playedUnits(netResult) / totalHoles, 1)
+            : (netResult.skins.length > 0 ? 1 : 0);
 
         const n = allPlayers.length;
         const grossStake = n > 0 ? (grossPot / n) * grossInPlay : 0;
