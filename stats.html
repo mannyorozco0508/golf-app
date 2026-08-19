@@ -1158,7 +1158,8 @@
         html += buildSideGamesHtml(data, courseData, savedScores);
 
         html += `
-            <button class="btn-primary" onclick="window.print()">📄 Save / Share as PDF</button>
+            <!-- Stats prints remain possible via the browser; the MONEY document is canonical. -->
+            <a class="btn-primary nav-link" href="settlement.html" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
         `;
 
         container.innerHTML = html;
