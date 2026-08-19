@@ -499,6 +499,50 @@ describe('LIVE ACTION AND ROUND READY', () => {
 });
 
 // ---------------------------------------------------------------------------
+// FOUND BY THE 100-SIMULATION AUDIT (P1).
+//
+// buildSideGamesHtml() itemised the Birdie Game and Side Matches and nothing else.
+// Every stacked game - Skins, Dots, Stableford - settled correctly into Final Money
+// and then appeared nowhere, so the Receipt said "Marty Won $58" with no line
+// explaining where it came from. With several participant-scoped Skins games able to
+// run at once, that is two invisible wagers on one card.
+describe('THE RECEIPT EXPLAINS THE MONEY IT SETTLES', () => {
+    const st = fs.readFileSync(path.join(REPO_ROOT, 'settlement.html'), 'utf8');
+    const fn = st.slice(st.indexOf('function buildSideGamesHtml'), st.indexOf('function renderCombinedSummary'));
+
+    test('stacked games are itemised, sourced from getRoundGames', () => {
+        assert.ok(/getRoundGames\(data\)\.filter\(g => g\.role === 'additional'\)/.test(fn),
+            'the breakdown must come from the same normalizer settlement uses');
+    });
+
+    test('each card is built from the CANONICAL per-game function, not a second calculation', () => {
+        assert.ok(/computeGameNetByPlayerId\(game, courseData, savedScores\)/.test(fn),
+            'a separate calculation here could disagree with the total it explains');
+    });
+
+    test('a game that produced no money renders no card', () => {
+        assert.ok(/if \(ids\.length === 0\) return;/.test(fn), 'empty cards are noise');
+    });
+
+    test('the card is labelled well enough to tell two Skins games apart', () => {
+        assert.ok(/describeGame\(game\)/.test(fn),
+            'stake alone does not identify one of several simultaneous skins games');
+    });
+
+    test('it degrades safely if the round model has not loaded', () => {
+        assert.ok(/typeof getRoundGames === 'function' && typeof computeGameNetByPlayerId === 'function'/.test(fn));
+    });
+
+    test('it still sits between Group Games and Side Matches', () => {
+        const birdie = fn.indexOf('Birdie Game');
+        const stacked = fn.indexOf('getRoundGames(data)');
+        const side = fn.indexOf('buildSideMatchesHtml(data');
+        assert.ok(birdie > -1 && stacked > birdie && side > stacked,
+            'round-wide games belong above private side action');
+    });
+});
+
+// ---------------------------------------------------------------------------
 describe('ADD / REMOVE SAFETY AND SCOPE CONTROL', () => {
     const adm = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
 
