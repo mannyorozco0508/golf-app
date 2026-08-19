@@ -543,6 +543,67 @@ describe('THE RECEIPT EXPLAINS THE MONEY IT SETTLES', () => {
 });
 
 // ---------------------------------------------------------------------------
+// P0, FOUND BY THE QUICK ROUND REAL-WORLD AUDIT.
+//
+// Void ("No Carry") skins pays the pot out across the holes won OUTRIGHT. If NO hole
+// was won - every one halved - skinValue correctly became 0 and nobody was paid, but
+// the buy-in was still charged in full. Three golfers in a $20 game each went -$20 and
+// the $60 pot vanished. Zero-sum is the one invariant this app cannot break.
+//
+// Not a hypothetical: a skins game added on the 16th tee has three holes to be decided
+// in, and all three halving is an ordinary Tuesday.
+describe('SKINS — the pot can never vanish', () => {
+    const cd = makeCourseData(18);
+    const P = makePlayers(['Marty', 'Stan', 'Greg'], ['0', '0', '0']);
+    P.forEach(p => { p.playingForMoney = true; });
+    const allHalved = {};
+    cd.forEach(h => P.forEach(p => { allHalved[`p${p.id}_h${h.hole}`] = h.par; }));
+
+    const settle = (carry, holes, scores) => run(`
+        return computeSkinsSettlementNet(
+            { players: ${J(P)}, skinsBuyIn: 20, skinsCarryOver: ${carry}, skinsPotFormat: 'gross' },
+            ${J(holes)}, ${J(scores)});
+    `);
+
+    test('NO CARRY, every hole halved: buy-ins are refunded, not pocketed by nobody', () => {
+        const net = settle(false, cd, allHalved);
+        assert.ok(Math.abs(sum(net)) < 1e-9, `pot vanished: ${J(net)}`);
+        Object.keys(net).forEach(id => assert.equal(net[id], 0, 'nobody won, so nobody pays'));
+    });
+
+    test('CARRY OVER, every hole halved: also refunded', () => {
+        assert.ok(Math.abs(sum(settle(true, cd, allHalved))) < 1e-9);
+    });
+
+    test('a short mid-round game with all holes halved stays zero-sum', () => {
+        // Added on the 16th tee: three holes, all halved.
+        const late = cd.filter(h => h.hole >= 16);
+        [true, false].forEach(c => {
+            const net = settle(c, late, allHalved);
+            assert.ok(Math.abs(sum(net)) < 1e-9, `carryOver=${c} leaked: ${J(net)}`);
+        });
+    });
+
+    test('REGRESSION: when a skin IS won the result is unchanged', () => {
+        // Marty alone birdies hole 7; he takes the whole $60 pot, the others pay $20.
+        const oneWinner = Object.assign({}, allHalved);
+        oneWinner[`p${P[0].id}_h7`] = cd[6].par - 1;
+        const net = settle(false, cd, oneWinner);
+        assert.equal(net[P[0].id], 40, 'winner takes the pot less his own buy-in');
+        assert.equal(net[P[1].id], -20);
+        assert.equal(net[P[2].id], -20);
+        assert.ok(Math.abs(sum(net)) < 1e-9);
+    });
+
+    test('the stake is charged in proportion to the pot actually paid out', () => {
+        const se = fs.readFileSync(path.join(REPO_ROOT, 'settlement-engine.js'), 'utf8');
+        assert.ok(/grossResult\.skins\.length > 0 \? 1 : 0/.test(se),
+            'void mode must not charge a buy-in it never distributes');
+        assert.ok(/netResult\.skins\.length > 0 \? 1 : 0/.test(se));
+    });
+});
+
+// ---------------------------------------------------------------------------
 describe('ADD / REMOVE SAFETY AND SCOPE CONTROL', () => {
     const adm = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
 
