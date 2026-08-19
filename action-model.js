@@ -47,7 +47,18 @@ const ADDITIONAL_GAME_CATALOG = {
         blurb: 'Low score on a hole wins the skin. Ties carry over.',
         stakeField: 'skinsBuyIn',
         stakeLabel: 'Buy-in per player',
-        defaults: { skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', skinsPotFormat: 'split' }
+        // These two defaults used to DISAGREE: skinsScoring said gross while
+        // skinsPotFormat said split. bet-strip read the first, settlement read the
+        // second, and a stacked skins game therefore showed gross-only counts on the
+        // course and paid half gross / half net at the end. Split is a real product
+        // mode - skins.html offers "Gross & Net (Split Pot)" deliberately - but it must
+        // be CHOSEN, never arrived at through a default that contradicts its neighbour.
+        //
+        // Rounds already saved carry skinsPotFormat: 'split' explicitly in Firebase
+        // (captureAdditionalGames has always written the defaults out), so their money
+        // is untouched by this change. Only games created from here on are affected,
+        // and the setup UI states the mode outright.
+        defaults: { skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', skinsPotFormat: 'gross' }
     },
     dots: {
         label: 'Dots / Junk',
@@ -230,6 +241,42 @@ function addableGames(data) {
 // IDs are compared as strings and matched against the real player list, so an id for
 // a golfer who was later removed simply drops out rather than throwing. Names are
 // never used: two golfers called Mike must stay distinguishable.
+// WHICH SCORES DECIDE A SKIN, resolved once for every consumer.
+//
+// Two fields grew up in this app and they are NOT interchangeable:
+//
+//   skinsPotFormat  - the historical, user-facing choice, written by skins.html's
+//                     "Gross & Net (Split Pot)" selector and read by settlement.
+//                     'split' means the pot is HALVED and TWO skins games run at once,
+//                     one on gross and one on net. 'gross'/'net' put the whole pot on
+//                     one of them.
+//   skinsScoring    - a newer binary gross/net that only ever existed inside
+//                     bet-strip.js and a catalog default. No UI ever wrote it.
+//
+// Because the catalog defaulted skinsPotFormat to 'split' while bet-strip read
+// skinsScoring (defaulting to gross), a stacked skins game could show gross-only
+// counts live and then settle half gross / half net. Same round, two answers.
+//
+// PRECEDENCE: skinsPotFormat wins whenever it is a recognised value. That is the field
+// settlement has always paid from, so no saved round's money can move. skinsScoring is
+// consulted only when potFormat is absent or unrecognised, and 'split' remains the
+// historical default for anything that specifies neither.
+function resolveSkinsMode(cfg) {
+    const pot = cfg && cfg.skinsPotFormat;
+    if (pot === 'gross' || pot === 'net' || pot === 'split') return pot;
+    const scoring = cfg && cfg.skinsScoring;
+    if (scoring === 'gross' || scoring === 'net') return scoring;
+    return 'split';
+}
+
+// The pot share each half carries under a resolved mode. Mirrors, and must always
+// agree with, computeSkinsSettlementNet's own arithmetic.
+function skinsPotShares(mode) {
+    if (mode === 'gross') return { gross: 1, net: 0 };
+    if (mode === 'net') return { gross: 0, net: 1 };
+    return { gross: 0.5, net: 0.5 };
+}
+
 function fieldParticipants(data) {
     const eligible = (data.players || []).filter(p => p.playingForMoney !== false);
     const ids = data && data.participantIds;
@@ -283,43 +330,72 @@ function getRoundGames(data) {
         startHole: 1
     });
 
-    const additional = data.additionalGames || {};
-    Object.keys(ADDITIONAL_GAME_CATALOG).forEach(format => {
-        const cfg = additional[format];
-        if (!cfg || cfg.enabled === false) return;
-        // A round cannot play the same game twice. If skins is already the main game,
-        // an additional skins entry is ignored rather than double-counted.
-        if (format === mainFormat) return;
-
+    // ONE normalizer, TWO storage shapes.
+    //
+    //   additionalGames        - the original slot-per-format map. Exactly one game of
+    //                            each kind, which is why a round could only ever hold a
+    //                            single skins wager.
+    //   additionalGameInstances - an id-keyed map, so the same format can appear as many
+    //                            times as golfers want to bet it. Firebase push keys give
+    //                            each instance a stable identity for free.
+    //
+    // Old rounds carry only the first, new rounds may carry both, and NOTHING is
+    // rewritten in Firebase to make that work. Every consumer downstream - settlement,
+    // Live Action, hole events, Round Ready - receives the same normalized shape and
+    // never learns that two schemas exist.
+    const buildGame = (format, cfg, key, startHole) => {
         const spec = ADDITIONAL_GAME_CATALOG[format];
+        if (!spec) return null;
         const merged = Object.assign({}, data, spec.defaults, cfg, { gameFormat: format });
         // additionalGames must never leak into a nested game's own view of the round,
         // or a game could recursively re-add its siblings.
         delete merged.additionalGames;
+        delete merged.additionalGameInstances;
         delete merged.enabled;
         delete merged.startHole;
+        delete merged.format;
 
-        const startHole = cfg.startHole || 1;
         // Dots reads its events from config, not from courseData, so its range has to
         // be applied here rather than by filtering holes downstream.
         if (format === 'dots' && startHole > 1) {
             merged.dots = scopeDotsToRange(merged.dots, startHole);
         }
 
-        games.push({
-            key: format,
+        return {
+            key: key,
             format: format,
             role: 'additional',
             label: spec.label,
             icon: spec.icon,
             stake: merged[spec.stakeField] || 0,
             config: merged,
-            // Carried from day one so a future "added on hole 5" game has somewhere to
-            // live. NOT yet honoured by any scoring path - every game currently covers
-            // the whole round - but the field exists so adding ranges later is a change
-            // to the engines' inputs rather than a schema migration.
             startHole: startHole
-        });
+        };
+    };
+
+    const additional = data.additionalGames || {};
+    Object.keys(ADDITIONAL_GAME_CATALOG).forEach(format => {
+        const cfg = additional[format];
+        if (!cfg || cfg.enabled === false) return;
+        // The legacy slot cannot hold a game the round is already playing as its main
+        // format - that would settle the same wager twice.
+        if (format === mainFormat) return;
+        const g = buildGame(format, cfg, format, cfg.startHole || 1);
+        if (g) games.push(g);
+    });
+
+    // Instances are independent wagers with their own id, participants, stake and
+    // range, so one is NOT a duplicate of the main format the way a legacy slot entry
+    // would be. Three golfers playing their own skins inside a skins round is a real
+    // thing people do.
+    const instances = data.additionalGameInstances || {};
+    Object.keys(instances).forEach(id => {
+        const cfg = instances[id];
+        if (!cfg || cfg.enabled === false) return;
+        const format = cfg.format;
+        if (!isAdditionalGameFormat(format)) return;
+        const g = buildGame(format, cfg, id, cfg.startHole || 1);
+        if (g) games.push(g);
     });
 
     return games;
@@ -334,7 +410,17 @@ function roundHasStackedAction(data) {
 // Human summary for Round Ready and the scorecard, e.g. "Skins \u00B7 $5".
 function describeGame(game) {
     if (!game) return '';
-    const base = game.stake > 0 ? `${game.label} \u00B7 $${game.stake}` : game.label;
+    let base = game.stake > 0 ? `${game.label} \u00B7 $${game.stake}` : game.label;
+
+    // With several skins games running, "$10 Skins" and "$20 Skins" is not enough to
+    // tell them apart at a glance - the mode and the tie rule are what differ.
+    if (game.format === 'skins' && game.config) {
+        const mode = resolveSkinsMode(game.config);
+        base += ` \u00B7 ${mode === 'split' ? 'Gross & Net' : (mode === 'net' ? 'Net' : 'Gross')}`;
+        base += game.config.skinsCarryOver === false ? ' \u00B7 No Carry' : ' \u00B7 Carry Over';
+        if (game.startHole > 1) base += ` \u00B7 from H${game.startHole}`;
+    }
+
     if (!game.config || !Array.isArray(game.config.participantIds)) return base;
 
     // A scoped wager must say WHO is in it, or the summary is actively misleading -
@@ -379,6 +465,7 @@ if (typeof module !== 'undefined' && module.exports) {
         ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
         gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
-        fieldParticipants, participantsCompletedHole, gameCoversHole
+        fieldParticipants, participantsCompletedHole, gameCoversHole,
+        resolveSkinsMode, skinsPotShares
     };
 }
