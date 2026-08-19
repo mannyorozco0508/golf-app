@@ -273,21 +273,44 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
         assert.ok(adm.includes('\uD83C\uDFAF Extras'), 'the birdie/KP extras keep their own heading');
     });
 
-    test('Step 3 asks how the round is SCORED, not what the game is', () => {
-        assert.ok(adm.includes('Step 3: How Are We Playing?'));
-        assert.ok(adm.includes('<label>Scoring Format</label>'));
-        assert.ok(!adm.includes('Step 3: Game Format'), 'the old conflated heading is gone');
-        // The stored key is untouched - this is wording only, never a schema change.
+    // BEHAVIOUR CHANGE (Quick Round Action model): Step 3 no longer asks which GAME is
+    // being played - it asks how the SCORECARD is organised. The money formats moved out
+    // of setup entirely and are created through Action after the round exists, so a
+    // golfer is never forced to pick a wager just to start keeping score.
+    test('Step 3 asks for a ROUND TYPE, and offers only structural choices', () => {
+        assert.ok(adm.includes('Step 3: Round Type'));
+        assert.ok(adm.includes('<label>Round Type</label>'));
+        assert.ok(!adm.includes('Step 3: Game Format'), 'the original conflated heading is gone');
+        assert.ok(!adm.includes('<label>Scoring Format</label>'), 'the interim wording is gone too');
+        // The stored key is STILL gameFormat - wording and options changed, schema did not.
         assert.ok(adm.includes('id="game-format-select"'), 'the stored gameFormat key must not be renamed');
     });
 
-    test('the format list no longer implies every option is the same kind of thing', () => {
-        assert.ok(adm.includes('<optgroup label="Just Keeping Score">'));
-        assert.ok(adm.includes('<optgroup label="Team Formats">'));
-        assert.ok(adm.includes('<optgroup label="Money Game As The Main Game">'));
-        // Nothing was removed from setup in this phase - clarifying, not migrating.
-        ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf', 'nassau', 'match', 'skins', 'dots']
-            .forEach(f => assert.ok(adm.includes(`value="${f}"`), `${f} must still be offered`));
+    test('no betting decision is required to create a round', () => {
+        assert.ok(!/-- Select Scoring Format --/.test(adm), 'the forced empty choice is gone');
+        assert.ok(/<option value="stroke" selected>/.test(adm), 'a normal round defaults to individual play');
+        assert.ok(/if \(!gameFormat\) gameFormat = 'stroke';/.test(adm),
+            'saving without a choice must fall back, never block');
+        assert.ok(!/Please select a Scoring Format before saving/.test(adm));
+    });
+
+    test('money-only formats are no longer offered for NEW rounds', () => {
+        const visible = adm.slice(adm.indexOf('id="game-format-select"'), adm.indexOf('legacy-format-group'));
+        ['nassau', 'match', 'skins', 'dots'].forEach(f =>
+            assert.ok(!visible.includes(`value="${f}"`), `${f} must not be a setup choice any more`));
+        ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf'].forEach(f =>
+            assert.ok(visible.includes(`value="${f}"`), `${f} is structural and must remain`));
+    });
+
+    test('LEGACY SAFETY: old money formats are hidden, not deleted, and reappear when editing', () => {
+        // Deleting the options would make an old Nassau round unselectable, and saving it
+        // would silently rewrite its format. They are hidden instead, and revealed on load.
+        assert.ok(adm.includes('id="legacy-format-group"'));
+        ['nassau', 'match', 'skins', 'dots'].forEach(f =>
+            assert.ok(adm.includes(`value="${f}"`), `${f} must still exist for legacy rounds`));
+        assert.ok(/function revealLegacyFormatOption/.test(adm));
+        assert.ok(/revealLegacyFormatOption\(data\.gameFormat\)/.test(adm),
+            'loading a saved round must reveal its own format before selecting it');
     });
 
     test('the choices are driven by the shared catalog, not a hardcoded list', () => {
