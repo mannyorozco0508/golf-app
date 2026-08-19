@@ -552,7 +552,11 @@ describe('ROUND READY AND LIVE ACTION', () => {
         assert.match(desc, /5 players/);
     });
 
-    test('a whole-group game says nothing extra — no noise where there is no scoping', () => {
+    // BEHAVIOUR CHANGE (multiple instances): with several skins games able to run at
+    // once, stake alone no longer identifies one. The summary now states the scoring
+    // mode and tie rule, which is what actually differs between two of them. It still
+    // names NO golfers when the game covers the whole group - that part is unchanged.
+    test('a whole-group game names its terms but no golfers', () => {
         const r = round({});
         delete r.data.additionalGames.skins.participantIds;
         const desc = run(`
@@ -560,7 +564,23 @@ describe('ROUND READY AND LIVE ACTION', () => {
             var g = getRoundGames(D).find(function(x){ return x.format === 'skins'; });
             return describeGame(g);
         `);
-        assert.equal(desc, 'Skins \u00B7 $10');
+        assert.equal(desc, 'Skins \u00B7 $10 \u00B7 Gross \u00B7 Carry Over');
+        ['Manny', 'Marty', 'James', 'Stan'].forEach(n =>
+            assert.ok(!desc.includes(n), 'an unscoped game must not list golfers'));
+    });
+
+    test('two skins games are distinguishable from their summaries alone', () => {
+        const a = round({ inIt: [0, 1, 2], skins: { skinsBuyIn: 10, skinsPotFormat: 'net', startHole: 6 } });
+        const b = round({ inIt: [0, 3], skins: { skinsBuyIn: 20, skinsPotFormat: 'gross', skinsCarryOver: false, startHole: 9 } });
+        const d = r => run(`
+            var D = ${'${J(r.data)}'};
+            var g = getRoundGames(D).find(function(x){ return x.format === 'skins'; });
+            return describeGame(g);
+        `.replace('${J(r.data)}', J(r.data)));
+        const da = d(a), db = d(b);
+        assert.notEqual(da, db);
+        assert.match(da, /Net/); assert.match(da, /Carry Over/); assert.match(da, /from H6/);
+        assert.match(db, /Gross/); assert.match(db, /No Carry/); assert.match(db, /from H9/);
     });
 
     test('Live Action prices and decides the row over the participants only', () => {
