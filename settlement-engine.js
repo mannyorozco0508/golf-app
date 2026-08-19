@@ -505,8 +505,14 @@
             const nameA = teamA.map(p => p.name.split(' ')[0]).join(' / ');
             const nameB = teamB.map(p => p.name.split(' ')[0]).join(' / ');
             const isTeam = teamA.length > 1 || teamB.length > 1;
-            const firstHole = courseData.length ? Math.min.apply(null, courseData.map(h => h.hole)) : 1;
-            const lastHole = courseData.length ? Math.max.apply(null, courseData.map(h => h.hole)) : 18;
+            // The Receipt must describe the holes this wager was actually settled over,
+            // or a mid-round match would print "Holes 1-18" beside money that only ever
+            // came from holes 6 onward.
+            const smCourse = (typeof sideMatchHoles === 'function')
+                ? sideMatchHoles(sm, courseData)
+                : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
+            const firstHole = smCourse.length ? Math.min.apply(null, smCourse.map(h => h.hole)) : 1;
+            const lastHole = smCourse.length ? Math.max.apply(null, smCourse.map(h => h.hole)) : 18;
 
             const receipt = {
                 matchId, nameA, nameB, isTeam,
@@ -526,7 +532,7 @@
                 }, sides);
                 const presses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
                 const calc = cfg.overallEnabled
-                    ? calculateOverallBetEngine([teamA[0], teamB[0]], courseData, savedScores, cfg, presses)
+                    ? calculateOverallBetEngine([teamA[0], teamB[0]], smCourse, savedScores, cfg, presses)
                     : null;
                 if (!calc) return;
 
@@ -557,7 +563,7 @@
                 const virtual = teamA.map(p => Object.assign({}, p, { team: 'Team 1' }))
                     .concat(teamB.map(p => Object.assign({}, p, { team: 'Team 2' })));
                 const presses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtual, courseData, savedScores,
+                const calc = calculateMatchEngine(virtual, smCourse, savedScores,
                     sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses);
                 if (!calc) return;
                 (calc.activeMatches || []).forEach(m => {
@@ -642,6 +648,14 @@
             const virtualPlayers = teamAPlayers.map(p => ({ ...p, team: "Team 1" })).concat(teamBPlayers.map(p => ({ ...p, team: "Team 2" })));
             if (virtualPlayers.length < 2) return;
 
+            // A side match only counts holes from its own start hole forward. A match
+            // with no startHole - every one saved before this existed - covers the whole
+            // round, so nothing already settled moves. The engines are untouched: they
+            // are simply handed the holes this wager is played over.
+            const smCourse = (typeof sideMatchHoles === 'function')
+                ? sideMatchHoles(sm, courseData)
+                : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
+
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
@@ -653,8 +667,8 @@
                 const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
-                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], courseData, savedScores, holeConfig, holePresses) : null;
-                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], courseData, savedScores, overallConfig, overallPresses) : null;
+                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
+                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
                 const sideTotal = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
                 // The stake is PER SIDE, split evenly between teammates - the same
                 // convention 2v2 Match Play and Nassau have always used below.
@@ -664,7 +678,7 @@
                 teamBPlayers.forEach(p => addAmount(p, bShare));
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtualPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
                 if (!calc) return;
                 const t1Share = calc.t1TotalMoney / teamAPlayers.length;
                 const t2Share = -calc.t1TotalMoney / teamBPlayers.length;
