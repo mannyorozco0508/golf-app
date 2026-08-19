@@ -784,6 +784,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
             <div id="stacked-games-list"></div>
+            <div id="skins-instances-list"></div>
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
             <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>🎯 Extras</strong></label>
@@ -1112,6 +1113,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const spec = ADDITIONAL_GAME_CATALOG[format];
             rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}`, 6]);
         });
+        Object.values(captureSkinsInstances()).forEach(cfg => {
+            const n = (cfg.participantIds || collectWizardPlayers().map(p => p.id)).length;
+            const mode = cfg.skinsPotFormat === 'split' ? 'Gross & Net' : (cfg.skinsPotFormat === 'net' ? 'Net' : 'Gross');
+            rows.push(['\uD83E\uDD69 Skins',
+                `$${cfg.skinsBuyIn} ${mode} \u00B7 ${n} players${cfg.startHole > 1 ? ` \u00B7 from H${cfg.startHole}` : ''}`, 6]);
+        });
         rows.push(['Players', `${playerCount} added`, 5]);
         rows.push(['Extras', sideGamesText, 6]);
         // Side Matches ($ bets like "Manny vs John") are set up on the Matches tab after the
@@ -1389,6 +1396,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 : 'Money games that run right alongside your scoring format.';
         }
 
+        const instList = document.getElementById('skins-instances-list');
+        if (instList) instList.innerHTML = renderSkinsInstances();
+
         list.innerHTML = available.map(format => {
             const spec = ADDITIONAL_GAME_CATALOG[format];
             const on = stackedGameState[format] && stackedGameState[format].enabled;
@@ -1503,6 +1513,186 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         updateWizardReview();
     }
 
+    // ------------------------------------------------------------------
+    // MULTIPLE SKINS GAMES
+    //
+    // additionalGames holds ONE entry per format, which is why a round could only ever
+    // carry a single skins wager. Extra games live in a separate id-keyed map so the
+    // same format can appear as many times as golfers want to bet it, and so nothing
+    // already saved has to be rewritten. getRoundGames() normalizes both.
+    // ------------------------------------------------------------------
+    let skinsInstances = [];   // [{ id, skinsBuyIn, skinsPotFormat, skinsCarryOver, startHole, participantIds }]
+
+    function newInstanceId() {
+        return 'sk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function addSkinsInstance() {
+        const players = collectWizardPlayers();
+        skinsInstances.push({
+            id: newInstanceId(),
+            skinsBuyIn: 10,
+            skinsPotFormat: 'gross',
+            skinsCarryOver: true,
+            startHole: 1,
+            participantIds: players.map(p => String(p.id))
+        });
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    // Removing a wager is consequential once it has results, and this screen cannot
+    // know whether any have accrued - scores live on the round, not in the wizard - so
+    // it always confirms rather than guessing.
+    function removeSkinsInstance(id) {
+        const inst = skinsInstances.find(x => x.id === id);
+        if (!inst) return;
+        const n = (inst.participantIds || []).length;
+        if (!confirm(`Remove this $${inst.skinsBuyIn || 0} skins game between ${n} golfer${n === 1 ? '' : 's'}?\n\nAny skins already won in it stop counting.`)) return;
+        skinsInstances = skinsInstances.filter(x => x.id !== id);
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    function setInstanceField(id, field, value) {
+        const inst = skinsInstances.find(x => x.id === id);
+        if (!inst) return;
+        inst[field] = value;
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    function toggleInstancePlayer(id, pid) {
+        const inst = skinsInstances.find(x => x.id === id);
+        if (!inst) return;
+        const key = String(pid);
+        const cur = (inst.participantIds || []).map(String);
+        inst.participantIds = cur.includes(key) ? cur.filter(x => x !== key) : cur.concat([key]);
+        renderStackedGames();
+        updateWizardReview();
+    }
+
+    function renderSkinsInstances() {
+        const players = collectWizardPlayers();
+        const holeOpts = [];
+        for (let h = 1; h <= 18; h++) holeOpts.push(h);
+
+        const cards = skinsInstances.map(inst => {
+            const chosen = (inst.participantIds || []).map(String).filter(id => players.some(p => String(p.id) === id));
+            const pot = (parseFloat(inst.skinsBuyIn) || 0) * chosen.length;
+            const chips = players.map(pl => {
+                const on = chosen.includes(String(pl.id));
+                return `<button type="button" onclick="toggleInstancePlayer('${inst.id}','${String(pl.id)}')"
+                    style="padding:7px 11px; min-height:44px; border-radius:20px; font-size:0.8rem; cursor:pointer;
+                           border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
+                           background:${on ? 'var(--brand-green)' : 'transparent'};
+                           color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
+            }).join('');
+
+            const modeBtn = (val, label) => `<button type="button" onclick="setInstanceField('${inst.id}','skinsPotFormat','${val}')"
+                style="flex:1; min-height:44px; border-radius:8px; font-size:0.78rem; cursor:pointer;
+                       border:1px solid ${inst.skinsPotFormat === val ? 'var(--brand-green)' : 'var(--border-mid)'};
+                       background:${inst.skinsPotFormat === val ? 'var(--brand-green)' : 'transparent'};
+                       color:${inst.skinsPotFormat === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
+
+            const carryBtn = (val, label) => `<button type="button" onclick="setInstanceField('${inst.id}','skinsCarryOver',${val})"
+                style="flex:1; min-height:44px; border-radius:8px; font-size:0.78rem; cursor:pointer;
+                       border:1px solid ${(inst.skinsCarryOver !== false) === val ? 'var(--brand-green)' : 'var(--border-mid)'};
+                       background:${(inst.skinsCarryOver !== false) === val ? 'var(--brand-green)' : 'transparent'};
+                       color:${(inst.skinsCarryOver !== false) === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
+
+            return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong style="font-size:0.9rem; color:var(--brand-green);">\uD83E\uDD69 Skins</strong>
+                    <button type="button" onclick="removeSkinsInstance('${inst.id}')"
+                        style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; min-height:44px;">Remove</button>
+                </div>
+                <label style="font-size:0.74rem;">Buy-in per golfer</label>
+                <input type="number" min="0" step="1" value="${inst.skinsBuyIn}" style="max-width:120px;"
+                       oninput="setInstanceFieldQuiet('${inst.id}','skinsBuyIn', this.value)">
+                <div style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 10px 0;">${pot > 0 ? `$${pot} total pot` : ''}</div>
+
+                <label style="font-size:0.74rem;">Scoring</label>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    ${modeBtn('gross', 'Gross')}${modeBtn('net', 'Net')}${modeBtn('split', 'Gross &amp; Net')}
+                </div>
+
+                <label style="font-size:0.74rem;">Ties</label>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    ${carryBtn(true, 'Carry Over')}${carryBtn(false, 'No Carry')}
+                </div>
+
+                <label style="font-size:0.74rem;">Starts on hole</label>
+                <select onchange="setInstanceField('${inst.id}','startHole', parseInt(this.value,10))" style="max-width:110px; margin-bottom:10px;">
+                    ${holeOpts.map(h => `<option value="${h}" ${inst.startHole === h ? 'selected' : ''}>Hole ${h}</option>`).join('')}
+                </select>
+
+                <label style="font-size:0.74rem;">Who's in?</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                    ${chips || '<span style="font-size:0.75rem; color:var(--text-muted);">Add players in Step 5 first.</span>'}
+                </div>
+            </div>`;
+        }).join('');
+
+        return `<div style="border-top:1px solid var(--border-mid); padding-top:10px; margin-top:10px;">
+            ${cards}
+            <button type="button" onclick="addSkinsInstance()"
+                style="width:100%; min-height:48px; border-radius:8px; font-size:0.85rem; cursor:pointer;
+                       border:1px dashed var(--brand-green); background:transparent; color:var(--brand-green);">
+                + Add another Skins game</button>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">
+                Separate skins games can run at once \u2014 different golfers, stakes and start holes. A golfer can be in more than one.</p>
+        </div>`;
+    }
+
+    // Typing in a number field must not re-render mid-keystroke or the caret jumps.
+    function setInstanceFieldQuiet(id, field, value) {
+        const inst = skinsInstances.find(x => x.id === id);
+        if (!inst) return;
+        inst[field] = value;
+        updateWizardReview();
+    }
+
+    function captureSkinsInstances() {
+        const out = {};
+        const players = collectWizardPlayers().map(p => String(p.id));
+        skinsInstances.forEach(inst => {
+            const chosen = (inst.participantIds || []).map(String).filter(id => players.includes(id));
+            if (chosen.length < 2) return;   // a skins game needs somebody to play against
+            const entry = {
+                format: 'skins',
+                enabled: true,
+                skinsBuyIn: parseFloat(inst.skinsBuyIn) || 0,
+                skinsPotFormat: inst.skinsPotFormat || 'gross',
+                skinsScoring: inst.skinsPotFormat === 'net' ? 'net' : 'gross',
+                skinsCarryOver: inst.skinsCarryOver !== false,
+                startHole: inst.startHole || 1
+            };
+            if (chosen.length < players.length) entry.participantIds = chosen;
+            out[inst.id] = entry;
+        });
+        return out;
+    }
+
+    function loadSkinsInstances(data) {
+        skinsInstances = [];
+        const saved = (data && data.additionalGameInstances) || {};
+        Object.keys(saved).forEach(id => {
+            const cfg = saved[id];
+            if (!cfg || cfg.format !== 'skins') return;
+            skinsInstances.push({
+                id: id,
+                skinsBuyIn: cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 10,
+                skinsPotFormat: cfg.skinsPotFormat || 'gross',
+                skinsCarryOver: cfg.skinsCarryOver !== false,
+                startHole: cfg.startHole || 1,
+                participantIds: Array.isArray(cfg.participantIds)
+                    ? cfg.participantIds.map(String)
+                    : (data.players || []).map(p => String(p.id))
+            });
+        });
+    }
+
     let stackedGameState = {};
 
     function toggleStackedGame(format, on) {
@@ -1558,6 +1748,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     // Restores the toggles when an existing round is reopened.
     function loadAdditionalGames(data) {
+        loadSkinsInstances(data);
         stackedGameState = {};
         const saved = (data && data.additionalGames) || {};
         Object.keys(saved).forEach(format => {
@@ -2969,6 +3160,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // Games stacked on top of the main format. Absent on legacy rounds, which
                 // getRoundGames() correctly reads as a single-game round.
                 additionalGames: captureAdditionalGames(),
+                additionalGameInstances: captureSkinsInstances(),
                 birdieGameEnabled: birdieGameEnabled,
                 birdieUnitVal: birdieUnitVal,
                 matchScoring: matchScoring,
