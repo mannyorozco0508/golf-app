@@ -6,6 +6,10 @@
     <title>Clean Scorecard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- sideMatchHoles lives here, so this page cannot drift from settlement on what a
+         side match's hole range means. The inline fallback below still covers the case
+         where this script fails to load. -->
+    <script src="action-model.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -463,6 +467,13 @@
             const virtualPlayers = teamAPlayers.concat(teamBPlayers);
             if (virtualPlayers.length < 2) return;
 
+            // Only holes from this match's own start hole forward. A match with no
+            // startHole covers the whole round, exactly as before. Declared ABOVE the
+            // format branch because both branches settle over the same range.
+            const smCourse = (typeof sideMatchHoles === 'function')
+                ? sideMatchHoles(sm, courseData)
+                : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
+
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
@@ -470,8 +481,8 @@
                 const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
-                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], courseData, savedScores, holeConfig, holePresses) : null;
-                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], courseData, savedScores, overallConfig, overallPresses) : null;
+                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
+                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
                 const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
 
                 rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); padding-top:8px; border-top:1px dashed var(--border-faint);"><span>${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]} — Stroke Play</span><span></span></div>`;
@@ -479,7 +490,7 @@
                 rows += `<div class="ledger-row"><span>${p2.name}</span><span>${fmtSideM(-p1Total)}</span></div>`;
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtualPlayers, courseData, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
                 if (!calc) return;
                 const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
 
