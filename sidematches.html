@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Side Matches</title>
+    <title>Action</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
@@ -233,15 +233,17 @@
         Looking for group-wide games like Skins, Birdie Game, or KPs? That's on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a> instead.
     </div>
 
-    <h2 class="event-title" id="main-title">⚔️ Side Matches</h2>
+    <h2 class="event-title" id="main-title">💰 Today's Action</h2>
 
     <div class="action-card" id="sidematches-card">
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sidematches-list"></div>
-        <button class="btn-primary" onclick="openSideMatchModal()">➕ New Side Match</button>
+        <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
         <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
-        <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="window.print()">📄 Send Results PDF</button>
+        <!-- Was window.print(), which printed this page's own side-match maths as if it were
+             an authoritative payout. There is ONE settlement document, and this opens it. -->
+        <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
     </div>
 </div>
 
@@ -258,10 +260,12 @@
                 <option value="match">Match Play Bet (Overall)</option>
                 <option value="nassau">Nassau Bet (F9 / B9 / 18)</option>
                 <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
+                <option value="skins">Skins (pick who's in)</option>
+                <option value="dots">Dots / Junk (whole group)</option>
             </select>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
-            <div class="control-group">
+            <div class="control-group" id="sm-scoring-group">
                 <label>Scoring</label>
                 <div class="toggle-row">
                     <span class="toggle-label-sm active" id="sm-scoring-label-net" onclick="setSmScoring('net')">Net</span>
@@ -347,6 +351,7 @@
             </div>
         </div>
 
+        <div id="sm-picker-box">
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap a golfer under the side you want them on. Tap again to remove them, or tap them under the other side to move them there. 2v2 works for Match Play and Nassau only.</div>
         <div class="sm-side-zone-label">Side 1 (green)</div>
         <div id="sm-player-picker-a" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
@@ -354,6 +359,41 @@
         <div id="sm-player-picker-b" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
         <div id="sm-team-size-indicator" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin-top:10px; margin-bottom:8px;"></div>
         <div id="sm-preview" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.85rem;"></div>
+        </div>
+
+        <!-- SKINS / DOTS: participant-based, not two-sided. -->
+        <div id="sm-field-fields" style="display:none;">
+            <div class="control-group" style="margin-bottom:10px;">
+                <label id="sm-field-stake-label">Buy-in per golfer ($)</label>
+                <input type="number" id="sm-field-stake" value="10" min="0" oninput="renderFieldActionForm(document.getElementById('sm-format').value)">
+            </div>
+            <div id="sm-skins-only">
+                <div class="control-group" style="margin-bottom:10px;">
+                    <label>Scoring</label>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" onclick="setFieldActionOpt('sm-field-mode','gross')" class="preset-btn" style="flex:1; min-height:44px;">Gross</button>
+                        <button type="button" onclick="setFieldActionOpt('sm-field-mode','net')" class="preset-btn" style="flex:1; min-height:44px;">Net</button>
+                        <button type="button" onclick="setFieldActionOpt('sm-field-mode','split')" class="preset-btn" style="flex:1; min-height:44px;">Gross &amp; Net</button>
+                    </div>
+                    <input type="hidden" id="sm-field-mode" value="gross">
+                </div>
+                <div class="control-group" style="margin-bottom:10px;">
+                    <label>Ties</label>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" onclick="setFieldActionOpt('sm-field-carry','yes')" class="preset-btn" style="flex:1; min-height:44px;">Carry Over</button>
+                        <button type="button" onclick="setFieldActionOpt('sm-field-carry','no')" class="preset-btn" style="flex:1; min-height:44px;">No Carry</button>
+                    </div>
+                    <input type="hidden" id="sm-field-carry" value="yes">
+                </div>
+                <label style="font-size:0.78rem;">Who's in?</label>
+                <div id="sm-field-players" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+            </div>
+            <div class="control-group" style="margin-bottom:10px;">
+                <label>Starts on</label>
+                <select id="sm-field-start"></select>
+            </div>
+            <p id="sm-field-note" style="font-size:0.74rem; color:var(--text-muted); margin:0 0 10px 0;"></p>
+        </div>
 
         <!-- A golfer should never have to wonder which holes their money is riding on. -->
         <div class="control-group" style="margin-bottom:12px;">
@@ -706,6 +746,9 @@
     function openSideMatchModal() {
         sidematchPickState = {};
         document.getElementById("sm-format").value = "match";
+        fieldActionPick = {};
+        const fs2 = document.getElementById('sm-field-start');
+        if (fs2) delete fs2.dataset.filled;
         onSideMatchFormatChange();
         renderSideMatchPicker();
         populateStartHolePicker();
@@ -762,13 +805,100 @@
         el.select();
     }
 
+    // Skins and Dots are NOT two-sided. Skins is participant-scoped and Dots covers the
+    // whole field, so both hide the Side 1 / Side 2 picker and the two-sided controls
+    // (stake per side, press rule) that make no sense for them. Each wager type shows
+    // only the settings it actually has - the app should feel like golf, not a form.
+    function isFieldAction(format) { return format === 'skins' || format === 'dots'; }
+
     function onSideMatchFormatChange() {
         const format = document.getElementById("sm-format").value;
         const isStroke = format === 'stroke';
-        document.getElementById("sm-stroke-fields").style.display = isStroke ? "block" : "none";
-        document.getElementById("sm-stake-group").style.display = isStroke ? "none" : "block";
-        document.getElementById("sm-press-rule-group").style.display = isStroke ? "none" : "block";
+        const fieldGame = isFieldAction(format);
+
+        document.getElementById("sm-stroke-fields").style.display = (isStroke && !fieldGame) ? "block" : "none";
+        document.getElementById("sm-stake-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+        document.getElementById("sm-press-rule-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+
+        const sideBox = document.getElementById('sm-picker-box');
+        if (sideBox) sideBox.style.display = fieldGame ? 'none' : 'block';
+        const scoringBox = document.getElementById('sm-scoring-group');
+        if (scoringBox) scoringBox.style.display = fieldGame ? 'none' : 'block';
+
+        const fieldBox = document.getElementById('sm-field-fields');
+        if (fieldBox) fieldBox.style.display = fieldGame ? 'block' : 'none';
+        const skinsOnly = document.getElementById('sm-skins-only');
+        if (skinsOnly) skinsOnly.style.display = (format === 'skins') ? 'block' : 'none';
+        if (fieldGame) renderFieldActionForm(format);
+
         updateSideMatchPickerFeedback();
+    }
+
+    // ---- SKINS / DOTS created from Action -------------------------------------
+    //
+    // These do NOT become side matches. They are written to additionalGameInstances -
+    // the same canonical instance model the setup wizard already uses and that
+    // getRoundGames() normalizes - so settlement, Live Action and the Receipt pick them
+    // up with no new money code anywhere. Forcing Skins into the two-sided side match
+    // schema is exactly what the participant-scoped work was built to avoid.
+    let fieldActionPick = {};   // { playerId: true }
+
+    function toggleFieldActionPlayer(pid) {
+        const k = String(pid);
+        if (fieldActionPick[k]) delete fieldActionPick[k]; else fieldActionPick[k] = true;
+        renderFieldActionForm(document.getElementById('sm-format').value);
+    }
+
+    function setFieldActionOpt(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = String(val);
+        renderFieldActionForm(document.getElementById('sm-format').value);
+    }
+
+    function renderFieldActionForm(format) {
+        const wrap = document.getElementById('sm-field-players');
+        if (!wrap) return;
+        const players = currentData.players || [];
+        const chosenIds = Object.keys(fieldActionPick);
+
+        if (format === 'dots') {
+            // Dots is a whole-field game in this architecture, so there is nothing to pick.
+            wrap.innerHTML = '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Dots / Junk runs for everyone playing for money in this round.</p>';
+        } else {
+            wrap.innerHTML = players.map(pl => {
+                const on = chosenIds.includes(String(pl.id));
+                return `<button type="button" onclick="toggleFieldActionPlayer('${String(pl.id)}')"
+                    style="padding:8px 12px; min-height:44px; border-radius:20px; font-size:0.82rem; cursor:pointer;
+                           border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
+                           background:${on ? 'var(--brand-green)' : 'transparent'};
+                           color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
+            }).join('');
+        }
+
+        const startSel = document.getElementById('sm-field-start');
+        if (startSel && !startSel.dataset.filled) {
+            const holes = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+            const parts = players.filter(p => chosenIds.includes(String(p.id)));
+            const auto = (typeof sideMatchStartHole === 'function')
+                ? sideMatchStartHole(parts.length ? parts : players, holes, currentData.scores || {})
+                : 1;
+            startSel.innerHTML = holes.map(h =>
+                `<option value="${h.hole}" ${h.hole === auto ? 'selected' : ''}>Hole ${h.hole}</option>`).join('');
+            startSel.dataset.filled = '1';
+        }
+
+        const note = document.getElementById('sm-field-note');
+        if (note) {
+            const buyIn = parseFloat((document.getElementById('sm-field-stake') || {}).value) || 0;
+            const n = format === 'dots'
+                ? (currentData.players || []).filter(p => p.playingForMoney !== false).length
+                : chosenIds.length;
+            note.textContent = format === 'dots'
+                ? `$${buyIn} per dot \u00B7 ${n} golfers`
+                : (n >= 2
+                    ? `$${buyIn} buy-in each \u00B7 ${n} golfers \u00B7 $${buyIn * n} pot`
+                    : 'Pick at least two golfers.');
+        }
     }
 
     function renderSideMatchPicker() {
@@ -1021,7 +1151,48 @@
             : `Only Holes ${start}\u2013${last} count for this bet. Earlier holes are already played and don't count.`;
     }
 
+    // Skins and Dots are saved as ADDITIONAL GAME INSTANCES, not side matches.
+    //
+    // That is the canonical model getRoundGames() already normalizes, so the moment this
+    // writes, settlement, Live Action, Round Ready and the Receipt all see the wager with
+    // no new money code anywhere. Start hole uses the same forward-looking rule as side
+    // matches: the first hole nobody in the wager has posted, so a bet struck on the 6th
+    // tee can never collect on holes 1-5.
+    function saveFieldAction(format) {
+        const players = currentData.players || [];
+        const stake = parseFloat(document.getElementById('sm-field-stake').value) || 0;
+        const startSel = document.getElementById('sm-field-start');
+        const startHole = startSel ? (parseInt(startSel.value, 10) || 1) : 1;
+
+        if (stake <= 0) { alert('\u26A0\uFE0F Enter an amount first.'); return; }
+
+        const entry = { format: format, enabled: true, startHole: startHole, createdAt: Date.now() };
+
+        if (format === 'skins') {
+            const chosen = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
+            if (chosen.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a skins game.'); return; }
+            const mode = document.getElementById('sm-field-mode').value || 'gross';
+            entry.skinsBuyIn = stake;
+            entry.skinsPotFormat = mode;
+            entry.skinsScoring = mode === 'net' ? 'net' : 'gross';
+            entry.skinsCarryOver = (document.getElementById('sm-field-carry').value !== 'no');
+            // Only recorded when the field was actually narrowed, so a whole-group game
+            // stays identical to one saved before participant scoping existed.
+            if (chosen.length < players.length) entry.participantIds = chosen;
+        } else {
+            entry.dotPointVal = stake;
+        }
+
+        const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
+        db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
+            .then(() => { closeSideMatchModal(); })
+            .catch(err => alert('\u26A0\uFE0F Could not save: ' + err.message));
+    }
+
     function saveSideMatch() {
+        const chosenFormat = document.getElementById("sm-format").value;
+        if (isFieldAction(chosenFormat)) { saveFieldAction(chosenFormat); return; }
+
         const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
         const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
         const format = document.getElementById("sm-format").value;
