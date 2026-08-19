@@ -138,6 +138,61 @@ function gameHoles(game, courseData) {
     return holes.filter(h => h.hole >= start);
 }
 
+// THE HOLES A SIDE MATCH IS PLAYED OVER.
+//
+// A side match is a wager with a start hole, exactly like a stacked game, so it reuses
+// gameHoles() rather than growing a second range implementation. A match with no
+// startHole - every side match saved before this existed - covers the whole round, so
+// nothing already settled moves.
+function sideMatchHoles(sm, courseData) {
+    return gameHoles({ startHole: (sm && sm.startHole) || 1 }, courseData);
+}
+
+// WHERE A NEW SIDE MATCH SHOULD BEGIN.
+//
+// The first hole NO participant has posted yet.
+//
+// Not "the next hole after everyone finished" - that is a different question, and the
+// difference matters for a cross-group bet. If Marty's group is through 9 and Stan's is
+// through 6, starting at 7 would hand Marty three holes he has already played and Stan
+// has not: Marty would know he was three-up before Stan hit a shot. Starting after the
+// FURTHEST-ALONG participant means neither golfer has posted a score in the wager when
+// it is struck, which is the only version of the rule that is fair to both.
+//
+// Before anybody tees off this returns the first hole, so a bet made in the car park
+// covers the whole round exactly as it always has. Returns null once no holes remain -
+// there is nothing left to bet on, and the caller should say so rather than invent one.
+function sideMatchStartHole(participants, courseData, savedScores) {
+    const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+    if (holes.length === 0) return 1;
+    const players = participants || [];
+    if (players.length === 0) return holes[0].hole;
+    const scores = savedScores || {};
+
+    let highestPosted = null;
+    holes.forEach(h => {
+        const anyone = players.some(p => {
+            const v = scores[`p${p.id}_h${h.hole}`];
+            return v && v > 0;
+        });
+        if (anyone) highestPosted = h.hole;
+    });
+
+    if (highestPosted === null) return holes[0].hole;
+    const next = holes.find(h => h.hole > highestPosted);
+    return next ? next.hole : null;
+}
+
+// Golfer-facing description of a side match's range. Says nothing at all for a
+// whole-round match, because "H1-18" on every ordinary bet is noise.
+function sideMatchRangeText(sm, courseData) {
+    const start = (sm && sm.startHole) || 1;
+    if (start <= 1) return '';
+    const holes = courseData || [];
+    const last = holes.length ? Math.max.apply(null, holes.map(h => h.hole)) : 18;
+    return `Starts H${start}` + (last > start ? ` \u00B7 H${start}\u2013${last}` : '');
+}
+
 // Dot events are keyed "h4", "h11". Anything earned before the game existed is
 // dropped, so junk added on hole 5 cannot pay out for a greenie on hole 2.
 function scopeDotsToRange(dots, startHole) {
@@ -466,6 +521,7 @@ if (typeof module !== 'undefined' && module.exports) {
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
         gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
         fieldParticipants, participantsCompletedHole, gameCoversHole,
-        resolveSkinsMode, skinsPotShares
+        resolveSkinsMode, skinsPotShares,
+        sideMatchHoles, sideMatchStartHole, sideMatchRangeText
     };
 }
