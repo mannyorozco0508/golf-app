@@ -470,24 +470,33 @@
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">⛳ Step 3: How Are We Playing?</div>
-        <div class="wizard-step-sub" id="step3-sub">How the round is scored. Money games get added in Step 6.</div>
+        <div class="wizard-step-title">⛳ Step 3: Round Type</div>
+        <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Money games are added later, and you can skip this if everyone's just playing their own ball.</div>
     <div class="form-group">
-        <label>Scoring Format</label>
+        <label>Round Type</label>
+        <!-- STRUCTURAL CHOICES ONLY.
+             Every option here changes how the scorecard is BUILT - individual play, or
+             teams that have to be assigned as players are entered. The money formats
+             (Nassau, Match Play, Skins, Dots) used to sit in this same list, which forced
+             a golfer to pick a wager before they could keep a single score. They now live
+             in Action, created after the round exists.
+
+             The legacy options are NOT deleted - they are kept in a hidden group so that
+             opening an old Nassau or Skins round for editing still finds and selects its
+             own format. See revealLegacyFormatOption(). -->
         <select id="game-format-select" onchange="handleFormatChange()">
-            <option value="" disabled selected>-- Select Scoring Format --</option>
-            <optgroup label="Just Keeping Score">
-                <option value="stroke">Stroke Play</option>
+            <optgroup label="Everyone plays their own ball">
+                <option value="stroke" selected>Individual (Stroke Play)</option>
                 <option value="stableford">Stableford</option>
             </optgroup>
-            <optgroup label="Team Formats">
+            <optgroup label="Team formats">
                 <option value="bestball">Best Ball</option>
                 <option value="scramble">Scramble</option>
                 <option value="ryder">Ryder Cup</option>
                 <option value="hilo">Hi-Lo</option>
                 <option value="wolf">Wolf</option>
             </optgroup>
-            <optgroup label="Money Game As The Main Game">
+            <optgroup label="Legacy round types" id="legacy-format-group" style="display:none;">
                 <option value="nassau">Nassau</option>
                 <option value="match">Match Play</option>
                 <option value="skins">Skins</option>
@@ -848,7 +857,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <div class="wr-label" style="margin-bottom:4px;">Action</div>
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div id="rr-action-text" style="font-size:0.95rem; font-weight:bold; color:var(--brand-green); line-height:1.6;"></div>
-            <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Manage</span>
+            <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Manage Action</span>
         </div>
     </div>
 
@@ -860,8 +869,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         </div>
     </div>
 
+    <!-- The two things a golfer can do from here, in the order they'd do them. "Add
+         Action" is the single entrance to every money game - there is no longer a
+         separate betting setup buried in the wizard. -->
     <button class="btn-primary" onclick="startScoring()" style="font-size:1.1rem; padding:16px;">▶️ START SCORING</button>
-    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;">➕ Add Side Bet</button>
+    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;" id="rr-add-action-btn">💰 ADD ACTION</button>
 
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
@@ -982,6 +994,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         document.getElementById('rr-action-box').style.display = actionLines.length > 0 ? 'block' : 'none';
         document.getElementById('rr-noaction-box').style.display = actionLines.length > 0 ? 'none' : 'block';
+        const addBtn = document.getElementById('rr-add-action-btn');
+        if (addBtn) {
+            addBtn.innerHTML = actionLines.length > 0
+                ? `\uD83D\uDCB0 MANAGE ACTION \u00B7 ${actionLines.length} active`
+                : '\uD83D\uDCB0 ADD ACTION';
+        }
         document.getElementById('rr-action-text').innerHTML = actionLines.map(l => `<div>${l}</div>`).join('');
     }
 
@@ -2535,6 +2553,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         hilo: "Teams battle for both the low score and the high score on every hole."
     };
 
+    // A round saved as Nassau/Match/Skins/Dots still has to be editable. Those options
+    // are hidden from NEW rounds but revealed the moment an old round using one is
+    // loaded, so the select can find its own value instead of silently falling back to
+    // Stroke Play and rewriting the golfer's format the next time they save.
+    function revealLegacyFormatOption(format) {
+        if (!['nassau', 'match', 'skins', 'dots'].includes(format)) return;
+        const grp = document.getElementById('legacy-format-group');
+        if (grp) grp.style.display = '';
+    }
+
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         const descEl = document.getElementById("format-description");
@@ -2584,7 +2612,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 updateCustomCoursePars();
             }
 
-            if (data.gameFormat && document.getElementById("game-format-select")) document.getElementById("game-format-select").value = data.gameFormat;
+            if (data.gameFormat && document.getElementById("game-format-select")) {
+                revealLegacyFormatOption(data.gameFormat);
+                document.getElementById("game-format-select").value = data.gameFormat;
+            }
             
             if (data.holeBetStake && document.getElementById("hole-bet-stake")) {
                 document.getElementById("hole-bet-stake").value = data.holeBetStake;
@@ -3018,8 +3049,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 return; 
             }
             
-            const gameFormat = document.getElementById("game-format-select").value;
-            if (!gameFormat) { alert("⚠️ Please select a Scoring Format before saving!"); saveBtn.innerText = originalText; saveBtn.disabled = false; return; }
+            let gameFormat = document.getElementById("game-format-select").value;
+            // No forced betting decision. A Quick Round is an individual round unless the
+            // organizer deliberately picks a team format.
+            if (!gameFormat) gameFormat = 'stroke';
 
             const rows = document.querySelectorAll('.player-row');
             // Players are no longer required to save — lets you set up a whole trip's worth of
