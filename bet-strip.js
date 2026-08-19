@@ -439,8 +439,8 @@ function gameStatusLine(game, holes, scores, players) {
 // Returns structured state, not text: who holds how many, what is riding, which hole
 // each skin was decided on, and what a skin is worth. Nothing is stored - it is
 // rebuilt from raw scores every time, so a correction simply produces a new answer.
-function skinsState(cfg, holes, scores, players) {
-    const scoringKey = (cfg.skinsScoring === 'net') ? 'net' : 'gross';
+// One pot's worth of skins, decided on a single scoring key.
+function skinsStatePot(cfg, holes, scores, players, scoringKey, potShare) {
     const carryOver = cfg.skinsCarryOver !== false;
     const won = {};
     const awards = [];      // { hole, playerId, units }
@@ -479,9 +479,10 @@ function skinsState(cfg, holes, scores, players) {
 
     // What one skin is worth. Under carry-over the pot is spread across the wager's
     // own hole range, which is what makes "3 riding = $60" an honest number rather
-    // than a guess. Mirrors computeSkinsSettlementNet's own arithmetic.
+    // than a guess. Mirrors computeSkinsSettlementNet's own arithmetic, including the
+    // half-pot share when gross and net are both running.
     const buyIn = cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 0;
-    const pot = buyIn * players.length;
+    const pot = buyIn * players.length * potShare;
     const skinValue = carryOver
         ? (holes.length > 0 ? pot / holes.length : 0)
         : (awards.length > 0 ? pot / awards.length : 0);
@@ -490,6 +491,61 @@ function skinsState(cfg, holes, scores, players) {
         won, awards, carryOver, lastDecidedHole,
         riding: carryOver && carry > 1 ? carry - 1 : 0,
         skinValue
+    };
+}
+
+// THE live view of a skins wager, using the SAME mode settlement will pay from.
+//
+// This used to read cfg.skinsScoring and default to gross, while settlement read
+// cfg.skinsPotFormat and defaulted to 'split'. A stacked skins game therefore showed
+// gross-only counts on the course and then paid out half gross / half net. Both now
+// go through resolveSkinsMode().
+//
+// Under 'split' two skins games genuinely run at once, so the live view combines
+// them: a golfer who takes both the gross and the net skin on a hole is two up, and
+// each award carries its own value because the two half-pots are priced separately.
+function skinsState(cfg, holes, scores, players) {
+    const mode = (typeof resolveSkinsMode === 'function')
+        ? resolveSkinsMode(cfg)
+        : ((cfg && cfg.skinsPotFormat) || 'split');
+    const shares = (typeof skinsPotShares === 'function')
+        ? skinsPotShares(mode)
+        : (mode === 'gross' ? { gross: 1, net: 0 } : mode === 'net' ? { gross: 0, net: 1 } : { gross: 0.5, net: 0.5 });
+
+    const parts = [];
+    if (shares.gross > 0) parts.push(['gross', skinsStatePot(cfg, holes, scores, players, 'gross', shares.gross)]);
+    if (shares.net > 0) parts.push(['net', skinsStatePot(cfg, holes, scores, players, 'net', shares.net)]);
+    if (parts.length === 1) {
+        const only = parts[0][1];
+        only.mode = mode;
+        only.awards.forEach(a => { a.pot = parts[0][0]; a.value = a.units * only.skinValue; });
+        return only;
+    }
+
+    const won = {};
+    const awards = [];
+    let riding = 0, lastDecidedHole = null;
+    parts.forEach(pair => {
+        const key = pair[0], st = pair[1];
+        Object.keys(st.won).forEach(id => { won[id] = (won[id] || 0) + st.won[id]; });
+        st.awards.forEach(a => awards.push({
+            hole: a.hole, playerId: a.playerId, units: a.units,
+            pot: key, value: a.units * st.skinValue
+        }));
+        riding += st.riding;
+        if (st.lastDecidedHole !== null && (lastDecidedHole === null || st.lastDecidedHole > lastDecidedHole)) {
+            lastDecidedHole = st.lastDecidedHole;
+        }
+    });
+    awards.sort((a, b) => a.hole - b.hole);
+
+    return {
+        won, awards, mode,
+        carryOver: cfg.skinsCarryOver !== false,
+        lastDecidedHole, riding,
+        // A representative unit price for callers that show one number. Under split the
+        // two halves are equal, so this is exact rather than an average of unlike things.
+        skinValue: parts.reduce((sum, pr) => sum + pr[1].skinValue, 0) / parts.length
     };
 }
 
