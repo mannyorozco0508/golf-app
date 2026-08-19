@@ -554,6 +554,36 @@
         }
 
 
+        // STACKED / ADDITIONAL GAMES.
+        //
+        // These settle into Final Money through computeCombinedNetTotals, but nothing
+        // itemised them here, so a golfer saw "Marty Won $58" with no line explaining
+        // where the skins money came from. That is the argument this document exists to
+        // prevent. Now that several participant-scoped Skins games can run at once, the
+        // gap is worse: two separate wagers, both invisible.
+        //
+        // Each card is built from computeGameNetByPlayerId - the SAME function the
+        // combined ledger uses - so this breakdown can never disagree with the total it
+        // is explaining. No second calculation, no chance of drift.
+        if (typeof getRoundGames === 'function' && typeof computeGameNetByPlayerId === 'function') {
+            getRoundGames(data).filter(g => g.role === 'additional').forEach(game => {
+                let net = {};
+                try { net = computeGameNetByPlayerId(game, courseData, savedScores) || {}; }
+                catch (e) { return; }
+                const ids = Object.keys(net);
+                if (ids.length === 0) return;
+
+                const label = (typeof describeGame === 'function') ? describeGame(game) : game.label;
+                html += `<div class="settle-card"><div class="settle-header">${game.icon || ''} ${label}</div>`;
+                const roster = data.players || [];
+                ids.forEach(pid => {
+                    const pl = roster.find(p => String(p.id) === String(pid));
+                    html += `<div class="ledger-row"><span>${pl ? pl.name : pid}</span>${fmtSignedHtml(net[pid] || 0)}</div>`;
+                });
+                html += `</div>`;
+            });
+        }
+
         html += buildSideMatchesHtml(data, courseData, savedScores);
 
         return html;
