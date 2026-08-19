@@ -569,7 +569,16 @@
                 (calc.activeMatches || []).forEach(m => {
                     receipt.segments.push({
                         label: m.pressNum > 0 ? `Press ${m.pressNum}` : (m.label || 'Original'),
-                        startHole: m.startHole, endHole: m.endHole, stake: sm.stake || 0,
+                        // A Nassau's F9/B9 windows are fixed at 1-9 and 10-18 by the engine -
+                        // they are scoring BOUNDS, not the holes played. On a side match that
+                        // starts mid-round the two differ: a Nassau struck on the 9th tee has
+                        // a "Front 9" consisting of exactly hole 9. The money already reflects
+                        // that, because the engine only ever saw the scoped holes; printing
+                        // the raw window said "H1-9" beside it and invited an argument about
+                        // whether the front nine counted. Clamped to what was actually played.
+                        startHole: Math.max(m.startHole, firstHole),
+                        endHole: Math.min(m.endHole, lastHole),
+                        stake: sm.stake || 0,
                         result: m.closed && m.finalResult ? m.finalResult
                             : (m.status === 0 ? 'All square' : `${m.status > 0 ? calc.t1Name : calc.t2Name} ${Math.abs(m.status)} up`),
                         winner: m.closed ? (m.status > 0 ? calc.t1Name : (m.status < 0 ? calc.t2Name : null)) : null,
