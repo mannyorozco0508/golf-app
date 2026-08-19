@@ -72,7 +72,14 @@
         const allPlayers = (typeof fieldParticipants === 'function')
             ? fieldParticipants(data)
             : (data.players || []).filter(p => p.playingForMoney !== false);
-        const potFormat = data.skinsPotFormat || 'split';
+        // ONE resolution rule, shared with the live view. resolveSkinsMode() gives
+        // skinsPotFormat precedence, which is exactly what this line has always done -
+        // so every saved round settles to the same cent - while also giving a config
+        // that only ever carried skinsScoring a defined answer instead of silently
+        // falling through to split.
+        const potFormat = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data)
+            : (data.skinsPotFormat || 'split');
         const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
         const carryOver = data.skinsCarryOver !== false;
         const totalHoles = (courseData || []).length;
