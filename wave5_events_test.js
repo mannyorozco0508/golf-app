@@ -500,11 +500,14 @@ describe('SCORECARD RENDER', () => {
         assert.match(render(`meId='${p[0].id}'; actionCenterOpen=false;`).action, /1 match/);
     });
 
-    test('the recap sits between score entry and Prev/Next', () => {
+    // BEHAVIOUR CHANGE: Prev/Next moved above the panels, so the recap now follows it.
+    test('the recap sits below Prev/Next, above the action panel', () => {
         const idx = read('index.html');
         const recap = idx.indexOf(`html += '<div id="hole-recap-mount"></div>'`);
         const nav = idx.indexOf('html += navRowHtml;');
-        assert.ok(recap > -1 && recap < nav);
+        const action = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
+        assert.ok(recap > -1 && recap > nav, 'what just happened is read after moving on');
+        assert.ok(recap < action, 'and still before the action panel');
     });
 
     test('the recap is hidden in print/PDF output', () => {
