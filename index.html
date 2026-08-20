@@ -750,6 +750,9 @@
         .hv-dots-btn:disabled { cursor: not-allowed; }
         /* Per-golfer confirmation, directly under the name. Nothing renders for a
            golfer with no dots. */
+        /* Red pips sit with the score they came from. Snake is rendered as a snake, not
+           another red dot - it costs a unit, so showing it as one would read backwards. */
+        .dot-pips { display: inline-block; margin-left: 6px; font-size: 0.8rem; letter-spacing: 1px; white-space: nowrap; vertical-align: middle; }
         .hv-dot-line { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); margin-top: 2px; line-height: 1.3; }
 
         .dots-btn { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
@@ -1058,6 +1061,35 @@
     
     let currentDotHole = 1;
     let tempDots = {}; 
+    // THE RED-DOT INDICATOR, next to the score that earned it.
+    //
+    // One red dot per POSITIVE junk unit. Snake is worth -1 in the engine
+    // (calcDotsEngine subtracts it), so painting it as another red dot would tell a
+    // golfer the opposite of what it costs them. It gets its own snake mark instead,
+    // and never adds to the red count. The indicator therefore always equals the
+    // player's positive units on that hole, and the snake is visible but unmistakable.
+    //
+    // Returns '' when a player has no junk on the hole, so nothing renders.
+    function dotIndicatorHtml(dotList) {
+        const list = dotList || [];
+        if (!list.length) return '';
+        const positives = list.filter(d => d !== 'snake').length;
+        const snakes = list.filter(d => d === 'snake').length;
+        let out = '';
+        if (positives > 0) out += '\uD83D\uDD34'.repeat(positives);
+        if (snakes > 0) out += (out ? ' ' : '') + '\uD83D\uDC0D'.repeat(snakes);
+        const net = positives - snakes;
+        const title = `${net >= 0 ? '+' : ''}${net} dot${Math.abs(net) === 1 ? '' : 's'}`;
+        return `<span class="dot-pips" title="${title}">${out}</span>`;
+    }
+
+    // The junk recorded for one player on one hole, straight from stored events.
+    function dotsForPlayerHole(playerId, holeNum) {
+        const all = currentData.dots || {};
+        const h = all[`h${holeNum}`] || {};
+        return h[`p${playerId}`] || [];
+    }
+
     // IS THERE AN ACTIVE DOTS GAME IN THIS ROUND?
     //
     // Not "is the round's main format Dots" - that was the bug. A Dots game created
@@ -1422,7 +1454,15 @@
                     html += `<div class="hv-dot-line">\uD83D\uDD34 ${mine.map(dotLabel).join(' \u00B7 ')}</div>`;
                 }
             }
-            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
+            // Quick reference sits WITH the score, not in a paragraph below it: a golfer
+            // scanning the hole reads "Marty 4 (2 dots)" in one movement. The written
+            // labels stay under the name for anyone who wants to know which junk it was.
+            let pipHtml = '';
+            if (dotsGame) {
+                const pl2 = filteredPlayers.find(p => String(p.name).trim() === name);
+                if (pl2) pipHtml = dotIndicatorHtml(holeDotsNow[`p${pl2.id}`]);
+            }
+            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}${pipHtml}</div></div>`;
         }
 
         // SCORE -> NEXT.
@@ -3808,21 +3848,17 @@
                     earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; font-weight:bold; color:var(--brand-green);">${entry.label} +${entry.pts}</div>`;
                 }
 
-                if (gameFormat === 'dots') {
-                    const hDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
-                    const myDots = hDots[`p${p.id}`] || [];
-                    let positiveDots = 0;
-                    let hasSnake = false;
-                    myDots.forEach(d => {
-                        if (d === 'snake') hasSnake = true;
-                        else positiveDots++;
-                    });
-                    
-                    if (positiveDots > 0 || hasSnake) {
-                        let dotStr = '🔴'.repeat(positiveDots);
-                        if (hasSnake) dotStr += '🐍';
-                        earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; letter-spacing: 1px;">${dotStr}</div>`;
-                    }
+                // WHERE the dots happened, not just a total - the Full Card is what gets
+                // reviewed after the round.
+                //
+                // This was gated on gameFormat === 'dots', the same mistake that hid the
+                // entry button: a Dots game created through Action never lit it up. It now
+                // uses hasDotsGame, and the SHARED indicator builder, so the Full Card and
+                // Hole View can never disagree about a hole. The old inline version also
+                // collapsed several snakes into one; the builder counts them.
+                if (hasDotsGame) {
+                    const pips = dotIndicatorHtml(dotsForPlayerHole(p.id, h.hole));
+                    if (pips) earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; letter-spacing: 1px;">${pips}</div>`;
                 }
 
                 // Birdie / eagle ring. GROSS score against the hole's par, from the one
