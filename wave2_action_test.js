@@ -251,7 +251,9 @@ describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
         const ac = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
         const bs = idx.indexOf(`html += '<div id="bet-strip-mount"></div>'`);
         const nav = idx.indexOf('html += navRowHtml;');
-        assert.ok(ac > -1 && ac < bs && bs < nav, 'reading order must be action -> bet detail -> next hole');
+        // Navigation is now above both panels; their order relative to each other is unchanged.
+        assert.ok(ac > -1 && ac < bs, 'reading order must stay action -> bet detail');
+        assert.ok(nav < ac, 'and both sit below Prev/Next');
     });
 });
 
