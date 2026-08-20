@@ -426,7 +426,11 @@ describe('MONEY READS LIKE MONEY', () => {
         const hits = (live.match(/toFixed\(2\)/g) || []).length;
         // The single permitted use is inside fmtWhole itself, which is the rule.
         assert.equal(hits, 1, 'money formatting drifted back out of the shared helper');
-        assert.ok(/function fmtWhole[\s\S]{0,120}toFixed\(2\)/.test(live));
+        // Scoped to the function body rather than a fixed character window: fmtWhole
+        // gained thousands-separator handling and a comment explaining it, which pushed
+        // toFixed past an arbitrary 120-char cutoff without weakening the rule.
+        const fn = live.slice(live.indexOf('function fmtWhole'), live.indexOf('function fmtSigned'));
+        assert.ok(/toFixed\(2\)/.test(fn), 'the one permitted toFixed must live inside fmtWhole');
     });
 
     test('Final Results, Birdie Game and Match Net all use the shared rule', () => {
