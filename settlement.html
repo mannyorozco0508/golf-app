@@ -485,7 +485,23 @@
     }
 
     function buildSideMatchesHtml(data, courseData, savedScores) {
-        const sideMatches = data.sideMatches || {};
+        // THE ROUND'S OWN WAGER IS A WAGER.
+        //
+        // A Match or Nassau created in setup used to render through a separate one-line
+        // card - "Overall Match: Manny Won (-50)" - with no presses, no start holes and
+        // no match net, while the identical bet created through Action printed its whole
+        // history. settlement-engine.js already learned to describe the main game as a
+        // virtual side match; this page never asked, so the improvement was built and
+        // discarded. It asks now, through the SAME helper, so the two can never disagree
+        // about what the round's wager was.
+        //
+        // DISPLAY ONLY. computeCombinedNetTotals is untouched and remains the sole source
+        // of money - this changes what the Receipt EXPLAINS, never what anyone is paid.
+        const sideMatches = Object.assign({}, data.sideMatches || {});
+        const mainWager = (typeof legacyMainAsSideMatch === 'function')
+            ? legacyMainAsSideMatch(data) : null;
+        if (mainWager) sideMatches.__main = mainWager;
+
         const matchIds = Object.keys(sideMatches);
         if (matchIds.length === 0) return "";
 
@@ -958,25 +974,12 @@
 
         const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
 
+        // The old "Final Payout Settlement" card is gone. It described the same wager the
+        // Side Matches section now describes properly, and describing one bet twice - once
+        // in full and once as a single line - is exactly how a golfer ends up unsure which
+        // number to believe. Per-player totals already appear in Final Results and Who
+        // Pays Who above, so nothing is lost.
         container.innerHTML = `
-            <div class="settle-card">
-                <div class="settle-header">💵 Final Payout Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
-                
-                <div class="match-breakdown-list" style="margin-bottom: 16px;">
-                    <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet Breakdown:</div>
-                    ${breakdownHtml}
-                </div>
-
-                <div class="ledger-row" style="background:var(--nav-bg);">
-                    <span>${matchData.t1Name}:</span>
-                    <span>${formatMoney(t1Total)}</span>
-                </div>
-                
-                <div class="ledger-row" style="background:var(--nav-bg);">
-                    <span>${matchData.t2Name}:</span>
-                    <span>${formatMoney(-t1Total)}</span>
-                </div>
-            </div>
             ${sideHtml}
 
             <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
