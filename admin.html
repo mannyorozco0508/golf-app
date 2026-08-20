@@ -505,6 +505,14 @@
         </select>
         <p id="format-description" style="font-size:0.78rem; color:var(--text-muted); margin:6px 0 0 0; min-height:1.2em;"></p>
 
+        <!-- Shown once the round has two or more groups. Round type still sets up teams
+             and the scorecard; the betting is created per-wager from Action so everyone
+             can see exactly who is in it. -->
+        <div id="multigroup-action-note" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-top:10px;">
+            <div style="font-size:0.82rem; font-weight:bold; color:var(--accent-teal); margin-bottom:4px;">\u26F3 Multi-group round</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">Set up your players and groups here. You'll add each bet from <strong>Action</strong> once the round is created, so every wager says exactly who's in it.</div>
+        </div>
+
         <div id="hole-bet-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
@@ -1265,6 +1273,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     
     let storedPlayersTemp = [];
     let groupSizeOverrides = {}; // sparse: { groupIndex(0-based): explicitSize }
+    // True when the round being edited ALREADY had a money-bearing main game. Those
+    // rounds keep their money untouched; the new rule applies to new rounds only.
+    let loadedLegacyMainStake = false;
     const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     if (!currentMode) {
@@ -2575,7 +2586,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (document.getElementById("nassau-settings")) document.getElementById("nassau-settings").style.display = (format === "nassau") ? "block" : "none";
         if (document.getElementById("wolf-settings")) document.getElementById("wolf-settings").style.display = (format === "wolf") ? "block" : "none";
         if (document.getElementById("stableford-settings")) document.getElementById("stableford-settings").style.display = (format === "stableford") ? "block" : "none";
-        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (['match', 'bestball', 'scramble', 'ryder'].includes(format)) ? "block" : "none";
+        const wantsMatchMoney = ['match', 'bestball', 'scramble', 'ryder'].includes(format);
+        const suppress = multiGroupMoneySuppressed();
+        if (document.getElementById("match-settings")) document.getElementById("match-settings").style.display = (wantsMatchMoney && !suppress) ? "block" : "none";
+        const mgNote = document.getElementById("multigroup-action-note");
+        if (mgNote) mgNote.style.display = suppress ? "block" : "none";
         if (document.getElementById("dot-settings")) document.getElementById("dot-settings").style.display = (format === "dots") ? "block" : "none";
         if (document.getElementById("skins-settings")) document.getElementById("skins-settings").style.display = (format === "skins") ? "block" : "none";
         
@@ -2612,6 +2627,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 updateCustomCoursePars();
             }
 
+            // Detect a saved money-bearing main game before anything re-renders, so an
+            // old multi-group Best Ball round keeps its stake instead of being quietly
+            // converted to a no-money round the next time it is saved.
+            loadedLegacyMainStake = (parseFloat(data.matchStake) || 0) > 0
+                || (parseFloat(data.nassauStake) || 0) > 0
+                || (parseFloat(data.skinsBuyIn) || 0) > 0
+                || (parseFloat(data.dotPointVal) || 0) > 0;
             if (data.gameFormat && document.getElementById("game-format-select")) {
                 revealLegacyFormatOption(data.gameFormat);
                 document.getElementById("game-format-select").value = data.gameFormat;
@@ -2876,6 +2898,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function updateCount() { 
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
         renderGroupDividers();
+        refreshMultiGroupMoneyRule();
         regenerateGroupLinks();
     }
 
@@ -2900,6 +2923,32 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return sizes;
     }
 
+    // HOW MANY SCORING GROUPS THIS ROUND HAS.
+    //
+    // Read from the same group model the rest of the app uses - computeGroupSizes()
+    // with the organizer's own size overrides - not from a player-count guess. Six
+    // golfers deliberately kept as one group is ONE group, and must keep the fast
+    // foursome setup; six split 4+2 is two.
+    function currentGroupCount() {
+        const rows = document.querySelectorAll('#player-list .player-row');
+        const n = rows.length || 0;
+        if (n === 0) return 1;
+        return computeGroupSizes(n, groupSizeOverrides).length;
+    }
+
+    // In a MULTI-GROUP round, a main-format wager has no honest meaning.
+    //
+    // Best Ball or Ryder Cup across two groups pays every golfer in the field from one
+    // $50 pot, splitting them by p.team - so Marty in Group 1 ends up partnered with
+    // Stan in Group 2 against golfers neither of them is playing with. Nobody sets that
+    // up on purpose. The ROUND TYPE still matters (it builds the teams and the
+    // scorecard), so it stays; the implicit money attached to it does not.
+    //
+    // A legacy round that already carries a stake is left exactly as it is.
+    function multiGroupMoneySuppressed() {
+        return currentGroupCount() >= 2 && !loadedLegacyMainStake;
+    }
+
     function computeGroupBoundaries(playerCount, overrides) {
         const sizes = computeGroupSizes(playerCount, overrides);
         let boundaries = [];
@@ -2909,6 +2958,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             idx += size;
         });
         return boundaries;
+    }
+
+    // Adding a 5th golfer turns one group into two. Re-run the format logic so the
+    // stake box and the multi-group note follow the group layout in real time.
+    function refreshMultiGroupMoneyRule() {
+        if (typeof handleFormatChange === 'function') {
+            try { handleFormatChange(); } catch (e) { /* setup not fully rendered yet */ }
+        }
     }
 
     function renderGroupDividers() {
@@ -2948,6 +3005,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         newSize = Math.max(1, Math.min(6, newSize));
         groupSizeOverrides[groupIdx] = newSize;
         renderGroupDividers();
+        refreshMultiGroupMoneyRule();
         regenerateGroupLinks();
     }
 
@@ -3122,7 +3180,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             const matchScoring = document.getElementById("match-scoring") ? document.getElementById("match-scoring").value : "net";
             const matchScoringStyle = document.getElementById("match-scoring-style") ? document.getElementById("match-scoring-style").value : "match";
-            const matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
+            // A new multi-group round saves no main-game stake. The round type still
+            // builds the teams; the money is created explicitly from Action.
+            let matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
+            if (multiGroupMoneySuppressed()) matchStake = 0;
             const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
