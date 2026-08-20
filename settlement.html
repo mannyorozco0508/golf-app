@@ -155,7 +155,11 @@
         @media print {
             body { background-color: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
-            .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn { display: none !important; }
+            /* The ⋯ More menu is a <details> element that sits OUTSIDE .top-nav-bar, so
+               hiding the nav bar never hid it. Left open when a golfer exported, it
+               printed a navigation menu into a payout document. */
+            .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn,
+            .nav-more, .app-nav-wrap { display: none !important; }
             .settle-card { border: 1px solid #ccc; background: #fff; }
             /* A match's story must not break across a page - the whole point is that a
                golfer can read one block and see how the money happened. */
@@ -353,7 +357,19 @@
     // shown honestly. A fraction appearing in canonical settlement would mean the
     // allocator failed, and that should be visible, not hidden.
     function fmtWhole(n) {
-        return Number.isInteger(n) ? String(n) : n.toFixed(2);
+        // Thousands separators, because this is the document people settle from and
+        // "$15000" is genuinely harder to read correctly at a glance than "$15,000".
+        //
+        // Grouping is applied to the WHOLE-DOLLAR part only, so a genuine fraction still
+        // prints its cents exactly as before - a per-game figure that really is $12.50
+        // must stay $12.50. Formatting only: fmtWhole's output is never parsed back
+        // anywhere, so a comma cannot leak into a calculation.
+        const group = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (Number.isInteger(n)) return group(n);
+        const fixed = n.toFixed(2);
+        const neg = fixed.startsWith('-');
+        const [whole, cents] = (neg ? fixed.slice(1) : fixed).split('.');
+        return (neg ? '-' : '') + group(whole) + '.' + cents;
     }
 
     // The sign belongs in front of the dollar sign. "$-210" is not how money is
