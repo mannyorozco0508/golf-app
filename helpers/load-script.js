@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { createDocument } = require('./mini-dom.js');
 
 const REPO_ROOT = path.join(__dirname, '..');
 
@@ -24,29 +25,22 @@ const REPO_ROOT = path.join(__dirname, '..');
 // document.getElementById('foo') call sees the same value. This is what makes it
 // possible to test logic that's embedded inside a DOM-dependent function (like trip.html's
 // renderPrizePayouts) without modifying production code to expose it separately.
+// A LIVE element tree (helpers/mini-dom.js) rather than a set of shapes.
+//
+// The previous stub answered every question with a placeholder: querySelectorAll()
+// returned [], createElement() handed back one shared object, appendChild() did
+// nothing, and Element.remove() did not exist. Production code therefore never really
+// ran - and an infinite-recursion bug in the "Add New Player" click path passed 1330
+// tests, because with no .player-row elements the render loop it recursed through had
+// nothing to iterate.
+//
+// The guarantee the old harness made is preserved exactly: getElementById returns a
+// DISTINCT, PERSISTENT element per id, so a test can pre-set a value and the
+// production function it calls sees the same object. What is new is that the tree is
+// real - appended children exist, selectors find them, and removing one removes it.
 function makeStubSandbox() {
-    const elementRegistry = new Map();
-    function getOrCreateElement(id) {
-        if (!elementRegistry.has(id)) {
-            elementRegistry.set(id, {
-                id, value: '', textContent: '', innerHTML: '', style: {}, checked: false,
-                classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-                addEventListener() {}, appendChild() {},
-                querySelector() { return getOrCreateElement(id + '__child'); },
-                querySelectorAll() { return []; }
-            });
-        }
-        return elementRegistry.get(id);
-    }
-
-    const documentStub = {
-        getElementById(id) { return getOrCreateElement(id); },
-        querySelector() { return getOrCreateElement('__anonymous'); },
-        querySelectorAll() { return []; },
-        addEventListener() {},
-        createElement() { return getOrCreateElement('__created'); },
-        documentElement: { classList: { add() {}, remove() {}, contains() { return false; } } }
-    };
+    const documentStub = createDocument();
+    const elementRegistry = documentStub.__registry;
     const dbStub = {
         ref() {
             return {
