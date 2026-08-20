@@ -550,11 +550,18 @@ describe('SCORECARD WIRING — the strip is mounted and prompt() is gone', () =>
         assert.ok(idx.includes('<script src="bet-strip.js"></script>'));
     });
 
-    test('the strip is mounted between score entry and Prev/Next', () => {
+    // BEHAVIOUR CHANGE (Scorecard cockpit): Prev/Next moved to sit directly under the
+    // score rows, so a golfer can score and move on without scrolling past every wager.
+    // Bet status is what you READ afterwards, so it now sits below navigation.
+    test('the strip is mounted below Prev/Next, after score entry', () => {
         const mount = idx.indexOf(`html += '<div id="bet-strip-mount"></div>'`);
         const nav = idx.indexOf('html += navRowHtml;');
         assert.ok(mount > -1, 'no bet strip mount point found');
-        assert.ok(mount < nav, 'bet status must sit above Prev/Next, not below it');
+        assert.ok(nav > -1, 'no navigation row found');
+        assert.ok(mount > nav, 'scoring and Next come first; bet detail is read afterwards');
+        // Still ABOVE the hole picker, so the reading order stays coherent. Matched on
+        // the CALL, not the function definition further up the file.
+        assert.ok(mount < idx.indexOf('html += buildHolePickerHtml('));
     });
 
     test('REGRESSION: no prompt() anywhere in index.html — it fails silently in an installed PWA', () => {
