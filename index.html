@@ -737,6 +737,21 @@
         }
         .press-btn.active-press { background-color: var(--accent-red); color: #ffffff; border-color: var(--accent-red); }
 
+        /* Hole View dots control: a full-width thumb target under the scores, styled
+           secondary to score entry - recording junk must never compete with the
+           primary job of the screen. 48px clears the phone tap minimum. */
+        .hv-dots-btn {
+            width: 100%; min-height: 48px; margin-top: 10px;
+            background: transparent; color: var(--accent-red);
+            border: 1px dashed var(--accent-red); border-radius: 10px;
+            font-size: 0.9rem; font-weight: bold; cursor: pointer;
+        }
+        .hv-dots-btn.has-dots { background: var(--accent-red); color: #fff; border-style: solid; }
+        .hv-dots-btn:disabled { cursor: not-allowed; }
+        /* Per-golfer confirmation, directly under the name. Nothing renders for a
+           golfer with no dots. */
+        .hv-dot-line { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); margin-top: 2px; line-height: 1.3; }
+
         .dots-btn { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
         .dots-btn.has-dots { background-color: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
@@ -1043,6 +1058,25 @@
     
     let currentDotHole = 1;
     let tempDots = {}; 
+    // IS THERE AN ACTIVE DOTS GAME IN THIS ROUND?
+    //
+    // Not "is the round's main format Dots" - that was the bug. A Dots game created
+    // through Action lives in additionalGameInstances, so a scorecard that only asked
+    // about gameFormat never drew the entry button and there was nowhere to record a
+    // dot. getRoundGames() already normalizes both storage shapes; this just asks it.
+    //
+    // Returns the game object (so callers get its startHole and stake) or null.
+    function activeDotsGame() {
+        if (typeof getRoundGames !== 'function') {
+            return (currentData.gameFormat === 'dots')
+                ? { key: 'main', format: 'dots', startHole: 1, config: currentData } : null;
+        }
+        try {
+            return getRoundGames(currentData).find(g => g.format === 'dots') || null;
+        } catch (e) { return null; }
+    }
+
+    // Dot categories a golfer can record. Snake subtracts a unit; everything else adds one.
     const DOT_TYPES = [
         { id: 'greenie', label: '⛳ Greenie' },
         { id: 'sandy', label: '🏖️ Sandy' },
@@ -1361,10 +1395,48 @@
 
         let html = `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
 
+        // DOTS / JUNK on the hole a golfer is actually standing on.
+        //
+        // The entry control used to exist only inside a Full Card table cell, which meant
+        // recording a dot required leaving the hole you were playing. It belongs here,
+        // next to the scores, with each golfer's dots shown underneath their name so the
+        // tap is visibly confirmed without opening anything.
+        const dotsGame = activeDotsGame();
+        const holeDotsNow = (dotsGame && currentData.dots && currentData.dots[`h${holeNum}`])
+            ? currentData.dots[`h${holeNum}`] : {};
+        const dotLabel = id => {
+            const t = DOT_TYPES.find(x => x.id === id);
+            return t ? t.label : id;
+        };
+
         const playerCellCount = cells.length - 3 - (window.__scHasMatchColumn ? 1 : 0);
         for (let i = 3; i < 3 + playerCellCount; i++) {
             const name = headCells[i] ? headCells[i].textContent.trim() : '';
-            html += `<div class="hv-player-row"><div class="hv-player-name">${name}</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
+            html += `<div class="hv-player-row"><div class="hv-player-name">${name}`;
+            if (dotsGame) {
+                // Match this row back to a player by name, the same way the header cells
+                // were built. A golfer with no dots shows nothing at all.
+                const pl = filteredPlayers.find(p => String(p.name).trim() === name);
+                const mine = pl ? (holeDotsNow[`p${pl.id}`] || []) : [];
+                if (mine.length) {
+                    html += `<div class="hv-dot-line">\uD83D\uDD34 ${mine.map(dotLabel).join(' \u00B7 ')}</div>`;
+                }
+            }
+            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
+        }
+
+        if (dotsGame) {
+            const total = Object.values(holeDotsNow).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
+            // Same write rule the Full Card button uses: on a multi-group round only a
+            // group-locked scorekeeper may record, since saveDots() strips cross-group
+            // writes anyway. Computed locally - isMultiGroupRound is function-scoped
+            // in the other render paths, not a global.
+            const multiGroup = (currentData.players || []).length > 4;
+            const allowed = !multiGroup || hasGroupLock;
+            const label = total > 0 ? `\uD83D\uDD34 Dots (${total})` : '\uD83D\uDD34 + DOT';
+            html += allowed
+                ? `<button type="button" class="hv-dots-btn${total > 0 ? ' has-dots' : ''}" onclick="openDotsModal(${holeNum})">${label}</button>`
+                : `<button type="button" class="hv-dots-btn" disabled style="opacity:0.5; cursor:not-allowed;">${label}</button>`;
         }
 
         // Bet status + PRESS sit between the scores and Prev/Next, matching the
@@ -3077,7 +3149,7 @@
         if (o.gameFormat === 'hilo' && o.hiloLog) {
             inner += pill('pill-main', 'Low: ' + (o.hiloLog.lowWinner || 'Halved'));
             inner += pill('pill-press', 'High: ' + (o.hiloLog.highWinner || 'Halved'));
-        } else if (o.gameFormat === 'dots') {
+        } else if (o.dots) {
             const d = o.dots || { count: 0, allowed: false };
             const cls = d.count > 0 ? 'dots-btn has-dots' : 'dots-btn';
             const label = d.count > 0 ? '\uD83D\uDD34 Dots (' + d.count + ')' : '\uD83D\uDD34 Add Dots';
@@ -3637,7 +3709,10 @@
             stablefordCalc = calcStablefordEngine(currentData, courseData, savedScores);
         }
 
-        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo', 'wolf', 'stableford'].includes(gameFormat));
+        // A Dots game created through Action needs the column too, or there is nowhere
+        // on the Full Card to review or correct an earlier hole's junk.
+        const hasDotsGame = !!activeDotsGame();
+        const showMatchColumn = (['bestball', 'match', 'ryder', 'scramble', 'nassau', 'dots', 'hilo', 'wolf', 'stableford'].includes(gameFormat)) || hasDotsGame;
         window.__scHasMatchColumn = showMatchColumn;
 
         // --- GLOBAL BET REGISTRY ---
@@ -3771,7 +3846,7 @@
             if (showMatchColumn) {
                 let matchPillText = '', holeWinnerText = '', stablefordParts = null, dotsInfo = null;
 
-                if (gameFormat === 'dots') {
+                if (hasDotsGame) {
                     const holeDots = currentData.dots && currentData.dots[`h${h.hole}`] ? currentData.dots[`h${h.hole}`] : {};
                     let dotCount = 0;
                     Object.values(holeDots).forEach(arr => dotCount += arr.length);
