@@ -802,7 +802,8 @@ describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
         const recap = idxSrc.indexOf(`html += '<div id="hole-recap-mount">`);
         const action = idxSrc.indexOf(`html += '<div id="action-center-mount">`);
         const nav = idxSrc.indexOf('html += navRowHtml;');
-        assert.ok(scores > -1 && recap < action && action < nav,
+        // Navigation now precedes the panels: hole -> scores -> Prev/Next -> recap -> action.
+        assert.ok(scores > -1 && nav < recap && recap < action,
             'order must stay hole -> scores -> recap -> action -> navigation');
     });
 
