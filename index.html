@@ -4098,7 +4098,15 @@
             const betsLine = globalBets.length > 0
                 ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">${globalBets.map(b => {
                     const lbl = b.isPrimaryMatch ? 'Main Bet' : `Press #${++tickerPressNum}`;
-                    return `${lbl}: <strong style="color:#fff;">${b.statusPlain}</strong>`;
+                    // statusFull, not statusPlain.
+                    //
+                    // statusPlain is whosUpText(), which returns only "NAME UP" - the margin
+                    // is computed and then thrown away. With a main bet and three presses
+                    // that rendered four genuinely different states as four identical
+                    // strings ("Manny UP | Manny UP | Manny UP | Manny UP") while the engine
+                    // already knew they were 8&7, 7&5, 5&3 and 3&2. Same data, same
+                    // calculation, correct field.
+                    return `${lbl}: <strong style="color:#fff;">${b.statusFull}</strong>`;
                 }).join(' &nbsp;|&nbsp; ')}</div>`
                 : '';
             statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${betsLine}`;
