@@ -1425,6 +1425,15 @@
             html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
         }
 
+        // SCORE -> NEXT.
+        //
+        // Prev/Next used to sit below the Action Center and the press strip, so on a
+        // heavy round a golfer had to scroll past Live Action, My Matches and every
+        // press just to reach Next. Entering a score and moving on is the primary job
+        // of this screen; the betting information is what you read afterwards, not
+        // something to wade through first.
+        html += navRowHtml;
+
         if (dotsGame) {
             const total = Object.values(holeDotsNow).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
             // Same write rule the Full Card button uses: on a multi-group round only a
@@ -1439,16 +1448,15 @@
                 : `<button type="button" class="hv-dots-btn" disabled style="opacity:0.5; cursor:not-allowed;">${label}</button>`;
         }
 
-        // Bet status + PRESS sit between the scores and Prev/Next, matching the
-        // intended reading order: hole -> scores -> what's at stake -> press -> next.
-        // The strip is a single scrollable chip row, so it stays a fixed height no
-        // matter how many presses are running and never pushes scoring off screen.
+        // Everything below the fold is what a golfer READS rather than acts on: what
+        // just happened, what's at stake, how the side matches stand. The press strip
+        // stays a single scrollable chip row, so it holds a fixed height no matter how
+        // many presses are running.
         html += '<div id="whoami-mount"></div>';
         html += '<div id="hole-recap-mount"></div>';
         html += '<div id="action-center-mount"></div>';
         html += '<div id="bet-strip-mount"></div>';
 
-        html += navRowHtml;
         html += buildHolePickerHtml(courseData, savedScores, filteredPlayers);
 
         if (window.__scHasMatchColumn && cells[cells.length - 1]) {
