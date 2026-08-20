@@ -261,7 +261,7 @@
                 <option value="nassau">Nassau Bet (F9 / B9 / 18)</option>
                 <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
                 <option value="skins">Skins (pick who's in)</option>
-                <option value="dots">Dots / Junk (whole group)</option>
+                <option value="dots">Dots / Junk (everyone playing)</option>
             </select>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
@@ -829,6 +829,10 @@
         if (fieldBox) fieldBox.style.display = fieldGame ? 'block' : 'none';
         const skinsOnly = document.getElementById('sm-skins-only');
         if (skinsOnly) skinsOnly.style.display = (format === 'skins') ? 'block' : 'none';
+        // Skins takes a buy-in per golfer; Dots is priced per dot. Naming the amount
+        // wrongly would misstate real money.
+        const stakeLabel = document.getElementById('sm-field-stake-label');
+        if (stakeLabel) stakeLabel.textContent = (format === 'dots') ? '$ per dot' : 'Buy-in per golfer ($)';
         if (fieldGame) renderFieldActionForm(format);
 
         updateSideMatchPickerFeedback();
@@ -863,7 +867,12 @@
 
         if (format === 'dots') {
             // Dots is a whole-field game in this architecture, so there is nothing to pick.
-            wrap.innerHTML = '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Dots / Junk runs for everyone playing for money in this round.</p>';
+            // Stated outright because Dots money is field-wide in the engine. Showing a
+            // participant picker here would let the UI promise scoping the maths does not
+            // do - participantIds are read for Skins, and ignored for Dots.
+            wrap.innerHTML = '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
+                + '<strong>Everyone in the round plays.</strong> Dots / Junk is field-wide \u2014 '
+                + 'every golfer playing for money wins and pays on every dot, across all groups.</p>';
         } else {
             wrap.innerHTML = players.map(pl => {
                 const on = chosenIds.includes(String(pl.id));
