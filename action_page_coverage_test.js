@@ -230,8 +230,15 @@ describe('COVERAGE PARITY — Action / Live / Settlement / Receipt', () => {
         assert.ok(live.includes('main') && live.includes('g1'), 'round games in Live Action');
         // Side matches deliberately render through the scorecard's My Matches surface,
         // not through buildActionRows - two jobs, two surfaces.
-        const recs = call(`return buildSideMatchReceipts(${J(data)}, ${J(CD)}, ${J(S)}).length;`);
-        assert.equal(recs, 1, 'side match on the Receipt');
+        // BEHAVIOUR CHANGE (legacy receipt parity): the round's own Match wager now gets
+        // a detailed receipt block too, described as a virtual side match through the SAME
+        // builder. It used to print one summary line with no presses or start holes while
+        // an identical Action wager printed its whole history. This fixture has a $50 main
+        // Match plus one side match, so it produces two blocks, not one.
+        const recs = call(`return buildSideMatchReceipts(${J(data)}, ${J(CD)}, ${J(S)}).map(function(r){ return r.matchId; });`);
+        assert.equal(recs.length, 2, 'the main wager and the side match both get a block');
+        assert.ok(recs.includes('__main'), 'the round wager must be explained, not just settled');
+        assert.equal(recs.filter(function (k) { return k !== '__main'; }).length, 1, 'side match on the Receipt');
         const money = call(`
             var o = computeCombinedNetTotals(${J(data)}, ${J(CD)}, ${J(S)});
             var t = 0; Object.keys(o.netByName).forEach(function(k){ t += o.netByName[k].net; });
