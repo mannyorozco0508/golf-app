@@ -2960,12 +2960,24 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return boundaries;
     }
 
-    // Adding a 5th golfer turns one group into two. Re-run the format logic so the
-    // stake box and the multi-group note follow the group layout in real time.
+    // Adding a 5th golfer turns one group into two, so the stake box and the
+    // multi-group note have to follow the group layout in real time.
+    //
+    // This deliberately does NOT call handleFormatChange(). That function re-renders the
+    // whole player list, which ends by calling updateCount(), which calls straight back
+    // into here - unbounded recursion that overflowed the stack and made "Add New
+    // Player" look like a dead button. Only the two controls that actually depend on
+    // group count are touched, and nothing here re-enters the render cycle.
     function refreshMultiGroupMoneyRule() {
-        if (typeof handleFormatChange === 'function') {
-            try { handleFormatChange(); } catch (e) { /* setup not fully rendered yet */ }
-        }
+        const format = document.getElementById("game-format-select");
+        if (!format) return;
+        const wantsMatchMoney = ['match', 'bestball', 'scramble', 'ryder'].includes(format.value);
+        const suppress = multiGroupMoneySuppressed();
+
+        const box = document.getElementById("match-settings");
+        if (box) box.style.display = (wantsMatchMoney && !suppress) ? "block" : "none";
+        const note = document.getElementById("multigroup-action-note");
+        if (note) note.style.display = suppress ? "block" : "none";
     }
 
     function renderGroupDividers() {
