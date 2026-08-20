@@ -505,9 +505,60 @@
     // number here ever disagreed with settlement, it would be a bug in this function,
     // not a second opinion about the money.
     // ========================================================================
+    // A LEGACY MAIN WAGER, described as a wager.
+    //
+    // A Match or Nassau created in setup settles correctly, but printed one line -
+    // "Overall Match: Manny Won (-50)" - with no presses, no start holes and no match
+    // net, while the identical wager created through Action printed its whole history.
+    // Same money, two very different explanations.
+    //
+    // Rather than a second receipt builder, the main game is described as a virtual
+    // side match and run through the SAME loop below. Its sides come from p.team,
+    // which is what the engine actually settled, so the block cannot claim a pairing
+    // that did not happen. Returns null when the main game carries no wager - Stroke
+    // Play is how a round is scored, not a bet.
+    //
+    // DISPLAY ONLY. computeCombinedNetTotals is untouched and still the sole source of
+    // money; this changes what the Receipt EXPLAINS, never what anyone is paid.
+    function legacyMainAsSideMatch(data) {
+        // EXACTLY the formats computeRoundMoneyByPlayer settles through
+        // calculateMatchEngine (money-engine.js:514). Hi-Lo, Skins, Dots, Stableford and
+        // Wolf are settled by their own engines, so describing them with a match-play
+        // receipt would print a result their money never came from - a new divergence,
+        // which is the one thing this fix must not create.
+        const fmt = data.gameFormat;
+        if (!['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(fmt)) return null;
+
+        const stake = fmt === 'nassau' ? (data.nassauStake || 0) : (data.matchStake || 0);
+        if (!(stake > 0)) return null;
+
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        const teamA = players.filter(p => String(p.team || 'Team 1') === 'Team 1').map(p => String(p.id));
+        const teamB = players.filter(p => String(p.team || '') === 'Team 2').map(p => String(p.id));
+        if (teamA.length === 0 || teamB.length === 0) return null;
+
+        return {
+            __legacyMain: true,
+            format: fmt,
+            scoring: fmt === 'nassau' ? (data.nassauScoring || 'net') : (data.matchScoring || 'net'),
+            stake: stake,
+            pressRule: fmt === 'nassau' ? (data.nassauPressRule || 'none') : (data.matchPressRule || 'none'),
+            presses: data.matchPresses || {},
+            teamAIds: teamA,
+            teamBIds: teamB,
+            startHole: 1,
+            createdAt: 0
+        };
+    }
+
     function buildSideMatchReceipts(data, courseData, savedScores) {
         const allPlayers = (data.players || []);
-        const sideMatches = data.sideMatches || {};
+        const sideMatches = Object.assign({}, data.sideMatches || {});
+
+        // The round's own wager leads, because it was struck first.
+        const mainWager = legacyMainAsSideMatch(data);
+        if (mainWager) sideMatches.__main = mainWager;
+
         const receipts = [];
 
         Object.keys(sideMatches).forEach(matchId => {
