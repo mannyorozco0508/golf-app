@@ -1594,6 +1594,52 @@
         if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
     }
 
+    // EVERY WAGER IN THE ROUND, NOT JUST ONE STORE.
+    //
+    // Money can arrive from three places: the legacy main game (gameFormat), stacked
+    // games (additionalGameInstances), and side matches. This list used to read only
+    // the third, which meant a $50 Match created during setup settled, showed in Live
+    // Action and printed on the Receipt while being invisible here - and a Skins game
+    // created ON THIS PAGE saved into additionalGameInstances and then vanished from it.
+    //
+    // getRoundGames() already normalizes the first two into one list, so this asks it
+    // rather than decoding two storage shapes by hand. Side matches keep their own
+    // renderer below, untouched.
+    function buildRoundGameCards() {
+        if (typeof getRoundGames !== 'function') return '';
+        let games;
+        try { games = getRoundGames(currentData) || []; } catch (e) { return ''; }
+
+        return games.map(game => {
+            const isMain = game.role === 'main';
+            // A main game with no stake is just how the round is scored - Stroke Play is
+            // not a wager, and listing it here would be noise.
+            if (isMain && !(game.stake > 0)) return '';
+
+            const label = (typeof describeGame === 'function') ? describeGame(game) : game.label;
+            const who = (typeof fieldParticipants === 'function' && game.config)
+                ? fieldParticipants(game.config).map(p => p.name).join(' \u00B7 ')
+                : '';
+            const range = (game.startHole > 1) ? `Starts H${game.startHole}` : '';
+
+            // The main game is READ-ONLY here. Removing or editing it would mean
+            // rewriting gameFormat on a saved round, which is a migration this fix
+            // deliberately does not perform.
+            const note = isMain
+                ? '<div style="font-size:0.72rem; color:var(--text-muted); margin-top:6px;">Created with the round \u00B7 can\'t be changed here</div>'
+                : '';
+
+            return `<div class="sm-card" data-action-key="${game.key}">
+                <div class="sm-card-head">
+                    <span class="sm-card-title">${game.icon || ''} ${label}</span>
+                </div>
+                ${who ? `<div style="font-size:0.82rem; color:var(--text-muted); margin-top:4px;">${who}</div>` : ''}
+                ${range ? `<div style="font-size:0.78rem; color:var(--accent-teal); margin-top:4px;">${range}</div>` : ''}
+                ${note}
+            </div>`;
+        }).join('');
+    }
+
     function renderSideMatches() {
         const list = document.getElementById("sidematches-list");
         if (!list) return;
@@ -1604,8 +1650,10 @@
         const sideMatches = currentData.sideMatches || {};
         const matchIds = Object.keys(sideMatches);
 
+        const roundGameCards = buildRoundGameCards();
+
         if (matchIds.length === 0) {
-            list.innerHTML = `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No side matches yet — tap below to start a 1v1 or 2v2 between any players in the field.</div>`;
+            list.innerHTML = roundGameCards || `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No action yet \u2014 tap below to add a bet between any players in the field.</div>`;
             return;
         }
 
@@ -1643,7 +1691,7 @@
 
                 html += `<div class="side-match-card">
                     <div class="side-match-players">${p1.name.split(' ')[0]} 🆚 ${p2.name.split(' ')[0]}</div>
-                    <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">Stroke Play • ${(sm.scoring || 'net').toUpperCase()}</div>`;
+                    <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
                 if (holeCalc) {
                     const carryText = holeCalc.currentCarry > 0 ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${holeCalc.currentCarry} carrying</span>` : '';
@@ -1697,7 +1745,7 @@
 
             html += `<div class="side-match-card">
                 <div class="side-match-players">${calc.t1Name} 🆚 ${calc.t2Name}</div>
-                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">${formatLabel} • ${scoringLabel} • $${sm.stake || 0}/match${sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''}</div>`;
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">${formatLabel} • ${scoringLabel} • $${sm.stake || 0}/match${sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
             if (sm.format === 'nassau') {
                 ['F9', 'B9', '18'].forEach(bId => {
@@ -1745,7 +1793,10 @@
             html += `</div></div>`;
         });
 
-        list.innerHTML = html;
+        // Round games first, then side matches. Each wager appears exactly ONCE: the
+        // normalizer covers gameFormat + additionalGameInstances, and the loop below
+        // covers sideMatches. The two sets never overlap.
+        list.innerHTML = roundGameCards + html;
     }
 
     function getRichHoleBetScore(player, holeNum, courseHole, scoringType, savedScores) {
