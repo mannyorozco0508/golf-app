@@ -113,6 +113,17 @@ function loadHtmlInlineScript(relativePath, dependencies = []) {
     const sandbox = makeStubSandbox();
     vm.createContext(sandbox);
 
+    // Seed every <select id="..."> from the page's own markup, with its options.
+    // Production code legitimately reads, adds to and removes from sel.options; with
+    // a generic div stub that threw, so any UI logic touching a dropdown was
+    // untestable. Reading the tags from the real page keeps the harness honest
+    // rather than requiring each test to describe its own controls.
+    const selectRe = /<select\b([^>]*\bid="([^"]+)"[^>]*)>([\s\S]*?)<\/select>/gi;
+    let sel;
+    while ((sel = selectRe.exec(html)) !== null) {
+        sandbox.document.__declare(sel[2], 'select', sel[3]);
+    }
+
     dependencies.forEach(depPath => {
         const depCode = fs.readFileSync(path.join(REPO_ROOT, depPath), 'utf8');
         vm.runInContext(depCode, sandbox, { filename: depPath });
