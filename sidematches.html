@@ -158,6 +158,10 @@
         .team-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; gap: 8px; }
         .team-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.82rem; }
         .btn-outline { background: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 6px 10px; font-size: 0.75rem; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .sm-scope-choice { display:block; width:100%; text-align:left; padding:14px; margin-bottom:10px; border-radius:10px; border:1px solid var(--border-mid); background:var(--nav-bg); cursor:pointer; min-height:44px; }
+        .sm-scope-choice strong { display:block; font-size:0.95rem; color:var(--text-main); margin-bottom:2px; }
+        .sm-scope-choice small { display:block; font-size:0.78rem; color:var(--text-muted); font-weight:normal; line-height:1.35; }
+        .sm-pick-group-head { width:100%; font-size:0.7rem; font-weight:bold; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-muted); margin:8px 0 2px 0; }
         .player-pick-badge { padding: 6px 10px; border-radius: 20px; border: 1px solid var(--border-mid); background: var(--nav-bg); font-size: 0.75rem; font-weight: bold; color: var(--text-muted); cursor: pointer; user-select: none; }
         .player-pick-badge.pick-a { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .player-pick-badge.pick-b { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); }
@@ -252,9 +256,34 @@
 <div class="modal-overlay" id="sidematch-modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span>⚔️ New Side Match</span>
+            <span id="sm-modal-title">⚔️ New Action</span>
             <button class="close-modal" onclick="closeSideMatchModal()">&times;</button>
         </div>
+
+        <!-- STEP 1 — WHO IS THIS BET BETWEEN?
+             Shown only when the round genuinely has more than one group. A single
+             foursome has nothing to choose, so Marty Monday never sees this. -->
+        <div id="sm-scope-step" style="display:none;">
+            <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 12px 0;">Who's this bet between?</p>
+            <button type="button" class="sm-scope-choice" onclick="pickActionScope('group')">
+                <strong id="sm-scope-group-title">This Group</strong>
+                <small id="sm-scope-group-blurb">Play something with the golfers in this foursome</small>
+            </button>
+            <button type="button" class="sm-scope-choice" onclick="pickActionScope('cross')">
+                <strong>Across Groups</strong>
+                <small>Create a match with golfers from different groups</small>
+            </button>
+        </div>
+
+        <!-- STEP 1b — ORGANIZER ONLY: which group's action is this? -->
+        <div id="sm-owner-step" style="display:none;">
+            <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 12px 0;">Which group is this action for?</p>
+            <div id="sm-owner-choices"></div>
+            <button type="button" class="btn-outline" style="width:100%; margin-top:4px;" onclick="backToScopeStep()">← Back</button>
+        </div>
+
+        <div id="sm-form-step">
+        <div id="sm-scope-banner" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
         <div class="control-group" style="margin-bottom:10px;">
             <label>Format</label>
             <select id="sm-format" onchange="onSideMatchFormatChange()">
@@ -264,6 +293,7 @@
                 <option value="skins">Skins (pick who's in)</option>
                 <option value="dots">Dots / Junk (everyone playing)</option>
             </select>
+            <p id="sm-format-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
             <div class="control-group" id="sm-scoring-group">
@@ -403,7 +433,8 @@
             <p id="sm-start-hole-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
         </div>
 
-        <button class="btn-primary" onclick="saveSideMatch()">💾 Start Side Match</button>
+        <button class="btn-primary" onclick="saveSideMatch()">💾 Start Action</button>
+        </div>
     </div>
 </div>
 
@@ -566,6 +597,13 @@
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `⚔️ Side Matches (${currentData.eventName || "Live Round"})`;
             renderSideMatches();
+            // Arrived from the scorecard's "+ ADD GROUP ACTION". Opened only once,
+            // and only after the round data has landed - the scope chooser needs to
+            // know how many groups exist before it can ask anything sensible.
+            if (urlParams.get('add') === '1' && !window.__smAutoOpened && (currentData.players || []).length) {
+                window.__smAutoOpened = true;
+                openSideMatchModal();
+            }
         });
     }
 
@@ -755,16 +793,161 @@
     // --- SIDE MATCHES (Cross-Group 1v1 / 2v2) ---
     let sidematchPickState = {}; // { playerId: 'a'|'b' }
 
+    // ---- ACTION SCOPE -------------------------------------------------------
+    // Every new wager is created as one of two things, and the golfer says which:
+    //
+    //   'group' - a local game inside ONE foursome. Participants come from that
+    //             group and nowhere else. This is the common case.
+    //   'cross' - an explicitly cross-group wager. Chosen deliberately, never
+    //             arrived at by accident.
+    //
+    // A one-group round has nothing to choose, so the chooser is skipped entirely
+    // and the scope is 'group' from the start. That keeps the everyday Monday
+    // round exactly as fast as it was.
+    //
+    // ownerGroup is stored alongside participants because participants alone
+    // cannot answer "whose wager is this" for permission purposes - a Skins game
+    // of Marty, Manny and Stan could be a cross-group bet or a mis-built local
+    // one, and the two have different management rules. Group membership is fixed
+    // for the life of a round, so a stored ownerGroup stays true.
+    let actionScope = null;      // 'group' | 'cross'
+    let actionOwnerGroup = null; // number, when actionScope === 'group'
+
+    function roundGroupNumbers() {
+        const players = currentData.players || [];
+        return computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {})
+            .map(b => b.group);
+    }
+
+    function isMultiGroupRound() {
+        return roundGroupNumbers().length > 1;
+    }
+
     function openSideMatchModal() {
         sidematchPickState = {};
-        document.getElementById("sm-format").value = "match";
         fieldActionPick = {};
+        actionScope = null;
+        actionOwnerGroup = null;
         const fs2 = document.getElementById('sm-field-start');
         if (fs2) delete fs2.dataset.filled;
+
+        // ONE group in the round: there is no scope question worth asking.
+        if (!isMultiGroupRound()) {
+            beginActionForm('group', roundGroupNumbers()[0] || 1);
+        } else if (hasGroupLock) {
+            // A group scorekeeper's "this group" can only ever mean their own.
+            showScopeStep();
+        } else {
+            showScopeStep();
+        }
+        document.getElementById("sidematch-modal").style.display = "flex";
+    }
+
+    function showScopeStep() {
+        actionScope = null;
+        actionOwnerGroup = null;
+        const g = document.getElementById('sm-scope-group-title');
+        const b = document.getElementById('sm-scope-group-blurb');
+        if (hasGroupLock) {
+            if (g) g.textContent = 'Group ' + lockedGroup;
+            if (b) b.textContent = 'Play something with the golfers in your foursome';
+        } else {
+            if (g) g.textContent = 'This Group';
+            if (b) b.textContent = 'Play something inside one foursome';
+        }
+        setStep('scope');
+    }
+
+    function backToScopeStep() { showScopeStep(); }
+
+    function setStep(step) {
+        const scope = document.getElementById('sm-scope-step');
+        const owner = document.getElementById('sm-owner-step');
+        const form = document.getElementById('sm-form-step');
+        if (scope) scope.style.display = step === 'scope' ? 'block' : 'none';
+        if (owner) owner.style.display = step === 'owner' ? 'block' : 'none';
+        if (form) form.style.display = step === 'form' ? 'block' : 'none';
+        const title = document.getElementById('sm-modal-title');
+        if (title) title.textContent = step === 'form' ? '\u2694\uFE0F New Action' : '\u2694\uFE0F Add Action';
+    }
+
+    function pickActionScope(scope) {
+        if (scope === 'cross') { beginActionForm('cross', null); return; }
+        // Group scope. A locked link already knows which group; the organizer picks.
+        if (hasGroupLock) { beginActionForm('group', lockedGroup); return; }
+        const groups = roundGroupNumbers();
+        if (groups.length <= 1) { beginActionForm('group', groups[0] || 1); return; }
+        renderOwnerGroupChoices(groups);
+        setStep('owner');
+    }
+
+    function renderOwnerGroupChoices(groups) {
+        const wrap = document.getElementById('sm-owner-choices');
+        if (!wrap) return;
+        const players = currentData.players || [];
+        const map = buildPlayerGroupMap();
+        wrap.innerHTML = groups.map(g => {
+            const names = players.filter(p => String(map[String(p.id)]) === String(g))
+                .map(p => p.name.split(' ')[0]).join(', ');
+            return `<button type="button" class="sm-scope-choice" onclick="pickOwnerGroup(${g})">`
+                + `<strong>Group ${g}</strong><small>${names || 'No golfers'}</small></button>`;
+        }).join('');
+    }
+
+    function pickOwnerGroup(g) { beginActionForm('group', g); }
+
+    // Enters the shared creation form with the scope already decided. ONE form,
+    // configured differently - no second copy of the wager fields exists.
+    function beginActionForm(scope, ownerGroup) {
+        actionScope = scope;
+        actionOwnerGroup = (scope === 'group') ? ownerGroup : null;
+        const sel = document.getElementById("sm-format");
+        if (sel) sel.value = "match";
+        applyScopeToFormatOptions();
+        renderScopeBanner();
         onSideMatchFormatChange();
         renderSideMatchPicker();
         populateStartHolePicker();
-        document.getElementById("sidematch-modal").style.display = "flex";
+        setStep('form');
+    }
+
+    // Dots is a foursome game. Offering it under Across Groups and rejecting it on
+    // save would be a broken option; it is removed from the list instead, with the
+    // reason stated in golf language.
+    function applyScopeToFormatOptions() {
+        const sel = document.getElementById('sm-format');
+        if (!sel) return;
+        let dots = Array.from(sel.options).find(o => o.value === 'dots');
+        const note = document.getElementById('sm-format-note');
+        if (actionScope === 'cross') {
+            if (dots) dots.remove();
+            if (sel.value === 'dots') sel.value = 'match';
+            if (note) {
+                note.textContent = 'Dots / Junk is played within one scoring group, so it isn\u2019t available across groups.';
+                note.style.display = 'block';
+            }
+        } else {
+            if (!dots) {
+                dots = document.createElement('option');
+                dots.value = 'dots';
+                sel.appendChild(dots);
+            }
+            // The label must state the actual field, or it promises the wrong money.
+            dots.textContent = isMultiGroupRound()
+                ? 'Dots / Junk (everyone in the group)'
+                : 'Dots / Junk (everyone playing)';
+            if (note) note.style.display = 'none';
+        }
+    }
+
+    function renderScopeBanner() {
+        const el = document.getElementById('sm-scope-banner');
+        if (!el) return;
+        if (!isMultiGroupRound()) { el.style.display = 'none'; return; }
+        el.textContent = actionScope === 'cross'
+            ? '\u{1F310} Across Groups \u2014 pick golfers from different foursomes'
+            : `\u{1F512} Group ${actionOwnerGroup} action \u2014 only Group ${actionOwnerGroup} golfers`;
+        el.style.display = 'block';
     }
 
     function closeSideMatchModal() {
@@ -845,6 +1028,11 @@
         // wrongly would misstate real money.
         const stakeLabel = document.getElementById('sm-field-stake-label');
         if (stakeLabel) stakeLabel.textContent = (format === 'dots') ? '$ per dot' : 'Buy-in per golfer ($)';
+        // A group Skins game starts with the whole foursome already in, so the fast
+        // path is "type the money, save". Tapping a golfer off is the exception.
+        if (format === 'skins' && Object.keys(fieldActionPick).length === 0) {
+            selectablePlayers().forEach(p => { fieldActionPick[String(p.id)] = true; });
+        }
         if (fieldGame) renderFieldActionForm(format);
 
         updateSideMatchPickerFeedback();
@@ -874,19 +1062,28 @@
     function renderFieldActionForm(format) {
         const wrap = document.getElementById('sm-field-players');
         if (!wrap) return;
-        // Same scoping as the side match picker, for the same reason.
         const players = selectablePlayers();
         const chosenIds = Object.keys(fieldActionPick);
 
         if (format === 'dots') {
-            // Dots is a whole-field game in this architecture, so there is nothing to pick.
-            // Stated outright because Dots money is field-wide in the engine. Showing a
-            // participant picker here would let the UI promise scoping the maths does not
-            // do - participantIds are read for Skins, and ignored for Dots.
-            wrap.innerHTML = '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
-                + '<strong>Everyone in the round plays.</strong> Dots / Junk is field-wide \u2014 '
-                + 'every golfer playing for money wins and pays on every dot, across all groups.</p>';
+            // DOTS IS A FOURSOME GAME.
+            //
+            // Under group scope it belongs to exactly one group and every golfer in
+            // that group is in it - there is nothing to pick, which is precisely what
+            // makes it fast. Settlement honours the participantIds this writes
+            // (Phase 1 scoped it at the orchestration layer), so what this says and
+            // what the Receipt pays are now the same thing.
+            const names = ownerGroupPlayers().map(p => p.name.split(' ')[0]).join(', ');
+            wrap.innerHTML = isMultiGroupRound()
+                ? '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
+                    + `<strong>Group ${actionOwnerGroup}\u2019s dots game.</strong> ${names} \u2014 `
+                    + 'dots by golfers in other groups don\u2019t count and cost nothing here.</p>'
+                : '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
+                    + `<strong>Everyone playing.</strong> ${names}.</p>`;
         } else {
+            // Skins is genuinely participant-scoped, so the picker is real. Under
+            // group scope it is seeded with the whole foursome and golfers can be
+            // tapped off - "Steve's sitting this one out" is a real thing people say.
             wrap.innerHTML = players.map(pl => {
                 const on = chosenIds.includes(String(pl.id));
                 return `<button type="button" onclick="toggleFieldActionPlayer('${String(pl.id)}')"
@@ -948,14 +1145,25 @@
             const wrapper = document.getElementById(containerId);
             if (!wrapper) return;
             let html = "";
+            // Across Groups shows the whole field, so it has to say who is in which
+            // foursome - otherwise "Marty vs Stan" is just two names.
+            const showHeads = actionScope === 'cross' && distinctGroups > 1;
+            let lastGroup = null;
             players.forEach(p => {
+                const grp = groupMap[String(p.id)];
+                if (showHeads && grp !== lastGroup) {
+                    html += `<div class="sm-pick-group-head">Group ${grp || '?'}</div>`;
+                    lastGroup = grp;
+                }
                 const currentSide = sidematchPickState[p.id];
                 const isOnThisSide = currentSide === side;
                 const isOnOtherSide = currentSide && currentSide !== side;
                 const cls = isOnThisSide ? (side === 'a' ? 'pick-a' : 'pick-b') : (isOnOtherSide ? 'on-other-side' : '');
                 const cnt = existingCount[p.id] || 0;
                 const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
-                const groupTag = distinctGroups > 1 ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${groupMap[String(p.id)] || '?'}</span>` : '';
+                // Inside a group game every name is in the same group, so the tag is noise.
+                const groupTag = (!showHeads && distinctGroups > 1 && actionScope !== 'group')
+                    ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${grp || '?'}</span>` : '';
                 html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}', '${side}')">${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
             });
             wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
@@ -1144,10 +1352,16 @@
 
     function allPlayersInLockedGroup(playerIds) {
         if (!hasGroupLock) return false;
+        return allPlayersInGroup(playerIds, lockedGroup);
+    }
+
+    // Are all these golfers in one named group? Used both for permission (against
+    // the locked group) and for scope integrity (against the wager's owner group).
+    function allPlayersInGroup(playerIds, group) {
         const ids = playerIds || [];
-        if (ids.length === 0) return false;
+        if (ids.length === 0 || group === null || group === undefined) return false;
         const map = buildPlayerGroupMap();
-        return ids.every(pid => String(map[String(pid)]) === String(lockedGroup));
+        return ids.every(pid => String(map[String(pid)]) === String(group));
     }
 
     // PRESS. Byte-for-byte the rule index.html:1744 already applies, so the two
@@ -1198,14 +1412,39 @@
         return allPlayersInLockedGroup(playerIds);
     }
 
-    // Golfers this link may put into a NEW wager. Organizer sees the field; a
-    // group scorekeeper sees their own foursome. The write guard above does not
-    // depend on this - it is here so the UI shows what the rule already permits.
+    // Golfers this link may put into a NEW wager. Two independent constraints, and
+    // both apply:
+    //
+    //   PERMISSION - a group scorekeeper may only ever build a wager from its own
+    //                foursome. That is the Phase 0 rule and it is not negotiable.
+    //   SCOPE      - what the golfer just chose. 'group' narrows to the owner
+    //                group even for the organizer, who has no permission limit.
+    //
+    // The write guards do not depend on this - it is here so nobody is offered a
+    // name that would be refused on save.
     function selectablePlayers() {
         const players = currentData.players || [];
-        if (isOrganizerView()) return players;
         const map = buildPlayerGroupMap();
-        return players.filter(p => String(map[String(p.id)]) === String(lockedGroup));
+
+        // Scope narrows first, when one has been chosen.
+        let pool = players;
+        if (actionScope === 'group' && actionOwnerGroup !== null) {
+            pool = players.filter(p => String(map[String(p.id)]) === String(actionOwnerGroup));
+        }
+
+        // Then permission, which can only narrow further, never widen.
+        if (isOrganizerView()) return pool;
+        return pool.filter(p => String(map[String(p.id)]) === String(lockedGroup));
+    }
+
+    // Every golfer in the owner group, regardless of what is currently ticked.
+    // Used to seed a group Skins game and to define a group Dots game's field.
+    function ownerGroupPlayers() {
+        const players = currentData.players || [];
+        const map = buildPlayerGroupMap();
+        const g = actionOwnerGroup !== null ? actionOwnerGroup : lockedGroup;
+        if (g === null || g === undefined) return players;
+        return players.filter(p => String(map[String(p.id)]) === String(g));
     }
 
     // One place to refuse, so every refusal reads the same and none of them
@@ -1313,35 +1552,40 @@
 
         if (stake <= 0) { alert('\u26A0\uFE0F Enter an amount first.'); return; }
 
-        // DOTS IS STILL FIELD-WIDE MATHEMATICS.
-        //
-        // computeRoundMoneyByPlayer settles dots across data.players and does not
-        // read participantIds - so a Dots game started from a Group 1 link would
-        // quietly enrol, charge and pay every golfer in the round, including groups
-        // who never agreed to it. Group-local Dots is later work; until the money
-        // supports it, a group link cannot open that door at all.
-        //
-        // The organizer may still start field-wide Dots, which is exactly what it
-        // has always been and what the setup copy already says it is.
-        if (format === 'dots' && !isOrganizerView()) {
-            console.warn('Blocked: Dots from a group link would enrol the whole field.');
-            alert('\u26A0\uFE0F Dots / Junk currently plays across everyone in the round, not just your group \u2014 '
-                + 'so it has to be started by the organizer. Group-only Dots is coming.');
+        // Dots is a foursome game and is never created across groups. The chooser
+        // already removes it from the Across Groups list; this is the write-site
+        // half of that rule, because a removed <option> is not a guard.
+        if (format === 'dots' && actionScope === 'cross') {
+            console.warn('Blocked: Dots is a group-local game.');
+            alert('\u26A0\uFE0F Dots / Junk is played within one scoring group, so it can\u2019t be set up across groups.');
             return;
         }
 
         const entry = { format: format, enabled: true, startHole: startHole, createdAt: Date.now() };
 
+        // OWNERSHIP METADATA.
+        //
+        // participantIds answers "who pays". scope and ownerGroup answer "whose
+        // wager is this" - which participants alone cannot, because a Skins game of
+        // Marty, Manny and Stan could be a deliberate cross-group bet or a
+        // mis-assembled local one, and those have different management rules.
+        // Groups are fixed for the life of a round, so a stored ownerGroup stays true.
+        if (actionScope) entry.scope = actionScope;
+        if (actionScope === 'group' && actionOwnerGroup !== null) entry.ownerGroup = actionOwnerGroup;
+
         if (format === 'skins') {
             const chosen = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
             if (chosen.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a skins game.'); return; }
-            // Skins genuinely honours participantIds (settlement-engine.js:72), so a
-            // group-local skins game settles correctly today. It must still be built
-            // only from this link's own golfers.
             if (!canCreateWagerWith(chosen)) {
                 console.warn('Blocked: a Group ' + lockedGroup + ' link may only enrol its own golfers in skins.');
                 alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a skins game here can '
                     + 'only include Group ' + lockedGroup + ' golfers. Ask the organizer for a skins game across groups.');
+                return;
+            }
+            // A group game must not silently span groups, however it was assembled.
+            if (actionScope === 'group' && !allPlayersInGroup(chosen, actionOwnerGroup)) {
+                alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s skins game, so it can only include Group '
+                    + actionOwnerGroup + ' golfers. Use Across Groups for a game between foursomes.');
                 return;
             }
             const mode = document.getElementById('sm-field-mode').value || 'gross';
@@ -1349,11 +1593,31 @@
             entry.skinsPotFormat = mode;
             entry.skinsScoring = mode === 'net' ? 'net' : 'gross';
             entry.skinsCarryOver = (document.getElementById('sm-field-carry').value !== 'no');
-            // Only recorded when the field was actually narrowed, so a whole-group game
-            // stays identical to one saved before participant scoping existed.
+            // Recorded whenever the pot is narrower than the round. A whole-field game
+            // on a one-group round still records nothing, staying byte-identical to
+            // one saved before participant scoping existed.
             if (chosen.length < players.length) entry.participantIds = chosen;
         } else {
             entry.dotPointVal = stake;
+            // A GROUP DOTS GAME NAMES ITS FIELD.
+            //
+            // This is what Phase 1 unlocked: settlement now scopes to participantIds
+            // at the orchestration layer, so writing the foursome here means dots by
+            // golfers in other groups genuinely contribute $0 and cannot influence
+            // this game's payouts. Written only when the round has more than one
+            // group - a single foursome IS the field, and recording nothing keeps
+            // that round identical to every dots game saved before this existed.
+            if (isMultiGroupRound()) {
+                const groupIds = ownerGroupPlayers().map(p => String(p.id));
+                if (groupIds.length < 2) { alert('\u26A0\uFE0F That group needs at least two golfers for a dots game.'); return; }
+                if (!canCreateWagerWith(groupIds)) {
+                    console.warn('Blocked: dots outside this link\u2019s group.');
+                    alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start Group '
+                        + lockedGroup + '\u2019s dots game.');
+                    return;
+                }
+                entry.participantIds = groupIds;
+            }
         }
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
@@ -1390,6 +1654,16 @@
             return;
         }
 
+        // A wager created as a group game must actually be one. Without this, an
+        // organizer could choose "This Group", then assemble a cross-group match and
+        // save it labelled as local - the silent conversion the scope chooser exists
+        // to prevent.
+        if (actionScope === 'group' && !allPlayersInGroup(teamAIds.concat(teamBIds), actionOwnerGroup)) {
+            alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s action, so everyone in it must be a Group '
+                + actionOwnerGroup + ' golfer. Use Across Groups for a match between foursomes.');
+            return;
+        }
+
         const scoring = document.getElementById("sm-scoring").value;
         // FORWARD-LOOKING BY DEFAULT.
         //
@@ -1407,6 +1681,14 @@
         const startHole = (!isNaN(chosen) && chosen > 0) ? chosen : (autoStart || 1);
 
         let payload = { format, scoring, teamAIds, teamBIds, startHole, createdAt: Date.now() };
+
+        // Ownership metadata, same reasoning as saveFieldAction: participants say who
+        // pays, scope and ownerGroup say whose wager it is. Omitted entirely on a
+        // one-group round, so those wagers stay byte-identical to existing ones.
+        if (isMultiGroupRound() && actionScope) {
+            payload.scope = actionScope;
+            if (actionScope === 'group' && actionOwnerGroup !== null) payload.ownerGroup = actionOwnerGroup;
+        }
 
         if (format === 'stroke') {
             const holeStake = parseFloat(document.getElementById("sm-holestake").value) || 0;
