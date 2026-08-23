@@ -152,6 +152,37 @@ class MiniNode {
     }
     get firstChild() { return this.children[0] || null; }
     get lastChild() { return this.children[this.children.length - 1] || null; }
+
+    // A <select>'s option list. Production code legitimately reads sel.options to
+    // add, remove or relabel choices, and without this the stub returned undefined
+    // and any such code threw inside the harness - which meant a whole class of
+    // real UI behaviour could not be tested at all.
+    //
+    // Options declared in the page's static HTML arrive as innerHTML text rather
+    // than as appended nodes, so both sources are merged: parsed <option> tags
+    // first, then any element children appended since. Each parsed option is a real
+    // MiniNode, so .remove() on it behaves the way production expects.
+    get options() {
+        if (this.tagName !== 'SELECT') return undefined;
+        if (!this._parsedOptions || this._parsedOptionsFrom !== this._html) {
+            const parsed = [];
+            const re = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
+            let m;
+            while ((m = re.exec(this._html || '')) !== null) {
+                const node = new MiniNode('option');
+                const val = /value\s*=\s*"([^"]*)"/i.exec(m[1]);
+                node.value = val ? val[1] : m[2].trim();
+                node.textContent = m[2].trim();
+                node.parentNode = this;
+                parsed.push(node);
+            }
+            this._parsedOptions = parsed;
+            this._parsedOptionsFrom = this._html;
+        }
+        const appended = this.children.filter(c => c.tagName === 'OPTION');
+        const live = this._parsedOptions.filter(o => o.parentNode === this);
+        return live.concat(appended);
+    }
     get nextSibling() {
         if (!this.parentNode) return null;
         const i = this.parentNode.children.indexOf(this);
@@ -166,6 +197,12 @@ class MiniNode {
     removeChild(node) {
         const i = this.children.indexOf(node);
         if (i >= 0) { this.children.splice(i, 1); node.parentNode = null; }
+        else if (this._parsedOptions && this._parsedOptions.indexOf(node) >= 0) {
+            // An <option> that came from the page's own markup rather than from
+            // appendChild. Production calls opt.remove() on these, so detaching has
+            // to work for them too or the option would silently survive.
+            node.parentNode = null;
+        }
         return node;
     }
     // The method the old stub was missing entirely.
@@ -246,6 +283,18 @@ function createDocument() {
                 registry.set(id, el);
             }
             return registry.get(id);
+        },
+        // Declares that an id belongs to a particular tag, optionally with the inner
+        // markup the page ships. Used by loadHtmlInlineScript to seed <select>
+        // controls so production code that reads sel.options sees the real choices
+        // instead of undefined. Never overwrites an element a test already touched.
+        __declare(id, tag, innerHTML) {
+            if (registry.has(id)) return registry.get(id);
+            const el = new MiniNode(tag);
+            el.id = id;
+            if (innerHTML !== undefined) el._html = String(innerHTML);
+            registry.set(id, el);
+            return el;
         },
         querySelector(sel) { return root.querySelector(sel); },
         querySelectorAll(sel) { return root.querySelectorAll(sel); },
