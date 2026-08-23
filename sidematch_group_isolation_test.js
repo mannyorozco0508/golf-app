@@ -381,23 +381,52 @@ describe('INSTANCE CREATION — no silent enrolment of unrelated groups', () => 
         b.sb.__setElement('sm-field-carry', 'yes');
     }
 
-    test('DOTS is blocked from a group link — the math is still field-wide', () => {
-        // computeRoundMoneyByPlayer settles dots across data.players and ignores
-        // participantIds, so a Group 1 dots game would charge all eight golfers.
+    test('DOTS from a group link is now ALLOWED, and names its own foursome', () => {
+        // PHASE 0 BLOCKED THIS. PHASE 1 EARNED IT BACK.
+        //
+        // The original restriction existed because settlement ignored participantIds,
+        // so a Group 1 dots game would have charged all eight golfers. Phase 1 scoped
+        // dots at the orchestration layer, so a group dots game now genuinely settles
+        // among its own four. The block is lifted deliberately - and the wager must
+        // carry the metadata that makes it safe.
         const b = boot(1);
         fieldSetup(b, 'dots');
-        b.run(`saveFieldAction('dots');`);
-        assert.equal(b.wrote(), false, 'a group link started a field-wide dots game');
+        b.run(`actionScope = 'group'; actionOwnerGroup = 1; saveFieldAction('dots');`);
+        const w = b.writes();
+        assert.equal(w.length, 1, 'a group scorekeeper may start their own dots game');
+        // Joined, not deep-compared: the array is built inside the vm realm.
+        assert.equal(w[0].value.participantIds.map(String).sort().join(),
+            b.g1.map(p => String(p.id)).sort().join(),
+            'the dots game must be scoped to exactly its own group');
+        assert.equal(w[0].value.ownerGroup, 1);
+        assert.equal(w[0].value.scope, 'group');
     });
 
-    test('DOTS from the ORGANIZER is unchanged', () => {
+    test('a group link still cannot start ANOTHER group\'s dots game', () => {
+        const b = boot(1);
+        fieldSetup(b, 'dots');
+        b.run(`actionScope = 'group'; actionOwnerGroup = 2; saveFieldAction('dots');`);
+        assert.equal(b.wrote(), false, 'Group 1 must not be able to create Group 2 dots');
+    });
+
+    test('DOTS is refused outright under Across Groups scope', () => {
         const b = boot(ORGANIZER);
         fieldSetup(b, 'dots');
-        b.run(`saveFieldAction('dots');`);
+        b.run(`actionScope = 'cross'; actionOwnerGroup = null; saveFieldAction('dots');`);
+        assert.equal(b.wrote(), false, 'dots is a foursome game and must never span groups');
+    });
+
+    test('the ORGANIZER can start any group\'s dots game', () => {
+        const b = boot(ORGANIZER);
+        fieldSetup(b, 'dots');
+        b.run(`actionScope = 'group'; actionOwnerGroup = 2; saveFieldAction('dots');`);
         const w = b.writes();
         assert.equal(w.length, 1, 'organizer dots creation must not regress');
         assert.equal(w[0].value.format, 'dots');
         assert.equal(w[0].value.dotPointVal, 10);
+        assert.equal(w[0].value.ownerGroup, 2);
+        assert.equal(w[0].value.participantIds.map(String).sort().join(),
+            b.g2.map(p => String(p.id)).sort().join());
     });
 
     test('SKINS from a group link cannot enrol another group', () => {
