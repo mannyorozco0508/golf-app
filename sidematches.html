@@ -238,9 +238,10 @@
     <div class="action-card" id="sidematches-card">
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
+        <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
-        <button class="btn-primary" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
+        <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
         <!-- Was window.print(), which printed this page's own side-match maths as if it were
              an authoritative payout. There is ONE settlement document, and this opens it. -->
         <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
@@ -535,6 +536,17 @@
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
     let currentData = {};
+
+    // ---- Group lock ---------------------------------------------------------
+    // Resolved EXACTLY as index.html resolves it (index.html:1055-1056), because a
+    // scorekeeper holding one link must not find that the Matches tab believes they
+    // are somebody else. Parity between these two lines is asserted by a test.
+    //
+    // Deliberately independent of ?me=. Personal identity changes wording and
+    // ordering only; it must never grant a permission, because a link is not proof
+    // of identity.
+    let hasGroupLock = urlParams.get('group') !== null;
+    let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
 
     if (!currentMode) {
         window.location.href = "admin.html";
@@ -862,7 +874,8 @@
     function renderFieldActionForm(format) {
         const wrap = document.getElementById('sm-field-players');
         if (!wrap) return;
-        const players = currentData.players || [];
+        // Same scoping as the side match picker, for the same reason.
+        const players = selectablePlayers();
         const chosenIds = Object.keys(fieldActionPick);
 
         if (format === 'dots') {
@@ -911,7 +924,10 @@
     }
 
     function renderSideMatchPicker() {
-        const players = currentData.players || [];
+        // Only golfers this link may actually put into a wager. The write guard in
+        // saveSideMatch does not depend on this being right - it is here so the
+        // scorekeeper is not offered names that would be refused on save.
+        const players = selectablePlayers();
         const sideMatches = currentData.sideMatches || {};
 
         let existingCount = {};
@@ -1079,6 +1095,128 @@
         return map;
     }
 
+    // ========================================================================
+    // PERMISSIONS — the same model index.html already enforces, applied here.
+    //
+    // WHY THIS BLOCK EXISTS
+    // index.html gates scoring and pressing on ?group=, and checks at the write
+    // site rather than at the button, precisely so that removing a button in
+    // devtools achieves nothing. This page had none of that: it read ?group=
+    // once, to decorate nav links, and every write below it was open. A Group 1
+    // scorekeeper could delete Group 2's Nassau in two taps.
+    //
+    // These predicates are DUPLICATES of index.html's by design - this codebase
+    // has no module system and duplication is managed with parity tests, not
+    // imports. sidematch_group_isolation_test.js asserts both copies agree.
+    //
+    // WHAT THIS IS AND IS NOT
+    // This is product-level isolation: it stops accidental damage between
+    // friendly groups sharing a round. It is NOT authorization. Firebase rules
+    // still allow any holder of the game code to write any field directly, by
+    // design, because scoring is deliberately account-free. Closing that needs
+    // real auth and is explicitly out of scope here.
+    // ========================================================================
+
+    // Round configuration - creating and removing wagers, auto-pairing a field.
+    // The unparameterised round URL is the organizer's; a ?group=N link is a
+    // scoped scorekeeper link. Same single definition as index.html:2293.
+    function isOrganizerView() {
+        return !hasGroupLock;
+    }
+
+    // The raw STORED match, so permission is checked against the real
+    // participants rather than against whatever happens to be rendered.
+    function sideMatchById(key) {
+        return (currentData.sideMatches || {})[key] || null;
+    }
+
+    function sideMatchParticipantIds(sideMatch) {
+        if (!sideMatch) return [];
+        return (sideMatch.teamAIds || []).concat(sideMatch.teamBIds || []).map(String);
+    }
+
+    // Does this scorekeeper's group have a stake in these golfers?
+    function lockedGroupHasStake(playerIds) {
+        if (!hasGroupLock) return false;
+        const map = buildPlayerGroupMap();
+        return (playerIds || []).some(pid => String(map[String(pid)]) === String(lockedGroup));
+    }
+
+    function allPlayersInLockedGroup(playerIds) {
+        if (!hasGroupLock) return false;
+        const ids = playerIds || [];
+        if (ids.length === 0) return false;
+        const map = buildPlayerGroupMap();
+        return ids.every(pid => String(map[String(pid)]) === String(lockedGroup));
+    }
+
+    // PRESS. Byte-for-byte the rule index.html:1744 already applies, so the two
+    // pages can never disagree about who may press what.
+    //
+    // A side match press is IN-ROUND ACTION on one specific wager, not round
+    // configuration. Requiring the organizer would mean phoning them from the 9th
+    // tee to press a $50 bet, which nobody will do - so any holder of a
+    // scorekeeper link for a group with a stake may press. A match between two
+    // other groups is none of their business.
+    function canPressSideMatch(sideMatch) {
+        const players = currentData.players || [];
+        const isMultiGroupRound = players.length > 4;
+
+        if (!hasGroupLock) {
+            // A single-group round has no meaningful spectator distinction - the bare
+            // link IS the organizer's. On a multi-group round the same URL is what
+            // spectators hold, so it grants nothing.
+            return !isMultiGroupRound;
+        }
+
+        if (!sideMatch) return false;
+        return lockedGroupHasStake(sideMatchParticipantIds(sideMatch));
+    }
+
+    // REMOVE. Standing-based: the organizer always, or a group with a stake in
+    // this particular wager. A group scorekeeper may clean up a match their
+    // foursome is actually in - including a cross-group one they helped set up
+    // wrong - but a wager belonging entirely to other groups is not theirs to
+    // touch.
+    function canManageSideMatch(sideMatch) {
+        if (isOrganizerView()) return true;
+        if (!sideMatch) return false;
+        return lockedGroupHasStake(sideMatchParticipantIds(sideMatch));
+    }
+
+    // CREATE. Conservative by deliberate choice, pending the Group Action work.
+    //
+    // The picker cannot yet express "this is a local game" versus "this is
+    // explicitly cross-group" - that chooser is Phase 3. Until it exists, a group
+    // link may only create a wager whose golfers are ALL its own. Cross-group
+    // creation stays with the organizer, who has always done it.
+    //
+    // This is the conservative restriction rather than a guess at intent: it can
+    // only ever refuse a write, never permit one that was previously refused.
+    function canCreateWagerWith(playerIds) {
+        if (isOrganizerView()) return true;
+        return allPlayersInLockedGroup(playerIds);
+    }
+
+    // Golfers this link may put into a NEW wager. Organizer sees the field; a
+    // group scorekeeper sees their own foursome. The write guard above does not
+    // depend on this - it is here so the UI shows what the rule already permits.
+    function selectablePlayers() {
+        const players = currentData.players || [];
+        if (isOrganizerView()) return players;
+        const map = buildPlayerGroupMap();
+        return players.filter(p => String(map[String(p.id)]) === String(lockedGroup));
+    }
+
+    // One place to refuse, so every refusal reads the same and none of them
+    // silently no-op.
+    function refuseGroupWrite(what) {
+        console.warn('Blocked: this scorekeeper link may not ' + what + '.');
+        alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only manage Group '
+            + lockedGroup + '\u2019s action. Ask the organizer to ' + what + '.');
+        return false;
+    }
+
     function scorecardBaseUrl() {
         // Built from the directory, not by replacing a filename. Cloudflare Pages serves
         // this page as ".../sidematches", so a filename replace finds nothing and quietly
@@ -1175,11 +1313,37 @@
 
         if (stake <= 0) { alert('\u26A0\uFE0F Enter an amount first.'); return; }
 
+        // DOTS IS STILL FIELD-WIDE MATHEMATICS.
+        //
+        // computeRoundMoneyByPlayer settles dots across data.players and does not
+        // read participantIds - so a Dots game started from a Group 1 link would
+        // quietly enrol, charge and pay every golfer in the round, including groups
+        // who never agreed to it. Group-local Dots is later work; until the money
+        // supports it, a group link cannot open that door at all.
+        //
+        // The organizer may still start field-wide Dots, which is exactly what it
+        // has always been and what the setup copy already says it is.
+        if (format === 'dots' && !isOrganizerView()) {
+            console.warn('Blocked: Dots from a group link would enrol the whole field.');
+            alert('\u26A0\uFE0F Dots / Junk currently plays across everyone in the round, not just your group \u2014 '
+                + 'so it has to be started by the organizer. Group-only Dots is coming.');
+            return;
+        }
+
         const entry = { format: format, enabled: true, startHole: startHole, createdAt: Date.now() };
 
         if (format === 'skins') {
             const chosen = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
             if (chosen.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a skins game.'); return; }
+            // Skins genuinely honours participantIds (settlement-engine.js:72), so a
+            // group-local skins game settles correctly today. It must still be built
+            // only from this link's own golfers.
+            if (!canCreateWagerWith(chosen)) {
+                console.warn('Blocked: a Group ' + lockedGroup + ' link may only enrol its own golfers in skins.');
+                alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a skins game here can '
+                    + 'only include Group ' + lockedGroup + ' golfers. Ask the organizer for a skins game across groups.');
+                return;
+            }
             const mode = document.getElementById('sm-field-mode').value || 'gross';
             entry.skinsBuyIn = stake;
             entry.skinsPotFormat = mode;
@@ -1212,6 +1376,17 @@
         }
         if (teamAIds.length > 2) {
             alert("⚠️ Side matches support 1v1 or 2v2 only.");
+            return;
+        }
+
+        // A group link may only build a match out of its own foursome. Until the
+        // This Group / Across Groups chooser exists, the picker cannot say which
+        // was intended, so the safe reading is the local one. The organizer's
+        // cross-group creation is untouched.
+        if (!canCreateWagerWith(teamAIds.concat(teamBIds))) {
+            console.warn('Blocked: a Group ' + lockedGroup + ' link may only create a match between its own golfers.');
+            alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only set up matches '
+                + 'between Group ' + lockedGroup + ' golfers. Ask the organizer to set up a match against another group.');
             return;
         }
 
@@ -1262,7 +1437,11 @@
     let pendingDeleteMatchId = null;
 
     function deleteSideMatch(matchId) {
-        const sm = (currentData.sideMatches || {})[matchId];
+        const sm = sideMatchById(matchId);
+        // Checked here so the modal never opens on a wager this link cannot remove,
+        // and AGAIN at the write below so calling confirmDeleteSideMatch() directly
+        // achieves nothing.
+        if (!canManageSideMatch(sm)) return refuseGroupWrite('remove that match');
         const players = currentData.players || [];
         pendingDeleteMatchId = matchId;
 
@@ -1290,6 +1469,13 @@
     function confirmDeleteSideMatch() {
         if (!pendingDeleteMatchId) return;
         const matchId = pendingDeleteMatchId;
+        // THE write-site guard. Re-read from currentData rather than trusting the
+        // pending id, so a match that changed hands while the modal sat open is
+        // re-checked against what is actually stored now.
+        if (!canManageSideMatch(sideMatchById(matchId))) {
+            closeSideMatchDeleteModal();
+            return refuseGroupWrite('remove that match');
+        }
         db.ref(`events/${currentMode}/sideMatches/${matchId}`).remove()
             .catch(err => alert(`Failed to remove: ${err.message}`));
         closeSideMatchDeleteModal();
@@ -1380,6 +1566,7 @@
     }
 
     function openAutoPairModal() {
+        if (!isOrganizerView()) return refuseGroupWrite('set up the cross-group matchups');
         const result = buildAutoPairMatchups();
         autoPairPreview = result.matchups;
         renderAutoPairPreview(result.note);
@@ -1409,6 +1596,11 @@
     }
 
     function confirmAutoPairCreate() {
+        // Auto-pair builds a slate across the WHOLE field by definition, so it is
+        // organizer-only by definition. There is no scoped version of it to offer a
+        // group link, and one group should not be able to commit every other group
+        // to a set of matches in a single tap.
+        if (!isOrganizerView()) return refuseGroupWrite('set up the cross-group matchups');
         if (autoPairPreview.length === 0) {
             alert("⚠️ No matchups to create.");
             return;
@@ -1444,6 +1636,7 @@
     }
 
     function pressSideMatch(matchId, baseId, nextHole) {
+        if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         if (!confirm(`Start a new press, starting hole ${nextHole}?`)) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole })
@@ -1461,6 +1654,7 @@
     }
 
     function showSideHolePressInput(matchId, p1Id, p2Id) {
+        if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
         const p2 = players.find(p => String(p.id) === String(p2Id));
@@ -1484,10 +1678,15 @@
     function cancelSideHolePressInput(matchId, p1Id, p2Id) {
         const row = document.getElementById(`sm-hole-press-row-${matchId}`);
         if (!row) return;
-        row.innerHTML = `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1Id}', '${p2Id}')">🔥 Press</button>`;
+        row.innerHTML = canPressSideMatch(sideMatchById(matchId))
+            ? `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1Id}', '${p2Id}')">🔥 Press</button>`
+            : '';
     }
 
     function confirmSideHolePress(matchId, nextHole, p1Id, p2Id) {
+        // Guarded independently of showSideHolePressInput - this is the write, and it
+        // is reachable without ever calling the opener.
+        if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const input = document.getElementById(`sm-hole-press-amount-${matchId}`);
         if (!input) return;
         const rate = parseFloat(input.value);
@@ -1499,6 +1698,7 @@
     }
 
     function pressSideMatchOverall(matchId, p1Id, p2Id) {
+        if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
         const p2 = players.find(p => String(p.id) === String(p2Id));
@@ -1649,7 +1849,27 @@
         }).join('');
     }
 
+    // Says plainly which link this is, so a scorekeeper who cannot see a Remove
+    // button knows why rather than assuming the page is broken. Mirrors the badge
+    // index.html already shows on the scorecard.
+    function renderGroupLockBadge() {
+        const badge = document.getElementById('sm-group-lock-badge');
+        if (badge) {
+            if (hasGroupLock) {
+                badge.textContent = `\u{1F512} Group ${lockedGroup} scorekeeper \u2014 you can set up and manage Group ${lockedGroup}\u2019s action.`;
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        // Auto-pair commits the whole field, so it is not offered to a group link.
+        // confirmAutoPairCreate refuses independently of this.
+        const autoPair = document.getElementById('sm-autopair-btn');
+        if (autoPair) autoPair.style.display = isOrganizerView() ? '' : 'none';
+    }
+
     function renderSideMatches() {
+        renderGroupLockBadge();
         const list = document.getElementById("sidematches-list");
         if (!list) return;
 
@@ -1675,7 +1895,7 @@
 
             if (virtualPlayers.length < 2) {
                 html += `<div class="side-match-card"><div style="color:var(--accent-red); font-size:0.8rem;">Players missing from this match — they may have been removed from the round.</div>
-                    <div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove</button></div></div>`;
+                    ${canManageSideMatch(sm) ? `<div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove</button></div>` : ''}</div>`;
                 return;
             }
 
@@ -1706,7 +1926,7 @@
                     const carryText = holeCalc.currentCarry > 0 ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${holeCalc.currentCarry} carrying</span>` : '';
                     html += `<div class="side-match-row">
                         <span style="font-size:0.8rem;">💵 $${holeCalc.currentStake}/hole${carryText}</span>
-                        <span id="sm-hole-press-row-${matchId}"><button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button></span>
+                        <span id="sm-hole-press-row-${matchId}">${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button>` : ''}</span>
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
                 }
@@ -1727,7 +1947,7 @@
                     }
                     html += `<div class="side-match-row">
                         <span style="font-size:0.8rem;">🎯 Overall ($${sm.overallStake}): ${statusText}</span>
-                        <button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>
+                        ${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>` : ''}
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
                 }
@@ -1737,7 +1957,8 @@
                 }
 
                 html += buildSideMatchMiniScorecard(matchId, [p1, p2], smCourse, savedScores);
-                html += `<div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button></div></div>`;
+                if (canManageSideMatch(sm)) html += `<div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button></div>`;
+                html += `</div>`;
                 return;
             }
 
@@ -1796,9 +2017,9 @@
             const anyOpenPressable = calc.activeMatches.some(m => !m.closed);
             if (sm.pressRule === 'anytime' && anyOpenPressable && calc.maxThru > 0 && calc.maxThru < lastHole) {
                 const openBase = calc.activeMatches.find(m => !m.closed && m.pressNum === 0) || calc.activeMatches.find(m => !m.closed);
-                if (openBase) html += `<button class="btn-outline-sm" onclick="pressSideMatch('${matchId}', '${openBase.baseId}', ${nextPressHole})">➕ Press</button>`;
+                if (openBase && canPressSideMatch(sm)) html += `<button class="btn-outline-sm" onclick="pressSideMatch('${matchId}', '${openBase.baseId}', ${nextPressHole})">➕ Press</button>`;
             }
-            html += `<button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button>`;
+            if (canManageSideMatch(sm)) html += `<button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button>`;
             html += `</div></div>`;
         });
 
