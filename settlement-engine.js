@@ -485,7 +485,34 @@
             return computeHiLoSettlementNet(cfg, holes, savedScores);
         }
 
-        const result = computeRoundMoneyByPlayer(cfg, holes, savedScores);
+        // THE WAGER'S OWN FIELD, not the round's.
+        //
+        // computeRoundMoneyByPlayer derives its money players from cfg.players and has
+        // never read participantIds - that is a money-engine.js concern and it is not
+        // changing. So a Dots or Stableford instance scoped to four golfers was settling
+        // across all twelve: an outsider with five dots could WIN a game he was not in,
+        // and every golfer in the round paid for it.
+        //
+        // Worse, it was silently inconsistent. bet-strip.js and hole-events.js already
+        // call fieldParticipants(game.config), so the scorecard showed a four-player
+        // game live and the Receipt paid out an eight-player one.
+        //
+        // Scoping happens HERE, at the orchestration layer, exactly as Skins already
+        // does one branch above and as side matches have always done. No golf
+        // mathematics moves: the engines are simply handed the right people.
+        //
+        // IDENTICAL FOR EVERY EXISTING ROUND. fieldParticipants returns
+        // players.filter(playingForMoney !== false) whenever participantIds is absent -
+        // which is precisely what computeRoundMoneyByPlayer computes as moneyPlayers.
+        // No production path has ever written participantIds at the round root, so the
+        // main game is unaffected by construction, and a legacy Dots game settles to
+        // the same cent. Absence of participantIds still means "everyone", so there is
+        // nothing to migrate and no version flag to carry.
+        const scopedCfg = (typeof fieldParticipants === 'function')
+            ? Object.assign({}, cfg, { players: fieldParticipants(cfg) })
+            : cfg;
+
+        const result = computeRoundMoneyByPlayer(scopedCfg, holes, savedScores);
         if (!result.valid) return out;
         result.players.forEach(p => { out[p.id] = p.net || 0; });
         return out;
