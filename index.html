@@ -2182,8 +2182,8 @@
             // On a multi-group round "Group Games" is ambiguous - it could mean the
             // round's games or this foursome's. Naming the group removes the doubt.
             const gamesLabel = (hasGroupLock && roundGroupCount() > 1)
-                ? '\\uD83C\\uDFC6 Group ' + lockedGroup + ' Action'
-                : '\\uD83C\\uDFC6 Group Games';
+                ? '\uD83C\uDFC6 Group ' + lockedGroup + ' Action'
+                : '\uD83C\uDFC6 Group Games';
             body += '<button type="button" class="action-section-label section-toggle" onclick="toggleGroupGames()">' +
                 gamesLabel +
                 '<span class="sec-arrow">' + (groupGamesOpen ? '\u25BE' : '\u203A') + '</span>' +
