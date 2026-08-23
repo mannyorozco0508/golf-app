@@ -360,8 +360,22 @@ describe('DOTS IS FIELD-WIDE, AND SAYS SO', () => {
         assert.ok(/\$ per dot/.test(sm), 'calling it a buy-in would misstate the money');
     });
 
-    test('participantIds genuinely have no effect on Dots money — documented, not implied', () => {
-        // Proof the label is honest: scoping the game changes nothing.
+    test('the ENGINE now honours participantIds — but the UI still creates field-wide Dots', () => {
+        // THIS TEST WAS INVERTED IN PHASE 1, DELIBERATELY.
+        //
+        // It used to assert that participantIds had NO effect on Dots money, and it
+        // carried a tripwire: "if this ever differs, Dots became scoped and the
+        // field-wide wording must change." Phase 1 scoped the maths at the
+        // orchestration layer, so the tripwire fired exactly as designed.
+        //
+        // The wording above is still HONEST, which is why those tests are untouched:
+        // saveFieldAction writes only dotPointVal for Dots and never participantIds,
+        // and no participant picker is rendered for it. So every Dots game a golfer
+        // can actually create today still plays across the whole field.
+        //
+        // What changed is that the engine is now READY for a scoped Dots game. The
+        // picker that would create one is Phase 3 work, and the "everyone plays"
+        // copy must be revisited in the same batch that ships it.
         const { P, S, id } = field(4);
         const dots = { h5: { [`p${id(0)}`]: ['birdie'] } };
         const mk = parts => {
@@ -371,7 +385,24 @@ describe('DOTS IS FIELD-WIDE, AND SAYS SO', () => {
         };
         const wide = call(`return computeGameNetByPlayerId(getRoundGames(${J(mk(null))}).find(function(g){ return g.format === 'dots'; }), ${J(CD)}, ${J(S)});`);
         const scoped = call(`return computeGameNetByPlayerId(getRoundGames(${J(mk([id(0), id(1)]))}).find(function(g){ return g.format === 'dots'; }), ${J(CD)}, ${J(S)});`);
-        assert.equal(J(wide), J(scoped),
-            'if this ever differs, Dots became scoped and the field-wide wording must change');
+
+        // Unscoped is unchanged: all four golfers, exactly as before Phase 1.
+        assert.equal(Object.keys(wide).length, 4, 'an unscoped Dots game must still be field-wide');
+
+        // Scoped now genuinely narrows the pot to the two named golfers.
+        assert.equal(Object.keys(scoped).length, 2, 'participantIds must now scope Dots money');
+        assert.notEqual(J(wide), J(scoped), 'scoping must change the money, or the fix did nothing');
+
+        // Both remain zero-sum.
+        assert.equal(Object.values(wide).reduce((a, b) => a + b, 0), 0);
+        assert.equal(Object.values(scoped).reduce((a, b) => a + b, 0), 0);
+    });
+
+    test('the Dots creation path still writes no participantIds, so the copy stays true', () => {
+        const fn = sm.slice(sm.indexOf('function saveFieldAction'), sm.indexOf('let pendingDeleteMatchId'));
+        const elseBranch = fn.slice(fn.indexOf('} else {'));
+        assert.ok(/entry\.dotPointVal = stake;/.test(elseBranch));
+        assert.ok(!/participantIds/.test(elseBranch),
+            'if Dots ever starts writing participantIds, the field-wide wording must change with it');
     });
 });
