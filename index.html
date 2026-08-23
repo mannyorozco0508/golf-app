@@ -1559,10 +1559,54 @@
     let addActionGame = null;
 
     function canAddAction() {
+        // The INLINE quick panel only. It writes a wager with no participants named,
+        // which is the right thing for a single foursome - one group IS the field -
+        // and the wrong thing the moment a round has more than one group, where a
+        // wager has to say whose it is. Multi-group rounds get the canonical
+        // scope-aware flow instead (see addGroupActionHref).
+        if (roundGroupCount() > 1) return false;
         if (typeof isOrganizerView === 'function' && !isOrganizerView()) return false;
         if (typeof addableGames !== 'function') return false;
         if (addableGames(currentData).length === 0) return false;
         return addActionStartHole() !== null;
+    }
+
+    function roundGroupCount() {
+        const players = currentData.players || [];
+        if (players.length === 0) return 1;
+        return computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {}).length;
+    }
+
+    // WHERE "+ ADD GROUP ACTION" GOES.
+    //
+    // Deliberately a link to the Action page rather than a second copy of the wager
+    // form. That page already owns the scope chooser, the group-scoped pickers, the
+    // Dots rules and every write guard; rebuilding any of it here would create two
+    // implementations of the same money decisions, which is exactly how the live
+    // view and settlement drifted apart before.
+    //
+    // The group parameter rides along, so a Group 1 scorekeeper lands already scoped
+    // to Group 1 and never has to explain to the app who they are.
+    function addGroupActionHref() {
+        const loc = window.location;
+        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
+        let href = loc.origin + dir + 'sidematches.html?game=' + currentMode;
+        if (hasGroupLock) href += '&group=' + lockedGroup;
+        return href + '&add=1';
+    }
+
+    // A group scorekeeper must be able to start their own action from the cockpit
+    // they are already looking at, without hunting through More first.
+    //
+    // No permission test here on purpose: this is a link, and the page it opens
+    // owns every write guard. Duplicating the rule would give it two places to
+    // drift from.
+    function canAddGroupAction() {
+        return roundGroupCount() > 1;
+    }
+
+    function addGroupActionLabel() {
+        return hasGroupLock ? '+ ADD GROUP ' + lockedGroup + ' ACTION' : '+ ADD ACTION';
     }
 
     function addActionStartHole() {
@@ -1632,10 +1676,22 @@
         const startHole = addActionStartHole();
         if (startHole === null) { closeAddAction(); alert('There are no holes left to play.'); return; }
 
-        const entry = Object.assign({}, spec.defaults, { enabled: true, startHole: startHole });
+        const entry = Object.assign({}, spec.defaults, { format: format, enabled: true, startHole: startHole, createdAt: Date.now() });
         entry[spec.stakeField] = amount;
 
-        db.ref(`events/${currentMode}/additionalGames/${format}`).set(entry)
+        // INSTANCES, NOT THE LEGACY SLOT.
+        //
+        // additionalGames holds ONE game per format, so writing there meant a round
+        // could never carry two dots games - and "Group 1 has $5 dots, Group 2 has
+        // $10 dots" is exactly what Group Action is for. The second write would have
+        // silently overwritten the first, taking real money with it.
+        //
+        // additionalGameInstances is the same canonical model the setup wizard and
+        // the Action page already use, and getRoundGames() normalizes both shapes, so
+        // saved rounds carrying the old slot keep working untouched. Nothing is
+        // migrated.
+        const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
+        db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
             .catch(err => alert(`Couldn't add that game: ${err.message}`));
 
         closeAddAction();
@@ -1963,6 +2019,20 @@
             return;
         }
 
+        // GROUP VISIBILITY.
+        //
+        // Side matches were already scoped - buildSideActionRows drops any match with
+        // no scoped player in it. Round-level games were not, because until Group
+        // Action every one of them genuinely involved the whole field. Now that a
+        // foursome can own its own Dots or Skins game, Group 1 must not be shown
+        // Group 2's, any more than it is shown Group 2's match.
+        //
+        // Filtered HERE rather than inside bet-strip.js: that file builds every row
+        // for every consumer, and who may SEE a row is a property of the link being
+        // held, not of the wager. Same reason settlement scopes at the orchestration
+        // layer instead of inside the engines.
+        games = games.filter(g => canSeeRoundGame(g.key));
+
         // When we know who's holding the phone, their own action leads. Nothing is
         // hidden - Other Action still lists everything - it is purely an ordering.
         const me = resolvedMeId();
@@ -2109,8 +2179,13 @@
             // One line when closed: a golfer glances at group games far less often than
             // at his own match, and four rows of them push everything else down.
             const summary = groupRows.map(g => (g.icon ? g.icon + ' ' : '') + g.label).join(' \u00B7 ');
+            // On a multi-group round "Group Games" is ambiguous - it could mean the
+            // round's games or this foursome's. Naming the group removes the doubt.
+            const gamesLabel = (hasGroupLock && roundGroupCount() > 1)
+                ? '\\uD83C\\uDFC6 Group ' + lockedGroup + ' Action'
+                : '\\uD83C\\uDFC6 Group Games';
             body += '<button type="button" class="action-section-label section-toggle" onclick="toggleGroupGames()">' +
-                '\uD83C\uDFC6 Group Games' +
+                gamesLabel +
                 '<span class="sec-arrow">' + (groupGamesOpen ? '\u25BE' : '\u203A') + '</span>' +
                 '</button>';
             body += groupGamesOpen
@@ -2141,6 +2216,9 @@
 
         if (addActionOpen) body += buildAddActionPanelHtml();
         else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ ADD ACTION</button>';
+        // A multi-group round needs the scope-aware flow, which lives on the Action
+        // page. This is a LINK to it, never a second copy of the wager form.
+        else if (canAddGroupAction()) body += '<a class="add-action-btn" href="' + addGroupActionHref() + '">' + addGroupActionLabel() + '</a>';
 
         mount.innerHTML = '<div class="action-center">' + toggle + '<div class="action-body">' + body + '</div></div>';
     }
@@ -2450,8 +2528,35 @@
         return map[playerId] !== undefined ? map[playerId] : null;
     }
 
-    function canWritePlayer(playerId) {
-        // Organizer (no ?group=) may score anyone. This is the existing Batch 1 rule.
+    // Which round-level wagers this link may SEE.
+    //
+    // Visibility and permission are different questions with the same shape: a
+    // wager is yours to look at if your group has a stake in it. A Group 1
+    // scorekeeper sees Group 1's dots and any cross-group game one of their four is
+    // in; an unrelated Group 2-vs-Group 3 game is none of their business and only
+    // clutters the cockpit.
+    //
+    // The organizer sees everything, and a one-group round has nothing to hide.
+    // Games with no participantIds are field-wide by definition, so everyone is in
+    // them - which is what keeps every legacy round rendering exactly as before.
+    function canSeeRoundGame(gameKey) {
+        if (!hasGroupLock) return true;
+        const players = currentData.players || [];
+        if (players.length <= 4) return true;
+        if (typeof getRoundGames !== 'function' || typeof fieldParticipants !== 'function') return true;
+        let game;
+        try {
+            game = getRoundGames(currentData).find(g => g.key === gameKey);
+        } catch (e) { return true; }
+        if (!game || game.role === 'main') return true;
+        const ids = fieldParticipants(game.config).map(p => String(p.id));
+        // A wager naming the whole field is everybody's.
+        if (ids.length >= players.filter(p => p.playingForMoney !== false).length) return true;
+        const map = window.__scPlayerGroupMap || {};
+        return ids.some(pid => String(map[pid]) === String(lockedGroup));
+    }
+
+    function canWritePlayer(playerId) {        // Organizer (no ?group=) may score anyone. This is the existing Batch 1 rule.
         if (!hasGroupLock) {
             const players = currentData.players || [];
             const isMultiGroupRound = players.length > 4;
