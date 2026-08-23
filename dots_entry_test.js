@@ -340,19 +340,31 @@ describe('MONEY — unchanged, and still reconciling', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Part 17: the UI must not promise scoping the maths does not do.
-describe('DOTS IS FIELD-WIDE, AND SAYS SO', () => {
+// The UI must never promise a field the maths does not settle. That rule has not
+// changed; what changed is the maths. Phase 1 scoped Dots settlement to
+// participantIds, and Group Action now writes them - so the honest wording is no
+// longer "field-wide", it is "this group".
+describe('DOTS STATES ITS ACTUAL FIELD', () => {
     const sm = read('sidematches.html');
 
     test('no participant picker is offered for Dots', () => {
+        // Still true, and still deliberate: a group Dots game IS the whole foursome,
+        // so there is nothing to tick. Skins is the participant-scoped one.
         const fn = sm.slice(sm.indexOf('function onSideMatchFormatChange'), sm.indexOf('function renderFieldActionForm'));
         assert.ok(/\(format === 'skins'\) \? 'block' : 'none'/.test(fn),
             'the participant picker is Skins-only');
     });
 
-    test('the setup says everyone plays', () => {
-        assert.ok(/Everyone in the round plays/.test(sm));
-        assert.ok(/field-wide/.test(sm));
+    test('the setup names the group whose dots game it is', () => {
+        assert.ok(/Group \$\{actionOwnerGroup\}\\u2019s dots game/.test(sm),
+            'a multi-group round must say which group the dots game belongs to');
+        assert.ok(/don\\u2019t count and cost nothing here/.test(sm),
+            'and must say plainly that other groups\' dots do not count');
+    });
+
+    test('a one-group round still says everyone plays', () => {
+        // Nothing changed for Marty Monday: one foursome IS the field.
+        assert.ok(/Everyone playing/.test(sm));
         assert.ok(/everyone playing/.test(sm), 'and the format list says it too');
     });
 
@@ -398,11 +410,20 @@ describe('DOTS IS FIELD-WIDE, AND SAYS SO', () => {
         assert.equal(Object.values(scoped).reduce((a, b) => a + b, 0), 0);
     });
 
-    test('the Dots creation path still writes no participantIds, so the copy stays true', () => {
+    test('Dots now writes participantIds on a multi-group round, and the copy changed with it', () => {
+        // THIS TEST WAS INVERTED IN THE GROUP ACTION BATCH, DELIBERATELY.
+        //
+        // Its previous form asserted Dots wrote NO participantIds, carrying the
+        // tripwire "if Dots ever starts writing participantIds, the field-wide
+        // wording must change with it." Group Action made that happen, and the
+        // wording above changed in the same batch - which is exactly what the
+        // tripwire was for.
         const fn = sm.slice(sm.indexOf('function saveFieldAction'), sm.indexOf('let pendingDeleteMatchId'));
         const elseBranch = fn.slice(fn.indexOf('} else {'));
         assert.ok(/entry\.dotPointVal = stake;/.test(elseBranch));
-        assert.ok(!/participantIds/.test(elseBranch),
-            'if Dots ever starts writing participantIds, the field-wide wording must change with it');
+        assert.ok(/entry\.participantIds = groupIds;/.test(elseBranch),
+            'a group dots game must name its field');
+        assert.ok(/if \(isMultiGroupRound\(\)\)/.test(elseBranch),
+            'and must record nothing on a one-group round, keeping those rounds identical');
     });
 });
