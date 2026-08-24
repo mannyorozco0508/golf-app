@@ -616,6 +616,57 @@
 
             if (sm.format === 'stroke') {
                 const sides = { sideA: teamA, sideB: teamB };
+
+                // THE RECEIPT MUST EXPLAIN ALL THE MONEY.
+                //
+                // A stroke side match is TWO wagers: a $/hole bet and an overall bet.
+                // Settlement (computeCombinedNetTotals, directly below this function)
+                // has always summed BOTH engines - but this receipt reported only the
+                // overall. A $10/hole match with a $78 hole press settled $1,064 that
+                // appeared nowhere on the page: Final Results said one number, the
+                // Receipt said another, and a golfer had no way to see why. Worse, a
+                // $/hole-only match produced no receipt at all.
+                //
+                // No new calculation is introduced. The hole figures below come from
+                // calculateHoleBetEngine - the exact engine settlement already trusts -
+                // called with growing press prefixes so each press's contribution is
+                // its own line and the lines sum, by construction, to the engine total.
+                const holeCfg = Object.assign({
+                    holeEnabled: (sm.holeStake || 0) > 0,
+                    holeStake: sm.holeStake || 0,
+                    segment: sm.segment || 'full',
+                    tieRule: sm.tieRule || 'carry',
+                    scoringType: sm.scoring || 'net'
+                }, sides);
+                const holePresses = (sm.holePresses ? Object.values(sm.holePresses) : [])
+                    .slice().sort((a, b) => a.fromHole - b.fromHole);
+                let holeNet = 0;
+                if (holeCfg.holeEnabled) {
+                    const at = k => {
+                        const r = calculateHoleBetEngine([teamA[0], teamB[0]], smCourse, savedScores,
+                            holeCfg, holePresses.slice(0, k));
+                        return r ? r.p1Money : 0;
+                    };
+                    let prev = at(0);
+                    const holeSeg = (label, startHole, rate, money) => ({
+                        label, startHole,
+                        endHole: lastHole,
+                        stake: rate, perHole: true,
+                        result: money > 0 ? `${nameA} up $${Math.abs(money)}`
+                            : (money < 0 ? `${nameB} up $${Math.abs(money)}` : 'Even'),
+                        winner: money > 0 ? nameA : (money < 0 ? nameB : null),
+                        money: Math.abs(money),
+                        toSideA: money > 0
+                    });
+                    receipt.segments.push(holeSeg('Hole Bet', firstHole, holeCfg.holeStake, prev));
+                    holePresses.forEach((pr, i) => {
+                        const cum = at(i + 1);
+                        receipt.segments.push(holeSeg(`Hole Press ${i + 1}`, pr.fromHole, pr.newStake, cum - prev));
+                        prev = cum;
+                    });
+                    holeNet = prev;
+                }
+
                 const cfg = Object.assign({
                     overallEnabled: (sm.overallStake || 0) > 0,
                     overallStake: sm.overallStake || 0,
@@ -626,7 +677,10 @@
                 const calc = cfg.overallEnabled
                     ? calculateOverallBetEngine([teamA[0], teamB[0]], smCourse, savedScores, cfg, presses)
                     : null;
-                if (!calc) return;
+                // A $/hole-only match is a real wager with a real receipt.
+                if (!calc && !holeCfg.holeEnabled) return;
+                if (!calc) { receipt.net = holeNet; }
+                else {
 
                 const describe = (seg, label) => {
                     const margin = Math.abs(seg.p1Total - seg.p2Total);
@@ -646,10 +700,13 @@
                     };
                 };
 
-                receipt.segments.push(describe(calc.base, 'Original'));
+                receipt.segments.push(describe(calc.base, 'Overall'));
                 (calc.pressSegs || []).forEach((seg, i) =>
-                    receipt.segments.push(describe(seg, `Press ${i + 1}`)));
-                receipt.net = calc.p1Money;
+                    receipt.segments.push(describe(seg, `Overall Press ${i + 1}`)));
+                // The one number a golfer argues about. Hole money and overall money
+                // together - the SAME sum settlement pays, or the receipt is a lie.
+                receipt.net = holeNet + calc.p1Money;
+                }
             } else {
                 // Match Play / Nassau: the engine reports its own segments and presses.
                 const virtual = teamA.map(p => Object.assign({}, p, { team: 'Team 1' }))
@@ -670,11 +727,15 @@
                         // whether the front nine counted. Clamped to what was actually played.
                         startHole: Math.max(m.startHole, firstHole),
                         endHole: Math.min(m.endHole, lastHole),
-                        stake: sm.stake || 0,
+                        // A manual press may carry its own stake (money-engine stores it
+                        // on the segment). Absent - every base match, every auto press,
+                        // every legacy press - it falls back to the match stake, so old
+                        // receipts print exactly what they always printed.
+                        stake: (m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake,
                         result: m.closed && m.finalResult ? m.finalResult
                             : (m.status === 0 ? 'All square' : `${m.status > 0 ? calc.t1Name : calc.t2Name} ${Math.abs(m.status)} up`),
                         winner: m.closed ? (m.status > 0 ? calc.t1Name : (m.status < 0 ? calc.t2Name : null)) : null,
-                        money: sm.stake || 0,
+                        money: (m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake,
                         toSideA: m.status > 0
                     });
                 });
