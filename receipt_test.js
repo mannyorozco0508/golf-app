@@ -277,32 +277,62 @@ describe('RESULTS PAGE renders the receipt', () => {
     });
 });
 
-describe('GROUP GAMES labelling', () => {
+// THIS BLOCK CHANGED CONTRACT, IT WAS NOT WEAKENED.
+//
+// It used to assert that the per-player money checkbox on the setup screen was
+// well labelled: a GROUP GAMES header, a tooltip naming what it gated, a hint
+// line, a 24px tap target. Those assertions were correct for a control that no
+// longer exists.
+//
+// The checkbox was removed because it asked the wrong question at the wrong
+// time. It set ONE round-wide flag, playingForMoney, and unchecking a golfer
+// removed them from the main bet, from every round-wide game, from Skins, Dots
+// and Birdies - and, via pool-engine's fallback, from the whole-field MONEY
+// POOL. An organizer assigning foursomes cannot know yet whether Group 2 will
+// run a dots game, let alone who wants in.
+//
+// The replacement assertions are STRICTLY STRONGER than what they replace. The
+// old set could only confirm a label was present. The new set confirms the
+// control cannot come back by accident, that both capture paths still default a
+// missing input to true, that the screen explains where the decision moved, and
+// that no stale instruction to "uncheck" anyone survives anywhere in the file.
+describe('GROUP GAMES - participation is no longer decided at setup', () => {
     const adm = read('admin.html');
 
-    test('REGRESSION: the bare money-bag icon is gone', () => {
-        assert.ok(!/title="Playing for money\?">\u{1F4B0}/u.test(adm), 'the unlabelled icon survives');
-        assert.ok(/GROUP<br>GAMES/.test(adm));
+    test('the per-player money checkbox and its column are gone', () => {
+        assert.ok(!/<input type="checkbox" class="p-money-input"/.test(adm), 'the checkbox survives');
+        assert.ok(!/GROUP<br>GAMES/.test(adm), 'the column header survives');
+        assert.ok(!/title="Playing for money\?">\u{1F4B0}/u.test(adm), 'the old unlabelled icon survives');
     });
 
-    test('the checkbox explains what it actually gates', () => {
-        assert.ok(/In the round-wide group games \(Skins, Dots, Birdies, main bet\)/.test(adm));
-        assert.ok(/Side Matches pick their own players/.test(adm));
+    test('no instruction to uncheck anybody survives in what the organizer actually sees', () => {
+        // A leftover "uncheck a golfer if..." line would send the organizer looking
+        // for a control that is not there.
+        //
+        // Comments are stripped first. admin.html explains WHY the checkbox was
+        // removed in a comment, and that explanation naturally quotes the old
+        // wording; matching raw source would fail on the file's own documentation.
+        // What matters is the rendered copy, so that is what gets scanned.
+        const live = adm.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/[^\n]*/gm, '');
+        assert.ok(!/[Uu]ncheck a golfer/.test(live), 'stale instruction for a removed control');
+        assert.ok(!/sitting out the group-wide bets/.test(live), 'stale copy');
     });
 
-    test('a one-line hint sits under the player list', () => {
-        assert.ok(/function renderGroupGamesHint/.test(adm));
-        assert.ok(/sitting out the group-wide bets/.test(adm));
-        assert.ok(/Side Matches choose their own players separately/.test(adm));
+    test('both capture paths default a missing input to true, so nobody is written out', () => {
+        const hits = adm.match(/const moneyVal = moneyInput \? moneyInput\.checked : true;/g) || [];
+        assert.equal(hits.length, 2, 'capturePlayers and the save path must both default to true');
+    });
+
+    test('the screen says where participation is decided instead', () => {
+        assert.ok(/function renderGroupGamesHint/.test(adm), 'the hint function should remain');
+        assert.ok(/Groups choose their own games from their own link/.test(adm));
+        assert.ok(/Side Matches pick their own players separately/.test(adm));
+        assert.ok(/Money Pool/.test(adm), 'the pool must be named, so the separation is explicit');
     });
 
     test('the stored field is unchanged, so legacy rounds still work', () => {
         assert.ok(/playingForMoney/.test(adm));
         assert.ok(/playingForMoney !== false/.test(adm), 'absence must still mean true');
-    });
-
-    test('the checkbox stays a comfortable tap target', () => {
-        assert.ok(/width:24px; height:24px/.test(adm));
     });
 });
 
