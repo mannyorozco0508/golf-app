@@ -91,7 +91,7 @@ function nameFor(player, meId) {
 }
 
 // Rewrites a status line the engines produced into second person. Works on whole
-// words only, so "Manny/Marty 2 UP" becomes "You/Marty 2 UP" - which keeps the golf
+// words only, so "Avery/Blake 2 UP" becomes "You/Blake 2 UP" - which keeps the golf
 // meaning of a TEAM wager intact. Saying "You 2 UP" there would imply a singles
 // match, so the partner's name is deliberately left in place.
 function personalize(text, meName) {
