@@ -1917,12 +1917,31 @@
             .catch(err => alert(`Failed to create matchups: ${err.message}`));
     }
 
+    // A press is a real bet with a real amount, so it is entered, written, and only
+    // then acknowledged. Claiming success before Firebase answers would let a dead
+    // spot on the 14th tee invent a wager that exists on one phone and nowhere else.
+    function pressMatchNames(sm) {
+        const players = currentData.players || [];
+        const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? p.name.split(' ')[0] : '?'; };
+        return `${(sm.teamAIds || []).map(nm).join(' / ')} vs ${(sm.teamBIds || []).map(nm).join(' / ')}`;
+    }
+
     function pressSideMatch(matchId, baseId, nextHole) {
-        if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
-        if (!confirm(`Start a new press, starting hole ${nextHole}?`)) return;
+        const sm = sideMatchById(matchId);
+        if (!canPressSideMatch(sm)) return refuseGroupWrite('press that match');
+        // CUSTOM PRESS AMOUNTS. "Press you for $78" is a different bet from "press
+        // you for the same $50" - the golfer says which, and the number they say is
+        // the number that settles. Default offered is the original stake, so the
+        // common case is one tap of OK.
+        const orig = sm && sm.stake ? sm.stake : 0;
+        const raw = prompt(`Press amount ($) \u2014 starts hole ${nextHole}`, String(orig || ''));
+        if (raw === null) return;   // golfer changed their mind - nothing happens
+        const amt = parseFloat(raw);
+        if (isNaN(amt) || amt <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
-        db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole })
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+        db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
+            .then(() => alert(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
+            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
     function getLastPlayedHoleForSideMatch(p1, p2, courseData, savedScores) {
@@ -1973,10 +1992,14 @@
         if (!input) return;
         const rate = parseFloat(input.value);
         if (isNaN(rate) || rate <= 0) { alert("Please enter a valid dollar amount."); return; }
+        const smForAck = sideMatchById(matchId);
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
-            .then(() => cancelSideHolePressInput(matchId, p1Id, p2Id))
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+            .then(() => {
+                cancelSideHolePressInput(matchId, p1Id, p2Id);
+                alert(`\u2705 PRESS CONFIRMED\n${pressMatchNames(smForAck)}\n$${rate}/hole\nStarts Hole ${nextHole}`);
+            })
+            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
     function pressSideMatchOverall(matchId, p1Id, p2Id) {
@@ -1986,10 +2009,21 @@
         const p2 = players.find(p => String(p.id) === String(p2Id));
         if (!p1 || !p2) return;
         const nextHole = getLastPlayedHoleForSideMatch(p1, p2, currentData.courseData || [], currentData.scores || {}) + 1;
-        if (!confirm(`Start a new press on the overall bet, starting hole ${nextHole}?`)) return;
+        // THE $78 BUG LIVED HERE. This wrote { startHole } with no stake and never
+        // asked for an amount, so every overall press silently inherited the original
+        // wager - a $78 press printed and settled as $200. The engine honoured a
+        // stored stake all along (segmentTotals reads pr.stake); the write site just
+        // never gave it one.
+        const smO = sideMatchById(matchId);
+        const origO = smO && smO.overallStake ? smO.overallStake : 0;
+        const rawO = prompt(`Press amount ($) \u2014 starts hole ${nextHole}`, String(origO || ''));
+        if (rawO === null) return;
+        const amtO = parseFloat(rawO);
+        if (isNaN(amtO) || amtO <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
-        db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole })
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+        db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
+            .then(() => alert(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
+            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
     function fmtSideM(amt) {
