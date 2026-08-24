@@ -2026,6 +2026,19 @@
             .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
+    // Renders one stored press map as compact ledger lines: "HP1 \u00B7 H6 \u00B7 $78/hole".
+    // Raw storage in, text out - no engine, no money math, the same numbers the
+    // scorecard chips and the settlement read. Stroke Play only: Match and Nassau
+    // already render their presses through the engine's own segment rows below.
+    function strokePressHistory(pressMap, prefix, fmt, sortBy) {
+        const list = pressMap ? Object.values(pressMap) : [];
+        if (!list.length) return '';
+        return list.slice().sort(sortBy).map((pr, i) =>
+            `<div class="side-match-row" style="padding-left:14px;">
+                <span style="font-size:0.76rem; color:var(--text-muted);">${prefix}${i + 1} \u00B7 ${fmt(pr)}</span>
+            </div>`).join('');
+    }
+
     function fmtSideM(amt) {
         if (amt > 0) return `<span class="val-pos">+$${amt.toFixed(2)}</span>`;
         if (amt < 0) return `<span class="val-neg">-$${Math.abs(amt).toFixed(2)}</span>`;
@@ -2245,6 +2258,15 @@
                         <span id="sm-hole-press-row-${matchId}">${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button>` : ''}</span>
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
+                    // THE HOLE-PRESS LEDGER. The row above shows the CURRENT rate, which
+                    // after a press is the pressed number - so "$125/hole" was true while
+                    // the $78 press that got it there, and its start hole, appeared
+                    // nowhere on this page. A press is a bet somebody made; the page that
+                    // manages the match lists each one, straight from storage, no engine.
+                    html += strokePressHistory(
+                        sm.holePresses, 'HP',
+                        pr => `H${pr.fromHole} \u00B7 $${pr.newStake}/hole`,
+                        (a, b) => a.fromHole - b.fromHole);
                 }
 
                 if (overallCalc) {
@@ -2266,6 +2288,14 @@
                         ${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>` : ''}
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
+                    // Overall presses, same treatment: every press with its own start
+                    // hole and its own stake. A press stored without one - every press
+                    // saved before custom stakes existed - shows the original wager,
+                    // which is exactly what it settles at.
+                    html += strokePressHistory(
+                        sm.overallPresses, 'P',
+                        pr => `H${pr.startHole} \u00B7 $${(pr.stake === undefined || pr.stake === null) ? (sm.overallStake || 0) : pr.stake}`,
+                        (a, b) => a.startHole - b.startHole);
                 }
 
                 if (!holeCalc && !overallCalc) {
