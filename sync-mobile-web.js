@@ -36,7 +36,7 @@ const FILES_TO_SYNC = [
     // Shared engines - see the note above before removing any of these
     'action-model.js', 'bet-strip.js', 'course-data.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'score-marks.js', 'settlement-engine.js',
-    'tournament-engine.js',
+    'tournament-engine.js', 'pwa-boot.js',
     // Shell assets
     'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
 ];
