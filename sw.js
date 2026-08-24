@@ -16,8 +16,9 @@
 // Bumping the key makes the activate handler delete every older cache outright, so the
 // next launch is guaranteed to be the deployed build. Bump it whenever the app shell
 // changes in a way people must see. Moved to v4 because the shell list below gained
-// pool-engine.js - every already-installed device is carrying a cache that is missing it.
-const CACHE_VERSION = 'golfapp-v4-pool-engine';
+// pool-engine.js, and again to v5 when pwa-boot.js joined it - every already-installed
+// device is carrying a cache that is missing whatever the newest entry is.
+const CACHE_VERSION = 'golfapp-v5-pwa-activation';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -50,6 +51,7 @@ const SHELL_FILES = [
     './hole-events.js',
     './pool-engine.js',
     './course-data.js',
+    './pwa-boot.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
