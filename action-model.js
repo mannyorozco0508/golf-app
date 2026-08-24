@@ -11,7 +11,7 @@
 // WHY THIS EXISTS
 // The app used to carry a single `gameFormat` string, so a round could play a
 // Nassau OR skins OR junk, never all three. Real groups stack action: "$20 Nassau,
-// $5 skins, $2 junk, and Marty and John have $50 on the side." Every engine needed
+// $5 skins, $2 junk, and two of us have $50 on the side." Every engine needed
 // for that already existed and was zero-sum; they simply could not coexist.
 //
 // THE TRICK THAT MAKES THIS CHEAP
@@ -153,9 +153,9 @@ function sideMatchHoles(sm, courseData) {
 // The first hole NO participant has posted yet.
 //
 // Not "the next hole after everyone finished" - that is a different question, and the
-// difference matters for a cross-group bet. If Marty's group is through 9 and Stan's is
-// through 6, starting at 7 would hand Marty three holes he has already played and Stan
-// has not: Marty would know he was three-up before Stan hit a shot. Starting after the
+// difference matters for a cross-group bet. If one golfer’s group is through 9 and the other’s is
+// through 6, starting at 7 would hand the first three holes he has already played and the second
+// has not: he would know he was three-up before the other hit a shot. Starting after the
 // FURTHEST-ALONG participant means neither golfer has posted a score in the wager when
 // it is struck, which is the only version of the rule that is fair to both.
 //
@@ -271,7 +271,7 @@ function addableGames(data) {
 // Every game returned by getRoundGames() is a round-level wager: Skins, Dots,
 // Stableford and the main game all involve the whole money field. Side Matches are
 // the exception - they name their own two or four players - and are resolved
-// separately, which is what lets Manny vs Marty react immediately without waiting
+// separately, which is what lets a cross-group match react immediately without waiting
 // for eight strangers.
 // ---------------------------------------------------------------------------
 
