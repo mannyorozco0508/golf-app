@@ -868,7 +868,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     <div class="mp-section-title">📍 KP Pool</div>
                     <input type="tel" inputmode="decimal" id="mp-kp-amount" value="100" oninput="mpRecalc()" placeholder="0 for no KP">
                     <div class="mp-sub-label">KP Holes</div>
-                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4, 14" inputmode="numeric">
+                    <!-- inputmode MUST NOT be numeric here.
+                         This is the only comma-separated field in the app. inputmode="numeric"
+                         brings up the iOS number pad, which has digits and nothing else - no
+                         comma key. So the field asked for "3, 9, 13, 17" and then made it
+                         physically impossible to type on the device the organizer actually
+                         uses. On a desktop keyboard it worked fine, which is why it survived.
+                         inputmode="text" gives the standard keyboard, whose 123 page carries
+                         both the digits and the comma. Every other numeric field on this
+                         screen keeps its numeric/decimal pad - they take one number each. -->
+                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4, 14" inputmode="text">
                     <div class="mp-hint">Hole numbers, separated by commas. Split evenly — <span id="mp-kp-split">$50 each</span></div>
                 </div>
 
