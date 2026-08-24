@@ -194,6 +194,84 @@ function splitCentsEvenly(cents, n) {
 }
 
 // ---------------------------------------------------------------------------
+// WHOLE-DOLLAR SETTLEMENT
+//
+// WHY THIS EXISTS
+//
+// Every bucket above works in integer cents, which makes the zero-sum identity
+// exact and auditable. It also means a $100 bucket shared three ways settles at
+// $33.34 / $33.33 / $33.33. Nobody standing in a car park settles a golf bet in
+// cents, and worse, a cent-accurate engine forces every downstream surface to
+// round for display - at which point the Receipt, Final Results and Who Pays Who
+// can each round differently and stop agreeing about what a golfer is owed.
+//
+// So a whole-dollar round allocates the ACTUAL BUCKET in whole dollars, once,
+// inside the engine. Those integers are the canonical answer. Nothing downstream
+// rounds anything; it consumes what the engine allocated.
+//
+// THE RULE: LARGEST REMAINDER, STABLE ORDER
+//
+//   1. exact_i   = bucket * weight_i / totalWeight
+//   2. base_i    = floor(exact_i)
+//   3. leftover  = bucket - sum(base)          // always an integer, 0 <= leftover < n
+//   4. the leftover dollars go one each to the entries with the largest
+//      fractional part; ties broken by POSITION, lowest index first.
+//
+// Step 4 is the whole determinism guarantee. Position means the caller's own
+// order, which for players is roster order - the order they appear in
+// data.players, the same order the setup screen wrote and the scorecard shows.
+// Roster order is used rather than alphabetical because it is the product's
+// existing stable ordering; sorting by name would make the extra dollar move if
+// somebody fixed a typo in a golfer's name.
+//
+// Conservation is structural: sum(base) + leftover === bucket by construction,
+// so no allocation can create or destroy a dollar regardless of the weights.
+//
+//   allocateWholeDollars(100, [1,1,1])  -> [34, 33, 33]
+//   allocateWholeDollars(70,  [1,1,1])  -> [24, 23, 23]
+//   allocateWholeDollars(25,  [1,1])    -> [13, 12]
+//   allocateWholeDollars(310, [1,1,1,1,1,1,1,1,1]) -> four 35s then five 34s
+//
+// LEGACY ROUNDS NEVER REACH THIS. See isWholeDollarRound().
+// ---------------------------------------------------------------------------
+
+function allocateWholeDollars(totalDollars, weights) {
+    const n = (weights || []).length;
+    if (n === 0) return [];
+    const total = Math.round(Number(totalDollars) || 0);
+    const sumW = weights.reduce((a, w) => a + (Number(w) || 0), 0);
+    if (sumW <= 0) return weights.map(() => 0);
+
+    const rows = weights.map((w, i) => {
+        const exact = total * (Number(w) || 0) / sumW;
+        const base = Math.floor(exact);
+        return { i, base, frac: exact - base };
+    });
+
+    let leftover = total - rows.reduce((a, r) => a + r.base, 0);
+
+    // Largest fractional part first; equal fractions resolved by original
+    // position, so the same inputs always hand the extra dollar to the same
+    // recipient.
+    const order = rows.slice().sort((a, b) => (b.frac - a.frac) || (a.i - b.i));
+    for (let k = 0; k < order.length && leftover > 0; k++) { order[k].base += 1; leftover -= 1; }
+
+    const out = new Array(n);
+    rows.forEach(r => { out[r.i] = r.base; });
+    return out;
+}
+
+// A round settles in whole dollars only when it says so.
+//
+// ABSENCE MEANS LEGACY, ALWAYS. Every round saved before this feature has no
+// settlementMode field, so it takes the cent path it has always taken and
+// settles to exactly the same numbers it did yesterday. That is the entire
+// backward-compatibility contract, and it is one line so it cannot rot.
+function isWholeDollarRound(data) {
+    return !!data && data.settlementMode === 'whole-dollar';
+}
+
+// ---------------------------------------------------------------------------
 // THE POOL SETTLEMENT.
 // Returns null when no pool is configured (legacy rounds by construction), or:
 // {
@@ -235,12 +313,24 @@ function computeMoneyPool(data, courseData, savedScores) {
     let refundCents = 0;
     const refundReason = t => result.refund.reasons.push(t);
 
+    // Whole-dollar mode allocates each bucket in dollars and stores the result as
+    // whole-dollar cents (always a multiple of 100), so every downstream consumer
+    // keeps reading the same perPlayerCents shape it always has and simply never
+    // sees a fractional dollar. Legacy rounds skip all of it.
+    const wholeDollar = isWholeDollarRound(data);
+    const D = (dollars) => Math.round(dollars) * 100;
+
     // ---- KP ---------------------------------------------------------------
     const kpCfg = pool.kp;
     if (kpCfg && (Number(kpCfg.amount) || 0) > 0) {
         const amountCents = Math.round(Number(kpCfg.amount) * 100);
         const holes = (kpCfg.holes || []).map(Number).sort((a, b) => a - b);
-        const shares = splitCentsEvenly(amountCents, holes.length);
+        // $100 across 3 KP holes is $34/$33/$33, not $33.34/$33.33/$33.33. Holes are
+        // already sorted, so hole order is the stable order and the extra dollar
+        // always lands on the earliest KP hole.
+        const shares = wholeDollar
+            ? allocateWholeDollars(amountCents / 100, holes.map(() => 1)).map(D)
+            : splitCentsEvenly(amountCents, holes.length);
         const kpWinners = data.kpWinners || {};
         const lines = [];
         let unclaimed = 0;
@@ -263,7 +353,25 @@ function computeMoneyPool(data, courseData, savedScores) {
     // ---- NET FINISH --------------------------------------------------------
     const netCfg = pool.net;
     if (netCfg && moneyPoolNetTotal(netCfg) > 0) {
-        const placeCents = moneyPoolNetPlaceCents(netCfg);
+        // PLACE AMOUNTS THEMSELVES MUST BE WHOLE DOLLARS.
+        //
+        // Allocating only the TIED groups was not enough, and a Receipt integration
+        // test is what caught it: $70 split 57.142857% / 42.857143% comes out of the
+        // percentage math as $39.99 / $30.01, and with no tie there was nothing to
+        // re-split, so those cents printed straight onto the Receipt.
+        //
+        // In whole-dollar mode the percentages become WEIGHTS and the allocator
+        // divides the bucket directly, which gives the $40 / $30 the organizer typed.
+        // A custom-amount payout is already whole dollars by construction and is
+        // passed through the same allocator so the two paths cannot drift.
+        const placeCents = wholeDollar
+            ? allocateWholeDollars(
+                  moneyPoolNetTotal(netCfg),
+                  isCustomNetPayout(netCfg)
+                      ? netCfg.amounts.map(Number).filter(a => isFinite(a) && a > 0)
+                      : (netCfg.places || []).map(Number)
+              ).map(D)
+            : moneyPoolNetPlaceCents(netCfg);
         const amountCents = placeCents.reduce((a, b) => a + b, 0);
         // Net totals over holes actually scored - the SAME formula the leaderboard
         // uses, via the same canonical helpers. No new handicap math.
@@ -283,9 +391,15 @@ function computeMoneyPool(data, courseData, savedScores) {
         const lines = [];
         let paid = 0;
         if (standings.length > 0) {
-            // TIES SPLIT THE TIED PLACES' MONEY. Two golfers tied for 1st in a
-            // 50/30/20 structure share 80% equally and 3rd place still pays 20% -
-            // the standard scoreboard convention, applied in cents.
+            // TIES CONSUME THE PLACES THEY OCCUPY, then split the combined money.
+            //
+            // The wording here used to say a 50/30/20 tie for 1st "shares 80%
+            // equally and 3rd place still pays 20%". That describes the same
+            // behaviour the code performs, but it reads as though 2nd place were
+            // simply skipped rather than CONSUMED - and the two golfers tied for
+            // 1st occupy 1st AND 2nd, which is why they share $80 and why the
+            // next golfer is 3rd rather than 2nd. Left as it was, the next person
+            // to touch this would have had two plausible readings to choose from.
             let place = 1;
             let i = 0;
             while (i < standings.length && place <= placeCents.length) {
@@ -298,7 +412,14 @@ function computeMoneyPool(data, courseData, savedScores) {
                 let groupCents = 0;
                 for (let k = place; k < place + span && k <= placeCents.length; k++) groupCents += placeCents[k - 1];
                 if (groupCents > 0) {
-                    const shares = splitCentsEvenly(groupCents, span);
+                    // POSITIONS ARE CONSUMED FIRST, THEN THE COMBINED AMOUNT IS SPLIT.
+                    // Three tied for 1st in a $50/$30/$20 structure consume all three
+                    // places, so $100 is split $34/$33/$33 - not three separately
+                    // rounded place amounts, which would not sum to $100. `tied` is
+                    // in standings order, which is roster order within a tie.
+                    const shares = wholeDollar
+                        ? allocateWholeDollars(groupCents / 100, tied.map(() => 1)).map(D)
+                        : splitCentsEvenly(groupCents, span);
                     tied.forEach((s, j) => pay(s.id, shares[j]));
                     paid += groupCents;
                     lines.push({ place, ids: tied.map(s => s.id), names: tied.map(s => s.name),
@@ -347,6 +468,27 @@ function computeMoneyPool(data, courseData, savedScores) {
             // cumulative floor: the differences telescope, so the lines sum to at
             // most the pot by construction, every cent lands on a real winner, and
             // the pending carry's share falls out as the exact residue.
+            if (wholeDollar) {
+                // ONE ALLOCATOR OVER THE CANONICAL UNITS. The skins engine above still
+                // decides which holes produced units and who owns them - this only
+                // divides the actual bucket. Weights include the pending carry as a
+                // final entry so an unwon carry keeps its exact share of the pot
+                // instead of that share being smeared across the winners; whatever it
+                // is allocated falls out as `unwon` below and refunds to the field.
+                //
+                // Skins are in hole order, so hole order is the stable order and the
+                // extra dollars land on the earliest holes.
+                const weights = calc.skins.map(s => s.unitsWon);
+                if (calc.pendingUnits > 0) weights.push(calc.pendingUnits);
+                const alloc = allocateWholeDollars(amountCents / 100, weights);
+                calc.skins.forEach((s, idx) => {
+                    const cents = D(alloc[idx]);
+                    pay(s.player.id, cents);
+                    paid += cents;
+                    lines.push({ hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
+                                 units: s.unitsWon, cents });
+                });
+            } else {
             let cumUnits = 0, prevFloor = 0;
             calc.skins.forEach(s => {
                 cumUnits += s.unitsWon;
@@ -358,6 +500,7 @@ function computeMoneyPool(data, courseData, savedScores) {
                 lines.push({ hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
                              units: s.unitsWon, cents });
             });
+            }
         }
         const unwon = amountCents - paid;
         if (unwon > 0) {
@@ -373,7 +516,16 @@ function computeMoneyPool(data, courseData, savedScores) {
     // Every unpaid cent comes back to the field equally. This is what makes the
     // zero-sum identity structural rather than hoped-for.
     if (refundCents > 0) {
-        const shares = splitCentsEvenly(refundCents, participants.length);
+        // Refunds are allocated the same way as every other bucket, or the last
+        // step of a whole-dollar round would reintroduce the cents the first three
+        // just removed. `participants` is roster order, so the extra dollar goes to
+        // the earliest golfer on the roster, every time.
+        //
+        // A refund in whole-dollar mode is always a whole number of dollars,
+        // because it is what a whole-dollar bucket did not pay out.
+        const shares = wholeDollar
+            ? allocateWholeDollars(refundCents / 100, participants.map(() => 1)).map(D)
+            : splitCentsEvenly(refundCents, participants.length);
         participants.forEach((p, i) => {
             pay(p.id, shares[i]);
             result.refund.perPlayerCents[String(p.id)] = shares[i];
