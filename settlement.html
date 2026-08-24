@@ -147,6 +147,10 @@
            with box-shadow so the cell keeps its size and the rows stay compact. */
         .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
         .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); border-radius: 50%; }
+        /* Net rows sit tight under their golfer's gross row and are visually
+           quieter, so the card still scans as one row per golfer. */
+        .rt-net td { font-size: 0.72em; color: var(--text-muted); border-top: none; padding-top: 0; }
+        .rt-net .rt-name { font-style: italic; }
         .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
         .legend-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); }
@@ -455,6 +459,24 @@
         const inPar = back.reduce((s, h) => s + (h.par || 0), 0);
         html += headRow('HOLE', h => h.hole, 'OUT', 'IN', 'TOT');
         html += headRow('PAR', h => h.par, outPar, inPar, outPar + inPar);
+        // STROKE INDEX. Without it a golfer cannot check a net score for
+        // themselves - which is the whole point of printing net at all.
+        html += headRow('HCP', h => (h.hcpIndex !== undefined && h.hcpIndex !== null) ? h.hcpIndex : '\u2013', '', '', '');
+
+        // IS NET RELEVANT TO THIS ROUND?
+        //
+        // Printing a net row on a round nobody played net just doubles the height of
+        // the card for no reason. Printing gross only on a round whose MONEY was
+        // decided on net is the failure this batch exists to fix - it forces golfers
+        // back to the paper card to compare handicap indexes and subtract strokes by
+        // hand. So it is asked, once, from the round's own configuration.
+        const anyHcp = players.some(p => (typeof parseHcp === 'function' ? parseHcp(p.hcp) : Number(p.hcp) || 0) > 0);
+        const poolNet = !!(data.moneyPool && data.moneyPool.enabled
+            && ((data.moneyPool.net && Number(data.moneyPool.net.amount) > 0)
+                || (data.moneyPool.skins && data.moneyPool.skins.scoring !== 'gross')));
+        const skinsNetMode = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data) !== 'gross' : false;
+        const netMatters = anyHcp && (poolNet || skinsNetMode || data.gameFormat === 'stableford');
 
         players.forEach(p => {
             const get = h => scores[`p${p.id}_h${h.hole}`] || null;
@@ -465,12 +487,31 @@
             if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
             r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
             html += r;
+
+            if (netMatters) {
+                // NET, from the CANONICAL handicap allocation - getStrokes/parseHcp in
+                // money-engine.js, the same pair the leaderboard, the skins ledger and
+                // every net wager already use. settlement.html does no handicap
+                // arithmetic of its own; a second implementation here is exactly how
+                // the Receipt would come to disagree with the money.
+                const strokes = h => (typeof getStrokes === 'function' && typeof parseHcp === 'function')
+                    ? getStrokes(h.hcpIndex, parseHcp(p.hcp)) : 0;
+                const netOf = h => { const g = get(h); return g === null ? null : g - strokes(h); };
+                const netSum = list => list.reduce((s, h) => s + (netOf(h) || 0), 0);
+                const no = netSum(front), ni = netSum(back);
+                let nr = `<tr class="rt-net"><td class="rt-name">net</td>`;
+                if (hasFront) { front.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasBack) nr += cell(no || '\u2013', 'rt-sec'); }
+                if (hasBack) { back.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasFront) nr += cell(ni || '\u2013', 'rt-sec'); }
+                nr += cell((no + ni) || '\u2013', 'rt-sec') + '</tr>';
+                html += nr;
+            }
         });
 
         html += `</table></div>
             <div class="receipt-legend">
                 <span class="legend-dot legend-birdie"></span> Birdie
                 <span class="legend-dot legend-eagle"></span> Eagle or better
+                ${netMatters ? '<span style="margin-left:10px;">net rows show the score after handicap strokes</span>' : ''}
             </div></div>`;
         return html;
     }
@@ -665,6 +706,135 @@
     // refund stated with its reason - the pot must be explainable line by line or
     // it does not belong on this page. Pure read of computeMoneyPool(); the pool's
     // per-player nets are already folded into Final Results by the engine.
+    // ---- SKINS ON THE RECEIPT ----------------------------------------------
+    //
+    // NO SKINS LOGIC LIVES HERE. Every winner, tie, net score and official flag
+    // comes from computeSkinsHoleLedger() in settlement-engine.js - the canonical
+    // ledger Wave 1 added - and every DOLLAR comes from the pool engine's own
+    // allocated lines. This function only turns those two objects into rows.
+    //
+    // WHY IT PRINTED ONLY WINNERS BEFORE
+    //
+    // The old block walked r.skins.lines, which by construction contains one entry
+    // per WON skin. A hole that tied produced no line, so it silently vanished from
+    // the Receipt. A golfer reading it could not tell the difference between "hole 7
+    // was tied" and "hole 7 is missing", and the only way to find out was the paper
+    // card - which is the exact thing this whole batch exists to retire.
+    //
+    // THE CONFIG SHIM, AND WHY IT IS NOT OPTIONAL
+    //
+    // The ledger reads its scoring basis from data.skinsPotFormat and its field from
+    // fieldParticipants(data). The MONEY POOL's skins bucket reads neither: its basis
+    // is moneyPool.skins.scoring and its field is moneyPoolParticipants(). Those are
+    // different config paths and can genuinely disagree - a round can have a net pool
+    // bucket and a gross standalone skins game.
+    //
+    // Handing the ledger the raw round would therefore print a hole-by-hole ledger
+    // for a DIFFERENT game than the one the money came from: right-looking rows,
+    // wrong winners. So the pool's own resolved basis, carry rule and participant
+    // list are passed in explicitly. The ledger still does all the deciding; it is
+    // just told which game to decide about.
+    function buildSkinsReceiptSection(r, data, courseData, savedScores, $) {
+        const scoring = r.skins.scoring === 'gross' ? 'gross' : 'net';
+        const basisLabel = scoring === 'gross' ? 'Gross' : 'Net';
+        const carryLabel = r.skins.carryOver ? 'carries' : 'ties void';
+
+        let html = `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} `
+            + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;
+
+        if (typeof computeSkinsHoleLedger !== 'function') {
+            // The engine is the only source. Rather than quietly falling back to a
+            // second implementation - the duplication this project keeps removing -
+            // the Receipt says the detail is unavailable and still prints the money.
+            r.skins.lines.forEach(l => {
+                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+            });
+            return html;
+        }
+
+        const ledgerCfg = Object.assign({}, data, {
+            participantIds: r.participants.map(p => String(p.id)),
+            skinsPotFormat: scoring,
+            skinsCarryOver: r.skins.carryOver,
+        });
+        const bundle = computeSkinsHoleLedger(ledgerCfg, courseData, savedScores);
+        const L = scoring === 'gross' ? bundle.gross : bundle.net;
+        if (!L) return html;
+
+        // Dollars per hole come from the POOL's allocated lines, keyed by hole. In
+        // whole-dollar mode those are already integers; nothing here rounds anything.
+        const centsByHole = {};
+        r.skins.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
+
+        // EVERY hole, in order - won, tied, or still waiting on a card.
+        L.holes.forEach(row => {
+            const label = `H${row.hole}`;
+            if (!row.official) {
+                // Only reachable on a Receipt previewed mid-round. A finished round
+                // has every card in, so none of these rows appear.
+                const who = row.missing.length > 0
+                    ? row.missing.map(m => m.name).join(', ')
+                    : `${row.requiredCount - row.postedCount} golfer(s)`;
+                html += `<div class="ledger-row"><span>${label} \u2014 Waiting on ${who}</span><span></span></div>`;
+                return;
+            }
+            if (row.state === 'tie') {
+                // The score is named, so a golfer can see WHY the hole paid nothing
+                // without reaching for the card.
+                html += `<div class="ledger-row"><span>${label} \u2014 Tie at ${basisLabel} ${row.low} \u2014 No Skin</span><span></span></div>`;
+                return;
+            }
+            const cents = centsByHole[String(row.hole)];
+            const units = row.unitsWon > 1 ? ` (${row.unitsWon} skins)` : '';
+            html += `<div class="ledger-row"><span>${label} \u2014 ${row.winner.name} \u2014 ${basisLabel} ${row.low} \u2014 Skin${units}</span>`
+                + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
+        });
+
+        // ---- SUMMARY BY GOLFER ---------------------------------------------
+        // Skin COUNTS come from the ledger; DOLLARS come from the pool's allocation.
+        // Summing the allocated line amounts is what keeps this summary equal to the
+        // per-player money, to the dollar, by construction rather than by luck.
+        const centsByPlayer = {};
+        const countByPlayer = {};
+        r.skins.lines.forEach(l => {
+            const k = String(l.winnerId);
+            centsByPlayer[k] = (centsByPlayer[k] || 0) + l.cents;
+        });
+        L.holes.forEach(row => {
+            if (row.state !== 'skin' || !row.winner) return;
+            const k = String(row.winner.id);
+            countByPlayer[k] = (countByPlayer[k] || 0) + 1;
+        });
+
+        const winners = Object.keys(countByPlayer).map(id => {
+            const pl = L.participants.find(p => String(p.id) === id);
+            return { id, name: pl ? pl.name : id, skins: countByPlayer[id], cents: centsByPlayer[id] || 0 };
+        }).sort((a, b) => b.skins - a.skins || b.cents - a.cents || a.name.localeCompare(b.name));
+
+        if (winners.length > 0) {
+            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary</span><span></span></div>`;
+            winners.forEach(w => {
+                html += `<div class="ledger-row"><span>${w.name} \u2014 ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
+                    + `<span class="val-pos">${$(w.cents)}</span></div>`;
+            });
+        } else {
+            html += `<div class="ledger-row"><span>No skins were won.</span><span></span></div>`;
+        }
+
+        // ---- MONEY THAT FOUND NO WINNER ------------------------------------
+        // Stated outright. An unwon carry or a fully tied round leaves real money in
+        // the pot, and a Receipt that just omits it looks like the money vanished.
+        if (r.skins.unwonCents > 0) {
+            const why = r.skins.pendingUnits > 0
+                ? `${r.skins.pendingUnits} unwon skin${r.skins.pendingUnits === 1 ? '' : 's'} carried to the end`
+                : 'no skins won';
+            html += `<div class="ledger-row"><span>\u21A9\uFE0F Unwon skins money (${why}) \u2014 refunded to the field</span>`
+                + `<span>${$(r.skins.unwonCents)}</span></div>`;
+        }
+
+        return html;
+    }
+
     function renderMoneyPoolSection(data, courseData, savedScores) {
         const mount = document.getElementById('money-pool-section');
         if (!mount) return;
@@ -694,11 +864,7 @@
             if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
         }
         if (r.valid && r.skins) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} (${r.skins.scoring}${r.skins.carryOver ? ', carries' : ', ties void'})</span><span></span></div>`;
-            r.skins.lines.forEach(l => {
-                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${l.units > 1 ? ` (${l.units} skins)` : ''}</span><span class="val-pos">${$(l.cents)}</span></div>`;
-            });
-            if (r.skins.unwonCents > 0) html += `<div class="ledger-row"><span>Unwon${r.skins.pendingUnits ? ` (${r.skins.pendingUnits} carried)` : ''} \u2014 refunded</span><span>${$(r.skins.unwonCents)}</span></div>`;
+            html += buildSkinsReceiptSection(r, data, courseData, savedScores, $);
         }
         if (r.valid && r.refund.cents > 0) {
             html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
