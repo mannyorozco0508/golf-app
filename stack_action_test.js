@@ -615,9 +615,21 @@ describe('WIRING — one settlement system, one composition layer', () => {
     });
 
     test('the combiner loops getRoundGames rather than branching on one gameFormat', () => {
+        // Scans the WHOLE function, not a fixed 1500-character prefix. The prefix
+        // window broke the moment an explanatory comment was added above the loop -
+        // the behaviour it checks was untouched, only its distance from the function
+        // header changed. Bounding on the next top-level function keeps the assertion
+        // about the code rather than about its byte offset.
         const s = read('settlement-engine.js');
-        const fn = s.slice(s.indexOf('function computeCombinedNetTotals'), s.indexOf('function computeCombinedNetTotals') + 1500);
+        const start = s.indexOf('function computeCombinedNetTotals');
+        assert.notEqual(start, -1, 'computeCombinedNetTotals was renamed or removed');
+        const after = s.indexOf('\n    function ', start + 10);
+        const fn = s.slice(start, after === -1 ? s.length : after);
         assert.ok(/getRoundGames\(data\)\.forEach/.test(fn), 'settlement is not composition-driven');
+        // And it must still be the FIRST money source folded in, ahead of the birdie
+        // pool and the money pool, which is what makes the composition order stable.
+        assert.ok(fn.indexOf('getRoundGames(data).forEach') < fn.indexOf('calculateBirdieGameTotalsForSettle'),
+            'the per-game loop must run before the standalone pools');
     });
 
     test('action-model.js contains no golf mathematics', () => {
