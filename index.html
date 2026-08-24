@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Live Scorecard</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f4c3a">
+    <script src="pwa-boot.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <!-- settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and this
@@ -1691,6 +1694,7 @@
         // the Action page already use, and getRoundGames() normalizes both shapes, so
         // saved rounds carrying the old slot keep working untouched. Nothing is
         // migrated.
+        if (!requireOnlineForMoney('GAME NOT ADDED', 'Reconnect before adding a game to the round.')) return;
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
         db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
             .catch(err => alert(`Couldn't add that game: ${err.message}`));
@@ -1897,6 +1901,7 @@
             ? { startHole: fresh.nextPressHole, stake: stake }
             : { baseId: '18', startHole: fresh.nextPressHole, stake: stake };
 
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closeSidePress(); return; }
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/${node}`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${key}/${node}/${pushKey}`)
             .set(payload)
@@ -1958,6 +1963,7 @@
 
     function savePoolKp(hole, pid) {
         if (!pid) return;
+        if (!requireOnlineForMoney('KP NOT SAVED', 'Reconnect before recording the KP.')) return;
         db.ref('events/' + currentMode + '/kpWinners/h' + hole).set(String(pid))
             .then(() => alert('\u2705 KP RECORDED\nHole ' + hole))
             .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
@@ -2471,6 +2477,7 @@
     function confirmStrokePress(stake) {
         const model = currentBetStripModel();
         if (!model || !model.canPress) { closePressPanel(); alert('That bet can no longer be pressed.'); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
         const pushKey = db.ref(`events/${currentMode}/strokePresses`).push().key;
         db.ref(`events/${currentMode}/strokePresses/${pushKey}`).set({ startHole: model.nextPressHole, stake })
             .catch(err => alert(`Press failed to save: ${err.message}`));
@@ -2480,6 +2487,7 @@
     function confirmMatchPress() {
         const model = currentBetStripModel();
         if (!model || !model.canPress || !model.pressBaseId) { closePressPanel(); alert('That match can no longer be pressed.'); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId: model.pressBaseId, startHole: model.nextPressHole })
             .catch(err => alert(`Press failed to save: ${err.message}`));
@@ -2707,6 +2715,38 @@
         return false;
     }
 
+    // ---- OFFLINE MONEY GUARD ------------------------------------------------
+    //
+    // A press, a KP, a new betting game, a Wolf call - these are AGREEMENTS
+    // struck between people standing on a tee box. They are not derived from
+    // anything; if the write is lost, nobody can reconstruct it from the card
+    // in their pocket. A score can be re-entered. A $78 press cannot.
+    //
+    // Firebase Realtime Database on web buffers a write while disconnected and
+    // resolves the promise only on server acknowledgement. Offline that promise
+    // never settles - so the existing `.catch(... PRESS NOT SAVED ...)` can
+    // never fire, and neither can the `.then(... PRESS CONFIRMED ...)`. The tap
+    // produces silence. The golfer assumes it worked, the buffer dies on the
+    // next reload, and the money is gone with no trace that anything happened.
+    //
+    // So these writes are refused BEFORE Firebase ever sees them.
+    //
+    // This deliberately depends on nothing but navigator.onLine. It does not go
+    // through window.GolfNet, because if pwa-boot.js ever fails to load the
+    // guard still has to hold - a money check that silently disappears when a
+    // script 404s is not a money check.
+    //
+    // navigator.onLine is a weak signal in one direction only: it can report
+    // "online" on a captive portal that goes nowhere. That is the safe way for
+    // it to be wrong here, because it is used to REFUSE, never to promise.
+    function requireOnlineForMoney(title, line) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            return false;
+        }
+        return true;
+    }
+
     function saveScore(playerId, holeNum, val) {
         if (!canWritePlayer(playerId)) return rejectCrossGroupWrite(playerId);
 
@@ -2715,10 +2755,18 @@
         const oldVal = (currentData.scores && currentData.scores[scoreKey] !== undefined) ? currentData.scores[scoreKey] : null;
         const newVal = (isNaN(intVal) || intVal <= 0) ? null : intVal;
 
-        if (newVal === null) {
-            db.ref(`events/${currentMode}/scores/${scoreKey}`).remove();
-        } else {
-            db.ref(`events/${currentMode}/scores/${scoreKey}`).set(newVal);
+        // Scores are handled differently from money on purpose. They are
+        // re-creatable from the paper card, so buffering one while the page
+        // stays open is a reasonable trade. What is NOT acceptable is implying
+        // it reached the server: trackPendingWrite feeds the counter behind the
+        // connectivity pill so the golfer can see the difference between
+        // "typed" and "acknowledged". Optional chaining on GolfNet keeps the
+        // write working untouched if pwa-boot.js never loaded.
+        const writePromise = (newVal === null)
+            ? db.ref(`events/${currentMode}/scores/${scoreKey}`).remove()
+            : db.ref(`events/${currentMode}/scores/${scoreKey}`).set(newVal);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') {
+            window.GolfNet.track(writePromise);
         }
 
         if (oldVal !== newVal) {
@@ -3055,6 +3103,7 @@
             if (!canWritePlayer(pid)) { rejectCrossGroupWrite(pid); delete tempDots[key]; }
         });
 
+        if (!requireOnlineForMoney('DOTS NOT SAVED', 'Reconnect before recording dots for this hole.')) return;
         db.ref(`events/${currentMode}/dots/h${currentDotHole}`).set(tempDots).then(() => {
             closeDotsModal();
         });
@@ -3474,6 +3523,7 @@
     // blocking dialogs are unreliable inside an installed PWA, and the inline
     // press panel already shows the start hole before anything is written.
     function pressMatchBet(baseId, nextHole) {
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId, startHole: nextHole })
             .catch(err => alert(`Press failed to save: ${err.message}`));
@@ -3651,6 +3701,9 @@
     }
 
     function saveWolfCall(hole, call, partnerId) {
+        // A Wolf call sets the teams the hole is played for money under, and it
+        // is time-boxed - it cannot honestly be entered after the fact.
+        if (!requireOnlineForMoney('WOLF CALL NOT SAVED', 'Reconnect before making the call.')) return;
         const payload = { call: call };
         if (call === 'partner' && partnerId) payload.partnerId = partnerId;
         db.ref(`events/${currentMode}/wolfCalls/h${hole}`).set(payload)
