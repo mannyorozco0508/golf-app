@@ -228,13 +228,43 @@ describe('ACROSS GROUPS PICKER — the whole field, visibly grouped', () => {
         assert.match(html, /sm-pick-group-head">Group 3</);
     });
 
-    test('a group link choosing Across Groups is still limited by PERMISSION', () => {
-        // Scope is what you want; permission is what you may. Phase 0 wins.
+    test('a group link choosing Across Groups now sees the whole field', () => {
+        // CONTRACT CHANGED, DELIBERATELY. This asserted the opposite: that a group
+        // scorekeeper choosing Across Groups still saw only its own foursome.
+        //
+        // That was correct while the restriction it tested was in force, and that
+        // restriction carried its own expiry note - it was conservative "pending the
+        // Group Action work", because the picker could not yet distinguish a local
+        // game from an explicitly cross-group one. The This Group / Across Groups
+        // chooser now exists, so the precondition has been met and the anchor rule
+        // has replaced it.
+        //
+        // The old behaviour was also a real device bug: the modal said "Across
+        // Groups - pick golfers from different foursomes" and then offered four
+        // names from one foursome. It advertised a scope it refused to honour.
+        //
+        // Isolation did not disappear, it moved to where it can actually be
+        // expressed. "At least one of ours" is a property of the COMBINATION, not of
+        // any single name, so it lives in canCreateWagerWith rather than in a name
+        // filter - and it is asserted immediately below, plus throughout
+        // cross_group_action_test.js.
         const b = boot(8, 1);
         b.run(`openSideMatchModal(); pickActionScope('cross');`);
         const names = b.sb.selectablePlayers().map(p => p.name).join(',');
-        assert.equal(names, 'Marty,Manny,John,Steve',
-            'a group scorekeeper still cannot build a wager from other groups');
+        assert.equal(names, 'Marty,Manny,John,Steve,Stan,Greg,Tony,James',
+            'Across Groups must offer the whole field, or the scope is unusable');
+    });
+
+    test('...but the anchor rule still refuses a wager this group has no stake in', () => {
+        // The isolation half of the same policy, asserted at the guard where it now
+        // lives. Group 1 may build Group 1 vs Group 2; it may not build a wager made
+        // entirely of other foursomes.
+        const b = boot(8, 1);
+        b.run(`openSideMatchModal(); pickActionScope('cross');`);
+        const g1 = b.sb.selectablePlayers().slice(0, 4).map(p => String(p.id));
+        const g2 = b.sb.selectablePlayers().slice(4, 8).map(p => String(p.id));
+        assert.equal(b.sb.canCreateWagerWith([g1[0], g2[0]]), true, 'anchored in Group 1');
+        assert.equal(b.sb.canCreateWagerWith([g2[0], g2[1]]), false, 'no Group 1 golfer in it');
     });
 });
 
@@ -485,12 +515,38 @@ describe('MATCH / STROKE / NASSAU / 2v2 — scope recorded, math untouched', () 
 });
 
 // ---------------------------------------------------------------------------
-describe('PHASE 0 GUARDS ARE NOT LOOSENED', () => {
-    test('a group link still cannot create a wager containing another group', () => {
+describe('GROUP GUARDS — narrowed to the anchor rule, not removed', () => {
+    // THIS BLOCK CHANGED CONTRACT ON ITS FIRST TEST ONLY.
+    //
+    // It used to assert that choosing Across Groups from a group link granted
+    // nothing - a Group 1 scorekeeper could not build Group 1 vs Group 2 at all.
+    // That was the correct assertion for the restriction in force at the time,
+    // and that restriction said so itself: conservative "pending the Group Action
+    // work", because the picker could not yet tell a local game from an
+    // explicitly cross-group one. That chooser now exists.
+    //
+    // What replaces it is narrower than "anything goes" and wider than "nothing":
+    // a group link may build a cross-group wager ITS OWN FOURSOME IS IN. The two
+    // tests below cover both halves, so the permission surface under test is
+    // larger than it was before, not smaller. Every other guard in this block is
+    // untouched.
+
+    test('a group link CAN create a cross-group wager its own foursome is in', () => {
         const b = boot(8, 1);
         b.run(`openSideMatchModal(); pickActionScope('cross');`);
         makeMatch(b, [b.ids(1)[0]], [b.ids(2)[0]]);
-        assert.equal(b.wrote(), false, 'choosing "across groups" does not grant permission');
+        assert.equal(b.wrote(), true,
+            'Group 1 vs Group 2, built from the Group 1 link, is the feature this batch enables.');
+    });
+
+    test('a group link still cannot create a wager it has NO stake in', () => {
+        // The isolation half. Group 1 may not commit Group 2 and Group 3 to money
+        // between themselves - nobody in that wager agreed to it in front of them.
+        const b = boot(8, 1);
+        b.run(`openSideMatchModal(); pickActionScope('cross');`);
+        makeMatch(b, [b.ids(2)[0]], [b.ids(2)[1]]);
+        assert.equal(b.wrote(), false,
+            'choosing "across groups" does not grant permission over other foursomes');
     });
 
     test('a group link cannot start another group\'s Skins game', () => {
