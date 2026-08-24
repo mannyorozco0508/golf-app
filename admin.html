@@ -9,6 +9,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <script src="course-data.js"></script>
     <script src="action-model.js"></script>
+    <script src="money-engine.js"></script>
+    <script src="settlement-engine.js"></script>
+    <script src="pool-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -818,6 +821,48 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
         </div>
+        <!-- MONEY POOL — the whole-round pot. One buy-in, three prize buckets,
+             validated here with the SAME engine settlement uses, so a pot that
+             cannot balance can never be saved. -->
+        <div class="extra-settings-box" style="display:block; border-color:#b8860b;">
+            <label style="color:#b8860b; margin-bottom:4px; font-size:0.9rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>\uD83C\uDFC6 Money Pool (whole-round pot)</strong>
+            </label>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Everyone playing for money antes once; the pot pays KPs, net finishers and a skins pot. Group bets stay separate.</p>
+            <div id="mp-panel" style="display:none;">
+                <div class="control-group"><label>Buy-in per golfer ($)</label>
+                    <input type="tel" inputmode="decimal" id="mp-buyin" value="40" oninput="mpRecalc()"></div>
+                <div class="control-group"><label>\uD83D\uDCCD KP money (total $, 0 = none)</label>
+                    <input type="tel" inputmode="decimal" id="mp-kp-amount" value="100" oninput="mpRecalc()">
+                    <label style="margin-top:6px;">KP holes (comma list, e.g. 4,14)</label>
+                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4,14">
+                </div>
+                <div class="control-group"><label>\uD83E\uDD47 Net finish money (total $, 0 = none)</label>
+                    <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()">
+                    <label style="margin-top:6px;">Paid places</label>
+                    <select id="mp-net-places" onchange="mpRecalc()">
+                        <option value="100">Winner takes all</option>
+                        <option value="60,40">Top 2 \u2014 60/40</option>
+                        <option value="50,30,20" selected>Top 3 \u2014 50/30/20</option>
+                        <option value="40,30,20,10">Top 4 \u2014 40/30/20/10</option>
+                    </select>
+                </div>
+                <div class="control-group"><label>\uD83E\uDD69 Skins pot</label>
+                    <select id="mp-skins-mode" onchange="mpRecalc()">
+                        <option value="remainder" selected>Everything left over</option>
+                        <option value="fixed">Fixed amount</option>
+                        <option value="none">No skins pot</option>
+                    </select>
+                    <input type="tel" inputmode="decimal" id="mp-skins-amount" value="280" oninput="mpRecalc()" placeholder="Fixed $" style="margin-top:6px; display:none;">
+                    <div style="display:flex; gap:10px; margin-top:6px;">
+                        <select id="mp-skins-scoring"><option value="net" selected>Net skins</option><option value="gross">Gross skins</option></select>
+                        <select id="mp-skins-carry"><option value="yes" selected>Ties carry</option><option value="no">Ties void</option></select>
+                    </div>
+                </div>
+                <div id="mp-math" style="font-size:0.8rem; font-weight:bold; padding:8px 10px; border-radius:8px; background:rgba(184,134,11,0.08); color:#b8860b;"></div>
+            </div>
+        </div>
+
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(6)">◀ Back</button>
             <button class="wizard-btn-next" onclick="wizardNext(6)">Next: Review ▶</button>
@@ -1746,6 +1791,67 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     // Builds the additionalGames node saved to Firebase. Each entry carries only its
     // own config; getRoundGames() merges it over the round data at read time.
+    // ---- MONEY POOL (setup) -------------------------------------------------
+    function mpToggle() {
+        const on = document.getElementById('mp-enabled').checked;
+        document.getElementById('mp-panel').style.display = on ? 'block' : 'none';
+        mpRecalc();
+    }
+
+    // The wizard's current field and course, shaped exactly as the saved round
+    // will be - so validateMoneyPool() here IS the settlement-time rule.
+    function mpDraftData() {
+        return { players: collectWizardPlayers(), moneyPool: captureMoneyPool() };
+    }
+
+    function captureMoneyPool() {
+        const on = document.getElementById('mp-enabled');
+        if (!on || !on.checked) return null;
+        const num = id => parseFloat(document.getElementById(id).value) || 0;
+        const pool = { enabled: true, buyIn: num('mp-buyin') };
+        const kpAmt = num('mp-kp-amount');
+        if (kpAmt > 0) {
+            pool.kp = { amount: kpAmt,
+                holes: document.getElementById('mp-kp-holes').value.split(',')
+                    .map(x => parseInt(x.trim(), 10)).filter(x => x > 0) };
+        }
+        const netAmt = num('mp-net-amount');
+        if (netAmt > 0) {
+            pool.net = { amount: netAmt,
+                places: document.getElementById('mp-net-places').value.split(',').map(Number) };
+        }
+        const mode = document.getElementById('mp-skins-mode').value;
+        pool.skins = { mode,
+            scoring: document.getElementById('mp-skins-scoring').value,
+            carryOver: document.getElementById('mp-skins-carry').value !== 'no' };
+        if (mode === 'fixed') pool.skins.amount = num('mp-skins-amount');
+        return pool;
+    }
+
+    function mpRecalc() {
+        const box = document.getElementById('mp-math');
+        if (!box) return;
+        const fixedInput = document.getElementById('mp-skins-amount');
+        if (fixedInput) fixedInput.style.display =
+            document.getElementById('mp-skins-mode').value === 'fixed' ? 'block' : 'none';
+        const on = document.getElementById('mp-enabled');
+        if (!on || !on.checked) { box.innerHTML = ''; return; }
+        const draft = mpDraftData();
+        if (!draft.moneyPool) { box.innerHTML = ''; return; }
+        // The wizard may not have assembled course data yet; an empty course skips
+        // only the hole-existence check. The full check runs again at save, on the
+        // exact courseData the round will carry.
+        const v = validateMoneyPool(draft, []);
+        if (v.valid) {
+            const rem = v.remainder > 0 ? ` \u00B7 skins remainder $${v.remainder.toFixed(0)}` : '';
+            box.style.color = '#b8860b';
+            box.innerHTML = `Pot $${v.totalPool.toFixed(0)} \u00B7 allocated $${v.fixedAllocated.toFixed(0)}${rem} \u2014 balances \u2713`;
+        } else {
+            box.style.color = 'var(--accent-red)';
+            box.innerHTML = '\u26A0\uFE0F ' + v.errors[0];
+        }
+    }
+
     function captureAdditionalGames() {
         const out = {};
         const mainFormat = document.getElementById('game-format-select').value || 'stroke';
@@ -3089,6 +3195,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function saveSettings() {
+
         try {
             const saveBtn = document.getElementById("main-save-btn");
             const originalText = saveBtn.innerText;
@@ -3251,7 +3358,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 console.warn("Could not save to local storage (likely Private Browsing)", e);
             }
 
-            db.ref(`events/${currentMode}`).update({
+            const payload = {
                 eventName: baseEventName,
                 roundDay: roundDay,
                 eventCategory: currentCategory,
@@ -3266,6 +3373,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // Games stacked on top of the main format. Absent on legacy rounds, which
                 // getRoundGames() correctly reads as a single-game round.
                 additionalGames: captureAdditionalGames(),
+                // The whole-round pot. null when the box is unticked, so legacy
+                // rounds and pool-less Mondays are byte-identical to before.
+                moneyPool: captureMoneyPool(),
                 additionalGameInstances: captureSkinsInstances(),
                 birdieGameEnabled: birdieGameEnabled,
                 birdieUnitVal: birdieUnitVal,
@@ -3291,7 +3401,21 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
                 players: playersList
-            }).then(() => {
+            };
+
+            // MONEY POOL GATE. Validated on the EXACT players and courseData this
+            // round will carry - the same validator settlement enforces - so a pot
+            // that cannot balance, or a KP hole that is not on this course, is
+            // stopped here with the reason on screen, before any golfer antes up.
+            if (payload.moneyPool) {
+                const mpCheck = validateMoneyPool(payload, finalCourseData);
+                if (!mpCheck.valid) {
+                    alert('\u26A0\uFE0F Money Pool:\n' + mpCheck.errors.join('\n'));
+                    return;
+                }
+            }
+
+            db.ref(`events/${currentMode}`).update(payload).then(() => {
                 if (tripLinkCode) {
                     return db.ref(`trips/${tripLinkCode}/rounds/${currentMode}`).set({
                         label: selectedCourseName,
