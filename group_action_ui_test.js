@@ -98,6 +98,22 @@ function fieldForm(b, stake) {
     b.sb.__setElement('sm-field-start', '1');
     b.sb.__setElement('sm-field-mode', 'gross');
     b.sb.__setElement('sm-field-carry', 'yes');
+    // Seed the participant picker exactly as the UI does.
+    //
+    // Dots used to need no seeding here because it had no picker - saveFieldAction
+    // enrolled the whole group unconditionally. Now both Skins and Dots read
+    // fieldActionPick, which onSideMatchFormatChange seeds with the whole foursome
+    // when the format is selected. This helper was skipping that step, so a dots
+    // save arrived with an empty pick and was correctly refused.
+    //
+    // Seeded the same way rather than defaulting inside saveFieldAction: falling
+    // back to "everyone" at the write site is precisely the silent enrolment this
+    // batch removed, and refusing an empty pick is the safe failure.
+    //
+    // Seeded ONLY WHEN EMPTY, mirroring the UI's own guard. An unconditional seed
+    // here silently undid any toggling a test had already done - which broke the
+    // very tests that assert tapping a golfer off narrows the pot.
+    b.run(`if (Object.keys(fieldActionPick).length === 0) { selectablePlayers().forEach(function (p) { fieldActionPick[String(p.id)] = true; }); }`);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,13 +287,25 @@ describe('DOTS — group-local, and never across groups', () => {
         assert.ok(!/additionalGames\//.test(b.last().path));
     });
 
-    test('the form names the group whose game it is', () => {
+    test('the dots form offers exactly this group\'s golfers, and nobody else', () => {
+        // This used to assert the form printed the sentence "Group 2's dots game".
+        // That sentence is gone: Dots now renders the same per-golfer picker Skins
+        // does, so the form shows names and tap targets rather than a description of
+        // who is automatically in.
+        //
+        // The replacement is stronger. The old version checked one group name was
+        // present and one outsider absent. This checks the picker offers EXACTLY the
+        // four golfers of the owning group - so an outsider appearing, or one of the
+        // group's own golfers going missing, both fail.
         const b = boot(8, 2);
         b.run(`openSideMatchModal(); pickActionScope('group');`);
         b.sb.__setElement('sm-format', 'dots');
-        b.run(`renderFieldActionForm('dots');`);
+        b.run(`onSideMatchFormatChange();`);
         const html = b.html('sm-field-players');
-        assert.match(html, /Group 2/);
+
+        const offered = [...html.matchAll(/toggleFieldActionPlayer\('(\d+)'\)/g)].map(m => m[1]);
+        assert.deepEqual(offered.sort(), b.ids(2).map(String).sort(),
+            'a Group 2 dots game must offer Group 2 and only Group 2');
         assert.match(html, /Stan/);
         assert.ok(!/Marty/.test(html), 'a Group 2 dots game must not list Group 1 golfers');
     });
