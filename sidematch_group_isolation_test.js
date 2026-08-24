@@ -204,10 +204,18 @@ describe('DELETE BYPASS — calling the write function directly is refused', () 
 // 5-8. PRESS
 // ---------------------------------------------------------------------------
 describe('PRESS — the index.html rule, now applied here too', () => {
-    test('Group 1 CAN press its own match', () => {
+    test('Group 1 CAN press its own match, and the entered amount is STORED', () => {
         const b = boot(1);
-        b.run(`pressSideMatch('m_g1', 'b0', 7);`);
+        b.run(`prompt = () => '78'; pressSideMatch('m_g1', 'b0', 7);`);
         assert.equal(b.writes().length, 1);
+        assert.equal(b.writes()[0].value.stake, 78, 'the amount the golfer typed is the amount stored');
+        assert.equal(b.writes()[0].value.startHole, 7);
+    });
+
+    test('cancelling the amount prompt creates NOTHING', () => {
+        const b = boot(1);
+        b.run(`prompt = () => null; pressSideMatch('m_g1', 'b0', 7);`);
+        assert.equal(b.wrote(), false, 'a dismissed prompt is a changed mind, not a bet');
     });
 
     test('Group 1 CANNOT press a Group 2-only match', () => {
@@ -222,11 +230,12 @@ describe('PRESS — the index.html rule, now applied here too', () => {
         assert.equal(b.wrote(), false);
     });
 
-    test('a CROSS-GROUP match is pressable by BOTH involved groups', () => {
+    test('a CROSS-GROUP match is pressable by BOTH involved groups, at a custom amount', () => {
         [1, 2].forEach(g => {
             const b = boot(g);
-            b.run(`pressSideMatch('m_cross', 'b0', 7);`);
+            b.run(`prompt = () => '78'; pressSideMatch('m_cross', 'b0', 7);`);
             assert.equal(b.writes().length, 1, `Group ${g} should be able to press the cross-group match`);
+            assert.equal(b.writes()[0].value.stake, 78, `Group ${g}'s $78 must be stored as $78`);
         });
     });
 
