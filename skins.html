@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Skins & Action Game</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f4c3a">
+    <script src="pwa-boot.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -418,9 +421,29 @@
         saveBirdieConfig();
     }
 
+    // ---- OFFLINE MONEY GUARD ------------------------------------------------
+    //
+    // Same inline guard as index.html and sidematches.html, duplicated rather
+    // than shared so it cannot be removed by a failed script load.
+    //
+    // These three writes are not scores - they set the STAKES. The dollars per
+    // birdie, the skins buy-in and pot format, and whether skins carry. Offline
+    // the write buffers, the .catch below never fires because the promise never
+    // settles, and the screen keeps showing the value that was typed. The group
+    // plays the back nine believing the buy-in is $20 when the server still has
+    // the old number. Refused before Firebase instead.
+    function requireOnlineForMoney(title, line) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            return false;
+        }
+        return true;
+    }
+
     function saveBirdieConfig() {
         const unitVal = parseFloat(document.getElementById("birdie-unit-val").value) || 0;
         const scoringType = document.getElementById("birdie-scoring-type").value;
+        if (!requireOnlineForMoney('BIRDIE STAKE NOT SAVED', 'Reconnect before changing the stake.')) return;
         db.ref(`events/${currentMode}`).update({ birdieUnitVal: unitVal, birdieScoringType: scoringType })
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
@@ -429,11 +452,13 @@
     function saveSkinsConfig() {
         const potFormat = document.getElementById("skins-pot-format").value;
         const buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
+        if (!requireOnlineForMoney('SKINS SETUP NOT SAVED', 'Reconnect before changing the pot.')) return;
         db.ref(`events/${currentMode}`).update({ skinsPotFormat: potFormat, skinsBuyIn: buyIn })
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
 
     function setSkinsCarryOver(val) {
+        if (!requireOnlineForMoney('CARRY RULE NOT SAVED', 'Reconnect before changing the carry rule.')) return;
         db.ref(`events/${currentMode}/skinsCarryOver`).set(val)
             .catch(err => alert(`Failed to save: ${err.message}`));
     }
