@@ -1879,10 +1879,28 @@
             .find(r => r.key === key);
         if (!fresh || !fresh.canPress) { closeSidePress(); alert('That match can no longer be pressed.'); return; }
 
-        const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/overallPresses`).push().key;
-        db.ref(`events/${currentMode}/sideMatches/${key}/overallPresses/${pushKey}`)
-            .set({ startHole: fresh.nextPressHole, stake: stake })
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+        // THE PRESS GOES WHERE ITS ENGINE READS.
+        //
+        // Stroke's overall engine reads overallPresses. Match Play and Nassau read
+        // `presses`, keyed by segment (calculateMatchEngine matches on baseId +
+        // startHole). This function wrote overallPresses for every format, so a
+        // cockpit press on a Match Play bet landed in a node no engine consults -
+        // it displayed briefly and moved no money at all. Cockpit presses press the
+        // OVERALL segment ('18'), same segment the Action page's overall button
+        // presses; per-nine Nassau presses stay on the Action page where the golfer
+        // can say which nine they mean.
+        const raw = (currentData.sideMatches || {})[key] || {};
+        const isStroke = (raw.format || fresh.format) === 'stroke';
+        const node = isStroke ? 'overallPresses' : 'presses';
+        const payload = isStroke
+            ? { startHole: fresh.nextPressHole, stake: stake }
+            : { baseId: '18', startHole: fresh.nextPressHole, stake: stake };
+
+        const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/${node}`).push().key;
+        db.ref(`events/${currentMode}/sideMatches/${key}/${node}/${pushKey}`)
+            .set(payload)
+            .then(() => alert(`\u2705 PRESS CONFIRMED\n${fresh.label}\n$${stake}\nStarts Hole ${fresh.nextPressHole}`))
+            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
         closeSidePress();
     }
 
@@ -2089,6 +2107,29 @@
         // AUTO-EXPANDED, because these are the moments a golfer would be annoyed to have
         // to hunt for: something just changed on this hole, the match can be pressed, or
         // it has finished. Everything else opens on demand.
+        // "P1 \u00B7 H6 \u00B7 $78" on the card itself. The stakes come from the RAW
+        // stored presses, not the display model, so what the cockpit says is what
+        // Firebase holds - the same numbers the engines settle. Presses without a
+        // stored stake show the wager's own stake, which is what they settle at.
+        const pressChips = sm => {
+            const raw = (currentData.sideMatches || {})[sm.key];
+            if (!raw) return '';
+            const chips = [];
+            const base = raw.format === 'stroke' ? (raw.overallStake || 0) : (raw.stake || 0);
+            const manual = raw.format === 'stroke'
+                ? (raw.overallPresses ? Object.values(raw.overallPresses) : [])
+                : (raw.presses ? Object.values(raw.presses) : []);
+            manual.slice().sort((a, b) => a.startHole - b.startHole).forEach((pr, i) => {
+                const amt = (pr.stake === undefined || pr.stake === null) ? base : pr.stake;
+                chips.push('P' + (i + 1) + ' H' + pr.startHole + ' $' + amt);
+            });
+            (raw.holePresses ? Object.values(raw.holePresses) : [])
+                .slice().sort((a, b) => a.fromHole - b.fromHole).forEach((pr, i) => {
+                    chips.push('HP' + (i + 1) + ' H' + pr.fromHole + ' $' + pr.newStake + '/hole');
+                });
+            return chips.join(' \u00B7 ');
+        };
+
         const sideRow = sm => {
             const open = isMatchExpanded(sm);
             const arrow = open ? '\u25BE' : '\u203A';
@@ -2113,8 +2154,8 @@
                     // having to open anything.
                     '<span class="mc-thru">' + (sm.thruShort || sm.thruText || '') +
                         (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') +
-                        (!open && sm.presses.length
-                            ? ' \u00B7 ' + sm.presses.length + ' press' + (sm.presses.length === 1 ? '' : 'es')
+                        (!open && pressChips(sm)
+                            ? ' \u00B7 ' + pressChips(sm)
                             : '') +
                     '</span>' +
                 '</button>';
