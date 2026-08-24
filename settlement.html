@@ -151,6 +151,14 @@
            quieter, so the card still scans as one row per golfer. */
         .rt-net td { font-size: 0.72em; color: var(--text-muted); border-top: none; padding-top: 0; }
         .rt-net .rt-name { font-style: italic; }
+        /* Player ledger. Note rows are indented and muted because they are ALREADY
+           inside the row above them; only the un-indented rows add up to FINAL NET. */
+        .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
+        .pl-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
+        .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
+        .pl-note { padding-left: 18px; font-size: 0.74rem; color: var(--text-muted); }
+        .pl-round { font-size: 0.74rem; color: var(--text-muted); font-style: italic; }
+        .pl-final { border-top: 1px solid var(--border-mid); margin-top: 4px; padding-top: 4px; font-weight: bold; }
         .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
         .legend-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); }
@@ -873,13 +881,69 @@
         mount.innerHTML = html;
     }
 
+    // Presenter only. Reads canonical contributions and formats them; the only
+    // arithmetic is summing the lines it was handed, to prove they add up.
+    function buildPlayerLedgerHtml(contributions, sortedTotals) {
+        if (!contributions) return '';
+        const keys = Object.keys(contributions);
+        if (keys.length === 0) return '';
+
+        // Ledger order follows Final Results, so a golfer reading down the page finds
+        // their detail in the same order they found their total.
+        const order = (sortedTotals || [])
+            .map(t => keys.find(k => contributions[k].name === t.name))
+            .filter(Boolean);
+        keys.forEach(k => { if (order.indexOf(k) === -1) order.push(k); });
+
+        // Formatting goes through fmtWhole, the single money-formatting rule in this
+        // file. It already prints an integer as "$93" and a genuine fraction as
+        // "$92.51", which is exactly what a ledger needs: whole-dollar rounds allocate
+        // integers and show no cents, while a legacy cent-settled round keeps the
+        // amounts the engine actually allocated.
+        //
+        // Nothing here rounds. An earlier draft of this function added its own
+        // toFixed/Math.round pair on a false diagnosis - a test regex, not the page,
+        // was truncating "92.51" to "92" - and that would have re-introduced per-line
+        // rounding into the one place a golfer reads to settle up.
+        const money = (amt) => {
+            const txt = '$' + fmtWhole(Math.abs(amt));
+            if (amt > 0.005) return `<span class="val-pos">+${txt}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-${txt}</span>`;
+            return `<span>$0</span>`;
+        };
+
+        let html = `<div class="settle-card">
+            <div class="settle-header">\uD83D\uDCD2 Player Ledger</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin:-4px 0 10px 0;">
+                Indented lines explain the line above them \u2014 they are already included in it.
+            </div>`;
+
+        order.forEach(k => {
+            const c = contributions[k];
+            html += `<div class="pl-block"><div class="pl-name">${c.name}</div>`;
+            if (c.lines.length === 0) {
+                html += `<div class="pl-row pl-note"><span>No money games this round</span><span></span></div>`;
+            }
+            c.lines.forEach(l => {
+                const cls = l.note ? 'pl-row pl-note' : (l.rounding ? 'pl-row pl-round' : 'pl-row');
+                html += `<div class="${cls}"><span>${l.label}</span>${money(l.amount)}</div>`;
+            });
+            html += `<div class="pl-row pl-final"><span>FINAL NET</span>${money(c.net)}</div></div>`;
+        });
+
+        return html + `</div>`;
+    }
+
     function renderCombinedSummary(data, courseData, savedScores) {
         const container = document.getElementById('combined-settlement-summary');
         if (!container) return;
         const players = data.players || [];
         if (players.length === 0) { container.innerHTML = ''; return; }
 
-        const { netByName, transactions } = computeCombinedNetTotals(data, courseData, savedScores);
+        // `contributions` is the canonical per-golfer breakdown added in the Wave 2B
+        // foundation. Destructured here so the ledger below reads engine output rather
+        // than recomputing anything.
+        const { netByName, transactions, contributions } = computeCombinedNetTotals(data, courseData, savedScores);
         const totals = Object.values(netByName);
 
         // Nothing to combine yet (no scores, no active bets) — stay quiet rather than show an
@@ -904,6 +968,24 @@
             html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
         });
         html += `</div>`;
+
+        // ---- PER-PLAYER LEDGER -----------------------------------------
+        //
+        // NO MONEY IS COMPUTED HERE. Every line, amount and final net is read from
+        // computeCombinedNetTotals()'s `contributions`, which records each amount at
+        // the moment the engine already counted it. That is the point of the
+        // contribution model: a page that re-ran the games to explain them would
+        // eventually disagree with the money it was explaining.
+        //
+        // MOVING vs NOTE is load-bearing and is SHOWN, not merely stored. Moving lines
+        // are the ones that ADD UP to the final net. Note lines sit indented beneath,
+        // explaining a moving line from the inside - the pool buy-in, each KP, the
+        // net-finish place, the skins. Adding a note into the total would double-count
+        // real money, so they are visually subordinate and never carry the sum.
+        //
+        // Every participant appears, including anyone who finishes exactly even. A
+        // golfer who cannot find their own name assumes the app lost them.
+        html += buildPlayerLedgerHtml(contributions, sorted);
 
         if (transactions.length > 0) {
             html += `<div class="settle-card">
