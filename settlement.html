@@ -10,6 +10,7 @@
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
+<script src="pool-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -212,6 +213,7 @@
 
     <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
 
+    <div id="money-pool-section"></div>
     <div id="combined-settlement-summary"></div>
 
     <div id="settle-content">
@@ -296,6 +298,7 @@
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
+            renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
             renderReceiptScorecard();
@@ -657,6 +660,52 @@
             if (!d.contains(e.target)) d.removeAttribute('open');
         });
     });
+
+    // MONEY POOL on the Receipt. Every bucket itemized, every winner named, every
+    // refund stated with its reason - the pot must be explainable line by line or
+    // it does not belong on this page. Pure read of computeMoneyPool(); the pool's
+    // per-player nets are already folded into Final Results by the engine.
+    function renderMoneyPoolSection(data, courseData, savedScores) {
+        const mount = document.getElementById('money-pool-section');
+        if (!mount) return;
+        if (typeof computeMoneyPool !== 'function') { mount.innerHTML = ''; return; }
+        const r = computeMoneyPool(data, courseData, savedScores);
+        if (!r) { mount.innerHTML = ''; return; }
+        const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+        let html = `<div class="settle-card" style="border:2px solid #b8860b;">
+            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)} (${r.participants.length} \u00D7 ${$(r.buyInCents)})</div>`;
+        if (!r.valid) {
+            html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
+        }
+        if (r.valid && r.kp) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}</span><span></span></div>`;
+            r.kp.lines.forEach(l => {
+                html += l.winnerId
+                    ? `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`
+                    : `<div class="ledger-row"><span>Hole ${l.hole}: unclaimed</span><span>${$(l.cents)} refunded</span></div>`;
+            });
+        }
+        if (r.valid && r.net) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
+            r.net.lines.forEach(l => {
+                const who = l.split ? `T${l.place}: ${l.names.join(' / ')} (split)` : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
+                html += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+            });
+            if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
+        }
+        if (r.valid && r.skins) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} (${r.skins.scoring}${r.skins.carryOver ? ', carries' : ', ties void'})</span><span></span></div>`;
+            r.skins.lines.forEach(l => {
+                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${l.units > 1 ? ` (${l.units} skins)` : ''}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+            });
+            if (r.skins.unwonCents > 0) html += `<div class="ledger-row"><span>Unwon${r.skins.pendingUnits ? ` (${r.skins.pendingUnits} carried)` : ''} \u2014 refunded</span><span>${$(r.skins.unwonCents)}</span></div>`;
+        }
+        if (r.valid && r.refund.cents > 0) {
+            html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
+        }
+        html += `</div>`;
+        mount.innerHTML = html;
+    }
 
     function renderCombinedSummary(data, courseData, savedScores) {
         const container = document.getElementById('combined-settlement-summary');
