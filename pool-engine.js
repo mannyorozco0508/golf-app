@@ -1,404 +1,1056 @@
-// ============================================================================
-// MONEY POOL — the whole-round prize pot (Marty Monday)
-//
-// A round-wide pot, separate from Group Action: every participant pays one
-// buy-in, and the pot is allocated across up to three prize buckets:
-//
-//   KP          fixed amount, split equally across the chosen KP holes
-//   NET FINISH  fixed amount, paid to the top net finishers by percentage
-//   SKINS       fixed amount OR the remainder of the pot, paid by skins won
-//
-// NOTHING HERE INVENTS GOLF MATH. Skins winners come from the settlement
-// engine's own computeSkinsCarryOverForSettle / computeSkinsVoidForSettle -
-// the functions every skins dollar in the app already trusts. Net scoring is
-// getStrokes/parseHcp - the same handicap math the leaderboard uses. KP
-// winners are read from data.kpWinners, the storage shape the app has always
-// used. This file only decides WHO GETS HOW MUCH OF A FIXED POT.
-//
-// THE ZERO-SUM RULE, stated once:
-//   sum(buy-ins) === sum(prizes paid) + sum(refunds), to the cent, always.
-// Money with no winner - an unclaimed KP, an unwon skins pot, a bucket on a
-// round with no qualifying scores - is REFUNDED equally to the participants,
-// never silently absorbed. Every path below either pays a named winner or
-// refunds the field; there is no third destination for a dollar.
-//
-// ALL ARITHMETIC IS IN INTEGER CENTS. Percent splits and equal shares produce
-// fractions; cents make every division auditable and make the zero-sum check
-// exact instead of within-epsilon. Leftover cents from a split go to the
-// earlier-sorted winners, one cent each, deterministically.
-// ============================================================================
-
-// ---------------------------------------------------------------------------
-// CONFIG SHAPE (data.moneyPool)
-//
-//   {
-//     enabled: true,
-//     buyIn: 40,                          // dollars per participant
-//     participantIds: ['101','102',...],  // optional; default = everyone playing for money
-//     kp:    { amount: 100, holes: [4, 14] },            // optional bucket
-//     net:   { amount: 100, places: [50, 30, 20] },      // optional; percents, sum 100
-//     skins: { mode: 'remainder'|'fixed'|'none',         // optional bucket
-//              amount: 280,               // when mode==='fixed'
-//              scoring: 'net'|'gross',
-//              carryOver: true }
-//   }
-//
-// Amounts are DOLLARS in storage (what the organizer typed); the engine works
-// in cents internally. 'remainder' is only offered on skins, and at most one
-// bucket may be the remainder by construction.
-// ---------------------------------------------------------------------------
-
-function moneyPoolParticipants(data) {
-    const pool = data.moneyPool || {};
-    const players = data.players || [];
-    if (Array.isArray(pool.participantIds) && pool.participantIds.length > 0) {
-        const wanted = pool.participantIds.map(String);
-        return players.filter(p => wanted.indexOf(String(p.id)) !== -1);
-    }
-    return players.filter(p => p.playingForMoney !== false);
-}
-
-// CUSTOM vs PRESET net payouts. One predicate, used by validation, settlement and
-// the setup screen, so all three agree on what a config means.
-function isCustomNetPayout(net) {
-    return !!(net && net.payoutMode === 'custom' && Array.isArray(net.amounts));
-}
-
-// The net bucket's total, in dollars. For custom payouts it is the SUM OF THE
-// PLACES - derived, never stored - so $40 + $30 can never drift from "$70".
-function moneyPoolNetTotal(net) {
-    if (!net) return 0;
-    if (isCustomNetPayout(net)) {
-        return net.amounts.map(Number).filter(a => isFinite(a) && a > 0).reduce((a, b) => a + b, 0);
-    }
-    return Number(net.amount) || 0;
-}
-
-// CENTS PER PLACE - the one list the tie logic walks.
-//
-// Preset percentages become cents by cumulative-floor differences (the same
-// telescoping rule the skins bucket uses), so the places always sum to exactly
-// the bucket and never to 100.01% of it. Because consecutive differences
-// telescope, summing these per-place figures across a tied span gives precisely
-// the span total the percentage code produced before this change - which is why
-// every existing preset round settles to the same cent.
-function moneyPoolNetPlaceCents(net) {
-    if (!net) return [];
-    if (isCustomNetPayout(net)) {
-        return net.amounts.map(Number).map(a => (isFinite(a) && a > 0) ? Math.round(a * 100) : 0)
-            .filter(c => c > 0);
-    }
-    const amountCents = Math.round((Number(net.amount) || 0) * 100);
-    const places = (net.places || []).map(Number);
-    const out = [];
-    let cumPct = 0, prevFloor = 0;
-    places.forEach(pct => {
-        cumPct += pct;
-        const cumFloor = Math.floor(amountCents * cumPct / 100);
-        out.push(cumFloor - prevFloor);
-        prevFloor = cumFloor;
-    });
-    return out;
-}
-
-// Validation is its own function so the SETUP UI can reject a bad pot before it
-// is ever saved, with the same rules settlement enforces. Returns { valid,
-// errors[], totalPool, fixedAllocated, remainder } - dollars, for display.
-function validateMoneyPool(data, courseData) {
-    const pool = data.moneyPool;
-    const errors = [];
-    if (!pool || pool.enabled === false) return { valid: false, errors: ['No money pool configured.'] };
-
-    const participants = moneyPoolParticipants(data);
-    const buyIn = Number(pool.buyIn) || 0;
-    if (buyIn <= 0) errors.push('Buy-in must be more than $0.');
-    if (participants.length < 2) errors.push('A money pool needs at least two golfers in it.');
-
-    const totalPool = buyIn * participants.length;
-    let fixed = 0;
-
-    const kp = pool.kp;
-    if (kp && (Number(kp.amount) || 0) > 0) {
-        const holes = Array.isArray(kp.holes) ? kp.holes : [];
-        if (holes.length === 0) errors.push('KP has money on it but no KP holes chosen.');
-        const courseHoles = (courseData || []).map(h => parseInt(h.hole, 10));
-        holes.forEach(h => {
-            if (courseHoles.length && courseHoles.indexOf(parseInt(h, 10)) === -1)
-                errors.push(`KP hole ${h} is not on this course.`);
-        });
-        if (new Set(holes.map(Number)).size !== holes.length) errors.push('The same KP hole is listed twice.');
-        fixed += Number(kp.amount);
-    }
-
-    // NET FINISH accepts either shape:
-    //   PRESET  places: [50,30,20]  percentages of net.amount (must total 100)
-    //   CUSTOM  payoutMode:'custom', amounts: [40,30]  exact dollars per place
-    // Custom exists because golfers say "forty and thirty", not "57.14% and
-    // 42.86% of seventy". Its total is DERIVED from the amounts - one source of
-    // truth, never a stored $70 that could disagree with its own places.
-    const net = pool.net;
-    const netTotal = moneyPoolNetTotal(net);
-    // CUSTOM SHAPE IS CHECKED EVEN WHEN THE TOTAL IS $0. moneyPoolNetTotal() sums
-    // only positive entries, so a config of nothing but "-5" totals zero and would
-    // otherwise skip the block entirely: no error shown, and the organizer's net
-    // prize silently disappearing. A bad number gets named either way.
-    if (isCustomNetPayout(net)) {
-        const raw = net.amounts;
-        const bad = raw.filter(a => a !== '' && a !== null && a !== undefined
-            && (!isFinite(Number(a)) || Number(a) < 0));
-        if (bad.length) errors.push('Every net payout must be $0 or more.');
-        else if (netTotal <= 0) errors.push('Enter at least one net payout amount.');
-    }
-    if (net && netTotal > 0) {
-        if (!isCustomNetPayout(net)) {
-            const places = Array.isArray(net.places) ? net.places.map(Number) : [];
-            if (places.length === 0) errors.push('Net prize has money on it but no paid places.');
-            const pctSum = places.reduce((a, b) => a + b, 0);
-            if (places.length && Math.abs(pctSum - 100) > 0.001)
-                errors.push(`Net payout percentages must total 100% (currently ${pctSum}%).`);
-            if (places.some(p => p <= 0)) errors.push('Every paid net place needs a positive percentage.');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Round Settlement</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="score-marks.js"></script>
+    <script src="money-engine.js"></script>
+<script src="action-model.js"></script>
+<script src="settlement-engine.js"></script>
+<script src="pool-engine.js"></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
         }
-        fixed += netTotal;
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
+        /* Top Navigation Bar */
+        /* ---- App navigation ----------------------------------------------------
+           The "More" popover used to be position:absolute INSIDE .top-nav-bar,
+           which is an overflow-x:auto container. An overflow container clips
+           absolutely-positioned descendants on BOTH axes, so the menu was being
+           sliced off at the nav bar's own bottom edge — only a few pixels of it
+           ever appeared. The fix is structural, not a z-index bump: the pills
+           scroll inside .top-nav-bar, but the <details> now lives OUTSIDE that
+           scroller in .app-nav-wrap, which has no overflow, so nothing can clip
+           the menu. .app-nav-wrap is also the positioning context, so the menu
+           anchors to the nav row rather than to the scrolling strip. */
+        .app-nav-wrap {
+            position: relative; display: flex; align-items: center; gap: 6px;
+            padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
+        }
+        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .top-nav-bar::-webkit-scrollbar { display: none; }
+        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
+        .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
+        .nav-more { position: static; flex: 0 0 auto; }
+        .nav-more > summary { list-style: none; cursor: pointer; }
+        .nav-more > summary::-webkit-details-marker { display: none; }
+        .nav-more-menu {
+            position: absolute; top: calc(100% + 2px); right: 0; z-index: 400;
+            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
+            padding: 8px; display: flex; flex-direction: column; gap: 6px;
+            min-width: 190px; max-width: calc(100vw - 24px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+        }
+        /* 48px rows: comfortable thumb targets for someone standing on a tee box. */
+        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; min-height: 48px; justify-content: flex-start; padding: 12px 14px; font-size: 0.95rem; }
+        /* No invisible overlay here. An earlier version put a full-screen ::before on
+           <summary> to catch outside taps; because summary also carried a z-index it
+           formed a stacking context, and the catcher ended up painted OVER the menu,
+           silently swallowing every tap on Matches / Stats / Trip / Home. Outside-tap
+           closing is handled by a real listener in JS instead, which can actually close
+           the menu rather than merely block it. */
+
+        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .val-pos { color: var(--accent-teal); }
+        .val-neg { color: var(--accent-red); }
+        .val-even { color: var(--text-muted); }
+        
+        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid var(--border-mid); padding-top: 8px; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
+
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
+        
+        /* ---- The Receipt --------------------------------------------------------
+           A vertical block per match: the original wager, every press with its start
+           hole and stake, who won each segment, and the net. Designed to be read on a
+           phone in a group chat, not printed as a spreadsheet. */
+        .receipt-match { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin: 10px 0; background: var(--bg-card); }
+        .receipt-title { font-size: 1rem; font-weight: bold; color: var(--text-main); }
+        .receipt-sub { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        .receipt-seg { padding: 8px 0; border-top: 1px solid var(--border-faint); }
+        .receipt-seg-head { display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: bold; color: var(--text-main); }
+        .receipt-seg-meta { font-size: 0.72rem; color: var(--text-muted); }
+        .receipt-seg-result { font-size: 0.85rem; color: var(--text-main); margin-top: 2px; }
+        .receipt-seg-money { font-size: 0.85rem; font-weight: bold; color: var(--brand-green); }
+        .receipt-net { margin-top: 10px; padding-top: 8px; border-top: 2px solid var(--border-mid); font-size: 0.92rem; font-weight: bold; color: var(--brand-green); }
+        .receipt-each { font-weight: normal; font-size: 0.78rem; color: var(--text-muted); }
+
+        .receipt-head { text-align: center; margin-bottom: 14px; }
+        .receipt-head-course { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; }
+        .receipt-head-date { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+        .receipt-head-format { font-size: 0.8rem; color: var(--text-main); margin-top: 2px; }
+
+        /* The one wide element. It scrolls inside its own card so the money sections
+           above it stay a single readable column on a phone. */
+        .receipt-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .receipt-table { border-collapse: collapse; width: 100%; font-size: 0.72rem; }
+        .receipt-table th, .receipt-table td { padding: 5px 4px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); }
+        .receipt-table th { background: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .receipt-table .rt-name { text-align: left; white-space: nowrap; padding-right: 8px; }
+        .receipt-table .rt-sec { background: var(--nassau-box-bg); font-weight: bold; }
+        /* A thin ring, not a filled badge - the score stays the readable thing. Drawn
+           with box-shadow so the cell keeps its size and the rows stay compact. */
+        .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
+        .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); border-radius: 50%; }
+        .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
+        .legend-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); }
+        .legend-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); margin-left: 10px; }
+
+        /* MAGIC PDF HIDING CSS */
+        @media print {
+            body { background-color: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; padding: 0; }
+            /* The ⋯ More menu is a <details> element that sits OUTSIDE .top-nav-bar, so
+               hiding the nav bar never hid it. Left open when a golfer exported, it
+               printed a navigation menu into a payout document. */
+            .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn,
+            .nav-more, .app-nav-wrap { display: none !important; }
+            .settle-card { border: 1px solid #ccc; background: #fff; }
+            /* A match's story must not break across a page - the whole point is that a
+               golfer can read one block and see how the money happened. */
+            .receipt-match { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ccc; background: #fff; }
+            /* Money must not split across pages either - a Who Pays Who list broken after
+               one row is exactly the sort of thing that starts an argument. */
+            .settle-card { break-inside: avoid; page-break-inside: avoid; }
+            .receipt-head { break-after: avoid; page-break-after: avoid; }
+            /* The scorecard is the only section allowed its own page. */
+            .receipt-card-wide { break-before: auto; page-break-inside: auto; }
+            .receipt-card-scroll { overflow-x: visible; }
+            /* Browsers drop box-shadows when saving to PDF unless told otherwise, and the
+               PDF is exactly where these rings matter most. */
+            .receipt-table td.mark-birdie, .receipt-table td.mark-eagle,
+            .legend-birdie, .legend-eagle {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .receipt-table td.mark-birdie, .legend-birdie {
+                box-shadow: inset 0 0 0 2px #c1121f !important; border-radius: 50% !important;
+            }
+            .receipt-table td.mark-eagle, .legend-eagle {
+                box-shadow: inset 0 0 0 2px #0f4c3a !important; border-radius: 50% !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <!-- Top Navigation Bar -->
+    <div class="app-nav-wrap">
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
+        <a href="settlement.html" class="top-nav-item active nav-link">💸 Results</a>
+    </div>
+    <details class="nav-more" id="nav-more-menu-wrap">
+        <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
+        <div class="nav-more-menu">
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
+        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="trip.html" class="top-nav-item">🧳 Trip</a>
+        <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
+        </div>
+    </details>
+    </div>
+
+    <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
+
+    <div id="money-pool-section"></div>
+    <div id="combined-settlement-summary"></div>
+
+    <div id="settle-content">
+        <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
+    </div>
+
+    <!-- THE FULL SCORECARD IS LAST, and it is last in the MARKUP, not merely last in
+         whatever order the render functions happen to run. It used to be appended to
+         the end of #combined-settlement-summary, which put an 18-hole grid between
+         Who Pays Who and the Group Games / Side Matches that explain those numbers -
+         the scorecard interrupted the money story instead of closing it. -->
+    <div id="receipt-scorecard"></div>
+</div>
+
+<script>
+    // --- DYNAMIC BETA TIME BOMB ---
+    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
+    if (new Date() > BETA_END_DATE) {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
+                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
+                <h2 style="color:#1d3557;">Beta Period Complete</h2>
+                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
+            </div>`;
+        throw new Error("Beta period expired.");
     }
+    // ---------------------------------
 
-    const skins = pool.skins || { mode: 'none' };
-    if (skins.mode === 'fixed') {
-        if ((Number(skins.amount) || 0) <= 0) errors.push('Fixed skins allocation must be more than $0.');
-        else fixed += Number(skins.amount);
-    }
-
-    // THE HARD INVARIANT: allocated money may never exceed the pot.
-    if (fixed > totalPool + 0.001) {
-        errors.push(`$${(fixed - totalPool).toFixed(0)} over budget — the pot is $${totalPool.toFixed(0)} but $${fixed.toFixed(0)} is allocated.`);
-    }
-
-    // With no remainder bucket, every dollar must still have a destination.
-    const remainder = totalPool - fixed;
-    if (skins.mode !== 'remainder' && remainder > 0.001) {
-        errors.push(`$${remainder.toFixed(0)} of the pot is unallocated — add it to a bucket or set skins to take the remainder.`);
-    }
-
-    return { valid: errors.length === 0, errors, totalPool, fixedAllocated: fixed,
-             remainder: skins.mode === 'remainder' ? Math.max(0, remainder) : 0 };
-}
-
-// Splits `cents` across `n` recipients as evenly as cents allow: the first
-// (cents % n) shares are one cent larger. Deterministic, exact.
-function splitCentsEvenly(cents, n) {
-    if (n <= 0) return [];
-    const base = Math.floor(cents / n);
-    const extra = cents - base * n;
-    const out = [];
-    for (let i = 0; i < n; i++) out.push(base + (i < extra ? 1 : 0));
-    return out;
-}
-
-// ---------------------------------------------------------------------------
-// THE POOL SETTLEMENT.
-// Returns null when no pool is configured (legacy rounds by construction), or:
-// {
-//   valid, errors,
-//   totalPoolCents, buyInCents, participants: [{id,name}],
-//   kp:    { amountCents, perHoleCents, lines: [{hole, winnerId, winnerName, cents}] , unclaimedCents }
-//   net:   { amountCents, standings: [...], lines: [{place, ids:[..], names, pctShare, cents}], unpaidCents }
-//   skins: { amountCents, scoring, carryOver, lines: [{hole, winnerId, winnerName, units, cents}],
-//            totalUnits, pendingUnits, unwonCents }
-//   refund:{ cents, perPlayerCents: {pid: cents}, reasons: [...] }
-//   perPlayerCents: { pid: net cents (prizes + refunds - buyIn) }
-// }
-// ---------------------------------------------------------------------------
-function computeMoneyPool(data, courseData, savedScores) {
-    const pool = data.moneyPool;
-    if (!pool || pool.enabled === false) return null;
-
-    const check = validateMoneyPool(data, courseData);
-    const participants = moneyPoolParticipants(data);
-    const isIn = id => participants.some(p => String(p.id) === String(id));
-    const nameOf = id => { const p = participants.find(x => String(x.id) === String(id)); return p ? p.name : '?'; };
-
-    const buyInCents = Math.round((Number(pool.buyIn) || 0) * 100);
-    const totalPoolCents = buyInCents * participants.length;
-
-    const result = {
-        valid: check.valid, errors: check.errors,
-        totalPoolCents, buyInCents,
-        participants: participants.map(p => ({ id: String(p.id), name: p.name })),
-        kp: null, net: null, skins: null,
-        refund: { cents: 0, perPlayerCents: {}, reasons: [] },
-        perPlayerCents: {}
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
     };
-    if (!check.valid) return result;
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    const perPlayer = {};
-    participants.forEach(p => { perPlayer[String(p.id)] = -buyInCents; });
-    const pay = (id, cents) => { perPlayer[String(id)] += cents; };
-    let refundCents = 0;
-    const refundReason = t => result.refund.reasons.push(t);
+    // --- DARK MODE ---
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') {
+            document.documentElement.classList.add('dark-mode');
+        }
+    })();
 
-    // ---- KP ---------------------------------------------------------------
-    const kpCfg = pool.kp;
-    if (kpCfg && (Number(kpCfg.amount) || 0) > 0) {
-        const amountCents = Math.round(Number(kpCfg.amount) * 100);
-        const holes = (kpCfg.holes || []).map(Number).sort((a, b) => a - b);
-        const shares = splitCentsEvenly(amountCents, holes.length);
-        const kpWinners = data.kpWinners || {};
-        const lines = [];
-        let unclaimed = 0;
-        holes.forEach((h, i) => {
-            const wid = kpWinners['h' + h];
-            // Only a POOL PARTICIPANT can take pool money. A non-participant on the
-            // sticks gets bragging rights; their KP share refunds to the field.
-            if (wid && isIn(wid)) {
-                pay(wid, shares[i]);
-                lines.push({ hole: h, winnerId: String(wid), winnerName: nameOf(wid), cents: shares[i] });
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) {
+            btn.textContent = '☀️ Light Mode';
+        }
+    });
+    // ------------------
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+    let currentData = {};
+
+    if (!currentMode) {
+        window.location.href = "admin.html";
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById("main-content").style.display = "block";
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            let navHref = base + '?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) navHref += '&group=' + groupParam;
+            link.href = navHref;
+        });
+
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentData = snapshot.val() || {};
+            document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
+            renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
+            renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
+            renderSettlement(currentData);
+            renderReceiptScorecard();
+        });
+    }
+
+    // parseHcp, getStrokes, calcWolfEngine, calcStablefordEngine, calcPointSettlement,
+    // calculateMatchEngine, and calcDotsEngine now all live in money-engine.js so
+    // settlement.html and trip.html always agree on the math. The old inline copies
+    // that used to sit here have been removed.
+    function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
+        if (isClosed && finalResult) return finalResult;
+        if (score === 0) return "AS";
+        if (score > 0) return `${t1Name} ${score}UP`;
+        return `${t2Name} ${Math.abs(score)}UP`;
+    }
+
+    // --- HOLE BET + OVERALL BET ENGINE (mirrors index.html for final settlement) ---
+
+
+
+    // Same rule as Dots/Junk, verified consistent — a stroke-under-par unit (birdie=1,
+    // eagle=2, already correctly weighted since "under" is the literal stroke count) is worth
+    // its dollar value paid by every other player, not an isolated credit with no payer.
+
+    // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
+    // Same rule, now complete on both sides: each KP win is paid by every other player.
+
+    // Cross-group Side Matches (from the ⚔️ Matches tab) — always shown regardless of primary format
+    // THE RECEIPT, per match. Reads buildSideMatchReceipts() in settlement-engine.js -
+    // the same engines settlement itself uses - so the story and the total can never
+    // disagree. Deliberately a vertical list, not a table: this gets opened in a group
+    // chat on a phone.
+    // ---- THE RECEIPT: header + scorecard ------------------------------------
+    // These are the only two things the retired index.html print path had that this
+    // document did not. Everything else it produced - game ledgers for the main format,
+    // Wolf, Stableford, Nassau, Skins, Birdie - the Receipt already covered, and covered
+    // better, because it also shows side matches and press timelines.
+    // Sets a useful document title so the saved PDF names itself after the round rather
+    // than the page, then restores it - the title is what most browsers use as the
+    // default filename.
+    function printReceipt() {
+        const course = ((currentData && currentData.courseName) || 'Golf Round')
+            .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const d = new Date();
+        const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const previous = document.title;
+        document.title = `${course}-${stamp}-Receipt`;
+        window.print();
+        setTimeout(() => { document.title = previous; }, 1000);
+    }
+
+    // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------
+    //
+    // Settlement is allocated in whole dollars, so ".00" is noise. But a fraction is
+    // never chopped off either: an explanatory per-game figure that genuinely lands on
+    // $12.50 must print $12.50. The Receipt EXPLAINS the money; it must not restate it
+    // as something tidier than it is. So: whole value -> no decimals, true fraction ->
+    // shown honestly. A fraction appearing in canonical settlement would mean the
+    // allocator failed, and that should be visible, not hidden.
+    function fmtWhole(n) {
+        // Thousands separators, because this is the document people settle from and
+        // "$15000" is genuinely harder to read correctly at a glance than "$15,000".
+        //
+        // Grouping is applied to the WHOLE-DOLLAR part only, so a genuine fraction still
+        // prints its cents exactly as before - a per-game figure that really is $12.50
+        // must stay $12.50. Formatting only: fmtWhole's output is never parsed back
+        // anywhere, so a comma cannot leak into a calculation.
+        const group = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (Number.isInteger(n)) return group(n);
+        const fixed = n.toFixed(2);
+        const neg = fixed.startsWith('-');
+        const [whole, cents] = (neg ? fixed.slice(1) : fixed).split('.');
+        return (neg ? '-' : '') + group(whole) + '.' + cents;
+    }
+
+    // The sign belongs in front of the dollar sign. "$-210" is not how money is
+    // written anywhere outside a spreadsheet.
+    function fmtSigned(n) {
+        if (n > 0) return `+$${fmtWhole(n)}`;
+        if (n < 0) return `-$${fmtWhole(Math.abs(n))}`;
+        return '$0';
+    }
+
+    // Same rule, wrapped in the colour classes the ledger rows already use.
+    function fmtSignedHtml(n) {
+        if (n > 0) return `<span class="val-pos">${fmtSigned(n)}</span>`;
+        if (n < 0) return `<span class="val-neg">${fmtSigned(n)}</span>`;
+        return `<span class="val-even">$0</span>`;
+    }
+
+    // The engine's segment labels are canonical DATA ("Original", "Press 1") and are
+    // deliberately not renamed there. This is the presentation layer translating them
+    // into what a golfer reads. Nassau's own segment names pass straight through,
+    // because "Front 9" is already plain golf English.
+    function receiptSegLabel(label) {
+        // 'Original' (Stroke Play) and 'Overall Match' (Match Play) are the same thing
+        // to a golfer: the bet that was there before anybody pressed.
+        if (/^(original|overall match)$/i.test(label || '')) return 'Original Bet';
+        const m = /^press\s+(\d+)/i.exec(label || '');
+        return m ? `Press #${m[1]}` : (label || '');
+    }
+
+    function buildReceiptHeader() {
+        const course = (currentData && currentData.courseName) || 'Golf Round';
+        const date = new Date().toLocaleDateString('en-US',
+            { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        const fmtName = { stroke: 'Stroke Play', nassau: 'Nassau', match: 'Match Play',
+            skins: 'Skins', dots: 'Dots / Junk', wolf: 'Wolf', stableford: 'Stableford',
+            hilo: 'Hi-Lo', bestball: '2-Man Best Ball', scramble: 'Scramble', ryder: 'Ryder Cup' };
+        const gameFormat = (currentData && currentData.gameFormat) || 'stroke';
+        const scoring = (currentData && (currentData.nassauScoring || currentData.matchScoring)) || '';
+        const sub = (fmtName[gameFormat] || gameFormat) + (scoring ? ' \u00B7 ' + (scoring === 'net' ? 'Net' : 'Gross') : '');
+
+        return `<div class="receipt-head">
+            <div class="receipt-head-course">${course}</div>
+            <div class="receipt-head-date">${date}</div>
+            <div class="receipt-head-format">${sub}</div>
+        </div>`;
+    }
+
+    // The full 18-hole grid, preserved from the retired print path. Deliberately the one
+    // wide element in the document: a scorecard is inherently tabular, and it sits last
+    // so the money sections above it stay a readable single column on a phone.
+    function buildReceiptScorecard() {
+        const data = currentData || {};
+        const courseData = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const players = data.players || [];
+        const scores = data.scores || {};
+        if (courseData.length === 0 || players.length === 0) return '';
+
+        const front = courseData.filter(h => h.hole <= 9);
+        const back = courseData.filter(h => h.hole > 9);
+        const hasFront = front.length > 0, hasBack = back.length > 0;
+
+        const cell = (v, cls) => `<td${cls ? ` class="${cls}"` : ''}>${v}</td>`;
+        // Birdie / eagle ring, from the SAME classifier the live Full Scorecard uses.
+        // Only ever applied to a player's hole score - totals, the PAR row and empty
+        // cells are left alone, because none of them is an achievement.
+        const markOf = (score, par) =>
+            (typeof scoreMarkClass === 'function') ? scoreMarkClass(score, par).trim() : '';
+        let html = `<div class="settle-card receipt-card-wide">
+            <div class="settle-header">\uD83D\uDCCB Full Scorecard</div>
+            <div class="receipt-card-scroll"><table class="receipt-table">`;
+
+        // HOLE + PAR rows
+        const headRow = (label, vals, outVal, inVal, total) => {
+            let r = `<tr><th class="rt-name">${label}</th>`;
+            if (hasFront) { front.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasBack) r += `<th class="rt-sec">${outVal}</th>`; }
+            if (hasBack) { back.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasFront) r += `<th class="rt-sec">${inVal}</th>`; }
+            return r + `<th class="rt-sec">${total}</th></tr>`;
+        };
+        const outPar = front.reduce((s, h) => s + (h.par || 0), 0);
+        const inPar = back.reduce((s, h) => s + (h.par || 0), 0);
+        html += headRow('HOLE', h => h.hole, 'OUT', 'IN', 'TOT');
+        html += headRow('PAR', h => h.par, outPar, inPar, outPar + inPar);
+
+        players.forEach(p => {
+            const get = h => scores[`p${p.id}_h${h.hole}`] || null;
+            const sum = list => list.reduce((s, h) => s + (get(h) || 0), 0);
+            const o = sum(front), i = sum(back);
+            let r = `<tr><td class="rt-name">${p.name}</td>`;
+            if (hasFront) { front.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasBack) r += cell(o || '\u2013', 'rt-sec'); }
+            if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
+            r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
+            html += r;
+        });
+
+        html += `</table></div>
+            <div class="receipt-legend">
+                <span class="legend-dot legend-birdie"></span> Birdie
+                <span class="legend-dot legend-eagle"></span> Eagle or better
+            </div></div>`;
+        return html;
+    }
+
+    function buildReceiptBlock(matchId, data, courseData, savedScores) {
+        if (typeof buildSideMatchReceipts !== 'function') return '';
+        const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
+        if (!r) return '';
+
+        let html = `<div class="receipt-match">`;
+        html += `<div class="receipt-title">${r.nameA} vs ${r.nameB}</div>`;
+        html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
+
+        r.segments.forEach(seg => {
+            html += `<div class="receipt-seg">`;
+            html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
+            html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
+            html += `<div class="receipt-seg-result">${seg.result}</div>`;
+            if (seg.winner && seg.money > 0) {
+                html += `<div class="receipt-seg-money">${seg.winner} +$${fmtWhole(seg.money)}</div>`;
+            }
+            html += `</div>`;
+        });
+
+        html += `<div class="receipt-net">MATCH NET \u00B7 ` +
+            (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
+            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
+            `</div>`;
+        html += `</div>`;
+        return html;
+    }
+
+    function buildSideMatchesHtml(data, courseData, savedScores) {
+        // THE ROUND'S OWN WAGER IS A WAGER.
+        //
+        // A Match or Nassau created in setup used to render through a separate one-line
+        // card - "Overall Match: Manny Won (-50)" - with no presses, no start holes and
+        // no match net, while the identical bet created through Action printed its whole
+        // history. settlement-engine.js already learned to describe the main game as a
+        // virtual side match; this page never asked, so the improvement was built and
+        // discarded. It asks now, through the SAME helper, so the two can never disagree
+        // about what the round's wager was.
+        //
+        // DISPLAY ONLY. computeCombinedNetTotals is untouched and remains the sole source
+        // of money - this changes what the Receipt EXPLAINS, never what anyone is paid.
+        const sideMatches = Object.assign({}, data.sideMatches || {});
+        const mainWager = (typeof legacyMainAsSideMatch === 'function')
+            ? legacyMainAsSideMatch(data) : null;
+        if (mainWager) sideMatches.__main = mainWager;
+
+        const matchIds = Object.keys(sideMatches);
+        if (matchIds.length === 0) return "";
+
+        const players = data.players || [];
+        // FINAL MONEY is what actually changes hands, so it prints whole dollars.
+        // The per-game rows keep their exact figures - they explain the canonical
+        // math rather than stating what anyone owes.
+        const fmtSideM = fmtSignedHtml;
+
+        let rows = "";
+        matchIds.sort((a, b) => (sideMatches[a].createdAt || 0) - (sideMatches[b].createdAt || 0)).forEach(matchId => {
+            const sm = sideMatches[matchId];
+            const teamAPlayers = players.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 1" }));
+            const teamBPlayers = players.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 2" }));
+            const virtualPlayers = teamAPlayers.concat(teamBPlayers);
+            if (virtualPlayers.length < 2) return;
+
+            // Only holes from this match's own start hole forward. A match with no
+            // startHole covers the whole round, exactly as before. Declared ABOVE the
+            // format branch because both branches settle over the same range.
+            const smCourse = (typeof sideMatchHoles === 'function')
+                ? sideMatchHoles(sm, courseData)
+                : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
+
+            if (sm.format === 'stroke') {
+                const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
+                if (!p1 || !p2) return;
+                const holeConfig = { holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' };
+                const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
+                const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
+                const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+                const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
+                const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
+                const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
+
+                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             } else {
-                unclaimed += shares[i];
-                lines.push({ hole: h, winnerId: null, winnerName: null, cents: shares[i] });
+                const manualPresses = sm.presses ? Object.values(sm.presses) : [];
+                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                if (!calc) return;
+                const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
+
+                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             }
         });
-        if (unclaimed > 0) { refundCents += unclaimed; refundReason('Unclaimed KP money refunded to the field.'); }
-        result.kp = { amountCents, perHoleCents: shares, lines, unclaimedCents: unclaimed };
+
+        if (!rows) return "";
+        return `<div class="settle-card"><div class="settle-header">⚔️ Side Matches</div>${rows}</div>`;
     }
 
-    // ---- NET FINISH --------------------------------------------------------
-    const netCfg = pool.net;
-    if (netCfg && moneyPoolNetTotal(netCfg) > 0) {
-        const placeCents = moneyPoolNetPlaceCents(netCfg);
-        const amountCents = placeCents.reduce((a, b) => a + b, 0);
-        // Net totals over holes actually scored - the SAME formula the leaderboard
-        // uses, via the same canonical helpers. No new handicap math.
-        const standings = participants.map(p => {
-            let net = 0, played = 0;
-            (courseData || []).forEach(h => {
-                const v = savedScores[`p${p.id}_h${h.hole}`];
-                if (v && v > 0) {
-                    net += parseInt(v, 10) - getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                    played++;
-                }
-            });
-            return { id: String(p.id), name: p.name, net, played };
-        }).filter(s => s.played > 0)
-          .sort((a, b) => a.net - b.net || a.name.localeCompare(b.name));
+    function buildSideGamesHtml(data, courseData, savedScores) {
+        let html = "";
 
-        const lines = [];
-        let paid = 0;
-        if (standings.length > 0) {
-            // TIES SPLIT THE TIED PLACES' MONEY. Two golfers tied for 1st in a
-            // 50/30/20 structure share 80% equally and 3rd place still pays 20% -
-            // the standard scoreboard convention, applied in cents.
-            let place = 1;
-            let i = 0;
-            while (i < standings.length && place <= placeCents.length) {
-                const tied = standings.filter(s => s.net === standings[i].net);
-                const span = tied.length;
-                // ONE TIE RULE, unchanged: golfers tied for a place consume that
-                // place AND the ones below it, and split the combined money. With
-                // $40/$30, two tied for 1st take $70 and split it $35 each; nobody
-                // below them is paid, because 2nd place was consumed by the tie.
-                let groupCents = 0;
-                for (let k = place; k < place + span && k <= placeCents.length; k++) groupCents += placeCents[k - 1];
-                if (groupCents > 0) {
-                    const shares = splitCentsEvenly(groupCents, span);
-                    tied.forEach((s, j) => pay(s.id, shares[j]));
-                    paid += groupCents;
-                    lines.push({ place, ids: tied.map(s => s.id), names: tied.map(s => s.name),
-                                 net: tied[0].net, cents: groupCents, split: span > 1,
-                                 pctShare: amountCents > 0 ? (groupCents / amountCents) * 100 : 0 });
-                }
-                i += span;
-                place += span;
+        if (data.birdieGameEnabled === true) {
+            const totals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
+            const players = (data.players || []).filter(p => p.playingForMoney !== false);
+            if (players.length > 0) {
+                html += `<div class="settle-card"><div class="settle-header">🐦 Birdie Game (amount won)</div>`;
+                players.forEach(p => {
+                    // Was `$${n.toFixed(2)}` on the raw signed number, which printed a
+                    // loss as "$-210.00". Signed properly, and without phantom cents.
+                    html += `<div class="ledger-row"><span>${p.name}</span>${fmtSignedHtml(totals[p.id] || 0)}</div>`;
+                });
+                html += `</div>`;
             }
         }
-        // Rounding residue from percent math, or a round with nobody scored yet:
-        // whatever the bucket did not pay goes back to the field, never nowhere.
-        const unpaid = amountCents - paid;
-        if (unpaid > 0) {
-            refundCents += unpaid;
-            if (standings.length === 0) refundReason('Net prize refunded — no scores posted.');
-        }
-        result.net = { amountCents, standings, lines, unpaidCents: unpaid };
-    }
 
-    // ---- SKINS -------------------------------------------------------------
-    const skCfg = pool.skins || { mode: 'none' };
-    if (skCfg.mode === 'remainder' || skCfg.mode === 'fixed') {
-        const amountCents = skCfg.mode === 'fixed'
-            ? Math.round(Number(skCfg.amount) * 100)
-            : totalPoolCents
-                - (result.kp ? result.kp.amountCents : 0)
-                - (result.net ? result.net.amountCents : 0);
-        const scoring = skCfg.scoring === 'gross' ? 'gross' : 'net';
-        const carry = skCfg.carryOver !== false;
 
-        // THE CANONICAL SKINS ENGINE decides the winners and the units - the same
-        // functions every skins wager in the app settles through. This bucket only
-        // divides a fixed pot by those units.
-        const calc = carry
-            ? computeSkinsCarryOverForSettle(participants, courseData || [], savedScores, scoring)
-            : computeSkinsVoidForSettle(participants, courseData || [], savedScores, scoring);
-        const totalUnits = calc.skins.reduce((a, s) => a + s.unitsWon, 0) + calc.pendingUnits;
-        const lines = [];
-        let paid = 0;
-        if (totalUnits > 0 && calc.skins.length > 0) {
-            // TELESCOPING ALLOCATION. Rounding each line independently overpaid the
-            // pot - eighteen Math.rounds summed to $480.08 on a $480 pot, which the
-            // reconciliation invariant caught on the first run. Each line instead
-            // gets floor(amount * cumulativeUnits / total) minus the previous
-            // cumulative floor: the differences telescope, so the lines sum to at
-            // most the pot by construction, every cent lands on a real winner, and
-            // the pending carry's share falls out as the exact residue.
-            let cumUnits = 0, prevFloor = 0;
-            calc.skins.forEach(s => {
-                cumUnits += s.unitsWon;
-                const cumFloor = Math.floor(amountCents * cumUnits / totalUnits);
-                const cents = cumFloor - prevFloor;
-                prevFloor = cumFloor;
-                pay(s.player.id, cents);
-                paid += cents;
-                lines.push({ hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
-                             units: s.unitsWon, cents });
+        // STACKED / ADDITIONAL GAMES.
+        //
+        // These settle into Final Money through computeCombinedNetTotals, but nothing
+        // itemised them here, so a golfer saw "Won $58" with no line explaining
+        // where the skins money came from. That is the argument this document exists to
+        // prevent. Now that several participant-scoped Skins games can run at once, the
+        // gap is worse: two separate wagers, both invisible.
+        //
+        // Each card is built from computeGameNetByPlayerId - the SAME function the
+        // combined ledger uses - so this breakdown can never disagree with the total it
+        // is explaining. No second calculation, no chance of drift.
+        if (typeof getRoundGames === 'function' && typeof computeGameNetByPlayerId === 'function') {
+            getRoundGames(data).filter(g => g.role === 'additional').forEach(game => {
+                let net = {};
+                try { net = computeGameNetByPlayerId(game, courseData, savedScores) || {}; }
+                catch (e) { return; }
+                const ids = Object.keys(net);
+                if (ids.length === 0) return;
+
+                const label = (typeof describeGame === 'function') ? describeGame(game) : game.label;
+                html += `<div class="settle-card"><div class="settle-header">${game.icon || ''} ${label}</div>`;
+                const roster = data.players || [];
+                ids.forEach(pid => {
+                    const pl = roster.find(p => String(p.id) === String(pid));
+                    html += `<div class="ledger-row"><span>${pl ? pl.name : pid}</span>${fmtSignedHtml(net[pid] || 0)}</div>`;
+                });
+                html += `</div>`;
             });
         }
-        const unwon = amountCents - paid;
-        if (unwon > 0) {
-            refundCents += unwon;
-            if (calc.skins.length === 0) refundReason('Skins pot refunded — no skins were won.');
-            else if (calc.pendingUnits > 0) refundReason(`Carry of ${calc.pendingUnits} unwon skin${calc.pendingUnits === 1 ? '' : 's'} refunded.`);
-        }
-        result.skins = { amountCents, scoring, carryOver: carry, lines,
-                         totalUnits, pendingUnits: calc.pendingUnits, unwonCents: unwon };
+
+        html += buildSideMatchesHtml(data, courseData, savedScores);
+
+        return html;
     }
 
-    // ---- REFUNDS -----------------------------------------------------------
-    // Every unpaid cent comes back to the field equally. This is what makes the
-    // zero-sum identity structural rather than hoped-for.
-    if (refundCents > 0) {
-        const shares = splitCentsEvenly(refundCents, participants.length);
-        participants.forEach((p, i) => {
-            pay(p.id, shares[i]);
-            result.refund.perPlayerCents[String(p.id)] = shares[i];
+    // Combines every active money source in this round — main game, birdie pool, KP game, and
+    // every side match — into one net-per-player total, then runs it through the same
+    // simplifyDebts() Trip Mode already uses, so a round with several simultaneous bets doesn't
+    // leave a golfer mentally adding up four separate cards to know what they actually owe.
+    // Reuses the exact same engine calls the existing per-game rendering below already makes —
+    // this is purely additive, none of that rendering logic is touched.
+    // Fills a real, confirmed gap: computeRoundMoneyByPlayer (money-engine.js) has no branch for
+    // 'skins' or 'hilo' as the MAIN format — a Skins or Hi-Lo round previously contributed
+    // nothing to Final Results / Who Pays Who at all. Deliberately NOT touching money-engine.js
+    // (the more protected canonical dispatcher) — these mirror the exact, already-tested formulas
+    // already used elsewhere (skins.html's renderSkinsEngine payout math; index.html's Hi-Lo
+    // ticker's (t1Points-t2Points)*holeBetStake) rather than inventing anything new.
+
+    // Skins is a pot/ante game — every player pays in buyIn, winners split the pot. For a
+    // zero-sum settlement figure (comparable to every other game's net win/loss), this is
+    // payout MINUS what that player put into the pot, not the raw payout skins.html displays.
+    // Exact copy of index.html's calculateHiLoEngine — not reinvented, same math verbatim.
+    // This app has no shared-module system, so small engine functions are duplicated per file
+    // by established convention; this one simply didn't exist here before, needed to compute
+    // Hi-Lo's settlement contribution using the identical formula the live ticker already uses.
+
+
+    // Reuses the exact (t1Points - t2Points) * holeBetStake formula already used in index.html's
+    // live Hi-Lo ticker and print ledger — same split-evenly-among-teammates convention Nassau
+    // and Match Play already use elsewhere in this same file.
+
+
+    // Close the "More" popover when a tap lands outside it. Native <details> already
+    // handles tapping the summary again, and navigating away closes it implicitly, so
+    // this only covers the tap-elsewhere case. Uses a plain listener rather than a CSS
+    // overlay: an overlay can block links but can never close anything.
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('details.nav-more[open]').forEach(function (d) {
+            if (!d.contains(e.target)) d.removeAttribute('open');
         });
-        result.refund.cents = refundCents;
+    });
+
+    // MONEY POOL on the Receipt. Every bucket itemized, every winner named, every
+    // refund stated with its reason - the pot must be explainable line by line or
+    // it does not belong on this page. Pure read of computeMoneyPool(); the pool's
+    // per-player nets are already folded into Final Results by the engine.
+    function renderMoneyPoolSection(data, courseData, savedScores) {
+        const mount = document.getElementById('money-pool-section');
+        if (!mount) return;
+        if (typeof computeMoneyPool !== 'function') { mount.innerHTML = ''; return; }
+        const r = computeMoneyPool(data, courseData, savedScores);
+        if (!r) { mount.innerHTML = ''; return; }
+        const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+        let html = `<div class="settle-card" style="border:2px solid #b8860b;">
+            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)} (${r.participants.length} \u00D7 ${$(r.buyInCents)})</div>`;
+        if (!r.valid) {
+            html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
+        }
+        if (r.valid && r.kp) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}</span><span></span></div>`;
+            r.kp.lines.forEach(l => {
+                html += l.winnerId
+                    ? `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`
+                    : `<div class="ledger-row"><span>Hole ${l.hole}: unclaimed</span><span>${$(l.cents)} refunded</span></div>`;
+            });
+        }
+        if (r.valid && r.net) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
+            r.net.lines.forEach(l => {
+                const who = l.split ? `T${l.place}: ${l.names.join(' / ')} (split)` : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
+                html += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+            });
+            if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
+        }
+        if (r.valid && r.skins) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} (${r.skins.scoring}${r.skins.carryOver ? ', carries' : ', ties void'})</span><span></span></div>`;
+            r.skins.lines.forEach(l => {
+                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${l.units > 1 ? ` (${l.units} skins)` : ''}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+            });
+            if (r.skins.unwonCents > 0) html += `<div class="ledger-row"><span>Unwon${r.skins.pendingUnits ? ` (${r.skins.pendingUnits} carried)` : ''} \u2014 refunded</span><span>${$(r.skins.unwonCents)}</span></div>`;
+        }
+        if (r.valid && r.refund.cents > 0) {
+            html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
+        }
+        html += `</div>`;
+        mount.innerHTML = html;
     }
 
-    result.perPlayerCents = perPlayer;
-    return result;
-}
+    function renderCombinedSummary(data, courseData, savedScores) {
+        const container = document.getElementById('combined-settlement-summary');
+        if (!container) return;
+        const players = data.players || [];
+        if (players.length === 0) { container.innerHTML = ''; return; }
 
-// Dollars view for settlement: { pid: dollars }. The single integration point
-// computeCombinedNetTotals uses. Cents→dollars division is exact display math;
-// the books balance in cents underneath.
-function computeMoneyPoolNetByPlayerId(data, courseData, savedScores) {
-    const r = computeMoneyPool(data, courseData, savedScores);
-    if (!r || !r.valid) return {};
-    const out = {};
-    Object.keys(r.perPlayerCents).forEach(pid => { out[pid] = r.perPlayerCents[pid] / 100; });
-    return out;
-}
+        const { netByName, transactions } = computeCombinedNetTotals(data, courseData, savedScores);
+        const totals = Object.values(netByName);
 
-// A round is "locked" for pool-rule edits once anyone has scored: changing the
-// money mid-round is how arguments start. Creation-time setup is unaffected.
-function moneyPoolRulesLocked(data) {
-    const scores = data.scores || {};
-    return Object.keys(scores).some(k => scores[k] && scores[k] > 0);
-}
+        // Nothing to combine yet (no scores, no active bets) — stay quiet rather than show an
+        // empty "Final Results" card above the real per-game breakdowns below.
+        if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
+
+        function fmt(amt) {
+            if (amt > 0.005) return `<span class="val-pos">Won $${fmtWhole(amt)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">Owes $${fmtWhole(Math.abs(amt))}</span>`;
+            return `<span>Even</span>`;
+        }
+
+        const sorted = totals.slice().sort((a, b) => b.net - a.net);
+
+        // The round this document belongs to. Only the retired print path carried this,
+        // which meant a shared Receipt had no course or date on it.
+        let html = buildReceiptHeader();
+
+        html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
+            <div class="settle-header">🏁 Final Results</div>`;
+        sorted.forEach(t => {
+            html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
+        });
+        html += `</div>`;
+
+        if (transactions.length > 0) {
+            html += `<div class="settle-card">
+                <div class="settle-header">🤝 Who Pays Who</div>`;
+            transactions.forEach(t => {
+                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtWhole(t.amount)}</span></div>`;
+            });
+            html += `</div>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    // Scores come LAST. The money story is what a golfer opens this document for, and
+    // the grid is the reference you check afterwards - so it renders into its own
+    // container, which sits after every money section in the markup.
+    function renderReceiptScorecard() {
+        const el = document.getElementById('receipt-scorecard');
+        if (!el) return;
+        el.innerHTML = buildReceiptScorecard();
+    }
+
+    function renderSettlement(data) {
+        const container = document.getElementById("settle-content");
+        const players = data.players || [];
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        const gameFormat = data.gameFormat || "stroke";
+        const holeBet = data.holeBetStake || 0;
+
+        // Only players opted in to money betting are included in payout math below -
+        // everyone still scores normally regardless of this flag (team formats never show
+        // this checkbox, so it's a no-op there and full teams stay intact).
+        const moneyPlayers = players.filter(p => p.playingForMoney !== false);
+
+        if (gameFormat === 'skins') {
+            const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
+            const carryOver = data.skinsCarryOver !== false;
+            let ledgerHtml = "";
+            moneyPlayers.forEach(p => {
+                const money = skinsNet[p.id] || 0;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
+            });
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🥩 Final Skins Settlement (${carryOver ? 'Carry Over' : 'No Carry'})</div>
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">Net of each player's own buy-in — a positive number means they came out ahead overall, not just what they won from the pot.</p>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'hilo') {
+            const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
+            const calc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            let ledgerHtml = "";
+            moneyPlayers.forEach(p => {
+                const money = hiloNet[p.id] || 0;
+                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
+            });
+            const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">♠️ Final Hi-Lo Settlement</div>
+                    ${pointsLine}
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'wolf') {
+            const wolfCalc = calcWolfEngine(data, courseData, savedScores);
+            const wolfMoney = calcPointSettlement(moneyPlayers, wolfCalc.totals, data.wolfPointVal || 0);
+            let ledgerHtml = "";
+
+            moneyPlayers.forEach(p => {
+                let pts = wolfCalc.totals[p.id] || 0;
+                let money = wolfMoney[p.id] || 0;
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        ${fmtSignedHtml(money)}
+                    </div>
+                `;
+            });
+
+            if (players.length !== 4) {
+                ledgerHtml = `<div style="text-align:center; color: var(--text-muted); padding: 10px;">Wolf requires exactly 4 players — check the Home/setup page.</div>`;
+            }
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🐺 Final Wolf Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'stableford') {
+            const sfCalc = calcStablefordEngine(data, courseData, savedScores);
+            const sfMoney = calcPointSettlement(moneyPlayers, sfCalc.totals, data.stablefordPointVal || 0);
+            let ledgerHtml = "";
+
+            moneyPlayers.forEach(p => {
+                let pts = sfCalc.totals[p.id] || 0;
+                let money = sfMoney[p.id] || 0;
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        ${fmtSignedHtml(money)}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🎯 Final Stableford Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'dots') {
+            const dotsCalc = calcDotsEngine(data, courseData, savedScores);
+            let dotVal = data.dotPointVal || 0;
+            let ledgerHtml = "";
+            
+            moneyPlayers.forEach(p => {
+                let pts = dotsCalc.totals[p.id] || 0;
+                let money = pts * dotVal;
+                ledgerHtml += `
+                    <div class="ledger-row">
+                        <span>${p.name} (${pts} Dots):</span>
+                        ${fmtSignedHtml(money)}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">🎯 Final Dot Game Settlement</div>
+                    ${ledgerHtml}
+                </div>
+                ${buildSideGamesHtml(data, courseData, savedScores)}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat === 'stroke') {
+            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
+            if (sideHtml) {
+                container.innerHTML = sideHtml + `<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>`;
+            } else {
+                container.innerHTML = `
+                    <div class="settle-card">
+                        <div class="settle-header">Final Ledger</div>
+                        <div style="text-align: center; color: var(--text-muted); padding: 10px;">No money bets were set up for this round.</div>
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        if (gameFormat === 'match' && data.matchScoringStyle === 'stroke') {
+            const scoringType = data.matchScoring || 'net';
+            const matchStake = data.matchStake || 0;
+            const strokePresses = data.strokePresses ? Object.values(data.strokePresses) : [];
+            const pressSet = calculateStrokePressSet(moneyPlayers, courseData, savedScores, scoringType, matchStake, strokePresses);
+            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
+
+            if (!pressSet) {
+                container.innerHTML = `
+                    <div class="settle-card">
+                        <div class="settle-header">Final Ledger</div>
+                        <div style="text-align: center; color: #555; padding: 10px;">Stroke Play 1v1 requires exactly 2 players.</div>
+                    </div>
+                    ${sideHtml}
+                `;
+                return;
+            }
+
+            const fmtStrokeSettle = fmtSignedHtml;
+
+            const calc = pressSet.original;
+            let pressBreakdownHtml = '';
+            pressSet.pressResults.forEach(pr => {
+                const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
+                const prStatus = !pr.roundComplete
+                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
+                    : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
+                pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
+            });
+
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">Final Ledger — 1v1 (Stroke Play)</div>
+                    <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${calc.p1.name} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${calc.p2.name} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
+                    ${!calc.roundComplete ? `<div class="breakdown-item"><span style="color:#888;">Not yet final — thru ${calc.holesCompleted} of ${calc.totalHoles}.</span></div>` : ''}
+                    ${pressBreakdownHtml}
+                    <div class="ledger-row" style="margin-top:10px;"><span>${pressSet.p1.name}</span>${fmtStrokeSettle(pressSet.combinedT1Money)}</div>
+                    <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
+                </div>
+                ${sideHtml}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        if (gameFormat !== 'nassau' && !['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) {
+            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">Final Ledger</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
+                </div>
+                ${sideHtml}
+                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+            `;
+            return;
+        }
+
+        let scoringType = data.nassauScoring || data.matchScoring || "net";
+        let pressRule = gameFormat === 'nassau' ? (data.nassauPressRule || "none") : (data.matchPressRule || "none");
+        let nassauStake = data.nassauStake || 10;
+        let matchStake = data.matchStake || 0;
+        let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
+
+        const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
+        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+
+        if (!matchData) {
+            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
+            container.innerHTML = `
+                <div class="settle-card">
+                    <div class="settle-header">Final Ledger</div>
+                    <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
+                </div>
+                ${sideHtml}
+                ${sideHtml ? '<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>' : ''}
+            `;
+            return;
+        }
+
+        let breakdownHtml = "";
+        
+        if (gameFormat === 'nassau') {
+            ['F9', 'B9', '18'].forEach(bId => {
+                let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
+                if(groupMatches.length > 0) {
+                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
+                    breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
+                    
+                    groupMatches.forEach(m => {
+                        let statusDesc = "All Square ($0)";
+                        if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stakeToUse}`;
+                        else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stakeToUse}`;
+                        
+                        let lockIcon = m.closed ? "🔒 " : "";
+                        let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
+                        breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
+                    });
+                }
+            });
+        } else {
+            let t18 = matchData.activeMatches.find(m => m.id === '18');
+            let statusDesc = "All Square ($0)";
+            if (holeBet > 0) {
+                let amt = Math.abs(t18.status * holeBet);
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+            } else {
+                let amt = matchStake;
+                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+            }
+            breakdownHtml += `
+                <div class="breakdown-item">
+                    <span>Overall Match:</span>
+                    <span><strong>${statusDesc}</strong></span>
+                </div>
+            `;
+        }
+
+        let t1Total = matchData.t1TotalMoney;
+        const formatMoney = fmtSignedHtml;
+
+        const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
+
+        // The old "Final Payout Settlement" card is gone. It described the same wager the
+        // Side Matches section now describes properly, and describing one bet twice - once
+        // in full and once as a single line - is exactly how a golfer ends up unsure which
+        // number to believe. Per-player totals already appear in Final Results and Who
+        // Pays Who above, so nothing is lost.
+        container.innerHTML = `
+            ${sideHtml}
+
+            <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
+        `;
+    }
+</script>
+
+</body>
+</html>
