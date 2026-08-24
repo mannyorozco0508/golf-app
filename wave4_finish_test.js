@@ -64,11 +64,21 @@ describe('DOLLAR GAME — retired from the active product', () => {
         assert.ok(!/kpGameEnabled:/.test(read('admin.html')), 'admin still saves the flag');
     });
 
-    test('no page offers a way to record a KP winner', () => {
+    test('the DOLLAR GAME writers stayed dead; the MONEY POOL writer is the only one', () => {
+        // AMENDED for the Money Pool (Aug 2026). The pool deliberately reuses the
+        // canonical kpWinners storage - the shape the settlement legacy reader has
+        // trusted all along - so index.html gained exactly ONE writer: savePoolKp,
+        // gated by the same standing rule as pressing. The retired Dollar Game's
+        // writers stay gone, and skins.html still cannot write a KP at all.
         ['skins.html', 'index.html'].forEach(f => {
-            assert.ok(!/markKPWinner|clearKPWinner|kpWinners\//.test(read(f)),
-                `${f} can still write a KP winner`);
+            assert.ok(!/markKPWinner|clearKPWinner/.test(read(f)),
+                `${f} resurrected a retired Dollar Game writer`);
         });
+        assert.ok(!/kpWinners\//.test(read('skins.html')), 'skins.html can write a KP winner');
+        const idx = read('index.html');
+        const writes = (idx.match(/kpWinners\//g) || []).length;
+        assert.equal(writes, 1, 'index.html must have exactly the pool writer, no more');
+        assert.ok(/function savePoolKp/.test(idx), 'and that writer is savePoolKp');
     });
 
     test('the duplicate winner-picker is gone from both places it lived', () => {
@@ -105,8 +115,16 @@ describe('DOLLAR GAME — retired from the active product', () => {
         // documentation, not an orphan reference.
         const stripComments = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
         const offenders = [];
+        // AMENDED for the Money Pool: kpWinners is once again a LIVE storage shape,
+        // read by pool-engine.js and written by index.html's savePoolKp. Those two
+        // files may reference it; the retired Dollar Game's OWN fields - the enable
+        // flag, the buy-in, the every-other-pays engine - stay forbidden everywhere
+        // outside the documented settlement legacy reader.
+        const kpWinnersAllowed = ['index.html', 'pool-engine.js'];
         PRODUCTION.forEach(f => {
-            if (/kpGameEnabled|kpWinners|kpBuyIn|calculateKPGameTotals/.test(stripComments(read(f)))) offenders.push(f);
+            const src = stripComments(read(f));
+            if (/kpGameEnabled|kpBuyIn|calculateKPGameTotals/.test(src)) offenders.push(f);
+            else if (/kpWinners/.test(src) && kpWinnersAllowed.indexOf(f) === -1) offenders.push(f);
         });
         assert.deepEqual(offenders.join(','), '',
             `active KP references remain in: ${offenders.join(', ')}`);
