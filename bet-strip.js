@@ -593,7 +593,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
 
     // "You" wherever the golfer appears, so the match row speaks the same way the
     // end-of-hole recap already does. Previously the recap said "You win 3 skins" while
-    // the row directly beneath it said "Marty vs John".
+    // the row directly beneath it said "Avery vs Blake".
     const nameOf = id => {
         const p = allPlayers.find(pl => String(pl.id) === String(id));
         if (!p) return '';
@@ -617,7 +617,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
         const matchPlayers = teamA.concat(teamB);
         const isTeam = teamA.length > 1 || teamB.length > 1;
 
-        // "vs John" when it's Marty's own match; the full pairing otherwise.
+        // "vs Blake" when it’s the reading golfer’s own match; the full pairing otherwise.
         const sideAName = a.map(nameOf).join(' / ');
         const sideBName = b.map(nameOf).join(' / ');
         const iAmInA = meId && a.includes(String(meId));
@@ -722,7 +722,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
             // MONEY WORDING.
             //
             // A 2v2 stake is PER SIDE and splits evenly between teammates, so "$300 at
-            // stake" on Marty's phone was double what he personally stood to win or lose.
+            // stake" on a golfer’s phone was double what they personally stood to win or lose.
             // A participant sees his own share first, with the team total for context; a
             // neutral viewer sees the team figure only, because "your share" would be a
             // lie to someone who is not in the match.
@@ -744,10 +744,10 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
 }
 
 // ============================================================================
-// MARTY MODE — full sentences instead of developer shorthand
+// READABLE STATUS — full sentences instead of developer shorthand
 //
 // Every figure below already existed. What was missing was the sentence: the app
-// computed "Marty +4" and left the golfer to work out that + means ahead, that the
+// computed "Avery +4" and left the golfer to work out that + means ahead, that the
 // unit is strokes, and that "H6-18" describes a press start hole.
 // ============================================================================
 
