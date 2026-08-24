@@ -756,11 +756,46 @@
 
     function computeCombinedNetTotals(data, courseData, savedScores) {
         const netByName = {}; // lowercased key -> { name, net }
-        function addAmount(player, amount) {
+
+        // ---- THE ITEMISED BREAKDOWN ----------------------------------------
+        //
+        // ADDITIVE. Every amount below is computed exactly as it always was, by the
+        // same engines, in the same order. This only WRITES DOWN what each amount was
+        // for as it goes past.
+        //
+        // WHY IT HAD TO LIVE HERE
+        //
+        // addAmount() used to take a player and a number and fold it straight into a
+        // running total, so by the time the function returned, "Avery: -$185" was all
+        // that survived. There was no record of the $40 buy-in, the $25 KP, the skins,
+        // or the side match that produced it. A page wanting to show a golfer WHY they
+        // owe $185 had only one option: re-run every game itself and hope its
+        // arithmetic matched the engine's. That is precisely the duplication this
+        // codebase keeps deleting, and it is how a Receipt comes to disagree with the
+        // money it is printing.
+        //
+        // So the labels are captured at the point the money is already being counted.
+        // No second pass, no re-derivation, and no way for a line to exist that the
+        // total does not contain - the same call produces both.
+        const linesByName = {};
+        function addAmount(player, amount, label) {
             if (!player || !amount) return;
             const key = player.name.trim().toLowerCase();
             if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
             netByName[key].net += amount;
+            if (!linesByName[key]) linesByName[key] = [];
+            linesByName[key].push({ label: label || 'Other', amount });
+        }
+
+        // A ledger line that moves no money. Used for the Money Pool buy-in, which is
+        // a real debit a golfer must see even though it is already folded into the
+        // pool's net, and for zero-balance golfers who must still appear.
+        function addNote(player, amount, label) {
+            if (!player) return;
+            const key = player.name.trim().toLowerCase();
+            if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
+            if (!linesByName[key]) linesByName[key] = [];
+            linesByName[key].push({ label: label || 'Other', amount: amount || 0, note: true });
         }
 
         const allPlayers = data.players || [];
@@ -774,11 +809,20 @@
         // config handed in differs. Adding a game therefore cannot change what any other
         // game pays, and the zero-sum guarantee of each engine composes: a sum of
         // zero-sum results is itself zero-sum.
+        // Several games of the same format can run at once, so the label carries an
+        // index when it needs one - "Group Dots" and "Group Dots (2)" are auditable;
+        // two lines both called "Dots" are not.
+        const gameLabelSeen = {};
         getRoundGames(data).forEach(game => {
             const gameNet = computeGameNetByPlayerId(game, courseData, savedScores);
+            const base = (typeof ADDITIONAL_GAME_CATALOG === 'object' && ADDITIONAL_GAME_CATALOG[game.format]
+                && ADDITIONAL_GAME_CATALOG[game.format].label)
+                || (game.format ? String(game.format).charAt(0).toUpperCase() + String(game.format).slice(1) : 'Game');
+            gameLabelSeen[base] = (gameLabelSeen[base] || 0) + 1;
+            const label = gameLabelSeen[base] > 1 ? `${base} (${gameLabelSeen[base]})` : base;
             Object.keys(gameNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
-                addAmount(p, gameNet[pid]);
+                addAmount(p, gameNet[pid], label);
             });
         });
 
@@ -786,7 +830,7 @@
         const birdieTotals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
         Object.keys(birdieTotals).forEach(pid => {
             const p = allPlayers.find(pl => String(pl.id) === String(pid));
-            addAmount(p, birdieTotals[pid]);
+            addAmount(p, birdieTotals[pid], 'Birdie Pool');
         });
 
 
@@ -795,7 +839,7 @@
         const kpResult = calculateKPGameTotalsForSettle(data, courseData);
         Object.keys(kpResult.money || {}).forEach(pid => {
             const p = allPlayers.find(pl => String(pl.id) === String(pid));
-            addAmount(p, kpResult.money[pid]);
+            addAmount(p, kpResult.money[pid], 'KP');
         });
 
         // MONEY POOL — the whole-round pot (pool-engine.js). Same additive pattern
@@ -807,8 +851,84 @@
             const poolNet = computeMoneyPoolNetByPlayerId(data, courseData, savedScores);
             Object.keys(poolNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
-                addAmount(p, poolNet[pid]);
+                addAmount(p, poolNet[pid], 'Money Pool');
             });
+
+            // ---- ITEMISING THE POOL ----------------------------------------
+            //
+            // The line above is the one that MOVES the money, and it stays exactly as
+            // it was. What follows adds detail lines only - marked `note: true` so
+            // nothing double-counts - because "Money Pool -$185" tells a golfer
+            // nothing about why.
+            //
+            // A golfer needs to see the $40 leaving, the KP they won on the 7th, their
+            // share of the net prize and their skins. Every figure is read from
+            // computeMoneyPool()'s own result: the buy-in it charged, the KP lines it
+            // paid, the net places it allocated, the skins lines it allocated. Nothing
+            // here recomputes a winner or divides a pot.
+            if (typeof computeMoneyPool === 'function') {
+                const pool = computeMoneyPool(data, courseData, savedScores);
+                if (pool && pool.valid) {
+                    const byId = {};
+                    allPlayers.forEach(p => { byId[String(p.id)] = p; });
+                    const dollars = c => c / 100;
+
+                    pool.participants.forEach(pp => {
+                        addNote(byId[String(pp.id)], -dollars(pool.buyInCents), 'Money Pool buy-in');
+                    });
+
+                    // KP names its hole. A golfer who won two KPs gets two lines, so the
+                    // breakdown stays auditable against the scorecard.
+                    if (pool.kp) {
+                        pool.kp.lines.forEach(l => {
+                            if (!l.winnerId) return;
+                            addNote(byId[String(l.winnerId)], dollars(l.cents), `KP H${l.hole}`);
+                        });
+                    }
+
+                    // Net Finish carries its finishing position, and says T when the
+                    // position was shared - the tie is the part golfers query.
+                    if (pool.net) {
+                        pool.net.lines.forEach(l => {
+                            const each = l.ids.length > 1
+                                ? (typeof allocateWholeDollars === 'function' && isWholeDollarRound(data)
+                                    ? allocateWholeDollars(dollars(l.cents), l.ids.map(() => 1))
+                                    : l.ids.map(() => dollars(l.cents) / l.ids.length))
+                                : [dollars(l.cents)];
+                            l.ids.forEach((id, i) => {
+                                addNote(byId[String(id)], each[i],
+                                    `Net Finish ${l.ids.length > 1 ? 'T' : ''}${l.place}`);
+                            });
+                        });
+                    }
+
+                    // Skins are summed per golfer from the allocated lines, with the
+                    // count alongside, because "3 skins +$105" is the sentence a golfer
+                    // actually wants.
+                    if (pool.skins) {
+                        const byWinner = {};
+                        pool.skins.lines.forEach(l => {
+                            const k = String(l.winnerId);
+                            if (!byWinner[k]) byWinner[k] = { cents: 0, n: 0 };
+                            byWinner[k].cents += l.cents;
+                            byWinner[k].n += 1;
+                        });
+                        const basis = pool.skins.scoring === 'gross' ? 'Gross' : 'Net';
+                        Object.keys(byWinner).forEach(k => {
+                            addNote(byId[k], dollars(byWinner[k].cents),
+                                `${basis} Skins \u00B7 ${byWinner[k].n} skin${byWinner[k].n === 1 ? '' : 's'}`);
+                        });
+                    }
+
+                    // Refunds are money coming back and must be visible, or the pool
+                    // lines will not account for the golfer's pool position.
+                    if (pool.refund && pool.refund.cents > 0) {
+                        Object.keys(pool.refund.perPlayerCents).forEach(id => {
+                            addNote(byId[String(id)], dollars(pool.refund.perPlayerCents[id]), 'Pool refund');
+                        });
+                    }
+                }
+            }
         }
 
         // Side matches — same logic buildSideMatchesHtml already uses per match, just summed
@@ -849,16 +969,28 @@
                 // convention 2v2 Match Play and Nassau have always used below.
                 const aShare = sideTotal / teamAPlayers.length;
                 const bShare = -sideTotal / teamBPlayers.length;
-                teamAPlayers.forEach(p => addAmount(p, aShare));
-                teamBPlayers.forEach(p => addAmount(p, bShare));
+                // The label names both sides, because a golfer in two side matches
+                // needs to tell the lines apart. Presses are inside sideTotal already -
+                // splitting them out would double-count real money - so the count is
+                // reported instead, and the press DETAIL lives in the side-match
+                // receipt that buildSideMatchReceipts() already produces.
+                const nPress = (sm.holePresses ? Object.keys(sm.holePresses).length : 0)
+                             + (sm.overallPresses ? Object.keys(sm.overallPresses).length : 0);
+                const smLabel = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
+                    + (nPress > 0 ? ` (+${nPress} press${nPress === 1 ? '' : 'es'})` : '');
+                teamAPlayers.forEach(p => addAmount(p, aShare, smLabel));
+                teamBPlayers.forEach(p => addAmount(p, bShare, smLabel));
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
                 const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
                 if (!calc) return;
                 const t1Share = calc.t1TotalMoney / teamAPlayers.length;
                 const t2Share = -calc.t1TotalMoney / teamBPlayers.length;
-                teamAPlayers.forEach(p => addAmount(p, t1Share));
-                teamBPlayers.forEach(p => addAmount(p, t2Share));
+                const nPress2 = manualPresses.length;
+                const smLabel2 = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
+                    + (nPress2 > 0 ? ` (+${nPress2} press${nPress2 === 1 ? '' : 'es'})` : '');
+                teamAPlayers.forEach(p => addAmount(p, t1Share, smLabel2));
+                teamBPlayers.forEach(p => addAmount(p, t2Share, smLabel2));
             }
         });
 
@@ -876,9 +1008,34 @@
 
         const netTotals = {};
         Object.values(wholeDollar).forEach(v => { netTotals[v.name] = v.net; });
+
+        // ---- RECONCILING THE BREAKDOWN TO THE FINAL NUMBER -----------------
+        //
+        // The money-moving lines sum to the EXACT net; the number a golfer is shown is
+        // the ROUNDED net. Those differ by at most a dollar, and only when some wager
+        // divided unevenly - a 2v2 stake halving to an odd amount, for instance.
+        //
+        // Silently printing lines that do not add up to the total is exactly the kind
+        // of thing that makes a golfer distrust the whole receipt, so the difference is
+        // stated as its own line instead of hidden. On a whole-dollar round with whole
+        // -dollar wagers this is always zero and no line appears.
+        const contributions = {};
+        Object.keys(netByName).forEach(key => {
+            const lines = (linesByName[key] || []).slice();
+            const moving = lines.filter(l => !l.note);
+            const exactNet = moving.reduce((a, l) => a + l.amount, 0);
+            const finalNet = wholeDollar[key] ? wholeDollar[key].net : 0;
+            const drift = finalNet - exactNet;
+            if (Math.abs(drift) > 0.005) {
+                lines.push({ label: 'Rounding to whole dollars', amount: drift, rounding: true });
+            }
+            contributions[key] = { name: netByName[key].name, lines, net: finalNet };
+        });
+
         // Who Pays Who runs from the ROUNDED balances, so a transaction can never carry
         // cents the ledger above it does not show.
-        return { netByName: wholeDollar, exact: netByName, transactions: simplifyDebts(netTotals) };
+        return { netByName: wholeDollar, exact: netByName, contributions,
+                 transactions: simplifyDebts(netTotals) };
     }
 
     // Largest-remainder allocation. Rounding each balance independently can leave the
