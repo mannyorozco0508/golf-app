@@ -92,14 +92,65 @@ self.addEventListener('fetch', (event) => {
 
     // Only handle same-origin GET requests for the app shell. Everything else
     // (Firebase calls, external scripts, POSTs, etc.) passes straight through
-    // to the network untouched.
+    // to the network untouched. Firebase Realtime Database runs on a different
+    // origin over its own WebSocket, so none of this touches live data sync.
     if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
         return;
     }
 
-    // Network-first: always prefer the latest deployed version when online,
-    // so a fresh GitHub Pages deploy shows up immediately. Cache is purely
-    // a fallback for when there's no connection at all.
+    // A page request, as opposed to a script/icon/manifest request.
+    const isNavigation = request.mode === 'navigate' || request.destination === 'document';
+
+    // WHY THE QUERY STRING HAS TO BE IGNORED FOR PAGES
+    //
+    // Cache lookups match the FULL url, query string included. Every real link
+    // this app hands out carries one:
+    //
+    //     index.html?game=ABCD&group=1     scorekeeper
+    //     index.html?game=ABCD             organizer
+    //     settlement.html?game=ABCD        receipt
+    //
+    // The install handler precaches './index.html' with no query at all, so a
+    // plain lookup for any of those misses, respondWith() resolves to undefined,
+    // and the navigation fails outright. The precached shell could never serve a
+    // single URL a golfer actually opens.
+    //
+    // Ignoring the query string on page requests fixes that, and it is safe here
+    // for a specific reason worth stating: every page in this app derives its
+    // identity at runtime from window.location.search - the live document URL,
+    // not the cache key. index.html reads `new URLSearchParams(window.location.search)`
+    // to set currentMode and lockedGroup; the other nine pages do the same. So a
+    // Group 2 scorekeeper served the shared cached shell still reads group=2 from
+    // their own address bar and stays locked to Group 2. The HTML bytes are
+    // identical for every group; only the URL differs, and the URL is preserved.
+    //
+    // Scripts and icons keep exact matching - they have no query strings, and
+    // loosening the match there would gain nothing.
+    async function fromCacheOrOffline() {
+        const exact = await caches.match(request);
+        if (exact) return exact;
+
+        if (isNavigation) {
+            const shell = await caches.match(request, { ignoreSearch: true });
+            if (shell) return shell;
+        }
+
+        // Never resolve to undefined. respondWith(undefined) throws a TypeError
+        // and produces a blank failed navigation with nothing to explain it.
+        return new Response(
+            '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
+            + '<title>Offline</title></head><body style="font-family:-apple-system,sans-serif;text-align:center;padding:60px 24px;">'
+            + '<h1 style="font-size:3rem;margin:0;">\u26F3</h1>'
+            + '<h2 style="color:#1d3557;">No connection</h2>'
+            + '<p style="color:#666;line-height:1.5;">This page has not been opened on this device yet, so there is nothing saved to show. '
+            + 'Reconnect and reload.</p></body></html>',
+            { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        );
+    }
+
+    // Network-first: always prefer the latest deployed version when online, so a
+    // fresh deploy shows up on the next navigation rather than being trapped
+    // behind a stale cache entry. Cache is purely the no-connection fallback.
     event.respondWith(
         fetch(request)
             .then((response) => {
@@ -107,6 +158,6 @@ self.addEventListener('fetch', (event) => {
                 caches.open(CACHE_VERSION).then((cache) => cache.put(request, responseClone));
                 return response;
             })
-            .catch(() => caches.match(request))
+            .catch(() => fromCacheOrOffline())
     );
 });
