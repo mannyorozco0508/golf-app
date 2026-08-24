@@ -245,3 +245,250 @@ describe('LIVE ALLOCATION SUMMARY — the organizer does no arithmetic', () => {
         assert.equal(b.noteShown(), false);
     });
 });
+
+// ---------------------------------------------------------------------------
+// CUSTOM NET PAYOUTS — the way golfers actually describe the game.
+//
+// Marty's real Monday came in over group text as "1st forty, 2nd thirty" on a
+// $480 pot with $100 of KPs. That is not a percentage of anything clean: $40 of
+// $70 is 57.142857%. Forcing the organizer to reverse-engineer percentages was
+// the gap; these tests pin the dollar-native mode and prove the preset mode is
+// untouched beside it.
+// ---------------------------------------------------------------------------
+describe('CUSTOM NET PAYOUTS — setup card', () => {
+    const PAGE2 = ['course-data.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js'];
+
+    function boot2(n, o) {
+        o = o || {};
+        const players = makePlayers(Array.from({ length: n }, (_, i) => 'P' + (i + 1)),
+            Array.from({ length: n }, () => 0));
+        const sb = loadHtmlInlineScript('admin.html', PAGE2);
+        vm.runInContext(`
+            captureCurrentPlayerInputs = function () { return ${JSON.stringify(players)}; };
+            document.getElementById('mp-enabled').checked = true;
+            __setElement('mp-buyin', '${o.buyIn || 40}');
+            __setElement('mp-kp-amount', '${o.kp !== undefined ? o.kp : 100}');
+            __setElement('mp-kp-holes', '${o.holes !== undefined ? o.holes : '3,9,13,17'}');
+            __setElement('mp-net-amount', '100');
+            __setElement('mp-net-places', '50,30,20');
+            __setElement('mp-skins-mode', 'remainder');
+            __setElement('mp-skins-scoring', 'net');
+            __setElement('mp-skins-carry', 'yes');
+            __setElement('mp-net-mode', '${o.mode || 'custom'}');
+            __setElement('mp-net-c1', '${o.c1 !== undefined ? o.c1 : 40}');
+            __setElement('mp-net-c2', '${o.c2 !== undefined ? o.c2 : 30}');
+            ${o.addPlaces ? 'mpAddPlace();'.repeat(o.addPlaces) : ''}
+            ${o.c3 !== undefined ? `__setElement('mp-net-c3', '${o.c3}');` : ''}
+            ${o.c4 !== undefined ? `__setElement('mp-net-c4', '${o.c4}');` : ''}
+            ${o.removePlaces ? 'mpRemovePlace();'.repeat(o.removePlaces) : ''}
+            mpToggle();
+        `, sb);
+        const txt = id => (sb.document.getElementById(id) || {}).textContent || '';
+        const vis = id => {
+            const el = sb.document.getElementById(id);
+            return !!el && el.style.display !== 'none';
+        };
+        return {
+            sb,
+            summary: () => (sb.document.getElementById('mp-math').innerHTML || '')
+                .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+            cls: () => sb.document.getElementById('mp-math').className || '',
+            netSplit: () => txt('mp-net-split'),
+            skinsLine: () => txt('mp-skins-line'),
+            kpSplit: () => txt('mp-kp-split'),
+            presetShown: () => vis('mp-net-preset-wrap'),
+            customShown: () => vis('mp-net-custom-wrap'),
+            rowShown: n => vis('mp-net-c' + n + '-row'),
+            captured: () => { vm.runInContext(`window.__cap = captureMoneyPool();`, sb); return sb.window.__cap; }
+        };
+    }
+
+    test('the card offers both payout modes in plain language', () => {
+        const card = poolCardMarkup();
+        assert.match(card, /id="mp-net-mode"/);
+        assert.match(visibleText(card), /Split a pool by percentage/);
+        assert.match(visibleText(card), /Exact dollar amounts/);
+        // Comments stripped: the card's own note explaining the escape trap is
+        // documentation, not something an organizer reads.
+        assert.ok(!/\\u|uD83|u2014/.test(visibleText(card)), 'the new controls carry no escape text');
+    });
+
+    test('MARTY TOMORROW: 1st $40 / 2nd $30 renders, total $70, skins $310', () => {
+        const b = boot2(12);
+        assert.match(b.netSplit(), /1st \$40/);
+        assert.match(b.netSplit(), /2nd \$30/);
+        assert.match(b.netSplit(), /Net Finish Total: \$70/);
+        assert.match(b.skinsLine(), /Skins pot: \$310/);
+        assert.match(b.kpSplit(), /\$25 each across 4 holes/);
+    });
+
+    test('the summary reads $480 / $100 / $70 / $310 and balances', () => {
+        const t = boot2(12).summary();
+        assert.match(t, /Total pool \$480/);
+        assert.match(t, /KP \$100/);
+        assert.match(t, /Net finish \$70/);
+        assert.match(t, /Skins \$310/);
+        assert.match(t, /Allocated \$480 of \$480/);
+        assert.equal(boot2(12).cls(), '', 'a valid pot is not red');
+    });
+
+    test('capture stores ONLY the amounts — the total is derived', () => {
+        const cap = boot2(12).captured();
+        assert.equal(cap.net.payoutMode, 'custom');
+        assert.equal(cap.net.amounts.join(','), '40,30');
+        assert.equal(cap.net.amount, undefined, 'no stored total that could disagree with its places');
+    });
+
+    test('switching custom → preset restores the percentage pool', () => {
+        const b = boot2(12, { mode: 'preset' });
+        assert.equal(b.presetShown(), true);
+        assert.equal(b.customShown(), false);
+        assert.match(b.netSplit(), /1st \$50/);
+        assert.match(b.summary(), /Net finish \$100/);
+        assert.match(b.skinsLine(), /Skins pot: \$280/);
+        const cap = b.captured();
+        assert.equal(cap.net.amount, 100);
+        assert.equal(cap.net.places.join(','), '50,30,20');
+    });
+
+    test('switching preset → custom swaps the panes', () => {
+        const b = boot2(12, { mode: 'custom' });
+        assert.equal(b.customShown(), true);
+        assert.equal(b.presetShown(), false);
+    });
+
+    test('adding a third place recalculates the remainder', () => {
+        const b = boot2(12, { addPlaces: 1, c3: 20 });
+        assert.equal(b.rowShown(3), true);
+        assert.match(b.netSplit(), /3rd \$20/);
+        assert.match(b.summary(), /Net finish \$90/);
+        assert.match(b.skinsLine(), /Skins pot: \$290/);
+    });
+
+    test('a fourth place works, and the Add button stops at four', () => {
+        const b = boot2(12, { addPlaces: 2, c3: 20, c4: 10 });
+        assert.equal(b.rowShown(4), true);
+        assert.match(b.summary(), /Net finish \$100/);
+        assert.match(b.skinsLine(), /Skins pot: \$280/);
+    });
+
+    test('removing a place clears its money and recalculates', () => {
+        const b = boot2(12, { removePlaces: 1 });
+        assert.equal(b.rowShown(2), false);
+        assert.match(b.netSplit(), /1st \$40/);
+        assert.ok(!/2nd/.test(b.netSplit()), '2nd place is gone, not merely hidden');
+        assert.match(b.summary(), /Net finish \$40/);
+        assert.match(b.skinsLine(), /Skins pot: \$340/);
+    });
+
+    test('custom payouts over the pot are refused with the overage', () => {
+        const b = boot2(12, { c1: 400, c2: 300 });
+        assert.equal(b.cls(), 'mp-bad');
+        assert.match(b.summary(), /Over by \$320/);
+    });
+
+    test('a negative payout is named, not silently dropped', () => {
+        const b = boot2(12, { c1: -5, c2: '' });
+        assert.equal(b.cls(), 'mp-bad');
+        assert.match(b.summary(), /\$0 or more/);
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
+    const { loadJsFile } = require('./helpers/load-script.js');
+    const { makeCourseData } = require('./helpers/fixtures.js');
+    const CD18 = makeCourseData(18);
+    const E2 = (() => {
+        const sb = loadJsFile('money-engine.js');
+        ['action-model.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']
+            .forEach(f => vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
+        return sb;
+    })();
+    const P12 = makePlayers(['Marty', 'Manny', 'John', 'Steve', 'Stan', 'Greg', 'Tony', 'James',
+        'Ryan', 'Dalen', 'Nick', 'Paul'], new Array(12).fill(0));
+    const ID = i => String(P12[i].id);
+    const ladder = () => { const s = {}; P12.forEach((p, i) =>
+        CD18.forEach(h => { s[`p${p.id}_h${h.hole}`] = h.par + i; })); return s; };
+    const MARTY = () => JSON.parse(JSON.stringify({
+        players: P12, courseData: CD18, gameFormat: 'stroke',
+        kpWinners: { h3: ID(0), h9: ID(1), h13: ID(2), h17: ID(3) },
+        moneyPool: { enabled: true, buyIn: 40,
+            kp: { amount: 100, holes: [3, 9, 13, 17] },
+            net: { payoutMode: 'custom', amounts: [40, 30] },
+            skins: { mode: 'remainder', scoring: 'net', carryOver: true } } }));
+    const pool2 = (d, sc) => { vm.runInContext(`window.__p2 = computeMoneyPool(${JSON.stringify(d)},
+        ${JSON.stringify(CD18)}, ${JSON.stringify(sc)});`, E2); return E2.window.__p2; };
+
+    test('MARTY ACCEPTANCE: $480 = $100 KP + $70 net + $310 skins, ledger $0', () => {
+        const r = pool2(MARTY(), ladder());
+        assert.equal(r.valid, true, (r.errors || []).join('|'));
+        assert.equal(r.totalPoolCents, 48000);
+        assert.equal(r.kp.perHoleCents.join(','), '2500,2500,2500,2500');
+        assert.equal(r.net.lines.map(l => l.cents).join(','), '4000,3000');
+        assert.equal(r.skins.amountCents, 31000);
+        const prizes = r.kp.lines.reduce((a, l) => a + (l.winnerId ? l.cents : 0), 0)
+            + r.net.lines.reduce((a, l) => a + l.cents, 0)
+            + r.skins.lines.reduce((a, l) => a + l.cents, 0);
+        assert.equal(prizes + r.refund.cents, 48000, 'every cent of the pot is accounted for');
+        assert.equal(Object.values(r.perPlayerCents).reduce((a, b) => a + b, 0), 0);
+    });
+
+    test('THE TIE RULE holds on custom amounts: $40 + $30 split $35 each', () => {
+        const tied = ladder();
+        CD18.forEach(h => { tied[`p${P12[1].id}_h${h.hole}`] = tied[`p${P12[0].id}_h${h.hole}`]; });
+        const r = pool2(MARTY(), tied);
+        assert.equal(r.net.lines.length, 1, 'the tie consumed both paid places');
+        assert.equal(r.net.lines[0].cents, 7000);
+        assert.equal(r.net.lines[0].split, true);
+        assert.equal(r.net.lines[0].ids.length, 2);
+        assert.equal(Object.values(r.perPlayerCents).reduce((a, b) => a + b, 0), 0);
+    });
+
+    test('PRESET PARITY: a percentage round is unchanged by this feature', () => {
+        const d = { players: P12, moneyPool: { enabled: true, buyIn: 40,
+            net: { amount: 100, places: [50, 30, 20] },
+            skins: { mode: 'remainder', scoring: 'net' } } };
+        const r = pool2(d, ladder());
+        assert.equal(r.net.lines.map(l => l.cents).join(','), '5000,3000,2000');
+        assert.equal(r.skins.amountCents, 38000);
+    });
+
+    test('the RECEIPT prints the custom amounts', () => {
+        const sb = loadHtmlInlineScript('settlement.html',
+            ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']);
+        vm.runInContext(`
+            db.ref = function () { return { on: function () {}, set: function () { return Promise.resolve(); } }; };
+            currentMode = 'ABCD'; currentData = ${JSON.stringify(MARTY())};
+            currentData.scores = ${JSON.stringify(ladder())};
+            renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
+        `, sb);
+        const html = sb.document.getElementById('money-pool-section').innerHTML;
+        assert.match(html, /Money Pool/);
+        assert.match(html, /Hole 3: Marty/);
+        assert.match(html, /Hole 17: Steve/);
+        assert.match(html, /1st: Marty[\s\S]*\$40/);
+        assert.match(html, /2nd: Manny[\s\S]*\$30/);
+        assert.match(html, /Skins Pot — \$310/);
+    });
+
+    test('adaptability A–F: totals and remainder follow the config, no code change', () => {
+        const mk = net => ({ players: P12, moneyPool: { enabled: true, buyIn: 40,
+            kp: { amount: 100, holes: [3, 9, 13, 17] }, net,
+            skins: { mode: 'remainder', scoring: 'net' } } });
+        const cases = [
+            [{ payoutMode: 'custom', amounts: [40, 30] }, 7000, 31000],
+            [{ payoutMode: 'custom', amounts: [50, 30, 20] }, 10000, 28000],
+            [{ payoutMode: 'custom', amounts: [100] }, 10000, 28000],
+            [{ payoutMode: 'custom', amounts: [50, 50] }, 10000, 28000],
+            [{ amount: 100, places: [60, 40] }, 10000, 28000],
+            [{ amount: 100, places: [50, 30, 20] }, 10000, 28000]
+        ];
+        cases.forEach(([net, netCents, skinsCents], i) => {
+            const r = pool2(mk(net), ladder());
+            assert.equal(r.net.lines.reduce((a, l) => a + l.cents, 0), netCents, `case ${i + 1} net`);
+            assert.equal(r.skins.amountCents, skinsCents, `case ${i + 1} skins`);
+            assert.equal(Object.values(r.perPlayerCents).reduce((a, b) => a + b, 0), 0, `case ${i + 1} zero-sum`);
+        });
+    });
+});
