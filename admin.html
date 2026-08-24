@@ -3294,7 +3294,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // In a MULTI-GROUP round, a main-format wager has no honest meaning.
     //
     // Best Ball or Ryder Cup across two groups pays every golfer in the field from one
-    // $50 pot, splitting them by p.team - so Marty in Group 1 ends up partnered with
+    // $50 pot, splitting them by p.team - so a Group 1 golfer ends up partnered with
     // Stan in Group 2 against golfers neither of them is playing with. Nobody sets that
     // up on purpose. The ROUND TYPE still matters (it builds the teams and the
     // scorecard), so it stays; the implicit money attached to it does not.
@@ -3437,6 +3437,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function getCategoryIcon(type) {
+        // LEGACY READ-ONLY ALIAS - deliberately retained, reported as a compatibility
+        // exception rather than cleaned up with the rest of the private naming.
+        //
+        // 'marty' is a SERIALIZED VALUE that may sit in eventCategory on rounds saved
+        // by an earlier build. It is read here and nowhere else: currentCategory is
+        // only ever assigned from stored data.eventCategory or the "weekend" default,
+        // so no new round can produce it. Removing the line would not lose data or
+        // change any money - an old round would simply fall through to the default
+        // trophy icon - but rewriting stored values is a data migration, and this was
+        // a copy cleanup. It stays until a migration is done deliberately.
         if (type === 'marty') return '🎰';
         if (type === 'myrtle') return '🏖️';
         if (type === 'weekday') return '🏌️‍♂️';
