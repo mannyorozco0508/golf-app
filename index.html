@@ -15,6 +15,7 @@
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
+    <script src="pool-engine.js"></script>
     <script src="bet-strip.js"></script>
     <script src="hole-events.js"></script>
     <style>
@@ -1904,6 +1905,64 @@
         closeSidePress();
     }
 
+    // MONEY POOL on the scorecard: the pot at a glance, and KP entry right where
+    // the golfer is standing. Read-only view of computeMoneyPool(); the ONLY write
+    // is the KP winner, to the storage shape settlement already reads.
+    function buildMoneyPoolBanner() {
+        if (!currentData.moneyPool || currentData.moneyPool.enabled === false) return '';
+        if (typeof computeMoneyPool !== 'function') return '';
+        const r = computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {});
+        if (!r) return '';
+        const $ = c => '$' + (c / 100).toFixed(0);
+        let html = '<div class="action-section-label">\uD83C\uDFC6 Money Pool \u00B7 ' + $(r.totalPoolCents) + '</div>';
+        if (!r.valid) return html + '<div class="section-summary" style="color:var(--accent-red);">\u26A0\uFE0F ' + r.errors[0] + '</div>';
+        const bits = [];
+        if (r.kp) bits.push('\uD83D\uDCCD KP ' + r.kp.lines.filter(l => l.winnerId).length + '/' + r.kp.lines.length + ' claimed');
+        if (r.net && r.net.standings.length) bits.push('\uD83E\uDD47 ' + r.net.standings[0].name.split(' ')[0] + ' leads net');
+        if (r.skins) bits.push('\uD83E\uDD69 ' + r.skins.lines.reduce((a, l) => a + l.units, 0) + ' skins won');
+        html += '<div class="section-summary">' + bits.join(' \u00B7 ') + '</div>';
+        html += buildPoolKpEntry(r);
+        return html;
+    }
+
+    // KP entry for the hole the group is standing on. Any scorekeeper link (or a
+    // one-group organizer) may record it; spectators may not. The winner list is
+    // POOL PARTICIPANTS only - a guest's great shot earns applause, not pool money.
+    function buildPoolKpEntry(r) {
+        const kp = currentData.moneyPool && currentData.moneyPool.kp;
+        if (!kp || !Array.isArray(kp.holes)) return '';
+        // The page's live hole variable is currentViewedHole (the one renderHoleView
+        // and the hole recap advance). A wrong name here fails SILENTLY through the
+        // typeof guard - the picker just never appears on a real phone - which is
+        // exactly how the first draft shipped and exactly what the lint diff caught.
+        const h = (typeof currentViewedHole !== 'undefined' && currentViewedHole) ? currentViewedHole
+            : ((typeof currentHole !== 'undefined') ? currentHole : null);
+        if (h === null || kp.holes.map(Number).indexOf(Number(h)) === -1) return '';
+        // THE SAME STANDING RULE AS PRESSING (Phase 0): on a multi-group round the
+        // bare link is what spectators hold, so it may not record money events; a
+        // group scorekeeper link may. On a single-group round the bare link IS the
+        // organizer's and writes normally.
+        const isMultiGroup = (currentData.players || []).length > 4;
+        const canWrite = hasGroupLock || !isMultiGroup;
+        const winner = (currentData.kpWinners || {})['h' + h];
+        if (!canWrite) {
+            const w = winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null;
+            return '<div class="section-summary">\uD83D\uDCCD KP hole ' + h + ': ' + (w || 'not claimed yet') + '</div>';
+        }
+        let opts = '<option value="">\uD83D\uDCCD KP hole ' + h + ' \u2014 who stuck it?</option>';
+        r.participants.forEach(p => {
+            opts += '<option value="' + p.id + '"' + (String(winner) === p.id ? ' selected' : '') + '>' + p.name + '</option>';
+        });
+        return '<div style="margin:6px 0;"><select style="width:100%; min-height:44px;" onchange="savePoolKp(' + h + ', this.value)">' + opts + '</select></div>';
+    }
+
+    function savePoolKp(hole, pid) {
+        if (!pid) return;
+        db.ref('events/' + currentMode + '/kpWinners/h' + hole).set(String(pid))
+            .then(() => alert('\u2705 KP RECORDED\nHole ' + hole))
+            .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
+    }
+
     function toggleActionCenter() {
         actionCenterOpen = !actionCenterOpen;
         renderActionCenter();
@@ -2081,14 +2140,22 @@
         soloMatch = side.length === 1;
 
         const totalBets = games.length + side.length;
+        // THE MONEY POOL IS CONTENT. These two guards predate the pool: they keep
+        // the panel silent when the bet strip below already says everything. But a
+        // Marty Monday round can be NOTHING BUT the pool - main game $0, no side
+        // matches - and on that round the pool banner and the KP picker are the
+        // whole reason to open this panel. A pool-less round is untouched: both
+        // guards fire exactly as before, which the legacy rendered test pins.
+        const hasPool = !!(currentData.moneyPool && currentData.moneyPool.enabled !== false
+            && typeof buildMoneyPoolBanner === 'function');
         // With a single game and no side action the bet strip below already says
         // everything - a second summary would just be noise.
-        if (totalBets === 0) { mount.innerHTML = ''; return; }
-        if (games.length <= 1 && side.length === 0 && !canAddAction()) { mount.innerHTML = ''; return; }
+        if (totalBets === 0 && !hasPool) { mount.innerHTML = ''; return; }
+        if (games.length <= 1 && side.length === 0 && !canAddAction() && !hasPool) { mount.innerHTML = ''; return; }
 
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
             '<span>\uD83D\uDD25 My Round</span>' +
-            '<span class="ac-count">' + (headline || totalBets + ' live') +
+            '<span class="ac-count">' + (headline || (totalBets === 0 && hasPool ? 'money pool' : totalBets + ' live')) +
                 ' \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
             '</button>';
 
@@ -2209,6 +2276,7 @@
             '</div>';
 
         let body = '';
+        body += buildMoneyPoolBanner();
         const main = games.filter(g => g.role === 'main');
         const extra = games.filter(g => g.role === 'additional');
         // Wagers that run alongside any format - currently the Birdie Game, which moved
