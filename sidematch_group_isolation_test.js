@@ -379,6 +379,17 @@ describe('CREATION — a group link cannot build a wager out of other groups', (
 // PART 8 — ADDITIONAL GAME INSTANCES
 // ---------------------------------------------------------------------------
 describe('INSTANCE CREATION — no silent enrolment of unrelated groups', () => {
+    // WHY EVERY DOTS CALLER NOW PASSES AN EXPLICIT PICK.
+    //
+    // Dots gained a participant picker, so saveFieldAction reads fieldActionPick for
+    // it exactly as it already did for Skins. Leaving picks undefined therefore
+    // means an EMPTY pick, and an empty pick is refused before any group guard is
+    // reached.
+    //
+    // For the two tests below that assert refusal, that would have been a false
+    // negative of the worst kind: they would keep passing with the cross-group guard
+    // deleted, because emptiness was doing the refusing. Each dots test now names the
+    // golfers it is trying to enrol, so the guard is what is actually under test.
     function fieldSetup(b, format, picks) {
         const state = {};
         (picks || []).forEach(id => { state[String(id)] = true; });
@@ -399,7 +410,7 @@ describe('INSTANCE CREATION — no silent enrolment of unrelated groups', () => 
         // among its own four. The block is lifted deliberately - and the wager must
         // carry the metadata that makes it safe.
         const b = boot(1);
-        fieldSetup(b, 'dots');
+        fieldSetup(b, 'dots', b.g1.map(p => p.id));
         b.run(`actionScope = 'group'; actionOwnerGroup = 1; saveFieldAction('dots');`);
         const w = b.writes();
         assert.equal(w.length, 1, 'a group scorekeeper may start their own dots game');
@@ -412,22 +423,24 @@ describe('INSTANCE CREATION — no silent enrolment of unrelated groups', () => 
     });
 
     test('a group link still cannot start ANOTHER group\'s dots game', () => {
+        // Group 2's own golfers are named here on purpose - the refusal must come
+        // from the permission guard, not from an empty picker.
         const b = boot(1);
-        fieldSetup(b, 'dots');
+        fieldSetup(b, 'dots', b.g2.map(p => p.id));
         b.run(`actionScope = 'group'; actionOwnerGroup = 2; saveFieldAction('dots');`);
         assert.equal(b.wrote(), false, 'Group 1 must not be able to create Group 2 dots');
     });
 
     test('DOTS is refused outright under Across Groups scope', () => {
         const b = boot(ORGANIZER);
-        fieldSetup(b, 'dots');
+        fieldSetup(b, 'dots', b.g1.map(p => p.id));
         b.run(`actionScope = 'cross'; actionOwnerGroup = null; saveFieldAction('dots');`);
         assert.equal(b.wrote(), false, 'dots is a foursome game and must never span groups');
     });
 
     test('the ORGANIZER can start any group\'s dots game', () => {
         const b = boot(ORGANIZER);
-        fieldSetup(b, 'dots');
+        fieldSetup(b, 'dots', b.g2.map(p => p.id));
         b.run(`actionScope = 'group'; actionOwnerGroup = 2; saveFieldAction('dots');`);
         const w = b.writes();
         assert.equal(w.length, 1, 'organizer dots creation must not regress');
