@@ -798,6 +798,19 @@
             addAmount(p, kpResult.money[pid]);
         });
 
+        // MONEY POOL — the whole-round pot (pool-engine.js). Same additive pattern
+        // as the birdie pool above: the pool engine returns per-player nets that are
+        // already zero-sum in cents, and this line folds them into the one combined
+        // ledger. A round with no moneyPool config gets an empty object here, so
+        // every legacy round is untouched by construction.
+        if (typeof computeMoneyPoolNetByPlayerId === 'function') {
+            const poolNet = computeMoneyPoolNetByPlayerId(data, courseData, savedScores);
+            Object.keys(poolNet).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, poolNet[pid]);
+            });
+        }
+
         // Side matches — same logic buildSideMatchesHtml already uses per match, just summed
         // into the combined total instead of only shown in its own separate card. Team-based
         // (2v2) matches split evenly between teammates, matching the same convention Trip
