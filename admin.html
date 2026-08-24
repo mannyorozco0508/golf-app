@@ -278,6 +278,11 @@
         <h3 style="margin-top: 20px;">☁️ Sync Courses to Firebase</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Push all pre-coded local courses to the global database.</p>
         <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="syncPresetsToFirebase()">📤 Push to Global Database</button>
+        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-mid);">
+            <div style="font-size:0.78rem; font-weight:bold; margin-bottom:4px;">Settlement</div>
+            <div id="settlement-mode-state" style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">Enter a game code to check this round.</div>
+            <button class="btn-primary" style="background-color: var(--brand-green);" onclick="enableWholeDollarSettlement()">💵 Settle this round in whole dollars</button>
+        </div>
 
         <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
@@ -1347,6 +1352,57 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             alert("✅ Beta expiration successfully updated to " + dateVal);
             document.getElementById('secret-master-panel').style.display = 'none';
         }).catch(err => alert("Error: " + err.message));
+    }
+
+    // ---- ACTIVE-ROUND SETTLEMENT OPT-IN -------------------------------------
+    //
+    // A round already in progress cannot be switched silently: it was created
+    // under the legacy cent rules, and somebody may already have looked at a
+    // projected number. So this is an explicit, one-way, organizer-only action,
+    // and it refuses once the round has been settled.
+    //
+    // The golfer-facing wording is "whole dollars". Nobody is shown a version
+    // string or a mode name.
+    function refreshSettlementModeState(code) {
+        const el = document.getElementById('settlement-mode-state');
+        if (!el) return;
+        // The secret panel is normally opened WITHOUT ?game=, so there is often no
+        // round in context. Say so plainly rather than showing a state for nothing.
+        const c = code || currentMode;
+        if (!c) { el.textContent = 'New rounds settle in whole dollars. Tap below to switch a round already in play.'; return; }
+        db.ref('events/' + String(c).toUpperCase() + '/settlementMode').once('value').then(snap => {
+            el.textContent = snap.val() === 'whole-dollar'
+                ? '\u2705 ' + String(c).toUpperCase() + ' settles in whole dollars.'
+                : String(c).toUpperCase() + ' settles the old way, with cents.';
+        }).catch(() => { el.textContent = 'Could not read that round.'; });
+    }
+
+    function enableWholeDollarSettlement() {
+        // Uses the round in context when there is one; otherwise asks. The panel is
+        // usually reached from admin.html with no ?game=, so prompting is the normal
+        // path rather than the fallback.
+        let code = currentMode ? String(currentMode).toUpperCase().trim() : '';
+        if (!code) {
+            const typed = prompt('Game code of the round to switch to whole dollars:');
+            code = typed ? typed.toUpperCase().trim() : '';
+        }
+        if (!code) return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('\u26A0\uFE0F NOT SAVED\nYou\'re offline. Reconnect before changing settlement.');
+            return;
+        }
+        db.ref('events/' + code).once('value').then(snap => {
+            const round = snap.val();
+            if (!round) { alert('\u26A0\uFE0F No round found for ' + code + '.'); return; }
+            if (round.settlementMode === 'whole-dollar') { alert('This round already settles in whole dollars.'); return; }
+            // Changing this after the fact would move numbers people have already
+            // been shown, so the organizer is told exactly what it does.
+            if (!confirm('Settle ' + code + ' in whole dollars?\n\nEvery payout becomes a whole dollar with no cents. '
+                + 'Do this before you settle up, not after.')) return;
+            db.ref('events/' + code + '/settlementMode').set('whole-dollar')
+                .then(() => { alert('\u2705 ' + code + ' will settle in whole dollars.'); refreshSettlementModeState(code); })
+                .catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message)));
+        }).catch(err => alert('\u26A0\uFE0F Could not read that round.\n' + (err && err.message)));
     }
 
     function syncPresetsToFirebase() {
@@ -3620,6 +3676,19 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const payload = {
                 eventName: baseEventName,
                 roundDay: roundDay,
+                // SETTLEMENT MODE - new rounds settle in whole dollars.
+                //
+                // Written on creation so it is a property of THIS round, not a global
+                // setting that would retroactively reinterpret rounds already played.
+                // Rounds saved before this field existed simply do not have it, and
+                // pool-engine.js treats its absence as the legacy cent behaviour - so
+                // a round settled last month still settles to the same numbers today.
+                //
+                // Deliberately not surfaced as a setup question. "Whole dollars or
+                // cents?" is not a decision a golfer wants on the first tee, and every
+                // new round wants the same answer. The organizer can still switch an
+                // in-progress round from the admin panel.
+                settlementMode: 'whole-dollar',
                 eventCategory: currentCategory,
                 categoryIcon: categoryIcon,
                 activeCourseKey: courseKey,
