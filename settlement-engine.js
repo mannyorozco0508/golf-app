@@ -525,7 +525,7 @@
     // Returns the STORY behind each side match: the original wager, every press with
     // its start hole and stake, who won each segment, and the match net. Settlement
     // itself already knew all of this; it just threw it away and kept the total, which
-    // is why nobody could answer "why do I owe Marty $200?".
+    // is why nobody could answer "why do I owe $200?".
     //
     // NO NEW MATHEMATICS. Every figure comes from calculateOverallBetEngine and
     // calculateHoleBetEngine - the same calls computeCombinedNetTotals makes. If a
@@ -926,4 +926,195 @@
         const out = {};
         rows.forEach(r => { out[r.key] = { name: r.name, net: r.rounded }; });
         return out;
+    }
+
+    // ========================================================================
+    // WHOLE-FIELD SKINS LEDGER — official / tie / waiting, hole by hole
+    //
+    // PURELY ADDITIVE. Nothing above this line changed. computeSkinsSettlementNet
+    // and both of its resolvers behave exactly as they always have, so every
+    // saved round settles to the same cent.
+    //
+    // WHY THIS EXISTS
+    //
+    // The two resolvers above answer "who won each skin" by looking at whoever
+    // has posted so far:
+    //
+    //     const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+    //     if (holeScores.length === 0) return;
+    //
+    // A hole with eight of twelve scores in is therefore resolved from those
+    // eight. That is correct and harmless for a FINISHED round, where every
+    // participant has posted every hole - which is the only context those
+    // functions were ever called from. It is wrong the moment anyone looks
+    // mid-round: the fast groups would be shown a "winner" for a hole the slow
+    // group has not played, and that winner can change when the last card
+    // arrives. Showing a golfer a skin and then taking it away is worse than
+    // showing nothing, which is exactly why the group went back to paper.
+    //
+    // So this function adds the missing concept - an OFFICIAL hole - without
+    // touching the money math. A hole is official when EVERY participant in
+    // that skins game has a posted score for it. Not every golfer in the round:
+    // a participant-scoped game is not delayed by golfers who are not in it.
+    //
+    // CARRY MAKES "OFFICIAL" MEAN TWO DIFFERENT THINGS, and the distinction is
+    // real rather than pedantic:
+    //
+    //   NO CARRY - each hole is worth one share and stands alone. A complete
+    //              hole 14 is fully known even if hole 13 is still waiting.
+    //
+    //   CARRY    - a hole's VALUE is however many units rolled into it, so
+    //              hole 14 cannot be valued until hole 13 has resolved. The
+    //              WINNER of a complete hole 14 is still known, and is still
+    //              worth showing; only the units are unknown.
+    //
+    // Both facts are reported separately: `official` (do we know the winner)
+    // and `valueKnown` (do we know what it is worth). A UI that conflates them
+    // will eventually overstate a payout.
+    //
+    // Group labels are supplied by the caller through opts.groupOf, so this
+    // engine keeps knowing nothing about scorekeeper links or group numbers.
+    // ========================================================================
+
+    // One ledger for one scoring basis. Pure: no data/config reading, so the
+    // gross and net halves of a split pot can each be built from it.
+    function buildSkinsLedgerFor(participants, courseData, savedScores, scoreKey, carryOver, opts) {
+        const groupOf = (opts && typeof opts.groupOf === 'function') ? opts.groupOf : null;
+        const required = participants.length;
+        const holes = [];
+
+        let carryUnits = 1;
+        let carryKnown = true;   // becomes false at the first hole we cannot resolve
+
+        (courseData || []).forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(participants, savedScores, h);
+            const posted = holeScores.length;
+            const official = required > 0 && posted === required;
+
+            const missing = official ? [] : participants
+                .filter(p => !holeScores.some(s => String(s.id) === String(p.id)))
+                .map(p => ({ id: p.id, name: p.name, group: groupOf ? groupOf(p.id) : null }));
+
+            const missingGroups = [...new Set(missing.map(m => m.group).filter(g => g !== null && g !== undefined))]
+                .sort((a, b) => Number(a) - Number(b));
+
+            const row = {
+                hole: h.hole,
+                par: h.par,
+                hcpIndex: h.hcpIndex,
+                scoreKey,
+                postedCount: posted,
+                requiredCount: required,
+                official,
+                missing,
+                missingGroups,
+                state: 'waiting',
+                winner: null,
+                low: null,
+                tiedPlayers: [],
+                unitsWon: null,
+                valueKnown: false,
+                scores: holeScores,
+            };
+
+            if (!official) {
+                // An unresolved hole breaks the carry chain: nothing after it can
+                // be valued until it lands. Under no-carry there is no chain to
+                // break, so later holes remain fully knowable.
+                if (carryOver) carryKnown = false;
+                holes.push(row);
+                return;
+            }
+
+            const values = holeScores.map(s => s[scoreKey]);
+            const low = Math.min(...values);
+            const winners = holeScores.filter(s => s[scoreKey] === low);
+            row.low = low;
+
+            if (winners.length === 1) {
+                row.state = 'skin';
+                row.winner = winners[0];
+                if (carryOver) {
+                    row.unitsWon = carryKnown ? carryUnits : null;
+                    row.valueKnown = carryKnown;
+                    carryUnits = 1;
+                } else {
+                    row.unitsWon = 1;
+                    row.valueKnown = true;
+                }
+            } else {
+                row.state = 'tie';
+                row.tiedPlayers = winners;
+                if (carryOver) {
+                    if (carryKnown) carryUnits += 1;
+                    row.valueKnown = carryKnown;
+                } else {
+                    // Tie voids the hole outright. Nothing rolls forward, and the
+                    // hole is closed - that is the whole point of no-carry.
+                    row.unitsWon = 0;
+                    row.valueKnown = true;
+                }
+            }
+
+            holes.push(row);
+        });
+
+        // Official THRU is the contiguous run from hole 1. A single gap stops it,
+        // because "official thru 14" has to mean everything up to 14 is settled -
+        // if hole 9 is still missing a card, thru 14 would be a lie.
+        let officialThru = 0;
+        for (let i = 0; i < holes.length; i++) {
+            if (!holes[i].official) break;
+            officialThru = holes[i].hole;
+        }
+
+        const countsByPlayerId = {};
+        participants.forEach(p => { countsByPlayerId[String(p.id)] = 0; });
+        holes.forEach(r => {
+            if (r.state === 'skin' && r.winner) {
+                const k = String(r.winner.id);
+                countsByPlayerId[k] = (countsByPlayerId[k] || 0) + 1;
+            }
+        });
+
+        const decided = holes.filter(r => r.state === 'skin');
+        const latest = decided.length > 0 ? decided[decided.length - 1] : null;
+        const firstWaiting = holes.find(r => !r.official) || null;
+
+        return {
+            scoreKey,
+            carryOver,
+            participants,
+            holes,
+            officialThru,
+            countsByPlayerId,
+            latest,
+            firstWaiting,
+            pendingUnits: carryOver && carryKnown && carryUnits > 1 ? carryUnits - 1 : 0,
+        };
+    }
+
+    // The ledger(s) for a round's configured skins game. Reads its field, mode
+    // and carry rule through exactly the same calls computeSkinsSettlementNet
+    // makes, so the two can never disagree about who is in or how ties behave.
+    function computeSkinsHoleLedger(data, courseData, savedScores, opts) {
+        const participants = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
+
+        const mode = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data)
+            : (data.skinsPotFormat || 'split');
+
+        const carryOver = data.skinsCarryOver !== false;
+
+        return {
+            mode,
+            carryOver,
+            participants,
+            gross: (mode === 'split' || mode === 'gross')
+                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'gross', carryOver, opts) : null,
+            net: (mode === 'split' || mode === 'net')
+                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
+        };
     }
