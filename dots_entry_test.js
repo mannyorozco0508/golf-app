@@ -347,25 +347,49 @@ describe('MONEY — unchanged, and still reconciling', () => {
 describe('DOTS STATES ITS ACTUAL FIELD', () => {
     const sm = read('sidematches.html');
 
-    test('no participant picker is offered for Dots', () => {
-        // Still true, and still deliberate: a group Dots game IS the whole foursome,
-        // so there is nothing to tick. Skins is the participant-scoped one.
-        const fn = sm.slice(sm.indexOf('function onSideMatchFormatChange'), sm.indexOf('function renderFieldActionForm'));
-        assert.ok(/\(format === 'skins'\) \? 'block' : 'none'/.test(fn),
-            'the participant picker is Skins-only');
+    test('a participant picker IS now offered for Dots', () => {
+        // THE TRIPWIRE ABOVE FIRED. This test previously asserted the picker was
+        // Skins-only, on the reasoning that a group Dots game IS the whole foursome
+        // so there was nothing to tick.
+        //
+        // That reasoning was wrong in practice, and the old arrangement was worse
+        // than "no picker": the picker element lived INSIDE the sm-skins-only block,
+        // so choosing Dots hid it - while renderFieldActionForm went on writing its
+        // Dots explanation into that same hidden container. The text nobody could
+        // read said "everyone in this group is in it", and that is exactly what
+        // happened, with no way to decline. "Randy's sitting this one out" had no
+        // expression in the product.
+        //
+        // Dots is scoped by participantIds and settlement honours that identically
+        // to Skins, so it gets the identical control.
+        const markup = sm.slice(sm.indexOf('id="sm-field-fields"'), sm.indexOf('id="sm-field-start"'));
+        const skinsOnlyAt = markup.indexOf('id="sm-skins-only"');
+        const pickerAt = markup.indexOf('id="sm-field-players"');
+        assert.ok(skinsOnlyAt !== -1 && pickerAt !== -1, 'both blocks should still exist');
+        const between = markup.slice(skinsOnlyAt, pickerAt);
+        assert.ok((between.match(/<\/div>/g) || []).length >= (between.match(/<div/g) || []).length,
+            'sm-field-players must sit OUTSIDE sm-skins-only, or Dots has no picker at all');
     });
 
-    test('the setup names the group whose dots game it is', () => {
-        assert.ok(/Group \$\{actionOwnerGroup\}\\u2019s dots game/.test(sm),
-            'a multi-group round must say which group the dots game belongs to');
-        assert.ok(/don\\u2019t count and cost nothing here/.test(sm),
-            'and must say plainly that other groups\' dots do not count');
+    test('the picker names who is in, and says plainly what being left out does NOT mean', () => {
+        // The old copy named the group and warned that other groups' dots cost
+        // nothing here. Both facts are still true, but they are no longer the
+        // interesting ones: a golfer can now be left out of their OWN group's dots
+        // game, and the thing they need to be told is that it changes nothing else.
+        //
+        // This assertion is stronger than the one it replaces. The old pair checked
+        // that two sentences existed. This checks that the product actually renders
+        // a per-golfer control AND explains the consequence of using it.
+        assert.ok(/toggleFieldActionPlayer/.test(sm), 'golfers must be individually tappable');
+        assert.ok(/out of this game only/.test(sm),
+            'someone tapped off must not think they have been dropped from the round');
+        assert.ok(/still scoring, still in every whole-field game/.test(sm),
+            'the separation from the Money Pool and whole-field games must be stated, not implied');
     });
 
-    test('a one-group round still says everyone plays', () => {
-        // Nothing changed for Marty Monday: one foursome IS the field.
-        assert.ok(/Everyone playing/.test(sm));
-        assert.ok(/everyone playing/.test(sm), 'and the format list says it too');
+    test('the picker starts with the whole foursome in, so the common case is one tap', () => {
+        assert.ok(/\(format === 'skins' \|\| format === 'dots'\) && Object\.keys\(fieldActionPick\)\.length === 0/.test(sm),
+            'everyone in is overwhelmingly the common case and must remain the default');
     });
 
     test('the amount is named per DOT, not as a buy-in', () => {
@@ -418,12 +442,16 @@ describe('DOTS STATES ITS ACTUAL FIELD', () => {
         // wording must change with it." Group Action made that happen, and the
         // wording above changed in the same batch - which is exactly what the
         // tripwire was for.
+        // Updated again, for the same reason and in the same spirit: the field is
+        // now the golfers the group PICKED rather than everyone in the group.
         const fn = sm.slice(sm.indexOf('function saveFieldAction'), sm.indexOf('let pendingDeleteMatchId'));
         const elseBranch = fn.slice(fn.indexOf('} else {'));
         assert.ok(/entry\.dotPointVal = stake;/.test(elseBranch));
-        assert.ok(/entry\.participantIds = groupIds;/.test(elseBranch),
-            'a group dots game must name its field');
-        assert.ok(/if \(isMultiGroupRound\(\)\)/.test(elseBranch),
-            'and must record nothing on a one-group round, keeping those rounds identical');
+        assert.ok(/const chosenD = Object\.keys\(fieldActionPick\)/.test(elseBranch),
+            'a dots game must name the field the group actually chose');
+        assert.ok(/entry\.participantIds = chosenD;/.test(elseBranch),
+            'and must record it');
+        assert.ok(/isMultiGroupRound\(\) \|\| chosenD\.length < players\.length/.test(elseBranch),
+            'a one-group round with everyone in must still record nothing, staying identical to before');
     });
 });
