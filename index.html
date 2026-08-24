@@ -2133,8 +2133,22 @@
         const sideRow = sm => {
             const open = isMatchExpanded(sm);
             const arrow = open ? '\u25BE' : '\u203A';
-            const money = sm.netText
-                ? '<span class="mc-money' + (sm.netMoney > 0 ? ' pos' : (sm.netMoney < 0 ? ' neg' : '')) + '">' + sm.netText + '</span>'
+            // A stroke side match can be TWO wagers: $/hole and overall. The cockpit's
+            // money figure comes from bet-strip, which models only the overall bet - so
+            // on a $10/hole + $200 overall match it read "up $433" while the golfer's
+            // true position was $1,920. That is not a wrong number; it is a partial
+            // number wearing the whole ledger's label. There is no canonical per-match
+            // combined figure in this row model and inventing one here would be a second
+            // calculation, so the honest fix is the label: when a hole bet exists, the
+            // figure says which wager it belongs to. The full combined truth lives on
+            // the Action page and the Receipt, both engine-fed.
+            const rawSm = (currentData.sideMatches || {})[sm.key];
+            const hasHoleBet = !!(rawSm && rawSm.format === 'stroke' && (rawSm.holeStake || 0) > 0);
+            const moneyText = sm.netText
+                ? ((hasHoleBet ? 'Overall: ' : '') + sm.netText)
+                : '';
+            const money = moneyText
+                ? '<span class="mc-money' + (sm.netMoney > 0 ? ' pos' : (sm.netMoney < 0 ? ' neg' : '')) + '">' + moneyText + '</span>'
                 : '';
 
             let html = '<div class="match-card' + (open ? ' open' : '') + '">' +
@@ -2154,7 +2168,15 @@
                     // having to open anything.
                     '<span class="mc-thru">' + (sm.thruShort || sm.thruText || '') +
                         (sm.waitingOn ? ' \u00B7 waiting on ' + sm.waitingOn : '') +
-                        (!open && pressChips(sm)
+                        // The press ledger renders on BOTH card states. It used to be
+                        // collapsed-only, and a 1v1 auto-opens - so the one golfer most
+                        // likely to be staring at this card was the one who could not see
+                        // his own $78 hole press. The open card's detail rows only cover
+                        // overall presses (bet-strip has never modelled hole presses), so
+                        // without this line a stroke match's hole presses were invisible
+                        // on the scorecard entirely. Same chips, same raw storage, both
+                        // states: what Firebase holds is what the card says.
+                        (pressChips(sm)
                             ? ' \u00B7 ' + pressChips(sm)
                             : '') +
                     '</span>' +
