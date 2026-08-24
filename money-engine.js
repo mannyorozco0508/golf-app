@@ -293,7 +293,19 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                     if (hNum < m.endHole) {
                         const threshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : null);
                         const autoTrigger = threshold !== null && Math.abs(m.status) >= threshold;
-                        const manualTrigger = (manualPresses || []).some(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
+                        // PER-PRESS STAKE (authorized change, Aug 2026).
+                        //
+                        // A manual press may carry its own dollar amount - "press you for
+                        // $78" is a different bet from "press you for the same $200", and
+                        // silently normalising it to the original stake moved real money to
+                        // the wrong number. The matched manual press is looked up (not just
+                        // detected) so its stored stake can ride on the segment it creates.
+                        //
+                        // AUTO presses never carry a stake here: the trigger rule invented
+                        // them, nobody typed an amount, and they settle at the original
+                        // stake exactly as before.
+                        const manualPress = (manualPresses || []).find(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
+                        const manualTrigger = !!manualPress;
 
                         if ((autoTrigger || manualTrigger) && m.triggers === 0) {
                             m.triggers = 1;
@@ -305,6 +317,11 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                             newPresses.push({
                                 id: `P${pressCount}`,
                                 baseId: m.baseId,
+                                // Stored ONLY when the golfer explicitly entered one. A press
+                                // without a stake settles at the original wager, which keeps
+                                // every legacy round to the cent.
+                                stake: (manualPress && manualPress.stake !== undefined && manualPress.stake !== null)
+                                    ? manualPress.stake : undefined,
                                 startHole: hNum + 1,
                                 endHole: m.endHole,
                                 status: 0,
@@ -334,18 +351,22 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
     });
 
     let t1TotalMoney = 0;
+    // Each segment settles at ITS stake. Base matches and auto presses never store
+    // one, so segStake is the original wager for them - byte-for-byte the old
+    // behaviour. Only a manual press that explicitly carried an amount differs.
+    const segStake = m => (m.stake === undefined || m.stake === null) ? stake : m.stake;
     if (gameFormat === 'nassau') {
         activeMatches.forEach(m => {
-            if (m.status > 0) t1TotalMoney += stake;
-            else if (m.status < 0) t1TotalMoney -= stake;
+            if (m.status > 0) t1TotalMoney += segStake(m);
+            else if (m.status < 0) t1TotalMoney -= segStake(m);
         });
     } else {
         activeMatches.forEach(m => {
             if (holeBet > 0) {
                 t1TotalMoney += m.status * holeBet;
             } else {
-                if (m.status > 0) t1TotalMoney += stake;
-                else if (m.status < 0) t1TotalMoney -= stake;
+                if (m.status > 0) t1TotalMoney += segStake(m);
+                else if (m.status < 0) t1TotalMoney -= segStake(m);
             }
         });
     }
