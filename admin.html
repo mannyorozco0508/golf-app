@@ -132,6 +132,9 @@
         #mp-math .mp-total { border-top: 1px solid rgba(184,134,11,0.45); margin-top: 5px; padding-top: 5px; font-weight: bold; }
         #mp-math.mp-bad { background: rgba(200,40,40,0.08); color: var(--accent-red); }
         #mp-skins-note { font-size: 0.7rem; color: #b8860b; margin: 4px 0 0 0; display: none; }
+        .mp-custom-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+        .mp-custom-row .mp-place { flex: 0 0 34px; font-size: 0.8rem; font-weight: bold; color: var(--text-muted); }
+        .mp-custom-row input { flex: 1 1 auto; }
 
         .wizard-progress { display: flex; justify-content: center; gap: 6px; margin: 4px 0 18px 0; flex-wrap: wrap; }
         .wizard-dot {
@@ -865,14 +868,41 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
                 <div class="mp-section">
                     <div class="mp-section-title">🥇 Net Finish Pool</div>
-                    <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()" placeholder="0 for no net prize">
                     <div class="mp-sub-label">Net Payout</div>
-                    <select id="mp-net-places" onchange="mpRecalc()">
-                        <option value="100">Winner Take All — 100%</option>
-                        <option value="60,40">Top 2 — 60 / 40</option>
-                        <option value="50,30,20" selected>Top 3 — 50 / 30 / 20</option>
-                        <option value="40,30,20,10">Top 4 — 40 / 30 / 20 / 10</option>
+                    <select id="mp-net-mode" onchange="mpRecalc()">
+                        <option value="preset" selected>Split a pool by percentage</option>
+                        <option value="custom">Exact dollar amounts</option>
                     </select>
+
+                    <!-- PRESET: one pool, divided by percentages. -->
+                    <div id="mp-net-preset-wrap">
+                        <div class="mp-sub-label">Net Finish Pool</div>
+                        <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()" placeholder="0 for no net prize">
+                        <select id="mp-net-places" onchange="mpRecalc()" style="margin-top:6px;">
+                            <option value="100">Winner Take All — 100%</option>
+                            <option value="60,40">Top 2 — 60 / 40</option>
+                            <option value="50,30,20" selected>Top 3 — 50 / 30 / 20</option>
+                            <option value="40,30,20,10">Top 4 — 40 / 30 / 20 / 10</option>
+                        </select>
+                    </div>
+
+                    <!-- CUSTOM: the amounts a golfer actually says out loud. The pool
+                         total is the SUM of these - never typed twice, never able to
+                         disagree with itself. -->
+                    <div id="mp-net-custom-wrap" style="display:none;">
+                        <div class="mp-custom-row"><span class="mp-place">1st</span>
+                            <input type="tel" inputmode="decimal" id="mp-net-c1" value="40" oninput="mpRecalc()" placeholder="$"></div>
+                        <div class="mp-custom-row"><span class="mp-place">2nd</span>
+                            <input type="tel" inputmode="decimal" id="mp-net-c2" value="30" oninput="mpRecalc()" placeholder="$"></div>
+                        <div class="mp-custom-row" id="mp-net-c3-row" style="display:none;"><span class="mp-place">3rd</span>
+                            <input type="tel" inputmode="decimal" id="mp-net-c3" value="" oninput="mpRecalc()" placeholder="$"></div>
+                        <div class="mp-custom-row" id="mp-net-c4-row" style="display:none;"><span class="mp-place">4th</span>
+                            <input type="tel" inputmode="decimal" id="mp-net-c4" value="" oninput="mpRecalc()" placeholder="$"></div>
+                        <div style="display:flex; gap:8px; margin-top:6px;">
+                            <button type="button" id="mp-add-place" class="btn-outline-sm" onclick="mpAddPlace()">+ Add Place</button>
+                            <button type="button" id="mp-remove-place" class="btn-outline-sm" onclick="mpRemovePlace()" style="display:none;">− Remove</button>
+                        </div>
+                    </div>
                     <div class="mp-hint" id="mp-net-split"></div>
                 </div>
 
@@ -1828,6 +1858,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function mpToggle() {
         const on = document.getElementById('mp-enabled').checked;
         document.getElementById('mp-panel').style.display = on ? 'block' : 'none';
+        mpSyncPlaceRows();
         mpRecalc();
     }
 
@@ -1848,10 +1879,19 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 holes: document.getElementById('mp-kp-holes').value.split(',')
                     .map(x => parseInt(x.trim(), 10)).filter(x => x > 0) };
         }
-        const netAmt = num('mp-net-amount');
-        if (netAmt > 0) {
-            pool.net = { amount: netAmt,
-                places: document.getElementById('mp-net-places').value.split(',').map(Number) };
+        // NET FINISH, two shapes, one source of truth each. Custom stores only the
+        // amounts; its total is derived by moneyPoolNetTotal() so a stored $70 can
+        // never drift from a $40/$30 pair. Preset rounds keep the exact shape they
+        // have always had, so nothing already saved needs migrating.
+        if (mpNetMode() === 'custom') {
+            const amounts = mpCustomAmounts();
+            if (amounts.length) pool.net = { payoutMode: 'custom', amounts };
+        } else {
+            const netAmt = num('mp-net-amount');
+            if (netAmt > 0) {
+                pool.net = { amount: netAmt,
+                    places: document.getElementById('mp-net-places').value.split(',').map(Number) };
+            }
         }
         const mode = document.getElementById('mp-skins-mode').value;
         pool.skins = { mode,
@@ -1877,10 +1917,60 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             return '$' + (v.totalPool - v.fixedAllocated).toFixed(0) + ' still unassigned — give it to Skins or raise a pool.';
         }
         if (/total 100%/.test(msg)) return 'Net payout percentages must add up to 100%.';
+        if (/net payout must be/.test(msg)) return 'Net payouts must be $0 or more.';
+        if (/at least one net payout/.test(msg)) return 'Enter a dollar amount for at least one place.';
         if (/at least two golfers/.test(msg)) return 'Add players in Step 5 first.';
         if (/Buy-in must be/.test(msg)) return 'Enter a buy-in above $0.';
         if (/not on this course/.test(msg)) return msg.replace('KP hole', 'Hole') + ' Check the KP holes.';
         return msg;
+    }
+
+    function mpNetMode() {
+        const el = document.getElementById('mp-net-mode');
+        return el && el.value === 'custom' ? 'custom' : 'preset';
+    }
+
+    // How many custom places are showing. Rows 3 and 4 are revealed on demand, so a
+    // two-place week never has empty boxes to scroll past.
+    let mpPlaceCount = 2;
+
+    function mpCustomAmounts() {
+        const out = [];
+        for (let i = 1; i <= mpPlaceCount; i++) {
+            const el = document.getElementById('mp-net-c' + i);
+            const v = el ? parseFloat(el.value) : NaN;
+            out.push(isNaN(v) ? '' : v);
+        }
+        return out;
+    }
+
+    function mpAddPlace() {
+        if (mpPlaceCount >= 4) return;
+        mpPlaceCount++;
+        mpSyncPlaceRows();
+        mpRecalc();
+    }
+
+    function mpRemovePlace() {
+        if (mpPlaceCount <= 1) return;
+        const el = document.getElementById('mp-net-c' + mpPlaceCount);
+        if (el) el.value = '';
+        mpPlaceCount--;
+        mpSyncPlaceRows();
+        mpRecalc();
+    }
+
+    function mpSyncPlaceRows() {
+        [2, 3, 4].forEach(n => {
+            const row = document.getElementById('mp-net-c' + n + '-row');
+            if (row) row.style.display = mpPlaceCount >= n ? 'flex' : 'none';
+        });
+        const r2 = document.getElementById('mp-net-c2');
+        if (r2 && r2.parentNode) r2.parentNode.style.display = mpPlaceCount >= 2 ? 'flex' : 'none';
+        const add = document.getElementById('mp-add-place');
+        const rem = document.getElementById('mp-remove-place');
+        if (add) add.style.display = mpPlaceCount < 4 ? 'inline-block' : 'none';
+        if (rem) rem.style.display = mpPlaceCount > 1 ? 'inline-block' : 'none';
     }
 
     function mpRecalc() {
@@ -1916,9 +2006,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (kpSplit) kpSplit.textContent = (pool.kp && holes.length)
             ? $0((pool.kp.amount || 0) / holes.length) + ' each across ' + holes.length + ' hole' + (holes.length === 1 ? '' : 's')
             : 'no holes chosen yet';
-        const places = (pool.net && pool.net.places) ? pool.net.places : [];
-        mpSetHint('mp-net-split', (pool.net && places.length)
-            ? places.map((pc, i) => (i + 1) + (['st','nd','rd'][i] || 'th') + ' ' + $0((pool.net.amount || 0) * pc / 100)).join('  ·  ')
+        // Show the two panes according to the chosen mode, then spell out the places
+        // in dollars either way - the organizer never converts percentages by hand.
+        const custom = mpNetMode() === 'custom';
+        const pw = document.getElementById('mp-net-preset-wrap');
+        const cw = document.getElementById('mp-net-custom-wrap');
+        if (pw) pw.style.display = custom ? 'none' : 'block';
+        if (cw) cw.style.display = custom ? 'block' : 'none';
+        const netTotal = (typeof moneyPoolNetTotal === 'function') ? moneyPoolNetTotal(pool.net) : 0;
+        const placeCents = (typeof moneyPoolNetPlaceCents === 'function') ? moneyPoolNetPlaceCents(pool.net) : [];
+        mpSetHint('mp-net-split', placeCents.length
+            ? placeCents.map((c, i) => (i + 1) + (['st','nd','rd'][i] || 'th') + ' ' + $0(c / 100)).join('  ·  ')
+                + (custom ? '   |   Net Finish Total: ' + $0(netTotal) : '')
             : '');
         mpSetHint('mp-skins-line', pool.skins && pool.skins.mode === 'remainder'
             ? (v.valid ? 'Skins pot: ' + $0(v.remainder) : '')
@@ -1932,7 +2031,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 : (pool.skins && pool.skins.mode === 'fixed' ? (pool.skins.amount || 0) : 0);
             let rows = '<div class="mp-row"><span>Total pool</span><span>' + $0(v.totalPool) + '</span></div>';
             if (pool.kp) rows += '<div class="mp-row"><span>KP</span><span>' + $0(pool.kp.amount) + '</span></div>';
-            if (pool.net) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(pool.net.amount) + '</span></div>';
+            if (pool.net && netTotal > 0) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(netTotal) + '</span></div>';
             if (skinsAmt > 0) rows += '<div class="mp-row"><span>Skins</span><span>' + $0(skinsAmt) + '</span></div>';
             rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(v.fixedAllocated + skinsAmt)
                 + ' of ' + $0(v.totalPool) + ' \u2713</span></div>';
