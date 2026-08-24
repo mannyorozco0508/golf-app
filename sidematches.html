@@ -419,9 +419,15 @@
                     </div>
                     <input type="hidden" id="sm-field-carry" value="yes">
                 </div>
-                <label style="font-size:0.78rem;">Who's in?</label>
-                <div id="sm-field-players" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
             </div>
+            <!-- MOVED OUT OF sm-skins-only.
+                 The picker used to live inside the skins-only block, so selecting Dots
+                 hid it entirely - and renderFieldActionForm was still writing its Dots
+                 text into this container, where nobody could see it. Dots was therefore
+                 always the whole foursome with no way to say otherwise. It is a
+                 participant-scoped game like Skins and it gets a real picker. -->
+            <label style="font-size:0.78rem;">Who's in?</label>
+            <div id="sm-field-players" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
             <div class="control-group" style="margin-bottom:10px;">
                 <label>Starts on</label>
                 <select id="sm-field-start"></select>
@@ -1033,7 +1039,10 @@
         if (stakeLabel) stakeLabel.textContent = (format === 'dots') ? '$ per dot' : 'Buy-in per golfer ($)';
         // A group Skins game starts with the whole foursome already in, so the fast
         // path is "type the money, save". Tapping a golfer off is the exception.
-        if (format === 'skins' && Object.keys(fieldActionPick).length === 0) {
+        // Both participant-scoped games start with the whole foursome already in,
+        // because that is overwhelmingly the common case: "we're all playing dots".
+        // Tapping someone off is the exception, and it has to be one tap.
+        if ((format === 'skins' || format === 'dots') && Object.keys(fieldActionPick).length === 0) {
             selectablePlayers().forEach(p => { fieldActionPick[String(p.id)] = true; });
         }
         if (fieldGame) renderFieldActionForm(format);
@@ -1068,33 +1077,33 @@
         const players = selectablePlayers();
         const chosenIds = Object.keys(fieldActionPick);
 
-        if (format === 'dots') {
-            // DOTS IS A FOURSOME GAME.
-            //
-            // Under group scope it belongs to exactly one group and every golfer in
-            // that group is in it - there is nothing to pick, which is precisely what
-            // makes it fast. Settlement honours the participantIds this writes
-            // (Phase 1 scoped it at the orchestration layer), so what this says and
-            // what the Receipt pays are now the same thing.
-            const names = ownerGroupPlayers().map(p => p.name.split(' ')[0]).join(', ');
-            wrap.innerHTML = isMultiGroupRound()
-                ? '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
-                    + `<strong>Group ${actionOwnerGroup}\u2019s dots game.</strong> ${names} \u2014 `
-                    + 'dots by golfers in other groups don\u2019t count and cost nothing here.</p>'
-                : '<p style="font-size:0.78rem; color:var(--text-muted); margin:0;">'
-                    + `<strong>Everyone playing.</strong> ${names}.</p>`;
-        } else {
-            // Skins is genuinely participant-scoped, so the picker is real. Under
-            // group scope it is seeded with the whole foursome and golfers can be
-            // tapped off - "Steve's sitting this one out" is a real thing people say.
-            wrap.innerHTML = players.map(pl => {
-                const on = chosenIds.includes(String(pl.id));
-                return `<button type="button" onclick="toggleFieldActionPlayer('${String(pl.id)}')"
-                    style="padding:8px 12px; min-height:44px; border-radius:20px; font-size:0.82rem; cursor:pointer;
-                           border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
-                           background:${on ? 'var(--brand-green)' : 'transparent'};
-                           color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
-            }).join('');
+        // ONE PICKER FOR BOTH PARTICIPANT-SCOPED GAMES.
+        //
+        // Skins always had a real picker. Dots printed a sentence saying "everyone in
+        // this group is in it" - into a container nested inside the skins-only block,
+        // so for Dots it was hidden and the game silently enrolled the whole foursome
+        // with no way to decline. Both are scoped by participantIds and settlement
+        // honours that identically, so both get the same control.
+        //
+        // Seeded with the whole foursome, so the fast path is still "type the money,
+        // save". Tapping a golfer off is one tap - "Randy's sitting this one out" is a
+        // real thing people say on a first tee.
+        wrap.innerHTML = players.map(pl => {
+            const on = chosenIds.includes(String(pl.id));
+            return `<button type="button" onclick="toggleFieldActionPlayer('${String(pl.id)}')"
+                style="padding:8px 12px; min-height:44px; border-radius:20px; font-size:0.82rem; cursor:pointer;
+                       border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
+                       background:${on ? 'var(--brand-green)' : 'transparent'};
+                       color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
+        }).join('');
+
+        // Said plainly, because a golfer left out of dots must not think they have been
+        // dropped from the round.
+        const leftOut = players.filter(pl => !chosenIds.includes(String(pl.id)));
+        if (leftOut.length > 0) {
+            wrap.innerHTML += `<p style="flex-basis:100%; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">`
+                + `${leftOut.map(pl => pl.name.split(' ')[0]).join(', ')} `
+                + `${leftOut.length === 1 ? 'is' : 'are'} out of this game only \u2014 still scoring, still in every whole-field game.</p>`;
         }
 
         const startSel = document.getElementById('sm-field-start');
@@ -1602,24 +1611,35 @@
             if (chosen.length < players.length) entry.participantIds = chosen;
         } else {
             entry.dotPointVal = stake;
-            // A GROUP DOTS GAME NAMES ITS FIELD.
+            // A DOTS GAME NAMES ITS FIELD, exactly as Skins does.
             //
-            // This is what Phase 1 unlocked: settlement now scopes to participantIds
-            // at the orchestration layer, so writing the foursome here means dots by
-            // golfers in other groups genuinely contribute $0 and cannot influence
-            // this game's payouts. Written only when the round has more than one
-            // group - a single foursome IS the field, and recording nothing keeps
-            // that round identical to every dots game saved before this existed.
-            if (isMultiGroupRound()) {
-                const groupIds = ownerGroupPlayers().map(p => String(p.id));
-                if (groupIds.length < 2) { alert('\u26A0\uFE0F That group needs at least two golfers for a dots game.'); return; }
-                if (!canCreateWagerWith(groupIds)) {
-                    console.warn('Blocked: dots outside this link\u2019s group.');
-                    alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start Group '
-                        + lockedGroup + '\u2019s dots game.');
-                    return;
-                }
-                entry.participantIds = groupIds;
+            // This used to enrol ownerGroupPlayers() wholesale - every golfer in the
+            // group, no say in it - because the picker was hidden for Dots. Now the
+            // chosen list drives it, with the same three guards Skins already applies:
+            // at least two players, no golfer this link may not enrol, and no group
+            // game that quietly spans two foursomes.
+            //
+            // Settlement scopes to participantIds at the orchestration layer, so a
+            // golfer left out genuinely contributes $0 to this game and collects $0
+            // from it, while their dots on the card remain their own business.
+            const chosenD = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
+            if (chosenD.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a dots game.'); return; }
+            if (!canCreateWagerWith(chosenD)) {
+                console.warn('Blocked: dots outside this link\u2019s group.');
+                alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start Group '
+                    + lockedGroup + '\u2019s dots game.');
+                return;
+            }
+            if (actionScope === 'group' && !allPlayersInGroup(chosenD, actionOwnerGroup)) {
+                alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s dots game, so it can only include Group '
+                    + actionOwnerGroup + ' golfers.');
+                return;
+            }
+            // Recorded whenever the game is narrower than the whole round. A single
+            // foursome playing dots with everyone in still records nothing, keeping
+            // that round byte-identical to every dots game saved before this existed.
+            if (isMultiGroupRound() || chosenD.length < players.length) {
+                entry.participantIds = chosenD;
             }
         }
 
