@@ -265,7 +265,7 @@
 
         <!-- STEP 1 — WHO IS THIS BET BETWEEN?
              Shown only when the round genuinely has more than one group. A single
-             foursome has nothing to choose, so Marty Monday never sees this. -->
+             foursome has nothing to choose, so a single-group round never sees this. -->
         <div id="sm-scope-step" style="display:none;">
             <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 12px 0;">Who's this bet between?</p>
             <button type="button" class="sm-scope-choice" onclick="pickActionScope('group')">
@@ -816,7 +816,7 @@
     //
     // ownerGroup is stored alongside participants because participants alone
     // cannot answer "whose wager is this" for permission purposes - a Skins game
-    // of Marty, Manny and Stan could be a cross-group bet or a mis-built local
+    // of three golfers from two foursomes could be a cross-group bet or a mis-built local
     // one, and the two have different management rules. Group membership is fixed
     // for the life of a round, so a stored ownerGroup stays true.
     let actionScope = null;      // 'group' | 'cross'
@@ -1158,7 +1158,7 @@
             if (!wrapper) return;
             let html = "";
             // Across Groups shows the whole field, so it has to say who is in which
-            // foursome - otherwise "Marty vs Stan" is just two names.
+            // foursome - otherwise "Avery vs Indigo" is just two names.
             const showHeads = actionScope === 'cross' && distinctGroups > 1;
             let lastGroup = null;
             players.forEach(p => {
@@ -1243,6 +1243,21 @@
         }
         // 2v2 Stroke Play is supported: the engine takes the whole side and scores it
         // best ball, and settlement splits the stake evenly between teammates.
+
+        // THE ANCHOR RULE, SHOWN BEFORE SAVE.
+        //
+        // Across Groups offers the whole field, because "at least one of ours" is a
+        // property of the COMBINATION and cannot be enforced by filtering names one
+        // at a time. So it is surfaced here instead - the same function the write
+        // guard calls, so the picker and the guard can never disagree about what is
+        // allowed. Finding out at Save, on a tee box, is not good enough.
+        const anchorWarn = (typeof crossGroupAnchorWarning === 'function')
+            ? crossGroupAnchorWarning(teamAIds.concat(teamBIds)) : '';
+        if (anchorWarn) {
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ ${anchorWarn}</span>`;
+            preview.style.display = 'none';
+            return;
+        }
 
         const sizeLabel = teamAIds.length === 1 ? '1v1' : `${teamAIds.length}v${teamBIds.length}`;
         indicator.innerHTML = `<span style="color:var(--brand-green);">✅ ${sizeLabel}</span>`;
@@ -1410,30 +1425,69 @@
         return lockedGroupHasStake(sideMatchParticipantIds(sideMatch));
     }
 
-    // CREATE. Conservative by deliberate choice, pending the Group Action work.
+    // CREATE — the ANCHOR RULE.
     //
-    // The picker cannot yet express "this is a local game" versus "this is
-    // explicitly cross-group" - that chooser is Phase 3. Until it exists, a group
-    // link may only create a wager whose golfers are ALL its own. Cross-group
-    // creation stays with the organizer, who has always done it.
+    // The restriction that used to live here carried its own expiry condition:
+    // it was conservative "pending the Group Action work", because the picker
+    // could not yet express "this is a local game" versus "this is explicitly
+    // cross-group". That chooser now exists - pickActionScope('group' | 'cross')
+    // - so the precondition has been met and the rule can become the one it was
+    // always waiting to be.
     //
-    // This is the conservative restriction rather than a guess at intent: it can
-    // only ever refuse a write, never permit one that was previously refused.
+    // A group link may now create a cross-group wager, but only one its own
+    // foursome has skin in:
+    //
+    //   1. Across Groups was explicitly chosen (never inferred, never silent)
+    //   2. at least ONE selected golfer belongs to this link's group
+    //   3. every other selected golfer is a real golfer in this round
+    //   4. only explicitly selected golfers enter the wager
+    //
+    // Rule 2 is the anchor, and it is what keeps this from being "any link may
+    // commit anyone to money". A Group 2 scorekeeper can set up Group 2 vs
+    // Group 1. They cannot set up Group 1 vs Group 3 and walk away - that wager
+    // has nothing to do with them, and nobody in it agreed to it in front of
+    // them.
+    //
+    // Under 'group' scope nothing changed: the wager must still be entirely
+    // this foursome's.
     function canCreateWagerWith(playerIds) {
         if (isOrganizerView()) return true;
+        if (actionScope === 'cross') return crossGroupWagerIsAnchored(playerIds);
         return allPlayersInLockedGroup(playerIds);
+    }
+
+    // Rules 2 and 3 of the anchor rule. Kept separate so the picker can call the
+    // exact same function the write guard does - a UI that offers a combination
+    // the guard then refuses is its own kind of bug.
+    function crossGroupWagerIsAnchored(playerIds) {
+        const ids = (playerIds || []).map(String);
+        if (ids.length === 0) return false;
+        const map = buildPlayerGroupMap();
+        const known = new Set((currentData.players || []).map(p => String(p.id)));
+
+        // 3 - every golfer must actually be in this round.
+        if (!ids.every(id => known.has(id))) return false;
+
+        // 2 - and at least one of them must be ours.
+        return ids.some(id => String(map[id]) === String(lockedGroup));
     }
 
     // Golfers this link may put into a NEW wager. Two independent constraints, and
     // both apply:
     //
-    //   PERMISSION - a group scorekeeper may only ever build a wager from its own
-    //                foursome. That is the Phase 0 rule and it is not negotiable.
+    //   PERMISSION - under 'group' scope a scorekeeper builds from its own
+    //                foursome. Under 'cross' scope the whole field is offered,
+    //                because the anchor rule in canCreateWagerWith is what
+    //                constrains the wager now - it needs at least one of this
+    //                group's golfers in it, which cannot be expressed by
+    //                filtering names one at a time.
     //   SCOPE      - what the golfer just chose. 'group' narrows to the owner
     //                group even for the organizer, who has no permission limit.
     //
-    // The write guards do not depend on this - it is here so nobody is offered a
-    // name that would be refused on save.
+    // This used to filter the pool down to lockedGroup unconditionally, which is
+    // why choosing "Across Groups — pick golfers from different foursomes" from
+    // a Group 2 link still showed only the four Group 2 golfers. The modal
+    // offered a scope the picker then refused to honour.
     function selectablePlayers() {
         const players = currentData.players || [];
         const map = buildPlayerGroupMap();
@@ -1444,9 +1498,26 @@
             pool = players.filter(p => String(map[String(p.id)]) === String(actionOwnerGroup));
         }
 
-        // Then permission, which can only narrow further, never widen.
         if (isOrganizerView()) return pool;
+
+        // Across Groups deliberately shows the whole field. The anchor rule is
+        // enforced on save, and surfaced live by crossGroupAnchorWarning() so the
+        // golfer is told before they get there rather than after.
+        if (actionScope === 'cross') return pool;
+
         return pool.filter(p => String(map[String(p.id)]) === String(lockedGroup));
+    }
+
+    // Live feedback for the anchor rule. A picker that silently allows an
+    // impossible combination and only objects at Save has just wasted the
+    // organizer's time on a tee box.
+    function crossGroupAnchorWarning(selectedIds) {
+        if (isOrganizerView() || actionScope !== 'cross') return '';
+        const ids = (selectedIds || []).map(String);
+        if (ids.length === 0) return '';
+        if (crossGroupWagerIsAnchored(ids)) return '';
+        return 'This is Group ' + lockedGroup + '\u2019s link, so a cross-group wager needs at least one Group '
+            + lockedGroup + ' golfer in it.';
     }
 
     // Every golfer in the owner group, regardless of what is currently ticked.
@@ -1579,7 +1650,7 @@
         //
         // participantIds answers "who pays". scope and ownerGroup answer "whose
         // wager is this" - which participants alone cannot, because a Skins game of
-        // Marty, Manny and Stan could be a deliberate cross-group bet or a
+        // Three golfers from two foursomes could be a deliberate cross-group bet or a
         // mis-assembled local one, and those have different management rules.
         // Groups are fixed for the life of a round, so a stored ownerGroup stays true.
         if (actionScope) entry.scope = actionScope;
@@ -1666,14 +1737,16 @@
             return;
         }
 
-        // A group link may only build a match out of its own foursome. Until the
-        // This Group / Across Groups chooser exists, the picker cannot say which
-        // was intended, so the safe reading is the local one. The organizer's
-        // cross-group creation is untouched.
+        // The anchor rule. Under Across Groups this now permits a genuine
+        // cross-group match, provided this foursome is actually in it.
         if (!canCreateWagerWith(teamAIds.concat(teamBIds))) {
-            console.warn('Blocked: a Group ' + lockedGroup + ' link may only create a match between its own golfers.');
-            alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only set up matches '
-                + 'between Group ' + lockedGroup + ' golfers. Ask the organizer to set up a match against another group.');
+            console.warn('Blocked: wager not anchored to Group ' + lockedGroup + '.');
+            alert(actionScope === 'cross'
+                ? '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a cross-group match needs '
+                    + 'at least one Group ' + lockedGroup + ' golfer in it. Ask the organizer to set up a match '
+                    + 'between two other foursomes.'
+                : '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s action, so everyone in it must be a Group '
+                    + lockedGroup + ' golfer. Choose Across Groups for a match between foursomes.');
             return;
         }
 
