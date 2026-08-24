@@ -15,12 +15,21 @@
 //
 // Bumping the key makes the activate handler delete every older cache outright, so the
 // next launch is guaranteed to be the deployed build. Bump it whenever the app shell
-// changes in a way people must see.
-const CACHE_VERSION = 'golfapp-v3-score-marks';
+// changes in a way people must see. Moved to v4 because the shell list below gained
+// pool-engine.js - every already-installed device is carrying a cache that is missing it.
+const CACHE_VERSION = 'golfapp-v4-pool-engine';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
 // runtime - fine online, useless on the first offline launch at a remote course.
+//
+// THE RULE: if a page is listed here, every script that page loads must be listed too.
+// These engines are plain <script src> globals and their call sites guard them with
+// `typeof fn === 'function'`, so a missing engine does not throw - it silently does
+// nothing. pool-engine.js was missing from this list while index.html, admin.html and
+// settlement.html all load it, which meant an offline Money Pool computed as zero and
+// disappeared from the banner, the receipt and the settlement totals with no error shown.
+// bundle_manifest_test.js enforces the rule now.
 const SHELL_FILES = [
     './index.html',
     './admin.html',
@@ -39,6 +48,7 @@ const SHELL_FILES = [
     './action-model.js',
     './bet-strip.js',
     './hole-events.js',
+    './pool-engine.js',
     './course-data.js',
     './manifest.json',
     './icon-192.png',
@@ -46,11 +56,24 @@ const SHELL_FILES = [
 ];
 
 self.addEventListener('install', (event) => {
+    // Cached one file at a time, deliberately.
+    //
+    // cache.addAll() is atomic: if any single request 404s, the whole promise rejects
+    // and NOTHING is written to the cache. The previous version wrapped that in a
+    // .catch() whose comment claimed "whatever succeeds still gets cached" - which is
+    // not how addAll behaves. One bad filename would have silently turned off offline
+    // support for the entire app, and the swallowed rejection meant nothing would ever
+    // have surfaced it. For an app whose job is to work on a course with no signal,
+    // that is the wrong way round: a single missing file should cost that one file,
+    // not the whole shell.
     event.waitUntil(
-        caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {
-            // Ignore individual file failures (e.g. a file that doesn't exist yet) so
-            // install doesn't fail outright - whatever succeeds still gets cached.
-        })
+        caches.open(CACHE_VERSION).then((cache) => Promise.all(
+            SHELL_FILES.map((file) => cache.add(file).catch((err) => {
+                // Logged rather than swallowed, so a broken entry is findable in
+                // Safari/Chrome devtools instead of failing invisibly.
+                console.warn('[sw] could not cache', file, err);
+            }))
+        ))
     );
     self.skipWaiting();
 });
