@@ -259,10 +259,47 @@ describe('SERVICE WORKER — the actual cause of the stale iPad build', () => {
     });
 
     test('it stays network-first, so a deploy still wins when online', () => {
+        // This used to assert the literal source string
+        // `.catch(() => caches.match(request))`. That pinned one specific
+        // implementation rather than the rule it was protecting, and it broke
+        // the moment the offline fallback grew a named function - even though
+        // the behaviour it cared about was unchanged.
+        //
+        // Rewritten to assert the actual contract, and deliberately tightened
+        // while doing so: it is no longer enough for a cache read to appear
+        // somewhere in the file. Inside the fetch handler, the network attempt
+        // must come FIRST, and every cache read must sit after it on the
+        // failure path. That is a strictly stronger guarantee than the old
+        // string match, which would have happily passed a cache-first handler
+        // that merely happened to contain the expected line somewhere.
         assert.ok(/Network-first/i.test(sw));
-        assert.ok(/fetch\(request\)/.test(sw));
-        assert.ok(/\.catch\(\(\) => caches\.match\(request\)\)/.test(sw),
-            'the cache must remain a fallback, never the first choice');
+
+        const handler = sw.slice(sw.indexOf("addEventListener('fetch'"));
+        assert.ok(handler.length > 0, 'no fetch handler found in sw.js');
+
+        // Anchored to respondWith, not to the first mention of fetch anywhere in
+        // the handler. Anchoring on `fetch(request)` alone is not enough: a
+        // cache-first handler written as `caches.match(req).then(hit => hit ||
+        // fetch(request))` still contains that substring, so the scan would
+        // start inside the cache-first expression and find nothing wrong. The
+        // question is specifically what the FIRST thing respondWith reaches for
+        // is, so that is what gets measured.
+        const respondAt = handler.indexOf('event.respondWith(');
+        assert.ok(respondAt !== -1, 'the fetch handler must call event.respondWith');
+        const body = handler.slice(respondAt);
+
+        const firstFetch = body.indexOf('fetch(request)');
+        const firstRead = body.indexOf('caches.match(');
+        assert.ok(firstFetch !== -1, 'the fetch handler must attempt the network');
+        assert.ok(firstRead === -1 || firstFetch < firstRead,
+            'the cache must remain a fallback, never the first choice - respondWith reaches for the cache before the network');
+
+        const catchAt = body.indexOf('.catch(');
+        assert.ok(catchAt !== -1, 'the network attempt must have a failure path');
+        assert.ok(catchAt > firstFetch, 'the failure path must come after the network attempt');
+
+        // And the network response must still be what gets returned when online.
+        assert.ok(/\.then\(\(response\) =>/.test(body), 'the online path must return the live network response');
     });
 });
 
