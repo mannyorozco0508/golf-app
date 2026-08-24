@@ -224,7 +224,7 @@
             padding: 8px 12px; border-top: 1px solid var(--border-light);
         }
         .action-row:first-of-type { border-top: none; }
-        /* Truncates rather than forcing the row wide. "Marty/John vs Manny/Steve" at
+        /* Truncates rather than forcing the row wide. A 2v2 pairing label at
            360px would otherwise overflow the card. */
         .ar-name {
             flex: 0 1 auto; min-width: 0; font-size: 0.82rem; font-weight: bold;
@@ -563,6 +563,22 @@
         .hv-bets-row { padding-top: 10px; margin-top: 4px; border-top: 1px dashed var(--border-mid); }
         .hv-bets-row .status-pill { font-size: 1rem; padding: 10px 12px; margin-bottom: 6px; }
         .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
+        /* Live whole-field skins. Compact by default: this sits BELOW score entry
+           and navigation, and must never grow tall enough to push them off screen. */
+        .live-skins { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+        .ls-title { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
+        .ls-thru { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+        .ls-standings { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .ls-chip { font-size: 0.76rem; font-weight: 600; background: var(--card-bg); border: 1px solid var(--border-faint); border-radius: 12px; padding: 3px 9px; }
+        .ls-none { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .ls-latest { font-size: 0.76rem; margin-top: 6px; }
+        .ls-waiting { font-size: 0.76rem; margin-top: 4px; color: var(--warn-text); }
+        .ls-toggle { margin-top: 8px; background: none; border: none; padding: 4px 0; font-size: 0.7rem; font-weight: 600; color: var(--accent-teal); cursor: pointer; text-decoration: underline; }
+        .ls-ledger { margin-top: 6px; border-top: 1px solid var(--border-faint); padding-top: 6px; max-height: 260px; overflow-y: auto; }
+        .ls-row { font-size: 0.74rem; padding: 3px 0; line-height: 1.35; }
+        .ls-tie { color: var(--text-muted); }
+        .ls-wait { color: var(--warn-text); }
+
         .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 14px; margin-bottom: 4px; border-top: 1px solid var(--border-faint); }
         .hole-view-nav-btn {
             flex: 1 1 0; min-width: 0; min-height: 48px; padding: 12px 8px;
@@ -1459,7 +1475,7 @@
                 }
             }
             // Quick reference sits WITH the score, not in a paragraph below it: a golfer
-            // scanning the hole reads "Marty 4 (2 dots)" in one movement. The written
+            // scanning the hole reads "Avery 4 (2 dots)" in one movement. The written
             // labels stay under the name for anyone who wants to know which junk it was.
             let pipHtml = '';
             if (dotsGame) {
@@ -1498,6 +1514,7 @@
         // many presses are running.
         html += '<div id="whoami-mount"></div>';
         html += '<div id="hole-recap-mount"></div>';
+        html += '<div id="live-skins-mount"></div>';
         html += '<div id="action-center-mount"></div>';
         html += '<div id="bet-strip-mount"></div>';
 
@@ -1511,8 +1528,132 @@
         container.innerHTML = html;
         renderWhoAmI();
         renderHoleRecap();
+        renderLiveSkins();
         renderActionCenter();
         renderBetStrip();
+    }
+
+    // ---- Live whole-field skins ---------------------------------------------
+    //
+    // NO SKINS ARITHMETIC LIVES HERE. Every winner, tie, official flag and skin
+    // count comes from computeSkinsHoleLedger() in settlement-engine.js, which is
+    // the same file that settles the round. This function turns that object into
+    // strings and does nothing else - if a name or a number is wrong here, the bug
+    // is in the engine, not in this presenter. That separation is what stops the
+    // live view and the receipt from ever disagreeing about who won a skin.
+    //
+    // Collapsed by default, and mounted below Prev/Next, because entering a score
+    // and moving on is still the primary job of this screen. Eighteen rows above
+    // score entry would be a worse product than the paper card it replaces.
+    let liveSkinsOpen = false;
+
+    function toggleLiveSkins() {
+        liveSkinsOpen = !liveSkinsOpen;
+        renderLiveSkins();
+    }
+
+    function liveSkinsGroupOf(playerId) {
+        const map = window.__scPlayerGroupMap || {};
+        return map[String(playerId)] !== undefined ? map[String(playerId)] : null;
+    }
+
+    function renderLiveSkins() {
+        const mount = document.getElementById('live-skins-mount');
+        if (!mount) return;
+        mount.innerHTML = '';
+
+        if (typeof computeSkinsHoleLedger !== 'function') return;
+        const data = currentData || {};
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        if (courseData.length === 0) return;
+
+        // Only for a genuine whole-field skins game. A round with no skins money
+        // must not grow a skins card.
+        const skinsOn = (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        if (!skinsOn) return;
+
+        let bundle;
+        try {
+            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
+        } catch (e) {
+            return;   // a presenter must never take the scorecard down with it
+        }
+        const L = bundle.net || bundle.gross;
+        if (!L || L.participants.length === 0) return;
+
+        const basis = bundle.net ? 'NET' : 'GROSS';
+        const carryLabel = bundle.carryOver ? 'CARRY' : 'NO CARRY';
+        const pot = Number(data.skinsBuyIn || 0) * L.participants.length;
+        const potLabel = pot > 0 ? ' \u00B7 $' + pot : '';
+
+        // Standings: only golfers who actually have a skin, most first.
+        const standings = Object.keys(L.countsByPlayerId)
+            .map(id => ({ id, n: L.countsByPlayerId[id] }))
+            .filter(r => r.n > 0)
+            .sort((a, b) => b.n - a.n)
+            .map(r => {
+                const pl = L.participants.find(p => String(p.id) === String(r.id));
+                return { name: pl ? pl.name : '?', n: r.n };
+            });
+
+        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+        let head = '<div class="ls-title">WHOLE-FIELD ' + basis + ' SKINS' + potLabel + ' \u00B7 ' + carryLabel + '</div>';
+        head += '<div class="ls-thru">Official thru ' + (L.officialThru > 0 ? L.officialThru : '\u2014') + '</div>';
+
+        let body = '';
+        if (standings.length > 0) {
+            body += '<div class="ls-standings">'
+                + standings.map(r => '<span class="ls-chip">' + esc(r.name) + ' \u2014 ' + r.n + '</span>').join('')
+                + '</div>';
+        } else {
+            body += '<div class="ls-none">No skins won yet.</div>';
+        }
+
+        if (L.latest && L.latest.winner) {
+            body += '<div class="ls-latest">Latest: H' + L.latest.hole + ' \u2014 ' + esc(L.latest.winner.name) + '</div>';
+        }
+
+        // WAITING is stated, never guessed past. Naming the group is what lets a
+        // golfer stop wondering whether the app is broken or the group is slow.
+        if (L.firstWaiting) {
+            const gs = L.firstWaiting.missingGroups;
+            const who = gs.length === 1 ? 'Group ' + gs[0]
+                : gs.length > 1 ? 'Groups ' + gs.join(', ')
+                : (L.firstWaiting.missing.length + ' golfer' + (L.firstWaiting.missing.length === 1 ? '' : 's'));
+            body += '<div class="ls-waiting">H' + L.firstWaiting.hole + ' \u2014 Waiting on ' + esc(who) + '</div>';
+        }
+
+        let ledgerHtml = '';
+        if (liveSkinsOpen) {
+            ledgerHtml = '<div class="ls-ledger">' + L.holes.map(r => {
+                const n = 'H' + r.hole;
+                if (!r.official) {
+                    const gs = r.missingGroups;
+                    const who = gs.length > 0 ? 'Group' + (gs.length > 1 ? 's ' : ' ') + gs.join(', ')
+                        : r.missing.length + ' to post';
+                    return '<div class="ls-row ls-wait">' + n + ' \u2014 Waiting on ' + esc(who) + '</div>';
+                }
+                if (r.state === 'tie') {
+                    // The score is named so nobody has to reach for the paper card to
+                    // work out why a hole produced nothing.
+                    return '<div class="ls-row ls-tie">' + n + ' \u2014 Tie at ' + basis.charAt(0) + basis.slice(1).toLowerCase()
+                        + ' ' + r.low + ' \u2014 No Skin</div>';
+                }
+                const units = (r.unitsWon !== null && r.unitsWon > 1) ? ' (' + r.unitsWon + ' skins)' : '';
+                const pending = r.valueKnown ? '' : ' \u00B7 value pending';
+                return '<div class="ls-row ls-skin">' + n + ' \u2014 ' + esc(r.winner.name) + ' \u2014 '
+                    + basis.charAt(0) + basis.slice(1).toLowerCase() + ' ' + r.low + ' \u2014 Skin' + units + pending + '</div>';
+            }).join('') + '</div>';
+        }
+
+        const toggle = '<button type="button" class="ls-toggle" onclick="toggleLiveSkins()">'
+            + (liveSkinsOpen ? 'hide hole-by-hole' : 'hole-by-hole') + '</button>';
+
+        mount.innerHTML = '<div class="live-skins">' + head + body + toggle + ledgerHtml + '</div>';
     }
 
 
@@ -1747,7 +1888,7 @@
     // scorekeeper link for a group containing a participant may press that match.
     //
     // This is Option B, and it is a deliberate trade. Group links are shared credentials,
-    // not identity: the app cannot prove "Marty is Marty" without real auth, so it cannot
+    // not identity: the app cannot prove a golfer is who they say without real auth, so it cannot
     // restrict this to participants only. It does NOT widen anything else - round setup,
     // Add Action and Group Links all remain organizer-only, and a scorekeeper still
     // cannot press a match belonging entirely to another group, because such a match is
@@ -1776,7 +1917,7 @@
         if (expandedMatches[sm.key] !== undefined) return expandedMatches[sm.key];
         if (sidePressOpen === sm.key) return true;
         // Deliberately NOT "can be pressed". Almost every live match can be pressed, so
-        // using that as a trigger opened all four of Marty's cards and collapsed nothing.
+        // using that as a trigger opened all four of a golfer’s cards and collapsed nothing.
         if (sm.justChanged) return true;
         if (sm.finished) return true;
         // One match has nothing to compete with, so there is no reason to hide it.
@@ -2148,7 +2289,7 @@
         const totalBets = games.length + side.length;
         // THE MONEY POOL IS CONTENT. These two guards predate the pool: they keep
         // the panel silent when the bet strip below already says everything. But a
-        // Marty Monday round can be NOTHING BUT the pool - main game $0, no side
+        // A whole-field Money Pool round can be NOTHING BUT the pool - main game $0, no side
         // matches - and on that round the pool banner and the KP picker are the
         // whole reason to open this panel. A pool-less round is untouched: both
         // guards fire exactly as before, which the legacy rendered test pins.
@@ -2171,9 +2312,9 @@
         // a row per press underneath. Nothing here computes money - buildSideActionRows
         // produced it from the same engines the Matches tab uses.
         // A match reads as a sentence now. Every figure here already existed - what was
-        // missing was saying it out loud: "Marty +4" required knowing that + means ahead,
+        // missing was saying it out loud: "Avery +4" required knowing that + means ahead,
         // that the unit is strokes, and that "H6-18" was a press start hole.
-        // A match is a card that COLLAPSES to one line. Marty's round produced 15 rows
+        // A match is a card that COLLAPSES to one line. A heavy round produced 15 rows
         // before Prev/Next - correct, and too much to read walking to a tee. The headline
         // answers "how am I doing"; the detail is one tap away and never lost.
         //
