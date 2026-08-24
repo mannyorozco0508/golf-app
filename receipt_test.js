@@ -148,7 +148,9 @@ describe('THE RECEIPT — the story behind every dollar', () => {
 
     test('the original wager appears first, then each press in order', () => {
         const m1 = receipts.find(r => r.matchId === 'm1');
-        assert.equal(m1.segments.map(s => s.label).join(','), 'Original,Press 1,Press 2');
+        // Renamed in the money-integrity batch: a stroke receipt now also carries Hole
+        // Bet lines, so the overall wager says which bet it is.
+        assert.equal(m1.segments.map(s => s.label).join(','), 'Overall,Overall Press 1,Overall Press 2');
     });
 
     test('every segment carries its start hole, range and stake', () => {
