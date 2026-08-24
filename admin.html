@@ -118,6 +118,20 @@
         .custom-select-add-option { text-align: center; color: var(--brand-green); font-weight: bold; }
 
         .extra-settings-box { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 12px; margin-top: 10px; display: none; }
+        /* MONEY POOL SETUP. Calm sections instead of a wall of form controls: one
+           heading, its input, one hint line. Same rhythm at phone and tablet width. */
+        .mp-section { border-top: 1px solid var(--border-faint); padding-top: 10px; margin-top: 10px; }
+        .mp-section:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+        .mp-section-title { font-size: 0.85rem; font-weight: bold; color: #b8860b; margin-bottom: 6px; }
+        .mp-sub-label { font-size: 0.75rem; color: var(--text-muted); margin: 8px 0 4px 0; }
+        .mp-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 5px; line-height: 1.35; }
+        .mp-section input, .mp-section select { width: 100%; box-sizing: border-box; font-size: 0.9rem; min-height: 40px; }
+        #mp-math { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 0.82rem;
+                   background: rgba(184,134,11,0.08); color: #b8860b; }
+        #mp-math .mp-row { display: flex; justify-content: space-between; padding: 2px 0; }
+        #mp-math .mp-total { border-top: 1px solid rgba(184,134,11,0.45); margin-top: 5px; padding-top: 5px; font-weight: bold; }
+        #mp-math.mp-bad { background: rgba(200,40,40,0.08); color: var(--accent-red); }
+        #mp-skins-note { font-size: 0.7rem; color: #b8860b; margin: 4px 0 0 0; display: none; }
 
         .wizard-progress { display: flex; justify-content: center; gap: 6px; margin: 4px 0 18px 0; flex-wrap: wrap; }
         .wizard-dot {
@@ -823,31 +837,47 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         </div>
         <!-- MONEY POOL — the whole-round pot. One buy-in, three prize buckets,
              validated here with the SAME engine settlement uses, so a pot that
-             cannot balance can never be saved. -->
+             cannot balance can never be saved.
+             NOTE: this is RAW HTML, not a JS template string. Emoji and dashes are
+             written as real characters - \uXXXX escapes only resolve inside JS
+             string literals, and pasting them here printed the escape text itself
+             on the organizer's screen. mp_setup_ux_test.js now fails if any come back. -->
         <div class="extra-settings-box" style="display:block; border-color:#b8860b;">
-            <label style="color:#b8860b; margin-bottom:4px; font-size:0.9rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>\uD83C\uDFC6 Money Pool (whole-round pot)</strong>
+            <label style="color:#b8860b; margin-bottom:4px; font-size:0.95rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Money Pool</strong>
             </label>
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Everyone playing for money antes once; the pot pays KPs, net finishers and a skins pot. Group bets stay separate.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">One pot for the whole field. Everyone antes once; it pays KPs, net finishers and skins. Group bets stay separate.</p>
             <div id="mp-panel" style="display:none;">
-                <div class="control-group"><label>Buy-in per golfer ($)</label>
-                    <input type="tel" inputmode="decimal" id="mp-buyin" value="40" oninput="mpRecalc()"></div>
-                <div class="control-group"><label>\uD83D\uDCCD KP money (total $, 0 = none)</label>
-                    <input type="tel" inputmode="decimal" id="mp-kp-amount" value="100" oninput="mpRecalc()">
-                    <label style="margin-top:6px;">KP holes (comma list, e.g. 4,14)</label>
-                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4,14">
+
+                <div class="mp-section">
+                    <div class="mp-section-title">Buy-in per player</div>
+                    <input type="tel" inputmode="decimal" id="mp-buyin" value="40" oninput="mpRecalc()">
+                    <div class="mp-hint" id="mp-pot-line"></div>
                 </div>
-                <div class="control-group"><label>\uD83E\uDD47 Net finish money (total $, 0 = none)</label>
-                    <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()">
-                    <label style="margin-top:6px;">Paid places</label>
+
+                <div class="mp-section">
+                    <div class="mp-section-title">📍 KP Pool</div>
+                    <input type="tel" inputmode="decimal" id="mp-kp-amount" value="100" oninput="mpRecalc()" placeholder="0 for no KP">
+                    <div class="mp-sub-label">KP Holes</div>
+                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4, 14" inputmode="numeric">
+                    <div class="mp-hint">Hole numbers, separated by commas. Split evenly — <span id="mp-kp-split">$50 each</span></div>
+                </div>
+
+                <div class="mp-section">
+                    <div class="mp-section-title">🥇 Net Finish Pool</div>
+                    <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()" placeholder="0 for no net prize">
+                    <div class="mp-sub-label">Net Payout</div>
                     <select id="mp-net-places" onchange="mpRecalc()">
-                        <option value="100">Winner takes all</option>
-                        <option value="60,40">Top 2 \u2014 60/40</option>
-                        <option value="50,30,20" selected>Top 3 \u2014 50/30/20</option>
-                        <option value="40,30,20,10">Top 4 \u2014 40/30/20/10</option>
+                        <option value="100">Winner Take All — 100%</option>
+                        <option value="60,40">Top 2 — 60 / 40</option>
+                        <option value="50,30,20" selected>Top 3 — 50 / 30 / 20</option>
+                        <option value="40,30,20,10">Top 4 — 40 / 30 / 20 / 10</option>
                     </select>
+                    <div class="mp-hint" id="mp-net-split"></div>
                 </div>
-                <div class="control-group"><label>\uD83E\uDD69 Skins pot</label>
+
+                <div class="mp-section">
+                    <div class="mp-section-title">🥣 Skins</div>
                     <select id="mp-skins-mode" onchange="mpRecalc()">
                         <option value="remainder" selected>Everything left over</option>
                         <option value="fixed">Fixed amount</option>
@@ -858,8 +888,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                         <select id="mp-skins-scoring"><option value="net" selected>Net skins</option><option value="gross">Gross skins</option></select>
                         <select id="mp-skins-carry"><option value="yes" selected>Ties carry</option><option value="no">Ties void</option></select>
                     </div>
+                    <div class="mp-hint" id="mp-skins-line"></div>
                 </div>
-                <div id="mp-math" style="font-size:0.8rem; font-weight:bold; padding:8px 10px; border-radius:8px; background:rgba(184,134,11,0.08); color:#b8860b;"></div>
+
+                <div id="mp-math"></div>
             </div>
         </div>
 
@@ -1678,6 +1710,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <strong style="font-size:0.9rem; color:var(--brand-green);">\uD83E\uDD69 Skins</strong>
+                    <p id="mp-skins-note">Money Pool already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
                     <button type="button" onclick="removeSkinsInstance('${inst.id}')"
                         style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; min-height:44px;">Remove</button>
                 </div>
@@ -1828,6 +1861,28 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return pool;
     }
 
+    // Plain-English wording for the validator's findings. The engine's messages are
+    // precise but they read like a spec; an organizer standing on the first tee needs
+    // the ACTION, not the diagnosis. Money rules unchanged - this only rephrases.
+    function mpFriendlyError(msg, v) {
+        if (/no KP holes/.test(msg)) {
+            const amt = v && v.fixedAllocated ? '' : '';
+            return 'Choose at least one KP hole' + amt + '.';
+        }
+        if (/over budget/.test(msg)) {
+            const over = (v.fixedAllocated - v.totalPool);
+            return 'Over by $' + over.toFixed(0) + ' — the pot is $' + v.totalPool.toFixed(0) + '.';
+        }
+        if (/unallocated/.test(msg)) {
+            return '$' + (v.totalPool - v.fixedAllocated).toFixed(0) + ' still unassigned — give it to Skins or raise a pool.';
+        }
+        if (/total 100%/.test(msg)) return 'Net payout percentages must add up to 100%.';
+        if (/at least two golfers/.test(msg)) return 'Add players in Step 5 first.';
+        if (/Buy-in must be/.test(msg)) return 'Enter a buy-in above $0.';
+        if (/not on this course/.test(msg)) return msg.replace('KP hole', 'Hole') + ' Check the KP holes.';
+        return msg;
+    }
+
     function mpRecalc() {
         const box = document.getElementById('mp-math');
         if (!box) return;
@@ -1835,21 +1890,67 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (fixedInput) fixedInput.style.display =
             document.getElementById('mp-skins-mode').value === 'fixed' ? 'block' : 'none';
         const on = document.getElementById('mp-enabled');
-        if (!on || !on.checked) { box.innerHTML = ''; return; }
+        const note = document.getElementById('mp-skins-note');
+        if (!on || !on.checked) {
+            box.innerHTML = '';
+            if (note) note.style.display = 'none';
+            mpSetHint('mp-pot-line', ''); mpSetHint('mp-net-split', ''); mpSetHint('mp-skins-line', '');
+            return;
+        }
         const draft = mpDraftData();
         if (!draft.moneyPool) { box.innerHTML = ''; return; }
         // The wizard may not have assembled course data yet; an empty course skips
         // only the hole-existence check. The full check runs again at save, on the
         // exact courseData the round will carry.
         const v = validateMoneyPool(draft, []);
+        const n = (draft.players || []).filter(p => p.playingForMoney !== false).length;
+        const pool = draft.moneyPool;
+        const $0 = x => '$' + (Number(x) || 0).toFixed(0);
+
+        // Per-section hints, so nobody has to do arithmetic in their head.
+        mpSetHint('mp-pot-line', n > 0
+            ? n + ' player' + (n === 1 ? '' : 's') + ' × ' + $0(pool.buyIn) + ' = ' + $0(v.totalPool) + ' total pool'
+            : 'Add players in Step 5 to see the pot.');
+        const holes = (pool.kp && pool.kp.holes) ? pool.kp.holes : [];
+        const kpSplit = document.getElementById('mp-kp-split');
+        if (kpSplit) kpSplit.textContent = (pool.kp && holes.length)
+            ? $0((pool.kp.amount || 0) / holes.length) + ' each across ' + holes.length + ' hole' + (holes.length === 1 ? '' : 's')
+            : 'no holes chosen yet';
+        const places = (pool.net && pool.net.places) ? pool.net.places : [];
+        mpSetHint('mp-net-split', (pool.net && places.length)
+            ? places.map((pc, i) => (i + 1) + (['st','nd','rd'][i] || 'th') + ' ' + $0((pool.net.amount || 0) * pc / 100)).join('  ·  ')
+            : '');
+        mpSetHint('mp-skins-line', pool.skins && pool.skins.mode === 'remainder'
+            ? (v.valid ? 'Skins pot: ' + $0(v.remainder) : '')
+            : (pool.skins && pool.skins.mode === 'fixed' ? 'Skins pot: ' + $0(pool.skins.amount) : 'No skins pot'));
+
+        // THE ALLOCATION SUMMARY. Where every dollar of the pot is going, in one
+        // glance, ending in a single line the organizer can trust before saving.
         if (v.valid) {
-            const rem = v.remainder > 0 ? ` \u00B7 skins remainder $${v.remainder.toFixed(0)}` : '';
-            box.style.color = '#b8860b';
-            box.innerHTML = `Pot $${v.totalPool.toFixed(0)} \u00B7 allocated $${v.fixedAllocated.toFixed(0)}${rem} \u2014 balances \u2713`;
+            box.className = '';
+            const skinsAmt = pool.skins && pool.skins.mode === 'remainder' ? v.remainder
+                : (pool.skins && pool.skins.mode === 'fixed' ? (pool.skins.amount || 0) : 0);
+            let rows = '<div class="mp-row"><span>Total pool</span><span>' + $0(v.totalPool) + '</span></div>';
+            if (pool.kp) rows += '<div class="mp-row"><span>KP</span><span>' + $0(pool.kp.amount) + '</span></div>';
+            if (pool.net) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(pool.net.amount) + '</span></div>';
+            if (skinsAmt > 0) rows += '<div class="mp-row"><span>Skins</span><span>' + $0(skinsAmt) + '</span></div>';
+            rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(v.fixedAllocated + skinsAmt)
+                + ' of ' + $0(v.totalPool) + ' \u2713</span></div>';
+            box.innerHTML = rows;
         } else {
-            box.style.color = 'var(--accent-red)';
-            box.innerHTML = '\u26A0\uFE0F ' + v.errors[0];
+            box.className = 'mp-bad';
+            box.innerHTML = '<div class="mp-row"><span>\u26A0\uFE0F ' + mpFriendlyError(v.errors[0], v) + '</span></div>';
         }
+
+        // NO ACCIDENTAL DOUBLE SKINS. The pot already contains a skins game; a
+        // stacked standalone Skins wager above would charge everyone a second time.
+        // Stated, not enforced - a group is allowed both if they truly mean it.
+        if (note) note.style.display = (pool.skins && pool.skins.mode !== 'none') ? 'block' : 'none';
+    }
+
+    function mpSetHint(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
     }
 
     function captureAdditionalGames() {
