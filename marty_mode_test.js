@@ -234,13 +234,17 @@ describe('MARTY MODE — the scorecard', () => {
         assert.match(render(martyRound().p[0].id), /waiting on Steve/);
     });
 
-    test('a collapsed card still answers the question, and counts its presses', () => {
+    test('a collapsed card still answers the question, and shows each press with ITS stake', () => {
+        // "2 presses" told Marty how many; it never told him $78 was riding on one of
+        // them. The chips carry the stored stake for every press - the number that
+        // settles - without opening anything.
         const out = render(martyRound().p[0].id);
         assert.match(out, /vs John/);
         assert.match(out, /You lead by \d+ strokes?/);
         assert.match(out, /Thru 12/);
-        assert.match(out, /2 presses/);
-        assert.ok(!/Started Hole 6/.test(out), 'press detail should be behind a tap');
+        assert.match(out, /P1 H6 \$50/);
+        assert.match(out, /P2 H10 \$100/);
+        assert.ok(!/Started Hole 6/.test(out), 'press DETAIL rows stay behind a tap');
     });
 
     test('headings speak the golfer\'s language, not the data model', () => {
@@ -360,9 +364,10 @@ describe('COLLAPSED CARDS — four matches fit one screen', () => {
         assert.match(out, /\$\d+ at stake/);
     });
 
-    test('press COUNT survives collapsing, press detail does not', () => {
+    test('press STAKES survive collapsing, press detail does not', () => {
         const out = render();
-        assert.match(out, /2 presses/);
+        assert.match(out, /P1 H6 \$50/);
+        assert.match(out, /P2 H10 \$100/);
         assert.ok(!/Started Hole 6/.test(out), 'detail should be one tap away');
     });
 
