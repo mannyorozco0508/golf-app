@@ -58,6 +58,49 @@ function moneyPoolParticipants(data) {
     return players.filter(p => p.playingForMoney !== false);
 }
 
+// CUSTOM vs PRESET net payouts. One predicate, used by validation, settlement and
+// the setup screen, so all three agree on what a config means.
+function isCustomNetPayout(net) {
+    return !!(net && net.payoutMode === 'custom' && Array.isArray(net.amounts));
+}
+
+// The net bucket's total, in dollars. For custom payouts it is the SUM OF THE
+// PLACES - derived, never stored - so $40 + $30 can never drift from "$70".
+function moneyPoolNetTotal(net) {
+    if (!net) return 0;
+    if (isCustomNetPayout(net)) {
+        return net.amounts.map(Number).filter(a => isFinite(a) && a > 0).reduce((a, b) => a + b, 0);
+    }
+    return Number(net.amount) || 0;
+}
+
+// CENTS PER PLACE - the one list the tie logic walks.
+//
+// Preset percentages become cents by cumulative-floor differences (the same
+// telescoping rule the skins bucket uses), so the places always sum to exactly
+// the bucket and never to 100.01% of it. Because consecutive differences
+// telescope, summing these per-place figures across a tied span gives precisely
+// the span total the percentage code produced before this change - which is why
+// every existing preset round settles to the same cent.
+function moneyPoolNetPlaceCents(net) {
+    if (!net) return [];
+    if (isCustomNetPayout(net)) {
+        return net.amounts.map(Number).map(a => (isFinite(a) && a > 0) ? Math.round(a * 100) : 0)
+            .filter(c => c > 0);
+    }
+    const amountCents = Math.round((Number(net.amount) || 0) * 100);
+    const places = (net.places || []).map(Number);
+    const out = [];
+    let cumPct = 0, prevFloor = 0;
+    places.forEach(pct => {
+        cumPct += pct;
+        const cumFloor = Math.floor(amountCents * cumPct / 100);
+        out.push(cumFloor - prevFloor);
+        prevFloor = cumFloor;
+    });
+    return out;
+}
+
 // Validation is its own function so the SETUP UI can reject a bad pot before it
 // is ever saved, with the same rules settlement enforces. Returns { valid,
 // errors[], totalPool, fixedAllocated, remainder } - dollars, for display.
@@ -87,15 +130,35 @@ function validateMoneyPool(data, courseData) {
         fixed += Number(kp.amount);
     }
 
+    // NET FINISH accepts either shape:
+    //   PRESET  places: [50,30,20]  percentages of net.amount (must total 100)
+    //   CUSTOM  payoutMode:'custom', amounts: [40,30]  exact dollars per place
+    // Custom exists because golfers say "forty and thirty", not "57.14% and
+    // 42.86% of seventy". Its total is DERIVED from the amounts - one source of
+    // truth, never a stored $70 that could disagree with its own places.
     const net = pool.net;
-    if (net && (Number(net.amount) || 0) > 0) {
-        const places = Array.isArray(net.places) ? net.places.map(Number) : [];
-        if (places.length === 0) errors.push('Net prize has money on it but no paid places.');
-        const pctSum = places.reduce((a, b) => a + b, 0);
-        if (places.length && Math.abs(pctSum - 100) > 0.001)
-            errors.push(`Net payout percentages must total 100% (currently ${pctSum}%).`);
-        if (places.some(p => p <= 0)) errors.push('Every paid net place needs a positive percentage.');
-        fixed += Number(net.amount);
+    const netTotal = moneyPoolNetTotal(net);
+    // CUSTOM SHAPE IS CHECKED EVEN WHEN THE TOTAL IS $0. moneyPoolNetTotal() sums
+    // only positive entries, so a config of nothing but "-5" totals zero and would
+    // otherwise skip the block entirely: no error shown, and the organizer's net
+    // prize silently disappearing. A bad number gets named either way.
+    if (isCustomNetPayout(net)) {
+        const raw = net.amounts;
+        const bad = raw.filter(a => a !== '' && a !== null && a !== undefined
+            && (!isFinite(Number(a)) || Number(a) < 0));
+        if (bad.length) errors.push('Every net payout must be $0 or more.');
+        else if (netTotal <= 0) errors.push('Enter at least one net payout amount.');
+    }
+    if (net && netTotal > 0) {
+        if (!isCustomNetPayout(net)) {
+            const places = Array.isArray(net.places) ? net.places.map(Number) : [];
+            if (places.length === 0) errors.push('Net prize has money on it but no paid places.');
+            const pctSum = places.reduce((a, b) => a + b, 0);
+            if (places.length && Math.abs(pctSum - 100) > 0.001)
+                errors.push(`Net payout percentages must total 100% (currently ${pctSum}%).`);
+            if (places.some(p => p <= 0)) errors.push('Every paid net place needs a positive percentage.');
+        }
+        fixed += netTotal;
     }
 
     const skins = pool.skins || { mode: 'none' };
@@ -199,9 +262,9 @@ function computeMoneyPool(data, courseData, savedScores) {
 
     // ---- NET FINISH --------------------------------------------------------
     const netCfg = pool.net;
-    if (netCfg && (Number(netCfg.amount) || 0) > 0) {
-        const amountCents = Math.round(Number(netCfg.amount) * 100);
-        const places = (netCfg.places || []).map(Number);
+    if (netCfg && moneyPoolNetTotal(netCfg) > 0) {
+        const placeCents = moneyPoolNetPlaceCents(netCfg);
+        const amountCents = placeCents.reduce((a, b) => a + b, 0);
         // Net totals over holes actually scored - the SAME formula the leaderboard
         // uses, via the same canonical helpers. No new handicap math.
         const standings = participants.map(p => {
@@ -225,24 +288,22 @@ function computeMoneyPool(data, courseData, savedScores) {
             // the standard scoreboard convention, applied in cents.
             let place = 1;
             let i = 0;
-            let cumPct = 0;
-            while (i < standings.length && place <= places.length) {
+            while (i < standings.length && place <= placeCents.length) {
                 const tied = standings.filter(s => s.net === standings[i].net);
                 const span = tied.length;
-                let pct = 0;
-                for (let k = place; k < place + span && k <= places.length; k++) pct += places[k - 1];
-                if (pct > 0) {
-                    // Same telescoping rule as the skins bucket, over cumulative
-                    // percent: independent per-place rounding could pay 100.01% of
-                    // the prize and turn the residue negative.
-                    const cumFloor = Math.floor(amountCents * (cumPct + pct) / 100);
-                    const groupCents = cumFloor - Math.floor(amountCents * cumPct / 100);
-                    cumPct += pct;
+                // ONE TIE RULE, unchanged: golfers tied for a place consume that
+                // place AND the ones below it, and split the combined money. With
+                // $40/$30, two tied for 1st take $70 and split it $35 each; nobody
+                // below them is paid, because 2nd place was consumed by the tie.
+                let groupCents = 0;
+                for (let k = place; k < place + span && k <= placeCents.length; k++) groupCents += placeCents[k - 1];
+                if (groupCents > 0) {
                     const shares = splitCentsEvenly(groupCents, span);
                     tied.forEach((s, j) => pay(s.id, shares[j]));
                     paid += groupCents;
                     lines.push({ place, ids: tied.map(s => s.id), names: tied.map(s => s.name),
-                                 net: tied[0].net, pctShare: pct, cents: groupCents, split: span > 1 });
+                                 net: tied[0].net, cents: groupCents, split: span > 1,
+                                 pctShare: amountCents > 0 ? (groupCents / amountCents) * 100 : 0 });
                 }
                 i += span;
                 place += span;
