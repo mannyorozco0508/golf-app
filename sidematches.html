@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Action</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f4c3a">
+    <script src="pwa-boot.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
@@ -1938,10 +1941,32 @@
         if (raw === null) return;   // golfer changed their mind - nothing happens
         const amt = parseFloat(raw);
         if (isNaN(amt) || amt <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
             .then(() => alert(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
             .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
+    }
+
+    // ---- OFFLINE MONEY GUARD ------------------------------------------------
+    //
+    // Same guard as index.html, deliberately duplicated rather than shared.
+    // This repo has no module system and duplication is the established pattern
+    // here, but the stronger reason is that a money check must keep working
+    // even if pwa-boot.js fails to load - a guard that vanishes when a script
+    // 404s is not a guard.
+    //
+    // Offline, Firebase buffers the write and the promise never settles, so
+    // neither the PRESS CONFIRMED nor the PRESS NOT SAVED alert below can ever
+    // fire. The tap produces silence, the buffer dies on the next reload, and a
+    // real agreement between two golfers disappears without a trace. Refused
+    // before Firebase sees it instead.
+    function requireOnlineForMoney(title, line) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            return false;
+        }
+        return true;
     }
 
     function getLastPlayedHoleForSideMatch(p1, p2, courseData, savedScores) {
@@ -1993,6 +2018,7 @@
         const rate = parseFloat(input.value);
         if (isNaN(rate) || rate <= 0) { alert("Please enter a valid dollar amount."); return; }
         const smForAck = sideMatchById(matchId);
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
             .then(() => {
@@ -2020,6 +2046,7 @@
         if (rawO === null) return;
         const amtO = parseFloat(rawO);
         if (isNaN(amtO) || amtO <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
             .then(() => alert(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
