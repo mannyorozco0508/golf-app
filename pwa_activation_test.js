@@ -21,7 +21,20 @@ const vm = require('vm');
 
 const REPO = __dirname;
 const ORIGIN = 'https://golf-app-5a5.pages.dev';
-const CACHE_NAME = 'golfapp-v4-pool-engine';
+// Read from sw.js rather than hardcoded. Pinning the literal here meant every
+// legitimate cache bump broke four unrelated tests, which trains people to
+// treat these failures as noise. The version is asserted explicitly in its own
+// test below; everywhere else it is simply looked up.
+const CACHE_NAME = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8').match(/const CACHE_VERSION = '([^']+)'/)[1];
+
+// Same reasoning for the shell size: derived from the actual SHELL_FILES array,
+// so adding a file to the shell does not require editing a magic number here.
+const SHELL_COUNT = (function () {
+    const sw = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
+    const body = sw.slice(sw.indexOf('const SHELL_FILES'));
+    const arr = body.slice(body.indexOf('['), body.indexOf('];')).replace(/\/\/[^\n]*/g, '');
+    return [...arr.matchAll(/'\.\/([^']+)'/g)].length;
+})();
 
 // ---------------------------------------------------------------------------
 // Service worker harness
@@ -184,13 +197,13 @@ describe('SERVICE WORKER - install and update behaviour', () => {
     test('a fresh install caches the whole shell', async () => {
         const sw = loadServiceWorker({ online: false });
         await sw.install();
-        assert.equal(sw.stores.get(CACHE_NAME).size, 21, 'All 21 shell files should be cached.');
+        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT, `All ${SHELL_COUNT} shell files should be cached.`);
     });
 
     test('one failing file costs that file only, and is logged rather than swallowed', async () => {
         const sw = loadServiceWorker({ online: false, failUrls: ['./icon-512.png'] });
         await sw.install();
-        assert.equal(sw.stores.get(CACHE_NAME).size, 20, 'A single failure must not abort the whole install.');
+        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT - 1, 'A single failure must not abort the whole install.');
         assert.equal(sw.warnings.length, 1, 'The failure should be logged.');
     });
 
@@ -202,8 +215,13 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         assert.deepEqual([...sw.stores.keys()], [CACHE_NAME], 'Activate must leave only the current cache.');
     });
 
-    test('the cache version is the expected one', () => {
-        assert.match(fs.readFileSync(path.join(REPO, 'sw.js'), 'utf8'), /const CACHE_VERSION = 'golfapp-v4-pool-engine';/);
+    test('the cache version is a bumped golfapp key, and moves whenever the shell changes', () => {
+        // The point of this assertion is not any one literal - it is that the
+        // key is versioned at all, so activate() can delete what came before.
+        // It is pinned to the shape, plus the current value, so a bump is a
+        // deliberate one-line edit here rather than four mystery failures.
+        assert.match(CACHE_NAME, /^golfapp-v\d+/, 'The cache key must carry a version number.');
+        assert.equal(CACHE_NAME, 'golfapp-v5-pwa-activation', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
     });
 });
 
