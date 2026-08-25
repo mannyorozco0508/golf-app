@@ -601,6 +601,9 @@
         }
         .finish-round-modal-content { max-width: 420px; }
         .fr-headline { text-align: center; font-size: 1.1rem; font-weight: bold; color: var(--brand-green); background: var(--nassau-box-bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+        .glr-organizer { border-top: 1px solid var(--border-mid); margin-top: 8px; padding-top: 10px; }
+        .glr-organizer .glr-title { color: var(--accent-teal); }
+        .fr-verified-badge { font-size: 0.72rem; color: var(--brand-green); font-weight: bold; margin-bottom: 6px; }
         .fr-review-lede { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; }
         .fr-secondary-btn { width: 100%; margin-top: 8px; padding: 11px; background: none; border: none; color: var(--text-muted); font-size: 0.82rem; text-decoration: underline; cursor: pointer; }
         .fr-back-btn { background: none; border: none; color: var(--brand-green); font-weight: bold; font-size: 0.85rem; padding: 6px 0 10px 0; cursor: pointer; }
@@ -1061,6 +1064,7 @@
         <!-- STATE 3: RESULTS -->
         <div id="fr-state-results" style="display:none;">
             <button class="fr-back-btn" onclick="frBackToReview()">‹ Back to Review</button>
+            <div id="fr-verified-badge"></div>
             <div class="fr-money-title" id="fr-money-title">Final Money</div>
             <div id="fr-final-money"></div>
 
@@ -2264,6 +2268,41 @@
     // ROUND per device, so last week's identity can never leak into today's round.
     const meStorageKey = () => `golfapp_me_${currentMode}`;
     let meId = urlParams.get('me') || null;
+
+    // ---- ORGANIZER AUTHORITY ------------------------------------------------
+    //
+    // A bearer token carried in the URL, compared against the value stored on the
+    // round. This is the ONLY new write authority in the app.
+    //
+    // WHY A SEPARATE TOKEN AND NOT THE BARE LINK. isOrganizerView() means nothing
+    // more than "this URL has no ?group=", and the bare link is the one shared with
+    // the whole group - the app's own banner tells spectators to ask for their
+    // group's link. Treating it as organizer authority would hand every golfer the
+    // ability to edit all twelve cards, which is exactly what canWritePlayer()
+    // already refuses to do on a multi-group round.
+    //
+    // WHY IT IS NOT ?me=. The comment on the press-permission rule states the
+    // principle: personal identity changes wording and ordering only, and must
+    // never grant a permission, because a link is not proof of identity. A random
+    // secret is different in kind from a claimed name.
+    //
+    // HONEST LIMIT. database.rules.json grants ".read": true on every event, so
+    // this token is readable by anyone holding the game code, and ".write": true
+    // means the server enforces nothing. This is a guardrail against ACCIDENTS at
+    // the same strength as the existing ?group= links - not a security boundary.
+    // Making it one requires real authentication, which the app does not have.
+    // `let`, matching meId / hasGroupLock / lockedGroup above: these are all
+    // per-session URL-derived values, and keeping the same declaration form lets
+    // tests set up a link context the way they already do for the others.
+    let organizerTokenParam = urlParams.get('organizer');
+
+    function hasOrganizerAuthority() {
+        const stored = currentData && currentData.organizerToken;
+        // Absent on either side grants nothing. Legacy rounds have no stored token,
+        // so they simply never gain the override - no migration, no behaviour change.
+        if (!stored || !organizerTokenParam) return false;
+        return String(organizerTokenParam) === String(stored);
+    }
     let whoAmIDismissed = false;
 
     function loadStoredMe() {
@@ -2812,6 +2851,23 @@
         // This page IS the scorecard, so its own URL is the right base. Deliberately not
         // a filename replace - that pattern is what broke the admin links on clean URLs.
         const base = window.location.href.split('?')[0];
+        // ORGANIZER LINK. Shown where someone already goes looking for links, but set
+        // apart and worded so it is obvious this one is not for the group chat.
+        //
+        // Rendered only when the round actually carries a token. A legacy round shows
+        // nothing here, which is the honest signal that no override exists on it.
+        let organizerRow = '';
+        if (currentData.organizerToken) {
+            const orgUrl = `${base}?game=${currentMode}&organizer=${currentData.organizerToken}`;
+            organizerRow = '<div class="group-link-row glr-organizer">'
+                + '<div class="glr-info">'
+                + '<div class="glr-title">\uD83D\uDD11 Organizer Link</div>'
+                + '<div class="glr-names">Full final-score review \u2014 keep this one private</div>'
+                + '</div>'
+                + '<button class="glr-copy" onclick="copyGroupLinkFromScorecard(\'' + orgUrl + '\', 0, this)">\uD83D\uDCCB Copy</button>'
+                + '</div>';
+        }
+
         let rows = boundaries.map(b => {
             const url = `${base}?game=${currentMode}&group=${b.group}`;
             const names = players.slice(b.start, b.start + b.size).map(p => p.name.split(' ')[0]).join(', ');
@@ -2828,6 +2884,7 @@
             <div class="glb-title">Scorekeeper Links</div>
             <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
             ${rows}
+            ${organizerRow}
         </div>`;
         panel.style.display = 'block';
     }
@@ -2975,7 +3032,20 @@
         return ids.some(pid => String(map[pid]) === String(lockedGroup));
     }
 
-    function canWritePlayer(playerId) {        // Organizer (no ?group=) may score anyone. This is the existing Batch 1 rule.
+    // Set true ONLY while the Finish Round review is driving a correction, and
+    // cleared immediately afterwards in a finally block. This is what keeps the
+    // organizer exception narrow: holding the organizer link does not turn the
+    // ordinary scorecard into a global editor, because every other write path runs
+    // with this flag false and therefore hits the unchanged group rules below.
+    let frOrganizerEditContext = false;
+
+    function canWritePlayer(playerId) {
+        // THE ONE NEW EXCEPTION. Requires BOTH a matching organizer token AND the
+        // final-review context; either alone grants nothing.
+        if (frOrganizerEditContext && hasOrganizerAuthority()) return true;
+
+        // Everything below is unchanged.
+        // Organizer (no ?group=) may score anyone. This is the existing Batch 1 rule.
         if (!hasGroupLock) {
             const players = currentData.players || [];
             const isMultiGroupRound = players.length > 4;
@@ -3051,7 +3121,54 @@
 
         if (oldVal !== newVal) {
             logAuditEntry(playerId, holeNum, oldVal, newVal);
+            // VERIFICATION IS CLEARED HERE, in the one canonical score-write path, so
+            // EVERY legitimate edit invalidates it automatically - group scorekeeper,
+            // organizer review, or anything added later. Centralising it means a new
+            // score-writing surface cannot forget to do it, and the Receipt can never
+            // keep claiming the scores were checked after one of them moved.
+            clearScoresVerified();
         }
+    }
+
+    // ---- PERSISTENT VERIFICATION STATE --------------------------------------
+    //
+    // ABSENT MEANS NOT VERIFIED. Legacy rounds have no such key and simply never
+    // show the badge - no migration, no behaviour change.
+    //
+    // verifiedBy records the AUTHORITY used, not a person. The app authenticates
+    // nobody, so claiming a human name here would be a lie the data cannot support.
+    function isScoresVerified() {
+        const v = currentData && currentData.scoresVerified;
+        return !!(v && v.verified === true);
+    }
+
+    function clearScoresVerified() {
+        if (!isScoresVerified()) return;
+        currentData.scoresVerified = null;
+        db.ref('events/' + currentMode + '/scoresVerified').remove();
+    }
+
+    // The write must LAND before the UI claims anything. Firebase buffers a write
+    // while disconnected and resolves the promise only on server acknowledgement, so
+    // offline that promise never settles - the same trap the press guard was built
+    // for. A verification badge that appears on an unsaved write is a lie about
+    // money, so it is refused before Firebase ever sees it.
+    function confirmScoresVerified(onDone) {
+        if (!requireOnlineForMoney('SCORES NOT CONFIRMED', 'Reconnect to confirm the scores.')) {
+            if (onDone) onDone(false);
+            return;
+        }
+        const payload = {
+            verified: true,
+            verifiedAt: Date.now(),
+            verifiedBy: hasOrganizerAuthority() ? 'organizer' : (hasGroupLock ? 'group-' + lockedGroup : 'round'),
+        };
+        db.ref('events/' + currentMode + '/scoresVerified').set(payload)
+            .then(() => { currentData.scoresVerified = payload; if (onDone) onDone(true); })
+            .catch(err => {
+                alert('\u26A0\uFE0F SCORES NOT CONFIRMED\n' + (err && err.message));
+                if (onDone) onDone(false);
+            });
     }
 
     function logAuditEntry(playerId, holeNum, oldVal, newVal) {
@@ -3142,6 +3259,16 @@
         // conservative rule applies: show the position, never call it FINAL, and never
         // invent a score or a winner to fill the gap.
         if (titleEl) titleEl.textContent = missing.length > 0 ? 'Money So Far \u2014 Not Final' : 'Final Money';
+
+        // THE BADGE READS PERSISTED STATE, NEVER THE IN-MEMORY FLAG. frReviewCompleted
+        // records that a button was pressed; isScoresVerified() records that the write
+        // actually landed. Driving the badge from the former would show "verified" on
+        // a confirmation that failed or was refused offline.
+        const badgeEl = document.getElementById('fr-verified-badge');
+        if (badgeEl) {
+            badgeEl.innerHTML = isScoresVerified()
+                ? '<div class="fr-verified-badge">\u2713 Scores verified before settlement</div>' : '';
+        }
 
         let result;
         try {
@@ -3314,7 +3441,13 @@
     // than skipping. Wave C decides whether that intent is persisted on the round;
     // nothing is written to Firebase here.
     function frShowResults(reviewed) {
-        frReviewCompleted = !!reviewed;
+        // Only the deliberate confirm persists. Skipping shows the money and records
+        // nothing, which is the whole point of having two buttons.
+        if (reviewed) {
+            confirmScoresVerified(ok => { frReviewCompleted = !!ok; renderFinishRoundMoney(); });
+        } else {
+            frReviewCompleted = false;
+        }
         renderFinishRoundMoney();
         frSection('fr-state-review', false);
         frSection('fr-state-detail', false);
@@ -3441,11 +3574,15 @@
         // AUTHORITY IS NOT WIDENED HERE. Review is whole-field; correcting is not.
         // canWritePlayer() is the same gate saveScore() applies, asked once so the UI
         // can explain itself rather than offering an input that would be refused.
+        // Asked WITH the review context on, so the row reflects what a correction
+        // would actually be allowed to do from this screen.
+        frOrganizerEditContext = true;
         const mayEdit = canWritePlayer(p.id);
+        frOrganizerEditContext = false;
         const note = document.getElementById('fr-detail-note');
         if (note) {
             note.innerHTML = mayEdit
-                ? 'Tap a score to correct it.'
+                ? (hasOrganizerAuthority() ? 'Organizer access \u00B7 tap a score to correct it.' : 'Tap a score to correct it.')
                 : '\uD83D\uDD12 Read-only. These scores can only be corrected from this group\u2019s scorekeeper link.';
             note.className = 'fr-review-note' + (mayEdit ? '' : ' fr-review-warn');
         }
@@ -3495,10 +3632,19 @@
         // not a copy of the rule, the function itself. A refused correction must
         // change nothing and must report nothing, or the impact panel would describe
         // money moving on the back of a write that never happened.
-        if (!canWritePlayer(playerId)) { renderFinishRoundDetail(); return; }
+        // The exception is opened for the duration of this one correction and closed
+        // in the finally, so an exception thrown mid-write cannot leave the app in a
+        // globally-writable state.
+        let allowed;
+        try { frOrganizerEditContext = true; allowed = canWritePlayer(playerId); }
+        finally { frOrganizerEditContext = false; }
+        if (!allowed) { renderFinishRoundDetail(); return; }
 
         const before = frSnapshot();
-        saveScore(playerId, hole, raw);          // the one canonical write path
+        try {
+            frOrganizerEditContext = true;
+            saveScore(playerId, hole, raw);      // the one canonical write path
+        } finally { frOrganizerEditContext = false; }
 
         // saveScore writes to Firebase and lets the .on('value') listener update
         // currentData - it deliberately does not touch the local model itself. So
