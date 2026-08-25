@@ -56,7 +56,7 @@ function round(opts = {}) {
         // reason. null is explicit and cannot be confused with "not specified".
         hcps = null, scoreFn = null, thru = null, mode = 'whole-dollar',
         pool = {}, kpWinners = { h3:'101', h7:'105', h12:'109', h16:'102' },
-        sideMatches = {}, games = null, dots = null, n = 12,
+        sideMatches = {}, games = null, dots = null, n = 12, kpNoWinner = null,
     } = opts;
 
     const cd = course();
@@ -75,7 +75,13 @@ function round(opts = {}) {
             net: { amount:70, places:[57.142857,42.857143] },
             skins: { mode:'remainder', scoring:'net', carryOver:false } }, pool),
         kpWinners, sideMatches,
+        // A finished round has had its KPs confirmed. Under the unresolved-KP model
+        // an unconfirmed KP bucket is deliberately withheld, so a fixture that means
+        // "this round is complete" has to say so - otherwise it is asserting the very
+        // state Wave B exists to block.
+        kpConfirmed: { confirmed: true },
     };
+    if (kpNoWinner) data.kpNoWinner = kpNoWinner;
     // Absent, not undefined: a legacy round must have NO settlementMode key at all,
     // which is exactly the shape every round saved before Wave 2A has.
     if (mode) data.settlementMode = mode;
@@ -284,15 +290,19 @@ describe('20 DETERMINISTIC SIMULATIONS', () => {
 
     test('16. multiple KPs with an uneven split', () => {
         const r = round({ pool: { kp: { amount:100, holes:[3,7,12] } },
-                          kpWinners: { h3:'101', h7:'105', h12:'109' } });
+                          kpWinners: { h3:'101', h7:'105', h12:'109' }, kpConfirmed: { confirmed: true } });
         assert.deepEqual(JSON.parse(JSON.stringify(r.pool.kp.perHoleCents)), [3400,3300,3300]);
         assert.equal(r.pool.kp.perHoleCents.reduce((a,b)=>a+b,0), 10000);
         assertSound('sim16', r);
     });
 
-    test('17. an unclaimed KP refunds to the field', () => {
-        const r = round({ kpWinners: { h3:'101' } });
+    test('17. a KP the organizer declares nobody won refunds to the field', () => {
+        // Retitled: an UNENTERED hole is unresolved now. A refund requires the
+        // organizer to have said outright that nobody won it.
+        const r = round({ kpWinners: { h3:'101' }, kpConfirmed: { confirmed: true },
+                          kpNoWinner: { h7:true, h12:true, h16:true } });
         assert.ok(r.pool.kp.unclaimedCents > 0);
+        assert.equal(r.pool.kpUnresolvedCents, 0, 'every hole was decided');
         assert.match(r.pool.refund.reasons.join(' '), /Unclaimed KP/);
         assertSound('sim17', r);
     });
@@ -369,7 +379,7 @@ describe('LEGACY NON-REGRESSION', () => {
 
     test('a round with no settlementMode still settles in cents', () => {
         const r = round({ mode: null, pool: { kp: { amount:100, holes:[3,7,12] } },
-                          kpWinners: { h3:'101', h7:'105', h12:'109' } });
+                          kpWinners: { h3:'101', h7:'105', h12:'109' }, kpConfirmed: { confirmed: true } });
         assert.deepEqual(JSON.parse(JSON.stringify(r.pool.kp.perHoleCents)), [3334,3333,3333],
             'the legacy cent split must be untouched');
         assertSound('legacy', r, { wholeDollar: false });
@@ -403,7 +413,7 @@ describe('FINAL SCORECARD — net must actually be printed', () => {
                     net:{amount:70,places:[57.142857,42.857143]},
                     skins:{mode:'remainder',scoring:'net',carryOver:false} }
                 : undefined,
-            kpWinners: {} };
+            kpWinners: {}, kpConfirmed: { confirmed: true } };
         vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(data)};`, sb);
         return vm.runInContext('buildReceiptScorecard()', sb);
     }
