@@ -55,7 +55,7 @@ function boot(over = {}) {
             kp: { amount: 100, holes: [3,7,12,16] },
             net: { amount: 70, places: [57.142857, 42.857143] },
             skins: { mode: 'remainder', scoring: 'net', carryOver: false } },
-        kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' },
+        kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true },
         sideMatches: {
             sm1: { format:'match', scoring:'net', stake:50, startHole:1, createdAt:1,
                    teamAIds:['101'], teamBIds:['102'] },
@@ -122,7 +122,7 @@ describe('EVERY GOLFER HAS A LEDGER', () => {
             moneyPool: { enabled: true, buyIn: 25,
                 kp: { amount: 100, holes: [3,7,12,16] },
                 skins: { mode: 'remainder', scoring: 'net', carryOver: false } },
-            kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' },
+            kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true },
             sideMatches: {},
         }).html());
 
@@ -173,7 +173,7 @@ describe('THE DETAIL A GOLFER ASKS FOR', () => {
     });
 
     test('two KPs to one golfer stay as two auditable lines', () => {
-        const led = parseLedger(boot({ kpWinners: { h3:'101', h7:'101', h12:'109', h16:'102' } }).html());
+        const led = parseLedger(boot({ kpWinners: { h3:'101', h7:'101', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true } }).html());
         const kp = led.Avery.filter(r => /^KP H/.test(r.label)).map(r => r.label).sort();
         assert.deepEqual(kp, ['KP H3','KP H7'], 'collapsing them loses the hole breakdown');
     });
