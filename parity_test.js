@@ -1,6 +1,8 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadJsFile, loadHtmlInlineScript } = require('./helpers/load-script.js');
+const fs = require('fs');
+const path = require('path');
+const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers, buildScores } = require('./helpers/fixtures.js');
 
 // ============================================================================
@@ -21,11 +23,28 @@ describe('PARITY — parseHcp / getStrokes local copies vs canonical (money-engi
     const filesWithLocalCopies = [
         { label: 'admin.html', loader: () => loadHtmlInlineScript('admin.html', ['course-data.js']), parseFn: 'parseHcpAdmin', strokesFn: 'getStrokesAdmin' },
         { label: 'index.html', loader: () => loadHtmlInlineScript('index.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
-        { label: 'leaderboard.html', loader: () => loadHtmlInlineScript('leaderboard.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
+        // leaderboard.html is deliberately ABSENT from this list now: it no longer has
+        // local copies to drift. It loads money-engine.js and uses the canonical pair
+        // directly, which is the outcome this whole parity suite exists to push toward.
+        // A dedicated test below asserts that, so removing it here loses no coverage.
         { label: 'sidematches.html', loader: () => loadHtmlInlineScript('sidematches.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
         { label: 'skins.html', loader: () => loadHtmlInlineScript('skins.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
         { label: 'stats.html', loader: () => loadHtmlInlineScript('stats.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
     ];
+
+    test('leaderboard.html has NO local copy left to drift', () => {
+        // The strongest form of parity: not "the duplicate matches" but "there is no
+        // duplicate". leaderboard.html carried byte-identical copies of both helpers;
+        // they were removed once the page began loading money-engine.js.
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'leaderboard.html'), 'utf8');
+        const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+        assert.ok(!/function parseHcp\s*\(/.test(inline),
+            'leaderboard.html must not redeclare parseHcp');
+        assert.ok(!/function getStrokes\s*\(/.test(inline),
+            'leaderboard.html must not redeclare getStrokes');
+        assert.match(src, /<script src="money-engine\.js">/,
+            'and it must load the canonical pair instead');
+    });
 
     const parseHcpCases = ['0', '12', '8.4', '+2', '+5.5', '', undefined, '18', '-3'];
     const getStrokesCases = [
