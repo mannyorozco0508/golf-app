@@ -100,7 +100,7 @@ function martyRound() {
             net: { amount: 70, places: [57.142857, 42.857143] },   // $40 / $30 of $70
             skins: { mode: 'remainder', scoring: 'net', carryOver: true },
         },
-        kpWinners: { h3: '101', h7: '105', h12: '109', h16: '102' },
+        kpWinners: { h3: '101', h7: '105', h12: '109', h16: '102' }, kpConfirmed: { confirmed: true },
         additionalGameInstances: {
             // Group 1 dots - Randy (104) sat this one out.
             g1dots: {
