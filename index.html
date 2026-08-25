@@ -565,6 +565,13 @@
         .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
         /* Live whole-field skins. Compact by default: this sits BELOW score entry
            and navigation, and must never grow tall enough to push them off screen. */
+        /* Live Net Finish / KP rows. Compact by design: this sits below score entry
+           and navigation and must not grow tall enough to push them off screen. */
+        .lnf-head { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); margin-top: 8px; }
+        .lnf-state { color: var(--text-muted); font-weight: 600; }
+        .lnf-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.74rem; padding: 2px 0; }
+        .lnf-amt { font-weight: 600; white-space: nowrap; }
+        .lnf-pending { color: var(--text-muted); font-style: italic; }
         .live-skins { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
         .ls-title { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
         .ls-thru { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
@@ -2067,7 +2074,82 @@
         if (r.net && r.net.standings.length) bits.push('\uD83E\uDD47 ' + r.net.standings[0].name.split(' ')[0] + ' leads net');
         if (r.skins) bits.push('\uD83E\uDD69 ' + r.skins.lines.reduce((a, l) => a + l.units, 0) + ' skins won');
         html += '<div class="section-summary">' + bits.join(' \u00B7 ') + '</div>';
+        html += buildLiveNetFinish(r);
+        html += buildLiveKpStatus(r);
         html += buildPoolKpEntry(r);
+        return html;
+    }
+
+    // ---- LIVE NET FINISH ---------------------------------------------------
+    //
+    // NO TIE MATH HERE. computeMoneyPool() has already decided which finishing
+    // positions a tie consumed, how much money those positions carry between them,
+    // and - in a whole-dollar round - the exact integer each golfer gets. This reads
+    // r.net.lines and prints it.
+    //
+    // That matters more than usual for this particular card. The tie rule is the
+    // least intuitive money rule in the app: two golfers tied for 1st in a $40/$30
+    // structure take $35 each and the next golfer gets NOTHING, because the tie
+    // consumed 2nd place as well. Anyone reimplementing that from scratch in a page
+    // would get it subtly wrong, and it would disagree with the receipt.
+    //
+    // WORDING IS DELIBERATE. This says PROJECTED, never FINAL, whenever a single
+    // participant still has a hole outstanding - which is almost always true while
+    // anyone is still on the course, and is exactly when a golfer is most likely to
+    // read it and act on it.
+    function buildLiveNetFinish(r) {
+        if (!r.net || !r.net.lines || r.net.lines.length === 0) return '';
+        const $ = c => '$' + (c / 100).toFixed(0);
+
+        // Complete means every pool participant has posted every hole. Anything less
+        // and the standings can still move.
+        const holes = (currentData.courseData || []).length;
+        const scores = currentData.scores || {};
+        const complete = holes > 0 && r.participants.every(p =>
+            (currentData.courseData || []).every(h => {
+                const v = scores['p' + p.id + '_h' + h.hole];
+                return v && v > 0;
+            }));
+
+        let html = '<div class="lnf-head">\uD83C\uDFC5 NET FINISH \u00B7 ' + $(r.net.amountCents)
+            + ' \u00B7 <span class="lnf-state">' + (complete ? 'FINAL' : 'PROJECTED') + '</span></div>';
+
+        r.net.lines.forEach(l => {
+            const tied = l.ids.length > 1;
+            const place = (tied ? 'T' : '') + l.place;
+            if (tied) {
+                // Per-golfer amounts come from the same allocator the settlement used,
+                // so the live figure and the receipt figure cannot drift apart.
+                const each = (typeof allocateWholeDollars === 'function' && currentData.settlementMode === 'whole-dollar')
+                    ? allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100)
+                    : l.ids.map(() => l.cents / l.ids.length);
+                const same = each.every(c => c === each[0]);
+                html += '<div class="lnf-row"><span>' + place + ' \u00B7 ' + l.names.join(' / ')
+                    + ' \u00B7 net ' + l.net + '</span><span class="lnf-amt">'
+                    + (same ? $(each[0]) + ' each' : each.map(c => $(c)).join(' / ')) + '</span></div>';
+            } else {
+                html += '<div class="lnf-row"><span>' + place + ' \u00B7 ' + l.names[0]
+                    + ' \u00B7 net ' + l.net + '</span><span class="lnf-amt">' + $(l.cents) + '</span></div>';
+            }
+        });
+        return html;
+    }
+
+    // ---- LIVE KP -----------------------------------------------------------
+    //
+    // Per-hole, with the ACTUAL allocated amount rather than an assumed equal share.
+    // $100 across three KP holes is $34/$33/$33 in a whole-dollar round, and printing
+    // "$33.33" or "$33" three times would be wrong in different ways. r.kp.perHoleCents
+    // is what the pool engine allocated, so it is what gets shown.
+    function buildLiveKpStatus(r) {
+        if (!r.kp || !r.kp.lines || r.kp.lines.length === 0) return '';
+        const $ = c => '$' + (c / 100).toFixed(0);
+        let html = '<div class="lnf-head">\uD83D\uDCCD KP \u00B7 ' + $(r.kp.amountCents) + '</div>';
+        r.kp.lines.forEach(l => {
+            html += '<div class="lnf-row"><span>H' + l.hole + ' \u00B7 '
+                + (l.winnerName ? l.winnerName : '<span class="lnf-pending">Pending</span>')
+                + '</span><span class="lnf-amt">' + $(l.cents) + '</span></div>';
+        });
         return html;
     }
 
