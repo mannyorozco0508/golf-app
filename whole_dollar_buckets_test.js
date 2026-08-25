@@ -215,14 +215,15 @@ describe('NET FINISH TIE MATRIX - locking in the audited behaviour', () => {
 
 describe('BUCKETS IN WHOLE-DOLLAR MODE', () => {
 
-    function poolRound(mode, poolCfg, kpWinners) {
+    function poolRound(mode, poolCfg, kpWinners, noWinner) {
         const cd = course();
         const ps = Array.from({ length: 12 }, (_, i) => ({
             id: 101 + i, name: 'G' + String.fromCharCode(65 + i), hcp: '10', playingForMoney: true }));
         const sc = {};
         ps.forEach((p, pi) => cd.forEach((h, hi) => { sc['p' + p.id + '_h' + h.hole] = h.par + ((pi * 3 + hi * 5) % 4) - 1; }));
         const data = { players: ps, courseData: cd, gameFormat: 'stroke', scores: sc,
-                       moneyPool: poolCfg, kpWinners: kpWinners || {} };
+                       moneyPool: poolCfg, kpWinners: kpWinners || {},
+                       kpConfirmed: { confirmed: true }, kpNoWinner: noWinner || {} };
         if (mode) data.settlementMode = mode;
         const sb = engines();
         return { sb, ps, r: sb.computeMoneyPool(data, cd, sc) };
@@ -268,8 +269,11 @@ describe('BUCKETS IN WHOLE-DOLLAR MODE', () => {
         assert.deepEqual(plain(r.kp.perHoleCents), [2500, 2500, 2500, 2500]);
     });
 
-    test('an unclaimed KP refunds in whole dollars and says so', () => {
-        const { r } = poolRound('whole-dollar', STD, { h3: '101' });
+    test('a KP the organizer declares nobody won refunds in whole dollars', () => {
+        // Retitled: an UNENTERED hole is now unresolved, not a refund. A refund needs
+        // the organizer to have said outright that nobody won it.
+        const { r } = poolRound('whole-dollar', STD, { h3: '101' },
+            { h7: true, h12: true, h16: true });
         assert.ok(r.kp.unclaimedCents > 0);
         assert.equal(Math.abs(r.refund.cents % 100), 0, 'a refund must not reintroduce cents');
         assert.match(r.refund.reasons.join(' '), /Unclaimed KP/);
@@ -286,14 +290,16 @@ describe('BUCKETS IN WHOLE-DOLLAR MODE', () => {
 
 describe('LEGACY PARITY - no historical result may move', () => {
 
-    function legacyPool(poolCfg, kpWinners) {
+    function legacyPool(poolCfg, kpWinners, noWinner) {
         const cd = course();
         const ps = Array.from({ length: 12 }, (_, i) => ({
             id: 101 + i, name: 'G' + String.fromCharCode(65 + i), hcp: String(5 + i), playingForMoney: true }));
         const sc = {};
         ps.forEach((p, pi) => cd.forEach((h, hi) => { sc['p' + p.id + '_h' + h.hole] = h.par + ((pi * 3 + hi * 5) % 4) - 1; }));
         const data = { players: ps, courseData: cd, gameFormat: 'stroke', scores: sc,
-                       moneyPool: poolCfg, kpWinners: kpWinners || {} };
+                       moneyPool: poolCfg, kpWinners: kpWinners || {},
+                       kpConfirmed: { confirmed: true }, kpNoWinner: noWinner || {},
+                       kpConfirmed: { confirmed: true }, kpNoWinner: noWinner || {} };
         return engines().computeMoneyPool(data, cd, sc);
     }
 
@@ -327,7 +333,11 @@ describe('LEGACY PARITY - no historical result may move', () => {
         const r = legacyPool({ enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [3, 7, 12] },
             net: { amount: 70, places: [57.142857, 42.857143] },
-            skins: { mode: 'remainder', scoring: 'net', carryOver: true } }, { h3: '101' });
+            skins: { mode: 'remainder', scoring: 'net', carryOver: true } },
+            { h3: '101' }, { h7: true, h12: true });
+        // Zero-sum still holds once every dollar is resolved - here one hole is won
+        // and two are declared no-winner, so nothing is left hanging.
+        assert.equal(r.kpUnresolvedCents, 0);
         assert.equal(Object.values(r.perPlayerCents).reduce((a, b) => a + b, 0), 0);
     });
 
