@@ -43,11 +43,21 @@ function makeStubSandbox() {
     const elementRegistry = documentStub.__registry;
     const dbStub = {
         ref() {
-            return {
+            // push() returns a FULL reference, as real Firebase does. It used to hand
+            // back { key: 'TEST' } only, so any production path that pushed and then
+            // set - logAuditEntry() does exactly that, and saveScore() calls it -
+            // died on "logRef.set is not a function". Nothing was wrong with the
+            // production code; the stub simply could not model it, which made
+            // saveScore() untestable. Strictly more capable than before: callers that
+            // only read .key are unaffected.
+            const ref = {
+                key: 'TEST',
                 on() {}, once() { return Promise.resolve({ val() { return null; }, exists() { return false; } }); },
                 set() { return Promise.resolve(); }, update() { return Promise.resolve(); },
-                remove() { return Promise.resolve(); }, push() { return { key: 'TEST' }; }
+                remove() { return Promise.resolve(); },
+                push() { return ref; }
             };
+            return ref;
         }
     };
     const sandbox = {
