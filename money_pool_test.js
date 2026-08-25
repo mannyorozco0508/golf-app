@@ -636,7 +636,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             alert = m => window.__alerts.push(String(m));
             db.ref = function (pth) { return { set: function (v) { window.__writes.push({ path: pth, value: v }); return Promise.resolve(); },
                 on: function () {}, push: function () { return { key: 'k' }; }, remove: function () { return Promise.resolve(); },
-                update: function () { return Promise.resolve(); } }; };
+                update: function (v) { window.__writes.push({ path: pth, value: v, atomic: true }); return Promise.resolve(); } }; };
             currentMode = 'ABCD';
             currentData = ${J(ROUND())};
             window.__scPlayerGroupMap = ${J(gm)}; window.__scFilteredPlayers = currentData.players;
@@ -657,22 +657,36 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
     });
 
     test('KP ENTRY appears on a KP hole, writes the canonical shape, confirms after', async () => {
+        // The UI is now a live-leader block rather than a bare dropdown, and the write
+        // is ONE atomic update on the round rather than a leaf .set(). That is a
+        // stronger contract, not a looser one: the leader, the settlement winner and
+        // the cleared confirmation land together or not at all, so kpLeaders and
+        // kpWinners can never disagree while the UI claims a result is final.
         const sb = bootIndex(2, 14);
         const html = sb.document.getElementById('action-center-mount').innerHTML;
-        assert.match(html, /KP hole 14/);
-        vm.runInContext(`savePoolKp(14, '${String(P[3].id)}');`, sb);
+        assert.match(html, /Hole 14 KP/);
+        assert.match(html, /Set KP Leader/);
+
+        vm.runInContext(`savePoolKp(14, '${String(P[4].id)}');`, sb);
         await new Promise(r => setImmediate(r));
-        assert.equal(sb.window.__writes.length, 1);
-        assert.match(sb.window.__writes[0].path, /kpWinners\/h14$/);
-        assert.equal(sb.window.__writes[0].value, String(P[3].id));
+
+        assert.equal(sb.window.__writes.length, 1, 'exactly one write, and it must be atomic');
+        const w = sb.window.__writes[0];
+        assert.equal(w.atomic, true, 'a leaf .set() would let the three paths diverge');
+        assert.match(w.path, /events\/ABCD$/);
+        assert.equal(w.value['kpWinners/h14'], String(P[4].id), 'settlement source still written');
+        assert.equal(w.value['kpLeaders/h14'].playerId, String(P[4].id), 'live leader written');
+        assert.equal(w.value['kpLeaders/h14'].distanceInches, null, 'distance stays optional');
+        assert.equal(w.value['kpConfirmed'], null, 'any leader change unconfirms the round');
         assert.ok(sb.window.__alerts.some(a => /KP RECORDED/.test(a)));
     });
 
     test('KP entry is absent on a non-KP hole; spectators get read-only', () => {
-        assert.ok(!/who stuck it/.test(bootIndex(1, 7).document.getElementById('action-center-mount').innerHTML));
+        assert.ok(!/Hole 7 KP/.test(bootIndex(1, 7).document.getElementById('action-center-mount').innerHTML));
         const spec = bootIndex(null, 14).document.getElementById('action-center-mount').innerHTML;
-        assert.ok(!/select/.test(spec.slice(spec.indexOf('KP hole 14') - 200, spec.indexOf('KP hole 14') + 100)),
-            'a spectator on a multi-group round sees the status, not the picker');
+        assert.match(spec, /Hole 14 KP/, 'a spectator still SEES the marker');
+        assert.ok(!/Set KP Leader|New Leader|kp-select/.test(spec),
+            'but is offered no way to claim it');
     });
 
     test('RECEIPT section itemizes every bucket and the refund', () => {
@@ -776,7 +790,10 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
             window.__writes = []; window.__alerts = [];
             alert = m => window.__alerts.push(String(m));
             db.ref = function (pth) { return { set: function (v) { window.__writes.push({ path: pth, value: v }); return Promise.resolve(); },
-                on: function () {}, push: function () { return { key: 'k' }; } }; };
+                on: function () {}, push: function () { return { key: 'k' }; },
+                remove: function () { return Promise.resolve(); },
+                // Records the atomic multi-path write the KP leader path now uses.
+                update: function (v) { window.__writes.push({ path: pth, value: v, atomic: true }); return Promise.resolve(); } }; };
             currentMode = 'ABCD';
             currentData = ${J(ROUND28())};
             window.__scPlayerGroupMap = ${J(gmap)};
@@ -788,13 +805,28 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
         const html = sb.document.getElementById('action-center-mount').innerHTML;
         assert.match(html, /Money Pool \u00B7 \$560/, 'the pot is one truth for all seven groups');
         assert.match(html, /KP 2\/3 claimed/);
-        assert.match(html, /KP hole 14/, 'the unclaimed hole offers its picker to whichever group stands on it');
-        vm.runInContext(`savePoolKp(14, '${String(P28[26].id)}');`, sb);
+        assert.match(html, /Hole 14 KP/, 'the unclaimed hole shows its marker to every group');
+        assert.match(html, /Set KP Leader/, 'and offers the picker to the group standing on it');
+
+        // CONTRACT REVERSED, DELIBERATELY. This used to assert that "group 6 records
+        // group 7's winner - any scorekeeper may". That was wrong: it let a group move
+        // KP money on a shot nobody in that group saw. A group may now name only its
+        // own golfers, matching the rule score-writing has always followed.
+        const g7 = P28[26];                      // index 26 -> group 7
+        vm.runInContext(`savePoolKp(14, '${String(g7.id)}');`, sb);
         return new Promise(res => setImmediate(() => {
-            assert.equal(sb.window.__writes.length, 1);
-            assert.match(sb.window.__writes[0].path, /kpWinners\/h14$/);
-            assert.equal(sb.window.__writes[0].value, String(P28[26].id), 'group 6 records group 7\'s winner — any scorekeeper may');
-            res();
+            assert.equal(sb.window.__writes.length, 0,
+                'a group 6 link must not be able to claim a group 7 golfer');
+            assert.ok(sb.window.__alerts.some(a => /own group/.test(a)),
+                'and the refusal must say why');
+
+            const g6 = P28[21];                  // index 21 -> group 6
+            vm.runInContext(`savePoolKp(14, '${String(g6.id)}');`, sb);
+            setImmediate(() => {
+                assert.equal(sb.window.__writes.length, 1, 'but it may name its own');
+                assert.equal(sb.window.__writes[0].value['kpWinners/h14'], String(g6.id));
+                res();
+            });
         }));
     });
 });
