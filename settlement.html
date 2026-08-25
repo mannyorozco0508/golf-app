@@ -149,7 +149,12 @@
         .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); border-radius: 50%; }
         /* Net rows sit tight under their golfer's gross row and are visually
            quieter, so the card still scans as one row per golfer. */
-        .rt-net td { font-size: 0.72em; color: var(--text-muted); border-top: none; padding-top: 0; }
+        /* NET IS SECONDARY, NOT INVISIBLE. At 0.72em in --text-muted this row was
+           unreadable on a phone, defeating the point of printing it: net is how you
+           check a net skin without doing handicap arithmetic in your head. It stays
+           subordinate to gross through weight and colour, not by being too small to
+           read. Row height is unchanged, so the card does not grow. */
+        .rt-net td { font-size: 0.82em; color: var(--text-secondary, #4a5568); border-top: none; padding-top: 0; }
         .rt-net .rt-name { font-style: italic; }
         /* Player ledger. Note rows are indented and muted because they are ALREADY
            inside the row above them; only the un-indented rows add up to FINAL NET. */
@@ -868,7 +873,7 @@
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
         let html = `<div class="settle-card" style="border:2px solid #b8860b;">
-            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)} (${r.participants.length} \u00D7 ${$(r.buyInCents)})</div>`;
+            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)}</div>`;
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
@@ -1094,10 +1099,19 @@
         // empty "Final Results" card above the real per-game breakdowns below.
         if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
 
+        // NET POSITION, SAID AS SUCH.
+        //
+        // This read "Won $4" for a golfer who was handed $44 out of the pot. Both
+        // figures were right - $44 the payout, +$4 the position after his own stake -
+        // but calling the second one "Won" invited exactly the argument the Receipt
+        // exists to prevent. Payout and net answer different questions, so they get
+        // different words: Player Payouts says TOTAL PAYOUT, this says NET.
+        //
+        // Presentation only; `amt` is untouched.
         function fmt(amt) {
-            if (amt > 0.005) return `<span class="val-pos">Won $${fmtWhole(amt)}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">Owes $${fmtWhole(Math.abs(amt))}</span>`;
-            return `<span>Even</span>`;
+            if (amt > 0.005) return `<span class="val-pos">+$${fmtWhole(amt)} NET</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-$${fmtWhole(Math.abs(amt))} NET</span>`;
+            return `<span class="val-even">$0 NET</span>`;
         }
 
         const sorted = totals.slice().sort((a, b) => b.net - a.net);
@@ -1107,7 +1121,19 @@
         let html = buildReceiptHeader();
 
         html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
-            <div class="settle-header">🏁 Final Results</div>`;
+            <div class="settle-header">${(function () {
+                // "FINAL" IS A CLAIM AND IT HAS TO BE EARNED. A round with unresolved
+                // KP money is not settled - Wave B made that a canonical fact rather
+                // than a guess, so this reads it instead of re-deriving it. Nothing
+                // here decides anything about money; it decides one word.
+                try {
+                    if (typeof computeMoneyPool === 'function') {
+                        const rs = computeMoneyPool(data, courseData, savedScores);
+                        if (rs && rs.valid && rs.settled === false) return '⏳ Results — Not Final';
+                    }
+                } catch (e) { /* fall through to Final */ }
+                return '🏁 Final Results';
+            })()}</div>`;
         sorted.forEach(t => {
             html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
         });
@@ -1176,7 +1202,6 @@
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">🥩 Final Skins Settlement (${carryOver ? 'Carry Over' : 'No Carry'})</div>
-                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">Net of each player's own buy-in — a positive number means they came out ahead overall, not just what they won from the pot.</p>
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
