@@ -17,6 +17,12 @@
             --bg-card: #ffffff;
             --text-main: #1a1a1a;
             --text-muted: #666;
+            /* Between --text-main and --text-muted. Introduced because the net rows
+               on the scorecard and leaderboards need to be clearly readable while
+               staying subordinate to gross - muted was too faint, main too loud.
+               It was previously referenced without ever being defined, so those rows
+               ran on a hard-coded fallback and did not react to dark mode. */
+            --text-secondary: #4a5568;
             --brand-green: #0f4c3a;
             --brand-navy: #1d3557;
             --accent-teal: #2a9d8f;
@@ -39,6 +45,7 @@
             --bg-card: #1e2426;
             --text-main: #e8ecec;
             --text-muted: #9aa8a7;
+            --text-secondary: #c2cecd;
             --brand-green: #2f9e78;
             --brand-navy: #4a7bb5;
             --accent-teal: #3dbfae;
@@ -173,7 +180,26 @@
 
         /* MAGIC PDF HIDING CSS */
         @media print {
-            body { background-color: white; padding: 0; }
+            /* DARK MODE MUST NOT REACH PAPER.
+               The theme is a class on <html>, and it survived into print. The block
+               forced a white background but never reset the text colours, so a golfer
+               who prints while in dark mode gets --text-main #e8ecec - near-white ink
+               on white paper. The money sections would be effectively invisible in the
+               saved PDF, and nothing on screen warns you before you share it.
+               Redefining the variables here restores the light palette for print only;
+               the on-screen theme is untouched. */
+            html.dark-mode, html.dark-mode body {
+                --bg-page: #ffffff; --bg-card: #ffffff;
+                --text-main: #1a1a1a; --text-muted: #5b6666; --text-secondary: #4a5568;
+                --brand-green: #0f4c3a; --brand-navy: #1d3557;
+                --accent-teal: #2a9d8f; --accent-red: #e63946;
+                --border-light: #e0e0e0; --border-mid: #d0e1db; --border-faint: #eee;
+                --nav-bg: #f0f4f2; --subtle-bg: #e0e8e4; --modal-bg: #ffffff;
+                --nassau-box-bg: #eef6f2; --danger-box-bg: #fff0f0;
+                --shadow-color: rgba(0,0,0,0.08);
+                background: #fff !important; color: #1a1a1a !important;
+            }
+            body { background-color: white; padding: 0; color: #1a1a1a; }
             .container { box-shadow: none; max-width: 100%; padding: 0; }
             /* The ⋯ More menu is a <details> element that sits OUTSIDE .top-nav-bar, so
                hiding the nav bar never hid it. Left open when a golfer exported, it
@@ -187,12 +213,20 @@
             /* Money must not split across pages either - a Who Pays Who list broken after
                one row is exactly the sort of thing that starts an argument. */
             .settle-card { break-inside: avoid; page-break-inside: avoid; }
+            /* One golfer's payout lines and their total belong together. */
+            .pl-block { break-inside: avoid; page-break-inside: avoid; }
             .receipt-head { break-after: avoid; page-break-after: avoid; }
             /* The scorecard is the only section allowed its own page. */
             .receipt-card-wide { break-before: auto; page-break-inside: auto; }
             .receipt-card-scroll { overflow-x: visible; }
             /* Browsers drop box-shadows when saving to PDF unless told otherwise, and the
                PDF is exactly where these rings matter most. */
+            /* The +/- colours carry meaning on a payout document, and browsers drop
+               colour when saving to PDF unless told otherwise. */
+            .val-pos, .val-neg, .val-even {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             .receipt-table td.mark-birdie, .receipt-table td.mark-eagle,
             .legend-birdie, .legend-eagle {
                 -webkit-print-color-adjust: exact !important;
@@ -1119,6 +1153,13 @@
         // The round this document belongs to. Only the retired print path carried this,
         // which meant a shared Receipt had no course or date on it.
         let html = buildReceiptHeader();
+
+        // PRINT AT THE TOP, where somebody looking for it will actually find it -
+        // the existing buttons sit at the very bottom, past the whole document. Uses
+        // window.print(), so the system print/share sheet handles Save PDF, AirDrop
+        // and the rest; building a second PDF renderer would mean a second source of
+        // truth for the money. Hidden in print by the .btn-primary rule above.
+        html += `<button class="btn-primary" style="margin-bottom:12px;" onclick="printReceipt()">\uD83D\uDDA8\uFE0F Print / Save PDF</button>`;
 
         html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
             <div class="settle-header">${(function () {
