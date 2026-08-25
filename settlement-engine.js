@@ -936,6 +936,9 @@
         // (2v2) matches split evenly between teammates, matching the same convention Trip
         // Mode's money settlement already uses for team-level bets.
         const sideMatches = data.sideMatches || {};
+        // Which golfers are on which side of each match, recorded as the loop runs so
+        // the segment detail below can be attributed without re-deriving teams.
+        const smDetail = {};
         Object.keys(sideMatches).forEach(matchId => {
             const sm = sideMatches[matchId];
             const teamAPlayers = allPlayers.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id));
@@ -976,6 +979,7 @@
                 // receipt that buildSideMatchReceipts() already produces.
                 const nPress = (sm.holePresses ? Object.keys(sm.holePresses).length : 0)
                              + (sm.overallPresses ? Object.keys(sm.overallPresses).length : 0);
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
                 const smLabel = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
                     + (nPress > 0 ? ` (+${nPress} press${nPress === 1 ? '' : 'es'})` : '');
                 teamAPlayers.forEach(p => addAmount(p, aShare, smLabel));
@@ -987,6 +991,7 @@
                 const t1Share = calc.t1TotalMoney / teamAPlayers.length;
                 const t2Share = -calc.t1TotalMoney / teamBPlayers.length;
                 const nPress2 = manualPresses.length;
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
                 const smLabel2 = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
                     + (nPress2 > 0 ? ` (+${nPress2} press${nPress2 === 1 ? '' : 'es'})` : '');
                 teamAPlayers.forEach(p => addAmount(p, t1Share, smLabel2));
@@ -1008,6 +1013,54 @@
 
         const netTotals = {};
         Object.values(wholeDollar).forEach(v => { netTotals[v.name] = v.net; });
+
+        // ---- SIDE MATCH SEGMENT DETAIL -------------------------------------
+        //
+        // ADDITIVE NOTE LINES ONLY. The moving Side Match total above is unchanged and
+        // still IS the golfer's money; these lines sit under it as `note: true` and
+        // explain what made it up - the original wager and each press, with its stake
+        // and the hole it started on.
+        //
+        // NOTHING IS RECOMPUTED. buildSideMatchReceipts() already breaks each match
+        // into canonical segments, and it does so by calling the SAME engines
+        // settlement uses with growing press prefixes, so each press's contribution is
+        // the delta it actually caused and the segments sum to the match total by
+        // construction. That function is called once here and read.
+        //
+        // Every press storage shape the app has ever written is handled by that
+        // function rather than by anything here: Match/Nassau manual presses, Stroke
+        // overall presses ({startHole, stake}), Stroke per-hole presses
+        // ({fromHole, newStake}), custom stakes, and legacy presses with no stake at
+        // all. Forcing one shape onto another is exactly how a press stops being
+        // counted, so the shapes are left where they are.
+        if (typeof buildSideMatchReceipts === 'function') {
+            let receipts = [];
+            try { receipts = buildSideMatchReceipts(data, courseData, savedScores) || []; }
+            catch (e) { receipts = []; }   // detail is never worth taking settlement down for
+
+            receipts.forEach(rec => {
+                const d = smDetail[rec.matchId];
+                if (!d || !rec.segments || rec.segments.length === 0) return;
+                // A single-segment match has nothing to explain that the total does not
+                // already say.
+                if (rec.segments.length < 2) return;
+
+                rec.segments.forEach(seg => {
+                    const money = Number(seg.money) || 0;
+                    if (!isFinite(money)) return;
+                    const where = seg.startHole ? ` \u00B7 H${seg.startHole}` : '';
+                    const stake = (seg.stake !== undefined && seg.stake !== null)
+                        ? ` \u00B7 $${seg.stake}${seg.perHole ? '/hole' : ''}` : '';
+                    const label = `${seg.label}${stake}${where}`;
+                    // toSideA says which side the money went to; each teammate's share is
+                    // the segment split the same way the moving line was split.
+                    const aShare = (money === 0) ? 0 : (seg.toSideA ? money : -money) / (d.teamA.length || 1);
+                    const bShare = (money === 0) ? 0 : (seg.toSideA ? -money : money) / (d.teamB.length || 1);
+                    d.teamA.forEach(p => addNote(p, aShare, label));
+                    d.teamB.forEach(p => addNote(p, bShare, label));
+                });
+            });
+        }
 
         // ---- RECONCILING THE BREAKDOWN TO THE FINAL NUMBER -----------------
         //
