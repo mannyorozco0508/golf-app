@@ -153,6 +153,8 @@
         .rt-net .rt-name { font-style: italic; }
         /* Player ledger. Note rows are indented and muted because they are ALREADY
            inside the row above them; only the un-indented rows add up to FINAL NET. */
+        /* Tie explanation sits under the line it explains, quieter than it. */
+        .nf-explain { font-size: 0.72rem; color: var(--text-muted); padding: 1px 0 1px 18px; }
         .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
         .pl-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
         .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
@@ -865,9 +867,64 @@
         }
         if (r.valid && r.net) {
             html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
+            // A TIE IS EXPLAINED, NOT JUST MARKED.
+            //
+            // "(split)" was accurate and told a golfer nothing. The rule behind it is
+            // the least intuitive money rule in the app: golfers tied for a place
+            // occupy every position the tie spans and share ALL of that money, so two
+            // tied for 1st in a $40/$30 structure take $70 between them and the next
+            // golfer finishes 3rd with nothing. People query that, on the spot, and
+            // "(split)" gives them nothing to check.
+            //
+            // Every figure below is read from the canonical result - the positions the
+            // engine consumed, the money it assigned to them, the integers it
+            // allocated. Nothing is recomputed here; a second implementation of the
+            // tie rule is exactly how a receipt starts disagreeing with the money.
+            // The ALLOCATED place values, straight from the engine. Calling
+            // moneyPoolNetPlaceCents() here instead was wrong: that is the legacy
+            // percentage path, and on a whole-dollar round it returns 3999/3001 where
+            // the engine allocated 4000/3000 - so the explanation read
+            // "$39.99 + $30.01 = $70" underneath a $70 line. Consume, never recompute.
+            const placeCents = r.net.placeCents || null;
             r.net.lines.forEach(l => {
-                const who = l.split ? `T${l.place}: ${l.names.join(' / ')} (split)` : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
+                const tied = l.ids.length > 1;
+                const who = tied
+                    ? `T${l.place}: ${l.names.join(' / ')}`
+                    : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
                 html += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+
+                if (!tied) return;
+
+                // Which positions this tie consumed, and what each was worth.
+                const span = l.ids.length;
+                const first = l.place, last = l.place + span - 1;
+                const parts = [];
+                if (placeCents) {
+                    for (let k = first; k <= last && k <= placeCents.length; k++) parts.push($(placeCents[k - 1]));
+                }
+                const posLabel = last > first ? `Positions ${first}\u2013${last}` : `Position ${first}`;
+                html += `<div class="nf-explain">${posLabel}`
+                    + (parts.length > 1 ? ` \u00B7 ${parts.join(' + ')} = ${$(l.cents)}` : ` \u00B7 ${$(l.cents)}`)
+                    + `</div>`;
+
+                // The per-golfer split, from the same allocator settlement used. In a
+                // whole-dollar round an odd pot is deliberately uneven - $100 over three
+                // is $34/$33/$33 - so the actual amounts are printed rather than an
+                // average that would not add up.
+                const each = (typeof allocateWholeDollars === 'function' && data.settlementMode === 'whole-dollar')
+                    ? allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100)
+                    : l.ids.map(() => l.cents / l.ids.length);
+                const same = each.every(c => c === each[0]);
+                html += `<div class="nf-explain">${same
+                    ? `${$(each[0])} each`
+                    : l.names.map((n, i) => `${n} ${$(each[i])}`).join(' \u00B7 ')}</div>`;
+
+                // What it cost the golfer behind them, stated plainly - this is the part
+                // that gets queried in the car park.
+                if (span > 1) {
+                    html += `<div class="nf-explain">The tie consumed ${span} paid place${span === 1 ? '' : 's'}, `
+                        + `so the next golfer finishes ${last + 1}${['st','nd','rd'][last]||'th'}.</div>`;
+                }
             });
             if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
         }
