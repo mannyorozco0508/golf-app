@@ -21,6 +21,12 @@
             --bg-card: #ffffff;
             --text-main: #1a1a1a;
             --text-muted: #666;
+            /* Between --text-main and --text-muted. Introduced because the net rows
+               on the scorecard and leaderboards need to be clearly readable while
+               staying subordinate to gross - muted was too faint, main too loud.
+               It was previously referenced without ever being defined, so those rows
+               ran on a hard-coded fallback and did not react to dark mode. */
+            --text-secondary: #4a5568;
             --brand-green: #0f4c3a;
             --brand-navy: #1d3557;
             --accent-teal: #2a9d8f;
@@ -40,6 +46,7 @@
             --bg-card: #1e2426;
             --text-main: #e8ecec;
             --text-muted: #9aa8a7;
+            --text-secondary: #c2cecd;
             --brand-green: #2f9e78;
             --brand-navy: #4a7bb5;
             --accent-teal: #3dbfae;
