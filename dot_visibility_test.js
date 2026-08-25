@@ -223,8 +223,8 @@ describe('DOTS IN THE RECEIPT', () => {
             var n = {}; Object.keys(o.netByName).forEach(function(k){ n[o.netByName[k].name] = o.netByName[k].net; });
             return n;`);
         const printed = {};
-        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>(Won|Owes) \$([\d.]+)<\/span>/g)]
-            .forEach(m => { printed[m[1]] = (m[2] === 'Won' ? 1 : -1) * parseFloat(m[3]); });
+        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d.]+) NET<\/span>/g)]
+            .forEach(m => { printed[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3]); });
         Object.keys(led).forEach(n => {
             if (led[n] === 0) return;
             assert.equal(printed[n], led[n], `${n}: Receipt ${printed[n]} vs ledger ${led[n]}`);
@@ -234,8 +234,8 @@ describe('DOTS IN THE RECEIPT', () => {
     test('Who Pays Who reconstructs the printed Final Results', () => {
         const r = receipt();
         const printed = {};
-        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>(Won|Owes) \$([\d.]+)<\/span>/g)]
-            .forEach(m => { printed[m[1]] = (m[2] === 'Won' ? 1 : -1) * parseFloat(m[3]); });
+        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d.]+) NET<\/span>/g)]
+            .forEach(m => { printed[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3]); });
         const tx = [...String(r.top).matchAll(/<span>([^<]+) → ([^<]+)<\/span><span[^>]*>\$([\d.]+)<\/span>/g)]
             .map(m => ({ from: m[1], to: m[2], amount: parseFloat(m[3]) }));
         const rb = {}; Object.keys(printed).forEach(n => { rb[n] = 0; });
