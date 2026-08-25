@@ -27,7 +27,20 @@ const J = JSON.stringify;
 const CD = makeCourseData(18);
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ST = read('settlement.html');
-const PRINT_CSS = ST.slice(ST.indexOf('@media print'), ST.indexOf('@media print') + 2400);
+// BOUNDED BY THE BLOCK, not by a character count. This sliced a fixed 2400
+// characters from '@media print', so adding any rule near the top of the block -
+// the dark-mode reset, in this case - pushed the later rules out of the window and
+// broke assertions about CSS that was still perfectly present.
+const PRINT_CSS = (() => {
+    const start = ST.indexOf('@media print');
+    if (start === -1) return '';
+    let depth = 0, i = ST.indexOf('{', start);
+    for (let j = i; j < ST.length; j++) {
+        if (ST[j] === '{') depth++;
+        else if (ST[j] === '}') { depth--; if (depth === 0) return ST.slice(start, j + 1); }
+    }
+    return ST.slice(start);
+})();
 
 const ENG = (() => {
     const sb = loadJsFile('money-engine.js');
