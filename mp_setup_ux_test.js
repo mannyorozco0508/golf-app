@@ -412,7 +412,7 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
         CD18.forEach(h => { s[`p${p.id}_h${h.hole}`] = h.par + i; })); return s; };
     const MARTY = () => JSON.parse(JSON.stringify({
         players: P12, courseData: CD18, gameFormat: 'stroke',
-        kpWinners: { h3: ID(0), h9: ID(1), h13: ID(2), h17: ID(3) },
+        kpWinners: { h3: ID(0), h9: ID(1), h13: ID(2), h17: ID(3) }, kpConfirmed: { confirmed: true },
         moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [3, 9, 13, 17] },
             net: { payoutMode: 'custom', amounts: [40, 30] },
@@ -473,7 +473,13 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
     });
 
     test('adaptability A–F: totals and remainder follow the config, no code change', () => {
-        const mk = net => ({ players: P12, moneyPool: { enabled: true, buyIn: 40,
+        // This case is about NET and SKINS config adaptability, so its KP is decided
+        // outright - otherwise the unresolved KP money would make the zero-sum
+        // assertion below fail for a reason that has nothing to do with what it tests.
+        const mk = net => ({ players: P12,
+            kpConfirmed: { confirmed: true },
+            kpNoWinner: { h3: true, h9: true, h13: true, h17: true },
+            moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [3, 9, 13, 17] }, net,
             skins: { mode: 'remainder', scoring: 'net' } } });
         const cases = [
