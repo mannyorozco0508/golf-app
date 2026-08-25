@@ -1328,3 +1328,80 @@
                 ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
         };
     }
+
+    // ========================================================================
+    // ONE ROUND TOTAL PER GOLFER — gross, net, and whether the round is finished
+    //
+    // ADDITIVE. Nothing above this line changed.
+    //
+    // WHY THIS EXISTS
+    //
+    // Three places were computing a golfer's round totals independently: the
+    // Net Finish standings in pool-engine.js, the per-hole skins scores here,
+    // and the Finish Round modal in index.html. The first two guard on a posted
+    // score. The third did not, and the difference was not cosmetic:
+    //
+    //     courseData.forEach(h => {
+    //         const v = savedScores[...];
+    //         if (v > 0) gross += parseInt(v, 10);      // guarded
+    //         strokesOff += getStrokes(h.hcpIndex, ...) // NOT guarded
+    //     });
+    //
+    // Gross counted only the holes played; the handicap deducted all eighteen.
+    // A golfer who walked in after seventeen holes was rendered as a finished
+    // round - "Gross 96 / Net 83" - on the very screen an organizer uses to
+    // check the scores before paying people. Nothing on it said the round was
+    // short.
+    //
+    // WHAT THIS RETURNS, and why the shape matters
+    //
+    //   holesPlayed / holesRequired  so a caller can SAY "17 of 18" instead of
+    //                                inventing a total
+    //   complete                     the single question a UI should ask before
+    //                                showing a finishing position
+    //   gross                        the holes actually posted, always safe
+    //   net                          null unless the round is complete
+    //
+    // net is deliberately null on an unfinished round rather than a partial
+    // number. A partial net is not a smaller result, it is a meaningless one,
+    // and returning something plausible is how it ended up on screen in the
+    // first place. A caller that wants to show progress can use grossSoFar and
+    // strokesSoFar, which are honest about what they are.
+    //
+    // Handicap allocation is getStrokes/parseHcp from money-engine.js - the same
+    // pair the leaderboard, the skins ledger and every net wager already use. No
+    // new handicap arithmetic is introduced here or anywhere downstream.
+    // ========================================================================
+    function computePlayerRoundTotals(player, courseData, savedScores) {
+        const holes = (courseData || []);
+        const hcp = (typeof parseHcp === 'function') ? parseHcp(player && player.hcp) : 0;
+
+        let gross = 0, strokesSoFar = 0, holesPlayed = 0;
+        holes.forEach(h => {
+            const v = savedScores ? savedScores['p' + player.id + '_h' + h.hole] : null;
+            if (v && v > 0) {
+                gross += parseInt(v, 10);
+                // Strokes accrue ONLY for holes that were actually played. This
+                // single guard is the whole fix.
+                strokesSoFar += (typeof getStrokes === 'function') ? getStrokes(h.hcpIndex, hcp) : 0;
+                holesPlayed += 1;
+            }
+        });
+
+        const holesRequired = holes.length;
+        const complete = holesRequired > 0 && holesPlayed === holesRequired;
+
+        return {
+            id: player.id,
+            name: player.name,
+            hcp,
+            holesPlayed,
+            holesRequired,
+            complete,
+            grossSoFar: gross,
+            strokesSoFar,
+            // Final figures only exist for a finished round.
+            gross: complete ? gross : null,
+            net: complete ? gross - strokesSoFar : null,
+        };
+    }
