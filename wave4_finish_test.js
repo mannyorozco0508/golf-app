@@ -76,9 +76,23 @@ describe('DOLLAR GAME — retired from the active product', () => {
         });
         assert.ok(!/kpWinners\//.test(read('skins.html')), 'skins.html can write a KP winner');
         const idx = read('index.html');
-        const writes = (idx.match(/kpWinners\//g) || []).length;
-        assert.equal(writes, 1, 'index.html must have exactly the pool writer, no more');
-        assert.ok(/function savePoolKp/.test(idx), 'and that writer is savePoolKp');
+        // AMENDED AGAIN (KP live leaders). A raw count of "kpWinners/" conflated
+        // three different things: setting a winner, clearing one, and reading the
+        // current leader to render it. The rule this test actually protects is that
+        // no path can put a KP winner into settlement without going through the
+        // canonical writer and clearing the confirmation alongside it.
+        assert.ok(/function saveKpLeader/.test(idx), 'the canonical KP writer exists');
+        assert.ok(/function savePoolKp/.test(idx), 'and the legacy entry point survives');
+        const sp = idx.slice(idx.indexOf('function savePoolKp'));
+        const spBody = sp.slice(0, sp.indexOf('\n    }'));
+        assert.ok(!/db\.ref/.test(spBody), 'savePoolKp delegates rather than writing directly');
+        // Every place that touches kpWinners must clear kpConfirmed in the same update.
+        idx.split('db.ref(').forEach(b => {
+            const seg = b.slice(-900);
+            if (!/updates\['kpWinners\/h'/.test(seg)) return;
+            assert.match(seg, /updates\['kpConfirmed'\]/,
+                'a KP winner write that leaves the round confirmed would be stale money');
+        });
     });
 
     test('the duplicate winner-picker is gone from both places it lived', () => {
