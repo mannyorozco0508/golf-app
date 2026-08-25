@@ -390,14 +390,25 @@ describe('THE ANCHOR — one definition of who won a skin', () => {
     });
 
     test('the ledger reuses the settlement primitives rather than reimplementing them', () => {
+        // Both slices are BOUNDED to their own function. Slicing to end-of-file made
+        // this assertion fail the moment any later function in settlement-engine.js
+        // legitimately used getStrokes - the skins ledger was untouched, it just was
+        // no longer the last thing in the file. The rule being protected is about
+        // buildSkinsLedgerFor's own body, so that is what gets read.
         const src = read('settlement-engine.js');
-        const fn = src.slice(src.indexOf('function buildSkinsLedgerFor'));
+        const bounded = (name) => {
+            const start = src.indexOf('function ' + name);
+            assert.notEqual(start, -1, name + ' was renamed or removed');
+            const end = src.indexOf('\n    function ', start + 10);
+            return src.slice(start, end === -1 ? src.length : end);
+        };
+        const fn = bounded('buildSkinsLedgerFor');
         assert.match(fn, /getSkinsHoleScoresForSettle\(participants, savedScores, h\)/,
             'Hole scores (and therefore net strokes) must come from the canonical helper.');
         assert.doesNotMatch(fn, /getStrokes\(/, 'The ledger must not do its own handicap allocation.');
         assert.doesNotMatch(fn, /parseHcp\(/, 'The ledger must not parse handicaps itself.');
 
-        const wrapper = src.slice(src.indexOf('function computeSkinsHoleLedger'));
+        const wrapper = bounded('computeSkinsHoleLedger');
         assert.match(wrapper, /fieldParticipants\(data\)/, 'Field must come from the canonical participant resolver.');
         assert.match(wrapper, /resolveSkinsMode\(data\)/, 'Mode must come from the canonical resolver.');
         assert.match(wrapper, /data\.skinsCarryOver !== false/, 'Carry must be read the same way settlement reads it.');
