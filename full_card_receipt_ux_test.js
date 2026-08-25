@@ -435,8 +435,11 @@ describe('MONEY READS LIKE MONEY', () => {
 
     test('Final Results, Birdie Game and Match Net all use the shared rule', () => {
         const st = read('settlement.html');
-        assert.ok(/Won \$\$\{fmtWhole\(amt\)\}/.test(st), 'Final Results must not print cents');
-        assert.ok(/Owes \$\$\{fmtWhole\(Math\.abs\(amt\)\)\}/.test(st));
+        // The wording moved from "Won $X" to "+$X NET"; the rule is unchanged - Final
+        // Results goes through fmtWhole and must not print cents.
+        assert.ok(/\+\$\$\{fmtWhole\(amt\)\} NET/.test(st), 'Final Results must not print cents');
+        assert.ok(/-\$\$\{fmtWhole\(Math\.abs\(amt\)\)\} NET/.test(st),
+            'the negative branch must go through fmtWhole too');
         assert.ok(/fmtSignedHtml\(totals\[p\.id\] \|\| 0\)/.test(st), 'Birdie Game printed $-210.00');
         assert.ok(/\+\$\$\{fmtWhole\(r\.netAmount\)\}/.test(st), 'MATCH NET printed +$60.00');
     });
