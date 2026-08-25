@@ -484,7 +484,22 @@
         const poolNet = !!(data.moneyPool && data.moneyPool.enabled
             && ((data.moneyPool.net && Number(data.moneyPool.net.amount) > 0)
                 || (data.moneyPool.skins && data.moneyPool.skins.scoring !== 'gross')));
-        const skinsNetMode = (typeof resolveSkinsMode === 'function')
+        // GUARDED ON A SKINS GAME EXISTING AT ALL.
+        //
+        // resolveSkinsMode() answers "which basis WOULD this round's skins use", and
+        // its documented default is 'split' - so on a round with no skins game
+        // whatsoever it still returns a non-gross answer. Reading it unguarded meant
+        // any handicapped round printed a net row per golfer, doubling the height of
+        // the scorecard on rounds where net decides nothing. Found by an acceptance
+        // test asserting the opposite case.
+        const hasSkinsGame = !!(
+            (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0)
+            || (data.moneyPool && data.moneyPool.skins
+                && data.moneyPool.skins.mode && data.moneyPool.skins.mode !== 'none')
+        );
+        const skinsNetMode = hasSkinsGame && (typeof resolveSkinsMode === 'function')
             ? resolveSkinsMode(data) !== 'gross' : false;
         const netMatters = anyHcp && (poolNet || skinsNetMode || data.gameFormat === 'stableford');
 
