@@ -110,6 +110,12 @@
         .lb-team { flex: 1; font-weight: bold; }
         .lb-sub { font-size: 0.72rem; color: var(--text-muted); font-weight: normal; }
         .lb-score { width: 70px; text-align: right; font-weight: bold; }
+        /* Same stacked gross-over-net treatment as the round leaderboard. Net stays
+           subordinate through size and weight, not by being muted into invisibility. */
+        .lb-score.score-cell { line-height: 1.15; white-space: nowrap; }
+        .score-gross { display: block; font-size: 1.05rem; font-weight: bold; }
+        .score-net { display: block; font-size: 0.8rem; color: var(--text-secondary, #4a5568); font-weight: 600; }
+        .toggle-rank-label { font-size: 0.72rem; color: var(--text-muted); margin-right: 6px; }
         .lb-row.leader { background: #fff8e1; }
         html.dark-mode .lb-row.leader { background: #2b2712; }
 
@@ -265,6 +271,7 @@
         <div class="trip-section-body">
             <p class="trip-section-sub">Totals across every linked round so far. Matches players by name across rounds.</p>
             <div class="toggle-row">
+                <span class="toggle-rank-label">Ranking:</span>
                 <span class="toggle-label-sm active" id="lb-mode-label-gross" onclick="setLbMode('gross')">Gross</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="lb-mode-switch" onchange="setLbMode(this.checked ? 'net' : 'gross')">
@@ -759,6 +766,13 @@
     let tripData = {};
     let lbMode = 'gross';
 
+    // ONE AMOUNT RULE for the whole page. Whole dollars unless the figure genuinely
+    // carries cents, which only a legacy cent-settled round produces.
+    function fmtAmt(v) {
+        const n = Math.abs(Number(v) || 0);
+        return Math.abs(n - Math.round(n)) < 0.005 ? String(Math.round(n)) : n.toFixed(2);
+    }
+
     function setLbMode(mode) {
         lbMode = mode;
         document.getElementById('lb-mode-switch').checked = (mode === 'net');
@@ -965,14 +979,18 @@
         }
 
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">${lbMode === 'net' ? 'Net' : 'Gross'}</span>
+            <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">Score</span>
         </div>`;
         rows.forEach((r, i) => {
-            const score = lbMode === 'net' ? r.net : r.gross;
+            // BOTH TOTALS, ALWAYS. This computed gross and net for every golfer and
+            // then showed whichever the toggle happened to be on - so comparing the
+            // trip board against a paper card meant flipping the toggle and holding a
+            // number in your head. Same fix, same stacked shape and the same class
+            // names as the round leaderboard, so the two screens read identically.
             html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
                 <span class="lb-pos">${i + 1}</span>
                 <span class="lb-team">${r.name}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
-                <span class="lb-score">${score}</span>
+                <span class="lb-score score-cell"><span class="score-gross">${r.gross}</span><span class="score-net">Net ${r.net}</span></span>
             </div>`;
         });
         container.innerHTML = html;
@@ -1049,10 +1067,16 @@
             });
         });
 
+        // WHOLE DOLLARS, like the Receipt. Round nets are already whole in
+        // whole-dollar mode, so "$40.00" was two decimal places of noise that made
+        // the trip look like a different system from the round it summed. A genuine
+        // fraction from a legacy cent round still prints its cents.
         function fmtMoney(amt) {
-            if (amt > 0.005) return `<span class="val-pos">+$${amt.toFixed(2)}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">-$${Math.abs(amt).toFixed(2)}</span>`;
-            return `<span class="val-even">$0.00</span>`;
+            const whole = Math.abs(amt - Math.round(amt)) < 0.005;
+            const show = v => whole ? String(Math.round(v)) : v.toFixed(2);
+            if (amt > 0.005) return `<span class="val-pos">+$${show(amt)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-$${show(Math.abs(amt))}</span>`;
+            return `<span class="val-even">$0</span>`;
         }
 
         const netTotals = {};
@@ -1090,7 +1114,7 @@
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">${msg}</div>`;
         } else {
             transactions.forEach(t => {
-                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${t.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
             });
         }
         html += `</div>`;
@@ -1397,7 +1421,7 @@
         let html = '';
         if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}. Adjust the per-place amounts so they match.
+                ⚠️ Payout amounts add up to $${fmtAmt(totalAllocated)}, but the pool is $${fmtAmt(pool)}. Adjust the per-place amounts so they match.
             </div>`;
         }
 
@@ -1412,7 +1436,7 @@
 
             group.forEach(s => {
                 const tieTag = group.length > 1 ? ' (tied)' : '';
-                html += `<div class="ledger-row"><span>${ordinal(rank)}${tieTag} — ${s.name}</span><span class="${perPlayer > 0 ? 'val-pos' : 'val-even'}">$${perPlayer.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(rank)}${tieTag} — ${s.name}</span><span class="${perPlayer > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(perPlayer)}</span></div>`;
             });
         });
 
@@ -1496,7 +1520,7 @@
         if (cachedMoneyTransactions.length === 0) {
             text += `Everyone's settled up — no money changes hands.\n`;
         } else {
-            cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${t.amount.toFixed(2)}\n`; });
+            cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
         }
 
         if (cachedPointsStandings && cachedPointsStandings.length > 0) {
