@@ -170,8 +170,8 @@ describe('THE RENDERED RECEIPT USES THE SEPARATORS', () => {
         const r = render(big.data);
         // Read the printed figures back, strip the commas, and compare to the ledger.
         const printed = {};
-        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>(Won|Owes) \$([\d,.]+)<\/span>/g)]
-            .forEach(m => { printed[m[1]] = (m[2] === 'Won' ? 1 : -1) * parseFloat(m[3].replace(/,/g, '')); });
+        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d,.]+) NET<\/span>/g)]
+            .forEach(m => { printed[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3].replace(/,/g, '')); });
         Object.keys(led).forEach(n => {
             if (led[n] === 0) return;
             assert.equal(printed[n], led[n], `${n}: printed ${printed[n]} vs ledger ${led[n]}`);
@@ -182,8 +182,8 @@ describe('THE RENDERED RECEIPT USES THE SEPARATORS', () => {
     test('Who Pays Who still reconstructs every balance', () => {
         const r = render(big.data);
         const printed = {};
-        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>(Won|Owes) \$([\d,.]+)<\/span>/g)]
-            .forEach(m => { printed[m[1]] = (m[2] === 'Won' ? 1 : -1) * parseFloat(m[3].replace(/,/g, '')); });
+        [...String(r.top).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d,.]+) NET<\/span>/g)]
+            .forEach(m => { printed[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3].replace(/,/g, '')); });
         const tx = [...String(r.top).matchAll(/<span>([^<]+) → ([^<]+)<\/span><span[^>]*>\$([\d,.]+)<\/span>/g)]
             .map(m => ({ from: m[1], to: m[2], amount: parseFloat(m[3].replace(/,/g, '')) }));
         const rb = {}; Object.keys(printed).forEach(n => { rb[n] = 0; });
@@ -196,7 +196,11 @@ describe('THE RENDERED RECEIPT USES THE SEPARATORS', () => {
         // look exactly as it did before this change.
         const small = duel(50);
         const r = render(small.data);
-        assert.ok(!/,/.test(String(r.top).match(/Won \$[\d,.]+/)[0]), 'no separator where none is due');
+        // Final Results now reads "+$150 NET" rather than "Won $150"; the rule being
+        // checked - no thousands separator below a thousand - is unchanged.
+        const amt = String(r.top).match(/[+-]\$[\d,.]+ NET/);
+        assert.ok(amt, 'a net figure must be printed');
+        assert.ok(!/,/.test(amt[0]), 'no separator where none is due');
         assert.match(r.top, /\$150/);
     });
 });
