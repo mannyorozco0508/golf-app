@@ -311,6 +311,9 @@ function computeMoneyPool(data, courseData, savedScores) {
     participants.forEach(p => { perPlayer[String(p.id)] = -buyInCents; });
     const pay = (id, cents) => { perPlayer[String(id)] += cents; };
     let refundCents = 0;
+    // KP money nobody has resolved yet. Withheld from every golfer and surfaced so
+    // every surface can agree the round is not settled.
+    let kpUnresolvedCents = 0;
     const refundReason = t => result.refund.reasons.push(t);
 
     // Whole-dollar mode allocates each bucket in dollars and stores the result as
@@ -321,6 +324,36 @@ function computeMoneyPool(data, courseData, savedScores) {
     const D = (dollars) => Math.round(dollars) * 100;
 
     // ---- KP ---------------------------------------------------------------
+    //
+    // UNRESOLVED IS NOT A REFUND.
+    //
+    // This block used to treat a KP hole with no winner as unclaimed and push the
+    // money into refundCents. That could not tell "nobody won it" from "nobody
+    // entered it" - so a $100 KP bucket nobody had typed in yet came back as $8 and
+    // $9 refund lines on twelve golfers' receipts, and the round presented itself as
+    // settled. Real money, quietly reassigned, on a screen that looked final.
+    //
+    // The two are now distinguished by an explicit organizer decision:
+    //
+    //   kpConfirmed not true          -> UNRESOLVED. Withheld from every player, and
+    //                                    every surface must refuse to call the round
+    //                                    final until somebody resolves it.
+    //   confirmed + winner            -> paid.
+    //   confirmed + noWinner: true    -> a legitimate refund. The organizer has said
+    //                                    out loud that nobody won this hole. A blank
+    //                                    field never means this.
+    //   winner not a pool participant -> refund, unchanged. Bragging rights.
+    //
+    // WHAT THIS DOES TO ZERO-SUM, deliberately: while money is unresolved the player
+    // ledger sums to -kpUnresolvedCents rather than 0, because the buy-ins were
+    // charged and that share has not been handed out. The invariant that still holds
+    // absolutely - and the one worth protecting - is that no money disappears:
+    //
+    //     prizes + refunds + kpUnresolvedCents === totalPoolCents
+    //
+    // Confirming the KPs distributes the money and zero-sum returns to 0.
+    const kpConf = data.kpConfirmed;
+    const kpIsConfirmed = !!(kpConf && kpConf.confirmed === true);
     const kpCfg = pool.kp;
     if (kpCfg && (Number(kpCfg.amount) || 0) > 0) {
         const amountCents = Math.round(Number(kpCfg.amount) * 100);
@@ -332,22 +365,42 @@ function computeMoneyPool(data, courseData, savedScores) {
             ? allocateWholeDollars(amountCents / 100, holes.map(() => 1)).map(D)
             : splitCentsEvenly(amountCents, holes.length);
         const kpWinners = data.kpWinners || {};
+        const kpNoWinner = (data.kpNoWinner || {});
         const lines = [];
-        let unclaimed = 0;
+        let unclaimed = 0;      // legitimately nobody's - refunds
+        let unresolved = 0;     // nobody has said yet - withheld
         holes.forEach((h, i) => {
             const wid = kpWinners['h' + h];
+            const declaredNoWinner = kpNoWinner['h' + h] === true;
+
             // Only a POOL PARTICIPANT can take pool money. A non-participant on the
             // sticks gets bragging rights; their KP share refunds to the field.
-            if (wid && isIn(wid)) {
+            if (kpIsConfirmed && wid && isIn(wid)) {
                 pay(wid, shares[i]);
-                lines.push({ hole: h, winnerId: String(wid), winnerName: nameOf(wid), cents: shares[i] });
-            } else {
+                lines.push({ hole: h, winnerId: String(wid), winnerName: nameOf(wid),
+                             cents: shares[i], state: 'paid' });
+            } else if (kpIsConfirmed && (declaredNoWinner || (wid && !isIn(wid)))) {
+                // Confirmed AND either the organizer said outright that nobody won it,
+                // or the winner is not in the pool. A BLANK hole never lands here:
+                // silence is not a decision, so it stays unresolved even on a round
+                // somebody marked confirmed. Confirmation is refused upstream while a
+                // hole is blank, and this is the defensive half of that rule.
                 unclaimed += shares[i];
-                lines.push({ hole: h, winnerId: null, winnerName: null, cents: shares[i] });
+                lines.push({ hole: h, winnerId: null, winnerName: null,
+                             cents: shares[i], state: 'refunded' });
+            } else {
+                // Nobody has resolved this hole. The money stays where it is.
+                unresolved += shares[i];
+                lines.push({ hole: h, winnerId: wid ? String(wid) : null,
+                             winnerName: wid ? nameOf(wid) : null,
+                             cents: shares[i], state: 'unresolved' });
             }
         });
         if (unclaimed > 0) { refundCents += unclaimed; refundReason('Unclaimed KP money refunded to the field.'); }
-        result.kp = { amountCents, perHoleCents: shares, lines, unclaimedCents: unclaimed };
+        kpUnresolvedCents = unresolved;
+        result.kp = { amountCents, perHoleCents: shares, lines,
+                      unclaimedCents: unclaimed, unresolvedCents: unresolved,
+                      confirmed: kpIsConfirmed };
     }
 
     // ---- NET FINISH --------------------------------------------------------
@@ -537,6 +590,11 @@ function computeMoneyPool(data, courseData, savedScores) {
         });
         result.refund.cents = refundCents;
     }
+
+    // Canonical, so no surface has to infer it. `settled` is the single question a
+    // UI should ask before printing the word FINAL.
+    result.kpUnresolvedCents = kpUnresolvedCents;
+    result.settled = kpUnresolvedCents === 0;
 
     result.perPlayerCents = perPlayer;
     return result;
