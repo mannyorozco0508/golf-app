@@ -51,8 +51,8 @@ const ledger = d => call(`
     return { net: n, tx: o.transactions };`);
 const printedFinal = top => {
     const out = {};
-    [...String(top).matchAll(/<span>([^<]+)<\/span><span[^>]*>(Won|Owes) \$([\d.]+)<\/span>/g)]
-        .forEach(m => { out[m[1]] = (m[2] === 'Won' ? 1 : -1) * parseFloat(m[3]); });
+    [...String(top).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d.]+) NET<\/span>/g)]
+        .forEach(m => { out[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3]); });
     return out;
 };
 
