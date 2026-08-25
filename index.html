@@ -617,6 +617,10 @@
         .glr-organizer { border-top: 1px solid var(--border-mid); margin-top: 8px; padding-top: 10px; }
         .glr-organizer .glr-title { color: var(--accent-teal); }
         .fr-verified-badge { font-size: 0.72rem; color: var(--brand-green); font-weight: bold; margin-bottom: 6px; }
+        .fr-gate { background: var(--warn-bg); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+        .fr-gate-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.03em; color: var(--warn-text); margin-bottom: 4px; }
+        .fr-gate-ok { font-size: 0.78rem; color: var(--brand-green); font-weight: bold; padding: 1px 0; }
+        .fr-gate-warn { font-size: 0.78rem; color: var(--warn-text); font-weight: bold; padding: 1px 0; }
         .fr-review-lede { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; }
         .fr-secondary-btn { width: 100%; margin-top: 8px; padding: 11px; background: none; border: none; color: var(--text-muted); font-size: 0.82rem; text-decoration: underline; cursor: pointer; }
         .fr-back-btn { background: none; border: none; color: var(--brand-green); font-weight: bold; font-size: 0.85rem; padding: 6px 0 10px 0; cursor: pointer; }
@@ -1061,6 +1065,7 @@
                 Before money changes hands, check these against the physical scorecards.
             </div>
             <div id="fr-player-list"></div>
+            <div id="fr-kp-block"></div>
             <button class="btn-primary" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
             <button class="fr-secondary-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
         </div>
@@ -1077,6 +1082,7 @@
         <!-- STATE 3: RESULTS -->
         <div id="fr-state-results" style="display:none;">
             <button class="fr-back-btn" onclick="frBackToReview()">‹ Back to Review</button>
+            <div id="fr-settle-gate"></div>
             <div id="fr-verified-badge"></div>
             <div class="fr-money-title" id="fr-money-title">Final Money</div>
             <div id="fr-final-money"></div>
@@ -3405,7 +3411,54 @@
         // Missing scores mean at least one wager cannot be settled honestly. The
         // conservative rule applies: show the position, never call it FINAL, and never
         // invent a score or a winner to fill the gap.
-        if (titleEl) titleEl.textContent = missing.length > 0 ? 'Money So Far \u2014 Not Final' : 'Final Money';
+        // ---- THE FINAL-STATE GATE ------------------------------------------
+        //
+        // Two independent requirements, and the round is FINAL only when every one
+        // that APPLIES is satisfied. They stay separate concepts - scores can be
+        // verified while KP is open, and vice versa - but the word "Final" waits for
+        // both. Anything less and the app would be presenting a settlement that
+        // still has money hanging in it, which is exactly what produced the $8/$9
+        // refund lines on a receipt nobody could argue with.
+        const kpOpen = frKpNeedsAttention();
+        // GATED ON MONEY THAT IS ACTUALLY HANGING, not on whether somebody chose to
+        // review. Unresolved KP and missing scores both mean dollars with no owner,
+        // so neither can be called final.
+        //
+        // scoresVerified is deliberately NOT part of this condition. Skipping review
+        // is a supported path - the modal offers "Skip Review & View Results" - so
+        // requiring verification would make Final Money unreachable for anyone who
+        // takes it, and would contradict the existing contract that a completed round
+        // shows its money without an extra tap. The verification state is still shown
+        // beside the KP state below, so the organizer sees both independently.
+        const notFinal = missing.length > 0 || kpOpen;
+        if (titleEl) titleEl.textContent = notFinal ? 'Money So Far \u2014 Not Final' : 'Final Money';
+
+        const gateEl = document.getElementById('fr-settle-gate');
+        if (gateEl) {
+            if (!notFinal) {
+                gateEl.innerHTML = '';
+            } else {
+                const rows = [];
+                rows.push(isScoresVerified()
+                    ? '<div class="fr-gate-ok">\u2713 Scores verified</div>'
+                    : '<div class="fr-gate-warn">\u26A0\uFE0F Scores not verified</div>');
+                const rk = frKpPool();
+                if (rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
+                    rows.push(kpOpen
+                        ? '<div class="fr-gate-warn">\u26A0\uFE0F KP winners not confirmed \u2014 $'
+                          + ((rk.kpUnresolvedCents || 0) / 100).toFixed(0) + ' still allocated to KP</div>'
+                        : '<div class="fr-gate-ok">\u2713 KP winners confirmed</div>');
+                }
+                if (missing.length > 0) {
+                    rows.push('<div class="fr-gate-warn">\u26A0\uFE0F ' + missing.length + ' score'
+                        + (missing.length === 1 ? '' : 's') + ' still missing</div>');
+                }
+                gateEl.innerHTML = '<div class="fr-gate">'
+                    + '<div class="fr-gate-head">Not final yet</div>' + rows.join('')
+                    + (kpOpen ? '<button class="fr-secondary-btn" onclick="frBackToReview()">Review KP Results</button>' : '')
+                    + '</div>';
+            }
+        }
 
         // THE BADGE READS PERSISTED STATE, NEVER THE IN-MEMORY FLAG. frReviewCompleted
         // records that a button was pressed; isScoresVerified() records that the write
@@ -3580,6 +3633,7 @@
     function frBackToReview() {
         frDetailPlayerId = null;
         renderFinishRoundReview();
+        renderFinishRoundKp();
         frSection('fr-state-review', true);
         frSection('fr-state-detail', false);
         frSection('fr-state-results', false);
@@ -3694,6 +3748,135 @@
                   + moved.map(m => '<div class="fr-impact-line fr-impact-money">' + m + '</div>').join('')
                 : '<div class="fr-impact-line" style="margin-top:8px;">Final money: no change</div>')
             + '</div>';
+    }
+
+    // ---- KP REVIEW & CONFIRMATION -------------------------------------------
+    //
+    // NO KP MATH HERE. Amounts come from computeMoneyPool()'s own kp.lines and its
+    // kpUnresolvedCents; this renders them and writes the organizer's decision.
+    //
+    // WHY CONFIRMATION EXISTS AT ALL. The engine cannot tell "nobody won it" from
+    // "nobody typed it in". Left alone it treated both as unclaimed and refunded the
+    // money - $100 of unentered KP came back as $8 and $9 lines on twelve receipts
+    // that called themselves final. Confirmation is the organizer saying out loud
+    // which of the two it was.
+    function frKpPool() {
+        if (typeof computeMoneyPool !== 'function') return null;
+        const cd = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        try { return computeMoneyPool(currentData, cd, currentData.scores || {}); }
+        catch (e) { return null; }
+    }
+
+    function frKpNeedsAttention() {
+        const r = frKpPool();
+        return !!(r && r.valid && (r.kpUnresolvedCents || 0) > 0);
+    }
+
+    function renderFinishRoundKp() {
+        const mount = document.getElementById('fr-kp-block');
+        if (!mount) return;
+        const r = frKpPool();
+        if (!r || !r.valid || !r.kp || r.kp.amountCents <= 0) { mount.innerHTML = ''; return; }
+
+        const $ = c => '$' + (c / 100).toFixed(0);
+        const leaders = currentData.kpLeaders || {};
+        const noWin = currentData.kpNoWinner || {};
+        const isOrg = hasOrganizerAuthority();
+        const unresolved = r.kp.unresolvedCents || 0;
+
+        let html = '<div class="fr-money-title">KP Results \u00B7 ' + $(r.kp.amountCents) + '</div>';
+        html += unresolved > 0
+            ? '<div class="fr-review-note fr-review-warn">\u26A0\uFE0F ' + $(unresolved)
+              + ' still needs confirming before the money can be settled.</div>'
+            : '<div class="fr-review-note">\u2713 KP winners confirmed.</div>';
+
+        r.kp.lines.forEach(l => {
+            const led = leaders['h' + l.hole];
+            const dist = (led && led.distanceInches !== null && led.distanceInches !== undefined)
+                ? kpDistanceLabel(led.distanceInches) : null;
+            let right;
+            if (l.state === 'paid') {
+                right = '<span class="fr-gross">' + l.winnerName + '</span>'
+                      + (dist ? '<br><span class="fr-net">' + dist + '</span>' : '');
+            } else if (l.state === 'refunded') {
+                right = '<span class="fr-net">No winner \u2014 refunded</span>';
+            } else if (l.winnerName) {
+                right = '<span class="fr-gross">' + l.winnerName + '</span>'
+                      + '<br><span class="fr-incomplete">Not confirmed</span>';
+            } else {
+                right = '<span class="fr-incomplete">No leader recorded</span>';
+            }
+            html += '<div class="fr-player-row' + (l.state === 'unresolved' ? ' fr-row-incomplete' : '') + '">'
+                 + '<span class="fr-player-name">Hole ' + l.hole + '</span>'
+                 + '<span class="fr-player-score">' + right + '</span></div>';
+        });
+
+        // ORGANIZER ONLY, and using the SAME authority Wave C established - a group
+        // link may set its own foursome's leader on the course, but the final
+        // whole-field decision is the organizer's.
+        if (isOrg && unresolved > 0) {
+            html += '<div class="fr-review-note">Organizer access \u00B7 correct a hole from the scorecard, '
+                 + 'or record that nobody won it.</div>';
+            r.kp.lines.forEach(l => {
+                if (l.state !== 'unresolved') return;
+                html += '<button class="fr-secondary-btn" onclick="frKpDeclareNoWinner(' + l.hole + ')">'
+                     + 'Hole ' + l.hole + ' \u2014 nobody won it</button>';
+            });
+            html += '<button class="btn-primary" style="margin-top:10px;" onclick="frConfirmKp()">'
+                 + '\u2713 Confirm KP Winners</button>';
+        } else if (!isOrg && unresolved > 0) {
+            html += '<div class="fr-review-note fr-review-warn">\uD83D\uDD12 Only the organizer link can confirm KP results.</div>';
+        }
+        mount.innerHTML = html;
+    }
+
+    // An explicit organizer decision that a hole had no winner. Deliberately a
+    // separate action from confirming: a blank hole must never become a refund by
+    // default, which is the whole failure this wave removes.
+    function frKpDeclareNoWinner(hole) {
+        if (!hasOrganizerAuthority()) return;
+        if (!confirm('Record that nobody won the KP on hole ' + hole + '?\n\nThat share is refunded to the field.')) return;
+        if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before recording KP results.')) return;
+        const updates = {};
+        updates['kpNoWinner/h' + hole] = true;
+        updates['kpWinners/h' + hole] = null;
+        updates['kpConfirmed'] = null;      // still needs the final confirm
+        db.ref('events/' + currentMode).update(updates)
+            .then(() => {
+                if (!currentData.kpNoWinner) currentData.kpNoWinner = {};
+                currentData.kpNoWinner['h' + hole] = true;
+                if (currentData.kpWinners) delete currentData.kpWinners['h' + hole];
+                currentData.kpConfirmed = null;
+                renderFinishRoundKp(); renderFinishRoundMoney();
+            })
+            .catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message)));
+    }
+
+    // CONFIRMATION REFUSES WHILE ANY HOLE IS BLANK. Confirming a round with an
+    // undecided hole would recreate the bug in a new place - money settled on a
+    // question nobody answered.
+    function frConfirmKp() {
+        if (!hasOrganizerAuthority()) return;
+        const r = frKpPool();
+        if (!r || !r.valid || !r.kp) return;
+        const noWin = currentData.kpNoWinner || {};
+        const blanks = r.kp.lines
+            .filter(l => !l.winnerId && noWin['h' + l.hole] !== true)
+            .map(l => l.hole);
+        if (blanks.length > 0) {
+            alert('\u26A0\uFE0F NOT CONFIRMED\nStill undecided: hole ' + blanks.join(', hole ')
+                + '\n\nRecord a winner, or that nobody won it.');
+            return;
+        }
+        if (!requireOnlineForMoney('KP NOT CONFIRMED', 'Reconnect before confirming KP results.')) return;
+        const payload = { confirmed: true, confirmedAt: Date.now(), confirmedBy: 'organizer' };
+        db.ref('events/' + currentMode + '/kpConfirmed').set(payload)
+            .then(() => {
+                currentData.kpConfirmed = payload;
+                renderFinishRoundKp(); renderFinishRoundMoney();
+                alert('\u2705 KP WINNERS CONFIRMED');
+            })
+            .catch(err => alert('\u26A0\uFE0F KP NOT CONFIRMED\n' + (err && err.message)));
     }
 
     function frOpenPlayer(playerId) {
@@ -3862,6 +4045,7 @@
         frSection('fr-state-review', true);
         frSection('fr-state-detail', false);
         frSection('fr-state-results', false);
+        renderFinishRoundKp();
 
         document.getElementById('finish-round-modal-overlay').style.display = 'flex';
     }
