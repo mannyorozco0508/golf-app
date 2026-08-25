@@ -54,13 +54,18 @@ const FIELD = [
   ['Jeremy',12,[7,5,4,4,6,3,5,5,5, 4,4,6,6,5,6,3,7,7]],
 ];
 
-function boot({ kpWinners = {}, mode = 'whole-dollar', sideMatches = null } = {}) {
+function boot({ kpWinners = {}, kpNoWinner = null, mode = 'whole-dollar', sideMatches = null } = {}) {
     const sb = loadHtmlInlineScript(PAGE, DEPS);
     const cd = PAR.map((p,i) => ({ hole:i+1, par:p, hcpIndex:IDX[i] }));
     const ps = FIELD.map(([name,hcp], i) => ({ id:101+i, name, hcp:String(hcp), playingForMoney:true }));
     const sc = {};
     FIELD.forEach((f,i) => f[2].forEach((v,hi) => { sc['p'+(101+i)+'_h'+(hi+1)] = v; }));
     const data = { players: ps, courseData: cd, scores: sc, gameFormat: 'stroke', kpWinners,
+        // Payout DISPLAY tests, not KP tests: the KP result is decided so the section
+        // renders a settled round. An unresolved KP would legitimately withhold money
+        // and these assertions would be testing the wrong thing.
+        kpConfirmed: { confirmed: true },
+        kpNoWinner: kpNoWinner || { h3:true, h7:true, h12:true, h16:true },
         moneyPool: { enabled:true, buyIn:40,
             kp:{amount:100,holes:[3,7,12,16]},
             net:{amount:70,places:[57.142857,42.857143]},
@@ -183,7 +188,7 @@ describe('THE DETAIL WORTH KEEPING IS KEPT', () => {
     });
 
     test('a KP winner sees their KP hole', () => {
-        const led = parse(boot({ kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' } }).html());
+        const led = parse(boot({ kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true } }).html());
         assert.ok(led.Marty.some(r => /^KP H3/.test(r.label) && r.amount === 25),
             'KP is app-managed pool money and belongs in the payout view');
     });
@@ -205,7 +210,7 @@ describe('A GOLFER WHO WON NOTHING', () => {
 
     function noWinners() {
         // Every KP claimed, so nothing refunds; only prize winners receive anything.
-        return boot({ kpWinners: { h3:'103', h7:'103', h12:'103', h16:'103' } });
+        return boot({ kpWinners: { h3:'103', h7:'103', h12:'103', h16:'103' }, kpConfirmed: { confirmed: true } });
     }
 
     test('shows no payout and no loss figure', () => {
