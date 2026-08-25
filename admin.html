@@ -1405,6 +1405,20 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }).catch(err => alert('\u26A0\uFE0F Could not read that round.\n' + (err && err.message)));
     }
 
+    // 128 bits from the platform CSPRNG, hex encoded. Falls back only if
+    // crypto.getRandomValues is genuinely unavailable, and says so in the console
+    // rather than silently producing a weak token.
+    function makeOrganizerToken() {
+        try {
+            const buf = new Uint8Array(16);
+            (window.crypto || window.msCrypto).getRandomValues(buf);
+            return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+            console.warn('Secure random unavailable; organizer token is weaker than intended.', e);
+            return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 14);
+        }
+    }
+
     function syncPresetsToFirebase() {
         const updates = {};
         Object.keys(coursePresets).forEach(key => {
@@ -3689,6 +3703,25 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // new round wants the same answer. The organizer can still switch an
                 // in-progress round from the admin panel.
                 settlementMode: 'whole-dollar',
+                // ORGANIZER TOKEN.
+                //
+                // A bearer token for the final-score-review workflow. It exists because
+                // the app has no authentication at all: the only way it can tell one
+                // person from another is which URL they opened. The bare round link is
+                // the link shared with everybody, so it cannot double as an admin
+                // credential - hence a separate secret, exactly as ?group= links already
+                // work for scorekeepers.
+                //
+                // crypto.getRandomValues, never Math.random and never derived from the
+                // game code: a token anyone could guess from the code they already have
+                // would be no token at all.
+                //
+                // HONEST LIMIT: database.rules.json grants ".read": true on every event,
+                // so this value is readable by anyone who has the game code. It stops
+                // ACCIDENTS - a golfer on the shared link quietly editing another
+                // foursome - not a determined party. That is the same protection group
+                // links provide today, and making it stronger needs real auth.
+                organizerToken: makeOrganizerToken(),
                 eventCategory: currentCategory,
                 categoryIcon: categoryIcon,
                 activeCourseKey: courseKey,
