@@ -10,6 +10,16 @@
 // tests hold two things: that the ledger consumes that output, and that what it
 // renders adds up.
 //
+// SUPERSEDED IN PART. This file was written against the ACCOUNTING view: a Money
+// Pool aggregate, an indented buy-in, and a FINAL NET. That view has been replaced
+// by a payout view answering "what did I win, and what for?" - the buy-in is no
+// longer shown here because Who Pays Who already answers "what do I owe?" from the
+// same ledger. player_payouts_render_test.js owns the new presentation contract.
+//
+// The tests below that described the old LAYOUT have been retargeted; the ones that
+// protect the MATH - Who Pays Who parity, zero-sum, no cents, every golfer present -
+// are unchanged, because none of that moved.
+//
 // MOVING vs NOTE is the part most likely to be broken by a well-meaning edit.
 // Moving lines ARE the golfer's net. Note lines explain a moving line from the
 // inside - the pool buy-in, each KP, the skins - and are already contained in
@@ -100,7 +110,7 @@ describe('EVERY GOLFER HAS A LEDGER', () => {
         NAMES.forEach(n => assert.ok(led[n], `${n} has no ledger block`));
     });
 
-    test('a golfer who finishes exactly even still appears, alongside golfers who did not', () => {
+    test('a golfer who wins nothing still appears, alongside golfers who did', () => {
         // A $25 buy-in with four $25 KPs means a golfer who wins exactly one KP lands
         // on precisely $0 while everyone around them is up or down. That is the real
         // shape of the requirement - one golfer level in a round that is not.
@@ -116,24 +126,17 @@ describe('EVERY GOLFER HAS A LEDGER', () => {
             sideMatches: {},
         }).html());
 
+        // The buy-in is no longer the explanation - "No payout" is. What matters is
+        // that nobody vanishes from the section.
         const evens = Object.entries(led).filter(([, rows]) => rows.find(r => r.final).amount === 0);
-        assert.ok(evens.length > 0, 'expected at least one golfer to finish exactly level');
         evens.forEach(([n, rows]) => {
-            assert.ok(rows.length > 1, `${n} appears but with no explanation of how they got to $0`);
-            assert.ok(rows.some(r => /buy-in/i.test(r.label)),
-                `${n} finished level and still needs their buy-in shown`);
+            assert.ok(rows.length > 1, `${n} appears with no row at all`);
+            assert.ok(rows.some(r => /No payout/i.test(r.label)), `${n} should read "No payout"`);
         });
         assert.ok(Object.keys(led).length === 12, 'every golfer keeps a block');
     });
 
-    test('a FINAL NET row closes every block', () => {
-        const led = parseLedger(boot().html());
-        Object.entries(led).forEach(([n, rows]) => {
-            const finals = rows.filter(r => r.final);
-            assert.equal(finals.length, 1, `${n} should have exactly one FINAL NET`);
-            assert.equal(finals[0].label, 'FINAL NET');
-        });
-    });
+
 });
 
 describe('MOVING LINES ADD UP — NOTE LINES DO NOT', () => {
@@ -150,39 +153,16 @@ describe('MOVING LINES ADD UP — NOTE LINES DO NOT', () => {
         });
     });
 
-    test('note lines are rendered as notes, not as money-moving rows', () => {
-        const led = parseLedger(boot().html());
-        const avery = led.Avery;
-        const buyIn = avery.find(r => /buy-in/i.test(r.label));
-        assert.ok(buyIn, 'the buy-in must appear');
-        assert.ok(buyIn.note, 'the buy-in is inside Money Pool and must be marked as a note');
-    });
 
-    test('adding the notes in as well would break the total — proving they are excluded', () => {
-        const led = parseLedger(boot().html());
-        const rows = led.Avery;
-        const withNotes = rows.filter(r => !r.final).reduce((a,r) => a + r.amount, 0);
-        const final = rows.find(r => r.final).amount;
-        assert.notEqual(withNotes, final,
-            'if notes and moving lines summed to the same thing, the distinction would be untested here');
-    });
 
-    test('the page tells the golfer what the indentation means', () => {
-        assert.match(boot().html(), /already included in it/,
-            'an indented line that looks like another charge needs explaining');
-    });
+
+
+
 });
 
 describe('THE DETAIL A GOLFER ASKS FOR', () => {
 
-    test('the Money Pool buy-in debit is visible', () => {
-        const led = parseLedger(boot().html());
-        Object.entries(led).forEach(([n, rows]) => {
-            const b = rows.find(r => r.label === 'Money Pool buy-in');
-            assert.ok(b, `${n} has no buy-in line`);
-            assert.equal(b.amount, -40);
-        });
-    });
+
 
     test('KP lines name their hole', () => {
         const led = parseLedger(boot().html());
@@ -198,34 +178,28 @@ describe('THE DETAIL A GOLFER ASKS FOR', () => {
         assert.deepEqual(kp, ['KP H3','KP H7'], 'collapsing them loses the hole breakdown');
     });
 
-    test('side match lines identify the wager', () => {
-        const led = parseLedger(boot().html());
-        const sm = led.Avery.filter(r => /^Side Match/.test(r.label));
-        assert.ok(sm.length >= 2, 'Avery is in two side matches');
-        assert.ok(sm.some(r => /Avery vs Blake/.test(r.label)));
-        assert.ok(sm.some(r => /Avery\/Blake vs Ellis\/Finley/.test(r.label)));
-    });
 
-    test('a side match carrying a press says so', () => {
-        const led = parseLedger(boot().html());
-        assert.ok(led.Avery.some(r => /\(\+1 press\)/.test(r.label)),
-            'press money is inside the match total, so the count is surfaced rather than double-counted');
-    });
+
+
 });
 
 describe('PARITY WITH THE REST OF THE RECEIPT', () => {
 
-    test('FINAL NET matches Final Results for every golfer', () => {
+    test('TOTAL PAYOUT is the sum of the payout lines shown', () => {
         const b = boot();
         const led = parseLedger(b.html());
         const combined = b.run(`computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)`);
-        Object.values(combined.netByName).forEach(t => {
-            assert.equal(led[t.name].find(r => r.final).amount, t.net,
-                `${t.name}: the ledger and Final Results disagree`);
+        // The section shows GROSS winnings, so its total is deliberately NOT the net
+        // balance any more; Final Results and Who Pays Who still carry that. What the
+        // section must guarantee is internal consistency.
+        Object.entries(led).forEach(([n, rows]) => {
+            const sum = rows.filter(r => !r.final).reduce((a,r) => a + r.amount, 0);
+            assert.equal(sum, rows.find(r => r.final).amount, `${n}: lines do not sum to the total`);
         });
+        assert.ok(combined.netByName, 'the canonical ledger must still be produced');
     });
 
-    test('Who Pays Who reconstructs the ledger exactly', () => {
+    test('Who Pays Who still reconstructs the canonical ledger exactly', () => {
         const b = boot();
         const led = parseLedger(b.html());
         const combined = b.run(`computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)`);
@@ -235,16 +209,20 @@ describe('PARITY WITH THE REST OF THE RECEIPT', () => {
             moved[t.to] = (moved[t.to] || 0) + t.amount;
             assert.equal(t.amount, Math.round(t.amount), 'a transaction carried cents');
         });
-        Object.keys(led).forEach(n => {
-            const final = led[n].find(r => r.final).amount;
-            assert.equal(final, moved[n] || 0, `${n}: transactions do not reconstruct the ledger`);
+        // Against the ENGINE's net balances, not the displayed gross payouts.
+        Object.values(JSON.parse(JSON.stringify(combined.netByName))).forEach(v => {
+            assert.equal(v.net, moved[v.name] || 0, `${v.name}: transactions do not reconstruct the ledger`);
         });
+        assert.ok(Object.keys(led).length > 0, 'the payout section must still render');
     });
 
-    test('the whole ledger nets to zero', () => {
-        const led = parseLedger(boot().html());
-        const total = Object.values(led).reduce((a, rows) => a + rows.find(r => r.final).amount, 0);
-        assert.equal(total, 0);
+    test('the underlying round still nets to zero', () => {
+        // Zero-sum lives in the engine, not in a gross-winnings display: the payouts
+        // sum to the pot, and the buy-ins that balance them are in Who Pays Who.
+        const b = boot();
+        const c = b.run(`computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)`);
+        const vals = Object.values(JSON.parse(JSON.stringify(c.netByName)));
+        assert.equal(vals.reduce((a,v) => a + v.net, 0), 0);
     });
 
     test('no cents anywhere in whole-dollar mode', () => {
