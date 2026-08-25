@@ -1051,7 +1051,7 @@
         let html = `<div class="settle-card">
             <div class="settle-header">\uD83D\uDCB0 Player Payouts</div>
             <div style="font-size:0.72rem; color:var(--text-muted); margin:-4px 0 10px 0;">
-                What each golfer won from the pot. Net positions are settled in Who Pays Who below.
+                What each golfer won from the pot.
             </div>`;
 
         order.forEach(k => {
@@ -1157,7 +1157,37 @@
         // golfer who cannot find their own name assumes the app lost them.
         html += buildPlayerLedgerHtml(contributions, sorted);
 
-        if (transactions.length > 0) {
+        // ---- WHO PAYS WHO, ONLY WHEN ANYBODY ACTUALLY PAYS ANYBODY ----------
+        //
+        // In a MONEY POOL ONLY round nobody owes another golfer a thing. Everyone put
+        // the same stake into a pot and the winners take out of that pot - the money
+        // moved through the pool, not between people. The settlement engine can still
+        // express that as golfer-to-golfer transfers, because arithmetically it can
+        // always net a set of balances into transfers, but those pairings are an
+        // artifact of the maths rather than a description of what happened. Printing
+        // "Marty pays Carp $40" when Marty paid the pot and Carp was paid by the pot
+        // invents a debt between two people who never had one, and it contradicts
+        // Player Payouts sitting directly above it.
+        //
+        // The moment a SIDE MATCH or any other head-to-head wager exists, real debts
+        // between people do exist, and the combined list is exactly what the group
+        // needs - it nets the pool position and the match together so nobody settles
+        // twice.
+        //
+        // THE TEST IS WHAT MOVED THE MONEY, not how many transactions came back. Each
+        // contribution carries MOVING lines - the ones that add up to a golfer's net -
+        // and a pool-only round has exactly one such label: "Money Pool". Anything
+        // else present means a genuine player-to-player wager.
+        const movingSources = new Set();
+        Object.values(contributions).forEach(c => {
+            (c.lines || []).forEach(l => {
+                if (!l.note && !l.rounding) movingSources.add(l.label);
+            });
+        });
+        const poolOnly = movingSources.size > 0
+            && [...movingSources].every(label => label === 'Money Pool');
+
+        if (transactions.length > 0 && !poolOnly) {
             html += `<div class="settle-card">
                 <div class="settle-header">🤝 Who Pays Who</div>`;
             transactions.forEach(t => {
