@@ -263,8 +263,12 @@ describe('NOTHING BEHIND THE VIEW CHANGED', () => {
         Object.values(plain(c.netByName)).forEach(v => {
             assert.equal(v.net, moved[v.name] || 0, `${v.name}: transactions must still reconcile`);
         });
-        const html = b.html();
-        assert.ok(/Who Pays Who/.test(html), 'the section must still render');
+        // The ENGINE still reconciles, which is what this test protects. The SECTION
+        // is no longer rendered for this fixture: it is a Money-Pool-only round, where
+        // nobody owes another golfer anything - everyone paid the pot and the pot paid
+        // the winners. Asserting the section's presence here was asserting the bug.
+        assert.ok(!/Who Pays Who/.test(b.html()),
+            'a pool-only round must not invent player-to-player debts');
     });
 
     test('the pool still reconciles and stays whole-dollar', () => {
