@@ -601,6 +601,12 @@
         }
         .finish-round-modal-content { max-width: 420px; }
         .fr-headline { text-align: center; font-size: 1.1rem; font-weight: bold; color: var(--brand-green); background: var(--nassau-box-bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+        .fr-group-head { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.04em; color: var(--brand-green); margin: 10px 0 2px 0; }
+        .fr-review-note { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+        .fr-review-warn { color: var(--warn-text); font-weight: bold; }
+        .fr-row-incomplete { background: var(--warn-bg); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
+        .fr-player-score .fr-incomplete { font-size: 0.74rem; font-weight: bold; color: var(--warn-text); }
+        .fr-player-score .fr-partial { font-size: 0.7rem; color: var(--text-muted); }
         .fr-player-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); }
         .fr-player-row:last-child { border-bottom: none; }
         .fr-player-name { font-weight: bold; }
@@ -1000,6 +1006,18 @@
         </div>
         <div id="fr-incomplete-warning"></div>
         <div id="fr-headline" class="fr-headline"></div>
+
+        <!-- REVIEW SCORES.
+             This mount is the reason the modal threw. fr-player-list and
+             fr-full-results were removed from the markup when the Receipt took over
+             the press timeline and scorecard, but openFinishRoundModal() kept writing
+             to both - so getElementById returned null, .innerHTML threw, and every
+             line after it (including display='flex') never ran. The modal could not
+             open at all. fr-full-results stays deleted, because the Receipt genuinely
+             replaced it; this one comes back, as the whole-field score review. -->
+        <div class="fr-money-title">Review Scores</div>
+        <div id="fr-review-note" class="fr-review-note"></div>
+        <div id="fr-player-list"></div>
 
         <div class="fr-money-title" id="fr-money-title">Final Money</div>
         <div id="fr-final-money"></div>
@@ -3128,7 +3146,9 @@
     function findMissingScores() {
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const savedScores = currentData.scores || {};
-        const players = window.__scFilteredPlayers || currentData.players || [];
+        // Whole field: a missing card in another foursome still blocks Net Finish
+        // and Skins, so the organizer's pre-payout check must see it.
+        const players = currentData.players || [];
         const missing = [];
         courseData.forEach(h => {
             players.forEach(p => {
@@ -3156,6 +3176,77 @@
             'Money below is where things stand, not a final settlement \u2014 some wagers can\'t be decided yet.' +
             '<div style="margin-top:6px;">' + rows + more + '</div>' +
             '</div>';
+    }
+
+    // ---- WHOLE-FIELD SCORE REVIEW ------------------------------------------
+    //
+    // NO SCORING ARITHMETIC HERE. Every gross, net and completion figure comes
+    // from computePlayerRoundTotals() in settlement-engine.js, which uses the
+    // same getStrokes/parseHcp pair the leaderboard, the skins ledger and every
+    // net wager already use. The inline version this replaces had its own copy,
+    // and its own bug: it guarded the gross on a posted score but deducted the
+    // handicap for all eighteen holes regardless, so a seventeen-hole round
+    // rendered as a finished one.
+    //
+    // WHOLE FIELD, ON PURPOSE. This list used to be filtered to the ?group= a
+    // scorekeeper was holding. Net Finish and Skins are decided across the whole
+    // field, so an organizer checking scores before money changes hands has to
+    // see all twelve golfers, not four.
+    //
+    // THIS WIDENS READING ONLY. Nothing here writes a score. canWritePlayer()
+    // still gates every write in saveScore(), and a group link still cannot
+    // touch another foursome's card.
+    function renderFinishRoundReview() {
+        const mount = document.getElementById('fr-player-list');
+        if (!mount) return;
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const players = currentData.players || [];      // whole field, never scoped
+        const groupMap = window.__scPlayerGroupMap || {};
+
+        if (players.length === 0 || courseData.length === 0) { mount.innerHTML = ''; return; }
+        if (typeof computePlayerRoundTotals !== 'function') { mount.innerHTML = ''; return; }
+
+        const rows = players.map(p => {
+            const t = computePlayerRoundTotals(p, courseData, savedScores);
+            t.group = groupMap[String(p.id)] !== undefined ? groupMap[String(p.id)] : null;
+            return t;
+        });
+
+        const incomplete = rows.filter(r => !r.complete).length;
+        const note = document.getElementById('fr-review-note');
+        if (note) {
+            note.innerHTML = incomplete === 0
+                ? 'All ' + rows.length + ' golfers have a complete card.'
+                : '\u26A0\uFE0F ' + incomplete + ' golfer' + (incomplete === 1 ? '' : 's')
+                  + ' still incomplete \u2014 those rounds have no final score yet.';
+            note.className = 'fr-review-note' + (incomplete === 0 ? '' : ' fr-review-warn');
+        }
+
+        // Grouped so an organizer can check a foursome at a time. Golfers with no
+        // group land in a trailing bucket rather than vanishing.
+        const groups = [...new Set(rows.map(r => r.group))]
+            .sort((a, b) => (a === null) - (b === null) || Number(a) - Number(b));
+
+        let html = '';
+        groups.forEach(g => {
+            html += '<div class="fr-group-head">' + (g === null ? 'Unassigned' : 'Group ' + g) + '</div>';
+            rows.filter(r => r.group === g).forEach(r => {
+                // An unfinished round shows what IS known - the holes posted and the
+                // running gross - and never a net. A partial net is not a smaller
+                // answer, it is a wrong one.
+                const right = r.complete
+                    ? '<span class="fr-gross">' + r.gross + '</span>'
+                      + '<br><span class="fr-net">Net ' + r.net + '</span>'
+                    : '<span class="fr-incomplete">Incomplete \u2014 ' + r.holesPlayed
+                      + ' of ' + r.holesRequired + ' holes posted</span>'
+                      + '<br><span class="fr-partial">' + r.grossSoFar + ' so far</span>';
+                html += '<div class="fr-player-row' + (r.complete ? '' : ' fr-row-incomplete') + '">'
+                     + '<span class="fr-player-name">' + r.name + '</span>'
+                     + '<span class="fr-player-score">' + right + '</span></div>';
+            });
+        });
+        mount.innerHTML = html;
     }
 
     function jumpToMissingHole(hole) {
@@ -3188,28 +3279,10 @@
         renderIncompleteWarning();
         renderFinishRoundMoney();
         document.getElementById('fr-headline').textContent = headlineEl ? headlineEl.innerText : 'Round Complete!';
-        document.getElementById('fr-full-results').innerHTML = cloneStatusPanelHtml();
+        // fr-full-results is deliberately gone - see the markup note. The write that
+        // remained here is what broke the modal.
 
-        const isNet = (window.__scScoringType || 'net').toLowerCase() === 'net';
-        let listHtml = '';
-        scopedPlayers.forEach(p => {
-            let gross = 0;
-            let strokesOff = 0;
-            courseData.forEach(h => {
-                const v = savedScores[`p${p.id}_h${h.hole}`];
-                if (v > 0) gross += parseInt(v, 10);
-                if (isNet) strokesOff += getStrokes(h.hcpIndex, parseHcp(p.hcp));
-            });
-            const netTotal = gross - strokesOff;
-            listHtml += `<div class="fr-player-row">
-                <span class="fr-player-name">${p.name}</span>
-                <span class="fr-player-score">
-                    <span class="fr-gross">${gross}</span>
-                    ${isNet ? `<br><span class="fr-net">Net ${netTotal}</span>` : ''}
-                </span>
-            </div>`;
-        });
-        document.getElementById('fr-player-list').innerHTML = listHtml;
+        renderFinishRoundReview();
 
         // Stats and Leaderboard only, as quiet text links. "View Settle" was removed: it
         // resolved to '#' because getNavLinkHref searched the nav for "Settle" and the
