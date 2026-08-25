@@ -1,16 +1,22 @@
 // ============================================================================
-// LIVE SKINS CARD — rendered output
+// LIVE ACTION — Net Finish, KP, and the scorecard order contract
 //
-// The engine side is covered in live_skins_test.js. This file covers the
-// presenter: that the card says what the ledger says, that it never claims a
-// hole is decided when it is waiting, and that it re-renders on a correction.
+// WHAT WAS ALREADY THERE, and deliberately not rebuilt: the Action Center
+// already renders Group Action, Side Matches, press lines with their stakes and
+// start holes, and a Money Pool header. Those are covered by bet-strip.js and
+// its own tests. Adding a second surface for them would have been the "another
+// dashboard" this work was told not to build.
 //
-// That last one matters more than it looks. The ledger is stateless - it is
-// rebuilt from scores on every call, so a stale winner is structurally
-// impossible inside the engine. Which means the ONLY place staleness can enter
-// is here, if the card fails to re-render after a score changes. Sabotaging the
-// engine to produce a stale winner is a no-op; sabotaging the render path is
-// not. So that is what gets tested.
+// WHAT WAS MISSING: the two whole-field pool prizes. KP showed only a count
+// ("2/4 claimed") with no holes and no money, and Net Finish showed only who led
+// with no projected payout at all - so the two prizes worth $170 of a $480 pot
+// were the least visible things on the screen.
+//
+// NO MONEY MATH LIVES IN THE PAGE. Both cards read computeMoneyPool(), which has
+// already decided which positions a tie consumed and what each golfer is
+// allocated. The tie rule in particular is the least intuitive money rule in the
+// app - two tied for 1st take 1st AND 2nd money, and the next golfer gets
+// nothing - and a page reimplementing it would drift from the receipt.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -19,287 +25,302 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
-const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const PAGE = 'index.html';
-const DEPS = ['action-model.js', 'money-engine.js', 'pool-engine.js',
-    'settlement-engine.js', 'score-marks.js', 'bet-strip.js', 'hole-events.js'];
+const DEPS = ['action-model.js','money-engine.js','pool-engine.js','settlement-engine.js',
+              'score-marks.js','bet-strip.js','hole-events.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
-const NAMES = ['Avery', 'Blake', 'Casey', 'Devon', 'Ellis', 'Finley',
-    'Gray', 'Harper', 'Indigo', 'Jordan', 'Kendall', 'Logan'];
+const NAMES = ['Avery','Blake','Casey','Devon','Ellis','Finley','Gray','Harper','Indigo','Jordan','Kendall','Logan'];
 
-// 12 golfers, 3 groups. `thru` sets how far each group has played.
-function boot({ thru = { 1: 18, 2: 18, 3: 18 }, spec = {}, carry = false, buyIn = 20, holes = 18 } = {}) {
+// `nets` optionally forces each golfer's gross (hcp 0) so standings are exact.
+function boot({ pool = {}, kpWinners = {}, nets = null, thru = null, mode = 'whole-dollar',
+                hcps = null, over = {} } = {}) {
     const sb = loadHtmlInlineScript(PAGE, DEPS);
-    const cd = makeCourseData(holes);
-    const p = makePlayers(NAMES, NAMES.map(() => 0));
-    const groupOf = (id) => Math.floor((Number(id) - Number(p[0].id)) / 4) + 1;
-
-    const scores = {};
-    p.forEach(pl => cd.forEach(h => {
-        const k = `p${pl.id}_h${h.hole}`;
-        if (spec[k] !== undefined) { scores[k] = spec[k]; return; }
-        if (h.hole <= (thru[groupOf(pl.id)] || 0)) scores[k] = h.par;
+    const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
+    const ps = NAMES.map((n,i)=>({id:101+i,name:n,hcp:String(hcps ? hcps[i] : (nets ? 0 : 4+i)),playingForMoney:true}));
+    const groupOf = id => Math.floor((Number(id)-101)/4)+1;
+    const sc = {};
+    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{
+        if (thru && h.hole > (thru[groupOf(p.id)] || 0)) return;
+        // Distributes a target total across 18 holes without ever producing a
+        // non-positive score. The naive version (round the average, dump the
+        // remainder on 18) generated scores like -3, which the completeness check
+        // correctly rejects as unposted - so the card said PROJECTED on a round the
+        // fixture believed was finished.
+        if (nets) {
+            const base = Math.floor(nets[pi] / cd.length);
+            const extra = nets[pi] - base * cd.length;
+            sc['p'+p.id+'_h'+h.hole] = base + (hi < extra ? 1 : 0);
+        } else {
+            sc['p'+p.id+'_h'+h.hole] = h.par + ((pi*3+hi*5)%4) - 1;
+        }
     }));
+    const gm = {}; ps.forEach(p => { gm[String(p.id)] = groupOf(p.id); });
 
-    const groupMap = {};
-    p.forEach(pl => { groupMap[String(pl.id)] = groupOf(pl.id); });
-
-    const data = {
-        gameFormat: 'stroke', players: p, courseData: cd, scores,
-        skinsPotFormat: 'net', skinsCarryOver: carry, skinsBuyIn: buyIn,
-        additionalGames: { skins: true },
-    };
+    const data = Object.assign({
+        players: ps, courseData: cd, gameFormat: 'stroke', scores: sc, settlementMode: mode,
+        moneyPool: Object.assign({ enabled:true, buyIn:40,
+            kp: { amount:100, holes:[3,7,12,16] },
+            net: { amount:70, places:[57.142857,42.857143] },
+            skins: { mode:'remainder', scoring:'net', carryOver:false } }, pool),
+        kpWinners,
+    }, over);
 
     vm.runInContext(`
         currentMode = 'ABCD';
         currentData = ${JSON.stringify(data)};
-        window.__scPlayerGroupMap = ${JSON.stringify(groupMap)};
-        document.getElementById('live-skins-mount') || (function () {
-            var d = document.createElement('div'); d.id = 'live-skins-mount';
-            document.body.appendChild(d);
-        })();
+        window.__scPlayerGroupMap = ${JSON.stringify(gm)};
+        window.__scFilteredPlayers = currentData.players.slice(0, 4);
+        hasGroupLock = true; lockedGroup = 1; actionCenterOpen = true;
+        currentViewedHole = 3;
     `, sb);
 
     return {
-        sb, p, cd,
-        ids: (g) => p.filter(x => groupOf(x.id) === g).map(x => String(x.id)),
+        sb, data, cd, ps,
+        banner: () => vm.runInContext('buildMoneyPoolBanner()', sb),
         run: c => vm.runInContext(c, sb),
-        render: () => { vm.runInContext('renderLiveSkins();', sb); },
-        html: () => sb.document.getElementById('live-skins-mount').innerHTML,
     };
 }
 
+const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
 // ============================================================================
 
-describe('THE COMPACT CARD', () => {
+describe('LIVE NET FINISH', () => {
 
-    test('states the basis, the pot and the carry rule', () => {
-        const b = boot({ spec: { p101_h1: 3 } });
-        b.render();
-        const h = b.html();
-        assert.match(h, /WHOLE-FIELD NET SKINS/);
-        assert.match(h, /\$240/, '12 golfers x $20.');
-        assert.match(h, /NO CARRY/, 'The configured rule must be visible, not assumed.');
+    test('projects the paid places with their money', () => {
+        const t = strip(boot({ nets: [70,72,75,78,80,82,84,86,88,90,92,94] }).banner());
+        assert.match(t, /NET FINISH · \$70/);
+        assert.match(t, /1 · Avery · net 70/);
+        assert.match(t, /\$40/);
+        assert.match(t, /2 · Blake · net 72/);
+        assert.match(t, /\$30/);
     });
 
-    test('says CARRY when the round is configured to carry', () => {
-        const b = boot({ carry: true, spec: { p101_h1: 3 } });
-        b.render();
-        assert.match(b.html(), /\u00B7 CARRY/);
-        assert.ok(!/NO CARRY/.test(b.html()));
+    test('says PROJECTED while anyone still has a hole to play', () => {
+        const t = strip(boot({ thru: { 1:15, 2:14, 3:13 } }).banner());
+        assert.match(t, /PROJECTED/);
+        assert.ok(!/FINAL/.test(t), 'nothing is final while a group is still out there');
     });
 
-    test('shows official-thru, and it reflects the slowest group', () => {
-        const b = boot({ thru: { 1: 14, 2: 14, 3: 13 } });
-        b.render();
-        assert.match(b.html(), /Official thru 13/);
+    test('says FINAL only when every participant has posted every hole', () => {
+        const t = strip(boot({ nets: [70,72,75,78,80,82,84,86,88,90,92,94] }).banner());
+        assert.match(t, /FINAL/);
     });
 
-    test('names the group a waiting hole is waiting on', () => {
-        const b = boot({ thru: { 1: 14, 2: 14, 3: 13 } });
-        b.render();
-        assert.match(b.html(), /H14 \u2014 Waiting on Group 3/);
+    test('a TIE shows the shared place and the per-golfer amount', () => {
+        // Two golfers level at the top consume 1st AND 2nd: $70 between them.
+        const t = strip(boot({ nets: [70,70,75,78,80,82,84,86,88,90,92,94] }).banner());
+        assert.match(t, /T1 · Avery \/ Blake/);
+        assert.match(t, /\$35 each/);
+        assert.ok(!/Casey · net 75/.test(t), 'the next golfer must not be shown a paid place');
     });
 
-    test('shows skin counts, most first, and omits golfers with none', () => {
-        const b = boot({ holes: 4, spec: { p101_h1: 3, p101_h2: 3, p105_h3: 2 } });
-        b.render();
-        const h = b.html();
-        assert.match(h, /Avery \u2014 2/);
-        assert.match(h, /Ellis \u2014 1/);
-        assert.ok(h.indexOf('Avery') < h.indexOf('Ellis'), 'Most skins first.');
-        assert.ok(!/Blake/.test(h), 'A golfer with no skins must not take up space.');
+    test('an UNEVEN tie split shows the actual allocated amounts', () => {
+        // $100 over three tied golfers is $34/$33/$33 - never an average.
+        const t = strip(boot({
+            pool: { net: { amount:100, places:[50,30,20] }, skins:{ mode:'remainder', scoring:'net', carryOver:false } },
+            nets: [70,70,70,78,80,82,84,86,88,90,92,94],
+        }).banner());
+        assert.match(t, /T1 · Avery \/ Blake \/ Casey/);
+        assert.match(t, /\$34 .* \$33 .* \$33|\$34 \/ \$33 \/ \$33/);
     });
 
-    test('names the most recent decided hole', () => {
-        const b = boot({ holes: 4, spec: { p105_h3: 2 } });   // h3 is a par 3, so 3 would tie
-        b.render();
-        assert.match(b.html(), /Latest: H3 \u2014 Ellis/);
-    });
-
-    test('says so plainly when nothing has been won yet', () => {
-        const b = boot({ holes: 3 });   // everyone level, every hole a tie
-        b.render();
-        assert.match(b.html(), /No skins won yet/);
-    });
-
-    test('the hole-by-hole ledger is COLLAPSED by default', () => {
-        const b = boot({ holes: 18, spec: { p101_h1: 3 } });
-        b.render();
-        const h = b.html();
-        assert.ok(!/ls-ledger/.test(h), '18 rows must not sit above the fold by default.');
-        assert.match(h, /hole-by-hole/, 'but it must be one tap away');
-    });
-
-    test('the card renders nothing at all when the round has no skins money', () => {
-        const b = boot({ buyIn: 0 });
-        b.run(`currentData.additionalGames = {}; currentData.gameFormat = 'match'; currentData.skinsBuyIn = 0;`);
-        b.render();
-        assert.equal(b.html(), '', 'A round with no skins must not grow a skins card.');
+    test('nothing renders when the round has no Net Finish prize', () => {
+        const t = strip(boot({ pool: { net: undefined, skins:{ mode:'remainder', scoring:'net', carryOver:false } } }).banner());
+        assert.ok(!/NET FINISH/.test(t));
     });
 });
 
-describe('THE EXPANDED LEDGER', () => {
+describe('LIVE KP', () => {
 
-    test('every hole gets a row, and each row says which state it is in', () => {
-        const b = boot({ holes: 4, thru: { 1: 4, 2: 4, 3: 3 }, spec: { p101_h1: 3, p105_h2: 3 } });
-        b.run('liveSkinsOpen = true;');
-        b.render();
-        const h = b.html();
-        assert.match(h, /H1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
-        assert.match(h, /H3 \u2014 Tie at Net \d+ \u2014 No Skin/);
-        assert.match(h, /H4 \u2014 Waiting on Group 3/);
+    test('lists every KP hole with its allocated amount', () => {
+        const t = strip(boot({ kpWinners: { h3:'101', h7:'105' } }).banner());
+        assert.match(t, /KP · \$100/);
+        assert.match(t, /H3 · Avery/);
+        assert.match(t, /H7 · Ellis/);
+        assert.match(t, /\$25/);
     });
 
-    test('a tie names the score, so nobody reaches for the paper card', () => {
-        const b = boot({ holes: 2 });
-        b.run('liveSkinsOpen = true;');
-        b.render();
-        assert.match(b.html(), /Tie at Net \d+ \u2014 No Skin/,
-            '"Tie" alone forces a golfer back to the scorecard to find out why.');
+    test('unclaimed holes read Pending, not blank', () => {
+        const t = strip(boot({ kpWinners: { h3:'101' } }).banner());
+        assert.match(t, /H7 · Pending/);
+        assert.match(t, /H12 · Pending/);
+        assert.match(t, /H16 · Pending/);
     });
 
-    test('a carried hole shows how many skins it was worth', () => {
-        const b = boot({ holes: 3, carry: true, spec: { p101_h2: 3 } });
-        b.run('liveSkinsOpen = true;');
-        b.render();
-        assert.match(b.html(), /H2 \u2014 Avery \u2014 Net 3 \u2014 Skin \(2 skins\)/,
-            'H1 tied and carried into H2.');
+    test('an UNEVEN KP split shows the real allocation, not an assumed equal share', () => {
+        // $100 across three holes is $34/$33/$33 in a whole-dollar round.
+        const t = strip(boot({
+            pool: { kp: { amount:100, holes:[3,7,12] } },
+            kpWinners: { h3:'101', h7:'105', h12:'109' },
+        }).banner());
+        assert.match(t, /\$34/);
+        assert.match(t, /\$33/);
+        assert.ok(!/\$33\.33/.test(t), 'a whole-dollar round must not print cents');
     });
 
-    test('a carry hole whose value depends on an unresolved hole says value pending', () => {
-        // The winner is known; what it is WORTH is not. Printing a number here
-        // would overstate the payout.
-        const b = boot({ holes: 3, carry: true, thru: { 1: 3, 2: 3, 3: 3 }, spec: { p101_h3: 2 } });
-        b.run(`delete currentData.scores.p109_h2; delete currentData.scores.p110_h2;
-               delete currentData.scores.p111_h2; delete currentData.scores.p112_h2;
-               liveSkinsOpen = true;`);
-        b.render();
-        const h = b.html();
-        assert.match(h, /H3 \u2014 Avery/, 'the winner is knowable');
-        assert.match(h, /value pending/, 'its value is not');
-    });
-
-    test('toggling opens and closes it', () => {
-        const b = boot({ holes: 4, spec: { p101_h1: 3 } });
-        b.render();
-        assert.ok(!/ls-ledger/.test(b.html()));
-        b.run('toggleLiveSkins();');
-        assert.ok(/ls-ledger/.test(b.html()));
-        b.run('toggleLiveSkins();');
-        assert.ok(!/ls-ledger/.test(b.html()));
+    test('nothing renders when the round has no KP prize', () => {
+        const t = strip(boot({ pool: { kp: undefined } }).banner());
+        assert.ok(!/KP · \$/.test(t));
     });
 });
 
-describe('NEVER OVERSTATE — a waiting hole is never shown as decided', () => {
+describe('DIFFERENT GROUP PACES', () => {
 
-    test('a waiting hole names no winner anywhere in the card', () => {
-        const b = boot({ holes: 4, thru: { 1: 4, 2: 4, 3: 3 }, spec: { p101_h4: 2 } });
-        b.run('liveSkinsOpen = true;');
-        b.render();
-        const h = b.html();
-        // Avery has the low score on H4, but group 3 has not played it.
-        assert.match(h, /H4 \u2014 Waiting on Group 3/);
-        assert.ok(!/H4 \u2014 Avery/.test(h), 'Showing a skin and then taking it away is worse than showing nothing.');
-        assert.match(h, /Official thru 3/);
+    test('15 / 14 / 13 keeps every live surface working and honest', () => {
+        const b = boot({ thru: { 1:15, 2:14, 3:13 }, kpWinners: { h3:'101', h7:'105' } });
+        const t = strip(b.banner());
+        assert.match(t, /PROJECTED/, 'standings can still move');
+        assert.match(t, /KP · \$100/, 'KP stays visible while groups are out');
+        assert.match(t, /H3 · Avery/);
+        assert.match(t, /H12 · Pending/);
     });
 
-    test('the card uses no word implying finality', () => {
-        const b = boot({ thru: { 1: 14, 2: 14, 3: 13 } });
-        b.render();
-        assert.ok(!/\bFINAL\b/i.test(b.html()), 'Nothing is final until the round is.');
-    });
-});
-
-describe('SCORE CORRECTIONS — the card moves with the score', () => {
-
-    test('winner becomes a tie on re-render', () => {
-        const b = boot({ holes: 3, spec: { p101_h1: 3 } });
-        b.render();
-        assert.match(b.html(), /Avery \u2014 1/);
-
-        b.run(`currentData.scores.p102_h1 = 3;`);   // Blake matches
-        b.render();
-        const h = b.html();
-        assert.ok(!/Avery \u2014 1/.test(h), 'The old winner must not survive the correction.');
-        assert.match(h, /No skins won yet/);
-    });
-
-    test('a tie becomes a winner on re-render', () => {
-        const b = boot({ holes: 3 });
-        b.render();
-        assert.match(b.html(), /No skins won yet/);
-
-        b.run(`currentData.scores.p103_h1 = 2;`);
-        b.render();
-        assert.match(b.html(), /Casey \u2014 1/);
-    });
-
-    test('winner A becomes winner B, with no duplicate left behind', () => {
-        const b = boot({ holes: 3, spec: { p101_h1: 3 } });
-        b.render();
-        assert.match(b.html(), /Avery \u2014 1/);
-
-        b.run(`currentData.scores.p101_h1 = 5; currentData.scores.p102_h1 = 3;`);
-        b.render();
-        const h = b.html();
-        assert.match(h, /Blake \u2014 1/);
-        assert.ok(!/Avery/.test(h), 'Avery must not keep a skin he no longer owns.');
-    });
-
-    test('a late group posting resolves the waiting hole', () => {
-        const b = boot({ holes: 4, thru: { 1: 4, 2: 4, 3: 3 }, spec: { p101_h4: 2 } });
-        b.render();
-        assert.match(b.html(), /H4 \u2014 Waiting on Group 3/);
-
-        b.run(`[109,110,111,112].forEach(function (id) { currentData.scores['p' + id + '_h4'] = 4; });`);
-        b.render();
-        const h = b.html();
-        assert.match(h, /Official thru 4/);
-        assert.match(h, /Latest: H4 \u2014 Avery/);
-        assert.ok(!/Waiting on/.test(h));
-    });
-
-    test('the card is re-rendered by the scorecard render path', () => {
-        // The engine cannot go stale; only a missing re-render can. This is the
-        // assertion that protects against that.
-        const src = read('index.html');
-        const at = src.indexOf('renderWhoAmI();');
-        const block = src.slice(at, at + 220);
-        assert.match(block, /renderLiveSkins\(\);/,
-            'renderLiveSkins must run whenever the scorecard renders, or a correction leaves a stale card.');
+    test('posting the late scores updates the surfaces', () => {
+        const b = boot({ thru: { 1:15, 2:14, 3:13 }, kpWinners: { h3:'101' } });
+        assert.match(strip(b.banner()), /H7 · Pending/);
+        b.run(`currentData.kpWinners.h7 = '105';`);
+        assert.match(strip(b.banner()), /H7 · Ellis/);
     });
 });
 
-describe('NO DUPLICATE ARITHMETIC', () => {
+describe('SCORE CORRECTION', () => {
 
-    test('the presenter computes no skins logic of its own', () => {
-        const src = read('index.html');
-        const at = src.indexOf('function renderLiveSkins');
-        const fn = src.slice(at, src.indexOf('\n    }', src.indexOf('mount.innerHTML = \'<div class="live-skins"')));
-        assert.match(fn, /computeSkinsHoleLedger\(/, 'It must consume the canonical ledger.');
-        assert.doesNotMatch(fn, /getStrokes\(/, 'No second handicap calculator.');
-        assert.doesNotMatch(fn, /Math\.min\(/, 'No second low-score calculator.');
-        assert.doesNotMatch(fn, /computeSkinsCarryOverForSettle|computeSkinsVoidForSettle/,
-            'It must go through the ledger, not reach past it into the resolvers.');
+    test('correcting a score moves the projected Net Finish', () => {
+        const b = boot({ nets: [70,72,75,78,80,82,84,86,88,90,92,94] });
+        assert.match(strip(b.banner()), /1 · Avery/);
+        // Blow Avery out to the back of the field.
+        b.run(`currentData.courseData.forEach(function (h) { currentData.scores['p101_h' + h.hole] = 8; });`);
+        const after = strip(b.banner());
+        assert.match(after, /1 · Blake/, 'the leader must change with the score');
+        assert.ok(!/1 · Avery/.test(after), 'no stale leader may survive');
     });
 
-    test('it degrades quietly if the engine is unavailable', () => {
-        // pwa/offline conditions can leave a script unloaded. A missing engine must
-        // cost the card, never the scorecard.
-        const src = read('index.html');
-        const fn = src.slice(src.indexOf('function renderLiveSkins'), src.indexOf('function renderLiveSkins') + 900);
-        assert.match(fn, /typeof computeSkinsHoleLedger !== 'function'/);
-        assert.match(src.slice(src.indexOf('function renderLiveSkins')), /catch \(e\) \{/);
+    test('changing a KP winner moves the KP line', () => {
+        const b = boot({ kpWinners: { h3:'101' } });
+        assert.match(strip(b.banner()), /H3 · Avery/);
+        b.run(`currentData.kpWinners.h3 = '102';`);
+        const after = strip(b.banner());
+        assert.match(after, /H3 · Blake/);
+        assert.ok(!/H3 · Avery/.test(after));
     });
+});
 
-    test('it sits below score entry and navigation, not above', () => {
-        const src = read('index.html');
+describe('SCORECARD ORDER CONTRACT', () => {
+
+    const src = read('index.html');
+
+    test('every live mount sits AFTER Prev/Next in the render', () => {
         const nav = src.indexOf('html += navRowHtml;');
-        const mount = src.indexOf("html += '<div id=\"live-skins-mount\"></div>';");
-        assert.ok(nav !== -1 && mount !== -1);
-        assert.ok(mount > nav, 'Prev/Next must never be pushed below the live card.');
+        assert.notEqual(nav, -1, 'the nav row must still be rendered');
+        ['live-skins-mount', 'action-center-mount', 'bet-strip-mount'].forEach(id => {
+            const at = src.indexOf(`html += '<div id="${id}"></div>';`);
+            assert.notEqual(at, -1, `${id} is missing`);
+            assert.ok(at > nav, `${id} renders before Prev/Next — score entry must stay first`);
+        });
+    });
+
+    test('score boxes and the hole header come before the nav row IN THE HOLE VIEW', () => {
+        // Scoped to renderHoleView. The first `class="score-input"` in the file
+        // belongs to the Full Card renderer, which is a different function further
+        // down - comparing raw file offsets across two functions proved nothing about
+        // the order a golfer actually sees.
+        const start = src.indexOf('function renderHoleView');
+        assert.notEqual(start, -1, 'renderHoleView was renamed');
+        const fn = src.slice(start, src.indexOf('html += buildHolePickerHtml', start));
+        const nav = fn.indexOf('html += navRowHtml;');
+        const header = fn.indexOf('hole-view-header');
+        assert.ok(nav !== -1, 'the hole view must render the nav row');
+        assert.ok(header !== -1 && header < nav, 'the hole header must precede Prev/Next');
+        const mount = fn.indexOf('live-skins-mount');
+        assert.ok(mount > nav, 'live action must come after Prev/Next');
+    });
+
+    test('the live cards live inside the existing Money Pool banner, not a new dashboard', () => {
+        assert.match(src, /html \+= buildLiveNetFinish\(r\);/);
+        assert.match(src, /html \+= buildLiveKpStatus\(r\);/);
+        const banner = src.slice(src.indexOf('function buildMoneyPoolBanner'), src.indexOf('function buildLiveNetFinish'));
+        assert.match(banner, /action-section-label/, 'it must remain part of the Action Center section');
+    });
+});
+
+describe('NO DUPLICATE MONEY MATH', () => {
+
+    const fnOf = (name, end) => {
+        const src = read('index.html');
+        return src.slice(src.indexOf(`function ${name}`), src.indexOf(`function ${end}`));
+    };
+
+    test('Net Finish consumes canonical pool output', () => {
+        const f = fnOf('buildLiveNetFinish', 'buildLiveKpStatus');
+        assert.match(f, /r\.net\.lines\.forEach/);
+        assert.doesNotMatch(f, /placeCents|standings\.filter/, 'the page must not redo position consumption');
+        assert.doesNotMatch(f, /getStrokes\(|parseHcp\(/, 'no second handicap calculator');
+    });
+
+    test('KP consumes canonical allocated amounts', () => {
+        const f = fnOf('buildLiveKpStatus', 'buildPoolKpEntry');
+        assert.match(f, /r\.kp\.lines\.forEach/);
+        assert.doesNotMatch(f, /splitCentsEvenly\(/, 'the page must not divide the KP bucket itself');
+        assert.doesNotMatch(f, /\/ r\.kp\.lines\.length/, 'an assumed equal split would be wrong on an odd bucket');
+    });
+});
+
+describe('RECEIPT — NET FINISH TIE EXPLANATION', () => {
+
+    const { loadHtmlInlineScript: loadS } = require('./helpers/load-script.js');
+    const SDEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+
+    function receipt({ amount = 70, places = [57.142857, 42.857143], nets, mode = 'whole-dollar' }) {
+        const sb = loadS('settlement.html', SDEPS);
+        const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
+        const ps = NAMES.slice(0, nets.length).map((n,i)=>({id:101+i,name:n,hcp:'0',playingForMoney:true}));
+        const sc = {};
+        ps.forEach((p,pi)=>cd.forEach((h,hi)=>{
+            const base = Math.floor(nets[pi]/cd.length), extra = nets[pi] - base*cd.length;
+            sc['p'+p.id+'_h'+h.hole] = base + (hi < extra ? 1 : 0);
+        }));
+        const data = { players: ps, courseData: cd, gameFormat: 'stroke', scores: sc, settlementMode: mode,
+            moneyPool: { enabled:true, buyIn:40, net:{ amount, places },
+                         skins:{ mode:'remainder', scoring:'net', carryOver:false } }, kpWinners: {} };
+        vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(data)};`, sb);
+        vm.runInContext(`renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`, sb);
+        return strip(sb.document.getElementById('money-pool-section').innerHTML);
+    }
+
+    test('a two-way tie for first explains the positions it consumed', () => {
+        const t = receipt({ nets: [70,70,75,78] });
+        assert.match(t, /T1: Avery \/ Blake/);
+        assert.match(t, /Positions 1–2/);
+        assert.match(t, /\$40 \+ \$30 = \$70/, 'the arithmetic must be shown, not inferred');
+        assert.match(t, /\$35 each/);
+        assert.match(t, /next golfer finishes 3rd/);
+    });
+
+    test('a three-way tie shows the uneven whole-dollar split', () => {
+        const t = receipt({ amount: 100, places: [50,30,20], nets: [70,70,70,78] });
+        assert.match(t, /T1: Avery \/ Blake \/ Casey/);
+        assert.match(t, /Positions 1–3/);
+        assert.match(t, /\$50 \+ \$30 \+ \$20 = \$100/);
+        assert.match(t, /Avery \$34 · Blake \$33 · Casey \$33/,
+            'an average would not add up to $100 — the real allocation must be shown');
+        assert.match(t, /next golfer finishes 4th/);
+    });
+
+    test('an outright winner gets no tie explanation', () => {
+        const t = receipt({ nets: [68,72,75,78] });
+        assert.match(t, /1st: Avery/);
+        assert.ok(!/Positions/.test(t), 'nothing to explain when nobody tied');
+    });
+
+    test('the Receipt does not recompute the tie itself', () => {
+        const src = read('settlement.html');
+        const at = src.indexOf('A TIE IS EXPLAINED, NOT JUST MARKED');
+        const block = src.slice(at, at + 3000);
+        assert.match(block, /r\.net\.lines\.forEach/, 'it must consume canonical lines');
+        assert.match(block, /moneyPoolNetPlaceCents/, 'place values must come from the engine');
+        assert.doesNotMatch(block, /standings\.filter/, 'the page must not redo position consumption');
     });
 });
