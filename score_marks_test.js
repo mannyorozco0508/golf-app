@@ -265,7 +265,20 @@ describe('PRESENTATION', () => {
         // PDF is exactly where a golfer wants to scan for birdies.
         [idx, st].forEach(src => {
             assert.ok(/print-color-adjust: exact/.test(src), 'colour adjustment not forced');
-            const printBlocks = src.match(/@media print \{[\s\S]*?\n\s*\}/g) || [];
+            // Non-greedy to the first '}' stopped at the end of the first NESTED rule,
+            // so a block that gained an inner rule above the rings looked as though the
+            // ring rule had vanished. Brace-matched instead.
+            const printBlocks = [];
+            let from = 0, at;
+            while ((at = src.indexOf('@media print', from)) !== -1) {
+                let depth = 0, end = src.length;
+                for (let j = src.indexOf('{', at); j < src.length; j++) {
+                    if (src[j] === '{') depth++;
+                    else if (src[j] === '}') { depth--; if (depth === 0) { end = j + 1; break; } }
+                }
+                printBlocks.push(src.slice(at, end));
+                from = end;
+            }
             assert.ok(printBlocks.some(b => /mark-birdie/.test(b)), 'no print rule for the rings');
         });
     });
