@@ -117,7 +117,11 @@ function validateMoneyPool(data, courseData) {
     const totalPool = buyIn * participants.length;
     let fixed = 0;
 
-    const kp = pool.kp;
+    // A cancelled KP game is not validated - it is no longer part of the pool, so
+    // "KP has money on it but no holes chosen" would be a complaint about a game
+    // nobody is playing.
+    const kpCancelledCfg = !!(data.kpCancelled && data.kpCancelled.cancelled === true);
+    const kp = kpCancelledCfg ? null : pool.kp;
     if (kp && (Number(kp.amount) || 0) > 0) {
         const holes = Array.isArray(kp.holes) ? kp.holes : [];
         if (holes.length === 0) errors.push('KP has money on it but no KP holes chosen.');
@@ -352,10 +356,38 @@ function computeMoneyPool(data, courseData, savedScores) {
     //     prizes + refunds + kpUnresolvedCents === totalPoolCents
     //
     // Confirming the KPs distributes the money and zero-sum returns to 0.
+    //
+    // CANCELLATION IS A THIRD THING, and the distinction is the whole point:
+    //
+    //   unresolved  nobody has said yet          -> withheld, settlement blocked
+    //   no winner   the organizer said nobody won -> a legitimate refund
+    //   CANCELLED   the organizer removed the game -> not a refund at all
+    //
+    // A cancelled KP game simply does not create a KP bucket. That is deliberate
+    // rather than clever: the skins remainder is already
+    //
+    //     totalPool - (result.kp ? result.kp.amountCents : 0) - net
+    //
+    // so leaving result.kp unset makes the former KP allocation flow into skins
+    // through the calculation that was always there. No transfer, no second
+    // allocation rule, no page arithmetic. $100 + $310 becomes $410 because the
+    // remainder is larger, which is what "remainder" means.
+    //
+    // The original amount is still reported so the Receipt can say what was
+    // cancelled - the round's history is not erased, it just stops being money.
+    const kpCancel = data.kpCancelled;
+    const kpIsCancelled = !!(kpCancel && kpCancel.cancelled === true);
     const kpConf = data.kpConfirmed;
     const kpIsConfirmed = !!(kpConf && kpConf.confirmed === true);
     const kpCfg = pool.kp;
-    if (kpCfg && (Number(kpCfg.amount) || 0) > 0) {
+    if (kpIsCancelled) {
+        // Reported, never paid. kpWinners and kpLeaders may still exist as round
+        // history; settlement ignores every one of them. The cancelled state wins.
+        result.kpCancelled = {
+            cancelled: true,
+            originalCents: Math.round((Number(kpCfg && kpCfg.amount) || 0) * 100),
+        };
+    } else if (kpCfg && (Number(kpCfg.amount) || 0) > 0) {
         const amountCents = Math.round(Number(kpCfg.amount) * 100);
         const holes = (kpCfg.holes || []).map(Number).sort((a, b) => a - b);
         // $100 across 3 KP holes is $34/$33/$33, not $33.34/$33.33/$33.33. Holes are
