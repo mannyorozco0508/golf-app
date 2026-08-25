@@ -302,8 +302,18 @@ describe('ONE ATOMIC WRITE — NO STALE CONFIRMATION', () => {
         // the current leader is not a write, and an earlier draft of this assertion
         // conflated the two.
         const src = read(PAGE);
-        const assigns = (src.match(/updates\['kpWinners\/h'\s*\+\s*hole\]\s*=/g) || []).length;
-        assert.equal(assigns, 1, 'exactly one place assigns a KP winner');
+        // THE RULE IS ABOUT PAIRING, NOT COUNTING. Two places touch kpWinners now -
+        // saveKpLeader sets one, and the organizer's no-winner action clears one -
+        // and both must clear kpConfirmed in the SAME atomic update. Counting
+        // assignments conflated setting a winner with removing one.
+        const blocks = src.split('db.ref(');
+        const touching = blocks.filter(b => /updates\['kpWinners\/h'/.test(b.slice(-900)));
+        assert.ok(touching.length >= 1, 'at least one path writes kpWinners');
+        touching.forEach(b => {
+            const seg = b.slice(-900);
+            assert.match(seg, /updates\['kpConfirmed'\]/,
+                'every kpWinners write must clear the confirmation in the same update');
+        });
         assert.ok(!/db\.ref\([^)]*kpWinners[^)]*\)\.set/.test(src),
             'a direct leaf .set() would write a winner without clearing the confirmation');
     });
@@ -344,9 +354,10 @@ describe('SAFETY RAILS PRESERVED', () => {
             .forEach(t => assert.ok(!block.includes(t), `KP payout math must stay in the engine; found ${t}`));
     });
 
-    test('WAVE A DOES NOT CHANGE SETTLEMENT - unresolved KP still refunds for now', () => {
-        // Stated as a test so the gap is visible rather than assumed fixed. Wave B
-        // is what stops missing KP winners becoming a silent Pool refund.
+    test('WAVE B: unresolved KP is withheld, not refunded', () => {
+        // This test previously asserted the OPPOSITE - that Wave A deliberately left
+        // the refund behaviour in place. Wave B is the change it was flagging, so the
+        // assertion is inverted rather than removed: the gap it guarded is now closed.
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
         vm.createContext(sb);
         ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
@@ -359,8 +370,9 @@ describe('SAFETY RAILS PRESERVED', () => {
             moneyPool:{ enabled:true, buyIn:40, kp:{amount:100,holes:KP_HOLES},
                 net:{amount:70,places:[57.142857,42.857143]},
                 skins:{mode:'remainder',scoring:'net',carryOver:false} } }, cd, sc);
-        assert.equal(r.kp.unclaimedCents, 10000);
-        assert.match(r.refund.reasons.join(' '), /Unclaimed KP/,
-            'still the current behaviour - Wave B changes it');
+        assert.equal(r.kpUnresolvedCents, 10000, 'the $100 stays unresolved');
+        assert.equal(r.settled, false, 'and the round is not settled');
+        assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')),
+            'the $8/$9 refund lines must be gone');
     });
 });
