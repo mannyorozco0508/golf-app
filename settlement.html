@@ -873,12 +873,32 @@
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
         if (r.valid && r.kp) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}</span><span></span></div>`;
+            // THREE STATES, NEVER TWO. A hole nobody has resolved is not "unclaimed" -
+            // saying so is what let $100 of unentered KP print as refunds on a receipt
+            // that called itself final. Distance appears only when somebody measured.
+            const unresolvedKp = r.kp.unresolvedCents || 0;
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}`
+                + (unresolvedKp > 0 ? ' \u2014 NOT CONFIRMED' : '') + `</span><span></span></div>`;
+            const leaders = (data.kpLeaders || {});
             r.kp.lines.forEach(l => {
-                html += l.winnerId
-                    ? `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`
-                    : `<div class="ledger-row"><span>Hole ${l.hole}: unclaimed</span><span>${$(l.cents)} refunded</span></div>`;
+                const led = leaders['h' + l.hole];
+                const dist = (led && led.distanceInches !== null && led.distanceInches !== undefined)
+                    ? ' \u2014 ' + Math.floor(led.distanceInches / 12) + "' " + (led.distanceInches % 12) + '"'
+                    : '';
+                if (l.state === 'paid') {
+                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                } else if (l.state === 'refunded') {
+                    html += `<div class="ledger-row"><span>Hole ${l.hole}: no winner</span><span>${$(l.cents)} refunded</span></div>`;
+                } else {
+                    html += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: `
+                        + (l.winnerName ? l.winnerName + dist + ' \u2014 not confirmed' : 'no winner recorded')
+                        + `</span><span>${$(l.cents)} pending</span></div>`;
+                }
             });
+            if (unresolvedKp > 0) {
+                html += `<div class="ledger-row" style="color:var(--warn-text); font-weight:bold;">`
+                    + `<span>\u26A0\uFE0F KP results not confirmed</span><span>${$(unresolvedKp)} pending</span></div>`;
+            }
         }
         if (r.valid && r.net) {
             html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
