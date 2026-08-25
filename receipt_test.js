@@ -452,8 +452,13 @@ describe('THE RECEIPT — header and scorecard moved across', () => {
     test('the header sits above Final Results', () => {
         // "Who Pays Who" appears in a comment earlier in the file, so anchor on the
         // header call and the Final Results card that follows it.
+        // Bounded by the NEXT card rather than a fixed 400 characters. The window
+        // broke the moment an explanatory comment was added above the heading - the
+        // ordering it checks never changed, only its distance from the anchor.
         const at = st.indexOf('let html = buildReceiptHeader();');
-        const fn = st.slice(at, at + 400);
+        assert.notEqual(at, -1, 'the header call was renamed');
+        const nextCard = st.indexOf('Who Pays Who', at);
+        const fn = st.slice(at, nextCard === -1 ? at + 4000 : nextCard);
         assert.ok(/Final Results/.test(fn), 'the header must be emitted before the money');
     });
 
