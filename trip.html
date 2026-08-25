@@ -9,6 +9,11 @@
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
+<!-- pool-engine.js: trip settlement asks each round whether its money is actually
+     settled. Without this the check was unreachable - the typeof guard around it
+     swallowed the absence silently, so the gate could never fire in the browser
+     even though it passed in a test harness that loads every engine. -->
+<script src="pool-engine.js"></script>
     <script src="course-data.js"></script>
     <style>
         :root {
@@ -833,6 +838,7 @@
     let cachedCountedResults = [];    // only rounds still counting toward trip totals
     let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
     let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
+    let cachedTripSettled = true;     // false while any linked round still has unresolved money
     let cachedAwards = {};         // trip awards — reused by the share recap
     let cachedPointsStandings = []; // points race standings — reused by the share recap and prize calculator
 
@@ -985,6 +991,7 @@
 
         const netByName = {}; // lowercased key -> { name, net }
         const perRoundBreakdown = [];
+        const unresolvedRounds = [];   // linked rounds whose money is not settled yet
 
         cachedCountedResults.forEach(({ label, data }) => {
             const courseData = data.courseData || [];
@@ -998,6 +1005,27 @@
             // Results page shows. Trip totals are now the sum of finalized round
             // settlements, not a narrower second opinion about what counts as money.
             const combined = computeCombinedNetTotals(data, courseData, savedScores);
+
+            // IS THIS ROUND'S MONEY ACTUALLY SETTLED?
+            //
+            // A round with unresolved KP money has a ledger that deliberately sums to
+            // -kpUnresolvedCents rather than zero - that share is withheld until the
+            // organizer confirms or cancels it. Summing such a round into a trip
+            // inherits the imbalance, and the trip would then present a distorted
+            // total under the heading "Final". One unconfirmed KP on day one quietly
+            // skews the whole week's settlement, which is what everybody actually
+            // pays from.
+            //
+            // Canonical read only: pool-engine already decided this in Wave B, so the
+            // question is asked, not re-derived.
+            try {
+                if (typeof computeMoneyPool === 'function') {
+                    const rp = computeMoneyPool(data, courseData, savedScores);
+                    if (rp && rp.valid && rp.settled === false) {
+                        unresolvedRounds.push({ label, cents: rp.kpUnresolvedCents || 0 });
+                    }
+                }
+            } catch (e) { /* a round we cannot read is not claimed as settled either */ }
 
             // The main-format label is still useful context in the per-round breakdown,
             // but it no longer decides what money is counted.
@@ -1034,7 +1062,27 @@
 
         let html = "";
 
-        html += `<div class="settle-card"><div class="settle-header">🏁 Final "Who Pays Who"</div>`;
+        // "FINAL" IS EARNED, HERE AS ON THE RECEIPT. The list below is still shown -
+        // hiding it would be worse, since the group wants to see where the week stands -
+        // but it is not called final while a linked round still has money hanging, and
+        // the rounds responsible are named so somebody can go and resolve them.
+        const tripSettled = unresolvedRounds.length === 0;
+        cachedTripSettled = tripSettled;
+        if (!tripSettled) {
+            const pending = unresolvedRounds
+                .map(u => u.label + (u.cents ? ' ($' + Math.round(u.cents / 100) + ')' : ''))
+                .join(', ');
+            html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
+                <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Not Settled Yet</div>
+                <div style="font-size:0.85rem; color:var(--warn-text); text-align:center;">
+                    KP results are still unconfirmed in: ${pending}.<br>
+                    These totals will change once those rounds are resolved.
+                </div></div>`;
+        }
+
+        html += `<div class="settle-card"><div class="settle-header">${tripSettled
+            ? '🏁 Final "Who Pays Who"'
+            : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
         if (transactions.length === 0) {
             const msg = Object.keys(netByName).length > 0
                 ? 'Everyone is settled up — no money changes hands.'
@@ -1439,7 +1487,12 @@
             netRows.forEach((r, i) => { text += `${i + 1}. ${r.name} — ${r.net}\n`; });
         }
 
-        text += `\n💵 FINAL SETTLEMENT\n`;
+        // The recap is the text people paste into the group chat, so it carries the
+        // same caveat as the screen - otherwise the caveat is the one thing that does
+        // not get shared.
+        text += cachedTripSettled
+            ? `\n💵 FINAL SETTLEMENT\n`
+            : `\n💵 SETTLEMENT SO FAR — NOT FINAL\n`;
         if (cachedMoneyTransactions.length === 0) {
             text += `Everyone's settled up — no money changes hands.\n`;
         } else {
