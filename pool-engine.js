@@ -437,7 +437,12 @@ function computeMoneyPool(data, courseData, savedScores) {
             refundCents += unpaid;
             if (standings.length === 0) refundReason('Net prize refunded — no scores posted.');
         }
-        result.net = { amountCents, standings, lines, unpaidCents: unpaid };
+        // placeCents is the ALLOCATED value of each paid position, exposed additively
+        // so a receipt can explain a tie without recomputing it. Callers previously had
+        // to reach for moneyPoolNetPlaceCents(), which is the legacy percentage path -
+        // on a whole-dollar round that returns 3999/3001 where this engine actually
+        // allocated 4000/3000, and the receipt printed "$39.99 + $30.01 = $70".
+        result.net = { amountCents, standings, lines, placeCents, unpaidCents: unpaid };
     }
 
     // ---- SKINS -------------------------------------------------------------
