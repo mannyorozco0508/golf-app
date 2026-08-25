@@ -262,10 +262,16 @@ describe('NOTHING BEHIND THE WORDS MOVED', () => {
         const t = strip(boot().summary());
         assert.match(t, /Player Payouts/);
         assert.match(t, /TOTAL PAYOUT/);
-        assert.ok(!/NET<\/span>/.test(boot().summary().slice(
-            boot().summary().indexOf('Player Payouts'),
-            boot().summary().indexOf('Who Pays Who'))),
-            'the payout section keeps its own vocabulary');
+        // Bounded by the NEXT section that actually exists. This sliced to
+        // 'Who Pays Who', which a Money-Pool-only round no longer renders - indexOf
+        // returned -1 and the slice ran backwards to the start of the document,
+        // sweeping in the NET wording from Final Results above.
+        const html = boot().summary();
+        const start = html.indexOf('Player Payouts');
+        assert.notEqual(start, -1, 'the payout section must render');
+        const after = html.indexOf('Who Pays Who', start);
+        const section = html.slice(start, after === -1 ? html.length : after);
+        assert.ok(!/NET<\/span>/.test(section), 'the payout section keeps its own vocabulary');
     });
 
     test('Who Pays Who still reconstructs every balance', () => {
