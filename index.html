@@ -567,6 +567,19 @@
            and navigation, and must never grow tall enough to push them off screen. */
         /* Live Net Finish / KP rows. Compact by design: this sits below score entry
            and navigation and must not grow tall enough to push them off screen. */
+        /* KP block. Compact by design - it sits inside the Action Center and must not
+           push score entry or Prev/Next down the screen. */
+        .kp-block { margin: 8px 0; padding: 8px; border-radius: 8px; background: var(--bg-soft); }
+        .kp-head { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
+        .kp-current { font-size: 0.82rem; padding: 2px 0; }
+        .kp-none { color: var(--text-muted); font-style: italic; }
+        .kp-dist-none { font-size: 0.7rem; color: var(--text-muted); }
+        .kp-select { width: 100%; min-height: 44px; margin-top: 6px; }
+        .kp-dist-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+        .kp-dist-label { font-size: 0.72rem; color: var(--text-muted); flex: 1; }
+        .kp-dist-input { width: 56px; height: 40px; text-align: center; font-size: 0.95rem; border: 1px solid var(--border-mid); border-radius: 8px; }
+        .kp-btn { width: 100%; min-height: 44px; margin-top: 6px; border: none; border-radius: 8px; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.85rem; }
+        .kp-cancel { width: 100%; min-height: 40px; margin-top: 4px; background: none; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; }
         .lnf-head { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); margin-top: 8px; }
         .lnf-state { color: var(--text-muted); font-weight: 600; }
         .lnf-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.74rem; padding: 2px 0; }
@@ -2234,24 +2247,158 @@
         const isMultiGroup = (currentData.players || []).length > 4;
         const canWrite = hasGroupLock || !isMultiGroup;
         const winner = (currentData.kpWinners || {})['h' + h];
-        if (!canWrite) {
-            const w = winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null;
-            return '<div class="section-summary">\uD83D\uDCCD KP hole ' + h + ': ' + (w || 'not claimed yet') + '</div>';
+        const leader = kpLeaderOf(h);
+
+        // EVERYBODY SEES THE LEADER. Only writing is scoped - a spectator or another
+        // group still needs to know what the marker says.
+        const leaderName = leader ? leader.playerName
+            : (winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null);
+        const distLine = leader ? kpDistanceLabel(leader.distanceInches) : null;
+
+        let head = '<div class="kp-block"><div class="kp-head">\uD83C\uDFAF Hole ' + h + ' KP</div>';
+        head += leaderName
+            ? '<div class="kp-current">Current: <strong>' + leaderName + '</strong>'
+              + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
+              + (distLine ? '' : '<div class="kp-dist-none">Distance not recorded</div>')
+            : '<div class="kp-current kp-none">No leader yet</div>';
+
+        // Only this group's golfers are selectable. Another foursome may hold the
+        // marker, which is fine - it just is not this group's to claim.
+        const mine = canWrite ? r.participants.filter(p => canSetKpLeader(p.id)) : [];
+
+        // ONE EXIT. Several returns each closed .kp-block correctly at runtime, but
+        // the div-balance check counts markup statically and saw the extra closes.
+        // Building one body keeps that guard honest.
+        let body = '';
+        if (mine.length > 0) {
+            if (kpEntryOpenHole !== h) {
+                body = '<button class="kp-btn" onclick="toggleKpEntry(' + h + ')">'
+                    + (leaderName ? 'New Leader' : 'Set KP Leader') + '</button>';
+            } else {
+                let opts = '<option value="">Who is closest?</option>';
+                mine.forEach(p => { opts += '<option value="' + p.id + '">' + p.name + '</option>'; });
+                body = '<select id="kp-pick-' + h + '" class="kp-select">' + opts + '</select>'
+                    + '<div class="kp-dist-row"><span class="kp-dist-label">Distance <em>(optional)</em></span>'
+                    + '<input id="kp-ft-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="ft">'
+                    + '<input id="kp-in-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="in">'
+                    + '</div>'
+                    + '<button class="kp-btn" onclick="submitKpEntry(' + h + ')">Save KP</button>'
+                    + '<button class="kp-cancel" onclick="toggleKpEntry(' + h + ')">Cancel</button>';
+            }
         }
-        let opts = '<option value="">\uD83D\uDCCD KP hole ' + h + ' \u2014 who stuck it?</option>';
-        r.participants.forEach(p => {
-            opts += '<option value="' + p.id + '"' + (String(winner) === p.id ? ' selected' : '') + '>' + p.name + '</option>';
-        });
-        return '<div style="margin:6px 0;"><select style="width:100%; min-height:44px;" onchange="savePoolKp(' + h + ', this.value)">' + opts + '</select></div>';
+        return head + body + '</div>';
     }
 
-    function savePoolKp(hole, pid) {
+    // ---- KP LEADERS ---------------------------------------------------------
+    //
+    // HOW KP ACTUALLY WORKS ON THE COURSE. Most groups never measure. There is a
+    // marker sitting next to the closest ball, and the next group looks at it and
+    // decides whether anybody beat it. So the app tracks a LIVE LEADER that a later
+    // group can replace, and a group that does not beat the marker does nothing at
+    // all. Distance is supplemental, never required, and never decides the winner -
+    // the golfers standing on the green do that.
+    //
+    // WHO MAY CLAIM IT. A group may only name one of ITS OWN golfers. Before this,
+    // the picker listed every pool participant, so Group 1 could record "Marcus from
+    // Group 3" as their KP - money moving on a shot nobody in that group saw. The
+    // rule now matches score-writing: see everything, write only your own four.
+    function canSetKpLeader(playerId) {
+        // Same shape as canWritePlayer, deliberately: a bare link on a multi-group
+        // round is a spectator and records nothing; a group link is scoped to its
+        // own group; a single-group round has no meaningful scoping.
+        const players = currentData.players || [];
+        const isMultiGroup = players.length > 4;
+        if (!hasGroupLock) return !isMultiGroup;
+        const grp = playerGroupOf(playerId);
+        if (grp === null) return true;
+        return String(grp) === String(lockedGroup);
+    }
+
+    function kpLeaderOf(hole) {
+        return (currentData.kpLeaders || {})['h' + hole] || null;
+    }
+
+    // Feet/inches in, total inches out. Blank stays blank - a leader with no
+    // measurement is a completely normal, valid state.
+    function kpDistanceInches(feet, inches) {
+        const f = parseInt(feet, 10), i = parseInt(inches, 10);
+        const hasF = !isNaN(f) && f >= 0, hasI = !isNaN(i) && i >= 0;
+        if (!hasF && !hasI) return null;
+        return (hasF ? f : 0) * 12 + (hasI ? i : 0);
+    }
+
+    function kpDistanceLabel(d) {
+        if (d === null || d === undefined || isNaN(d)) return 'Distance not recorded';
+        const f = Math.floor(d / 12), i = d % 12;
+        return f + "' " + i + '"';
+    }
+
+    // ONE ATOMIC WRITE. kpLeaders is the live on-course state and kpWinners is what
+    // settlement reads; if those two could ever be written separately there would be
+    // a window where the money authority disagreed with the marker on the green.
+    // A single .update() on the round makes all three paths land together or not at
+    // all - the leader, the settlement winner, and the cleared confirmation.
+    //
+    // CLEARING kpConfirmed IS THE ANTI-STALE MECHANISM. A confirmed round whose
+    // leader later changes must stop looking confirmed in the same instant the
+    // leader moves, and it cannot be left to a caller to remember.
+    function saveKpLeader(hole, pid, feet, inches) {
         if (!pid) return;
+        if (!canSetKpLeader(pid)) {
+            alert('\u26A0\uFE0F NOT SAVED\nYou can only record a KP for a golfer in your own group.');
+            return;
+        }
         if (!requireOnlineForMoney('KP NOT SAVED', 'Reconnect before recording the KP.')) return;
-        db.ref('events/' + currentMode + '/kpWinners/h' + hole).set(String(pid))
-            .then(() => alert('\u2705 KP RECORDED\nHole ' + hole))
+
+        const players = currentData.players || [];
+        const p = players.find(x => String(x.id) === String(pid));
+        const dist = kpDistanceInches(feet, inches);
+        const leader = {
+            playerId: String(pid),
+            playerName: p ? p.name : String(pid),
+            group: playerGroupOf(pid),
+            distanceInches: dist,
+            updatedAt: Date.now(),
+        };
+
+        const updates = {};
+        updates['kpLeaders/h' + hole] = leader;
+        updates['kpWinners/h' + hole] = String(pid);
+        updates['kpConfirmed'] = null;          // any leader change unconfirms the round
+
+        db.ref('events/' + currentMode).update(updates)
+            .then(() => {
+                kpEntryOpenHole = null;
+                alert('\u2705 KP RECORDED\nHole ' + hole + '\n' + leader.playerName
+                    + (dist === null ? '' : ' \u2014 ' + kpDistanceLabel(dist)));
+                renderActionCenter();
+            })
             .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
     }
+
+    // RETAINED AS A DELEGATE, NOT A SECOND WRITER. saveKpLeader performs the only
+    // kpWinners write in this page; keeping a second db.ref().set() here would mean
+    // two paths could write the KP winner and only one of them would clear the
+    // confirmation. Existing callers keep the same signature and get the leader
+    // record, the atomic update and the invalidation for free.
+    function savePoolKp(hole, pid) {
+        saveKpLeader(hole, pid, '', '');
+    }
+
+    function toggleKpEntry(hole) {
+        kpEntryOpenHole = (kpEntryOpenHole === hole) ? null : hole;
+        renderActionCenter();
+    }
+
+    function submitKpEntry(hole) {
+        const sel = document.getElementById('kp-pick-' + hole);
+        const ft = document.getElementById('kp-ft-' + hole);
+        const inch = document.getElementById('kp-in-' + hole);
+        if (!sel || !sel.value) { alert('Pick the golfer who is closest.'); return; }
+        saveKpLeader(hole, sel.value, ft ? ft.value : '', inch ? inch.value : '');
+    }
+
+    let kpEntryOpenHole = null;
 
     function toggleActionCenter() {
         actionCenterOpen = !actionCenterOpen;
