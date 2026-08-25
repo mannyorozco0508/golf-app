@@ -872,6 +872,14 @@
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
+        // CANCELLED IS NOT A REFUND, and the Receipt has to say which it was. The
+        // money did not come back to the field - the game was removed and the pot
+        // was re-divided, which is why no golfer sees a KP line at all.
+        if (r.valid && r.kpCancelled && r.kpCancelled.cancelled) {
+            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 Cancelled</span><span></span></div>`;
+            html += `<div class="ledger-row"><span>Cancelled before settlement \u00B7 original allocation ${$(r.kpCancelled.originalCents)}</span>`
+                 + `<span>moved to skins</span></div>`;
+        }
         if (r.valid && r.kp) {
             // THREE STATES, NEVER TWO. A hole nobody has resolved is not "unclaimed" -
             // saying so is what let $100 of unentered KP print as refunds on a receipt
