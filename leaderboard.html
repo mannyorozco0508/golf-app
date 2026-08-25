@@ -6,12 +6,25 @@
     <title>Live Leaderboard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- Live Skins consumes computeSkinsHoleLedger() from settlement-engine.js - the
+         same canonical resolver the scorecard uses. money-engine.js and action-model.js
+         are its dependencies. This page previously carried its own byte-identical
+         copies of parseHcp/getStrokes; those are gone now that the real ones load. -->
+    <script src="money-engine.js"></script>
+    <script src="action-model.js"></script>
+    <script src="settlement-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
             --bg-card: #ffffff;
             --text-main: #1a1a1a;
             --text-muted: #666;
+            /* Between --text-main and --text-muted. Introduced because the net rows
+               on the scorecard and leaderboards need to be clearly readable while
+               staying subordinate to gross - muted was too faint, main too loud.
+               It was previously referenced without ever being defined, so those rows
+               ran on a hard-coded fallback and did not react to dark mode. */
+            --text-secondary: #4a5568;
             --brand-green: #0f4c3a;
             --brand-navy: #1d3557;
             --accent-teal: #2a9d8f;
@@ -35,6 +48,7 @@
             --bg-card: #1e2426;
             --text-main: #e8ecec;
             --text-muted: #9aa8a7;
+            --text-secondary: #c2cecd;
             --brand-green: #2f9e78;
             --brand-navy: #4a7bb5;
             --accent-teal: #3dbfae;
@@ -119,6 +133,15 @@
         .board-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid var(--border-light); }
         .row-leader { background-color: var(--leader-bg); font-weight: bold; }
         .player-name { text-align: left; font-weight: bold; }
+        .ls-card { background: var(--bg-card); border-radius: 12px; padding: 12px 14px; margin-top: 14px; box-shadow: 0 2px 6px var(--shadow-color); }
+        .ls-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); margin-bottom: 6px; }
+        .ls-summary { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+        .ls-quiet { font-weight: normal; color: var(--text-muted); font-style: italic; }
+        .ls-rows { display: flex; flex-direction: column; gap: 2px; }
+        .ls-r { font-size: 0.82rem; padding: 3px 0; border-bottom: 1px solid var(--border-faint); }
+        .ls-s { color: var(--text-main); font-weight: 600; }
+        .ls-t { color: var(--text-secondary); }
+        .ls-w { color: var(--text-muted); font-style: italic; }
         .player-hcp { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px; }
         /* GROSS OVER NET, both readable. Stacked rather than columned so the player
            name keeps its width on a phone. Net is deliberately smaller than gross but
@@ -197,6 +220,8 @@
     <div id="board-content">
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading Leaderboard...</div>
     </div>
+    <!-- Live Skins sits BELOW the standings: who is leading, then who has won what. -->
+    <div id="live-skins-mount"></div>
 </div>
 
 <script>
@@ -309,24 +334,8 @@
         });
     }
 
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
-    }
-
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
-        } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
-        }
-    }
+    // parseHcp and getStrokes now come from money-engine.js. They were duplicated
+    // here verbatim; two copies of a handicap rule is one copy too many.
 
     function formatToPar(val) {
         if (val === 0) return '<span class="to-par-even">E</span>';
@@ -435,6 +444,107 @@
              + '</td>';
     }
 
+    // ---- LIVE SKINS ---------------------------------------------------------
+    //
+    // WHO WON WHAT HOLE - never how much it is worth. Until the round finishes the
+    // number of winning skins can still change, so any dollar figure shown now is a
+    // guess that will be contradicted later. Results answers "how much"; this
+    // answers "who", which is the question people ask on the course.
+    //
+    // EVERY FIGURE IS CANONICAL. computeSkinsHoleLedger() in settlement-engine.js is
+    // the same resolver the scorecard uses - it decides low scores, ties, carries and
+    // crucially whether a hole is OFFICIAL, meaning every participant has posted it.
+    // This function reads its rows and writes sentences. It resolves nothing.
+    function lbSkinsGroupOf(playerId) {
+        const players = (currentBoardData.players || []);
+        const idx = players.findIndex(p => String(p.id) === String(playerId));
+        if (idx < 0) return null;
+        // computeGroupBoundaries returns { group, startIdx, size } - not start/end.
+        // Reading the wrong field returned null for everyone, so the waiting line fell
+        // back to listing eight names instead of saying "Group 3".
+        const boundaries = computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {});
+        for (let i = 0; i < boundaries.length; i++) {
+            const b = boundaries[i];
+            if (idx >= b.startIdx && idx < b.startIdx + b.size) return b.group;
+        }
+        return null;
+    }
+
+    function renderLiveSkinsBoard() {
+        const mount = document.getElementById('live-skins-mount');
+        if (!mount) return;
+        mount.innerHTML = '';
+        if (typeof computeSkinsHoleLedger !== 'function') return;
+
+        const data = currentBoardData || {};
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        if (courseData.length === 0) return;
+
+        // A round with no skins money must not grow a skins card.
+        const skinsOn = (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        if (!skinsOn) return;
+
+        let bundle;
+        try {
+            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: lbSkinsGroupOf });
+        } catch (e) {
+            return;   // a presenter must never take the leaderboard down with it
+        }
+        const L = bundle.net || bundle.gross;
+        if (!L || L.participants.length === 0) return;
+
+        // BASIS COMES FROM THE SKINS GAME, not the leaderboard's ranking toggle.
+        // Those are different questions and must not be allowed to drift together.
+        const basis = bundle.net ? 'Net' : 'Gross';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let html = '<div class="ls-card"><div class="ls-head">\uD83E\uDD69 LIVE SKINS</div>';
+
+        const standings = Object.keys(L.countsByPlayerId)
+            .map(id => ({ id, n: L.countsByPlayerId[id] }))
+            .filter(r => r.n > 0)
+            .sort((a, b) => b.n - a.n)
+            .map(r => {
+                const pl = L.participants.find(p => String(p.id) === String(r.id));
+                return (pl ? pl.name : '?') + ' ' + r.n;
+            });
+        html += standings.length > 0
+            ? '<div class="ls-summary">' + esc(standings.join(' \u00B7 ')) + '</div>'
+            : '<div class="ls-summary ls-quiet">No skins won yet.</div>';
+
+        // FULL HOLE NAMES. This is read next to a paper card, and the card says
+        // "Hole 14", not "H14".
+        // COMPACT ON A PHONE. Every resolved hole is shown - a won skin must never be
+        // hidden - but only the FIRST waiting hole. Fourteen identical "Waiting for
+        // Groups 1, 2, 3" rows push the real results off the screen and tell nobody
+        // anything they did not already know from the one above.
+        const firstWaitingHole = (L.firstWaiting && L.firstWaiting.hole) || null;
+        const visible = L.holes.filter(r => r.official || r.hole === firstWaitingHole);
+
+        html += '<div class="ls-rows">' + visible.map(r => {
+            if (!r.official) {
+                const gs = r.missingGroups || [];
+                const who = gs.length === 1 ? 'Group ' + gs[0]
+                    : gs.length > 1 ? 'Groups ' + gs.join(', ')
+                    : (r.missing || []).map(m => m.name).join(', ');
+                return '<div class="ls-r ls-w">Hole ' + r.hole + ' \u2014 Waiting for ' + esc(who || 'the field') + '</div>';
+            }
+            if (r.state === 'tie') {
+                // Named so nobody has to reach for the card to see why a hole paid
+                // nothing - a tie is a result, not an absence of one.
+                return '<div class="ls-r ls-t">Hole ' + r.hole + ' \u2014 No Skin \u00B7 Tie at ' + basis + ' ' + r.low + '</div>';
+            }
+            const units = (r.unitsWon !== null && r.unitsWon > 1) ? ' (' + r.unitsWon + ' skins)' : '';
+            return '<div class="ls-r ls-s">Hole ' + r.hole + ' \u2014 ' + esc(r.winner.name)
+                 + ' \u00B7 ' + basis + ' ' + r.low + units + '</div>';
+        }).join('') + '</div></div>';
+
+        mount.innerHTML = html;
+    }
+
     function renderFlatBoard(results, container) {
         let sorted = results.slice().sort((a, b) => {
             if (a.thru === 0 && b.thru > 0) return 1;
@@ -539,6 +649,8 @@
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 20px;">No players active. Admin needs to set up this game.</div>`;
             return;
         }
+
+        renderLiveSkinsBoard();
 
         if (activeView === "individual") {
             let results = players.map(p => {
