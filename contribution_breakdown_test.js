@@ -62,7 +62,7 @@ function acceptance(over = {}) {
             kp: { amount: 100, holes: [3,7,12,16] },
             net: { amount: 70, places: [57.142857, 42.857143] },
             skins: { mode: 'remainder', scoring: 'net', carryOver: false } },
-        kpWinners: { h3: '101', h7: '105', h12: '109', h16: '102' },
+        kpWinners: { h3: '101', h7: '105', h12: '109', h16: '102' }, kpConfirmed: { confirmed: true },
         sideMatches: {
             sm1: { format:'match', scoring:'net', stake:50, startHole:1, createdAt:1,
                    teamAIds:['101'], teamBIds:['102'] },
@@ -169,7 +169,7 @@ describe('ITEMISED LINES', () => {
     });
 
     test('a golfer winning two KPs gets two separate hole lines', () => {
-        const { r } = acceptance({ kpWinners: { h3:'101', h7:'101', h12:'109', h16:'102' } });
+        const { r } = acceptance({ kpWinners: { h3:'101', h7:'101', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true } });
         const kp = labels(r.contributions.avery).filter(l => l.startsWith('KP H'));
         assert.deepEqual(plain(kp).sort(), ['KP H3','KP H7'],
             'grouping two KPs into one line would lose the hole breakdown');
