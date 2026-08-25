@@ -1009,7 +1009,22 @@
         // Rounding happens exactly once, HERE, after every wager has been combined.
         // Rounding each bet on the way in would change the math; rounding the final
         // position does not - it only decides how the last dollar falls.
-        const wholeDollar = roundNetTotalsToWholeDollars(netByName);
+        // WHAT THE LEDGER SHOULD SUM TO. Unresolved KP money is withheld from every
+        // golfer, so the ledger is deliberately short by exactly that amount. Passing
+        // it here is what stops the reconciler treating the gap as a lost dollar and
+        // distributing it. When nothing is unresolved this is 0 and the behaviour is
+        // byte-for-byte what it always was.
+        let unresolvedDollars = 0;
+        try {
+            if (typeof computeMoneyPool === 'function') {
+                const poolNow = computeMoneyPool(data, courseData, savedScores);
+                if (poolNow && poolNow.valid) {
+                    unresolvedDollars = (poolNow.kpUnresolvedCents || 0) / 100;
+                }
+            }
+        } catch (e) { unresolvedDollars = 0; }
+
+        const wholeDollar = roundNetTotalsToWholeDollars(netByName, -unresolvedDollars);
 
         const netTotals = {};
         Object.values(wholeDollar).forEach(v => { netTotals[v.name] = v.net; });
@@ -1097,7 +1112,32 @@
     //
     // Deterministic: ties break on name, so the same round always produces the same
     // answer on every device and every render.
-    function roundNetTotalsToWholeDollars(netByName) {
+    // targetTotal is what the rounded ledger MUST sum to. It is normally 0, because
+    // a settled round is zero-sum by construction. It is NOT zero while money is
+    // deliberately unresolved.
+    //
+    // THE BUG THIS FIXES. The loop below was written when the ledger always summed
+    // to zero, so it only ever nudged a stray cent. Wave B changed that: while KP is
+    // unresolved the ledger sums to -kpUnresolvedCents, because that money is
+    // intentionally withheld from everybody. The loop did not know, saw $100
+    // "missing", and handed it out a dollar at a time across the field - then
+    // labelled the result "Rounding to whole dollars".
+    //
+    // That is the KP refund bug resurfacing one layer up. Wave B stopped
+    // pool-engine.js refunding unresolved money; this loop was quietly redistributing
+    // it anyway, and the label hid it. On today's round it moved $14 and $15 onto
+    // seven golfers whose exact balances were already whole dollars, so Marty read
+    // -$26 when he had genuinely lost $40.
+    //
+    // Rounding can never move a balance by more than a dollar. Anything larger was
+    // never rounding.
+    function roundNetTotalsToWholeDollars(netByName, targetTotal) {
+        // ROUNDED TO A WHOLE DOLLAR, and it has to be. Every rounded balance is an
+        // integer, so their sum is an integer; a fractional target could never be
+        // reached and the loop below would spin forever. An unresolved KP share of
+        // $8.33 is a real possibility on a legacy cent round, and the first version of
+        // this change hung the entire suite on exactly that.
+        const target = Math.round(Number(targetTotal) || 0);
         const keys = Object.keys(netByName);
         if (keys.length === 0) return netByName;
 
@@ -1107,10 +1147,19 @@
             return { key: k, name: netByName[k].name, exact, rounded, drift: rounded - exact };
         });
 
-        let total = rows.reduce((s, r) => s + r.rounded, 0);
+        // Measured against the TARGET, not against zero. A round with $100 unresolved
+        // is supposed to be $100 short, and closing that gap would be inventing
+        // recipients for money nobody has been awarded.
+        let total = rows.reduce((s, r) => s + r.rounded, 0) - target;
 
         // total > 0 means we handed out a dollar nobody won; < 0 means one went missing.
-        while (Math.abs(total) > 0.0001) {
+        //
+        // BOUNDED. Each pass moves total by exactly 1, so it can never need more
+        // passes than there are dollars to move; the cap only exists so a future
+        // mistake degrades into a slightly-off cent instead of hanging settlement
+        // forever. A frozen Receipt is worse than a stray dollar.
+        let guard = Math.abs(total) + rows.length + 10;
+        while (Math.abs(total) > 0.0001 && guard-- > 0) {
             const takeAway = total > 0;
             const candidates = rows.filter(r => {
                 if (takeAway) {
