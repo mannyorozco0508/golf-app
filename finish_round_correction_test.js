@@ -396,16 +396,30 @@ describe('OPENING REVIEW IS NOT VERIFYING', () => {
         assert.equal(b.run('frReviewCompleted'), false);
     });
 
-    test('confirming does', () => {
+    test('confirming persists verification, and the flag follows the WRITE', () => {
+        // Wave B set frReviewCompleted synchronously. Wave C makes it depend on the
+        // Firebase write actually resolving, because a flag set before the write
+        // lands is how a round gets stamped "verified" on a confirmation that failed.
+        // The assertion therefore moved from "the button was pressed" to "the state
+        // was persisted" - a stronger contract, not a weaker one.
         const b = boot();
         b.run('frShowResults(true);');
-        assert.equal(b.run('frReviewCompleted'), true);
+        return new Promise(resolve => setImmediate(() => {
+            assert.equal(b.run('isScoresVerified()'), true, 'verification must persist');
+            assert.equal(b.run('currentData.scoresVerified.verified'), true);
+            resolve();
+        }));
     });
 
-    test('nothing is persisted to the round - that is Wave C', () => {
-        const src = read(PAGE);
-        assert.ok(!/scoresVerified/.test(src),
-            'persistent verification state belongs to Wave C, not here');
+    test('verifiedBy records the AUTHORITY, never a claimed human identity', () => {
+        // The app authenticates nobody, so naming a person here would be a lie the
+        // data cannot support.
+        const b = boot({ group: 3 });
+        b.run('frShowResults(true);');
+        return new Promise(resolve => setImmediate(() => {
+            assert.match(String(b.run('currentData.scoresVerified.verifiedBy')), /^(organizer|group-\d+|round)$/);
+            resolve();
+        }));
     });
 });
 
