@@ -1,612 +1,955 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Round Settlement</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <script src="score-marks.js"></script>
-    <script src="money-engine.js"></script>
-<script src="action-model.js"></script>
-<script src="settlement-engine.js"></script>
-<script src="pool-engine.js"></script>
-    <style>
-        :root {
-            --bg-page: #f4f6f8;
-            --bg-card: #ffffff;
-            --text-main: #1a1a1a;
-            --text-muted: #666;
-            --brand-green: #0f4c3a;
-            --brand-navy: #1d3557;
-            --accent-teal: #2a9d8f;
-            --accent-red: #e63946;
-            --border-light: #e0e0e0;
-            --border-mid: #d0e1db;
-            --border-faint: #eee;
-            --nav-bg: #f0f4f2;
-            --subtle-bg: #e0e8e4;
-            --modal-bg: #ffffff;
-            --input-disabled-bg: #dde3e8;
-            --input-disabled-border: #aab4bc;
-            --input-disabled-text: #1a1a1a;
-            --shadow-color: rgba(0,0,0,0.08);
-            --nassau-box-bg: #eef6f2;
-            --danger-box-bg: #fff0f0;
-        }
-        html.dark-mode {
-            --bg-page: #14181a;
-            --bg-card: #1e2426;
-            --text-main: #e8ecec;
-            --text-muted: #9aa8a7;
-            --brand-green: #2f9e78;
-            --brand-navy: #4a7bb5;
-            --accent-teal: #3dbfae;
-            --accent-red: #ff6b76;
-            --border-light: #333c3e;
-            --border-mid: #3a4a45;
-            --border-faint: #2c3436;
-            --nav-bg: #223028;
-            --subtle-bg: #26332d;
-            --modal-bg: #1e2426;
-            --input-disabled-bg: #3a4145;
-            --input-disabled-border: #55606a;
-            --input-disabled-text: #f0f0f0;
-            --shadow-color: rgba(0,0,0,0.4);
-            --nassau-box-bg: #1a2b24;
-            --danger-box-bg: #2b1c1e;
-        }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
-        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
-        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
+// ============================================================================
+// GolfApp — Settlement Engine (CANONICAL)
+//
+// The complete money picture for ONE finished round: the main game, plus Skins,
+// Hi-Lo, the Birdie Pool and every Side Match. computeCombinedNetTotals()
+// is the single source of truth for "what did each golfer win or lose today".
+//
+// WHY THIS FILE EXISTS
+// These functions used to live inline in settlement.html. That meant trip.html
+// could not reach them, so Trip settlement fell back to computeRoundMoneyByPlayer
+// in money-engine.js — which only covers the MAIN format and explicitly excludes
+// Skins and Hi-Lo, and knows nothing about birdie pools, KPs or Side Matches. A
+// trip round played as Skins with a birdie pool and three side matches therefore
+// contributed $0 to the trip total, and side-match money vanished with no warning.
+//
+// Both settlement.html and trip.html now load this file, so there is exactly ONE
+// definition of what counts as money. Do not copy these functions back into a page.
+//
+// DEPENDS ON money-engine.js being loaded first (parseHcp, getStrokes,
+// calculateMatchEngine, computeRoundMoneyByPlayer). Plain global functions, no
+// module system, matching the rest of the codebase.
+//
+// INVARIANT: every completed wager is zero-sum. SUM(all golfer money) === 0.
+// ============================================================================
 
-        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
-
-        /* Top Navigation Bar */
-        /* ---- App navigation ----------------------------------------------------
-           The "More" popover used to be position:absolute INSIDE .top-nav-bar,
-           which is an overflow-x:auto container. An overflow container clips
-           absolutely-positioned descendants on BOTH axes, so the menu was being
-           sliced off at the nav bar's own bottom edge — only a few pixels of it
-           ever appeared. The fix is structural, not a z-index bump: the pills
-           scroll inside .top-nav-bar, but the <details> now lives OUTSIDE that
-           scroller in .app-nav-wrap, which has no overflow, so nothing can clip
-           the menu. .app-nav-wrap is also the positioning context, so the menu
-           anchors to the nav row rather than to the scrolling strip. */
-        .app-nav-wrap {
-            position: relative; display: flex; align-items: center; gap: 6px;
-            padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
-        }
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
-        .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
-        .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
-        .nav-more { position: static; flex: 0 0 auto; }
-        .nav-more > summary { list-style: none; cursor: pointer; }
-        .nav-more > summary::-webkit-details-marker { display: none; }
-        .nav-more-menu {
-            position: absolute; top: calc(100% + 2px); right: 0; z-index: 400;
-            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
-            padding: 8px; display: flex; flex-direction: column; gap: 6px;
-            min-width: 190px; max-width: calc(100vw - 24px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.22);
-        }
-        /* 48px rows: comfortable thumb targets for someone standing on a tee box. */
-        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; min-height: 48px; justify-content: flex-start; padding: 12px 14px; font-size: 0.95rem; }
-        /* No invisible overlay here. An earlier version put a full-screen ::before on
-           <summary> to catch outside taps; because summary also carried a z-index it
-           formed a stacking context, and the catcher ended up painted OVER the menu,
-           silently swallowing every tap on Matches / Stats / Trip / Home. Outside-tap
-           closing is handled by a real listener in JS instead, which can actually close
-           the menu rather than merely block it. */
-
-        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
-        
-        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
-        .val-pos { color: var(--accent-teal); }
-        .val-neg { color: var(--accent-red); }
-        .val-even { color: var(--text-muted); }
-        
-        .match-breakdown-list { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid var(--border-mid); padding-top: 8px; }
-        .breakdown-item { display: flex; justify-content: space-between; padding: 3px 0; }
-
-        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 16px;}
-        
-        /* ---- The Receipt --------------------------------------------------------
-           A vertical block per match: the original wager, every press with its start
-           hole and stake, who won each segment, and the net. Designed to be read on a
-           phone in a group chat, not printed as a spreadsheet. */
-        .receipt-match { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin: 10px 0; background: var(--bg-card); }
-        .receipt-title { font-size: 1rem; font-weight: bold; color: var(--text-main); }
-        .receipt-sub { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
-        .receipt-seg { padding: 8px 0; border-top: 1px solid var(--border-faint); }
-        .receipt-seg-head { display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: bold; color: var(--text-main); }
-        .receipt-seg-meta { font-size: 0.72rem; color: var(--text-muted); }
-        .receipt-seg-result { font-size: 0.85rem; color: var(--text-main); margin-top: 2px; }
-        .receipt-seg-money { font-size: 0.85rem; font-weight: bold; color: var(--brand-green); }
-        .receipt-net { margin-top: 10px; padding-top: 8px; border-top: 2px solid var(--border-mid); font-size: 0.92rem; font-weight: bold; color: var(--brand-green); }
-        .receipt-each { font-weight: normal; font-size: 0.78rem; color: var(--text-muted); }
-
-        .receipt-head { text-align: center; margin-bottom: 14px; }
-        .receipt-head-course { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; }
-        .receipt-head-date { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
-        .receipt-head-format { font-size: 0.8rem; color: var(--text-main); margin-top: 2px; }
-
-        /* The one wide element. It scrolls inside its own card so the money sections
-           above it stay a single readable column on a phone. */
-        .receipt-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .receipt-table { border-collapse: collapse; width: 100%; font-size: 0.72rem; }
-        .receipt-table th, .receipt-table td { padding: 5px 4px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); }
-        .receipt-table th { background: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
-        .receipt-table .rt-name { text-align: left; white-space: nowrap; padding-right: 8px; }
-        .receipt-table .rt-sec { background: var(--nassau-box-bg); font-weight: bold; }
-        /* A thin ring, not a filled badge - the score stays the readable thing. Drawn
-           with box-shadow so the cell keeps its size and the rows stay compact. */
-        .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
-        .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); border-radius: 50%; }
-        /* Net rows sit tight under their golfer's gross row and are visually
-           quieter, so the card still scans as one row per golfer. */
-        .rt-net td { font-size: 0.72em; color: var(--text-muted); border-top: none; padding-top: 0; }
-        .rt-net .rt-name { font-style: italic; }
-        /* Player ledger. Note rows are indented and muted because they are ALREADY
-           inside the row above them; only the un-indented rows add up to FINAL NET. */
-        /* Tie explanation sits under the line it explains, quieter than it. */
-        .nf-explain { font-size: 0.72rem; color: var(--text-muted); padding: 1px 0 1px 18px; }
-        .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
-        .pl-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
-        .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
-        .pl-note { padding-left: 18px; font-size: 0.74rem; color: var(--text-muted); }
-        .pl-round { font-size: 0.74rem; color: var(--text-muted); font-style: italic; }
-        .pl-final { border-top: 1px solid var(--border-mid); margin-top: 4px; padding-top: 4px; font-weight: bold; }
-        .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-        .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
-        .legend-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); }
-        .legend-eagle { box-shadow: inset 0 0 0 2px var(--brand-green); margin-left: 10px; }
-
-        /* MAGIC PDF HIDING CSS */
-        @media print {
-            body { background-color: white; padding: 0; }
-            .container { box-shadow: none; max-width: 100%; padding: 0; }
-            /* The ⋯ More menu is a <details> element that sits OUTSIDE .top-nav-bar, so
-               hiding the nav bar never hid it. Left open when a golfer exported, it
-               printed a navigation menu into a payout document. */
-            .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn,
-            .nav-more, .app-nav-wrap { display: none !important; }
-            .settle-card { border: 1px solid #ccc; background: #fff; }
-            /* A match's story must not break across a page - the whole point is that a
-               golfer can read one block and see how the money happened. */
-            .receipt-match { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ccc; background: #fff; }
-            /* Money must not split across pages either - a Who Pays Who list broken after
-               one row is exactly the sort of thing that starts an argument. */
-            .settle-card { break-inside: avoid; page-break-inside: avoid; }
-            .receipt-head { break-after: avoid; page-break-after: avoid; }
-            /* The scorecard is the only section allowed its own page. */
-            .receipt-card-wide { break-before: auto; page-break-inside: auto; }
-            .receipt-card-scroll { overflow-x: visible; }
-            /* Browsers drop box-shadows when saving to PDF unless told otherwise, and the
-               PDF is exactly where these rings matter most. */
-            .receipt-table td.mark-birdie, .receipt-table td.mark-eagle,
-            .legend-birdie, .legend-eagle {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .receipt-table td.mark-birdie, .legend-birdie {
-                box-shadow: inset 0 0 0 2px #c1121f !important; border-radius: 50% !important;
-            }
-            .receipt-table td.mark-eagle, .legend-eagle {
-                box-shadow: inset 0 0 0 2px #0f4c3a !important; border-radius: 50% !important;
-            }
-        }
-    </style>
-</head>
-<body>
-
-<div class="container" id="main-content" style="display: none;">
-    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-    <!-- Top Navigation Bar -->
-    <div class="app-nav-wrap">
-    <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item active nav-link">💸 Results</a>
-    </div>
-    <details class="nav-more" id="nav-more-menu-wrap">
-        <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
-        <div class="nav-more-menu">
-        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
-        <a href="trip.html" class="top-nav-item">🧳 Trip</a>
-        <a href="admin.html" class="top-nav-item nav-link">⚙️ Home</a>
-        </div>
-    </details>
-    </div>
-
-    <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
-
-    <div id="money-pool-section"></div>
-    <div id="combined-settlement-summary"></div>
-
-    <div id="settle-content">
-        <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
-    </div>
-
-    <!-- THE FULL SCORECARD IS LAST, and it is last in the MARKUP, not merely last in
-         whatever order the render functions happen to run. It used to be appended to
-         the end of #combined-settlement-summary, which put an 18-hole grid between
-         Who Pays Who and the Group Games / Side Matches that explain those numbers -
-         the scorecard interrupted the money story instead of closing it. -->
-    <div id="receipt-scorecard"></div>
-</div>
-
-<script>
-    // --- DYNAMIC BETA TIME BOMB ---
-    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
-    if (new Date() > BETA_END_DATE) {
-        document.body.innerHTML = `
-            <div style="text-align:center; padding:60px 20px; font-family:-apple-system, sans-serif; background:#f4f6f8; height:100vh;">
-                <h1 style="color:#0f4c3a; font-size: 3.5rem; margin-bottom: 10px;">⛳</h1>
-                <h2 style="color:#1d3557;">Beta Period Complete</h2>
-                <p style="color:#666; font-size:1.05rem; line-height:1.5;">Thank you for testing the app! The beta timeline has ended while we work on the next round of updates and bug fixes.</p>
-            </div>`;
-        throw new Error("Beta period expired.");
-    }
-    // ---------------------------------
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
-      authDomain: "golfapp-9fb21.firebaseapp.com",
-      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
-      projectId: "golfapp-9fb21",
-      storageBucket: "golfapp-9fb21.firebasestorage.app",
-      messagingSenderId: "761739328763",
-      appId: "1:761739328763:web:08ac41351578565c94045e"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // --- DARK MODE ---
-    (function initTheme() {
-        const saved = localStorage.getItem('golfapp-theme');
-        if (saved === 'dark') {
-            document.documentElement.classList.add('dark-mode');
-        }
-    })();
-
-    function toggleTheme() {
-        const isDark = document.documentElement.classList.toggle('dark-mode');
-        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn && document.documentElement.classList.contains('dark-mode')) {
-            btn.textContent = '☀️ Light Mode';
-        }
-    });
-    // ------------------
-
-    const urlParams = new URLSearchParams(window.location.search);
-    let currentMode = urlParams.get('game');
-    let currentData = {};
-
-    if (!currentMode) {
-        window.location.href = "admin.html";
-    } else {
-        currentMode = currentMode.toUpperCase();
-        document.getElementById("main-content").style.display = "block";
-
-        document.querySelectorAll('.nav-link').forEach(link => {
-            const base = link.getAttribute('href').split('?')[0];
-            let navHref = base + '?game=' + currentMode;
-            const groupParam = urlParams.get('group');
-            if (groupParam) navHref += '&group=' + groupParam;
-            link.href = navHref;
-        });
-
-        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
-            currentData = snapshot.val() || {};
-            document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
-            renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
-            renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
-            renderSettlement(currentData);
-            renderReceiptScorecard();
-        });
-    }
-
-    // parseHcp, getStrokes, calcWolfEngine, calcStablefordEngine, calcPointSettlement,
-    // calculateMatchEngine, and calcDotsEngine now all live in money-engine.js so
-    // settlement.html and trip.html always agree on the math. The old inline copies
-    // that used to sit here have been removed.
-    function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
-        if (isClosed && finalResult) return finalResult;
-        if (score === 0) return "AS";
-        if (score > 0) return `${t1Name} ${score}UP`;
-        return `${t2Name} ${Math.abs(score)}UP`;
-    }
-
-    // --- HOLE BET + OVERALL BET ENGINE (mirrors index.html for final settlement) ---
-
-
-
-    // Same rule as Dots/Junk, verified consistent — a stroke-under-par unit (birdie=1,
-    // eagle=2, already correctly weighted since "under" is the literal stroke count) is worth
-    // its dollar value paid by every other player, not an isolated credit with no payer.
-
-    // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
-    // Same rule, now complete on both sides: each KP win is paid by every other player.
-
-    // Cross-group Side Matches (from the ⚔️ Matches tab) — always shown regardless of primary format
-    // THE RECEIPT, per match. Reads buildSideMatchReceipts() in settlement-engine.js -
-    // the same engines settlement itself uses - so the story and the total can never
-    // disagree. Deliberately a vertical list, not a table: this gets opened in a group
-    // chat on a phone.
-    // ---- THE RECEIPT: header + scorecard ------------------------------------
-    // These are the only two things the retired index.html print path had that this
-    // document did not. Everything else it produced - game ledgers for the main format,
-    // Wolf, Stableford, Nassau, Skins, Birdie - the Receipt already covered, and covered
-    // better, because it also shows side matches and press timelines.
-    // Sets a useful document title so the saved PDF names itself after the round rather
-    // than the page, then restores it - the title is what most browsers use as the
-    // default filename.
-    function printReceipt() {
-        const course = ((currentData && currentData.courseName) || 'Golf Round')
-            .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const d = new Date();
-        const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const previous = document.title;
-        document.title = `${course}-${stamp}-Receipt`;
-        window.print();
-        setTimeout(() => { document.title = previous; }, 1000);
-    }
-
-    // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------
-    //
-    // Settlement is allocated in whole dollars, so ".00" is noise. But a fraction is
-    // never chopped off either: an explanatory per-game figure that genuinely lands on
-    // $12.50 must print $12.50. The Receipt EXPLAINS the money; it must not restate it
-    // as something tidier than it is. So: whole value -> no decimals, true fraction ->
-    // shown honestly. A fraction appearing in canonical settlement would mean the
-    // allocator failed, and that should be visible, not hidden.
-    function fmtWhole(n) {
-        // Thousands separators, because this is the document people settle from and
-        // "$15000" is genuinely harder to read correctly at a glance than "$15,000".
-        //
-        // Grouping is applied to the WHOLE-DOLLAR part only, so a genuine fraction still
-        // prints its cents exactly as before - a per-game figure that really is $12.50
-        // must stay $12.50. Formatting only: fmtWhole's output is never parsed back
-        // anywhere, so a comma cannot leak into a calculation.
-        const group = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        if (Number.isInteger(n)) return group(n);
-        const fixed = n.toFixed(2);
-        const neg = fixed.startsWith('-');
-        const [whole, cents] = (neg ? fixed.slice(1) : fixed).split('.');
-        return (neg ? '-' : '') + group(whole) + '.' + cents;
-    }
-
-    // The sign belongs in front of the dollar sign. "$-210" is not how money is
-    // written anywhere outside a spreadsheet.
-    function fmtSigned(n) {
-        if (n > 0) return `+$${fmtWhole(n)}`;
-        if (n < 0) return `-$${fmtWhole(Math.abs(n))}`;
-        return '$0';
-    }
-
-    // Same rule, wrapped in the colour classes the ledger rows already use.
-    function fmtSignedHtml(n) {
-        if (n > 0) return `<span class="val-pos">${fmtSigned(n)}</span>`;
-        if (n < 0) return `<span class="val-neg">${fmtSigned(n)}</span>`;
-        return `<span class="val-even">$0</span>`;
-    }
-
-    // The engine's segment labels are canonical DATA ("Original", "Press 1") and are
-    // deliberately not renamed there. This is the presentation layer translating them
-    // into what a golfer reads. Nassau's own segment names pass straight through,
-    // because "Front 9" is already plain golf English.
-    function receiptSegLabel(label) {
-        // 'Original' (Stroke Play) and 'Overall Match' (Match Play) are the same thing
-        // to a golfer: the bet that was there before anybody pressed.
-        if (/^(original|overall match)$/i.test(label || '')) return 'Original Bet';
-        const m = /^press\s+(\d+)/i.exec(label || '');
-        return m ? `Press #${m[1]}` : (label || '');
-    }
-
-    function buildReceiptHeader() {
-        const course = (currentData && currentData.courseName) || 'Golf Round';
-        const date = new Date().toLocaleDateString('en-US',
-            { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-        const fmtName = { stroke: 'Stroke Play', nassau: 'Nassau', match: 'Match Play',
-            skins: 'Skins', dots: 'Dots / Junk', wolf: 'Wolf', stableford: 'Stableford',
-            hilo: 'Hi-Lo', bestball: '2-Man Best Ball', scramble: 'Scramble', ryder: 'Ryder Cup' };
-        const gameFormat = (currentData && currentData.gameFormat) || 'stroke';
-        const scoring = (currentData && (currentData.nassauScoring || currentData.matchScoring)) || '';
-        const sub = (fmtName[gameFormat] || gameFormat) + (scoring ? ' \u00B7 ' + (scoring === 'net' ? 'Net' : 'Gross') : '');
-
-        return `<div class="receipt-head">
-            <div class="receipt-head-course">${course}</div>
-            <div class="receipt-head-date">${date}</div>
-            <div class="receipt-head-format">${sub}</div>
-        </div>`;
-    }
-
-    // The full 18-hole grid, preserved from the retired print path. Deliberately the one
-    // wide element in the document: a scorecard is inherently tabular, and it sits last
-    // so the money sections above it stay a readable single column on a phone.
-    function buildReceiptScorecard() {
-        const data = currentData || {};
-        const courseData = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        const players = data.players || [];
-        const scores = data.scores || {};
-        if (courseData.length === 0 || players.length === 0) return '';
-
-        const front = courseData.filter(h => h.hole <= 9);
-        const back = courseData.filter(h => h.hole > 9);
-        const hasFront = front.length > 0, hasBack = back.length > 0;
-
-        const cell = (v, cls) => `<td${cls ? ` class="${cls}"` : ''}>${v}</td>`;
-        // Birdie / eagle ring, from the SAME classifier the live Full Scorecard uses.
-        // Only ever applied to a player's hole score - totals, the PAR row and empty
-        // cells are left alone, because none of them is an achievement.
-        const markOf = (score, par) =>
-            (typeof scoreMarkClass === 'function') ? scoreMarkClass(score, par).trim() : '';
-        let html = `<div class="settle-card receipt-card-wide">
-            <div class="settle-header">\uD83D\uDCCB Full Scorecard</div>
-            <div class="receipt-card-scroll"><table class="receipt-table">`;
-
-        // HOLE + PAR rows
-        const headRow = (label, vals, outVal, inVal, total) => {
-            let r = `<tr><th class="rt-name">${label}</th>`;
-            if (hasFront) { front.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasBack) r += `<th class="rt-sec">${outVal}</th>`; }
-            if (hasBack) { back.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasFront) r += `<th class="rt-sec">${inVal}</th>`; }
-            return r + `<th class="rt-sec">${total}</th></tr>`;
-        };
-        const outPar = front.reduce((s, h) => s + (h.par || 0), 0);
-        const inPar = back.reduce((s, h) => s + (h.par || 0), 0);
-        html += headRow('HOLE', h => h.hole, 'OUT', 'IN', 'TOT');
-        html += headRow('PAR', h => h.par, outPar, inPar, outPar + inPar);
-        // STROKE INDEX. Without it a golfer cannot check a net score for
-        // themselves - which is the whole point of printing net at all.
-        html += headRow('HCP', h => (h.hcpIndex !== undefined && h.hcpIndex !== null) ? h.hcpIndex : '\u2013', '', '', '');
-
-        // IS NET RELEVANT TO THIS ROUND?
-        //
-        // Printing a net row on a round nobody played net just doubles the height of
-        // the card for no reason. Printing gross only on a round whose MONEY was
-        // decided on net is the failure this batch exists to fix - it forces golfers
-        // back to the paper card to compare handicap indexes and subtract strokes by
-        // hand. So it is asked, once, from the round's own configuration.
-        const anyHcp = players.some(p => (typeof parseHcp === 'function' ? parseHcp(p.hcp) : Number(p.hcp) || 0) > 0);
-        const poolNet = !!(data.moneyPool && data.moneyPool.enabled
-            && ((data.moneyPool.net && Number(data.moneyPool.net.amount) > 0)
-                || (data.moneyPool.skins && data.moneyPool.skins.scoring !== 'gross')));
-        // GUARDED ON A SKINS GAME EXISTING AT ALL.
-        //
-        // resolveSkinsMode() answers "which basis WOULD this round's skins use", and
-        // its documented default is 'split' - so on a round with no skins game
-        // whatsoever it still returns a non-gross answer. Reading it unguarded meant
-        // any handicapped round printed a net row per golfer, doubling the height of
-        // the scorecard on rounds where net decides nothing. Found by an acceptance
-        // test asserting the opposite case.
-        const hasSkinsGame = !!(
-            (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0)
-            || (data.moneyPool && data.moneyPool.skins
-                && data.moneyPool.skins.mode && data.moneyPool.skins.mode !== 'none')
-        );
-        const skinsNetMode = hasSkinsGame && (typeof resolveSkinsMode === 'function')
-            ? resolveSkinsMode(data) !== 'gross' : false;
-        const netMatters = anyHcp && (poolNet || skinsNetMode || data.gameFormat === 'stableford');
-
+    function getSkinsHoleScoresForSettle(players, savedScores, h) {
+        let holeScores = [];
         players.forEach(p => {
-            const get = h => scores[`p${p.id}_h${h.hole}`] || null;
-            const sum = list => list.reduce((s, h) => s + (get(h) || 0), 0);
-            const o = sum(front), i = sum(back);
-            let r = `<tr><td class="rt-name">${p.name}</td>`;
-            if (hasFront) { front.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasBack) r += cell(o || '\u2013', 'rt-sec'); }
-            if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
-            r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
-            html += r;
-
-            if (netMatters) {
-                // NET, from the CANONICAL handicap allocation - getStrokes/parseHcp in
-                // money-engine.js, the same pair the leaderboard, the skins ledger and
-                // every net wager already use. settlement.html does no handicap
-                // arithmetic of its own; a second implementation here is exactly how
-                // the Receipt would come to disagree with the money.
-                const strokes = h => (typeof getStrokes === 'function' && typeof parseHcp === 'function')
-                    ? getStrokes(h.hcpIndex, parseHcp(p.hcp)) : 0;
-                const netOf = h => { const g = get(h); return g === null ? null : g - strokes(h); };
-                const netSum = list => list.reduce((s, h) => s + (netOf(h) || 0), 0);
-                const no = netSum(front), ni = netSum(back);
-                let nr = `<tr class="rt-net"><td class="rt-name">net</td>`;
-                if (hasFront) { front.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasBack) nr += cell(no || '\u2013', 'rt-sec'); }
-                if (hasBack) { back.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasFront) nr += cell(ni || '\u2013', 'rt-sec'); }
-                nr += cell((no + ni) || '\u2013', 'rt-sec') + '</tr>';
-                html += nr;
+            let v = savedScores[`p${p.id}_h${h.hole}`];
+            if (v && v > 0) {
+                let gross = parseInt(v, 10);
+                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                holeScores.push({ id: p.id, name: p.name, gross, net });
             }
         });
-
-        html += `</table></div>
-            <div class="receipt-legend">
-                <span class="legend-dot legend-birdie"></span> Birdie
-                <span class="legend-dot legend-eagle"></span> Eagle or better
-                ${netMatters ? '<span style="margin-left:10px;">net rows show the score after handicap strokes</span>' : ''}
-            </div></div>`;
-        return html;
+        return holeScores;
     }
 
-    function buildReceiptBlock(matchId, data, courseData, savedScores) {
-        if (typeof buildSideMatchReceipts !== 'function') return '';
-        const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
-        if (!r) return '';
+    function computeSkinsCarryOverForSettle(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        let carryUnits = 1;
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) { skins.push({ hole: h.hole, player: winners[0], unitsWon: carryUnits }); carryUnits = 1; }
+            else { carryUnits += 1; }
+        });
+        return { skins, pendingUnits: carryUnits > 1 ? carryUnits - 1 : 0 };
+    }
 
-        let html = `<div class="receipt-match">`;
-        html += `<div class="receipt-title">${r.nameA} vs ${r.nameB}</div>`;
-        html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
+    function computeSkinsVoidForSettle(players, courseData, savedScores, scoreKey) {
+        let skins = [];
+        courseData.forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+            if (holeScores.length === 0) return;
+            const scores = holeScores.map(s => s[scoreKey]);
+            const min = Math.min(...scores);
+            const winners = holeScores.filter(s => s[scoreKey] === min);
+            if (winners.length === 1) skins.push({ hole: h.hole, player: winners[0], unitsWon: 1 });
+        });
+        return { skins, pendingUnits: 0 };
+    }
 
-        r.segments.forEach(seg => {
-            html += `<div class="receipt-seg">`;
-            html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
-            html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
-            html += `<div class="receipt-seg-result">${seg.result}</div>`;
-            if (seg.winner && seg.money > 0) {
-                html += `<div class="receipt-seg-money">${seg.winner} +$${fmtWhole(seg.money)}</div>`;
+    function computeSkinsSettlementNet(data, courseData, savedScores) {
+        // The wager's own field. For a round-wide skins game this is everyone playing
+        // for money, exactly as before; for a participant-scoped game it is only the
+        // golfers named on it. Everyone else is not in this pot at all - they cannot
+        // win a skin, cannot break a tie, and neither pay nor receive a cent.
+        const allPlayers = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
+        // ONE resolution rule, shared with the live view. resolveSkinsMode() gives
+        // skinsPotFormat precedence, which is exactly what this line has always done -
+        // so every saved round settles to the same cent - while also giving a config
+        // that only ever carried skinsScoring a defined answer instead of silently
+        // falling through to split.
+        const potFormat = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data)
+            : (data.skinsPotFormat || 'split');
+        const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
+        const carryOver = data.skinsCarryOver !== false;
+        const totalHoles = (courseData || []).length;
+        const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
+
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+
+        const totalPot = buyIn * allPlayers.length;
+        let grossPot = 0, netPot = 0;
+        if (potFormat === 'split') { grossPot = totalPot / 2; netPot = totalPot / 2; }
+        else if (potFormat === 'gross') { grossPot = totalPot; }
+        else if (potFormat === 'net') { netPot = totalPot; }
+
+        const grossSkinValue = carryOver ? (totalHoles > 0 ? grossPot / totalHoles : 0) : (grossResult.skins.length > 0 ? grossPot / grossResult.skins.length : 0);
+        const netSkinValue = carryOver ? (totalHoles > 0 ? netPot / totalHoles : 0) : (netResult.skins.length > 0 ? netPot / netResult.skins.length : 0);
+
+        let payout = {};
+        allPlayers.forEach(p => payout[p.id] = 0);
+        grossResult.skins.forEach(s => { payout[s.player.id] += s.unitsWon * grossSkinValue; });
+        netResult.skins.forEach(s => { payout[s.player.id] += s.unitsWon * netSkinValue; });
+        if (carryOver && grossResult.pendingUnits > 0 && allPlayers.length > 0) {
+            const share = (grossResult.pendingUnits * grossSkinValue) / allPlayers.length;
+            allPlayers.forEach(p => payout[p.id] += share);
+        }
+        if (carryOver && netResult.pendingUnits > 0 && allPlayers.length > 0) {
+            const share = (netResult.pendingUnits * netSkinValue) / allPlayers.length;
+            allPlayers.forEach(p => payout[p.id] += share);
+        }
+
+        // MID-ROUND STAKE PRORATION (carry-over skins only).
+        //
+        // Each player used to be charged the FULL buy-in from the first score entered,
+        // while the pot for holes NOT YET PLAYED had been awarded to nobody. Mid-round
+        // the totals therefore summed negative - money looked destroyed - and every
+        // golfer showed as already down their share of skins nobody had won yet. That
+        // contradicts the app's own rule that money AT STAKE is not money LOST.
+        //
+        // A player is now charged only for the portion of the pot that is actually in
+        // play: the holes that have been played. Under carry-over every played hole
+        // contributes exactly one unit, either won outright or carried forward, so
+        // (unitsWon + pendingUnits) IS the number of holes played.
+        //
+        // On a COMPLETED round played === total, the multiplier is 1, and every result
+        // is bit-for-bit what it has always been. This changes in-progress display only,
+        // never final settlement.
+        //
+        // Non-carry-over ("void") skins distribute the whole pot across the holes that
+        // were WON OUTRIGHT - which is zero-sum as long as at least one hole was won.
+        //
+        // P0 FIX (found by the Quick Round real-world audit): if NO skin was won at all -
+        // every hole halved - skinValue correctly became 0 and nobody was paid, but the
+        // buy-in was still charged at the full rate. Three golfers in a $20 void game
+        // each went -$20 and the $60 pot simply disappeared. Money must never vanish.
+        //
+        // The stake is now charged in proportion to the pot actually distributed, which
+        // is what the carry-over branch above has always done. When any skin is won the
+        // multiplier is 1 and every existing result is bit-for-bit unchanged; when none
+        // is won it is 0 and the buy-ins are refunded, which is what golfers do anyway.
+        function playedUnits(result) {
+            return result.skins.reduce((sum, s) => sum + s.unitsWon, 0) + (result.pendingUnits || 0);
+        }
+        const grossInPlay = (carryOver && totalHoles > 0)
+            ? Math.min(playedUnits(grossResult) / totalHoles, 1)
+            : (grossResult.skins.length > 0 ? 1 : 0);
+        const netInPlay = (carryOver && totalHoles > 0)
+            ? Math.min(playedUnits(netResult) / totalHoles, 1)
+            : (netResult.skins.length > 0 ? 1 : 0);
+
+        const n = allPlayers.length;
+        const grossStake = n > 0 ? (grossPot / n) * grossInPlay : 0;
+        const netStake = n > 0 ? (netPot / n) * netInPlay : 0;
+
+        let netByPlayerId = {};
+        allPlayers.forEach(p => { netByPlayerId[p.id] = payout[p.id] - grossStake - netStake; });
+        return netByPlayerId;
+    }
+
+    function calculateHiLoEngine(players, courseData, savedScores) {
+        let teams = {};
+        players.forEach(p => {
+            let key = p.team || "Team 1";
+            if (!teams[key]) teams[key] = [];
+            teams[key].push(p);
+        });
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return null;
+        let t1Key = teamKeys[0], t2Key = teamKeys[1];
+        let t1Players = teams[t1Key], t2Players = teams[t2Key];
+        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
+        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
+        let t1Points = 0, t2Points = 0;
+        let holeLog = {};
+        courseData.forEach(hole => {
+            let hNum = hole.hole;
+            let t1NetScores = [], t2NetScores = [];
+            t1Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) { let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp)); t1NetScores.push(s); }
+            });
+            t2Players.forEach(p => {
+                let v = savedScores[`p${p.id}_h${hNum}`];
+                if (v && v > 0) { let s = parseInt(v, 10) - getStrokes(hole.hcpIndex, parseHcp(p.hcp)); t2NetScores.push(s); }
+            });
+            if (t1NetScores.length > 0 && t2NetScores.length > 0) {
+                t1NetScores.sort((a, b) => a - b); t2NetScores.sort((a, b) => a - b);
+                let t1Low = t1NetScores[0], t2Low = t2NetScores[0];
+                let t1High = t1NetScores[t1NetScores.length - 1], t2High = t2NetScores[t2NetScores.length - 1];
+                let h1Won = null;
+                if (t1Low < t2Low) { t1Points += 0.5; h1Won = t1Name; }
+                else if (t2Low < t1Low) { t2Points += 0.5; h1Won = t2Name; }
+                let h2Won = null;
+                if (t1High < t2High) { t1Points += 0.5; h2Won = t1Name; }
+                else if (t2High < t1High) { t2Points += 0.5; h2Won = t2Name; }
+                holeLog[hNum] = { lowWinner: h1Won, highWinner: h2Won };
             }
-            html += `</div>`;
+        });
+        return { t1Name, t2Name, t1Points, t2Points, holeLog };
+    }
+
+    function computeHiLoSettlementNet(data, courseData, savedScores) {
+        const allPlayers = (data.players || []).filter(p => p.playingForMoney !== false);
+        const holeBet = data.holeBetStake || 0;
+        const calc = calculateHiLoEngine(allPlayers, courseData, savedScores);
+        let netByPlayerId = {};
+        if (!calc || holeBet <= 0) return netByPlayerId;
+
+        const t1Total = (calc.t1Points - calc.t2Points) * holeBet;
+        const teams = {};
+        allPlayers.forEach(p => { const k = p.team || 'Team 1'; if (!teams[k]) teams[k] = []; teams[k].push(p); });
+        const teamKeys = Object.keys(teams);
+        if (teamKeys.length < 2) return netByPlayerId;
+        const t1Players = teams[teamKeys[0]], t2Players = teams[teamKeys[1]];
+        const t1Share = t1Players.length > 0 ? t1Total / t1Players.length : 0;
+        const t2Share = t2Players.length > 0 ? -t1Total / t2Players.length : 0;
+        t1Players.forEach(p => netByPlayerId[p.id] = t1Share);
+        t2Players.forEach(p => netByPlayerId[p.id] = t2Share);
+        return netByPlayerId;
+    }
+
+    function calculateBirdieGameTotalsForSettle(data, courseData, savedScores) {
+        if (data.birdieGameEnabled !== true) return {};
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 0;
+        const scoringType = data.birdieScoringType || 'gross';
+        let units = {};
+        players.forEach(p => units[p.id] = 0);
+        (courseData || []).forEach(h => {
+            players.forEach(p => {
+                const v = savedScores[`p${p.id}_h${h.hole}`];
+                if (!v || v <= 0) return;
+                let score = parseInt(v, 10);
+                if (scoringType === 'net') score -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                const under = parseInt(h.par) - score;
+                if (under >= 1) units[p.id] += under;
+            });
+        });
+        const n = players.length;
+        const totalUnits = players.reduce((s, p) => s + units[p.id], 0);
+        let totals = {};
+        players.forEach(p => { totals[p.id] = n > 1 ? unitVal * (n * units[p.id] - totalUnits) : 0; });
+        return totals;
+    }
+
+    // RETIRED FEATURE - LEGACY COMPATIBILITY ONLY.
+    //
+    // Dollar Game / KP was removed from the product. Every path that could create,
+    // edit or display it is gone: setup, the Action tab picker, the scorecard picker,
+    // Results, Stats and print.
+    //
+    // This calculation deliberately remains, because settlement is always recomputed
+    // from raw data - no final money is ever stored. Deleting it would silently rewrite
+    // the money of every historical round that played KP, so a golfer reopening an old
+    // round would see totals the group never actually settled on.
+    //
+    // It is unreachable for anything new: it returns immediately unless kpGameEnabled
+    // is true, and nothing in the product can set that flag any more. Do not add a
+    // caller. Do not re-expose it in UI.
+    function calculateKPGameTotalsForSettle(data, courseData) {
+        if (data.kpGameEnabled !== true) return { money: {}, wins: {} };
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        if (players.length < 2 || players.length > 4) return { money: {}, wins: {} };
+        const kpHoles = (courseData || []).filter(h => parseInt(h.par) === 3);
+        const kpWinners = data.kpWinners || {};
+        const buyIn = data.kpBuyIn !== undefined ? data.kpBuyIn : 0;
+        let money = {}, wins = {};
+        players.forEach(p => { money[p.id] = 0; wins[p.id] = 0; });
+        kpHoles.forEach(h => {
+            const winnerId = kpWinners[`h${h.hole}`];
+            if (!winnerId) return;
+            const winnerPlayer = players.find(p => String(p.id) === String(winnerId));
+            if (!winnerPlayer) return;
+            wins[winnerPlayer.id] = (wins[winnerPlayer.id] || 0) + 1;
+            money[winnerPlayer.id] += buyIn * (players.length - 1);
+            players.forEach(p => { if (String(p.id) !== String(winnerPlayer.id)) money[p.id] -= buyIn; });
+        });
+        return { money, wins };
+    }
+
+    function getRichHoleBetScore(player, holeNum, courseHole, scoringType, savedScores) {
+        const v = savedScores[`p${player.id}_h${holeNum}`];
+        if (!v || v <= 0) return null;
+        const gross = parseInt(v, 10);
+        if (scoringType === 'gross') return gross;
+        return gross - getStrokes(courseHole.hcpIndex, parseHcp(player.hcp));
+    }
+
+    // Team hole score, BEST BALL - the same convention calculateMatchEngine has always
+    // used for every 2v2 format in this app (Match Play, Nassau, Best Ball, Ryder). Not a
+    // new rule invented for Stroke: the lowest single score on the side counts, net or
+    // gross per the match's own scoring setting.
+    //
+    // Returns null until every player on the side has posted, so a half-scored team can
+    // never win or lose a hole - the same participant-readiness principle as Wave 6.
+    function sideHoleScore(sidePlayers, hole, holeObj, scoringType, savedScores) {
+        let best = null;
+        for (let i = 0; i < sidePlayers.length; i++) {
+            const s = getRichHoleBetScore(sidePlayers[i], hole, holeObj, scoringType, savedScores);
+            if (s === null) return null;
+            if (best === null || s < best) best = s;
+        }
+        return best;
+    }
+
+    function calculateHoleBetEngine(players, courseData, savedScores, config, presses) {
+        if (!config || config.holeEnabled === false || players.length < 2) return null;
+        const p1 = players[0], p2 = players[1];
+
+        // Same side resolution as the overall bet: one player or a whole team.
+        const sideA = (config.sideA && config.sideA.length) ? config.sideA : [p1];
+        const sideB = (config.sideB && config.sideB.length) ? config.sideB : [p2];
+        const sortedPresses = (presses || []).slice().sort((a, b) => a.fromHole - b.fromHole);
+
+        function getStake(holeNum) {
+            let stake = config.holeStake;
+            sortedPresses.forEach(pr => { if (holeNum >= pr.fromHole) stake = pr.newStake; });
+            return stake;
+        }
+
+        let segments = [];
+        if (config.segment === 'frontback') {
+            segments = [
+                { holes: courseData.filter(h => h.hole <= 9), label: 'Front 9' },
+                { holes: courseData.filter(h => h.hole > 9), label: 'Back 9' }
+            ];
+        } else {
+            segments = [{ holes: courseData, label: 'Full Round' }];
+        }
+
+        let p1Money = 0;
+        let holeLog = [];
+        let currentCarry = 0;
+        let lastPlayedHole = 0;
+
+        segments.forEach(seg => {
+            let carry = 0;
+            seg.holes.forEach(h => {
+                const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
+                if (s1 === null || s2 === null) return;
+                lastPlayedHole = Math.max(lastPlayedHole, h.hole);
+
+                const baseStake = getStake(h.hole);
+                const effectiveStake = baseStake + carry;
+
+                if (s1 < s2) {
+                    p1Money += effectiveStake;
+                    holeLog.push({ hole: h.hole, winner: p1.name, amount: effectiveStake });
+                    carry = 0;
+                } else if (s2 < s1) {
+                    p1Money -= effectiveStake;
+                    holeLog.push({ hole: h.hole, winner: p2.name, amount: effectiveStake });
+                    carry = 0;
+                } else {
+                    if (config.tieRule === 'carry') {
+                        carry = effectiveStake;
+                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: carry });
+                    } else {
+                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: 0 });
+                        carry = 0;
+                    }
+                }
+            });
+            currentCarry = carry;
         });
 
-        html += `<div class="receipt-net">MATCH NET \u00B7 ` +
-            (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
-            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
-            `</div>`;
-        html += `</div>`;
-        return html;
+        const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
+        const rateHistory = [{ stake: config.holeStake, fromHole: startHole, pressNum: 0 }]
+            .concat(sortedPresses.map((pr, i) => ({ stake: pr.newStake, fromHole: pr.fromHole, pressNum: i + 1 })));
+        const tiesCarried = holeLog.filter(h => h.winner === null && h.carrying > 0).map(h => h.hole);
+
+        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory, tiesCarried };
     }
 
-    function buildSideMatchesHtml(data, courseData, savedScores) {
-        // THE ROUND'S OWN WAGER IS A WAGER.
+    function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
+        if (!config || config.overallEnabled === false || players.length < 2) return null;
+        const p1 = players[0], p2 = players[1];
+
+        // 2v2: config.sideA / sideB carry the full teams. Falling back to the first player
+        // of each keeps every existing 1v1 caller working untouched. THIS IS THE FIX for
+        // the defect where a 2v2 stroke match settled only two of the four golfers.
+        const sideA = (config.sideA && config.sideA.length) ? config.sideA : [p1];
+        const sideB = (config.sideB && config.sideB.length) ? config.sideB : [p2];
+        const nameA = sideA.map(p => p.name.split(' ')[0]).join(' / ');
+        const nameB = sideB.map(p => p.name.split(' ')[0]).join(' / ');
+
+        if (config.overallMode === 'stroke') {
+            // PER-PRESS STAKES. Every segment used to settle at config.overallStake, so a
+            // side match pressed for $100 still paid the original $50 - a press could
+            // change the holes but never the money, which is the whole point of pressing.
+            // The stake is now an argument, defaulting to the original for any press
+            // stored without one (every press created before this change).
+            function segmentTotals(startHole, segStake) {
+                let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
+                courseData.forEach(h => {
+                    if (h.hole < startHole) return;
+                    totalHolesInSeg++;
+                    const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                    const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
+                    if (s1 !== null && s2 !== null) {
+                        p1Total += s1;
+                        p2Total += s2;
+                        holesCompleted++;
+                    }
+                });
+                const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
+                const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
+                let winner = null, money = 0;
+                if (roundComplete) {
+                    if (p1Total < p2Total) { winner = nameA; money = stake; }
+                    else if (p2Total < p1Total) { winner = nameB; money = stake; }
+                }
+                const segP1Money = winner === nameA ? money : (winner === nameB ? -money : 0);
+                return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg,
+                         roundComplete, winner, p1Money: segP1Money, nameA, nameB,
+                         endHole: courseData.length ? courseData[courseData.length - 1].hole : startHole };
+            }
+
+            const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
+            const pressSegs = (presses || []).slice()
+                .sort((a, b) => a.startHole - b.startHole)
+                .map((pr, i) => Object.assign(segmentTotals(pr.startHole, pr.stake), { pressNum: i + 1 }));
+
+            let p1Money = base.p1Money;
+            pressSegs.forEach(seg => { p1Money += seg.p1Money; });
+
+            return {
+                p1, p2, mode: 'stroke', base, pressSegs, p1Money,
+                p1Total: base.p1Total, p2Total: base.p2Total, holesCompleted: base.holesCompleted, totalHoles: base.totalHoles, roundComplete: base.roundComplete, winner: base.winner
+            };
+        } else {
+            function matchStatusFromHole(startHole) {
+                let status = 0;
+                courseData.forEach(h => {
+                    if (h.hole < startHole) return;
+                    const s1 = sideHoleScore(sideA, h.hole, h, config.scoringType, savedScores);
+                    const s2 = sideHoleScore(sideB, h.hole, h, config.scoringType, savedScores);
+                    if (s1 !== null && s2 !== null) {
+                        if (s1 < s2) status += 1;
+                        else if (s2 < s1) status -= 1;
+                    }
+                });
+                return status;
+            }
+
+            const baseStatus = matchStatusFromHole(1);
+            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole), pressNum: i + 1 }));
+
+            let p1Money = 0;
+            if (baseStatus > 0) p1Money += config.overallStake;
+            else if (baseStatus < 0) p1Money -= config.overallStake;
+            pressResults.forEach(pr => {
+                if (pr.status > 0) p1Money += config.overallStake;
+                else if (pr.status < 0) p1Money -= config.overallStake;
+            });
+
+            return { p1, p2, mode: 'match', baseStatus, pressResults, p1Money };
+        }
+    }
+
+    // Settles ONE game from getRoundGames() and returns { playerId: net }.
+    //
+    // Skins and Hi-Lo are dispatched directly because computeRoundMoneyByPlayer does
+    // not handle them (a long-standing, documented gap). Everything else goes through
+    // that canonical dispatcher untouched. No new golf math lives here - this function
+    // only chooses which existing engine to call.
+    function computeGameNetByPlayerId(game, courseData, savedScores) {
+        const cfg = game.config;
+        const out = {};
+
+        // A game added mid-round only covers holes from its start hole onward. The
+        // engines are not taught about ranges - they are simply handed a shorter hole
+        // list, exactly as calculateStrokePressSet has always done for presses. For a
+        // Skins wager over H5-18 that means 14 holes IS its whole round: units, carries,
+        // pot share and the played-hole proration all scale to the wager's own range
+        // rather than to an 18-hole round it was never part of.
+        const holes = (typeof gameHoles === 'function') ? gameHoles(game, courseData) : courseData;
+
+        if (game.format === 'skins') {
+            return computeSkinsSettlementNet(cfg, holes, savedScores);
+        }
+        if (game.format === 'hilo') {
+            return computeHiLoSettlementNet(cfg, holes, savedScores);
+        }
+
+        // THE WAGER'S OWN FIELD, not the round's.
         //
-        // A Match or Nassau created in setup used to render through a separate one-line
-        // card - "Overall Match: Manny Won (-50)" - with no presses, no start holes and
-        // no match net, while the identical bet created through Action printed its whole
-        // history. settlement-engine.js already learned to describe the main game as a
-        // virtual side match; this page never asked, so the improvement was built and
-        // discarded. It asks now, through the SAME helper, so the two can never disagree
-        // about what the round's wager was.
+        // computeRoundMoneyByPlayer derives its money players from cfg.players and has
+        // never read participantIds - that is a money-engine.js concern and it is not
+        // changing. So a Dots or Stableford instance scoped to four golfers was settling
+        // across all twelve: an outsider with five dots could WIN a game he was not in,
+        // and every golfer in the round paid for it.
         //
-        // DISPLAY ONLY. computeCombinedNetTotals is untouched and remains the sole source
-        // of money - this changes what the Receipt EXPLAINS, never what anyone is paid.
+        // Worse, it was silently inconsistent. bet-strip.js and hole-events.js already
+        // call fieldParticipants(game.config), so the scorecard showed a four-player
+        // game live and the Receipt paid out an eight-player one.
+        //
+        // Scoping happens HERE, at the orchestration layer, exactly as Skins already
+        // does one branch above and as side matches have always done. No golf
+        // mathematics moves: the engines are simply handed the right people.
+        //
+        // IDENTICAL FOR EVERY EXISTING ROUND. fieldParticipants returns
+        // players.filter(playingForMoney !== false) whenever participantIds is absent -
+        // which is precisely what computeRoundMoneyByPlayer computes as moneyPlayers.
+        // No production path has ever written participantIds at the round root, so the
+        // main game is unaffected by construction, and a legacy Dots game settles to
+        // the same cent. Absence of participantIds still means "everyone", so there is
+        // nothing to migrate and no version flag to carry.
+        const scopedCfg = (typeof fieldParticipants === 'function')
+            ? Object.assign({}, cfg, { players: fieldParticipants(cfg) })
+            : cfg;
+
+        const result = computeRoundMoneyByPlayer(scopedCfg, holes, savedScores);
+        if (!result.valid) return out;
+        result.players.forEach(p => { out[p.id] = p.net || 0; });
+        return out;
+    }
+
+
+    // ========================================================================
+    // THE RECEIPT — per-match breakdown
+    //
+    // Returns the STORY behind each side match: the original wager, every press with
+    // its start hole and stake, who won each segment, and the match net. Settlement
+    // itself already knew all of this; it just threw it away and kept the total, which
+    // is why nobody could answer "why do I owe $200?".
+    //
+    // NO NEW MATHEMATICS. Every figure comes from calculateOverallBetEngine and
+    // calculateHoleBetEngine - the same calls computeCombinedNetTotals makes. If a
+    // number here ever disagreed with settlement, it would be a bug in this function,
+    // not a second opinion about the money.
+    // ========================================================================
+    // A LEGACY MAIN WAGER, described as a wager.
+    //
+    // A Match or Nassau created in setup settles correctly, but printed one line -
+    // "Overall Match: Manny Won (-50)" - with no presses, no start holes and no match
+    // net, while the identical wager created through Action printed its whole history.
+    // Same money, two very different explanations.
+    //
+    // Rather than a second receipt builder, the main game is described as a virtual
+    // side match and run through the SAME loop below. Its sides come from p.team,
+    // which is what the engine actually settled, so the block cannot claim a pairing
+    // that did not happen. Returns null when the main game carries no wager - Stroke
+    // Play is how a round is scored, not a bet.
+    //
+    // DISPLAY ONLY. computeCombinedNetTotals is untouched and still the sole source of
+    // money; this changes what the Receipt EXPLAINS, never what anyone is paid.
+    function legacyMainAsSideMatch(data) {
+        // EXACTLY the formats computeRoundMoneyByPlayer settles through
+        // calculateMatchEngine (money-engine.js:514). Hi-Lo, Skins, Dots, Stableford and
+        // Wolf are settled by their own engines, so describing them with a match-play
+        // receipt would print a result their money never came from - a new divergence,
+        // which is the one thing this fix must not create.
+        const fmt = data.gameFormat;
+        if (!['match', 'bestball', 'scramble', 'ryder', 'nassau'].includes(fmt)) return null;
+
+        const stake = fmt === 'nassau' ? (data.nassauStake || 0) : (data.matchStake || 0);
+        if (!(stake > 0)) return null;
+
+        const players = (data.players || []).filter(p => p.playingForMoney !== false);
+        const teamA = players.filter(p => String(p.team || 'Team 1') === 'Team 1').map(p => String(p.id));
+        const teamB = players.filter(p => String(p.team || '') === 'Team 2').map(p => String(p.id));
+        if (teamA.length === 0 || teamB.length === 0) return null;
+
+        return {
+            __legacyMain: true,
+            format: fmt,
+            scoring: fmt === 'nassau' ? (data.nassauScoring || 'net') : (data.matchScoring || 'net'),
+            stake: stake,
+            pressRule: fmt === 'nassau' ? (data.nassauPressRule || 'none') : (data.matchPressRule || 'none'),
+            presses: data.matchPresses || {},
+            teamAIds: teamA,
+            teamBIds: teamB,
+            startHole: 1,
+            createdAt: 0
+        };
+    }
+
+    function buildSideMatchReceipts(data, courseData, savedScores) {
+        const allPlayers = (data.players || []);
         const sideMatches = Object.assign({}, data.sideMatches || {});
-        const mainWager = (typeof legacyMainAsSideMatch === 'function')
-            ? legacyMainAsSideMatch(data) : null;
+
+        // The round's own wager leads, because it was struck first.
+        const mainWager = legacyMainAsSideMatch(data);
         if (mainWager) sideMatches.__main = mainWager;
 
-        const matchIds = Object.keys(sideMatches);
-        if (matchIds.length === 0) return "";
+        const receipts = [];
 
-        const players = data.players || [];
-        // FINAL MONEY is what actually changes hands, so it prints whole dollars.
-        // The per-game rows keep their exact figures - they explain the canonical
-        // math rather than stating what anyone owes.
-        const fmtSideM = fmtSignedHtml;
-
-        let rows = "";
-        matchIds.sort((a, b) => (sideMatches[a].createdAt || 0) - (sideMatches[b].createdAt || 0)).forEach(matchId => {
+        Object.keys(sideMatches).forEach(matchId => {
             const sm = sideMatches[matchId];
-            const teamAPlayers = players.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 1" }));
-            const teamBPlayers = players.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 2" }));
-            const virtualPlayers = teamAPlayers.concat(teamBPlayers);
+            const teamA = allPlayers.filter(p => (sm.teamAIds || []).map(String).includes(String(p.id)));
+            const teamB = allPlayers.filter(p => (sm.teamBIds || []).map(String).includes(String(p.id)));
+            if (teamA.length === 0 || teamB.length === 0) return;
+
+            const nameA = teamA.map(p => p.name.split(' ')[0]).join(' / ');
+            const nameB = teamB.map(p => p.name.split(' ')[0]).join(' / ');
+            const isTeam = teamA.length > 1 || teamB.length > 1;
+            // The Receipt must describe the holes this wager was actually settled over,
+            // or a mid-round match would print "Holes 1-18" beside money that only ever
+            // came from holes 6 onward.
+            const smCourse = (typeof sideMatchHoles === 'function')
+                ? sideMatchHoles(sm, courseData)
+                : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
+            const firstHole = smCourse.length ? Math.min.apply(null, smCourse.map(h => h.hole)) : 1;
+            const lastHole = smCourse.length ? Math.max.apply(null, smCourse.map(h => h.hole)) : 18;
+
+            const receipt = {
+                matchId, nameA, nameB, isTeam,
+                teamA: teamA.map(p => p.name), teamB: teamB.map(p => p.name),
+                format: sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'nassau' ? 'Nassau' : 'Match Play'),
+                scoring: (sm.scoring || 'net') === 'net' ? 'Net' : 'Gross',
+                segments: [], net: 0, netTo: null
+            };
+
+            if (sm.format === 'stroke') {
+                const sides = { sideA: teamA, sideB: teamB };
+
+                // THE RECEIPT MUST EXPLAIN ALL THE MONEY.
+                //
+                // A stroke side match is TWO wagers: a $/hole bet and an overall bet.
+                // Settlement (computeCombinedNetTotals, directly below this function)
+                // has always summed BOTH engines - but this receipt reported only the
+                // overall. A $10/hole match with a $78 hole press settled $1,064 that
+                // appeared nowhere on the page: Final Results said one number, the
+                // Receipt said another, and a golfer had no way to see why. Worse, a
+                // $/hole-only match produced no receipt at all.
+                //
+                // No new calculation is introduced. The hole figures below come from
+                // calculateHoleBetEngine - the exact engine settlement already trusts -
+                // called with growing press prefixes so each press's contribution is
+                // its own line and the lines sum, by construction, to the engine total.
+                const holeCfg = Object.assign({
+                    holeEnabled: (sm.holeStake || 0) > 0,
+                    holeStake: sm.holeStake || 0,
+                    segment: sm.segment || 'full',
+                    tieRule: sm.tieRule || 'carry',
+                    scoringType: sm.scoring || 'net'
+                }, sides);
+                const holePresses = (sm.holePresses ? Object.values(sm.holePresses) : [])
+                    .slice().sort((a, b) => a.fromHole - b.fromHole);
+                let holeNet = 0;
+                if (holeCfg.holeEnabled) {
+                    const at = k => {
+                        const r = calculateHoleBetEngine([teamA[0], teamB[0]], smCourse, savedScores,
+                            holeCfg, holePresses.slice(0, k));
+                        return r ? r.p1Money : 0;
+                    };
+                    let prev = at(0);
+                    const holeSeg = (label, startHole, rate, money) => ({
+                        label, startHole,
+                        endHole: lastHole,
+                        stake: rate, perHole: true,
+                        result: money > 0 ? `${nameA} up $${Math.abs(money)}`
+                            : (money < 0 ? `${nameB} up $${Math.abs(money)}` : 'Even'),
+                        winner: money > 0 ? nameA : (money < 0 ? nameB : null),
+                        money: Math.abs(money),
+                        toSideA: money > 0
+                    });
+                    receipt.segments.push(holeSeg('Hole Bet', firstHole, holeCfg.holeStake, prev));
+                    holePresses.forEach((pr, i) => {
+                        const cum = at(i + 1);
+                        receipt.segments.push(holeSeg(`Hole Press ${i + 1}`, pr.fromHole, pr.newStake, cum - prev));
+                        prev = cum;
+                    });
+                    holeNet = prev;
+                }
+
+                const cfg = Object.assign({
+                    overallEnabled: (sm.overallStake || 0) > 0,
+                    overallStake: sm.overallStake || 0,
+                    overallMode: sm.overallMode || 'stroke',
+                    scoringType: sm.scoring || 'net'
+                }, sides);
+                const presses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
+                const calc = cfg.overallEnabled
+                    ? calculateOverallBetEngine([teamA[0], teamB[0]], smCourse, savedScores, cfg, presses)
+                    : null;
+                // A $/hole-only match is a real wager with a real receipt.
+                if (!calc && !holeCfg.holeEnabled) return;
+                if (!calc) { receipt.net = holeNet; }
+                else {
+
+                const describe = (seg, label) => {
+                    const margin = Math.abs(seg.p1Total - seg.p2Total);
+                    let result;
+                    if (!seg.roundComplete) result = 'Not finished';
+                    else if (!seg.winner) result = 'Tied \u2014 push';
+                    else result = `${seg.winner} by ${margin} stroke${margin === 1 ? '' : 's'}`;
+                    return {
+                        label,
+                        startHole: seg.startHole,
+                        endHole: seg.endHole !== undefined ? seg.endHole : lastHole,
+                        stake: seg.stake,
+                        result,
+                        winner: seg.roundComplete ? seg.winner : null,
+                        money: Math.abs(seg.p1Money),
+                        toSideA: seg.p1Money > 0
+                    };
+                };
+
+                receipt.segments.push(describe(calc.base, 'Overall'));
+                (calc.pressSegs || []).forEach((seg, i) =>
+                    receipt.segments.push(describe(seg, `Overall Press ${i + 1}`)));
+                // The one number a golfer argues about. Hole money and overall money
+                // together - the SAME sum settlement pays, or the receipt is a lie.
+                receipt.net = holeNet + calc.p1Money;
+                }
+            } else {
+                // Match Play / Nassau: the engine reports its own segments and presses.
+                const virtual = teamA.map(p => Object.assign({}, p, { team: 'Team 1' }))
+                    .concat(teamB.map(p => Object.assign({}, p, { team: 'Team 2' })));
+                const presses = sm.presses ? Object.values(sm.presses) : [];
+                const calc = calculateMatchEngine(virtual, smCourse, savedScores,
+                    sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses);
+                if (!calc) return;
+                (calc.activeMatches || []).forEach(m => {
+                    receipt.segments.push({
+                        label: m.pressNum > 0 ? `Press ${m.pressNum}` : (m.label || 'Original'),
+                        // A Nassau's F9/B9 windows are fixed at 1-9 and 10-18 by the engine -
+                        // they are scoring BOUNDS, not the holes played. On a side match that
+                        // starts mid-round the two differ: a Nassau struck on the 9th tee has
+                        // a "Front 9" consisting of exactly hole 9. The money already reflects
+                        // that, because the engine only ever saw the scoped holes; printing
+                        // the raw window said "H1-9" beside it and invited an argument about
+                        // whether the front nine counted. Clamped to what was actually played.
+                        startHole: Math.max(m.startHole, firstHole),
+                        endHole: Math.min(m.endHole, lastHole),
+                        // A manual press may carry its own stake (money-engine stores it
+                        // on the segment). Absent - every base match, every auto press,
+                        // every legacy press - it falls back to the match stake, so old
+                        // receipts print exactly what they always printed.
+                        stake: (m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake,
+                        result: m.closed && m.finalResult ? m.finalResult
+                            : (m.status === 0 ? 'All square' : `${m.status > 0 ? calc.t1Name : calc.t2Name} ${Math.abs(m.status)} up`),
+                        winner: m.closed ? (m.status > 0 ? calc.t1Name : (m.status < 0 ? calc.t2Name : null)) : null,
+                        money: (m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake,
+                        toSideA: m.status > 0
+                    });
+                });
+                receipt.net = calc.t1TotalMoney;
+            }
+
+            receipt.netTo = receipt.net > 0 ? nameA : (receipt.net < 0 ? nameB : null);
+            receipt.netAmount = Math.abs(receipt.net);
+            // Per-player money, so a 2v2 receipt can state what each golfer owes rather
+            // than leaving them to divide a team figure.
+            receipt.perPlayerA = teamA.length ? receipt.net / teamA.length : 0;
+            receipt.perPlayerB = teamB.length ? -receipt.net / teamB.length : 0;
+            receipts.push(receipt);
+        });
+
+        return receipts;
+    }
+
+    function computeCombinedNetTotals(data, courseData, savedScores) {
+        const netByName = {}; // lowercased key -> { name, net }
+
+        // ---- THE ITEMISED BREAKDOWN ----------------------------------------
+        //
+        // ADDITIVE. Every amount below is computed exactly as it always was, by the
+        // same engines, in the same order. This only WRITES DOWN what each amount was
+        // for as it goes past.
+        //
+        // WHY IT HAD TO LIVE HERE
+        //
+        // addAmount() used to take a player and a number and fold it straight into a
+        // running total, so by the time the function returned, "Avery: -$185" was all
+        // that survived. There was no record of the $40 buy-in, the $25 KP, the skins,
+        // or the side match that produced it. A page wanting to show a golfer WHY they
+        // owe $185 had only one option: re-run every game itself and hope its
+        // arithmetic matched the engine's. That is precisely the duplication this
+        // codebase keeps deleting, and it is how a Receipt comes to disagree with the
+        // money it is printing.
+        //
+        // So the labels are captured at the point the money is already being counted.
+        // No second pass, no re-derivation, and no way for a line to exist that the
+        // total does not contain - the same call produces both.
+        const linesByName = {};
+        function addAmount(player, amount, label) {
+            if (!player || !amount) return;
+            const key = player.name.trim().toLowerCase();
+            if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
+            netByName[key].net += amount;
+            if (!linesByName[key]) linesByName[key] = [];
+            linesByName[key].push({ label: label || 'Other', amount });
+        }
+
+        // A ledger line that moves no money. Used for the Money Pool buy-in, which is
+        // a real debit a golfer must see even though it is already folded into the
+        // pool's net, and for zero-balance golfers who must still appear.
+        function addNote(player, amount, label) {
+            if (!player) return;
+            const key = player.name.trim().toLowerCase();
+            if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
+            if (!linesByName[key]) linesByName[key] = [];
+            linesByName[key].push({ label: label || 'Other', amount: amount || 0, note: true });
+        }
+
+        const allPlayers = data.players || [];
+
+        // Every game this round is playing — the main game plus any additional games
+        // stacked on top of it. getRoundGames() in action-model.js normalises a legacy
+        // single-gameFormat round to a one-item list, so this loop settles old and new
+        // rounds through exactly the same path.
+        //
+        // Each game is settled by the SAME engines that have always settled it; only the
+        // config handed in differs. Adding a game therefore cannot change what any other
+        // game pays, and the zero-sum guarantee of each engine composes: a sum of
+        // zero-sum results is itself zero-sum.
+        // Several games of the same format can run at once, so the label carries an
+        // index when it needs one - "Group Dots" and "Group Dots (2)" are auditable;
+        // two lines both called "Dots" are not.
+        const gameLabelSeen = {};
+        getRoundGames(data).forEach(game => {
+            const gameNet = computeGameNetByPlayerId(game, courseData, savedScores);
+            const base = (typeof ADDITIONAL_GAME_CATALOG === 'object' && ADDITIONAL_GAME_CATALOG[game.format]
+                && ADDITIONAL_GAME_CATALOG[game.format].label)
+                || (game.format ? String(game.format).charAt(0).toUpperCase() + String(game.format).slice(1) : 'Game');
+            gameLabelSeen[base] = (gameLabelSeen[base] || 0) + 1;
+            const label = gameLabelSeen[base] > 1 ? `${base} (${gameLabelSeen[base]})` : base;
+            Object.keys(gameNet).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, gameNet[pid], label);
+            });
+        });
+
+        // Birdie pool
+        const birdieTotals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
+        Object.keys(birdieTotals).forEach(pid => {
+            const p = allPlayers.find(pl => String(pl.id) === String(pid));
+            addAmount(p, birdieTotals[pid], 'Birdie Pool');
+        });
+
+
+        // Legacy KP money, for historical rounds only (see the note on the function).
+        // A round created today has no kpGameEnabled flag, so this contributes nothing.
+        const kpResult = calculateKPGameTotalsForSettle(data, courseData);
+        Object.keys(kpResult.money || {}).forEach(pid => {
+            const p = allPlayers.find(pl => String(pl.id) === String(pid));
+            addAmount(p, kpResult.money[pid], 'KP');
+        });
+
+        // MONEY POOL — the whole-round pot (pool-engine.js). Same additive pattern
+        // as the birdie pool above: the pool engine returns per-player nets that are
+        // already zero-sum in cents, and this line folds them into the one combined
+        // ledger. A round with no moneyPool config gets an empty object here, so
+        // every legacy round is untouched by construction.
+        if (typeof computeMoneyPoolNetByPlayerId === 'function') {
+            const poolNet = computeMoneyPoolNetByPlayerId(data, courseData, savedScores);
+            Object.keys(poolNet).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, poolNet[pid], 'Money Pool');
+            });
+
+            // ---- ITEMISING THE POOL ----------------------------------------
+            //
+            // The line above is the one that MOVES the money, and it stays exactly as
+            // it was. What follows adds detail lines only - marked `note: true` so
+            // nothing double-counts - because "Money Pool -$185" tells a golfer
+            // nothing about why.
+            //
+            // A golfer needs to see the $40 leaving, the KP they won on the 7th, their
+            // share of the net prize and their skins. Every figure is read from
+            // computeMoneyPool()'s own result: the buy-in it charged, the KP lines it
+            // paid, the net places it allocated, the skins lines it allocated. Nothing
+            // here recomputes a winner or divides a pot.
+            if (typeof computeMoneyPool === 'function') {
+                const pool = computeMoneyPool(data, courseData, savedScores);
+                if (pool && pool.valid) {
+                    const byId = {};
+                    allPlayers.forEach(p => { byId[String(p.id)] = p; });
+                    const dollars = c => c / 100;
+
+                    pool.participants.forEach(pp => {
+                        addNote(byId[String(pp.id)], -dollars(pool.buyInCents), 'Money Pool buy-in');
+                    });
+
+                    // KP names its hole. A golfer who won two KPs gets two lines, so the
+                    // breakdown stays auditable against the scorecard.
+                    if (pool.kp) {
+                        pool.kp.lines.forEach(l => {
+                            if (!l.winnerId) return;
+                            addNote(byId[String(l.winnerId)], dollars(l.cents), `KP H${l.hole}`);
+                        });
+                    }
+
+                    // Net Finish carries its finishing position, and says T when the
+                    // position was shared - the tie is the part golfers query.
+                    if (pool.net) {
+                        pool.net.lines.forEach(l => {
+                            const each = l.ids.length > 1
+                                ? (typeof allocateWholeDollars === 'function' && isWholeDollarRound(data)
+                                    ? allocateWholeDollars(dollars(l.cents), l.ids.map(() => 1))
+                                    : l.ids.map(() => dollars(l.cents) / l.ids.length))
+                                : [dollars(l.cents)];
+                            l.ids.forEach((id, i) => {
+                                addNote(byId[String(id)], each[i],
+                                    `Net Finish ${l.ids.length > 1 ? 'T' : ''}${l.place}`);
+                            });
+                        });
+                    }
+
+                    // Skins are summed per golfer from the allocated lines, with the
+                    // count alongside, because "3 skins +$105" is the sentence a golfer
+                    // actually wants.
+                    if (pool.skins) {
+                        const byWinner = {};
+                        pool.skins.lines.forEach(l => {
+                            const k = String(l.winnerId);
+                            if (!byWinner[k]) byWinner[k] = { cents: 0, n: 0 };
+                            byWinner[k].cents += l.cents;
+                            byWinner[k].n += 1;
+                        });
+                        const basis = pool.skins.scoring === 'gross' ? 'Gross' : 'Net';
+                        Object.keys(byWinner).forEach(k => {
+                            addNote(byId[k], dollars(byWinner[k].cents),
+                                `${basis} Skins \u00B7 ${byWinner[k].n} skin${byWinner[k].n === 1 ? '' : 's'}`);
+                        });
+                    }
+
+                    // Refunds are money coming back and must be visible, or the pool
+                    // lines will not account for the golfer's pool position.
+                    if (pool.refund && pool.refund.cents > 0) {
+                        Object.keys(pool.refund.perPlayerCents).forEach(id => {
+                            addNote(byId[String(id)], dollars(pool.refund.perPlayerCents[id]), 'Pool refund');
+                        });
+                    }
+                }
+            }
+        }
+
+        // Side matches — same logic buildSideMatchesHtml already uses per match, just summed
+        // into the combined total instead of only shown in its own separate card. Team-based
+        // (2v2) matches split evenly between teammates, matching the same convention Trip
+        // Mode's money settlement already uses for team-level bets.
+        const sideMatches = data.sideMatches || {};
+        // Which golfers are on which side of each match, recorded as the loop runs so
+        // the segment detail below can be attributed without re-deriving teams.
+        const smDetail = {};
+        Object.keys(sideMatches).forEach(matchId => {
+            const sm = sideMatches[matchId];
+            const teamAPlayers = allPlayers.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id));
+            const teamBPlayers = allPlayers.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id));
+            const virtualPlayers = teamAPlayers.map(p => ({ ...p, team: "Team 1" })).concat(teamBPlayers.map(p => ({ ...p, team: "Team 2" })));
             if (virtualPlayers.length < 2) return;
 
-            // Only holes from this match's own start hole forward. A match with no
-            // startHole covers the whole round, exactly as before. Declared ABOVE the
-            // format branch because both branches settle over the same range.
+            // A side match only counts holes from its own start hole forward. A match
+            // with no startHole - every one saved before this existed - covers the whole
+            // round, so nothing already settled moves. The engines are untouched: they
+            // are simply handed the holes this wager is played over.
             const smCourse = (typeof sideMatchHoles === 'function')
                 ? sideMatchHoles(sm, courseData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
@@ -614,835 +957,451 @@
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
-                const holeConfig = { holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' };
-                const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
+                // REGRESSION FIX: this used to pass only [p1, p2], so a 2v2 stroke match
+                // settled two golfers and silently dropped the other two - money that was
+                // not zero-sum. The whole side goes to the engine now.
+                const sides = { sideA: teamAPlayers, sideB: teamBPlayers };
+                const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' }, sides);
+                const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
                 const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
                 const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
-                const p1Total = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
-
-                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
+                const sideTotal = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
+                // The stake is PER SIDE, split evenly between teammates - the same
+                // convention 2v2 Match Play and Nassau have always used below.
+                const aShare = sideTotal / teamAPlayers.length;
+                const bShare = -sideTotal / teamBPlayers.length;
+                // The label names both sides, because a golfer in two side matches
+                // needs to tell the lines apart. Presses are inside sideTotal already -
+                // splitting them out would double-count real money - so the count is
+                // reported instead, and the press DETAIL lives in the side-match
+                // receipt that buildSideMatchReceipts() already produces.
+                const nPress = (sm.holePresses ? Object.keys(sm.holePresses).length : 0)
+                             + (sm.overallPresses ? Object.keys(sm.overallPresses).length : 0);
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
+                const smLabel = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
+                    + (nPress > 0 ? ` (+${nPress} press${nPress === 1 ? '' : 'es'})` : '');
+                teamAPlayers.forEach(p => addAmount(p, aShare, smLabel));
+                teamBPlayers.forEach(p => addAmount(p, bShare, smLabel));
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
                 const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
                 if (!calc) return;
-                const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
-
-                rows += buildReceiptBlock(matchId, data, courseData, savedScores);
+                const t1Share = calc.t1TotalMoney / teamAPlayers.length;
+                const t2Share = -calc.t1TotalMoney / teamBPlayers.length;
+                const nPress2 = manualPresses.length;
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
+                const smLabel2 = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`
+                    + (nPress2 > 0 ? ` (+${nPress2} press${nPress2 === 1 ? '' : 'es'})` : '');
+                teamAPlayers.forEach(p => addAmount(p, t1Share, smLabel2));
+                teamBPlayers.forEach(p => addAmount(p, t2Share, smLabel2));
             }
         });
 
-        if (!rows) return "";
-        return `<div class="settle-card"><div class="settle-header">⚔️ Side Matches</div>${rows}</div>`;
-    }
+        // WHOLE-DOLLAR SETTLEMENT.
+        //
+        // Every engine above keeps full precision - skins pots divide by the field, 2v2
+        // stakes halve, presses stack - and that precision is correct. But golfers do not
+        // hand each other 74 cents on the 18th green, and "you owe me $50.74" is not a
+        // sentence anyone wants to say.
+        //
+        // Rounding happens exactly once, HERE, after every wager has been combined.
+        // Rounding each bet on the way in would change the math; rounding the final
+        // position does not - it only decides how the last dollar falls.
+        const wholeDollar = roundNetTotalsToWholeDollars(netByName);
 
-    function buildSideGamesHtml(data, courseData, savedScores) {
-        let html = "";
+        const netTotals = {};
+        Object.values(wholeDollar).forEach(v => { netTotals[v.name] = v.net; });
 
-        if (data.birdieGameEnabled === true) {
-            const totals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
-            const players = (data.players || []).filter(p => p.playingForMoney !== false);
-            if (players.length > 0) {
-                html += `<div class="settle-card"><div class="settle-header">🐦 Birdie Game (amount won)</div>`;
-                players.forEach(p => {
-                    // Was `$${n.toFixed(2)}` on the raw signed number, which printed a
-                    // loss as "$-210.00". Signed properly, and without phantom cents.
-                    html += `<div class="ledger-row"><span>${p.name}</span>${fmtSignedHtml(totals[p.id] || 0)}</div>`;
+        // ---- SIDE MATCH SEGMENT DETAIL -------------------------------------
+        //
+        // ADDITIVE NOTE LINES ONLY. The moving Side Match total above is unchanged and
+        // still IS the golfer's money; these lines sit under it as `note: true` and
+        // explain what made it up - the original wager and each press, with its stake
+        // and the hole it started on.
+        //
+        // NOTHING IS RECOMPUTED. buildSideMatchReceipts() already breaks each match
+        // into canonical segments, and it does so by calling the SAME engines
+        // settlement uses with growing press prefixes, so each press's contribution is
+        // the delta it actually caused and the segments sum to the match total by
+        // construction. That function is called once here and read.
+        //
+        // Every press storage shape the app has ever written is handled by that
+        // function rather than by anything here: Match/Nassau manual presses, Stroke
+        // overall presses ({startHole, stake}), Stroke per-hole presses
+        // ({fromHole, newStake}), custom stakes, and legacy presses with no stake at
+        // all. Forcing one shape onto another is exactly how a press stops being
+        // counted, so the shapes are left where they are.
+        if (typeof buildSideMatchReceipts === 'function') {
+            let receipts = [];
+            try { receipts = buildSideMatchReceipts(data, courseData, savedScores) || []; }
+            catch (e) { receipts = []; }   // detail is never worth taking settlement down for
+
+            receipts.forEach(rec => {
+                const d = smDetail[rec.matchId];
+                if (!d || !rec.segments || rec.segments.length === 0) return;
+                // A single-segment match has nothing to explain that the total does not
+                // already say.
+                if (rec.segments.length < 2) return;
+
+                rec.segments.forEach(seg => {
+                    const money = Number(seg.money) || 0;
+                    if (!isFinite(money)) return;
+                    const where = seg.startHole ? ` \u00B7 H${seg.startHole}` : '';
+                    const stake = (seg.stake !== undefined && seg.stake !== null)
+                        ? ` \u00B7 $${seg.stake}${seg.perHole ? '/hole' : ''}` : '';
+                    const label = `${seg.label}${stake}${where}`;
+                    // toSideA says which side the money went to; each teammate's share is
+                    // the segment split the same way the moving line was split.
+                    const aShare = (money === 0) ? 0 : (seg.toSideA ? money : -money) / (d.teamA.length || 1);
+                    const bShare = (money === 0) ? 0 : (seg.toSideA ? -money : money) / (d.teamB.length || 1);
+                    d.teamA.forEach(p => addNote(p, aShare, label));
+                    d.teamB.forEach(p => addNote(p, bShare, label));
                 });
-                html += `</div>`;
+            });
+        }
+
+        // ---- RECONCILING THE BREAKDOWN TO THE FINAL NUMBER -----------------
+        //
+        // The money-moving lines sum to the EXACT net; the number a golfer is shown is
+        // the ROUNDED net. Those differ by at most a dollar, and only when some wager
+        // divided unevenly - a 2v2 stake halving to an odd amount, for instance.
+        //
+        // Silently printing lines that do not add up to the total is exactly the kind
+        // of thing that makes a golfer distrust the whole receipt, so the difference is
+        // stated as its own line instead of hidden. On a whole-dollar round with whole
+        // -dollar wagers this is always zero and no line appears.
+        const contributions = {};
+        Object.keys(netByName).forEach(key => {
+            const lines = (linesByName[key] || []).slice();
+            const moving = lines.filter(l => !l.note);
+            const exactNet = moving.reduce((a, l) => a + l.amount, 0);
+            const finalNet = wholeDollar[key] ? wholeDollar[key].net : 0;
+            const drift = finalNet - exactNet;
+            if (Math.abs(drift) > 0.005) {
+                lines.push({ label: 'Rounding to whole dollars', amount: drift, rounding: true });
             }
-        }
+            contributions[key] = { name: netByName[key].name, lines, net: finalNet };
+        });
 
-
-        // STACKED / ADDITIONAL GAMES.
-        //
-        // These settle into Final Money through computeCombinedNetTotals, but nothing
-        // itemised them here, so a golfer saw "Won $58" with no line explaining
-        // where the skins money came from. That is the argument this document exists to
-        // prevent. Now that several participant-scoped Skins games can run at once, the
-        // gap is worse: two separate wagers, both invisible.
-        //
-        // Each card is built from computeGameNetByPlayerId - the SAME function the
-        // combined ledger uses - so this breakdown can never disagree with the total it
-        // is explaining. No second calculation, no chance of drift.
-        if (typeof getRoundGames === 'function' && typeof computeGameNetByPlayerId === 'function') {
-            getRoundGames(data).filter(g => g.role === 'additional').forEach(game => {
-                let net = {};
-                try { net = computeGameNetByPlayerId(game, courseData, savedScores) || {}; }
-                catch (e) { return; }
-                const ids = Object.keys(net);
-                if (ids.length === 0) return;
-
-                const label = (typeof describeGame === 'function') ? describeGame(game) : game.label;
-                html += `<div class="settle-card"><div class="settle-header">${game.icon || ''} ${label}</div>`;
-                const roster = data.players || [];
-                ids.forEach(pid => {
-                    const pl = roster.find(p => String(p.id) === String(pid));
-                    html += `<div class="ledger-row"><span>${pl ? pl.name : pid}</span>${fmtSignedHtml(net[pid] || 0)}</div>`;
-                });
-                html += `</div>`;
-            });
-        }
-
-        html += buildSideMatchesHtml(data, courseData, savedScores);
-
-        return html;
+        // Who Pays Who runs from the ROUNDED balances, so a transaction can never carry
+        // cents the ledger above it does not show.
+        return { netByName: wholeDollar, exact: netByName, contributions,
+                 transactions: simplifyDebts(netTotals) };
     }
 
-    // Combines every active money source in this round — main game, birdie pool, KP game, and
-    // every side match — into one net-per-player total, then runs it through the same
-    // simplifyDebts() Trip Mode already uses, so a round with several simultaneous bets doesn't
-    // leave a golfer mentally adding up four separate cards to know what they actually owe.
-    // Reuses the exact same engine calls the existing per-game rendering below already makes —
-    // this is purely additive, none of that rendering logic is touched.
-    // Fills a real, confirmed gap: computeRoundMoneyByPlayer (money-engine.js) has no branch for
-    // 'skins' or 'hilo' as the MAIN format — a Skins or Hi-Lo round previously contributed
-    // nothing to Final Results / Who Pays Who at all. Deliberately NOT touching money-engine.js
-    // (the more protected canonical dispatcher) — these mirror the exact, already-tested formulas
-    // already used elsewhere (skins.html's renderSkinsEngine payout math; index.html's Hi-Lo
-    // ticker's (t1Points-t2Points)*holeBetStake) rather than inventing anything new.
+    // Largest-remainder allocation. Rounding each balance independently can leave the
+    // table $1 up or $1 down - money invented or destroyed - so any drift is pushed onto
+    // the players whose own rounding moved furthest, which is the fairest place for it.
+    //
+    // Deterministic: ties break on name, so the same round always produces the same
+    // answer on every device and every render.
+    function roundNetTotalsToWholeDollars(netByName) {
+        const keys = Object.keys(netByName);
+        if (keys.length === 0) return netByName;
 
-    // Skins is a pot/ante game — every player pays in buyIn, winners split the pot. For a
-    // zero-sum settlement figure (comparable to every other game's net win/loss), this is
-    // payout MINUS what that player put into the pot, not the raw payout skins.html displays.
-    // Exact copy of index.html's calculateHiLoEngine — not reinvented, same math verbatim.
-    // This app has no shared-module system, so small engine functions are duplicated per file
-    // by established convention; this one simply didn't exist here before, needed to compute
-    // Hi-Lo's settlement contribution using the identical formula the live ticker already uses.
-
-
-    // Reuses the exact (t1Points - t2Points) * holeBetStake formula already used in index.html's
-    // live Hi-Lo ticker and print ledger — same split-evenly-among-teammates convention Nassau
-    // and Match Play already use elsewhere in this same file.
-
-
-    // Close the "More" popover when a tap lands outside it. Native <details> already
-    // handles tapping the summary again, and navigating away closes it implicitly, so
-    // this only covers the tap-elsewhere case. Uses a plain listener rather than a CSS
-    // overlay: an overlay can block links but can never close anything.
-    document.addEventListener('click', function (e) {
-        document.querySelectorAll('details.nav-more[open]').forEach(function (d) {
-            if (!d.contains(e.target)) d.removeAttribute('open');
+        const rows = keys.map(k => {
+            const exact = netByName[k].net;
+            const rounded = Math.round(exact);
+            return { key: k, name: netByName[k].name, exact, rounded, drift: rounded - exact };
         });
-    });
 
-    // MONEY POOL on the Receipt. Every bucket itemized, every winner named, every
-    // refund stated with its reason - the pot must be explainable line by line or
-    // it does not belong on this page. Pure read of computeMoneyPool(); the pool's
-    // per-player nets are already folded into Final Results by the engine.
-    // ---- SKINS ON THE RECEIPT ----------------------------------------------
-    //
-    // NO SKINS LOGIC LIVES HERE. Every winner, tie, net score and official flag
-    // comes from computeSkinsHoleLedger() in settlement-engine.js - the canonical
-    // ledger Wave 1 added - and every DOLLAR comes from the pool engine's own
-    // allocated lines. This function only turns those two objects into rows.
-    //
-    // WHY IT PRINTED ONLY WINNERS BEFORE
-    //
-    // The old block walked r.skins.lines, which by construction contains one entry
-    // per WON skin. A hole that tied produced no line, so it silently vanished from
-    // the Receipt. A golfer reading it could not tell the difference between "hole 7
-    // was tied" and "hole 7 is missing", and the only way to find out was the paper
-    // card - which is the exact thing this whole batch exists to retire.
-    //
-    // THE CONFIG SHIM, AND WHY IT IS NOT OPTIONAL
-    //
-    // The ledger reads its scoring basis from data.skinsPotFormat and its field from
-    // fieldParticipants(data). The MONEY POOL's skins bucket reads neither: its basis
-    // is moneyPool.skins.scoring and its field is moneyPoolParticipants(). Those are
-    // different config paths and can genuinely disagree - a round can have a net pool
-    // bucket and a gross standalone skins game.
-    //
-    // Handing the ledger the raw round would therefore print a hole-by-hole ledger
-    // for a DIFFERENT game than the one the money came from: right-looking rows,
-    // wrong winners. So the pool's own resolved basis, carry rule and participant
-    // list are passed in explicitly. The ledger still does all the deciding; it is
-    // just told which game to decide about.
-    function buildSkinsReceiptSection(r, data, courseData, savedScores, $) {
-        const scoring = r.skins.scoring === 'gross' ? 'gross' : 'net';
-        const basisLabel = scoring === 'gross' ? 'Gross' : 'Net';
-        const carryLabel = r.skins.carryOver ? 'carries' : 'ties void';
+        let total = rows.reduce((s, r) => s + r.rounded, 0);
 
-        let html = `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} `
-            + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;
-
-        if (typeof computeSkinsHoleLedger !== 'function') {
-            // The engine is the only source. Rather than quietly falling back to a
-            // second implementation - the duplication this project keeps removing -
-            // the Receipt says the detail is unavailable and still prints the money.
-            r.skins.lines.forEach(l => {
-                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+        // total > 0 means we handed out a dollar nobody won; < 0 means one went missing.
+        while (Math.abs(total) > 0.0001) {
+            const takeAway = total > 0;
+            const candidates = rows.filter(r => {
+                if (takeAway) {
+                    // Never turn a winner into a loser, or push someone below zero who
+                    // did not lose anything.
+                    return r.rounded - 1 >= Math.min(0, Math.floor(r.exact));
+                }
+                return r.rounded + 1 <= Math.max(0, Math.ceil(r.exact));
             });
-            return html;
+            const pool = candidates.length > 0 ? candidates : rows;
+
+            // Whoever gained most from rounding gives the dollar back, and vice versa.
+            pool.sort((a, b) => takeAway
+                ? (b.drift - a.drift) || a.name.localeCompare(b.name)
+                : (a.drift - b.drift) || a.name.localeCompare(b.name));
+
+            const target = pool[0];
+            target.rounded += takeAway ? -1 : 1;
+            target.drift = target.rounded - target.exact;
+            total += takeAway ? -1 : 1;
         }
 
-        const ledgerCfg = Object.assign({}, data, {
-            participantIds: r.participants.map(p => String(p.id)),
-            skinsPotFormat: scoring,
-            skinsCarryOver: r.skins.carryOver,
-        });
-        const bundle = computeSkinsHoleLedger(ledgerCfg, courseData, savedScores);
-        const L = scoring === 'gross' ? bundle.gross : bundle.net;
-        if (!L) return html;
+        const out = {};
+        rows.forEach(r => { out[r.key] = { name: r.name, net: r.rounded }; });
+        return out;
+    }
 
-        // Dollars per hole come from the POOL's allocated lines, keyed by hole. In
-        // whole-dollar mode those are already integers; nothing here rounds anything.
-        const centsByHole = {};
-        r.skins.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
+    // ========================================================================
+    // WHOLE-FIELD SKINS LEDGER — official / tie / waiting, hole by hole
+    //
+    // PURELY ADDITIVE. Nothing above this line changed. computeSkinsSettlementNet
+    // and both of its resolvers behave exactly as they always have, so every
+    // saved round settles to the same cent.
+    //
+    // WHY THIS EXISTS
+    //
+    // The two resolvers above answer "who won each skin" by looking at whoever
+    // has posted so far:
+    //
+    //     const holeScores = getSkinsHoleScoresForSettle(players, savedScores, h);
+    //     if (holeScores.length === 0) return;
+    //
+    // A hole with eight of twelve scores in is therefore resolved from those
+    // eight. That is correct and harmless for a FINISHED round, where every
+    // participant has posted every hole - which is the only context those
+    // functions were ever called from. It is wrong the moment anyone looks
+    // mid-round: the fast groups would be shown a "winner" for a hole the slow
+    // group has not played, and that winner can change when the last card
+    // arrives. Showing a golfer a skin and then taking it away is worse than
+    // showing nothing, which is exactly why the group went back to paper.
+    //
+    // So this function adds the missing concept - an OFFICIAL hole - without
+    // touching the money math. A hole is official when EVERY participant in
+    // that skins game has a posted score for it. Not every golfer in the round:
+    // a participant-scoped game is not delayed by golfers who are not in it.
+    //
+    // CARRY MAKES "OFFICIAL" MEAN TWO DIFFERENT THINGS, and the distinction is
+    // real rather than pedantic:
+    //
+    //   NO CARRY - each hole is worth one share and stands alone. A complete
+    //              hole 14 is fully known even if hole 13 is still waiting.
+    //
+    //   CARRY    - a hole's VALUE is however many units rolled into it, so
+    //              hole 14 cannot be valued until hole 13 has resolved. The
+    //              WINNER of a complete hole 14 is still known, and is still
+    //              worth showing; only the units are unknown.
+    //
+    // Both facts are reported separately: `official` (do we know the winner)
+    // and `valueKnown` (do we know what it is worth). A UI that conflates them
+    // will eventually overstate a payout.
+    //
+    // Group labels are supplied by the caller through opts.groupOf, so this
+    // engine keeps knowing nothing about scorekeeper links or group numbers.
+    // ========================================================================
 
-        // EVERY hole, in order - won, tied, or still waiting on a card.
-        L.holes.forEach(row => {
-            const label = `H${row.hole}`;
-            if (!row.official) {
-                // Only reachable on a Receipt previewed mid-round. A finished round
-                // has every card in, so none of these rows appear.
-                const who = row.missing.length > 0
-                    ? row.missing.map(m => m.name).join(', ')
-                    : `${row.requiredCount - row.postedCount} golfer(s)`;
-                html += `<div class="ledger-row"><span>${label} \u2014 Waiting on ${who}</span><span></span></div>`;
+    // One ledger for one scoring basis. Pure: no data/config reading, so the
+    // gross and net halves of a split pot can each be built from it.
+    function buildSkinsLedgerFor(participants, courseData, savedScores, scoreKey, carryOver, opts) {
+        const groupOf = (opts && typeof opts.groupOf === 'function') ? opts.groupOf : null;
+        const required = participants.length;
+        const holes = [];
+
+        let carryUnits = 1;
+        let carryKnown = true;   // becomes false at the first hole we cannot resolve
+
+        (courseData || []).forEach(h => {
+            const holeScores = getSkinsHoleScoresForSettle(participants, savedScores, h);
+            const posted = holeScores.length;
+            const official = required > 0 && posted === required;
+
+            const missing = official ? [] : participants
+                .filter(p => !holeScores.some(s => String(s.id) === String(p.id)))
+                .map(p => ({ id: p.id, name: p.name, group: groupOf ? groupOf(p.id) : null }));
+
+            const missingGroups = [...new Set(missing.map(m => m.group).filter(g => g !== null && g !== undefined))]
+                .sort((a, b) => Number(a) - Number(b));
+
+            const row = {
+                hole: h.hole,
+                par: h.par,
+                hcpIndex: h.hcpIndex,
+                scoreKey,
+                postedCount: posted,
+                requiredCount: required,
+                official,
+                missing,
+                missingGroups,
+                state: 'waiting',
+                winner: null,
+                low: null,
+                tiedPlayers: [],
+                unitsWon: null,
+                valueKnown: false,
+                scores: holeScores,
+            };
+
+            if (!official) {
+                // An unresolved hole breaks the carry chain: nothing after it can
+                // be valued until it lands. Under no-carry there is no chain to
+                // break, so later holes remain fully knowable.
+                if (carryOver) carryKnown = false;
+                holes.push(row);
                 return;
             }
-            if (row.state === 'tie') {
-                // The score is named, so a golfer can see WHY the hole paid nothing
-                // without reaching for the card.
-                html += `<div class="ledger-row"><span>${label} \u2014 Tie at ${basisLabel} ${row.low} \u2014 No Skin</span><span></span></div>`;
-                return;
-            }
-            const cents = centsByHole[String(row.hole)];
-            const units = row.unitsWon > 1 ? ` (${row.unitsWon} skins)` : '';
-            html += `<div class="ledger-row"><span>${label} \u2014 ${row.winner.name} \u2014 ${basisLabel} ${row.low} \u2014 Skin${units}</span>`
-                + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
-        });
 
-        // ---- SUMMARY BY GOLFER ---------------------------------------------
-        // Skin COUNTS come from the ledger; DOLLARS come from the pool's allocation.
-        // Summing the allocated line amounts is what keeps this summary equal to the
-        // per-player money, to the dollar, by construction rather than by luck.
-        const centsByPlayer = {};
-        const countByPlayer = {};
-        r.skins.lines.forEach(l => {
-            const k = String(l.winnerId);
-            centsByPlayer[k] = (centsByPlayer[k] || 0) + l.cents;
-        });
-        L.holes.forEach(row => {
-            if (row.state !== 'skin' || !row.winner) return;
-            const k = String(row.winner.id);
-            countByPlayer[k] = (countByPlayer[k] || 0) + 1;
-        });
+            const values = holeScores.map(s => s[scoreKey]);
+            const low = Math.min(...values);
+            const winners = holeScores.filter(s => s[scoreKey] === low);
+            row.low = low;
 
-        const winners = Object.keys(countByPlayer).map(id => {
-            const pl = L.participants.find(p => String(p.id) === id);
-            return { id, name: pl ? pl.name : id, skins: countByPlayer[id], cents: centsByPlayer[id] || 0 };
-        }).sort((a, b) => b.skins - a.skins || b.cents - a.cents || a.name.localeCompare(b.name));
-
-        if (winners.length > 0) {
-            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary</span><span></span></div>`;
-            winners.forEach(w => {
-                html += `<div class="ledger-row"><span>${w.name} \u2014 ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
-                    + `<span class="val-pos">${$(w.cents)}</span></div>`;
-            });
-        } else {
-            html += `<div class="ledger-row"><span>No skins were won.</span><span></span></div>`;
-        }
-
-        // ---- MONEY THAT FOUND NO WINNER ------------------------------------
-        // Stated outright. An unwon carry or a fully tied round leaves real money in
-        // the pot, and a Receipt that just omits it looks like the money vanished.
-        if (r.skins.unwonCents > 0) {
-            const why = r.skins.pendingUnits > 0
-                ? `${r.skins.pendingUnits} unwon skin${r.skins.pendingUnits === 1 ? '' : 's'} carried to the end`
-                : 'no skins won';
-            html += `<div class="ledger-row"><span>\u21A9\uFE0F Unwon skins money (${why}) \u2014 refunded to the field</span>`
-                + `<span>${$(r.skins.unwonCents)}</span></div>`;
-        }
-
-        return html;
-    }
-
-    function renderMoneyPoolSection(data, courseData, savedScores) {
-        const mount = document.getElementById('money-pool-section');
-        if (!mount) return;
-        if (typeof computeMoneyPool !== 'function') { mount.innerHTML = ''; return; }
-        const r = computeMoneyPool(data, courseData, savedScores);
-        if (!r) { mount.innerHTML = ''; return; }
-        const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
-        let html = `<div class="settle-card" style="border:2px solid #b8860b;">
-            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)} (${r.participants.length} \u00D7 ${$(r.buyInCents)})</div>`;
-        if (!r.valid) {
-            html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
-        }
-        // CANCELLED IS NOT A REFUND, and the Receipt has to say which it was. The
-        // money did not come back to the field - the game was removed and the pot
-        // was re-divided, which is why no golfer sees a KP line at all.
-        if (r.valid && r.kpCancelled && r.kpCancelled.cancelled) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 Cancelled</span><span></span></div>`;
-            html += `<div class="ledger-row"><span>Cancelled before settlement \u00B7 original allocation ${$(r.kpCancelled.originalCents)}</span>`
-                 + `<span>moved to skins</span></div>`;
-        }
-        if (r.valid && r.kp) {
-            // THREE STATES, NEVER TWO. A hole nobody has resolved is not "unclaimed" -
-            // saying so is what let $100 of unentered KP print as refunds on a receipt
-            // that called itself final. Distance appears only when somebody measured.
-            const unresolvedKp = r.kp.unresolvedCents || 0;
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}`
-                + (unresolvedKp > 0 ? ' \u2014 NOT CONFIRMED' : '') + `</span><span></span></div>`;
-            const leaders = (data.kpLeaders || {});
-            r.kp.lines.forEach(l => {
-                const led = leaders['h' + l.hole];
-                const dist = (led && led.distanceInches !== null && led.distanceInches !== undefined)
-                    ? ' \u2014 ' + Math.floor(led.distanceInches / 12) + "' " + (led.distanceInches % 12) + '"'
-                    : '';
-                if (l.state === 'paid') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
-                } else if (l.state === 'refunded') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: no winner</span><span>${$(l.cents)} refunded</span></div>`;
+            if (winners.length === 1) {
+                row.state = 'skin';
+                row.winner = winners[0];
+                if (carryOver) {
+                    row.unitsWon = carryKnown ? carryUnits : null;
+                    row.valueKnown = carryKnown;
+                    carryUnits = 1;
                 } else {
-                    html += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: `
-                        + (l.winnerName ? l.winnerName + dist + ' \u2014 not confirmed' : 'no winner recorded')
-                        + `</span><span>${$(l.cents)} pending</span></div>`;
+                    row.unitsWon = 1;
+                    row.valueKnown = true;
                 }
-            });
-            if (unresolvedKp > 0) {
-                html += `<div class="ledger-row" style="color:var(--warn-text); font-weight:bold;">`
-                    + `<span>\u26A0\uFE0F KP results not confirmed</span><span>${$(unresolvedKp)} pending</span></div>`;
+            } else {
+                row.state = 'tie';
+                row.tiedPlayers = winners;
+                if (carryOver) {
+                    if (carryKnown) carryUnits += 1;
+                    row.valueKnown = carryKnown;
+                } else {
+                    // Tie voids the hole outright. Nothing rolls forward, and the
+                    // hole is closed - that is the whole point of no-carry.
+                    row.unitsWon = 0;
+                    row.valueKnown = true;
+                }
             }
+
+            holes.push(row);
+        });
+
+        // Official THRU is the contiguous run from hole 1. A single gap stops it,
+        // because "official thru 14" has to mean everything up to 14 is settled -
+        // if hole 9 is still missing a card, thru 14 would be a lie.
+        let officialThru = 0;
+        for (let i = 0; i < holes.length; i++) {
+            if (!holes[i].official) break;
+            officialThru = holes[i].hole;
         }
-        if (r.valid && r.net) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
-            // A TIE IS EXPLAINED, NOT JUST MARKED.
-            //
-            // "(split)" was accurate and told a golfer nothing. The rule behind it is
-            // the least intuitive money rule in the app: golfers tied for a place
-            // occupy every position the tie spans and share ALL of that money, so two
-            // tied for 1st in a $40/$30 structure take $70 between them and the next
-            // golfer finishes 3rd with nothing. People query that, on the spot, and
-            // "(split)" gives them nothing to check.
-            //
-            // Every figure below is read from the canonical result - the positions the
-            // engine consumed, the money it assigned to them, the integers it
-            // allocated. Nothing is recomputed here; a second implementation of the
-            // tie rule is exactly how a receipt starts disagreeing with the money.
-            // The ALLOCATED place values, straight from the engine. Calling
-            // moneyPoolNetPlaceCents() here instead was wrong: that is the legacy
-            // percentage path, and on a whole-dollar round it returns 3999/3001 where
-            // the engine allocated 4000/3000 - so the explanation read
-            // "$39.99 + $30.01 = $70" underneath a $70 line. Consume, never recompute.
-            const placeCents = r.net.placeCents || null;
-            r.net.lines.forEach(l => {
-                const tied = l.ids.length > 1;
-                const who = tied
-                    ? `T${l.place}: ${l.names.join(' / ')}`
-                    : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
-                html += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
 
-                if (!tied) return;
+        const countsByPlayerId = {};
+        participants.forEach(p => { countsByPlayerId[String(p.id)] = 0; });
+        holes.forEach(r => {
+            if (r.state === 'skin' && r.winner) {
+                const k = String(r.winner.id);
+                countsByPlayerId[k] = (countsByPlayerId[k] || 0) + 1;
+            }
+        });
 
-                // Which positions this tie consumed, and what each was worth.
-                const span = l.ids.length;
-                const first = l.place, last = l.place + span - 1;
-                const parts = [];
-                if (placeCents) {
-                    for (let k = first; k <= last && k <= placeCents.length; k++) parts.push($(placeCents[k - 1]));
-                }
-                const posLabel = last > first ? `Positions ${first}\u2013${last}` : `Position ${first}`;
-                html += `<div class="nf-explain">${posLabel}`
-                    + (parts.length > 1 ? ` \u00B7 ${parts.join(' + ')} = ${$(l.cents)}` : ` \u00B7 ${$(l.cents)}`)
-                    + `</div>`;
+        const decided = holes.filter(r => r.state === 'skin');
+        const latest = decided.length > 0 ? decided[decided.length - 1] : null;
+        const firstWaiting = holes.find(r => !r.official) || null;
 
-                // The per-golfer split, from the same allocator settlement used. In a
-                // whole-dollar round an odd pot is deliberately uneven - $100 over three
-                // is $34/$33/$33 - so the actual amounts are printed rather than an
-                // average that would not add up.
-                const each = (typeof allocateWholeDollars === 'function' && data.settlementMode === 'whole-dollar')
-                    ? allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100)
-                    : l.ids.map(() => l.cents / l.ids.length);
-                const same = each.every(c => c === each[0]);
-                html += `<div class="nf-explain">${same
-                    ? `${$(each[0])} each`
-                    : l.names.map((n, i) => `${n} ${$(each[i])}`).join(' \u00B7 ')}</div>`;
-
-                // What it cost the golfer behind them, stated plainly - this is the part
-                // that gets queried in the car park.
-                if (span > 1) {
-                    html += `<div class="nf-explain">The tie consumed ${span} paid place${span === 1 ? '' : 's'}, `
-                        + `so the next golfer finishes ${last + 1}${['st','nd','rd'][last]||'th'}.</div>`;
-                }
-            });
-            if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
-        }
-        if (r.valid && r.skins) {
-            html += buildSkinsReceiptSection(r, data, courseData, savedScores, $);
-        }
-        if (r.valid && r.refund.cents > 0) {
-            html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
-        }
-        html += `</div>`;
-        mount.innerHTML = html;
-    }
-
-    // Presenter only. Reads canonical contributions and formats them; the only
-    // arithmetic is summing the lines it was handed, to prove they add up.
-    function buildPlayerLedgerHtml(contributions, sortedTotals) {
-        if (!contributions) return '';
-        const keys = Object.keys(contributions);
-        if (keys.length === 0) return '';
-
-        // Ledger order follows Final Results, so a golfer reading down the page finds
-        // their detail in the same order they found their total.
-        const order = (sortedTotals || [])
-            .map(t => keys.find(k => contributions[k].name === t.name))
-            .filter(Boolean);
-        keys.forEach(k => { if (order.indexOf(k) === -1) order.push(k); });
-
-        // Formatting goes through fmtWhole, the single money-formatting rule in this
-        // file. It already prints an integer as "$93" and a genuine fraction as
-        // "$92.51", which is exactly what a ledger needs: whole-dollar rounds allocate
-        // integers and show no cents, while a legacy cent-settled round keeps the
-        // amounts the engine actually allocated.
-        //
-        // Nothing here rounds. An earlier draft of this function added its own
-        // toFixed/Math.round pair on a false diagnosis - a test regex, not the page,
-        // was truncating "92.51" to "92" - and that would have re-introduced per-line
-        // rounding into the one place a golfer reads to settle up.
-        const money = (amt) => {
-            const txt = '$' + fmtWhole(Math.abs(amt));
-            if (amt > 0.005) return `<span class="val-pos">+${txt}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">-${txt}</span>`;
-            return `<span>$0</span>`;
+        return {
+            scoreKey,
+            carryOver,
+            participants,
+            holes,
+            officialThru,
+            countsByPlayerId,
+            latest,
+            firstWaiting,
+            pendingUnits: carryOver && carryKnown && carryUnits > 1 ? carryUnits - 1 : 0,
         };
+    }
 
-        // ---- WHAT THIS SECTION ANSWERS -------------------------------------
-        //
-        // "What did I win, and what for?" - not "what is my net position after the
-        // buy-in?". Who Pays Who answers the second question, from the same canonical
-        // ledger, which is why the buy-in can be left out here without anything going
-        // missing: it is still in the engine, still in every net balance, still in the
-        // transactions people actually settle from.
-        //
-        // Nobody needs reminding they paid $40. Everybody put the same $40 in, and
-        // showing it as a deduction against a golfer's winnings made a $128 payout
-        // read as "+$88" with a line of accounting above it.
-        //
-        // PRESENTATION ONLY. Every figure below is a canonical contribution line;
-        // this function chooses which to display and adds them up to prove the total.
-        // No amount is computed, rounded or reallocated here.
-        //
-        // TWO LINES ARE EXCLUDED, for different reasons:
-        //
-        //   'Money Pool buy-in'  what the golfer paid in, not what they won.
-        //   'Money Pool'         the AGGREGATE moving line. Its own note lines carry
-        //                        the detail - Net Finish, skins, refund - so showing
-        //                        both would count the same money twice.
-        //
-        // Everything else positive is money coming to the golfer and is shown: a side
-        // match won, a group game won, a refund. Negative lines are omitted because a
-        // loss is not a payout; it remains in Who Pays Who where it belongs.
-        const isBuyIn = l => /buy-in/i.test(l.label);
-        const isPoolAggregate = l => !l.note && l.label === 'Money Pool';
-        const payoutLines = c => c.lines.filter(l =>
-            !isBuyIn(l) && !isPoolAggregate(l) && l.amount > 0.005);
+    // The ledger(s) for a round's configured skins game. Reads its field, mode
+    // and carry rule through exactly the same calls computeSkinsSettlementNet
+    // makes, so the two can never disagree about who is in or how ties behave.
+    function computeSkinsHoleLedger(data, courseData, savedScores, opts) {
+        const participants = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
 
-        let html = `<div class="settle-card">
-            <div class="settle-header">\uD83D\uDCB0 Player Payouts</div>
-            <div style="font-size:0.72rem; color:var(--text-muted); margin:-4px 0 10px 0;">
-                What each golfer won from the pot. Net positions are settled in Who Pays Who below.
-            </div>`;
+        const mode = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data)
+            : (data.skinsPotFormat || 'split');
 
-        order.forEach(k => {
-            const c = contributions[k];
-            const lines = payoutLines(c);
-            html += `<div class="pl-block"><div class="pl-name">${c.name}</div>`;
+        const carryOver = data.skinsCarryOver !== false;
 
-            // ONE EXIT PATH. Two returns here each closed pl-block correctly at
-            // runtime, but the div-balance check counts markup statically and saw an
-            // extra close. Keeping a single path keeps that guard meaningful rather
-            // than teaching it to ignore this function.
-            let total = 0;
-            if (lines.length === 0) {
-                // No loss figure. A golfer who won nothing sees that plainly; what
-                // they owe is Who Pays Who's job.
-                html += `<div class="pl-row pl-note"><span>No payout</span><span>$0</span></div>`;
-            } else {
-                lines.forEach(l => {
-                    total += l.amount;
-                    html += `<div class="pl-row"><span>${l.label}</span>${money(l.amount)}</div>`;
-                });
+        return {
+            mode,
+            carryOver,
+            participants,
+            gross: (mode === 'split' || mode === 'gross')
+                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'gross', carryOver, opts) : null,
+            net: (mode === 'split' || mode === 'net')
+                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
+        };
+    }
+
+    // ========================================================================
+    // ONE ROUND TOTAL PER GOLFER — gross, net, and whether the round is finished
+    //
+    // ADDITIVE. Nothing above this line changed.
+    //
+    // WHY THIS EXISTS
+    //
+    // Three places were computing a golfer's round totals independently: the
+    // Net Finish standings in pool-engine.js, the per-hole skins scores here,
+    // and the Finish Round modal in index.html. The first two guard on a posted
+    // score. The third did not, and the difference was not cosmetic:
+    //
+    //     courseData.forEach(h => {
+    //         const v = savedScores[...];
+    //         if (v > 0) gross += parseInt(v, 10);      // guarded
+    //         strokesOff += getStrokes(h.hcpIndex, ...) // NOT guarded
+    //     });
+    //
+    // Gross counted only the holes played; the handicap deducted all eighteen.
+    // A golfer who walked in after seventeen holes was rendered as a finished
+    // round - "Gross 96 / Net 83" - on the very screen an organizer uses to
+    // check the scores before paying people. Nothing on it said the round was
+    // short.
+    //
+    // WHAT THIS RETURNS, and why the shape matters
+    //
+    //   holesPlayed / holesRequired  so a caller can SAY "17 of 18" instead of
+    //                                inventing a total
+    //   complete                     the single question a UI should ask before
+    //                                showing a finishing position
+    //   gross                        the holes actually posted, always safe
+    //   net                          null unless the round is complete
+    //
+    // net is deliberately null on an unfinished round rather than a partial
+    // number. A partial net is not a smaller result, it is a meaningless one,
+    // and returning something plausible is how it ended up on screen in the
+    // first place. A caller that wants to show progress can use grossSoFar and
+    // strokesSoFar, which are honest about what they are.
+    //
+    // Handicap allocation is getStrokes/parseHcp from money-engine.js - the same
+    // pair the leaderboard, the skins ledger and every net wager already use. No
+    // new handicap arithmetic is introduced here or anywhere downstream.
+    // ========================================================================
+    function computePlayerRoundTotals(player, courseData, savedScores) {
+        const holes = (courseData || []);
+        const hcp = (typeof parseHcp === 'function') ? parseHcp(player && player.hcp) : 0;
+
+        let gross = 0, strokesSoFar = 0, holesPlayed = 0;
+        holes.forEach(h => {
+            const v = savedScores ? savedScores['p' + player.id + '_h' + h.hole] : null;
+            if (v && v > 0) {
+                gross += parseInt(v, 10);
+                // Strokes accrue ONLY for holes that were actually played. This
+                // single guard is the whole fix.
+                strokesSoFar += (typeof getStrokes === 'function') ? getStrokes(h.hcpIndex, hcp) : 0;
+                holesPlayed += 1;
             }
-            // The total is the sum of the lines PRINTED ABOVE IT, so this section can
-            // never display components that fail to add up to their own total.
-            html += `<div class="pl-row pl-final"><span>TOTAL PAYOUT</span>${money(total)}</div>`;
-            html += `</div>`;
         });
 
-        return html + `</div>`;
+        const holesRequired = holes.length;
+        const complete = holesRequired > 0 && holesPlayed === holesRequired;
+
+        return {
+            id: player.id,
+            name: player.name,
+            hcp,
+            holesPlayed,
+            holesRequired,
+            complete,
+            grossSoFar: gross,
+            strokesSoFar,
+            // Final figures only exist for a finished round.
+            gross: complete ? gross : null,
+            net: complete ? gross - strokesSoFar : null,
+        };
     }
-
-    function renderCombinedSummary(data, courseData, savedScores) {
-        const container = document.getElementById('combined-settlement-summary');
-        if (!container) return;
-        const players = data.players || [];
-        if (players.length === 0) { container.innerHTML = ''; return; }
-
-        // `contributions` is the canonical per-golfer breakdown added in the Wave 2B
-        // foundation. Destructured here so the ledger below reads engine output rather
-        // than recomputing anything.
-        const { netByName, transactions, contributions } = computeCombinedNetTotals(data, courseData, savedScores);
-        const totals = Object.values(netByName);
-
-        // Nothing to combine yet (no scores, no active bets) — stay quiet rather than show an
-        // empty "Final Results" card above the real per-game breakdowns below.
-        if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
-
-        function fmt(amt) {
-            if (amt > 0.005) return `<span class="val-pos">Won $${fmtWhole(amt)}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">Owes $${fmtWhole(Math.abs(amt))}</span>`;
-            return `<span>Even</span>`;
-        }
-
-        const sorted = totals.slice().sort((a, b) => b.net - a.net);
-
-        // The round this document belongs to. Only the retired print path carried this,
-        // which meant a shared Receipt had no course or date on it.
-        let html = buildReceiptHeader();
-
-        html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
-            <div class="settle-header">🏁 Final Results</div>`;
-        sorted.forEach(t => {
-            html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
-        });
-        html += `</div>`;
-
-        // ---- PER-PLAYER LEDGER -----------------------------------------
-        //
-        // NO MONEY IS COMPUTED HERE. Every line, amount and final net is read from
-        // computeCombinedNetTotals()'s `contributions`, which records each amount at
-        // the moment the engine already counted it. That is the point of the
-        // contribution model: a page that re-ran the games to explain them would
-        // eventually disagree with the money it was explaining.
-        //
-        // MOVING vs NOTE is load-bearing and is SHOWN, not merely stored. Moving lines
-        // are the ones that ADD UP to the final net. Note lines sit indented beneath,
-        // explaining a moving line from the inside - the pool buy-in, each KP, the
-        // net-finish place, the skins. Adding a note into the total would double-count
-        // real money, so they are visually subordinate and never carry the sum.
-        //
-        // Every participant appears, including anyone who finishes exactly even. A
-        // golfer who cannot find their own name assumes the app lost them.
-        html += buildPlayerLedgerHtml(contributions, sorted);
-
-        if (transactions.length > 0) {
-            html += `<div class="settle-card">
-                <div class="settle-header">🤝 Who Pays Who</div>`;
-            transactions.forEach(t => {
-                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtWhole(t.amount)}</span></div>`;
-            });
-            html += `</div>`;
-        }
-
-        container.innerHTML = html;
-    }
-
-    // Scores come LAST. The money story is what a golfer opens this document for, and
-    // the grid is the reference you check afterwards - so it renders into its own
-    // container, which sits after every money section in the markup.
-    function renderReceiptScorecard() {
-        const el = document.getElementById('receipt-scorecard');
-        if (!el) return;
-        el.innerHTML = buildReceiptScorecard();
-    }
-
-    function renderSettlement(data) {
-        const container = document.getElementById("settle-content");
-        const players = data.players || [];
-        const courseData = data.courseData || [];
-        const savedScores = data.scores || {};
-        const gameFormat = data.gameFormat || "stroke";
-        const holeBet = data.holeBetStake || 0;
-
-        // Only players opted in to money betting are included in payout math below -
-        // everyone still scores normally regardless of this flag (team formats never show
-        // this checkbox, so it's a no-op there and full teams stay intact).
-        const moneyPlayers = players.filter(p => p.playingForMoney !== false);
-
-        if (gameFormat === 'skins') {
-            const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
-            const carryOver = data.skinsCarryOver !== false;
-            let ledgerHtml = "";
-            moneyPlayers.forEach(p => {
-                const money = skinsNet[p.id] || 0;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
-            });
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">🥩 Final Skins Settlement (${carryOver ? 'Carry Over' : 'No Carry'})</div>
-                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">Net of each player's own buy-in — a positive number means they came out ahead overall, not just what they won from the pot.</p>
-                    ${ledgerHtml}
-                </div>
-                ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat === 'hilo') {
-            const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
-            const calc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
-            let ledgerHtml = "";
-            moneyPlayers.forEach(p => {
-                const money = hiloNet[p.id] || 0;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
-            });
-            const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">♠️ Final Hi-Lo Settlement</div>
-                    ${pointsLine}
-                    ${ledgerHtml}
-                </div>
-                ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat === 'wolf') {
-            const wolfCalc = calcWolfEngine(data, courseData, savedScores);
-            const wolfMoney = calcPointSettlement(moneyPlayers, wolfCalc.totals, data.wolfPointVal || 0);
-            let ledgerHtml = "";
-
-            moneyPlayers.forEach(p => {
-                let pts = wolfCalc.totals[p.id] || 0;
-                let money = wolfMoney[p.id] || 0;
-                ledgerHtml += `
-                    <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
-                        ${fmtSignedHtml(money)}
-                    </div>
-                `;
-            });
-
-            if (players.length !== 4) {
-                ledgerHtml = `<div style="text-align:center; color: var(--text-muted); padding: 10px;">Wolf requires exactly 4 players — check the Home/setup page.</div>`;
-            }
-
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">🐺 Final Wolf Settlement</div>
-                    ${ledgerHtml}
-                </div>
-                ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat === 'stableford') {
-            const sfCalc = calcStablefordEngine(data, courseData, savedScores);
-            const sfMoney = calcPointSettlement(moneyPlayers, sfCalc.totals, data.stablefordPointVal || 0);
-            let ledgerHtml = "";
-
-            moneyPlayers.forEach(p => {
-                let pts = sfCalc.totals[p.id] || 0;
-                let money = sfMoney[p.id] || 0;
-                ledgerHtml += `
-                    <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
-                        ${fmtSignedHtml(money)}
-                    </div>
-                `;
-            });
-
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">🎯 Final Stableford Settlement</div>
-                    ${ledgerHtml}
-                </div>
-                ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat === 'dots') {
-            const dotsCalc = calcDotsEngine(data, courseData, savedScores);
-            let dotVal = data.dotPointVal || 0;
-            let ledgerHtml = "";
-            
-            moneyPlayers.forEach(p => {
-                let pts = dotsCalc.totals[p.id] || 0;
-                let money = pts * dotVal;
-                ledgerHtml += `
-                    <div class="ledger-row">
-                        <span>${p.name} (${pts} Dots):</span>
-                        ${fmtSignedHtml(money)}
-                    </div>
-                `;
-            });
-
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">🎯 Final Dot Game Settlement</div>
-                    ${ledgerHtml}
-                </div>
-                ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat === 'stroke') {
-            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
-            if (sideHtml) {
-                container.innerHTML = sideHtml + `<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>`;
-            } else {
-                container.innerHTML = `
-                    <div class="settle-card">
-                        <div class="settle-header">Final Ledger</div>
-                        <div style="text-align: center; color: var(--text-muted); padding: 10px;">No money bets were set up for this round.</div>
-                    </div>
-                `;
-            }
-            return;
-        }
-
-        if (gameFormat === 'match' && data.matchScoringStyle === 'stroke') {
-            const scoringType = data.matchScoring || 'net';
-            const matchStake = data.matchStake || 0;
-            const strokePresses = data.strokePresses ? Object.values(data.strokePresses) : [];
-            const pressSet = calculateStrokePressSet(moneyPlayers, courseData, savedScores, scoringType, matchStake, strokePresses);
-            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
-
-            if (!pressSet) {
-                container.innerHTML = `
-                    <div class="settle-card">
-                        <div class="settle-header">Final Ledger</div>
-                        <div style="text-align: center; color: #555; padding: 10px;">Stroke Play 1v1 requires exactly 2 players.</div>
-                    </div>
-                    ${sideHtml}
-                `;
-                return;
-            }
-
-            const fmtStrokeSettle = fmtSignedHtml;
-
-            const calc = pressSet.original;
-            let pressBreakdownHtml = '';
-            pressSet.pressResults.forEach(pr => {
-                const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
-                const prStatus = !pr.roundComplete
-                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
-                    : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
-                pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
-            });
-
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">Final Ledger — 1v1 (Stroke Play)</div>
-                    <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${calc.p1.name} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${calc.p2.name} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
-                    ${!calc.roundComplete ? `<div class="breakdown-item"><span style="color:#888;">Not yet final — thru ${calc.holesCompleted} of ${calc.totalHoles}.</span></div>` : ''}
-                    ${pressBreakdownHtml}
-                    <div class="ledger-row" style="margin-top:10px;"><span>${pressSet.p1.name}</span>${fmtStrokeSettle(pressSet.combinedT1Money)}</div>
-                    <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
-                </div>
-                ${sideHtml}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        if (gameFormat !== 'nassau' && !['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) {
-            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">Final Ledger</div>
-                    <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
-                </div>
-                ${sideHtml}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-            `;
-            return;
-        }
-
-        let scoringType = data.nassauScoring || data.matchScoring || "net";
-        let pressRule = gameFormat === 'nassau' ? (data.nassauPressRule || "none") : (data.matchPressRule || "none");
-        let nassauStake = data.nassauStake || 10;
-        let matchStake = data.matchStake || 0;
-        let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
-
-        const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
-        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
-
-        if (!matchData) {
-            const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
-            container.innerHTML = `
-                <div class="settle-card">
-                    <div class="settle-header">Final Ledger</div>
-                    <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
-                </div>
-                ${sideHtml}
-                ${sideHtml ? '<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>' : ''}
-            `;
-            return;
-        }
-
-        let breakdownHtml = "";
-        
-        if (gameFormat === 'nassau') {
-            ['F9', 'B9', '18'].forEach(bId => {
-                let groupMatches = matchData.activeMatches.filter(m => m.baseId === bId);
-                if(groupMatches.length > 0) {
-                    let groupLabel = bId === 'F9' ? 'Front 9' : (bId === 'B9' ? 'Back 9' : 'Total');
-                    breakdownHtml += `<div style="background:#e0e8e4; color:#0f4c3a; padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px;">${groupLabel} Bets</div>`;
-                    
-                    groupMatches.forEach(m => {
-                        let statusDesc = "All Square ($0)";
-                        if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stakeToUse}`;
-                        else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stakeToUse}`;
-                        
-                        let lockIcon = m.closed ? "🔒 " : "";
-                        let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
-                        breakdownHtml += `<div class="breakdown-item" style="border-bottom:1px solid #eee; padding: 4px 0; ${indent}"><span>${lockIcon}${m.label}:</span> <strong>${statusDesc}</strong></div>`;
-                    });
-                }
-            });
-        } else {
-            let t18 = matchData.activeMatches.find(m => m.id === '18');
-            let statusDesc = "All Square ($0)";
-            if (holeBet > 0) {
-                let amt = Math.abs(t18.status * holeBet);
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
-            } else {
-                let amt = matchStake;
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
-            }
-            breakdownHtml += `
-                <div class="breakdown-item">
-                    <span>Overall Match:</span>
-                    <span><strong>${statusDesc}</strong></span>
-                </div>
-            `;
-        }
-
-        let t1Total = matchData.t1TotalMoney;
-        const formatMoney = fmtSignedHtml;
-
-        const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
-
-        // The old "Final Payout Settlement" card is gone. It described the same wager the
-        // Side Matches section now describes properly, and describing one bet twice - once
-        // in full and once as a single line - is exactly how a golfer ends up unsure which
-        // number to believe. Per-player totals already appear in Final Results and Who
-        // Pays Who above, so nothing is lost.
-        container.innerHTML = `
-            ${sideHtml}
-
-            <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
-        `;
-    }
-</script>
-
-</body>
-</html>
