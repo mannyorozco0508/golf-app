@@ -601,6 +601,22 @@
         }
         .finish-round-modal-content { max-width: 420px; }
         .fr-headline { text-align: center; font-size: 1.1rem; font-weight: bold; color: var(--brand-green); background: var(--nassau-box-bg); border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+        .fr-review-lede { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; }
+        .fr-secondary-btn { width: 100%; margin-top: 8px; padding: 11px; background: none; border: none; color: var(--text-muted); font-size: 0.82rem; text-decoration: underline; cursor: pointer; }
+        .fr-back-btn { background: none; border: none; color: var(--brand-green); font-weight: bold; font-size: 0.85rem; padding: 6px 0 10px 0; cursor: pointer; }
+        .fr-detail-name { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); margin-bottom: 2px; }
+        .fr-review-chev { color: var(--brand-green); font-size: 0.72rem; font-weight: bold; margin-left: 8px; white-space: nowrap; }
+        .fr-hole-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--border-faint); min-height: 44px; }
+        .fr-hole-label { font-size: 0.88rem; }
+        .fr-hole-par { color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
+        .fr-hole-val { font-weight: bold; font-size: 1rem; min-width: 44px; text-align: right; }
+        .fr-hole-input { width: 56px; height: 40px; text-align: center; font-size: 1rem; font-weight: bold; border: 1px solid var(--border-mid); border-radius: 8px; }
+        .fr-hole-missing { color: var(--warn-text); font-style: italic; font-size: 0.8rem; }
+        .fr-sub-row { display: flex; justify-content: space-between; padding: 6px 4px; font-size: 0.85rem; font-weight: bold; background: var(--bg-soft); }
+        .fr-impact { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--warn-bg); font-size: 0.82rem; }
+        .fr-impact-head { font-weight: bold; color: var(--brand-green); margin-bottom: 6px; }
+        .fr-impact-line { padding: 2px 0; }
+        .fr-impact-money { font-weight: bold; }
         .fr-group-head { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.04em; color: var(--brand-green); margin: 10px 0 2px 0; }
         .fr-review-note { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
         .fr-review-warn { color: var(--warn-text); font-weight: bold; }
@@ -1015,23 +1031,46 @@
              line after it (including display='flex') never ran. The modal could not
              open at all. fr-full-results stays deleted, because the Receipt genuinely
              replaced it; this one comes back, as the whole-field score review. -->
-        <div class="fr-money-title">Review Scores</div>
-        <div id="fr-review-note" class="fr-review-note"></div>
-        <div id="fr-player-list"></div>
+        <!-- THREE STATES, ONE MODAL. Money is not shown until the organizer has either
+             reviewed the scores or explicitly chosen to skip. "All 12 golfers have a
+             complete card" only ever meant eighteen numbers exist - it never meant
+             anybody checked them against the paper. Presenting Final Money directly
+             beneath that sentence made the app look more certain than it was. -->
 
-        <div class="fr-money-title" id="fr-money-title">Final Money</div>
-        <div id="fr-final-money"></div>
+        <!-- STATE 1: REVIEW -->
+        <div id="fr-state-review">
+            <div class="fr-money-title">Review Scores</div>
+            <div id="fr-review-note" class="fr-review-note"></div>
+            <div id="fr-review-lede" class="fr-review-lede">
+                Before money changes hands, check these against the physical scorecards.
+            </div>
+            <div id="fr-player-list"></div>
+            <button class="btn-primary" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
+            <button class="fr-secondary-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
+        </div>
 
-        <div class="fr-money-title">Who Pays Who</div>
-        <div id="fr-who-pays-who"></div>
+        <!-- STATE 2: ONE GOLFER, ALL 18 HOLES -->
+        <div id="fr-state-detail" style="display:none;">
+            <button class="fr-back-btn" onclick="frBackToReview()">‹ Back to Review</button>
+            <div id="fr-detail-name" class="fr-detail-name"></div>
+            <div id="fr-detail-note" class="fr-review-note"></div>
+            <div id="fr-detail-holes"></div>
+            <div id="fr-detail-impact"></div>
+        </div>
 
-        <!-- "View Bet Breakdown & Scores" lived here: a clone of the live status panel
-             plus a score list. The Receipt now carries the full press timeline and the
-             scorecard, so this was a strictly worse second copy of both. One document. -->
+        <!-- STATE 3: RESULTS -->
+        <div id="fr-state-results" style="display:none;">
+            <button class="fr-back-btn" onclick="frBackToReview()">‹ Back to Review</button>
+            <div class="fr-money-title" id="fr-money-title">Final Money</div>
+            <div id="fr-final-money"></div>
 
-        <button class="btn-primary" style="margin-top: 14px;" onclick="openReceipt()">🧾 Round Receipt</button>
+            <div class="fr-money-title">Who Pays Who</div>
+            <div id="fr-who-pays-who"></div>
 
-        <div id="fr-jump-links" class="fr-jump-links"></div>
+            <button class="btn-primary" style="margin-top: 14px;" onclick="openReceipt()">🧾 Round Receipt</button>
+            <div id="fr-jump-links" class="fr-jump-links"></div>
+        </div>
+
         <button class="fr-close-btn" onclick="closeFinishRoundModal()">Done</button>
     </div>
 </div>
@@ -3241,12 +3280,243 @@
                     : '<span class="fr-incomplete">Incomplete \u2014 ' + r.holesPlayed
                       + ' of ' + r.holesRequired + ' holes posted</span>'
                       + '<br><span class="fr-partial">' + r.grossSoFar + ' so far</span>';
-                html += '<div class="fr-player-row' + (r.complete ? '' : ' fr-row-incomplete') + '">'
+                html += '<div class="fr-player-row' + (r.complete ? '' : ' fr-row-incomplete') + '"'
+                     + ' onclick="frOpenPlayer(' + r.id + ')" style="cursor:pointer;">'
                      + '<span class="fr-player-name">' + r.name + '</span>'
-                     + '<span class="fr-player-score">' + right + '</span></div>';
+                     + '<span class="fr-player-score">' + right
+                     + '<span class="fr-review-chev">Review \u203A</span></span></div>';
             });
         });
         mount.innerHTML = html;
+    }
+
+    // ---- WAVE B: SCORE VERIFICATION ----------------------------------------
+    //
+    // NO MONEY MATH IN THIS BLOCK. Impact is measured by taking a canonical
+    // settlement SNAPSHOT before a correction and another after it, then diffing
+    // the two objects. Both snapshots come from computeCombinedNetTotals() and
+    // computeMoneyPool(). Nothing here adds, splits or allocates a dollar.
+    let frDetailPlayerId = null;
+    let frReviewCompleted = false;   // in-memory only; persistence is Wave C
+
+    function frSection(id, show) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = show ? '' : 'none';
+    }
+    function frBackToReview() {
+        frDetailPlayerId = null;
+        renderFinishRoundReview();
+        frSection('fr-state-review', true);
+        frSection('fr-state-detail', false);
+        frSection('fr-state-results', false);
+    }
+    // `reviewed` records intent: the organizer pressed the confirm button rather
+    // than skipping. Wave C decides whether that intent is persisted on the round;
+    // nothing is written to Firebase here.
+    function frShowResults(reviewed) {
+        frReviewCompleted = !!reviewed;
+        renderFinishRoundMoney();
+        frSection('fr-state-review', false);
+        frSection('fr-state-detail', false);
+        frSection('fr-state-results', true);
+    }
+
+    // A canonical settlement snapshot. READS ONLY.
+    function frSnapshot() {
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const snap = { net: {}, skins: {}, place: {}, totals: {} };
+        try {
+            const c = computeCombinedNetTotals(currentData, courseData, savedScores);
+            Object.values(c.netByName).forEach(v => { snap.net[v.name] = v.net; });
+        } catch (e) { /* a snapshot that cannot be taken simply reports no change */ }
+        try {
+            if (typeof computeMoneyPool === 'function') {
+                const pool = computeMoneyPool(currentData, courseData, savedScores);
+                if (pool && pool.valid) {
+                    (pool.skins ? pool.skins.lines : []).forEach(l => {
+                        snap.skins[String(l.hole)] = { name: l.winnerName, cents: l.cents };
+                    });
+                    (pool.net ? pool.net.lines : []).forEach(l => {
+                        l.names.forEach(n => { snap.place[n] = l.place; });
+                    });
+                }
+            }
+        } catch (e) { /* as above */ }
+        (currentData.players || []).forEach(p => {
+            if (typeof computePlayerRoundTotals !== 'function') return;
+            const t = computePlayerRoundTotals(p, courseData, savedScores);
+            snap.totals[p.name] = { gross: t.gross, net: t.net, complete: t.complete };
+        });
+        return snap;
+    }
+
+    const frMoney = c => (c < 0 ? '-$' : '+$') + Math.abs(Math.round(c / 100));
+
+    // Diffs two canonical snapshots. Reports what MOVED; says so plainly when
+    // nothing did, because "no change" is the answer an organizer most wants.
+    function frRenderImpact(before, after, playerName, hole, oldVal, newVal) {
+        const el = document.getElementById('fr-detail-impact');
+        if (!el) return;
+        const lines = [];
+
+        const tb = before.totals[playerName] || {}, ta = after.totals[playerName] || {};
+        if (tb.gross !== ta.gross) {
+            lines.push('Gross: ' + (tb.gross === null ? '\u2014' : tb.gross) + ' \u2192 ' + (ta.gross === null ? '\u2014' : ta.gross));
+        }
+        if (tb.net !== ta.net) {
+            lines.push('Net: ' + (tb.net === null ? '\u2014' : tb.net) + ' \u2192 ' + (ta.net === null ? '\u2014' : ta.net));
+        }
+
+        // Skins, hole by hole, from the canonical pool result.
+        const holes = [...new Set([...Object.keys(before.skins), ...Object.keys(after.skins)])]
+            .sort((a, b) => Number(a) - Number(b));
+        let skinChanged = false;
+        holes.forEach(h => {
+            const b = before.skins[h], a = after.skins[h];
+            const bn = b ? b.name : null, an = a ? a.name : null;
+            if (bn === an && (!b || !a || b.cents === a.cents)) return;
+            skinChanged = true;
+            if (bn && !an) lines.push('Hole ' + h + ' skin: ' + bn + ' \u2192 no skin');
+            else if (!bn && an) lines.push('Hole ' + h + ' skin: no skin \u2192 ' + an + ' (' + frMoney(a.cents) + ')');
+            else if (bn !== an) lines.push('Hole ' + h + ' skin: ' + bn + ' \u2192 ' + an);
+            else lines.push('Hole ' + h + ' skin value: ' + frMoney(b.cents) + ' \u2192 ' + frMoney(a.cents));
+        });
+        if (!skinChanged) lines.push('Skins: no change');
+
+        // Net Finish positions.
+        const names = [...new Set([...Object.keys(before.place), ...Object.keys(after.place)])];
+        let placeChanged = false;
+        names.forEach(n => {
+            const b = before.place[n], a = after.place[n];
+            if (b === a) return;
+            placeChanged = true;
+            if (b && !a) lines.push('Net Finish: ' + n + ' no longer places');
+            else if (!b && a) lines.push('Net Finish: ' + n + ' now ' + a + (a === 1 ? 'st' : a === 2 ? 'nd' : a === 3 ? 'rd' : 'th'));
+            else lines.push('Net Finish: ' + n + ' ' + b + ' \u2192 ' + a);
+        });
+        if (!placeChanged) lines.push('Net Finish: no change');
+
+        // Final money, per golfer, straight from the combined ledger.
+        const moved = [];
+        [...new Set([...Object.keys(before.net), ...Object.keys(after.net)])].forEach(n => {
+            const b = before.net[n] || 0, a = after.net[n] || 0;
+            if (b !== a) moved.push(n + ': ' + (b >= 0 ? '+$' + b : '-$' + Math.abs(b))
+                                     + ' \u2192 ' + (a >= 0 ? '+$' + a : '-$' + Math.abs(a)));
+        });
+
+        el.innerHTML = '<div class="fr-impact"><div class="fr-impact-head">\u2713 Score corrected</div>'
+            + '<div class="fr-impact-line">' + playerName + ' \u00B7 Hole ' + hole + ': '
+            + (oldVal === null ? '\u2014' : oldVal) + ' \u2192 ' + (newVal === null ? '\u2014' : newVal) + '</div>'
+            + '<div style="margin-top:6px;">' + lines.map(l => '<div class="fr-impact-line">' + l + '</div>').join('') + '</div>'
+            + (moved.length
+                ? '<div class="fr-impact-head" style="margin-top:8px;">Final money</div>'
+                  + moved.map(m => '<div class="fr-impact-line fr-impact-money">' + m + '</div>').join('')
+                : '<div class="fr-impact-line" style="margin-top:8px;">Final money: no change</div>')
+            + '</div>';
+    }
+
+    function frOpenPlayer(playerId) {
+        frDetailPlayerId = playerId;
+        renderFinishRoundDetail();
+        frSection('fr-state-review', false);
+        frSection('fr-state-detail', true);
+        frSection('fr-state-results', false);
+    }
+
+    // All 18 holes for one golfer. Hole names are written out in full - this screen
+    // exists to be read side by side with a paper card, and "H13" is not what the
+    // card says.
+    function renderFinishRoundDetail() {
+        const mount = document.getElementById('fr-detail-holes');
+        if (!mount || frDetailPlayerId === null) return;
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = currentData.scores || {};
+        const p = (currentData.players || []).find(x => String(x.id) === String(frDetailPlayerId));
+        if (!p) { mount.innerHTML = ''; return; }
+
+        const t = computePlayerRoundTotals(p, courseData, savedScores);
+        document.getElementById('fr-detail-name').textContent = p.name;
+
+        // AUTHORITY IS NOT WIDENED HERE. Review is whole-field; correcting is not.
+        // canWritePlayer() is the same gate saveScore() applies, asked once so the UI
+        // can explain itself rather than offering an input that would be refused.
+        const mayEdit = canWritePlayer(p.id);
+        const note = document.getElementById('fr-detail-note');
+        if (note) {
+            note.innerHTML = mayEdit
+                ? 'Tap a score to correct it.'
+                : '\uD83D\uDD12 Read-only. These scores can only be corrected from this group\u2019s scorekeeper link.';
+            note.className = 'fr-review-note' + (mayEdit ? '' : ' fr-review-warn');
+        }
+
+        let html = '';
+        courseData.forEach(h => {
+            const v = savedScores['p' + p.id + '_h' + h.hole];
+            const has = v && v > 0;
+            const right = mayEdit
+                ? '<input class="fr-hole-input" type="tel" inputmode="numeric" pattern="[0-9]*" value="'
+                  + (has ? v : '') + '" onchange="frCorrectScore(' + p.id + ',' + h.hole + ',this.value)">'
+                : (has ? '<span class="fr-hole-val">' + v + '</span>'
+                       : '<span class="fr-hole-missing">no score</span>');
+            html += '<div class="fr-hole-row"><span class="fr-hole-label">Hole ' + h.hole
+                 + '<span class="fr-hole-par">par ' + h.par + '</span></span>' + right + '</div>';
+        });
+
+        // Totals come from the canonical helper, never recomputed here.
+        const front = courseData.filter(h => h.hole <= 9), back = courseData.filter(h => h.hole > 9);
+        const sumOf = list => list.reduce((a, h) => {
+            const v = savedScores['p' + p.id + '_h' + h.hole];
+            return a + (v && v > 0 ? parseInt(v, 10) : 0);
+        }, 0);
+        html += '<div class="fr-sub-row"><span>OUT</span><span>' + sumOf(front) + '</span></div>';
+        html += '<div class="fr-sub-row"><span>IN</span><span>' + sumOf(back) + '</span></div>';
+        html += '<div class="fr-sub-row"><span>GROSS</span><span>'
+             + (t.complete ? t.gross : t.grossSoFar + ' so far') + '</span></div>';
+        html += '<div class="fr-sub-row"><span>NET</span><span>'
+             + (t.complete ? t.net : 'Incomplete \u2014 ' + t.holesPlayed + ' of ' + t.holesRequired + ' holes')
+             + '</span></div>';
+        mount.innerHTML = html;
+    }
+
+    // THE CORRECTION PATH. saveScore() is the app's one score-writing function; it
+    // carries the permission gate, the Firebase write, the pending-write tracking
+    // and the audit entry. Nothing is duplicated here.
+    function frCorrectScore(playerId, hole, raw) {
+        const p = (currentData.players || []).find(x => String(x.id) === String(playerId));
+        if (!p) return;
+        const key = 'p' + playerId + '_h' + hole;
+        const oldVal = (currentData.scores && currentData.scores[key] !== undefined) ? currentData.scores[key] : null;
+        const parsed = parseInt(raw, 10);
+        const newVal = (isNaN(parsed) || parsed <= 0) ? null : parsed;
+        if (oldVal === newVal) return;
+
+        // PERMISSION IS ASKED FIRST, and it is the SAME gate saveScore applies -
+        // not a copy of the rule, the function itself. A refused correction must
+        // change nothing and must report nothing, or the impact panel would describe
+        // money moving on the back of a write that never happened.
+        if (!canWritePlayer(playerId)) { renderFinishRoundDetail(); return; }
+
+        const before = frSnapshot();
+        saveScore(playerId, hole, raw);          // the one canonical write path
+
+        // saveScore writes to Firebase and lets the .on('value') listener update
+        // currentData - it deliberately does not touch the local model itself. So
+        // currentData.scores still holds the OLD value on the very next line, and
+        // reading it here would snapshot the round as though nothing had changed.
+        //
+        // The local value is therefore applied optimistically, exactly as the
+        // listener is about to. Firebase remains authoritative: when the round-trip
+        // completes the listener overwrites this with whatever actually landed, and
+        // if the write failed the value reverts. This is the same brief divergence
+        // the scorecard's own inputs already live with.
+        if (!currentData.scores) currentData.scores = {};
+        if (newVal === null) delete currentData.scores[key];
+        else currentData.scores[key] = newVal;
+
+        const after = frSnapshot();
+        renderFinishRoundDetail();
+        frRenderImpact(before, after, p.name, hole, oldVal, newVal);
     }
 
     function jumpToMissingHole(hole) {
@@ -3292,6 +3562,13 @@
             <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Stats')}">📊 Stats</a>
             <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Leaderboard')}">🏆 Leaderboard</a>
         `;
+
+        // Always opens on REVIEW. Money lives one deliberate tap away.
+        frDetailPlayerId = null;
+        frReviewCompleted = false;
+        frSection('fr-state-review', true);
+        frSection('fr-state-detail', false);
+        frSection('fr-state-results', false);
 
         document.getElementById('finish-round-modal-overlay').style.display = 'flex';
     }
