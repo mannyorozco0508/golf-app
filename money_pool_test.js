@@ -55,14 +55,30 @@ function assertZeroSum(r, label) {
     assert.equal(centsSum(r), 0, `${label}: pool must net to zero CENTS, got ${centsSum(r)}`);
 }
 // Reconciliation: buy-ins fully redistributed across prizes+refunds.
+// THE INVARIANT THAT ALWAYS HOLDS: no money disappears.
+//
+//     prizes + refunds + unresolved === the pot
+//
+// Zero-sum is a CONSEQUENCE of that, and only once every dollar has been handed
+// out. While KP money is unresolved the ledger deliberately sums to -unresolved:
+// the buy-ins were charged and that share has not been distributed. Forcing it to
+// zero is exactly the bug Wave B removed - it is what turned $100 of unentered KP
+// into $8 and $9 refund lines on a receipt that called itself final.
 function assertReconciled(r, label) {
     const prizes =
-        (r.kp ? r.kp.lines.reduce((a, l) => a + (l.winnerId ? l.cents : 0), 0) : 0) +
+        (r.kp ? r.kp.lines.reduce((a, l) => a + (l.state === 'paid' ? l.cents : 0), 0) : 0) +
         (r.net ? r.net.lines.reduce((a, l) => a + l.cents, 0) : 0) +
         (r.skins ? r.skins.lines.reduce((a, l) => a + l.cents, 0) : 0);
-    assert.equal(prizes + r.refund.cents, r.totalPoolCents,
-        `${label}: prizes ${prizes} + refunds ${r.refund.cents} must equal the pot ${r.totalPoolCents}`);
-    assertZeroSum(r, label);
+    const unresolved = r.kpUnresolvedCents || 0;
+    assert.equal(prizes + r.refund.cents + unresolved, r.totalPoolCents,
+        `${label}: prizes ${prizes} + refunds ${r.refund.cents} + unresolved ${unresolved} `
+        + `must equal the pot ${r.totalPoolCents}`);
+    if (unresolved === 0) {
+        assertZeroSum(r, label);
+    } else {
+        assert.equal(centsSum(r), -unresolved,
+            `${label}: the ledger must be short by exactly the unresolved amount`);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +139,7 @@ describe('THE MARTY ACCEPTANCE — 12 × $40, KP $100×2, Net $100 top-3, skins 
     const SC = ladderScores(P);
     const d = () => ({
         players: P,
-        kpWinners: { h4: String(P[0].id), h14: String(P[2].id) },   // Marty, John
+        kpWinners: { h4: String(P[0].id), h14: String(P[2].id) }, kpConfirmed: { confirmed: true },   // Marty, John
         moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [4, 14] },
             net: { amount: 100, places: [50, 30, 20] },
@@ -185,6 +201,8 @@ describe('KP — splits, ties rule, unclaimed money', () => {
     const P = makeField(12);
     const SC = ladderScores(P);
     const mk = (holes, winners) => ({ players: P, kpWinners: winners || {},
+        // These fixtures describe finished rounds, so their KPs are confirmed.
+        kpConfirmed: { confirmed: true },
         moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes },
             skins: { mode: 'remainder', scoring: 'net' } } });
@@ -211,7 +229,12 @@ describe('KP — splits, ties rule, unclaimed money', () => {
     });
 
     test('an unclaimed KP refunds the field equally — no vanished money', () => {
-        const r = pool(mk([4, 14], { h4: String(P[0].id) }), SC);   // h14 never won
+        // A refund now requires the organizer to have SAID nobody won it. A blank
+        // hole is unresolved, not free money - which is the whole point of Wave B.
+        const dUn = mk([4, 14], { h4: String(P[0].id) });
+        dUn.kpConfirmed = { confirmed: true };
+        dUn.kpNoWinner = { h14: true };
+        const r = pool(dUn, SC);
         assert.equal(r.kp.unclaimedCents, 5000);
         assert.equal(r.refund.cents, 5000);
         const shares = Object.values(r.refund.perPlayerCents);
@@ -222,6 +245,7 @@ describe('KP — splits, ties rule, unclaimed money', () => {
 
     test('a NON-PARTICIPANT KP winner cannot take pool money', () => {
         const d = mk([4], { h4: String(P[11].id) });
+        d.kpConfirmed = { confirmed: true };
         d.moneyPool.participantIds = P.slice(0, 8).map(p => String(p.id));   // Paul excluded
         const r = pool(d, SC);
         assert.equal(r.kp.lines[0].winnerId, null, 'his shot counts; the pool money refunds');
@@ -468,7 +492,7 @@ describe('PARTICIPANTS, LOCK, LEGACY', () => {
 
     test('the pool coexists with Group Action — separate money, one ledger', () => {
         const d = { players: P, gameFormat: 'stroke',
-            kpWinners: { h4: String(P[0].id) },
+            kpWinners: { h4: String(P[0].id) }, kpConfirmed: { confirmed: true },
             moneyPool: { enabled: true, buyIn: 40,
                 kp: { amount: 100, holes: [4] },
                 skins: { mode: 'remainder', scoring: 'net' } },
@@ -491,13 +515,21 @@ describe('20 POOL SIMULATIONS', () => {
         const P = makeField(nPlayers, hcps);
         const scores = scoreFn ? scoreFn(P) : ladderScores(P);
         const d = { players: P, kpWinners: winners || {},
+            kpConfirmed: { confirmed: true },      // a completed simulation
             moneyPool: Object.assign({ enabled: true, buyIn }, mp) };
         const r = pool(d, scores);
         assert.equal(r.valid, true, label + ': ' + (r.errors || []).join('|'));
         assertReconciled(r, label);
+        // Same rule as assertReconciled: the combined ledger balances to zero only
+        // once every dollar is distributed. A simulation whose KP holes are blank
+        // leaves that money deliberately unresolved, and the ledger is short by
+        // exactly that much - which is the honest state, not a leak.
         const c = combined(d, scores);
         const t = Object.values(c.exact).reduce((a, p) => a + p.net, 0);
-        assert.ok(Math.abs(t) < 0.01, label + ': combined ledger $0');
+        const unresolved = (r.kpUnresolvedCents || 0) / 100;
+        assert.ok(Math.abs(t + unresolved) < 0.01,
+            label + ': combined ledger must be short by exactly the unresolved KP ($'
+            + unresolved + '), got $' + t);
         return { r, c, P };
     };
     const id = (P, i) => String(P[i].id);
@@ -541,10 +573,15 @@ describe('20 POOL SIMULATIONS', () => {
     sim('16 players, $25', () => quick(16, 25, { kp: { amount: 80, holes: [4, 14] },
         skins: { mode: 'remainder', scoring: 'net' } }));
     sim('smallest pool: 2 golfers', () => quick(2, 40, { skins: { mode: 'remainder', scoring: 'net' } }));
-    sim('unclaimed KP mid-round refund', () => {
+    sim('a blank KP hole is UNRESOLVED, not a refund', () => {
+        // This used to assert the opposite - that an unentered KP hole refunded to
+        // the field. That is precisely the behaviour that turned $100 of KP nobody
+        // had typed in into $8 and $9 lines on a receipt calling itself final.
         const { r } = quick(12, 40, { kp: { amount: 100, holes: [4, 14] },
             skins: { mode: 'remainder', scoring: 'net' } }, { h4: String(makeField(12)[0].id) });
-        assert.equal(r.refund.cents >= 5000, true);
+        assert.equal(r.kpUnresolvedCents, 5000, 'hole 14 is unresolved, not given away');
+        assert.equal(r.settled, false);
+        assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')));
     });
     sim('mid-round: only 6 holes scored, still zero-sum', () => quick(12, 40,
         { net: { amount: 100, places: [50, 30, 20] }, skins: { mode: 'remainder', scoring: 'net' } }, {},
@@ -571,7 +608,7 @@ describe('20 POOL SIMULATIONS', () => {
     sim('3 groups + group action + pool in one combined ledger', () => {
         const P = makeField(12);
         const d = { players: P, gameFormat: 'stroke',
-            kpWinners: { h4: id(P, 0) },
+            kpWinners: { h4: id(P, 0) }, kpConfirmed: { confirmed: true },
             moneyPool: { enabled: true, buyIn: 40, kp: { amount: 100, holes: [4] },
                 net: { amount: 100, places: [50, 30, 20] }, skins: { mode: 'remainder', scoring: 'net' } },
             additionalGameInstances: { d1: { format: 'dots', enabled: true, dotPointVal: 5,
@@ -622,7 +659,10 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
     const P = makeField(12);
     const SC = ladderScores(P);
     const ROUND = () => ({ players: P, courseData: CD, gameFormat: 'stroke', scores: SC,
-        kpWinners: { h4: String(P[0].id) },
+        kpWinners: { h4: String(P[0].id) }, kpConfirmed: { confirmed: true },
+        // Hole 14 refunds because the organizer SAID nobody won it. A blank hole is
+        // unresolved instead - silence is not a decision.
+        kpNoWinner: { h14: true },
         moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [4, 14] },
             net: { amount: 100, places: [50, 30, 20] },
@@ -700,7 +740,9 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         const html = sb.document.getElementById('money-pool-section').innerHTML;
         assert.match(html, /Money Pool \u2014 \$480 \(12 \u00D7 \$40\)/);
         assert.match(html, /Hole 4: Marty/);
-        assert.match(html, /Hole 14: unclaimed/);
+        // "unclaimed" implied a decision nobody made. A confirmed round with an
+        // explicit no-winner reads "no winner"; an unresolved one reads "pending".
+        assert.match(html, /Hole 14: no winner/);
         assert.match(html, /1st: Marty[\s\S]*\$50/);
         assert.match(html, /Skins Pot \u2014 \$280/);
         assert.match(html, /Refunded to the field/);
@@ -739,7 +781,7 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
         CD.forEach(h => { s[`p${p.id}_h${h.hole}`] = h.par + (i % 7); })); return s; })();
     const ROUND28 = () => JSON.parse(JSON.stringify({
         players: P28, courseData: CD, gameFormat: 'stroke', scores: SC28,
-        kpWinners: { h4: String(P28[9].id), h8: String(P28[17].id) },   // groups 3 and 5 claimed
+        kpWinners: { h4: String(P28[9].id), h8: String(P28[17].id) }, kpConfirmed: { confirmed: true },   // groups 3 and 5 claimed
         moneyPool: { enabled: true, buyIn: 20,
             kp: { amount: 90, holes: [4, 8, 14] },
             net: { amount: 150, places: [40, 30, 20, 10] },
@@ -765,7 +807,9 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
         assertReconciled(r, '28-player');
         const c = combined(d, SC28);
         const t = Object.values(c.exact).reduce((a, p) => a + p.net, 0);
-        assert.ok(Math.abs(t) < 0.01, 'combined ledger $0 at 28');
+        const unresolved28 = (r.kpUnresolvedCents || 0) / 100;
+        assert.ok(Math.abs(t + unresolved28) < 0.01,
+            'combined ledger at 28 must be short by exactly the unresolved KP');
         const owed = Object.values(c.exact).filter(p => p.net > 0).reduce((a, p) => a + p.net, 0);
         const paid = c.transactions.reduce((a, t2) => a + t2.amount, 0);
         assert.ok(Math.abs(Math.round(owed) - paid) <= 1, 'Who Pays Who reconstructs at 28');
