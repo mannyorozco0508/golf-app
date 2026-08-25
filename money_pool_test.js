@@ -738,7 +738,10 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Money Pool \u2014 \$480 \(12 \u00D7 \$40\)/);
+        assert.match(html, /Money Pool \u2014 \$480/);
+        // The per-head buy-in arithmetic was removed: the pot total is useful, what
+        // each golfer paid in is not something the Receipt needs to state.
+        assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');
         assert.match(html, /Hole 4: Marty/);
         // "unclaimed" implied a decision nobody made. A confirmed round with an
         // explicit no-winner reads "no winner"; an unresolved one reads "pending".
