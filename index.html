@@ -3443,6 +3443,8 @@
                     ? '<div class="fr-gate-ok">\u2713 Scores verified</div>'
                     : '<div class="fr-gate-warn">\u26A0\uFE0F Scores not verified</div>');
                 const rk = frKpPool();
+                // A cancelled game has no rk.kp, so no KP row appears - there is
+                // nothing outstanding to report.
                 if (rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
                     rows.push(kpOpen
                         ? '<div class="fr-gate-warn">\u26A0\uFE0F KP winners not confirmed \u2014 $'
@@ -3776,7 +3778,20 @@
         const mount = document.getElementById('fr-kp-block');
         if (!mount) return;
         const r = frKpPool();
-        if (!r || !r.valid || !r.kp || r.kp.amountCents <= 0) { mount.innerHTML = ''; return; }
+        if (!r || !r.valid) { mount.innerHTML = ''; return; }
+
+        // CANCELLED IS A FINISHED DECISION. No pending warning, no confirm button,
+        // no "nobody won it" - the organizer removed the game and the money is
+        // already skins money. Showing any of the unresolved furniture here would
+        // suggest there is still something to do.
+        if (r.kpCancelled && r.kpCancelled.cancelled) {
+            const orig = r.kpCancelled.originalCents;
+            mount.innerHTML = '<div class="fr-money-title">KP Results</div>'
+                + '<div class="fr-review-note">KPs cancelled for this round \u00B7 '
+                + '$' + (orig / 100).toFixed(0) + ' moved into the skins pool.</div>';
+            return;
+        }
+        if (!r.kp || r.kp.amountCents <= 0) { mount.innerHTML = ''; return; }
 
         const $ = c => '$' + (c / 100).toFixed(0);
         const leaders = currentData.kpLeaders || {};
@@ -3824,6 +3839,9 @@
             });
             html += '<button class="btn-primary" style="margin-top:10px;" onclick="frConfirmKp()">'
                  + '\u2713 Confirm KP Winners</button>';
+            // Deliberately secondary. Cancelling the game is unusual and irreversible
+            // in effect, so it must not sit next to the everyday action as a peer.
+            html += '<button class="fr-secondary-btn" onclick="frCancelKps()">Cancel KPs for this round</button>';
         } else if (!isOrg && unresolved > 0) {
             html += '<div class="fr-review-note fr-review-warn">\uD83D\uDD12 Only the organizer link can confirm KP results.</div>';
         }
@@ -3877,6 +3895,49 @@
                 alert('\u2705 KP WINNERS CONFIRMED');
             })
             .catch(err => alert('\u26A0\uFE0F KP NOT CONFIRMED\n' + (err && err.message)));
+    }
+
+    // ---- CANCEL THE KP GAME -------------------------------------------------
+    //
+    // REFUSED ON A FIXED-SKINS ROUND. With skins on 'remainder' the freed money is
+    // absorbed by the calculation that was always there. With a FIXED skins amount
+    // there is no rule for where it should go - the engine's own validator says so:
+    // "$100 of the pot is unallocated". Inventing a destination here would be a
+    // second allocation algorithm, so the organizer is told to fix the setup instead.
+    //
+    // ONE WRITE. kpCancelled alone is authoritative - the engine treats a cancelled
+    // game as having no KP bucket at all - so there is no second field to fall out of
+    // step and no half-cancelled state to recover from.
+    function frCancelKps() {
+        if (!hasOrganizerAuthority()) return;
+        const r = frKpPool();
+        if (!r || !r.kp || r.kp.amountCents <= 0) return;
+
+        const skinsMode = (currentData.moneyPool && currentData.moneyPool.skins
+            && currentData.moneyPool.skins.mode) || 'none';
+        if (skinsMode !== 'remainder') {
+            alert('\u26A0\uFE0F CAN\u2019T CANCEL KPs\n\nThis round uses a fixed skins amount, so there is '
+                + 'nowhere for the KP money to go. Adjust the Money Pool setup first.');
+            return;
+        }
+
+        const amt = '$' + (r.kp.amountCents / 100).toFixed(0);
+        if (!confirm('Cancel all KPs for this round?\n\nThe ' + amt + ' KP allocation moves into the '
+            + 'skins pool.\n\nExisting KP leaders will no longer receive KP money.')) return;
+        if (!requireOnlineForMoney('KPs NOT CANCELLED', 'Reconnect before cancelling the KPs.')) return;
+
+        const payload = { cancelled: true, cancelledAt: Date.now(), cancelledBy: 'organizer' };
+        db.ref('events/' + currentMode + '/kpCancelled').set(payload)
+            .then(() => {
+                // Local state only after the write lands. kpLeaders and kpWinners are
+                // deliberately left alone - they are what happened on the course, and
+                // settlement already ignores them once cancelled.
+                currentData.kpCancelled = payload;
+                renderFinishRoundKp();
+                renderFinishRoundMoney();
+                alert('\u2705 KPs CANCELLED\n' + amt + ' moved into the skins pool.');
+            })
+            .catch(err => alert('\u26A0\uFE0F KPs NOT CANCELLED\n' + (err && err.message)));
     }
 
     function frOpenPlayer(playerId) {
