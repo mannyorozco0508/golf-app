@@ -174,8 +174,13 @@ describe('WHOLE DOLLARS — through the real settlement path', () => {
         assert.ok(!/roundNetTotalsToWholeDollars/.test(fn),
             'the wager engines must keep full precision');
         const combiner = se.slice(se.indexOf('function computeCombinedNetTotals'), se.length);
-        assert.ok(/roundNetTotalsToWholeDollars\(netByName\)/.test(combiner));
-        assert.ok(combiner.indexOf('roundNetTotalsToWholeDollars(netByName)') < combiner.indexOf('simplifyDebts(netTotals)'),
+        // The call now carries a second argument - the total the rounded ledger must
+        // sum to, which is 0 on a settled round and -unresolved while KP money is
+        // being withheld. The rule this test protects is unchanged: rounding happens
+        // once, on the combined balances, before Who Pays Who reads them.
+        assert.ok(/roundNetTotalsToWholeDollars\(netByName,/.test(combiner),
+            'the combiner must still be the single rounding site');
+        assert.ok(combiner.indexOf('roundNetTotalsToWholeDollars(netByName,') < combiner.indexOf('simplifyDebts(netTotals)'),
             'Who Pays Who must run from the rounded balances');
     });
 
