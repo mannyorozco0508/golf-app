@@ -67,7 +67,9 @@ function boot({ link = 'group', group = 1, token = TOKEN, legacy = false, online
     const gm = {}; ps.forEach((p,i) => { gm[String(p.id)] = Math.floor(i/4)+1; });
 
     const data = { players: ps, courseData: cd, scores: sc, gameFormat: 'stroke',
-                   settlementMode: 'whole-dollar', kpWinners: {},
+                   settlementMode: 'whole-dollar', kpWinners: {}, kpConfirmed: { confirmed: true },
+        // Not a KP test: every hole is decided so no money is left unresolved.
+        kpNoWinner: { h3:true, h7:true, h12:true, h16:true },
                    moneyPool: { enabled:true, buyIn:40,
                        kp:{amount:100,holes:[3,7,12,16]},
                        net:{amount:70,places:[57.142857,42.857143]},
