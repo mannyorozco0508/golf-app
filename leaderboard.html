@@ -653,28 +653,13 @@
         renderLiveSkinsBoard();
 
         if (activeView === "individual") {
-            let results = players.map(p => {
-                let net = 0, gross = 0, thru = 0, parPlayed = 0;
-                courseData.forEach(h => {
-                    let v = savedScores[`p${p.id}_h${h.hole}`];
-                    if (v && v > 0) {
-                        let score = parseInt(v, 10);
-                        let holePar = parseInt(h.par, 10);
-                        gross += score;
-                        net += (score - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
-                        parPlayed += holePar;
-                        thru++;
-                    }
-                });
-
-                let toParGross = gross - parPlayed;
-                let toParNet = net - parPlayed;
-
-                let toParDisplay = activeScoring === 'net' ? toParNet : toParGross;
-                let sortVal = activeScoring === 'net' ? toParNet : toParGross;
-
-                return { name: p.name, hcp: p.hcp, net: net, gross: gross, thru: thru, toPar: toParDisplay, sortVal: sortVal };
-            });
+            // LIFTED, NOT COPIED. This accumulation now lives in money-engine.js as
+            // computeNetToParStandings() so the scorecard's live ticker can call the
+            // very same function. Two surfaces showing the same round must not be able
+            // to disagree about who is leading, and the only way to guarantee that is
+            // for there to be one implementation.
+            let results = computeNetToParStandings(players, courseData, savedScores,
+                { basis: activeScoring === 'net' ? 'net' : 'gross' });
 
             const boundaries = computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {});
             const groupToggle = document.getElementById('group-view-toggle');
