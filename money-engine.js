@@ -595,3 +595,77 @@ function simplifyDebts(netByName) {
     }
     return transactions;
 }
+
+// ============================================================================
+// NET-TO-PAR STANDINGS — the one ranking every live surface reads
+//
+// This lived inside leaderboard.html's renderBoard(), computed and rendered in a
+// single pass, so nothing else could reach it. The scorecard needs the same
+// answer, and a golfer must never be able to open the Leaderboard and the
+// scorecard ticker on the same round and see two different orders.
+//
+// So it is lifted out verbatim - the same accumulation, the same
+// getStrokes/parseHcp pair, the same toPar arithmetic - and both surfaces now
+// call it. Extracting rather than copying is the point: a third copy is exactly
+// how the two screens would drift.
+//
+// RELATIVE TO PAR, NOT A CUMULATIVE TOTAL. "Net 19" means nothing at a glance
+// after five holes; "-2" means everything. parPlayed only counts holes actually
+// posted, so a golfer thru 5 is measured against 5 holes of par, not 18.
+//
+// TIES SHARE A POSITION AND CONSUME THE SLOTS BENEATH. Two golfers tied at the
+// top are both T1 and the next is 3rd - never 1st, 2nd, 3rd as if the tie had
+// been broken by nothing.
+function computeNetToParStandings(players, courseData, savedScores, opts) {
+    const options = opts || {};
+    const basis = options.basis === 'gross' ? 'gross' : 'net';
+    const rows = (players || []).map(p => {
+        let net = 0, gross = 0, thru = 0, parPlayed = 0;
+        (courseData || []).forEach(h => {
+            const v = savedScores ? savedScores['p' + p.id + '_h' + h.hole] : null;
+            if (v && v > 0) {
+                const score = parseInt(v, 10);
+                gross += score;
+                net += (score - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
+                parPlayed += parseInt(h.par, 10);
+                thru++;
+            }
+        });
+        const toParGross = gross - parPlayed;
+        const toParNet = net - parPlayed;
+        return {
+            id: p.id, name: p.name, hcp: p.hcp,
+            gross, net, thru,
+            toParGross, toParNet,
+            toPar: basis === 'net' ? toParNet : toParGross,
+            sortVal: basis === 'net' ? toParNet : toParGross,
+            started: thru > 0,
+        };
+    });
+
+    // Golfers who have not teed off sort last regardless of basis - a score of
+    // zero is not level par, it is an absence of information.
+    rows.sort((a, b) => {
+        if (a.started !== b.started) return a.started ? -1 : 1;
+        if (a.sortVal !== b.sortVal) return a.sortVal - b.sortVal;
+        return String(a.name).localeCompare(String(b.name));
+    });
+
+    let lastVal = null, lastPos = 0;
+    rows.forEach((r, i) => {
+        if (!r.started) { r.position = null; r.positionLabel = '\u2014'; return; }
+        if (lastVal === null || r.sortVal !== lastVal) { lastPos = i + 1; lastVal = r.sortVal; }
+        r.position = lastPos;
+        const tied = rows.filter(x => x.started && x.sortVal === r.sortVal).length > 1;
+        r.positionLabel = (tied ? 'T' : '') + lastPos;
+    });
+    return rows;
+}
+
+// "E" for level, an explicit sign otherwise. Golfers read a scoreboard, not a
+// number line.
+function formatToPar(v) {
+    const n = Number(v) || 0;
+    if (n === 0) return 'E';
+    return (n > 0 ? '+' : '') + n;
+}
