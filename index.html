@@ -840,6 +840,41 @@
         .history-undo-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--brand-green); border-radius: 6px; font-size: 0.75rem; font-weight: bold; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
 
         /* Modal Styles */
+        /* LIVE TICKER. One row, horizontally scrollable, so five names can never
+           introduce horizontal scrolling on the page itself or push score entry down. */
+        .live-ticker { display: flex; align-items: center; gap: 8px; margin: 6px 0 8px 0; }
+        .lt-scroll { display: flex; gap: 10px; overflow-x: auto; flex: 1; scrollbar-width: none; padding-bottom: 2px; }
+        .lt-scroll::-webkit-scrollbar { display: none; }
+        .lt-item { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; font-size: 0.78rem; }
+        .lt-pos { color: var(--text-muted); font-weight: bold; font-size: 0.68rem; }
+        .lt-name { font-weight: 600; }
+        .lt-par { font-weight: bold; color: var(--brand-green); }
+        .lt-more { flex-shrink: 0; background: none; border: none; color: var(--brand-green); font-size: 0.72rem; font-weight: bold; padding: 4px 2px; cursor: pointer; white-space: nowrap; }
+
+        /* FULL FIELD OVERLAY */
+        .lb-overlay-box { width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; background: var(--modal-bg); border-radius: 14px; overflow: hidden; }
+        .lb-overlay-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-weight: bold; color: var(--brand-green); border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+        .lb-overlay-close { background: none; border: none; font-size: 1.6rem; line-height: 1; color: var(--text-muted); padding: 0 4px; cursor: pointer; min-width: 44px; min-height: 44px; }
+        .lb-overlay-body { overflow-y: auto; padding: 8px 12px 16px 12px; -webkit-overflow-scrolling: touch; }
+        .lb-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border-faint); }
+        .lb-head { font-size: 0.62rem; letter-spacing: 0.04em; color: var(--text-muted); font-weight: bold; }
+        .lb-c-pos { width: 34px; flex-shrink: 0; font-weight: bold; font-size: 0.8rem; }
+        .lb-c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.85rem; }
+        .lb-hcp { display: block; font-size: 0.66rem; color: var(--text-muted); font-weight: normal; }
+        .lb-c-score { width: 58px; flex-shrink: 0; text-align: right; line-height: 1.15; }
+        .lb-gross { display: block; font-weight: bold; font-size: 0.9rem; }
+        .lb-net { display: block; font-size: 0.72rem; color: var(--text-secondary, #4a5568); font-weight: 600; }
+        .lb-c-par { width: 44px; flex-shrink: 0; text-align: right; font-weight: bold; font-size: 0.85rem; }
+        .lb-c-thru { width: 34px; flex-shrink: 0; text-align: right; font-size: 0.78rem; color: var(--text-muted); }
+
+        /* SKINS WON - winners only, never an audit trail. */
+        .sw-head { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.04em; color: var(--brand-green); margin-top: 14px; }
+        .sw-thru { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px; }
+        .sw-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
+        .sw-name { font-weight: 600; font-size: 0.85rem; }
+        .sw-detail { font-size: 0.76rem; color: var(--text-secondary, #4a5568); }
+        .sw-none { font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; padding: 12px; }
         .modal-content { background: var(--modal-bg); border-radius: 12px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; color: var(--text-main); }
         .modal-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -1031,6 +1066,18 @@
             <button class="close-modal" onclick="closeHistoryModal()">&times;</button>
         </div>
         <div id="history-list-container"></div>
+    </div>
+</div>
+
+<!-- FULL FIELD, WITHOUT LEAVING SCORE ENTRY. Navigating to leaderboard.html mid-hole
+     loses whatever is half-typed; an overlay keeps the scorecard mounted underneath. -->
+<div class="modal-overlay" id="live-board-overlay">
+    <div class="modal-box lb-overlay-box">
+        <div class="lb-overlay-head">
+            <span>\uD83C\uDFC6 Leaderboard</span>
+            <button class="lb-overlay-close" onclick="closeLiveBoard()" aria-label="Close leaderboard">\u00D7</button>
+        </div>
+        <div id="live-board-body" class="lb-overlay-body"></div>
     </div>
 </div>
 
@@ -1533,6 +1580,10 @@
         const hcp = cells[2] ? cells[2].textContent.trim() : '';
 
         let html = `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
+        // ONE LINE, ABOVE THE SCORE BOXES. A golfer standing on the tee wants to know
+        // where they stand without leaving the screen they are already using. One row
+        // costs almost no vertical space; a card would push score entry down the page.
+        html += '<div id="live-ticker-mount"></div>';
 
         // DOTS / JUNK on the hole a golfer is actually standing on.
         //
@@ -1616,6 +1667,11 @@
         renderWhoAmI();
         renderHoleRecap();
         renderLiveSkins();
+        renderLiveTicker();
+        if (document.getElementById('live-board-overlay')
+            && document.getElementById('live-board-overlay').style.display === 'flex') {
+            renderLiveBoard();   // keep the overlay live while it is open
+        }
         renderActionCenter();
         renderBetStrip();
     }
@@ -1642,6 +1698,144 @@
     function liveSkinsGroupOf(playerId) {
         const map = window.__scPlayerGroupMap || {};
         return map[String(playerId)] !== undefined ? map[String(playerId)] : null;
+    }
+
+    // ---- LIVE LEADER TICKER + FULL BOARD OVERLAY ----------------------------
+    //
+    // ONE RANKING FOR THE WHOLE APP. computeNetToParStandings() in money-engine.js
+    // is the same function leaderboard.html calls. A golfer must never be able to
+    // open the Leaderboard tab and this ticker on the same round and see two
+    // different orders, and the only way to guarantee that is to share the code
+    // rather than reimplement it.
+    //
+    // ALWAYS NET HERE. The Leaderboard has a ranking toggle; the scorecard ticker
+    // does not, because "who is leading" during a money round means net. The
+    // toggle over there must not change what this line means.
+    function liveStandings() {
+        if (typeof computeNetToParStandings !== 'function') return [];
+        const players = (currentData && currentData.players) || [];
+        const courseData = (currentData && currentData.courseData) || [];
+        const savedScores = (currentData && currentData.scores) || {};
+        if (players.length === 0 || courseData.length === 0) return [];
+        return computeNetToParStandings(players, courseData, savedScores, { basis: 'net' });
+    }
+
+    function renderLiveTicker() {
+        const mount = document.getElementById('live-ticker-mount');
+        if (!mount) return;
+        mount.innerHTML = '';
+        const rows = liveStandings().filter(r => r.started);
+        if (rows.length === 0) return;
+
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        // TOP 5, and a scrollable row rather than a wrap: five names must never
+        // introduce horizontal scrolling on the page itself.
+        const top = rows.slice(0, 5).map(r =>
+            '<span class="lt-item"><span class="lt-pos">' + r.positionLabel + '</span>'
+            + '<span class="lt-name">' + esc(r.name) + '</span>'
+            + '<span class="lt-par">' + formatToPar(r.toPar) + '</span></span>').join('');
+
+        mount.innerHTML = '<div class="live-ticker">'
+            + '<div class="lt-scroll">' + top + '</div>'
+            + '<button type="button" class="lt-more" onclick="openLiveBoard()">Full Leaderboard \u203A</button>'
+            + '</div>';
+    }
+
+    function openLiveBoard() {
+        renderLiveBoard();
+        const el = document.getElementById('live-board-overlay');
+        if (el) el.style.display = 'flex';
+    }
+    function closeLiveBoard() {
+        const el = document.getElementById('live-board-overlay');
+        if (el) el.style.display = 'none';
+    }
+
+    // The whole field, plus who has actually won a skin. Reads canonical results
+    // and formats them; it resolves nothing.
+    function renderLiveBoard() {
+        const body = document.getElementById('live-board-body');
+        if (!body) return;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const rows = liveStandings();
+
+        let html = '<div class="lb-row lb-head"><span class="lb-c-pos">POS</span>'
+            + '<span class="lb-c-name">PLAYER</span><span class="lb-c-score">SCORE</span>'
+            + '<span class="lb-c-par">TO PAR</span><span class="lb-c-thru">THRU</span></div>';
+
+        rows.forEach(r => {
+            // Gross over net, the same stacked shape the Leaderboard uses, so the two
+            // surfaces read identically rather than merely agreeing numerically.
+            const score = r.started
+                ? '<span class="lb-gross">' + r.gross + '</span><span class="lb-net">Net ' + r.net + '</span>'
+                : '<span class="lb-net">\u2014</span>';
+            html += '<div class="lb-row">'
+                 + '<span class="lb-c-pos">' + r.positionLabel + '</span>'
+                 + '<span class="lb-c-name">' + esc(r.name) + '<span class="lb-hcp">HCP ' + esc(r.hcp) + '</span></span>'
+                 + '<span class="lb-c-score">' + score + '</span>'
+                 + '<span class="lb-c-par">' + (r.started ? formatToPar(r.toPar) : '\u2014') + '</span>'
+                 + '<span class="lb-c-thru">' + r.thru + '</span>'
+                 + '</div>';
+        });
+
+        html += renderSkinsWonHtml();
+        body.innerHTML = html;
+    }
+
+    // WINNERS ONLY. Not an audit trail: a tied hole produced no skin, so it does not
+    // belong in a list of skins won, and a golfer with none is not news. Holes that
+    // are not yet official across every group are simply absent - the canonical
+    // ledger decides that, never this function.
+    function renderSkinsWonHtml() {
+        if (typeof computeSkinsHoleLedger !== 'function') return '';
+        const data = currentData || {};
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        if (courseData.length === 0) return '';
+
+        const skinsOn = (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        if (!skinsOn) return '';
+
+        let bundle;
+        try {
+            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
+        } catch (e) { return ''; }
+        const L = bundle.net || bundle.gross;
+        if (!L || L.participants.length === 0) return '';
+
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const thru = L.officialThru > 0
+            ? 'Official through Hole ' + L.officialThru
+            : 'No holes official yet';
+
+        // Winning holes per golfer, taken straight from the ledger's own verdicts.
+        const byPlayer = {};
+        L.holes.forEach(r => {
+            if (!r.official || r.state === 'tie' || !r.winner) return;
+            const k = String(r.winner.id);
+            if (!byPlayer[k]) byPlayer[k] = { name: r.winner.name, holes: [] };
+            byPlayer[k].holes.push(r.hole);
+        });
+
+        const winners = Object.values(byPlayer)
+            .sort((a, b) => b.holes.length - a.holes.length
+                || a.holes[0] - b.holes[0]
+                || String(a.name).localeCompare(String(b.name)));
+
+        let html = '<div class="sw-head">\uD83E\uDD69 SKINS WON</div>'
+                 + '<div class="sw-thru">' + thru + '</div>';
+        if (winners.length === 0) {
+            return html + '<div class="sw-none">No official skins yet.</div>';
+        }
+        html += winners.map(w => {
+            const n = w.holes.length;
+            return '<div class="sw-row"><span class="sw-name">' + esc(w.name) + '</span>'
+                 + '<span class="sw-detail">' + n + (n === 1 ? ' skin \u00B7 Hole ' : ' skins \u00B7 Holes ')
+                 + w.holes.join(', ') + '</span></div>';
+        }).join('');
+        return html;
     }
 
     function renderLiveSkins() {
