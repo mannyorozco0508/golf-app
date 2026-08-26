@@ -109,6 +109,18 @@
            closing is handled by a real listener in JS instead, which can actually close
            the menu rather than merely block it. */
 
+        .live-head { border-color: var(--brand-green) !important; }
+        .live-note { font-size: 0.74rem; color: var(--text-muted); text-align: center; }
+        .lr-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border-faint); }
+        .lr-pos { width: 34px; flex-shrink: 0; font-size: 0.72rem; font-weight: bold; color: var(--text-muted); }
+        .lr-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lr-par { font-weight: bold; font-size: 1rem; color: var(--brand-green); }
+        .lr-count { font-size: 0.78rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
+        .lr-holes { font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; }
+        .lr-more { display: block; text-align: center; margin-top: 8px; padding: 10px; font-size: 0.8rem; font-weight: bold; color: var(--brand-green); text-decoration: none; }
+        .lr-none { font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+        .lr-foot { font-size: 0.68rem; color: var(--text-muted); margin-top: 6px; }
+        .lr-kp { font-size: 0.85rem; }
         .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
         .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         
@@ -1117,11 +1129,174 @@
         return html + `</div>`;
     }
 
+    // ---- LIVE RESULTS -------------------------------------------------------
+    //
+    // A GOLF SUMMARY, NOT A RECEIPT. Three questions and nothing else: who is
+    // leading, who has won skins, what is still outstanding. Every dollar figure is
+    // deliberately absent - the number of winning skins can still change, so any
+    // amount shown now is a guess that gets contradicted later.
+    //
+    // NO NEW MATH. Standings come from computeNetToParStandings() in money-engine.js,
+    // the same function the scorecard ticker and the Leaderboard tab call, so all
+    // three surfaces rank identically. Skins come from computeSkinsHoleLedger(). KP
+    // status is read off the pool result.
+    function liveGroupOf(data, playerId) {
+        const players = data.players || [];
+        const idx = players.findIndex(p => String(p.id) === String(playerId));
+        if (idx < 0) return null;
+        return Math.floor(idx / 4) + 1;
+    }
+
+    function buildLiveResultsHtml(data, courseData, savedScores) {
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let L = null;
+        const mpSkins = data.moneyPool && data.moneyPool.enabled && data.moneyPool.skins;
+        const skinsOn = (mpSkins && mpSkins.mode && mpSkins.mode !== 'none')
+            || (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        if (skinsOn && typeof computeSkinsHoleLedger === 'function') {
+            try {
+                const bundle = computeSkinsHoleLedger(data, courseData, savedScores,
+                    { groupOf: id => liveGroupOf(data, id) });
+                const cand = bundle.net || bundle.gross;
+                if (cand && cand.participants.length > 0) L = cand;
+            } catch (e) { L = null; }
+        }
+
+        // THRU is the OFFICIAL point across every group, never whichever hole this
+        // device happens to be looking at.
+        let thru = 0;
+        if (L && L.officialThru > 0) {
+            thru = L.officialThru;
+        } else if (typeof computePlayerRoundTotals === 'function') {
+            const played = (data.players || []).map(p => {
+                try { return computePlayerRoundTotals(p, courseData, savedScores).holesPlayed; }
+                catch (e) { return 0; }
+            });
+            thru = played.length ? Math.min.apply(null, played) : 0;
+        }
+
+        let html = '<div class="settle-card live-head">'
+            + '<div class="settle-header">\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '') + '</div>'
+            + '<div class="live-note">The round is still in play. Final money appears once every card is in.</div>'
+            + '</div>';
+
+        if (typeof computeNetToParStandings === 'function') {
+            const rows = computeNetToParStandings(data.players || [], courseData, savedScores,
+                { basis: 'net' }).filter(r => r.started);
+            if (rows.length > 0) {
+                html += '<div class="settle-card"><div class="settle-header">OVERALL \u2014 NET</div>';
+                rows.slice(0, 5).forEach(r => {
+                    html += '<div class="lr-row"><span class="lr-pos">' + r.positionLabel + '</span>'
+                         + '<span class="lr-name">' + esc(r.name) + '</span>'
+                         + '<span class="lr-par">' + formatToPar(r.toPar) + '</span></div>';
+                });
+                html += '<a class="lr-more" href="leaderboard.html?game=' + encodeURIComponent(currentMode)
+                     + '">View Full Leaderboard \u203A</a></div>';
+            }
+        }
+
+        if (L) {
+            const byPlayer = {};
+            L.holes.forEach(r => {
+                if (!r.official || r.state === 'tie' || !r.winner) return;
+                const k = String(r.winner.id);
+                if (!byPlayer[k]) byPlayer[k] = { name: r.winner.name, holes: [] };
+                byPlayer[k].holes.push(r.hole);
+            });
+            const winners = Object.values(byPlayer).sort((a, b) => b.holes.length - a.holes.length
+                || a.holes[0] - b.holes[0] || String(a.name).localeCompare(String(b.name)));
+
+            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON</div>';
+            if (winners.length === 0) {
+                html += '<div class="lr-none">No official skins yet.</div>';
+            } else {
+                winners.forEach(w => {
+                    html += '<div class="lr-row"><span class="lr-name">' + esc(w.name) + '</span>'
+                         + '<span class="lr-count">' + w.holes.length
+                         + (w.holes.length === 1 ? ' skin' : ' skins') + '</span>'
+                         + '<span class="lr-holes">' + (w.holes.length === 1 ? 'Hole ' : 'Holes ')
+                         + w.holes.join(', ') + '</span></div>';
+                });
+            }
+            html += '<div class="lr-foot">Tied holes are not shown'
+                 + (L.officialThru > 0 ? ' \u00B7 Official through Hole ' + L.officialThru : '')
+                 + '</div></div>';
+        }
+
+        if (typeof computeMoneyPool === 'function') {
+            try {
+                const r = computeMoneyPool(data, courseData, savedScores);
+                if (r && r.valid && r.kp && r.kp.lines.length > 0) {
+                    const total = r.kp.lines.length;
+                    const decided = r.kp.lines.filter(l => l.state !== 'unresolved').length;
+                    const recorded = r.kp.lines.filter(l => l.winnerId).length;
+                    const status = decided === total ? 'all confirmed'
+                        : (recorded > 0 ? recorded + ' of ' + total + ' recorded' : 'none confirmed yet');
+                    html += '<div class="settle-card"><div class="settle-header">\uD83D\uDCCD KP</div>'
+                         + '<div class="lr-kp">' + total + ' KP' + (total === 1 ? '' : 's')
+                         + ' today \u00B7 ' + status + '</div></div>';
+                }
+            } catch (e) { /* a status line is never worth taking the page down for */ }
+        }
+
+        return html;
+    }
+
+    // ---- IS THE ROUND ACTUALLY OVER? ----------------------------------------
+    //
+    // TWO SEPARATE QUESTIONS, and Results needs both:
+    //
+    //   scores complete  every participant has posted every hole.
+    //                    computePlayerRoundTotals() already answers this per golfer -
+    //                    the canonical helper from the Finish Round work - so this
+    //                    only asks it of everybody rather than inventing a new rule.
+    //
+    //   money settled    pool-engine's `settled`, which means unresolved KP money has
+    //                    been confirmed or cancelled.
+    //
+    // FINAL requires both. `settled` alone is not enough: a round five holes in with
+    // no KP money reports settled === true, and on that basis the page used to render
+    // the entire settlement document while the group was still on the front nine.
+    //
+    // A DNF/incomplete card keeps the round live until somebody resolves it through
+    // the Finish Round review - which is exactly the workflow built for that.
+    function roundScoresComplete(data, courseData, savedScores) {
+        const players = data.players || [];
+        const holes = courseData || [];
+        if (players.length === 0 || holes.length === 0) return false;
+        if (typeof computePlayerRoundTotals !== 'function') return false;
+        return players.every(p => {
+            try { return computePlayerRoundTotals(p, holes, savedScores).complete === true; }
+            catch (e) { return false; }
+        });
+    }
+
+    function moneyIsSettled(data, courseData, savedScores) {
+        if (typeof computeMoneyPool !== 'function') return true;
+        try {
+            const r = computeMoneyPool(data, courseData, savedScores);
+            return !(r && r.valid && r.settled === false);
+        } catch (e) { return true; }
+    }
+
     function renderCombinedSummary(data, courseData, savedScores) {
         const container = document.getElementById('combined-settlement-summary');
         if (!container) return;
         const players = data.players || [];
         if (players.length === 0) { container.innerHTML = ''; return; }
+
+        // LIVE MODE SHORT-CIRCUITS THE WHOLE SETTLEMENT DOCUMENT. At hole five a
+        // golfer wants to know who is leading, who has won a skin and what is still
+        // outstanding - not a $480 accounting statement with pending-dollar rows for
+        // holes nobody has played. Results earns its receipt when the round is over.
+        if (!roundScoresComplete(data, courseData, savedScores)
+            || !moneyIsSettled(data, courseData, savedScores)) {
+            container.innerHTML = buildLiveResultsHtml(data, courseData, savedScores);
+            return;
+        }
 
         // `contributions` is the canonical per-golfer breakdown added in the Wave 2B
         // foundation. Destructured here so the ledger below reads engine output rather
