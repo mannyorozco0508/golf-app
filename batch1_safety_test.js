@@ -58,7 +58,15 @@ describe('TRIP SETTLEMENT — the canonical combiner is the only definition of m
         const trip = read('trip.html');
         const fn = trip.slice(trip.indexOf('function renderTripMoneySettlement'), trip.indexOf('function renderTripMoneySettlement') + 3000);
         assert.ok(/computeCombinedNetTotals/.test(fn), 'trip totals must use the complete money picture');
-        assert.ok(/combined\.netByName/.test(fn), 'trip must aggregate the combiner output, not the main-game rows');
+        // Checked against the whole function rather than a slice that now ends before
+        // the aggregation: the merge of contributions was inserted between the call
+        // and the netByName loop.
+        const whole = read('trip.html');
+        const at = whole.indexOf('function renderTripMoneySettlement');
+        const body = whole.slice(at, whole.indexOf('\n    function ', at + 10));
+        assert.ok(/computeCombinedNetTotals\(data, courseData, savedScores\)/.test(body));
+        assert.ok(/combined\.netByName/.test(body),
+            'trip must aggregate the combiner output, not the main-game rows');
     });
 
     test('no page redefines the combiner — there is exactly one copy in the repo', () => {
