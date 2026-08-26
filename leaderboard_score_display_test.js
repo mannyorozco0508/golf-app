@@ -233,10 +233,21 @@ describe('NO NEW MATH, NO ENGINE TOUCHED', () => {
         assert.match(fn, /r\.net/);
     });
 
-    test('handicap allocation still happens exactly once, in renderBoard', () => {
+    test('the standings no longer allocate strokes in this page at all', () => {
+        // Stronger than before. This asserted "exactly one allocation site inside
+        // renderBoard"; there are now ZERO, because the whole computation moved to
+        // computeNetToParStandings() in money-engine.js so the scorecard ticker can
+        // call the identical function. One implementation cannot disagree with itself.
+        // Scoped to the INDIVIDUAL standings path. renderBoard also contains the
+        // team/best-ball scoring, which allocates strokes for a different purpose -
+        // best net on a hole, not a golfer's running total - and predates this change.
         const src = read(PAGE);
-        assert.equal((src.match(/getStrokes\(h\.hcpIndex, parseHcp\(p\.hcp\)\)/g) || []).length, 1,
-            'a second allocation site could disagree with the first');
+        const at = src.indexOf('if (activeView === "individual")');
+        const indiv = src.slice(at, src.indexOf('} else {', at));
+        assert.ok(!/getStrokes\(/.test(indiv),
+            'the individual standings must not allocate strokes themselves');
+        assert.match(indiv, /computeNetToParStandings\(players, courseData, savedScores/,
+            'they must consume the shared helper');
     });
 
     test('the leaderboard settles no money', () => {
