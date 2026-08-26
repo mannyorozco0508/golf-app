@@ -1818,46 +1818,9 @@
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         if (courseData.length === 0) return null;
-        // A MONEY POOL SKINS BUCKET IS NOT A "SKINS GAME", and that is the whole bug.
-        //
-        // getRoundGames() enumerates GAMES - the main format plus anything in
-        // additionalGames / additionalGameInstances. A Money Pool is not a game in that
-        // model; it is a pot with prize BUCKETS, and its skins live at
-        //
-        //     moneyPool.skins = { mode, scoring, carryOver }
-        //
-        // written by captureMoneyPool() in admin.html. So on the round from device QA -
-        // Money Pool with Net Finish, KP and Net Skins - every check here was false
-        // while settlement was simultaneously resolving $310 of net skins and naming
-        // the winners. Two parts of the app disagreed about whether the round had
-        // skins at all.
-        //
-        // The previous additionalGameInstances fix was correct and did not help,
-        // because this round stores skins in neither game map.
-        //
-        // pool-engine is the existing source of truth for the pot: it decides the
-        // bucket, the scoring basis and the carry rule. Ask it, exactly as settlement
-        // does, rather than adding a third hand-rolled shape check.
-        let skinsOn = false;
-
-        // 1. Money Pool skins - what the setup wizard actually writes.
-        const mpSkins = data.moneyPool && data.moneyPool.enabled && data.moneyPool.skins;
-        if (mpSkins && mpSkins.mode && mpSkins.mode !== 'none') skinsOn = true;
-
-        // 2. A standalone skins game, in either game map.
-        if (!skinsOn && typeof getRoundGames === 'function') {
-            try {
-                skinsOn = getRoundGames(data).some(g => g.format === 'skins' && g.enabled !== false);
-            } catch (e) { skinsOn = false; }
-        }
-
-        // 3. Legacy shapes, so rounds saved before either model still draw the widget.
-        if (!skinsOn) {
-            skinsOn = (data.additionalGames && data.additionalGames.skins)
-                || data.gameFormat === 'skins'
-                || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
-        }
-        if (!skinsOn) return null;
+        // ONE PREDICATE FOR THE WHOLE APP - see roundHasSkinsGame() in action-model.js,
+        // which carries the reasoning about why a Money Pool bucket is not a "game".
+        if (!roundHasSkinsGame(data)) return null;
         try {
             const bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
             const L = bundle.net || bundle.gross;
@@ -1966,10 +1929,10 @@
 
         // Only for a genuine whole-field skins game. A round with no skins money
         // must not grow a skins card.
-        const skinsOn = (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
-        if (!skinsOn) return;
+        // ONE PREDICATE FOR THE WHOLE APP. This asked only about legacy shapes, so a
+        // round created through the real setup flow - Money Pool with Net Skins -
+        // answered "no skins" and this surface silently rendered nothing.
+        if (!roundHasSkinsGame(data)) return;
 
         let bundle;
         try {
