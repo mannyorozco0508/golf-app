@@ -232,10 +232,15 @@ describe('PARITY WITH THE REST OF THE RECEIPT', () => {
 
 describe('NO DUPLICATE MONEY MATH IN THE PAGE', () => {
 
+    // BOUNDED TO ITS OWN FUNCTION. This sliced from buildPlayerLedgerHtml all the way
+    // to renderCombinedSummary, so any function added between the two was read as if
+    // it were part of the ledger presenter. The rule protected here is about
+    // buildPlayerLedgerHtml's own body.
     const fn = () => {
         const src = read('settlement.html');
         const at = src.indexOf('function buildPlayerLedgerHtml');
-        return src.slice(at, src.indexOf('\n    function renderCombinedSummary', at));
+        const end = src.indexOf('\n    function ', at + 10);
+        return src.slice(at, end === -1 ? src.length : end);
     };
 
     test('it consumes canonical contributions', () => {
