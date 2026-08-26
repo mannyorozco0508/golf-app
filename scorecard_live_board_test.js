@@ -56,7 +56,16 @@ function fixture({ thru = [5,5,4], hcps = null, tweak = null, skins = true } = {
     if (tweak) tweak(sc);
     const gm = {}; ps.forEach((p,i)=>{ gm[String(p.id)] = Math.floor(i/4)+1; });
     const d = { players: ps, courseData: cd, scores: sc, gameFormat:'stroke', skinsCarryOver:false };
-    if (skins) { d.skinsBuyIn = 5; d.additionalGames = { skins: true }; }
+    if (skins === 'instances') {
+        // THE SHAPE A REAL ROUND ACTUALLY SAVES. The setup wizard and the Action tab
+        // both write additionalGameInstances; the widget's hand-rolled detection only
+        // knew additionalGames, so on a live round it never rendered at all.
+        d.additionalGameInstances = { k1: { format:'skins', buyIn:5, enabled:true, carryOver:false } };
+    } else if (skins === 'format') {
+        d.gameFormat = 'skins'; d.skinsBuyIn = 5;
+    } else if (skins) {
+        d.skinsBuyIn = 5; d.additionalGames = { skins: true };
+    }
     return { d, gm };
 }
 
@@ -490,6 +499,107 @@ describe('THE MODAL READS LIKE A FINISHED SCREEN', () => {
         assert.match(head, /position:\s*sticky/);
         const body = /\.lb-overlay-body \{([^}]*)\}/.exec(src)[1];
         assert.match(body, /overflow-y:\s*auto/);
+    });
+});
+
+describe('THE SKINS WIDGET RENDERS ON A REAL ROUND', () => {
+
+    // THE FAILURE DEVICE QA FOUND. Every storage shape must draw the widget - the
+    // one that was broken is the one a round actually uses.
+    [['legacy additionalGames', true],
+     ['gameFormat === skins', 'format'],
+     ['additionalGameInstances (setup wizard / Action tab)', 'instances']]
+        .forEach(([label, shape]) => {
+            test(`skins configured as ${label} renders the widget`, () => {
+                const t = strip(scorecard({ skins: shape }).ticker());
+                assert.match(t, /SKINS WON/, 'a configured skins game must show its widget');
+            });
+        });
+
+    test('it survives every early hole being tied', () => {
+        // Hiding the widget because the opening holes tied is how a golfer concludes
+        // the feature is broken.
+        const b = scorecard({
+            skins: 'instances',
+            thru: [3,3,3],
+            tweak: sc => { NAMES.forEach((n,i) => { sc['p'+(101+i)+'_h1'] = 4; sc['p'+(101+i)+'_h2'] = 4; }); },
+        });
+        const t = strip(b.ticker());
+        assert.match(t, /SKINS WON/);
+        assert.match(t, /No official skins yet/);
+        assert.ok(!/No Skin/.test(t), 'a tie is omitted, not narrated');
+    });
+
+    test('a later official winner appears alongside the earlier ties', () => {
+        const t = strip(scorecard({ skins:'instances' }).ticker());
+        assert.match(t, /SKINS WON/);
+        assert.match(t, /Carp 1 skin Hole 1/);
+        assert.ok(!/Hole 3/.test(t), 'hole 3 tied and stays out');
+    });
+
+    test('a round with NO skins game shows no widget', () => {
+        assert.ok(!/SKINS WON/.test(strip(scorecard({ skins:false }).ticker())));
+    });
+
+    test('detection asks the canonical normalizer, not the raw shapes', () => {
+        const src = read('index.html');
+        const at = src.indexOf('function liveSkinsLedger');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        assert.match(fn, /getRoundGames\(data\)\.some\(g => g\.format === 'skins'/,
+            'one normalizer already handles both storage shapes');
+    });
+
+    test('THE MOUNT EXISTS IN THE MARKUP', () => {
+        // Structural, not DOM-based. helpers/load-script.js hands back a live element
+        // for ANY id, so a missing node is invisible to every other test here - which
+        // is exactly how the Finish Round modal shipped broken. Checked as text.
+        const src = read('index.html');
+        const ids = new Set([...src.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+        const written = [...src.matchAll(/getElementById\('(live-[a-z-]+)'\)/g)].map(m => m[1]);
+        assert.ok(written.includes('live-ticker-mount'));
+        [...new Set(written)].forEach(id => {
+            const inserted = new RegExp("id=\\\"" + id + "\\\"").test(src);
+            assert.ok(ids.has(id) || inserted, `${id} is written to but never created`);
+        });
+    });
+
+    test('both widgets share one mount and one grid', () => {
+        const html = scorecard({ skins:'instances' }).ticker();
+        assert.match(html, /class="lw-grid"/);
+        assert.equal((html.match(/class="lw-card"/g) || []).length, 2);
+    });
+
+    test('stacked by default, side by side only at the wide breakpoint', () => {
+        const src = read('index.html');
+        assert.match(src, /\.lw-grid \{ display: grid; grid-template-columns: 1fr;/,
+            'a phone stacks them; neither may be hidden');
+        assert.match(src, /\.lw-grid \{ grid-template-columns: 1fr 1fr; \}/);
+    });
+});
+
+describe('NET IS SAID OUT LOUD', () => {
+
+    test('the widget header names the basis', () => {
+        assert.match(strip(scorecard().ticker()), /LIVE LEADERBOARD — NET TO PAR/,
+            'a golfer must not have to wonder whether -2 is gross or net');
+    });
+
+    test('the modal column says NET TO PAR', () => {
+        assert.match(strip(scorecard().board()), /NET TO PAR/);
+        const html = scorecard().board();
+        assert.ok(!/>TO PAR</.test(html), 'the ambiguous header must be gone');
+    });
+
+    test('the ranking maths is untouched', () => {
+        const src = read('index.html');
+        const at = src.indexOf('function liveStandings');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        assert.match(fn, /computeNetToParStandings/);
+        assert.match(fn, /basis: 'net'/);
+    });
+
+    test('the Score cell still stacks gross over net', () => {
+        assert.match(scorecard().board(), /<span class="lb-gross">\d+<\/span><span class="lb-net">Net \d+<\/span>/);
     });
 });
 
