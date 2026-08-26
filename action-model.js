@@ -525,3 +525,73 @@ if (typeof module !== 'undefined' && module.exports) {
         sideMatchHoles, sideMatchStartHole, sideMatchRangeText
     };
 }
+
+// ============================================================================
+// TWO QUESTIONS EVERY SURFACE MUST ANSWER THE SAME WAY
+//
+// Both of these were hand-written in three or four places, and each copy drifted.
+// They live here because action-model.js is the one module every live surface
+// already loads - scorecard, leaderboard, settlement and trip.
+// ============================================================================
+
+// ---- "Does this round have an active skins game?" --------------------------
+//
+// A MONEY POOL SKINS BUCKET IS NOT A "SKINS GAME", and that distinction is what
+// broke this repeatedly. getRoundGames() enumerates GAMES - the main format plus
+// additionalGames / additionalGameInstances. A Money Pool is not a game in that
+// model; it is a pot with prize BUCKETS, and its skins live at
+//
+//     moneyPool.skins = { mode, scoring, carryOver }
+//
+// written by captureMoneyPool() in admin.html. So a round created through the
+// real setup flow answered "no skins" to every hand-rolled predicate while
+// settlement was simultaneously resolving hundreds of dollars of net skins.
+//
+// The legacy shapes below are kept because rounds saved before either model
+// still exist and must keep working.
+function roundHasSkinsGame(data) {
+    if (!data) return false;
+
+    // 1. Money Pool skins bucket - what the setup wizard actually writes.
+    const mp = data.moneyPool;
+    if (mp && mp.enabled && mp.skins && mp.skins.mode && mp.skins.mode !== 'none') return true;
+
+    // 2. A standalone skins game, in either game map.
+    if (typeof getRoundGames === 'function') {
+        try {
+            if (getRoundGames(data).some(g => g.format === 'skins' && g.enabled !== false)) return true;
+        } catch (e) { /* fall through to the legacy checks */ }
+    }
+
+    // 3. Legacy shapes.
+    if (data.additionalGames && data.additionalGames.skins) return true;
+    if (data.gameFormat === 'skins') return true;
+    if (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0) return true;
+
+    return false;
+}
+
+// ---- "Does anybody actually owe another golfer money?" ---------------------
+//
+// In a MONEY POOL ONLY round nobody does. Everyone put the same stake into a pot
+// and the winners took out of it; the money moved through the pool, not between
+// people. The settlement engine can still express that as golfer-to-golfer
+// transfers, because it can always net a set of balances into a minimal set of
+// payments - but those pairings are an artifact of the arithmetic, not a
+// description of what happened. Printing "Marty pays Carp $40" invents a debt
+// between two people who never had one.
+//
+// KEYED ON WHAT MOVED THE MONEY, never on transaction count: a pool round can
+// produce transactions, so counting them would suppress a real side match.
+// Each contribution carries MOVING lines - the ones summing to a golfer's net -
+// and a pool-only round has exactly one such label: "Money Pool".
+function hasPlayerToPlayerSettlement(contributions) {
+    const sources = new Set();
+    Object.values(contributions || {}).forEach(c => {
+        (c.lines || []).forEach(l => {
+            if (!l.note && !l.rounding) sources.add(l.label);
+        });
+    });
+    if (sources.size === 0) return false;
+    return ![...sources].every(label => label === 'Money Pool');
+}
