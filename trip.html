@@ -1017,6 +1017,7 @@
         const netByName = {}; // lowercased key -> { name, net }
         const perRoundBreakdown = [];
         const unresolvedRounds = [];   // linked rounds whose money is not settled yet
+        const tripContributions = {};  // merged moving lines, for the relevance rule
 
         cachedCountedResults.forEach(({ label, data }) => {
             const courseData = data.courseData || [];
@@ -1030,6 +1031,14 @@
             // Results page shows. Trip totals are now the sum of finalized round
             // settlements, not a narrower second opinion about what counts as money.
             const combined = computeCombinedNetTotals(data, courseData, savedScores);
+
+            // MERGED ACROSS THE WEEK. "Does anybody owe another golfer money" is asked
+            // of the trip as a whole, so a side match on any single day makes the
+            // trip-wide list meaningful.
+            Object.keys(combined.contributions || {}).forEach(k => {
+                if (!tripContributions[k]) tripContributions[k] = { name: combined.contributions[k].name, lines: [] };
+                tripContributions[k].lines = tripContributions[k].lines.concat(combined.contributions[k].lines || []);
+            });
 
             // IS THIS ROUND'S MONEY ACTUALLY SETTLED?
             //
@@ -1111,20 +1120,21 @@
                 </div></div>`;
         }
 
-        html += `<div class="settle-card"><div class="settle-header">${tripSettled
-            ? '🏁 Final "Who Pays Who"'
-            : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
-        if (transactions.length === 0) {
-            const msg = Object.keys(netByName).length > 0
-                ? 'Everyone is settled up — no money changes hands.'
-                : 'No money bets recorded yet across the linked rounds.';
-            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">${msg}</div>`;
-        } else {
+        // ONLY WHEN SOMEBODY ACTUALLY OWES SOMEBODY. A week of shared Money Pool
+        // rounds produces no debts between people - everyone paid the same pot each
+        // day and the winners were paid by it. The engine can still net those balances
+        // into transfers, but printing them tells Marty to pay Carp for a debt neither
+        // of them has. Same predicate the Receipt uses, in action-model.js, so the two
+        // surfaces cannot drift.
+        if (transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
+            html += `<div class="settle-card"><div class="settle-header">${tripSettled
+                ? '🏁 Final "Who Pays Who"'
+                : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
             transactions.forEach(t => {
-                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
+                html += `<div class="ledger-row"><span>${t.from} \u2192 ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
             });
+            html += `</div>`;
         }
-        html += `</div>`;
 
         if (Object.keys(netByName).length > 0) {
             html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
