@@ -89,7 +89,10 @@ describe('AN UNSETTLED ROUND STOPS THE TRIP CALLING ITSELF FINAL', () => {
 
     test('one unresolved round is enough', () => {
         const t = boot([{ label:'Caledonia', confirmed:false }]).text();
-        assert.match(t, /Who Pays Who — Not Final/);
+        // Pool-only trips no longer print a Who Pays Who list at all, so the gate's
+        // visible signal is the warning banner. The heading path is covered by the
+        // side-match case below.
+        assert.match(t, /Not Settled Yet/);
         assert.ok(!/Final "Who Pays Who"/.test(t), 'money with $100 hanging is not final');
     });
 
@@ -107,7 +110,7 @@ describe('AN UNSETTLED ROUND STOPS THE TRIP CALLING ITSELF FINAL', () => {
             { label:'Pine Lakes', confirmed:true, seed:2 },
         ]);
         const t = b.text();
-        assert.match(t, /Who Pays Who — Not Final/);
+        assert.match(t, /Not Settled Yet/);
         assert.match(t, /True Blue/);
         assert.ok(!/Caledonia/.test(t.slice(t.indexOf('unconfirmed in:'), t.indexOf('These totals'))),
             'only the offending round should be named');
@@ -133,8 +136,7 @@ describe('A SETTLED TRIP IS CALLED FINAL', () => {
 
     test('every round confirmed means final', () => {
         const t = boot([{ label:'Caledonia', confirmed:true }]).text();
-        assert.match(t, /Final "Who Pays Who"/);
-        assert.ok(!/Not Settled Yet/.test(t));
+        assert.ok(!/Not Settled Yet/.test(t), 'nothing outstanding');
         assert.ok(!/Not Final/.test(t));
     });
 
@@ -144,8 +146,7 @@ describe('A SETTLED TRIP IS CALLED FINAL', () => {
             { label:'True Blue', confirmed:true, seed:1 },
             { label:'Pine Lakes', confirmed:true, seed:2 },
         ]).text();
-        assert.match(t, /Final "Who Pays Who"/);
-        assert.ok(!/Not Settled Yet/.test(t));
+        assert.ok(!/Not Settled Yet/.test(t), 'nothing outstanding');
     });
 
     test('a round with NO money pool at all does not block the trip', () => {
@@ -157,8 +158,8 @@ describe('A SETTLED TRIP IS CALLED FINAL', () => {
     test('confirming the offending round flips the trip to final', () => {
         const open = boot([{ label:'Caledonia', confirmed:false }]).text();
         const done = boot([{ label:'Caledonia', confirmed:true }]).text();
-        assert.match(open, /Not Final/);
-        assert.match(done, /Final "Who Pays Who"/);
+        assert.match(open, /Not Settled Yet/);
+        assert.ok(!/Not Settled Yet/.test(done));
     });
 });
 
