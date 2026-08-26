@@ -577,6 +577,144 @@ describe('THE SKINS WIDGET RENDERS ON A REAL ROUND', () => {
     });
 });
 
+describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
+
+    // THE ROUND FROM DEVICE QA, in the shape captureMoneyPool() in admin.html
+    // actually writes. Not invented: buyIn, kp{amount,holes}, net{amount,places},
+    // skins{mode,scoring,carryOver} is the literal object that function returns.
+    //
+    // A Money Pool is NOT a game. getRoundGames() enumerates games - the main format
+    // plus additionalGames / additionalGameInstances - and a pot with prize buckets
+    // appears in none of them. So every detector the widget had was false while
+    // settlement was simultaneously resolving $310 of net skins and naming winners.
+    // Two parts of the app disagreed about whether the round had skins at all.
+    const MONEY_POOL = {
+        enabled: true, buyIn: 40,
+        kp: { amount: 100, holes: [3,7,12,16] },
+        net: { amount: 70, places: [57.142857, 42.857143] },
+        skins: { mode: 'remainder', scoring: 'net', carryOver: false },
+    };
+
+    function poolRound({ thru = [5,5,5], pool = MONEY_POOL, tweak = null } = {}) {
+        const sb = loadHtmlInlineScript('index.html', IDX_DEPS);
+        const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
+        const ps = NAMES.map((n,i)=>({ id:101+i, name:n, hcp:'0', playingForMoney:true }));
+        const sc = {};
+        ps.forEach((p,pi)=>{
+            const g = Math.floor(pi/4);
+            cd.forEach(h => { if (h.hole <= thru[g]) sc['p'+p.id+'_h'+h.hole] = 4; });
+        });
+        sc['p103_h1'] = 3;   // Carp
+        sc['p102_h2'] = 3;   // Scott
+        sc['p103_h3'] = 3;   // Carp again
+        sc['p110_h5'] = 3;   // Rocco   (hole 4 left level = a tie)
+        if (tweak) tweak(sc);
+        const gm = {}; ps.forEach((p,i)=>{ gm[String(p.id)] = Math.floor(i/4)+1; });
+        const d = { players: ps, courseData: cd, scores: sc, gameFormat:'stroke',
+                    settlementMode:'whole-dollar' };
+        if (pool) d.moneyPool = pool;
+        vm.runInContext(`
+            currentMode = 'ABCD';
+            currentData = ${JSON.stringify(d)};
+            window.__scPlayerGroupMap = ${JSON.stringify(gm)};
+            renderLiveTicker(); renderLiveBoard();
+        `, sb);
+        return {
+            sb, run: c => vm.runInContext(c, sb),
+            ticker: () => sb.document.getElementById('live-ticker-mount').innerHTML,
+        };
+    }
+
+    test('A. the scorecard detects skins on the real Money Pool shape', () => {
+        const b = poolRound();
+        assert.notEqual(b.run('liveSkinsLedger()'), null,
+            'this returned null on the deployed round, suppressing the widget');
+    });
+
+    test('B/C. the widget is present and visible', () => {
+        const html = poolRound().ticker();
+        assert.match(strip(html), /SKINS WON/);
+        assert.ok(!/display:\s*none/.test(html.slice(html.indexOf('SKINS WON') - 200,
+                                                      html.indexOf('SKINS WON'))));
+    });
+
+    test('D. the ledger receives NET scoring, from the pool config', () => {
+        const b = poolRound();
+        assert.equal(b.run(`!!computeSkinsHoleLedger(currentData, currentData.courseData,
+            currentData.scores, { groupOf: liveSkinsGroupOf }).net`), true,
+            'moneyPool.skins.scoring is "net"');
+    });
+
+    test('E. through hole 5: Carp 1+3, Scott 2, Rocco 5', () => {
+        const t = strip(poolRound().ticker());
+        assert.match(t, /Carp 2 skins Holes 1, 3/);
+        assert.match(t, /Scott 1 skin Hole 2/);
+        assert.match(t, /Rocco 1 skin Hole 5/);
+    });
+
+    test('F. the hole 4 tie is absent', () => {
+        const t = strip(poolRound().ticker());
+        const skins = t.slice(t.indexOf('SKINS WON'));
+        assert.ok(!/Hole 4/.test(skins));
+        assert.ok(!/No Skin/.test(skins));
+    });
+
+    test('G/H/I. no dollars, no payout, no buy-in', () => {
+        const html = poolRound().ticker();
+        assert.ok(!/\$/.test(html), 'the pot is $310 and none of it belongs here');
+        ['payout','pot','buy-in','buyIn'].forEach(w =>
+            assert.ok(!new RegExp(w, 'i').test(strip(html)), `${w} must not appear`));
+    });
+
+    test('the official-through line reflects the slowest group', () => {
+        assert.match(strip(poolRound({ thru:[5,5,4] }).ticker()), /Official through Hole 4/);
+        assert.match(strip(poolRound({ thru:[5,5,5] }).ticker()), /Official through Hole 5/);
+    });
+
+    test('a Money Pool with NO skins bucket shows no widget', () => {
+        // The distinction that keeps this from being a blanket "any pool = skins".
+        const noSkins = JSON.parse(JSON.stringify(MONEY_POOL));
+        noSkins.skins = { mode: 'none' };
+        noSkins.net = { amount: 380, places: [57.142857, 42.857143] };
+        assert.ok(!/SKINS WON/.test(strip(poolRound({ pool: noSkins }).ticker())));
+    });
+
+    test('THE RENDERER IS REACHED THROUGH THE PRODUCTION PATH', () => {
+        // Not a direct helper call: renderLiveTicker() is what the scorecard runs, and
+        // the assertion is on what it wrote into the real mount.
+        const b = poolRound();
+        b.run("document.getElementById('live-ticker-mount').innerHTML = '';");
+        b.run('renderLiveTicker();');
+        assert.match(strip(b.ticker()), /SKINS WON/,
+            'the production render path must reach the widget');
+    });
+
+    test('THE MOUNT IS IN THE MARKUP, not fabricated by the harness', () => {
+        // helpers/load-script.js returns a live element for ANY id, so a DOM check
+        // alone proves nothing. Read as text.
+        const src = read('index.html');
+        assert.match(src, /html \+= '<div id="live-ticker-mount"><\/div>'/,
+            'the mount must be inserted by the scorecard itself');
+    });
+
+    test('detection reads the pool bucket, not a fourth hand-rolled shape', () => {
+        const src = read('index.html');
+        const at = src.indexOf('function liveSkinsLedger');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        assert.match(fn, /data\.moneyPool && data\.moneyPool\.enabled && data\.moneyPool\.skins/);
+        assert.match(fn, /mpSkins\.mode !== 'none'/);
+    });
+
+    test('and settlement still agrees about the same round', () => {
+        // The contradiction that started this: both surfaces must now say skins.
+        const b = poolRound();
+        const r = b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores)');
+        assert.equal(r.valid, true);
+        assert.ok(r.skins.amountCents > 0, 'settlement funds a skins bucket');
+        assert.match(strip(b.ticker()), /SKINS WON/, 'and the scorecard shows one');
+    });
+});
+
 describe('NET IS SAID OUT LOUD', () => {
 
     test('the widget header names the basis', () => {
