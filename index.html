@@ -187,6 +187,12 @@
            roughly half a scorecard. */
         @media (min-width: 1000px) {
             .round-body-layout { display: flex; flex-direction: row-reverse; gap: 18px; align-items: flex-start; }
+            /* Side by side once there is room. Folded into the page's existing wide
+               breakpoint rather than introducing a third width query - the layout
+               deliberately runs on one narrow and one wide rule.
+               Kept AFTER .round-body-layout: the responsive suite locates this
+               breakpoint by matching that rule as the first in the block. */
+            .lw-grid { grid-template-columns: 1fr 1fr; }
             .status-panel { flex: 0 0 280px; position: sticky; top: 12px; margin-bottom: 0; }
             .scorecard-main { flex: 1 1 auto; min-width: 0; }
         }
@@ -840,21 +846,37 @@
         .history-undo-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--brand-green); border-radius: 6px; font-size: 0.75rem; font-weight: bold; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
 
         /* Modal Styles */
-        /* LIVE TICKER. One row, horizontally scrollable, so five names can never
-           introduce horizontal scrolling on the page itself or push score entry down. */
-        .live-ticker { display: flex; align-items: center; gap: 8px; margin: 6px 0 8px 0; }
-        .lt-scroll { display: flex; gap: 10px; overflow-x: auto; flex: 1; scrollbar-width: none; padding-bottom: 2px; }
-        .lt-scroll::-webkit-scrollbar { display: none; }
-        .lt-item { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; font-size: 0.78rem; }
-        .lt-pos { color: var(--text-muted); font-weight: bold; font-size: 0.68rem; }
-        .lt-name { font-weight: 600; }
-        .lt-par { font-weight: bold; color: var(--brand-green); }
-        .lt-more { flex-shrink: 0; background: none; border: none; color: var(--brand-green); font-size: 0.72rem; font-weight: bold; padding: 4px 2px; cursor: pointer; white-space: nowrap; }
+        /* LIVE DASHBOARD WIDGETS. Stacked on a phone, side by side once there is room.
+           Bordered cards rather than loose text, so the top of the scorecard reads as
+           a dashboard and score entry still starts high on the screen. */
+        .lw-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 6px 0 10px 0; }
+        .lw-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        .lw-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+        .lw-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
+        .lw-sub { font-size: 0.6rem; color: var(--text-muted); letter-spacing: 0.04em; flex: 1; white-space: nowrap; }
+        .lw-more { background: none; border: none; color: var(--brand-green); font-size: 0.68rem; font-weight: bold; padding: 6px 2px; cursor: pointer; white-space: nowrap; min-height: 44px; }
+        /* Five columns share the width evenly; no horizontal scrolling on the page. */
+        .lw-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; text-align: center; }
+        .lw-col { min-width: 0; }
+        .lw-pos { font-size: 0.6rem; font-weight: bold; color: var(--text-muted); }
+        .lw-name { font-size: 0.72rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lw-par { font-size: 0.95rem; font-weight: bold; color: var(--brand-green); }
+        .lw-srow { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border-faint); }
+        .lw-sname { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lw-scount { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
+        .lw-sholes { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; }
+        .lw-none { font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+        .lw-foot { font-size: 0.6rem; color: var(--text-muted); margin-top: 5px; }
+        .lb-foot { font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 8px 0 2px 0; }
 
         /* FULL FIELD OVERLAY */
         .lb-overlay-box { width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; background: var(--modal-bg); border-radius: 14px; overflow: hidden; }
-        .lb-overlay-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-weight: bold; color: var(--brand-green); border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
-        .lb-overlay-close { background: none; border: none; font-size: 1.6rem; line-height: 1; color: var(--text-muted); padding: 0 4px; cursor: pointer; min-width: 44px; min-height: 44px; }
+        .lb-overlay-box { border: 2px solid var(--brand-green); }
+        .lb-overlay-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 10px 14px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; position: sticky; top: 0; background: var(--modal-bg); z-index: 1; }
+        .lb-overlay-title { margin: 0; font-size: 1rem; font-weight: bold; color: var(--brand-green); }
+        /* An obvious control, not an ambiguous glyph: bordered, 44px, and dark enough
+           to read against the card. */
+        .lb-overlay-close { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; font-size: 1.5rem; line-height: 1; color: var(--text-main); background: var(--subtle-bg); border: 1px solid var(--border-mid); border-radius: 10px; cursor: pointer; }
         .lb-overlay-body { overflow-y: auto; padding: 8px 12px 16px 12px; -webkit-overflow-scrolling: touch; }
         .lb-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border-faint); }
         .lb-head { font-size: 0.62rem; letter-spacing: 0.04em; color: var(--text-muted); font-weight: bold; }
@@ -1071,11 +1093,15 @@
 
 <!-- FULL FIELD, WITHOUT LEAVING SCORE ENTRY. Navigating to leaderboard.html mid-hole
      loses whatever is half-typed; an overlay keeps the scorecard mounted underneath. -->
-<div class="modal-overlay" id="live-board-overlay">
+<div class="modal-overlay" id="live-board-overlay" onclick="if (event.target === this) closeLiveBoard();">
     <div class="modal-box lb-overlay-box">
+        <!-- REAL CHARACTERS, NOT ESCAPES. \uXXXX sequences only resolve inside a JS
+             string; in raw HTML markup they print literally, which is why the header
+             read "\uD83C\uDFC6 Leaderboard" and the close button showed "\u00D7" on
+             the device. Written as actual glyphs here. -->
         <div class="lb-overlay-head">
-            <span>\uD83C\uDFC6 Leaderboard</span>
-            <button class="lb-overlay-close" onclick="closeLiveBoard()" aria-label="Close leaderboard">\u00D7</button>
+            <h2 class="lb-overlay-title">Full Leaderboard</h2>
+            <button class="lb-overlay-close" onclick="closeLiveBoard()" aria-label="Close leaderboard" title="Close">&times;</button>
         </div>
         <div id="live-board-body" class="lb-overlay-body"></div>
     </div>
@@ -1580,9 +1606,9 @@
         const hcp = cells[2] ? cells[2].textContent.trim() : '';
 
         let html = `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
-        // ONE LINE, ABOVE THE SCORE BOXES. A golfer standing on the tee wants to know
-        // where they stand without leaving the screen they are already using. One row
-        // costs almost no vertical space; a card would push score entry down the page.
+        // THE LIVE DASHBOARD, above score entry. Two bordered widgets - standings and
+        // skins - rather than a loose line of text floating under the hole heading.
+        // They stack on a phone and sit side by side once there is room.
         html += '<div id="live-ticker-mount"></div>';
 
         // DOTS / JUNK on the hole a golfer is actually standing on.
@@ -1720,25 +1746,96 @@
         return computeNetToParStandings(players, courseData, savedScores, { basis: 'net' });
     }
 
+    // TWO WIDGETS, ONE DASHBOARD. The loose ticker line is gone: leader information
+    // now lives in exactly one place, inside a bordered card, so nothing duplicates
+    // it further down the page.
     function renderLiveTicker() {
         const mount = document.getElementById('live-ticker-mount');
         if (!mount) return;
-        mount.innerHTML = '';
+        const board = renderLeaderWidgetHtml();
+        const skins = renderSkinsWidgetHtml();
+        mount.innerHTML = (board || skins) ? '<div class="lw-grid">' + board + skins + '</div>' : '';
+    }
+
+    function renderLeaderWidgetHtml() {
         const rows = liveStandings().filter(r => r.started);
-        if (rows.length === 0) return;
-
+        if (rows.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        // TOP 5, and a scrollable row rather than a wrap: five names must never
-        // introduce horizontal scrolling on the page itself.
-        const top = rows.slice(0, 5).map(r =>
-            '<span class="lt-item"><span class="lt-pos">' + r.positionLabel + '</span>'
-            + '<span class="lt-name">' + esc(r.name) + '</span>'
-            + '<span class="lt-par">' + formatToPar(r.toPar) + '</span></span>').join('');
 
-        mount.innerHTML = '<div class="live-ticker">'
-            + '<div class="lt-scroll">' + top + '</div>'
-            + '<button type="button" class="lt-more" onclick="openLiveBoard()">Full Leaderboard \u203A</button>'
+        // Columns, not a sentence: position over name over score reads at a glance
+        // and keeps five golfers inside a phone's width.
+        const cols = rows.slice(0, 5).map(r =>
+            '<div class="lw-col">'
+            + '<div class="lw-pos">' + r.positionLabel + '</div>'
+            + '<div class="lw-name">' + esc(r.name) + '</div>'
+            + '<div class="lw-par">' + formatToPar(r.toPar) + '</div>'
+            + '</div>').join('');
+
+        return '<div class="lw-card">'
+            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 LIVE LEADERBOARD</span>'
+            + '<span class="lw-sub">NET TO PAR</span>'
+            + '<button type="button" class="lw-more" onclick="openLiveBoard()">Full Leaderboard \u203A</button></div>'
+            + '<div class="lw-cols">' + cols + '</div>'
             + '</div>';
+    }
+
+    function renderSkinsWidgetHtml() {
+        const L = liveSkinsLedger();
+        if (!L) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const thru = L.officialThru > 0 ? 'Thru Hole ' + L.officialThru : 'Not official yet';
+
+        const winners = skinsWinners(L);
+        let body;
+        if (winners.length === 0) {
+            body = '<div class="lw-none">No official skins yet.</div>';
+        } else {
+            body = winners.map(w => '<div class="lw-srow">'
+                + '<span class="lw-sname">' + esc(w.name) + '</span>'
+                + '<span class="lw-scount">' + w.holes.length + (w.holes.length === 1 ? ' skin' : ' skins') + '</span>'
+                + '<span class="lw-sholes">' + (w.holes.length === 1 ? 'Hole ' : 'Holes ') + w.holes.join(', ') + '</span>'
+                + '</div>').join('');
+        }
+
+        return '<div class="lw-card">'
+            + '<div class="lw-head"><span class="lw-title">\uD83E\uDD69 SKINS WON</span>'
+            + '<span class="lw-sub">' + thru + '</span></div>'
+            + body
+            + '<div class="lw-foot">Tied holes are not shown'
+            + (L.officialThru > 0 ? ' \u00B7 Official through Hole ' + L.officialThru : '') + '</div>'
+            + '</div>';
+    }
+
+    // Shared by both the widget and the modal, so the two can never disagree about
+    // who has won what. Reads the canonical ledger; resolves nothing.
+    function liveSkinsLedger() {
+        if (typeof computeSkinsHoleLedger !== 'function') return null;
+        const data = currentData || {};
+        const courseData = data.courseData || [];
+        const savedScores = data.scores || {};
+        if (courseData.length === 0) return null;
+        const skinsOn = (data.additionalGames && data.additionalGames.skins)
+            || data.gameFormat === 'skins'
+            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        if (!skinsOn) return null;
+        try {
+            const bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
+            const L = bundle.net || bundle.gross;
+            return (L && L.participants.length > 0) ? L : null;
+        } catch (e) { return null; }
+    }
+
+    function skinsWinners(L) {
+        const byPlayer = {};
+        L.holes.forEach(r => {
+            if (!r.official || r.state === 'tie' || !r.winner) return;
+            const k = String(r.winner.id);
+            if (!byPlayer[k]) byPlayer[k] = { name: r.winner.name, holes: [] };
+            byPlayer[k].holes.push(r.hole);
+        });
+        return Object.values(byPlayer).sort((a, b) => b.holes.length - a.holes.length
+            || a.holes[0] - b.holes[0]
+            || String(a.name).localeCompare(String(b.name)));
     }
 
     function openLiveBoard() {
@@ -1778,6 +1875,10 @@
                  + '</div>';
         });
 
+        // Confirms at a glance that nobody is missing from the list.
+        const shown = rows.length;
+        html += '<div class="lb-foot">Showing ' + shown + ' of ' + shown
+             + ' player' + (shown === 1 ? '' : 's') + '</div>';
         html += renderSkinsWonHtml();
         body.innerHTML = html;
     }
@@ -1787,42 +1888,16 @@
     // are not yet official across every group are simply absent - the canonical
     // ledger decides that, never this function.
     function renderSkinsWonHtml() {
-        if (typeof computeSkinsHoleLedger !== 'function') return '';
-        const data = currentData || {};
-        const courseData = data.courseData || [];
-        const savedScores = data.scores || {};
-        if (courseData.length === 0) return '';
-
-        const skinsOn = (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
-        if (!skinsOn) return '';
-
-        let bundle;
-        try {
-            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
-        } catch (e) { return ''; }
-        const L = bundle.net || bundle.gross;
-        if (!L || L.participants.length === 0) return '';
+        const L = liveSkinsLedger();
+        if (!L) return '';
 
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
         const thru = L.officialThru > 0
             ? 'Official through Hole ' + L.officialThru
             : 'No holes official yet';
 
-        // Winning holes per golfer, taken straight from the ledger's own verdicts.
-        const byPlayer = {};
-        L.holes.forEach(r => {
-            if (!r.official || r.state === 'tie' || !r.winner) return;
-            const k = String(r.winner.id);
-            if (!byPlayer[k]) byPlayer[k] = { name: r.winner.name, holes: [] };
-            byPlayer[k].holes.push(r.hole);
-        });
-
-        const winners = Object.values(byPlayer)
-            .sort((a, b) => b.holes.length - a.holes.length
-                || a.holes[0] - b.holes[0]
-                || String(a.name).localeCompare(String(b.name)));
+        // Same helper the widget uses, so the two surfaces cannot disagree.
+        const winners = skinsWinners(L);
 
         let html = '<div class="sw-head">\uD83E\uDD69 SKINS WON</div>'
                  + '<div class="sw-thru">' + thru + '</div>';
