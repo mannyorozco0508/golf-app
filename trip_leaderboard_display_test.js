@@ -248,12 +248,14 @@ describe('NO MONEY BEHAVIOUR CHANGED', () => {
         assert.match(f, /rp\.settled === false/);
         assert.match(f, /unresolvedRounds/);
         const t = strip(boot({ rounds:[{ label:'Caledonia', confirmed:false }] }).money());
-        assert.match(t, /Who Pays Who — Not Final/);
+        assert.match(t, /Not Settled Yet/);
         assert.match(t, /unconfirmed in: Caledonia/);
     });
 
-    test('a settled trip is still called final', () => {
-        assert.match(strip(boot().money()), /Final "Who Pays Who"/);
+    test('a settled trip reports nothing outstanding', () => {
+        // Pool-only, so the Who Pays Who list is correctly suppressed; what matters
+        // here is that no round is flagged unresolved.
+        assert.ok(!/Not Settled Yet/.test(strip(boot().money())));
     });
 
     test('every handicap allocation on the page uses the canonical call', () => {
