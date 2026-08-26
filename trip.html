@@ -136,6 +136,32 @@
         .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
 
+        /* RECAP CARD. Full-screen so a screenshot captures the card and nothing else.
+           Portrait-shaped and self-contained - it has to read as a finished thing when
+           it lands in a group chat with no surrounding context. */
+        .recap-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; align-items: center; justify-content: center; padding: 10px; overflow-y: auto; }
+        .recap-sheet { width: 100%; max-width: 460px; }
+        .recap-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .recap-hint { font-size: 0.72rem; color: #fff; opacity: 0.85; }
+        .recap-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; line-height: 1; background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 10px; cursor: pointer; }
+        .recap-share { margin-top: 10px; }
+        /* The card itself pins its own colours rather than inheriting the theme: a
+           screenshot taken in dark mode must not arrive as pale text on white. */
+        .recap-card { background: #0f4c3a; color: #fff; border-radius: 16px; padding: 18px 16px; }
+        .rc-title { font-size: 1.25rem; font-weight: bold; line-height: 1.15; }
+        .rc-sub { font-size: 0.74rem; opacity: 0.8; margin-bottom: 12px; }
+        .rc-block { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+        .rc-head { font-size: 0.64rem; font-weight: bold; letter-spacing: 0.06em; opacity: 0.75; margin-bottom: 5px; }
+        .rc-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 0.86rem; }
+        .rc-pos { width: 22px; flex-shrink: 0; font-weight: bold; opacity: 0.7; font-size: 0.74rem; }
+        .rc-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rc-val { font-weight: bold; white-space: nowrap; }
+        .rc-award { display: flex; gap: 8px; padding: 3px 0; font-size: 0.82rem; }
+        .rc-award-name { font-weight: 600; }
+        .rc-detail { font-size: 0.72rem; opacity: 0.8; }
+        .rc-none { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
+        .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
+        .rc-foot { font-size: 0.62rem; opacity: 0.6; text-align: center; margin-top: 10px; }
         .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
         .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
@@ -328,8 +354,25 @@
         </div>
     </details>
 
+    <!-- THE RECAP CARD. A full-screen overlay so the card fills the phone and a
+         screenshot captures it cleanly, with nothing from the page bleeding in. -->
+    <div class="recap-overlay" id="trip-recap-overlay" onclick="if (event.target === this) closeTripRecap();">
+        <div class="recap-sheet">
+            <div class="recap-bar">
+                <span class="recap-hint">Screenshot this \u2014 or use Share below</span>
+                <button class="recap-close" onclick="closeTripRecap()" aria-label="Close recap" title="Close">&times;</button>
+            </div>
+            <div id="trip-recap-card" class="recap-card"></div>
+            <button class="btn-primary recap-share" onclick="shareRecap()">\uD83D\uDCE4 Share as Text</button>
+        </div>
+    </div>
+
     <hr class="section-divider">
-    <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap</button>
+    <!-- TWO WAYS TO SHARE. The text recap pastes into a group chat; the visual one
+         is the thing somebody screenshots. Both read the same cached state, so they
+         cannot tell different stories about the same trip. -->
+    <button class="btn-primary" onclick="openTripRecap()">📸 Trip Recap Card</button>
+    <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap (Text)</button>
     <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:6px;">Standings, settlement, and awards in one message for the group chat.</p>
 
     <hr class="section-divider">
@@ -1517,6 +1560,126 @@
 
     // caches populated by the leaderboard/settlement/awards renderers above, so
     // it always matches exactly what's on screen with no recomputation.
+    // ---- THE VISUAL RECAP CARD ----------------------------------------------
+    //
+    // THE THING SOMEBODY SCREENSHOTS. The text recap pastes into a group chat; this
+    // is what gets posted. Both read the SAME cached state - cachedPlayerTotals,
+    // cachedMoneyTransactions, cachedTripSettled, cachedPointsStandings,
+    // cachedAwards - so the two can never tell different stories about one trip.
+    //
+    // NOTHING IS RECOMPUTED HERE. Every figure was already produced by the canonical
+    // engines when the page rendered; this arranges them.
+    //
+    // IT MUST SURVIVE LEAVING THE APP. A screenshot lands in a chat with no
+    // surrounding context, so the card carries the trip name, the round count and -
+    // when money is still unresolved - the caveat. A recap that says FINAL when a
+    // round is unconfirmed is worse than no recap at all.
+    function openTripRecap() {
+        if (cachedRoundResults.length === 0) {
+            alert('\u26A0\uFE0F Link at least one round with scores before making a recap card.');
+            return;
+        }
+        renderTripRecapCard();
+        const el = document.getElementById('trip-recap-overlay');
+        if (el) el.style.display = 'flex';
+    }
+    function closeTripRecap() {
+        const el = document.getElementById('trip-recap-overlay');
+        if (el) el.style.display = 'none';
+    }
+
+    function renderTripRecapCard() {
+        const mount = document.getElementById('trip-recap-card');
+        if (!mount) return;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        const counted = cachedCountedResults.length;
+        let html = '<div class="rc-title">\uD83E\uDDF3 ' + esc(tripData.name || 'Trip') + '</div>'
+                 + '<div class="rc-sub">' + counted + ' round' + (counted === 1 ? '' : 's')
+                 + (cachedTripSettled ? '' : ' \u00B7 still in progress') + '</div>';
+
+        // ---- STANDINGS, top 5 ----
+        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
+        html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC6 STANDINGS \u00B7 NET</div>';
+        if (netRows.length === 0) {
+            html += '<div class="rc-none">No scores yet.</div>';
+        } else {
+            netRows.slice(0, 5).forEach((r, i) => {
+                html += '<div class="rc-row"><span class="rc-pos">' + (i + 1) + '</span>'
+                     + '<span class="rc-name">' + esc(r.name) + '</span>'
+                     + '<span class="rc-val">' + r.net + '</span></div>';
+            });
+            if (netRows.length > 5) {
+                html += '<div class="rc-detail">+ ' + (netRows.length - 5) + ' more</div>';
+            }
+        }
+        html += '</div>';
+
+        // ---- MONEY. The caveat travels with the card, not just the screen. ----
+        html += '<div class="rc-block"><div class="rc-head">\uD83D\uDCB5 '
+             + (cachedTripSettled ? 'FINAL SETTLEMENT' : 'SETTLEMENT SO FAR') + '</div>';
+        if (cachedMoneyTransactions.length === 0) {
+            html += '<div class="rc-none">Everyone\u2019s settled up.</div>';
+        } else {
+            cachedMoneyTransactions.slice(0, 6).forEach(t => {
+                html += '<div class="rc-row"><span class="rc-name">' + esc(t.from)
+                     + ' \u2192 ' + esc(t.to) + '</span>'
+                     + '<span class="rc-val">$' + fmtAmt(t.amount) + '</span></div>';
+            });
+            if (cachedMoneyTransactions.length > 6) {
+                html += '<div class="rc-detail">+ ' + (cachedMoneyTransactions.length - 6) + ' more</div>';
+            }
+        }
+        if (!cachedTripSettled) {
+            html += '<div class="rc-warn">\u26A0\uFE0F Not final \u2014 some rounds still have unconfirmed results.</div>';
+        }
+        html += '</div>';
+
+        // ---- POINTS RACE, only when the trip is running one ----
+        if (cachedPointsStandings && cachedPointsStandings.length > 0) {
+            html += '<div class="rc-block"><div class="rc-head">\uD83C\uDF96\uFE0F POINTS RACE</div>';
+            cachedPointsStandings.slice(0, 5).forEach(sd => {
+                const pts = sd.points % 1 === 0 ? sd.points : sd.points.toFixed(1);
+                html += '<div class="rc-row"><span class="rc-pos">' + sd.rank + '</span>'
+                     + '<span class="rc-name">' + esc(sd.name) + '</span>'
+                     + '<span class="rc-val">' + pts + '</span></div>';
+            });
+            html += '</div>';
+        }
+
+        // ---- AWARDS, only the ones that were actually earned ----
+        const a = cachedAwards || {};
+        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+            html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC5 AWARDS</div>';
+            if (a.mostBirdies) {
+                html += '<div class="rc-award">\uD83D\uDC26<span><span class="rc-award-name">'
+                     + esc(a.mostBirdies.name) + '</span> \u00B7 Most Birdies ('
+                     + a.mostBirdies.count + ')</span></div>';
+            }
+            if (a.blowUp) {
+                html += '<div class="rc-award">\uD83D\uDCA5<span><span class="rc-award-name">'
+                     + esc(a.blowUp.name) + '</span> \u00B7 Biggest Blow-Up<br>'
+                     + '<span class="rc-detail">' + a.blowUp.score + ' on a par '
+                     + a.blowUp.par + ' \u00B7 Hole ' + a.blowUp.hole + ', ' + esc(a.blowUp.label)
+                     + '</span></span></div>';
+            }
+            if (a.comeback) {
+                html += '<div class="rc-award">\uD83D\uDCC8<span><span class="rc-award-name">'
+                     + esc(a.comeback.name) + '</span> \u00B7 Best Comeback<br>'
+                     + '<span class="rc-detail">' + a.comeback.frontGross + ' front, '
+                     + a.comeback.backGross + ' back \u00B7 ' + esc(a.comeback.label)
+                     + '</span></span></div>';
+            }
+            if (a.sandbagger) {
+                html += '<div class="rc-award">\uD83C\uDFAD<span><span class="rc-award-name">'
+                     + esc(a.sandbagger.name) + '</span> \u00B7 Sandbagger of the Week</span></div>';
+            }
+            html += '</div>';
+        }
+
+        mount.innerHTML = html;
+    }
+
     function buildShareRecapText() {
         let text = `🧳 ${tripData.name} — Trip Recap\n\n`;
 
