@@ -1772,14 +1772,18 @@
             + '</div>').join('');
 
         return '<div class="lw-card">'
-            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 LIVE LEADERBOARD</span>'
-            + '<span class="lw-sub">NET TO PAR</span>'
+            // NET, stated outright. "-2" is meaningless if a golfer has to wonder
+            // whether it is measured before or after their strokes.
+            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 LIVE LEADERBOARD \u2014 NET TO PAR</span>'
             + '<button type="button" class="lw-more" onclick="openLiveBoard()">Full Leaderboard \u203A</button></div>'
             + '<div class="lw-cols">' + cols + '</div>'
             + '</div>';
     }
 
     function renderSkinsWidgetHtml() {
+        // A configured skins game earns its widget even before a single hole is
+        // official. Hiding it because the opening holes tied is how a golfer concludes
+        // the feature is broken.
         const L = liveSkinsLedger();
         if (!L) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -1814,9 +1818,31 @@
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         if (courseData.length === 0) return null;
-        const skinsOn = (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        // ONE NORMALIZER, TWO STORAGE SHAPES - and this asked about only one of them.
+        //
+        //   additionalGames         the original slot-per-format map
+        //   additionalGameInstances the id-keyed map the setup wizard and the Action
+        //                           tab actually write today
+        //
+        // A skins game created through either of those newer paths lives in
+        // additionalGameInstances, so the hand-rolled check below never saw it and the
+        // widget silently never rendered on a real round. getRoundGames() already
+        // normalizes both - the same fix the Dots entry button needed for exactly this
+        // reason, documented a few hundred lines above. Ask it rather than guessing at
+        // the shape.
+        let skinsOn = false;
+        if (typeof getRoundGames === 'function') {
+            try {
+                skinsOn = getRoundGames(data).some(g => g.format === 'skins' && g.enabled !== false);
+            } catch (e) { skinsOn = false; }
+        }
+        // Legacy fallbacks, kept so a round saved before the normalizer existed still
+        // draws its widget.
+        if (!skinsOn) {
+            skinsOn = (data.additionalGames && data.additionalGames.skins)
+                || data.gameFormat === 'skins'
+                || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
+        }
         if (!skinsOn) return null;
         try {
             const bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
@@ -1858,7 +1884,7 @@
 
         let html = '<div class="lb-row lb-head"><span class="lb-c-pos">POS</span>'
             + '<span class="lb-c-name">PLAYER</span><span class="lb-c-score">SCORE</span>'
-            + '<span class="lb-c-par">TO PAR</span><span class="lb-c-thru">THRU</span></div>';
+            + '<span class="lb-c-par">NET TO PAR</span><span class="lb-c-thru">THRU</span></div>';
 
         rows.forEach(r => {
             // Gross over net, the same stacked shape the Leaderboard uses, so the two
