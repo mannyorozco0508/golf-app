@@ -170,19 +170,25 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         assert.ok(!/Not Final/.test(strip(b.summary())));
     });
 
-    test('unresolved KP money says RESULTS — NOT FINAL', () => {
+    test('unresolved KP money renders LIVE RESULTS, not a settlement document', () => {
+        // The heading used to read "Results — Not Final" above the full receipt. That
+        // was still an accounting statement for a round nobody had finished, so the
+        // whole page is now replaced by the live summary. The rule this protects -
+        // unresolved money must never look final - is enforced more strongly.
         const b = boot({ confirmed: false });
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), false);
         const t = strip(b.summary());
-        assert.match(t, /Results — Not Final/);
-        assert.ok(!/🏁 Final Results/.test(t), 'money with $100 hanging is not final');
+        assert.match(t, /LIVE RESULTS/);
+        assert.ok(!/Final Results/.test(t), 'money with $100 hanging is not final');
+        assert.ok(!/Player Payouts/.test(t), 'and no payout document while it hangs');
     });
 
-    test('confirming flips the heading, with no other change', () => {
+    test('confirming moves the page from LIVE to FINAL', () => {
         const open = strip(boot({ confirmed: false }).summary());
         const done = strip(boot({ confirmed: true }).summary());
-        assert.match(open, /Not Final/);
+        assert.match(open, /LIVE RESULTS/);
         assert.match(done, /Final Results/);
+        assert.match(done, /Player Payouts/, 'the receipt returns once the money settles');
     });
 
     test('cancelling KPs also settles it', () => {
