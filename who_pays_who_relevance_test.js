@@ -181,14 +181,17 @@ describe('OTHER PLAYER-TO-PLAYER GAMES ALSO COUNT', () => {
     });
 
     test('the rule keys on the money SOURCE, not the transaction count', () => {
-        const src = read(PAGE);
-        const at = src.indexOf('const movingSources = new Set()');
-        assert.notEqual(at, -1, 'the gate must exist');
-        const block = src.slice(at, at + 700);
+        // The rule lives in action-model.js now, shared by settlement and trip.
+        const am = read('action-model.js');
+        const at = am.indexOf('function hasPlayerToPlayerSettlement');
+        assert.notEqual(at, -1, 'the shared predicate must exist');
+        const block = am.slice(at);
         assert.match(block, /!l\.note && !l\.rounding/, 'moving lines only');
         assert.match(block, /every\(label => label === 'Money Pool'\)/);
-        assert.ok(!/transactions\.length === 1/.test(block),
+        assert.ok(!/transactions\.length/.test(block),
             'counting transactions would break the moment a pool round produced one');
+        assert.match(read(PAGE), /hasPlayerToPlayerSettlement\(contributions\)/,
+            'and the page must consume it');
     });
 
     test('a round with no money at all shows no Who Pays Who', () => {
