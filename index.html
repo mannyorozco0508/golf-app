@@ -1818,26 +1818,40 @@
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
         if (courseData.length === 0) return null;
-        // ONE NORMALIZER, TWO STORAGE SHAPES - and this asked about only one of them.
+        // A MONEY POOL SKINS BUCKET IS NOT A "SKINS GAME", and that is the whole bug.
         //
-        //   additionalGames         the original slot-per-format map
-        //   additionalGameInstances the id-keyed map the setup wizard and the Action
-        //                           tab actually write today
+        // getRoundGames() enumerates GAMES - the main format plus anything in
+        // additionalGames / additionalGameInstances. A Money Pool is not a game in that
+        // model; it is a pot with prize BUCKETS, and its skins live at
         //
-        // A skins game created through either of those newer paths lives in
-        // additionalGameInstances, so the hand-rolled check below never saw it and the
-        // widget silently never rendered on a real round. getRoundGames() already
-        // normalizes both - the same fix the Dots entry button needed for exactly this
-        // reason, documented a few hundred lines above. Ask it rather than guessing at
-        // the shape.
+        //     moneyPool.skins = { mode, scoring, carryOver }
+        //
+        // written by captureMoneyPool() in admin.html. So on the round from device QA -
+        // Money Pool with Net Finish, KP and Net Skins - every check here was false
+        // while settlement was simultaneously resolving $310 of net skins and naming
+        // the winners. Two parts of the app disagreed about whether the round had
+        // skins at all.
+        //
+        // The previous additionalGameInstances fix was correct and did not help,
+        // because this round stores skins in neither game map.
+        //
+        // pool-engine is the existing source of truth for the pot: it decides the
+        // bucket, the scoring basis and the carry rule. Ask it, exactly as settlement
+        // does, rather than adding a third hand-rolled shape check.
         let skinsOn = false;
-        if (typeof getRoundGames === 'function') {
+
+        // 1. Money Pool skins - what the setup wizard actually writes.
+        const mpSkins = data.moneyPool && data.moneyPool.enabled && data.moneyPool.skins;
+        if (mpSkins && mpSkins.mode && mpSkins.mode !== 'none') skinsOn = true;
+
+        // 2. A standalone skins game, in either game map.
+        if (!skinsOn && typeof getRoundGames === 'function') {
             try {
                 skinsOn = getRoundGames(data).some(g => g.format === 'skins' && g.enabled !== false);
             } catch (e) { skinsOn = false; }
         }
-        // Legacy fallbacks, kept so a round saved before the normalizer existed still
-        // draws its widget.
+
+        // 3. Legacy shapes, so rounds saved before either model still draw the widget.
         if (!skinsOn) {
             skinsOn = (data.additionalGames && data.additionalGames.skins)
                 || data.gameFormat === 'skins'
