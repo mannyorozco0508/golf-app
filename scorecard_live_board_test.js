@@ -545,8 +545,13 @@ describe('THE SKINS WIDGET RENDERS ON A REAL ROUND', () => {
         const src = read('index.html');
         const at = src.indexOf('function liveSkinsLedger');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /getRoundGames\(data\)\.some\(g => g\.format === 'skins'/,
-            'one normalizer already handles both storage shapes');
+        // The predicate moved to action-model.js so every live surface asks one
+        // question; the page now delegates rather than hand-rolling shape checks.
+        assert.match(fn, /roundHasSkinsGame\(data\)/, 'the page must delegate');
+        const am = read('action-model.js');
+        assert.match(am, /function roundHasSkinsGame/);
+        assert.match(am, /getRoundGames\(data\)\.some\(g => g\.format === 'skins'/,
+            'the shared predicate still normalizes both game maps');
     });
 
     test('THE MOUNT EXISTS IN THE MARKUP', () => {
@@ -701,8 +706,10 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         const src = read('index.html');
         const at = src.indexOf('function liveSkinsLedger');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /data\.moneyPool && data\.moneyPool\.enabled && data\.moneyPool\.skins/);
-        assert.match(fn, /mpSkins\.mode !== 'none'/);
+        assert.match(fn, /roundHasSkinsGame\(data\)/, 'the page delegates');
+        const am = read('action-model.js');
+        assert.match(am, /mp\.enabled && mp\.skins && mp\.skins\.mode && mp\.skins\.mode !== 'none'/,
+            'the shared predicate reads the Money Pool bucket');
     });
 
     test('and settlement still agrees about the same round', () => {
@@ -744,9 +751,10 @@ describe('NET IS SAID OUT LOUD', () => {
 describe('NOTHING ELSE MOVED', () => {
 
     test('the pool-only Who Pays Who rule is untouched', () => {
-        const src = read('settlement.html');
-        assert.match(src, /const poolOnly = movingSources\.size > 0/);
-        assert.match(src, /if \(transactions\.length > 0 && !poolOnly\)/);
+        // Relevance is now a shared predicate too, consumed by settlement AND trip.
+        assert.match(read('settlement.html'),
+            /if \(transactions\.length > 0 && hasPlayerToPlayerSettlement\(contributions\)\)/);
+        assert.match(read('action-model.js'), /function hasPlayerToPlayerSettlement/);
     });
 
     test('the LIVE overlay never renders Who Pays Who', () => {
