@@ -181,10 +181,12 @@ describe('LIVE TICKER ON THE SCORECARD', () => {
         assert.ok(!/\$/.test(scorecard().ticker()));
     });
 
-    test('it stays empty before anybody tees off', () => {
+    test('the standings widget stays away before anybody tees off', () => {
+        // The skins widget may still render its own honest empty state; what must not
+        // appear is a leaderboard with nobody in it.
         const b = scorecard();
         b.run('currentData.scores = {}; renderLiveTicker();');
-        assert.equal(b.ticker(), '', 'nothing to say yet');
+        assert.ok(!/LIVE LEADERBOARD/.test(strip(b.ticker())), 'no standings to show yet');
     });
 
     test('it is always NET, whatever the Leaderboard toggle says', () => {
@@ -200,7 +202,11 @@ describe('THE FULL-FIELD OVERLAY', () => {
 
     test('it uses the page\u2019s existing modal pattern', () => {
         const src = read('index.html');
-        assert.match(src, /<div class="modal-overlay" id="live-board-overlay">/);
+        // The element also carries a backdrop-close handler now, so the match is on
+        // the opening tag rather than an exact string.
+        assert.match(src, /<div class="modal-overlay" id="live-board-overlay"/);
+        assert.match(src, /closeLiveBoard\(\);" *>|closeLiveBoard\(\);/,
+            'tapping the dimmed backdrop should close it');
     });
 
     test('open and close are plain display toggles — no navigation', () => {
@@ -355,13 +361,135 @@ describe('SKINS WON — WINNERS ONLY', () => {
 
     test('it reads the canonical ledger and resolves nothing', () => {
         const src = read('index.html');
+        // The ledger call and the winner-grouping now live in shared helpers, so the
+        // widget and the modal read one answer instead of each asking the question.
+        const shared = src.slice(src.indexOf('function liveSkinsLedger'),
+                                 src.indexOf('function renderSkinsWonHtml'));
+        assert.match(shared, /computeSkinsHoleLedger\(data, courseData, savedScores/);
+        assert.match(shared, /r\.official/);
+        assert.match(shared, /r\.state === 'tie'/);
+        ['getStrokes(','parseHcp(','Math.min(','officialThru =']
+            .forEach(t => assert.ok(!shared.includes(t), `must not resolve skins; found ${t}`));
+
         const at = src.indexOf('function renderSkinsWonHtml');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /computeSkinsHoleLedger\(data, courseData, savedScores/);
-        ['getStrokes(','parseHcp(','Math.min(','officialThru =']
-            .forEach(t => assert.ok(!fn.includes(t), `the presenter must not resolve skins; found ${t}`));
-        assert.match(fn, /r\.official/);
-        assert.match(fn, /r\.state === 'tie'/);
+        assert.match(fn, /liveSkinsLedger\(\)/, 'the modal consumes the shared helper');
+        assert.match(fn, /skinsWinners\(L\)/);
+    });
+});
+
+describe('THE DASHBOARD WIDGETS', () => {
+
+    test('both widgets render as bordered cards', () => {
+        const html = scorecard().ticker();
+        assert.match(html, /class="lw-grid"/);
+        assert.equal((html.match(/class="lw-card"/g) || []).length, 2,
+            'a standings card and a skins card');
+        assert.match(strip(html), /LIVE LEADERBOARD/);
+        assert.match(strip(html), /SKINS WON/);
+    });
+
+    test('THE OLD LOOSE TICKER IS GONE — leader info lives in one place', () => {
+        const html = scorecard().ticker();
+        assert.ok(!/class="live-ticker"/.test(html), 'the floating text row must not return');
+        assert.ok(!/lt-scroll|lt-item/.test(html));
+        const src = read('index.html');
+        assert.ok(!/\.lt-scroll|\.lt-item/.test(src), 'and its styles should be gone too');
+    });
+
+    test('the standings widget still shows the top 5 with correct positions', () => {
+        const t = strip(scorecard().ticker());
+        assert.match(t, /1 Carp -2/);
+        assert.match(t, /T2 Marty -1/);
+        assert.match(t, /T4/);
+        const shown = NAMES.filter(n => t.includes(n));
+        assert.equal(shown.length, 5);
+    });
+
+    test('the skins widget names winners, counts and holes', () => {
+        const t = strip(scorecard().ticker());
+        assert.match(t, /Carp 1 skin Hole 1/);
+        assert.match(t, /Scott 1 skin Hole 2/);
+    });
+
+    test('it states the official-through hole and explains the omission', () => {
+        const t = strip(scorecard().ticker());
+        assert.match(t, /Thru Hole 4/);
+        assert.match(t, /Tied holes are not shown/,
+            'a golfer should not wonder why a hole is missing');
+    });
+
+    test('an honest empty state before any skin is official', () => {
+        const t = strip(scorecard({ thru:[1,0,0] }).ticker());
+        assert.match(t, /No official skins yet/);
+        assert.ok(!/No Skin/.test(t));
+    });
+
+    test('NO MONEY of any kind in either widget', () => {
+        const html = scorecard().ticker();
+        assert.ok(!/\$/.test(html));
+        ['buy-in','Money Pool','payout','pot','Who Pays Who','Player Payouts']
+            .forEach(w => assert.ok(!new RegExp(w, 'i').test(strip(html)), `${w} is not live golf information`));
+    });
+
+    test('the widgets sit above score entry', () => {
+        const src = read('index.html');
+        const mount = src.indexOf("html += '<div id=\"live-ticker-mount\"></div>'");
+        const boxes = src.indexOf('hv-score-box');
+        assert.notEqual(mount, -1);
+        assert.ok(mount < boxes || boxes === -1);
+    });
+
+    test('one layout rule, not a per-device pile', () => {
+        const src = read('index.html');
+        assert.match(src, /\.lw-grid \{ grid-template-columns: 1fr; \}|\.lw-grid \{ display: grid; grid-template-columns: 1fr;/,
+            'stacked by default on a phone');
+        assert.match(src, /\.lw-grid \{ grid-template-columns: 1fr 1fr; \}/,
+            'side by side only at the existing wide breakpoint');
+    });
+});
+
+describe('THE MODAL READS LIKE A FINISHED SCREEN', () => {
+
+    test('NO LITERAL UNICODE ESCAPES in the header', () => {
+        // \uXXXX only resolves inside a JS string; in raw HTML markup it prints
+        // literally, which is exactly what device QA saw.
+        const src = read('index.html');
+        const head = src.slice(src.indexOf('<div class="lb-overlay-head"'),
+                               src.indexOf('id="live-board-body"'));
+        assert.ok(!/\\u[0-9A-Fa-f]{4}/.test(head),
+            'escaped sequences must not reach the markup: ' + head.slice(0, 120));
+    });
+
+    test('the title is plain and readable', () => {
+        const src = read('index.html');
+        assert.match(src, /<h2 class="lb-overlay-title">Full Leaderboard<\/h2>/);
+    });
+
+    test('the close control is an obvious, labelled 44px target', () => {
+        const src = read('index.html');
+        assert.match(src, /aria-label="Close leaderboard"/);
+        assert.match(src, /&times;/, 'a rendered glyph, not an escape');
+        const rule = /\.lb-overlay-close \{([^}]*)\}/.exec(src)[1];
+        assert.match(rule, /min-width:\s*44px/);
+        assert.match(rule, /min-height:\s*44px/);
+        assert.match(rule, /border:/, 'it should look like a control');
+    });
+
+    test('tapping the backdrop closes it', () => {
+        assert.match(read('index.html'), /id="live-board-overlay"[^>]*onclick="[^"]*closeLiveBoard\(\)/);
+    });
+
+    test('the footer confirms the whole field is present', () => {
+        assert.match(strip(scorecard().board()), /Showing 12 of 12 players/);
+    });
+
+    test('the header stays put while the body scrolls', () => {
+        const src = read('index.html');
+        const head = /\.lb-overlay-head \{([^}]*)\}/.exec(src)[1];
+        assert.match(head, /position:\s*sticky/);
+        const body = /\.lb-overlay-body \{([^}]*)\}/.exec(src)[1];
+        assert.match(body, /overflow-y:\s*auto/);
     });
 });
 
