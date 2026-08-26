@@ -482,10 +482,10 @@
         if (courseData.length === 0) return;
 
         // A round with no skins money must not grow a skins card.
-        const skinsOn = (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0);
-        if (!skinsOn) return;
+        // ONE PREDICATE FOR THE WHOLE APP. This asked only about legacy shapes, so a
+        // round created through the real setup flow - Money Pool with Net Skins -
+        // answered "no skins" and this surface silently rendered nothing.
+        if (!roundHasSkinsGame(data)) return;
 
         let bundle;
         try {
