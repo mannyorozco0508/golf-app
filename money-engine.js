@@ -1133,3 +1133,135 @@ function buildLiveHiLoState(data, courseData, savedScores) {
         started: resolvedHoles > 0,
     };
 }
+
+// ============================================================================
+// LIVE STROKE BET — $/hole and $/overall side matches
+//
+// A stroke side match is a real money game: it settles, it pays, it is zero-sum.
+// During play the golfer saw only "NET TO PAR", which is the round's standings,
+// not the wager. The same failure that hid a real Nassau and then Hi-Lo.
+//
+// A FOURTH SIBLING, DELIBERATELY. buildLiveMatchStates is segments and presses;
+// buildLivePointsState is a running total per player; buildLiveHiLoState is two
+// team contests. A stroke bet is TWO INDEPENDENT WAGERS in one record - $/hole
+// and $/overall - either of which may be switched off. None of the existing
+// shapes fits, and bending one to cover it would describe the wrong game.
+//
+// IT COMPUTES NO GOLF. calculateHoleBetEngine and calculateStrokeHeadToHead are
+// canonical and already parity-guarded across money-engine.js and index.html.
+// This reads their output and arranges it.
+//
+// CARRY BELONGS ON THE HOLE SIDE. A halved hole raises what the NEXT one is
+// worth, so a golfer standing on the tee needs it - the same reasoning that put
+// Wolf's carry on its card.
+//
+// NO MONEY TOTALS. Who is ahead, by how much, and what the next hole is worth -
+// never a running payout. Settlement is final only in Results.
+function buildLiveStrokeBetStates(data, courseData, savedScores, visiblePlayerIds) {
+    const d = data || {};
+    const holes = courseData || [];
+    const out = [];
+    if (holes.length === 0) return out;
+
+    const sideMatches = d.sideMatches || {};
+    const visible = Array.isArray(visiblePlayerIds) && visiblePlayerIds.length > 0
+        ? visiblePlayerIds.map(String) : null;
+    const byId = {};
+    (d.players || []).forEach(p => { byId[String(p.id)] = p; });
+
+    Object.keys(sideMatches).forEach(key => {
+        const sm = sideMatches[key] || {};
+        if (sm.format !== 'stroke') return;
+
+        const a = (sm.teamAIds || []).map(String);
+        const b = (sm.teamBIds || []).map(String);
+        if (a.length === 0 || b.length === 0) return;
+        if (visible && !a.concat(b).some(id => visible.includes(id))) return;
+
+        // The engines are 1v1. A 2v2 stroke bet is settled elsewhere by its own
+        // path, so this presenter declines rather than describing it wrongly.
+        if (a.length !== 1 || b.length !== 1) return;
+        const p1 = byId[a[0]], p2 = byId[b[0]];
+        if (!p1 || !p2) return;
+
+        // A wager struck on the 6th tee does not own holes 1-5.
+        const start = Number(sm.startHole) || 1;
+        const range = holes.filter(h => h.hole >= start);
+        if (range.length === 0) return;
+
+        const scoring = sm.scoring || 'net';
+        const holeStake = Number(sm.holeStake) || 0;
+        const overallStake = Number(sm.overallStake) || 0;
+        if (holeStake <= 0 && overallStake <= 0) return;   // no wager to report
+
+        let thru = 0;
+        range.forEach(h => {
+            if (savedScores && savedScores['p' + p1.id + '_h' + h.hole] > 0
+                && savedScores['p' + p2.id + '_h' + h.hole] > 0) {
+                thru = Math.max(thru, h.hole);
+            }
+        });
+
+        // ---- $/HOLE ----
+        let holeSide = null;
+        if (holeStake > 0 && typeof calculateHoleBetEngine === 'function') {
+            try {
+                const cfg = {
+                    holeEnabled: true, holeStake, segment: sm.segment || 'full',
+                    tieRule: sm.tieRule || 'carry', scoringType: scoring, p1, p2,
+                };
+                const hb = calculateHoleBetEngine([p1, p2], range, savedScores, cfg,
+                    sm.holePresses ? Object.values(sm.holePresses) : []);
+                if (hb) {
+                    const log = hb.holeLog || [];
+                    holeSide = {
+                        stake: holeStake,
+                        p1Holes: log.filter(h => h.winner === p1.name).length,
+                        p2Holes: log.filter(h => h.winner === p2.name).length,
+                        carry: Number(hb.currentCarry) || 0,
+                        // What the NEXT hole is actually worth, carry included.
+                        currentStake: Number(hb.currentStake) || holeStake,
+                        tiedHoles: (hb.tiesCarried || []).length,
+                    };
+                }
+            } catch (e) { holeSide = null; }
+        }
+
+        // ---- $/OVERALL ----
+        let overallSide = null;
+        if (overallStake > 0 && typeof calculateStrokeHeadToHead === 'function') {
+            try {
+                const ov = calculateStrokeHeadToHead([p1, p2], range, savedScores, scoring, overallStake);
+                if (ov) {
+                    const lead = ov.p2Total - ov.p1Total;   // lower total wins
+                    overallSide = {
+                        stake: overallStake,
+                        p1Total: ov.p1Total,
+                        p2Total: ov.p2Total,
+                        leadText: lead > 0 ? p1.name.split(' ')[0] + ' by ' + lead
+                                : lead < 0 ? p2.name.split(' ')[0] + ' by ' + Math.abs(lead)
+                                : 'All square',
+                        closed: !!ov.roundComplete,
+                    };
+                }
+            } catch (e) { overallSide = null; }
+        }
+        if (!holeSide && !overallSide) return;
+
+        out.push({
+            wagerId: key,
+            label: 'STROKE BET',
+            icon: '\uD83C\uDFAF',
+            p1Name: p1.name.split(' ')[0],
+            p2Name: p2.name.split(' ')[0],
+            scoring,
+            startHole: start,
+            thru,
+            started: thru > 0,
+            hole: holeSide,
+            overall: overallSide,
+        });
+    });
+
+    return out;
+}
