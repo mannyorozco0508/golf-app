@@ -161,7 +161,8 @@
         .rc-detail { font-size: 0.72rem; opacity: 0.8; }
         .rc-none { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
         .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
-        .rc-foot { font-size: 0.62rem; opacity: 0.6; text-align: center; margin-top: 10px; }
+        .rc-foot { font-size: 0.66rem; opacity: 0.75; text-align: center; margin-top: 10px; font-weight: 600; }
+        .trip-share-btn { margin-top: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--subtle-bg); color: var(--brand-green); font-size: 0.82rem; font-weight: bold; cursor: pointer; }
         .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
         .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
@@ -246,6 +247,10 @@
     <div style="text-align:center;">
         <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Trip Code</span><br>
         <span class="room-badge" id="manage-room-badge"></span>
+        <!-- SHARING A TRIP USED TO MEAN READING FOUR CHARACTERS ALOUD. trip.html?trip=CODE
+             already worked; it simply was not surfaced anywhere, so twelve people each
+             typed the code by hand. A round has had copyable group links for months. -->
+        <div><button class="trip-share-btn" id="trip-share-btn" onclick="copyTripLink(this)">🔗 Share Trip Link</button></div>
     </div>
     <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
 
@@ -760,6 +765,44 @@
         db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} }).then(() => {
             window.location.href = `trip.html?trip=${code}`;
         }).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // ONE LINK, NO TYPING. Same shape the scorecard's group links use:
+    // window.location.href minus any existing query, plus ?trip=CODE.
+    function tripShareUrl() {
+        const base = window.location.href.split('?')[0];
+        return base + '?trip=' + encodeURIComponent(currentTripCode || '');
+    }
+
+    function copyTripLink(btn) {
+        if (!currentTripCode) { alert('\u26A0\uFE0F Open a trip first.'); return; }
+        const url = tripShareUrl();
+        const done = () => {
+            if (!btn) return;
+            const original = btn.innerHTML;
+            btn.innerHTML = '\u2705 Copied';
+            setTimeout(() => { btn.innerHTML = original; }, 1800);
+        };
+        // navigator.clipboard needs a secure context and can reject silently; the
+        // textarea fallback is what actually works on older iOS webviews. Ported
+        // verbatim from index.html rather than reinvented.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(() => tripFallbackCopy(url, done));
+        } else {
+            tripFallbackCopy(url, done);
+        }
+    }
+
+    function tripFallbackCopy(text, onDone) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); onDone(); }
+        catch (e) { alert(text); }
+        document.body.removeChild(ta);
     }
 
     function joinTrip() {
@@ -1677,6 +1720,15 @@
             html += '</div>';
         }
 
+        // THE SCREENSHOT IS THE INVITATION. This card is what gets posted to the group
+        // chat, so it is the one place a join instruction reaches somebody not yet in
+        // the trip. Code only - a URL wraps badly at this size and is untappable in an
+        // image anyway.
+        if (currentTripCode) {
+            html += '<div class="rc-foot">Join this trip \u00B7 Trip Code '
+                 + esc(currentTripCode) + '</div>';
+        }
+
         mount.innerHTML = html;
     }
 
@@ -1718,6 +1770,11 @@
             if (a.blowUp) text += `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
             if (a.comeback) text += `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
             if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name}\n`;
+        }
+
+        // Unlike the card, pasted text carries a tappable link - so it does.
+        if (currentTripCode) {
+            text += `\n\uD83D\uDD17 Join: ${tripShareUrl()}\n`;
         }
 
         return text;
