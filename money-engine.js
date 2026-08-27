@@ -799,6 +799,17 @@ function buildLiveMatchStates(data, courseData, savedScores, visiblePlayerIds) {
             st.wagerId = key;
             st.isSideMatch = true;
             st.startHole = start;
+            // CAN THIS STILL BE PRESSED, AND FROM WHICH HOLE?
+            //
+            // Decided here so the page renders a control without re-deriving press
+            // rules - the divergence that class of duplication has already caused.
+            // A press begins on the hole AFTER the last one everybody has posted, and
+            // only while holes remain. pressRule 'none' means the group agreed not to.
+            const lastHole = holes.length ? holes[holes.length - 1].hole : 0;
+            const nextHole = (st.thru || start - 1) + 1;
+            st.pressRule = sm.pressRule || 'none';
+            st.canPress = st.pressRule !== 'none' && nextHole <= lastHole && st.thru > 0;
+            st.nextPressHole = st.canPress ? nextHole : null;
             out.push(st);
         }
     });
