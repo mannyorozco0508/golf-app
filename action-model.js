@@ -595,3 +595,63 @@ function hasPlayerToPlayerSettlement(contributions) {
     if (sources.size === 0) return false;
     return ![...sources].every(label => label === 'Money Pool');
 }
+
+// ============================================================================
+// NASSAU WAGER PAYLOAD — one builder, two entry points
+//
+// A Nassau can now be set up two ways: while BUILDING the round (Step 6, "What's
+// The Action?") and mid-round from Action -> Add Wager. Both must produce the
+// same record, because everything downstream - calculateMatchEngine, the press
+// system, buildLiveMatchStates, settlement - reads one shape.
+//
+// Two hand-written payload builders would drift. That is not hypothetical: this
+// project has already paid for it once, when a per-press stake landed in
+// money-engine.js and not in the three page copies, and a $10 Nassau with a $25
+// press showed $30 live while the Receipt correctly paid $45.
+//
+// PURE. It reads no DOM and writes no database. The Firebase write stays where
+// it already lives - sidematches.html for Action, admin.html's own round-create
+// authority for setup. Sharing payload construction is not sharing a write path.
+//
+//   format         always 'nassau'
+//   frontStake/backStake/overallStake   three independent wagers
+//   autoPressStake null = "same as segment" (the default most groups play)
+//   stake          legacy mirror of Overall, so any surface that has not learned
+//                  the new fields still reads something sensible
+function buildNassauWagerPayload(input) {
+    const i = input || {};
+    const num = (v, fallback) => {
+        const n = parseFloat(v);
+        return isNaN(n) ? fallback : n;
+    };
+    const front = num(i.frontStake, 0);
+    const back = num(i.backStake, 0);
+    const overall = num(i.overallStake, 0);
+
+    // Only an explicit positive amount overrides "same as segment".
+    const rawAuto = num(i.autoPressStake, NaN);
+    const autoPress = (i.autoPressStake === null || i.autoPressStake === undefined
+        || i.autoPressStake === '' || isNaN(rawAuto) || rawAuto <= 0) ? null : rawAuto;
+
+    const ids = list => (list || []).map(String).filter(Boolean);
+
+    return {
+        format: 'nassau',
+        scoring: i.scoring === 'gross' ? 'gross' : 'net',
+        teamAIds: ids(i.teamAIds),
+        teamBIds: ids(i.teamBIds),
+        startHole: num(i.startHole, 1) || 1,
+        frontStake: front,
+        backStake: back,
+        overallStake: overall,
+        autoPressStake: autoPress,
+        pressRule: i.pressRule || 'none',
+        // Legacy mirror. Overall is the closest single number to "the Nassau".
+        stake: overall || front || back || 0,
+        createdAt: num(i.createdAt, 0) || Date.now(),
+    };
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
+}
