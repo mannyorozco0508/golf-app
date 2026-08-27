@@ -268,8 +268,15 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     // represents rather than for being "more" of the previous step. Step 3 asks how the
     // round is scored; Step 6 asks what the money is.
     test('Step 6 offers additional games alongside the extras', () => {
-        assert.ok(adm.includes("Step 6: What's The Action?"));
+        // Renamed to "Games & Money": "What's The Action?" is clubhouse language that
+        // did not tell a golfer this is where every bet is configured.
+        assert.ok(adm.includes('Step 6: Games &amp; Money'));
+        assert.ok(adm.includes("Choose the games and bets you're playing. Everything here is optional."));
+        assert.ok(!adm.includes("Step 6: What's The Action?"), 'the vaguer heading is gone');
         assert.ok(!adm.includes('Step 6: More Action'), 'the old undifferentiated wording is gone');
+        // Sections, in the order a group actually decides.
+        ['PRIMARY GAME / MATCHES', 'ALSO PLAYING', 'POOLS &amp; EXTRAS']
+            .forEach(h => assert.ok(adm.includes(h), 'missing section heading: ' + h));
         assert.ok(adm.includes('stacked-games-list'));
         assert.ok(adm.includes('Also Playing'), 'the setup wizard keeps its own wording');
         assert.ok(adm.includes('\uD83C\uDFAF Extras'), 'the birdie/KP extras keep their own heading');
@@ -279,11 +286,15 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     // being played - it asks how the SCORECARD is organised. The money formats moved out
     // of setup entirely and are created through Action after the round exists, so a
     // golfer is never forced to pick a wager just to start keeping score.
-    test('Step 3 asks for a ROUND TYPE, and offers only structural choices', () => {
-        assert.ok(adm.includes('Step 3: Round Type'));
-        assert.ok(adm.includes('<label>Round Type</label>'));
+    test('Step 3 asks HOW WE ARE SCORING, and offers only structural choices', () => {
+        // Renamed from "Round Type": that title promised to answer "what are we
+        // playing?" while hiding Nassau and Match, which is how a golfer ended up
+        // configuring a Nassau twice. Games and bets are Step 6's job now.
+        assert.ok(adm.includes("Step 3: How We're Scoring"));
+        assert.ok(adm.includes('Choose how scores are kept. Games and bets are added later.'),
+            'the helper line must say where games actually live');
+        assert.ok(!adm.includes('Step 3: Round Type'), 'the ambiguous heading is gone');
         assert.ok(!adm.includes('Step 3: Game Format'), 'the original conflated heading is gone');
-        assert.ok(!adm.includes('<label>Scoring Format</label>'), 'the interim wording is gone too');
         // The stored key is STILL gameFormat - wording and options changed, schema did not.
         assert.ok(adm.includes('id="game-format-select"'), 'the stored gameFormat key must not be renamed');
     });
