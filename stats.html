@@ -490,7 +490,7 @@
                 rows += `<div class="ledger-row"><span>${p2.name}</span><span>${fmtSideM(-p1Total)}</span></div>`;
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));
                 if (!calc) return;
                 const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
 
@@ -526,6 +526,57 @@
     }
 
     // --- Ported from settlement.html: handles Nassau / Match / Best Ball / Scramble / Ryder ---
+    // ============================================================================
+    // NASSAU STAKE CONFIG — read the persisted fields into the runtime shape
+    //
+    // Flat fields, matching every other Nassau setting:
+    //   nassauFrontStake / nassauBackStake / nassauOverallStake / nassauAutoPressStake
+    //
+    // LEGACY IS THE ABSENCE OF THESE FIELDS. A round carrying only nassauStake gets
+    // undefined for each segment, calculateMatchEngine falls back to the single
+    // wager, and it settles to the cent exactly as it always has. Nothing is
+    // migrated; old rounds are simply never asked the new question.
+    //
+    // nassauAutoPressStake null/absent means "same as segment" - the default most
+    // groups play. A number applies to every automatic press. Manual presses are
+    // untouched either way: whatever the golfer typed at the moment of pressing.
+    function nassauStakeConfig(data) {
+        const d = data || {};
+        // TWO SHAPES, ONE CONTRACT.
+        //
+        //   SIDE MATCH (the supported path): frontStake / backStake / overallStake
+        //   ROUND FORMAT (legacy, hidden):   nassauFrontStake / nassauBackStake / ...
+        //
+        // Nassau is a WAGER created from Action, not a round type; the round format
+        // survives only so existing rounds stay readable. Both normalize here so no
+        // consumer needs to know which it is holding.
+        const isSideMatch = d.format === 'nassau';
+        if (isSideMatch) {
+            const pickS = v => (v === undefined || v === null || v === '') ? undefined : Number(v);
+            const c = {
+                F9: pickS(d.frontStake),
+                B9: pickS(d.backStake),
+                '18': pickS(d.overallStake),
+                autoPress: pickS(d.autoPressStake),
+            };
+            if (c.F9 === undefined && c.B9 === undefined && c['18'] === undefined
+                && c.autoPress === undefined) return undefined;   // legacy: single `stake`
+            return c;
+        }
+        if (d.gameFormat !== 'nassau') return undefined;
+        const pick = v => (v === undefined || v === null || v === '') ? undefined : Number(v);
+        const cfg = {
+            F9: pick(d.nassauFrontStake),
+            B9: pick(d.nassauBackStake),
+            '18': pick(d.nassauOverallStake),
+            autoPress: pick(d.nassauAutoPressStake),
+        };
+        // Nothing configured at all -> behave exactly like a legacy round.
+        if (cfg.F9 === undefined && cfg.B9 === undefined && cfg['18'] === undefined
+            && cfg.autoPress === undefined) return undefined;
+        return cfg;
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
     // THREE-STAKE NASSAU (authorized change).
     //
@@ -1033,7 +1084,7 @@
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
         const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
-        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(data));
 
         if (!matchData) {
             return `
