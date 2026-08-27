@@ -1047,3 +1047,89 @@ function buildLivePointsState(data, courseData, savedScores) {
         rows,
     };
 }
+
+// ============================================================================
+// LIVE HI-LO
+//
+// Hi-Lo is a complete money game - real settlement, real receipts, zero-sum -
+// and during play it showed the golfer only "NET TO PAR". That is not the game:
+// Hi-Lo is decided by two contests on every hole, the low ball and the high
+// ball, and net-to-par says nothing about either.
+//
+// A THIRD PRESENTER, DELIBERATELY. buildLiveMatchStates covers segments and
+// presses; buildLivePointsState covers a running total per player. Hi-Lo is
+// neither: it is two team contests whose results accumulate as half-points.
+// Forcing it into "2 UP" match language would describe a game nobody is playing.
+//
+// IT COMPUTES NO GOLF. calculateHiLoEngine is canonical - it decides every low
+// and high winner and both point totals. This reads holeLog and counts. The
+// engine lives in settlement-engine.js, which both pages load after this file,
+// so it is resolved at call time rather than at definition time.
+//
+// NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake, and that belongs
+// in Results. A running dollar figure mid-round is not final and must not appear.
+function buildLiveHiLoState(data, courseData, savedScores) {
+    const d = data || {};
+    if (d.gameFormat !== 'hilo') return null;
+    if (typeof calculateHiLoEngine !== 'function') return null;
+
+    const holes = courseData || [];
+    const players = (d.players || []).filter(p => p.playingForMoney !== false);
+    if (players.length < 2 || holes.length === 0) return null;
+
+    let calc;
+    try { calc = calculateHiLoEngine(players, holes, savedScores); }
+    catch (e) { return null; }
+    if (!calc || !calc.t1Name || !calc.t2Name) return null;
+
+    // CUMULATIVE LOW AND HIGH, counted only from holes the engine actually
+    // resolved. An unplayed hole has no entry in holeLog, so it cannot be
+    // mistaken for a halve - "tied" here means both balls matched, which is a
+    // real Hi-Lo result and different from "not played yet".
+    const log = calc.holeLog || {};
+    const tally = { low: { t1: 0, t2: 0, tied: 0 }, high: { t1: 0, t2: 0, tied: 0 } };
+    let resolvedHoles = 0;
+    Object.keys(log).forEach(k => {
+        const h = log[k];
+        if (!h) return;
+        resolvedHoles++;
+        if (h.lowWinner === calc.t1Name) tally.low.t1++;
+        else if (h.lowWinner === calc.t2Name) tally.low.t2++;
+        else tally.low.tied++;
+        if (h.highWinner === calc.t1Name) tally.high.t1++;
+        else if (h.highWinner === calc.t2Name) tally.high.t2++;
+        else tally.high.tied++;
+    });
+
+    let thru = 0;
+    holes.forEach(h => {
+        if (players.some(p => savedScores && savedScores['p' + p.id + '_h' + h.hole] > 0)) {
+            thru = Math.max(thru, h.hole);
+        }
+    });
+
+    const diff = calc.t1Points - calc.t2Points;
+    // "Leading by 1.5 points" is the honest description. Hi-Lo has no UP/DOWN.
+    let leadText;
+    if (diff > 0) leadText = calc.t1Name + ' by ' + Math.abs(diff);
+    else if (diff < 0) leadText = calc.t2Name + ' by ' + Math.abs(diff);
+    else leadText = 'All even';
+
+    return {
+        gameFormat: 'hilo',
+        label: 'HI-LO',
+        icon: '\u2696\uFE0F',
+        t1Name: calc.t1Name,
+        t2Name: calc.t2Name,
+        t1Points: calc.t1Points,
+        t2Points: calc.t2Points,
+        differential: diff,
+        leadText,
+        low: tally.low,
+        high: tally.high,
+        thru,
+        // Nothing resolved yet means nothing to report - not a 0-0 tie, which
+        // would read as though the teams had fought to a standstill.
+        started: resolvedHoles > 0,
+    };
+}
