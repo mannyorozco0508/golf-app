@@ -243,12 +243,17 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
     });
 
     test('both consume the SAME shared presenter', () => {
+        // The presenter is now buildLiveMatchStates() - plural - because a round can
+        // carry several wagers and the supported Nassau lives in sideMatches, not in
+        // the round format. Both pages still consume ONE shared implementation.
         ['index.html','leaderboard.html'].forEach(f =>
-            assert.match(read(f), /buildLiveMatchState\(data, courseData, savedScores\)/,
+            assert.match(read(f), /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\)/,
                 f + ' must call the shared presenter'));
-        const defs = ['index.html','leaderboard.html','money-engine.js']
-            .filter(f => /function buildLiveMatchState/.test(read(f)));
-        assert.deepEqual(defs, ['money-engine.js'], 'exactly one implementation');
+        ['buildLiveMatchState','buildLiveMatchStates'].forEach(fn => {
+            const defs = ['index.html','leaderboard.html','money-engine.js']
+                .filter(f => new RegExp('function ' + fn + '\\(').test(read(f)));
+            assert.deepEqual(defs, ['money-engine.js'], fn + ': exactly one implementation');
+        });
     });
 
     test('NET TO PAR stays clearly labelled and separate', () => {
@@ -271,9 +276,13 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
 
 describe('LIVE MEANS LIVE — NO SETTLEMENT', () => {
 
-    test('no dollar figures in the widget', () => {
-        assert.ok(!/\$/.test(scorecard(round({ wins:{1:'A',2:'A'} }))));
-        assert.ok(!/\$/.test(leaderboard(round({ wins:{1:'A',2:'A'} }))));
+    test('STAKES are shown — they define the bet', () => {
+        // Reversed deliberately. A golfer must be able to see WHICH bet is running:
+        // "$5 front, $10 overall" is the wager itself, not settlement. What stays out
+        // is any running total or payout, which is not final mid-round.
+        const html = scorecard(round({ wins:{1:'A',2:'A'} }));
+        assert.match(html, /class="lm-stake">\$\d+</, 'the segment stake must be visible');
+        assert.match(strip(html), /\$10/, 'the $10 wager in this fixture');
     });
 
     test('no Who Pays Who, payouts or buy-in', () => {
