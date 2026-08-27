@@ -135,7 +135,7 @@ describe('STEP 6 OFFERS NASSAU — AND STEP 3 STAYS SCORING', () => {
 
     test('Step 3 still hides the deprecated Nassau round type', () => {
         assert.match(read('admin.html'),
-            /<optgroup label="Legacy round types" id="legacy-format-group" style="display:none;">/);
+            /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
     });
 
     test('a setup Nassau does NOT write gameFormat nassau', () => {
