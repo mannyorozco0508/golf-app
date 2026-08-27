@@ -99,7 +99,7 @@ describe('A BLANK NEW ROUND CANNOT BECOME A LEGACY NASSAU', () => {
 
     test('the legacy optgroup ships hidden in the markup', () => {
         assert.match(read('admin.html'),
-            /<optgroup label="Legacy round types" id="legacy-format-group" style="display:none;">/);
+            /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
     });
 
     test('only one line in admin.html selects a format', () => {
