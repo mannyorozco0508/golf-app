@@ -1969,24 +1969,26 @@
             payload.stake = parseFloat(document.getElementById("sm-stake").value) || 0;
             payload.pressRule = document.getElementById("sm-press-rule").value;
             if (format === 'nassau') {
-                // THREE INDEPENDENT WAGERS, persisted separately. `stake` is still
-                // written and mirrors Overall, so a record saved here stays readable to
-                // any surface that has not learned the new fields - and a legacy record
-                // carrying only `stake` keeps settling exactly as it does today.
-                const f = parseFloat(document.getElementById("sm-front-stake").value) || 0;
-                const b = parseFloat(document.getElementById("sm-back-stake").value) || 0;
-                const o = parseFloat(document.getElementById("sm-overall-stake").value) || 0;
-                payload.frontStake = f;
-                payload.backStake = b;
-                payload.overallStake = o;
-                payload.stake = o || payload.stake;
-                // null means "same as segment" - the default. Absence is the signal, so
-                // nothing needs migrating.
+                // ONE BUILDER, TWO ENTRY POINTS. buildNassauWagerPayload lives in
+                // action-model.js and is used identically by Step 6 of round setup.
+                // Two hand-written payload builders would drift, and this project has
+                // already paid for that class of bug once.
                 const apMode = document.getElementById("sm-autopress-mode");
-                const apVal = parseFloat(document.getElementById("sm-autopress-stake").value);
-                payload.autoPressStake = (apMode && apMode.value === 'custom' && apVal > 0) ? apVal : null;
-                // Nassau is Match Play, always.
-                payload.scoring = document.getElementById("sm-scoring").value || 'net';
+                const built = buildNassauWagerPayload({
+                    teamAIds: teamAIds,
+                    teamBIds: teamBIds,
+                    frontStake: document.getElementById("sm-front-stake").value,
+                    backStake: document.getElementById("sm-back-stake").value,
+                    overallStake: document.getElementById("sm-overall-stake").value,
+                    autoPressStake: (apMode && apMode.value === 'custom')
+                        ? document.getElementById("sm-autopress-stake").value : null,
+                    pressRule: document.getElementById("sm-press-rule").value,
+                    scoring: document.getElementById("sm-scoring").value,
+                    startHole: startHole,
+                });
+                // Scope/ownerGroup and any other side-match context set above are kept;
+                // the builder owns only the Nassau wager fields.
+                payload = Object.assign({}, payload, built);
             }
         }
 
