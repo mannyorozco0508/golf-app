@@ -964,3 +964,86 @@ function nassauStakeConfig(data) {
         && cfg.autoPress === undefined) return undefined;
     return cfg;
 }
+
+// ============================================================================
+// LIVE POINTS/EVENT GAMES — Stableford, Wolf, Dots
+//
+// WHAT THIS EXISTS TO FIX. A golfer playing Stableford saw only
+// "LIVE LEADERBOARD - NET TO PAR". So did a golfer playing Wolf, and one playing
+// Dots. Net-to-par is not those games: Stableford is points, Wolf is points won
+// per hole, Dots is junk earned and lost. All three engines already computed the
+// real answer and nothing rendered it - the same failure that made a real Nassau
+// look like stroke play.
+//
+// A SIBLING OF buildLiveMatchStates, NOT AN EXTENSION. Match games have segments
+// and presses; these have a running total per player. Forcing both into one
+// presenter would produce a shape that fits neither.
+//
+// It computes NO game rules. calcStablefordEngine, calcWolfEngine and
+// calcDotsEngine are the canonical sources; this reads their `totals` and ranks
+// them. That is the whole job.
+//
+// Returns null when the game is not being played, so a caller can simply omit
+// the widget rather than draw an empty one.
+function buildLivePointsState(data, courseData, savedScores) {
+    const d = data || {};
+    const holes = courseData || [];
+    const players = (d.players || []);
+    if (players.length === 0 || holes.length === 0) return null;
+
+    const fmt = d.gameFormat;
+    let totals = null, label = '', icon = '', unit = '', signed = false, extra = null;
+
+    if (fmt === 'stableford' && typeof calcStablefordEngine === 'function') {
+        const calc = calcStablefordEngine(d, holes, savedScores);
+        totals = calc && calc.totals;
+        label = 'STABLEFORD'; icon = '\uD83C\uDFC1'; unit = 'pts';
+    } else if (fmt === 'wolf' && typeof calcWolfEngine === 'function') {
+        const calc = calcWolfEngine(d, holes, savedScores);
+        totals = calc && calc.totals;
+        label = 'WOLF'; icon = '\uD83D\uDC3A'; unit = 'pts'; signed = true;
+        // Carried points are real Wolf state - a hole that pushed raises the next
+        // one's value, and a golfer deciding whether to go lone needs to know.
+        if (calc && calc.carryPending > 0) extra = 'Carry: ' + calc.carryPending;
+    } else if (typeof calcDotsEngine === 'function' && (fmt === 'dots' || d.dots)) {
+        const calc = calcDotsEngine(d, holes, savedScores);
+        totals = calc && calc.totals;
+        label = 'DOTS'; icon = '\uD83C\uDFAF'; unit = ''; signed = true;
+    }
+    if (!totals) return null;
+
+    // HOW FAR IN ARE WE. Counted from posted scores, not from configuration, so
+    // "thru 6" always describes what has actually been played.
+    let thru = 0;
+    holes.forEach(h => {
+        if (players.some(p => savedScores && savedScores['p' + p.id + '_h' + h.hole] > 0)) {
+            thru = Math.max(thru, h.hole);
+        }
+    });
+
+    // A game with no events yet is "not started" rather than a table of zeros,
+    // which would read as though everyone were tied on merit.
+    const anyValue = Object.keys(totals).some(k => Number(totals[k]) !== 0);
+    const rows = players.map(p => ({
+        id: p.id,
+        name: p.name,
+        value: Number(totals[p.id]) || 0,
+    })).sort((a, b) => b.value - a.value);
+
+    // Shared rank on equal totals - "T2" is the honest answer to a tie.
+    let lastVal = null, lastRank = 0;
+    rows.forEach((r, i) => {
+        if (lastVal !== null && r.value === lastVal) { r.rank = lastRank; r.tied = true; }
+        else { r.rank = i + 1; lastRank = r.rank; }
+        lastVal = r.value;
+    });
+    rows.forEach(r => { r.tied = rows.filter(x => x.value === r.value).length > 1; });
+
+    return {
+        gameFormat: fmt,
+        label, icon, unit, signed, extra,
+        thru,
+        started: thru > 0 && anyValue,
+        rows,
+    };
+}
