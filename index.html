@@ -846,6 +846,23 @@
         .history-undo-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--brand-green); border-radius: 6px; font-size: 0.75rem; font-weight: bold; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
 
         /* Modal Styles */
+        /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
+           through tabs during a real Nassau. Segments stack; presses indent under the
+           segment they belong to so a press can never be mistaken for a base match. */
+        .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+        .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
+        .lm-sub { font-size: 0.6rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lm-seg { padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
+        .lm-seg:last-child { border-bottom: none; }
+        .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
+        .lm-seg-name { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-muted); width: 62px; flex-shrink: 0; }
+        .lm-seg-status { font-size: 0.9rem; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.8rem; }
+        .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 62px; }
+        .lm-press-tag { font-size: 0.6rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .lm-press-status { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+        .lm-closed { opacity: 0.6; }
         /* LIVE DASHBOARD WIDGETS. Stacked on a phone, side by side once there is room.
            Bordered cards rather than loose text, so the top of the scorecard reads as
            a dashboard and score entry still starts high on the screen. */
@@ -1746,6 +1763,40 @@
         return computeNetToParStandings(players, courseData, savedScores, { basis: 'net' });
     }
 
+    // LIVE MATCHES & PRESSES - reads buildLiveMatchState() in money-engine.js, the
+    // shared presenter the Leaderboard also uses, so the two surfaces cannot tell
+    // different stories about the same match. It formats; it decides nothing.
+    //
+    // NO SETTLEMENT ARITHMETIC HERE. During play a golfer needs to know who is up and
+    // which presses are running - not what it pays. That belongs in Results.
+    function buildLiveMatchHtml(data, courseData, savedScores) {
+        if (typeof buildLiveMatchState !== 'function') return '';
+        const st = buildLiveMatchState(data, courseData, savedScores);
+        if (!st) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let html = '<div class="lm-card"><div class="lm-head">'
+            + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
+            + '<span class="lm-sub">' + esc(st.formatLabel) + ' \u00B7 ' + esc(st.t1Name)
+            + ' v ' + esc(st.t2Name) + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</span></div>';
+
+        st.segments.forEach(seg => {
+            html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
+                 + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
+                 + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
+                 + esc(seg.statusText) + (seg.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
+            seg.presses.forEach(p => {
+                html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
+                     + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
+                     + ' PRESS \u00B7 H' + p.startHole + '</span>'
+                     + '<span class="lm-press-status">' + esc(p.statusText)
+                     + (p.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
+            });
+            html += '</div>';
+        });
+        return html + '</div>';
+    }
+
     // TWO WIDGETS, ONE DASHBOARD. The loose ticker line is gone: leader information
     // now lives in exactly one place, inside a bordered card, so nothing duplicates
     // it further down the page.
@@ -1754,7 +1805,9 @@
         if (!mount) return;
         const board = renderLeaderWidgetHtml();
         const skins = renderSkinsWidgetHtml();
-        mount.innerHTML = (board || skins) ? '<div class="lw-grid">' + board + skins + '</div>' : '';
+        const matches = buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        const any = board || skins || matches;
+        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + '</div>' : '';
     }
 
     function renderLeaderWidgetHtml() {
