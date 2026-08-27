@@ -853,6 +853,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 <strong>⚔️ Nassau</strong>
             </label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 26px;">Match Play · Front / Back / Overall — three separate bets.</p>
+            <!-- Shown only when the round already carries a legacy main-game wager.
+                 Explains rather than simply going dead. -->
+            <div id="setup-nassau-legacy-note" style="display:none; font-size:0.72rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:8px 10px; margin:0 0 10px 26px; line-height:1.45;"></div>
             <div id="setup-nassau-panel" style="display:none;">
                 <label style="font-size:0.75rem;">Nassau Bets ($)</label>
                 <div class="sm-nassau-stakes">
@@ -3078,6 +3081,49 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     // ---- STEP 6 NASSAU ------------------------------------------------------
+    // A ROUND MUST NOT CARRY THE SAME NASSAU TWICE.
+    //
+    // A round saved the old way already HAS a Nassau: settlement synthesises
+    // the legacy Nassau round format into a receipt through legacyMainAsSideMatch(),
+    // which is how old rounds still pay. Ticking the modern Step 6 card on top of that
+    // leaves two Nassaus between the same golfers, and settlement pays BOTH -
+    // $80 on a $40 bet. It stays zero-sum, so nothing else catches it.
+    //
+    // The formats listed are exactly the ones legacyMainAsSideMatch settles. Skins
+    // and Dots are absent on purpose: those rounds carry no main Nassau, so adding
+    // one there is a genuine new wager, not a double bill.
+    //
+    // The guard lives here rather than in settlement because settlement cannot
+    // tell a duplicate from a legitimate second wager - a legacy 2v2 plus a
+    // private 1v1 Nassau looks identical to a legacy 2v2 plus its own copy. A
+    // generic dedupe would silently delete a bet two golfers actually struck.
+    function legacyMainGameBlocksNassau() {
+        const sel = document.getElementById('game-format-select');
+        const fmt = sel ? sel.value : '';
+        return ['nassau', 'match', 'bestball', 'scramble', 'ryder'].includes(fmt);
+    }
+
+    // Called whenever the round's format is known or changes.
+    function syncSetupNassauAvailability() {
+        const box = document.getElementById('setup-nassau-enabled');
+        const note = document.getElementById('setup-nassau-legacy-note');
+        const blocked = legacyMainGameBlocksNassau();
+        if (box) {
+            box.disabled = blocked;
+            // An already-ticked box on a round that turns out to be legacy must not
+            // survive as a half-configured wager.
+            if (blocked && box.checked) { box.checked = false; toggleSetupNassau(); }
+        }
+        const card = document.getElementById('setup-nassau-box');
+        if (card) card.style.opacity = blocked ? '0.55' : '';
+        if (note) {
+            note.textContent = 'This round already uses the legacy Nassau setup. '
+                + 'Edit its Nassau settings in Step 4, or start a new round to use the '
+                + 'newer Front / Back / Overall setup.';
+            note.style.display = blocked ? 'block' : 'none';
+        }
+    }
+
     function toggleSetupNassau() {
         const on = document.getElementById('setup-nassau-enabled');
         const panel = document.getElementById('setup-nassau-panel');
@@ -3135,6 +3181,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function collectSetupNassauWager() {
         const on = document.getElementById('setup-nassau-enabled');
         if (!on || !on.checked) return null;
+        // Last gate before the write. The checkbox alone is not trusted: this is
+        // money, and a manipulated DOM must not be able to persist a second Nassau.
+        if (legacyMainGameBlocksNassau()) return null;
         if (typeof buildNassauWagerPayload !== 'function') return null;
         const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
         const p1 = v('setup-nassau-p1'), p2 = v('setup-nassau-p2');
@@ -3155,6 +3204,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
+        // The Step 6 Nassau card's availability follows the round's scoring format.
+        if (typeof syncSetupNassauAvailability === 'function') syncSetupNassauAvailability();
         const descEl = document.getElementById("format-description");
         if (descEl) descEl.textContent = formatDescriptions[format] || "";
         const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
@@ -3237,6 +3288,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     revealLegacyFormatOption(data.gameFormat);
                     document.getElementById("game-format-select").value = data.gameFormat;
                     if (!isCopy) showLegacyRoundNotice(data.gameFormat);
+                    syncSetupNassauAvailability();
                 }
             }
             
