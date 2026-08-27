@@ -724,6 +724,88 @@ function formatToPar(v) {
 //
 // Returns null when the round has no match-play action, so callers can simply
 // omit the widget rather than drawing an empty box.
+// SIDE-MATCH WAGERS ARE THE SUPPORTED NASSAU PATH.
+//
+// buildLiveMatchState originally read only d.gameFormat - the ROUND format. But
+// Nassau is a wager in this app, created from Action, so a real $5/$5/$10 Nassau
+// lives in sideMatches on an otherwise Stroke Play round. The presenter returned
+// null and the widget never rendered: the money was right, the Matches tab showed
+// it, and the scorecard - the screen a golfer is already holding - showed nothing.
+//
+// buildLiveMatchStates() returns EVERY match-play wager visible to this viewer:
+// the round format if it is one, plus each qualifying side match.
+//
+// SCOPE MIRRORS THE SCORECARD'S EXISTING RULE - a wager is shown when any
+// participant is among the players this viewer can see. That is deliberately not
+// "only matches I am in": a caddie or the organizer watching a group needs the
+// bets in front of them, and a cross-group wager legitimately appears to both
+// sides. visiblePlayerIds is supplied by the caller, which already knows its own
+// group lock; when absent, every player counts.
+function buildLiveMatchStates(data, courseData, savedScores, visiblePlayerIds) {
+    const d = data || {};
+    const out = [];
+
+    // 1. The round format itself, when it is a match-play format.
+    const roundState = buildLiveMatchState(d, courseData, savedScores);
+    if (roundState) out.push(roundState);
+
+    // 2. Every side-match wager the engine can express as a match.
+    const sideMatches = d.sideMatches || {};
+    const visible = Array.isArray(visiblePlayerIds) && visiblePlayerIds.length > 0
+        ? visiblePlayerIds.map(String) : null;
+
+    Object.keys(sideMatches).forEach(key => {
+        const sm = sideMatches[key] || {};
+        if (!['nassau', 'match'].includes(sm.format)) return;   // stroke/skins/dots are not matches
+
+        const a = (sm.teamAIds || []).map(String);
+        const b = (sm.teamBIds || []).map(String);
+        if (a.length === 0 || b.length === 0) return;
+        if (visible && !a.concat(b).some(id => visible.includes(id))) return;
+
+        // Real player objects, assigned to the two sides the wager named.
+        const byId = {};
+        (d.players || []).forEach(p => { byId[String(p.id)] = p; });
+        const players = a.map(id => byId[id]).filter(Boolean)
+            .map(p => Object.assign({}, p, { team: 'Team 1' }))
+            .concat(b.map(id => byId[id]).filter(Boolean)
+                .map(p => Object.assign({}, p, { team: 'Team 2' })));
+        if (players.length < 2) return;
+
+        // A wager struck on the 6th tee does not retroactively own holes 1-5.
+        const start = Number(sm.startHole) || 1;
+        const holes = (courseData || []).filter(h => h.hole >= start);
+        if (holes.length === 0) return;
+
+        const st = buildLiveMatchState(Object.assign({}, d, {
+            gameFormat: sm.format,
+            players,
+            nassauScoring: sm.scoring || 'net',
+            matchScoring: sm.scoring || 'net',
+            nassauPressRule: sm.pressRule || 'none',
+            matchPressRule: sm.pressRule || 'none',
+            nassauStake: sm.stake || 0,
+            matchStake: sm.stake || 0,
+            matchPresses: sm.presses || null,
+            // The side-match stake fields, so nassauStakeConfig resolves $5/$5/$10.
+            format: sm.format,
+            frontStake: sm.frontStake,
+            backStake: sm.backStake,
+            overallStake: sm.overallStake,
+            autoPressStake: sm.autoPressStake,
+        }), holes, savedScores);
+
+        if (st) {
+            st.wagerId = key;
+            st.isSideMatch = true;
+            st.startHole = start;
+            out.push(st);
+        }
+    });
+
+    return out;
+}
+
 function buildLiveMatchState(data, courseData, savedScores) {
     if (typeof calculateMatchEngine !== 'function') return null;
     const d = data || {};
