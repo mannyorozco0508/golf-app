@@ -321,6 +321,27 @@
                 </div>
                 <input type="number" id="sm-stake" value="20" min="0" oninput="clearStakePresetHighlight('sm-stake-presets')">
             </div>
+            <!-- NASSAU IS THREE INDEPENDENT WAGERS. One stake box could not express
+                 "$5 front, $5 back, $10 overall" - the ordinary bet - so a golfer who
+                 wanted a real Nassau had to settle for three equal amounts. The presets
+                 above fill all three at once; after that each stands alone. -->
+            <div class="control-group" id="sm-nassau-stake-group" style="display:none;">
+                <label>Nassau Bets ($)</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                    <div>
+                        <label style="font-size:0.68rem; color:var(--text-muted);">Front 9</label>
+                        <input type="number" id="sm-front-stake" value="20" min="0">
+                    </div>
+                    <div>
+                        <label style="font-size:0.68rem; color:var(--text-muted);">Back 9</label>
+                        <input type="number" id="sm-back-stake" value="20" min="0">
+                    </div>
+                    <div>
+                        <label style="font-size:0.68rem; color:var(--text-muted);">Overall 18</label>
+                        <input type="number" id="sm-overall-stake" value="20" min="0">
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="control-group" style="margin-bottom:10px;" id="sm-press-rule-group">
             <label>Press Rule</label>
@@ -330,6 +351,19 @@
                 <option value="anytime">Press Any Hole</option>
                 <option value="none">No Press</option>
             </select>
+            <!-- WHAT AN AUTOMATIC PRESS IS WORTH. "Same as segment" is how most groups
+                 play it: a press on the $5 front is $5. A custom amount applies to every
+                 automatic press. Manual presses are unaffected - the amount typed at the
+                 moment of pressing always stands, and it never cascades into later
+                 automatic ones. -->
+            <div id="sm-autopress-group" style="display:none; margin-top:8px;">
+                <label style="font-size:0.75rem;">Auto Press Amount</label>
+                <select id="sm-autopress-mode" onchange="toggleSmAutoPressAmount()">
+                    <option value="same">Same as Segment</option>
+                    <option value="custom">Custom Amount</option>
+                </select>
+                <input type="number" id="sm-autopress-stake" value="" min="0" placeholder="$ per auto press" style="display:none; margin-top:6px;">
+            </div>
         </div>
 
         <div id="sm-stroke-fields" style="display:none;">
@@ -633,6 +667,26 @@
             if (hcpIndex > (18 - plusVal)) return -1;
             return 0;
         }
+    }
+
+    // ---- NASSAU STAKE CONFIG -------------------------------------------------
+    // Nassau is a WAGER here, created from Action, not a round type. A side match
+    // persists frontStake / backStake / overallStake / autoPressStake; a legacy
+    // record carries only `stake`, and the absence of the new fields IS the legacy
+    // signal - so nothing needs migrating and old bets settle exactly as before.
+    function nassauStakeConfig(sm) {
+        const d = sm || {};
+        if (d.format !== 'nassau') return undefined;
+        const pick = v => (v === undefined || v === null || v === '') ? undefined : Number(v);
+        const c = {
+            F9: pick(d.frontStake),
+            B9: pick(d.backStake),
+            '18': pick(d.overallStake),
+            autoPress: pick(d.autoPressStake),
+        };
+        if (c.F9 === undefined && c.B9 === undefined && c['18'] === undefined
+            && c.autoPress === undefined) return undefined;
+        return c;
     }
 
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
@@ -1049,6 +1103,10 @@
     // presets in admin.html. No new stored field, no new config model.
     function setSmStakePreset(value) {
         document.getElementById('sm-stake').value = value;
+        // A preset is a shortcut for all three Nassau boxes; each stays editable after.
+        ['sm-front-stake','sm-back-stake','sm-overall-stake'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = value;
+        });
         document.querySelectorAll('#sm-stake-presets .preset-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
     }
@@ -1068,14 +1126,30 @@
     // only the settings it actually has - the app should feel like golf, not a form.
     function isFieldAction(format) { return format === 'skins' || format === 'dots'; }
 
+    function toggleSmAutoPressAmount() {
+        const mode = document.getElementById('sm-autopress-mode');
+        const amt = document.getElementById('sm-autopress-stake');
+        if (mode && amt) amt.style.display = mode.value === 'custom' ? 'block' : 'none';
+    }
+
     function onSideMatchFormatChange() {
         const format = document.getElementById("sm-format").value;
         const isStroke = format === 'stroke';
         const fieldGame = isFieldAction(format);
 
         document.getElementById("sm-stroke-fields").style.display = (isStroke && !fieldGame) ? "block" : "none";
-        document.getElementById("sm-stake-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+        const isNassau = format === 'nassau';
+        // Nassau shows THREE stakes instead of one; every other format keeps its single box.
+        document.getElementById("sm-stake-group").style.display = (!isStroke && !fieldGame && !isNassau) ? "block" : "none";
+        document.getElementById("sm-nassau-stake-group").style.display = (isNassau && !fieldGame) ? "block" : "none";
         document.getElementById("sm-press-rule-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+        const apg = document.getElementById("sm-autopress-group");
+        if (apg) apg.style.display = (isNassau && !fieldGame) ? "block" : "none";
+        // NASSAU IS MATCH PLAY. Front, back and overall are three match-play bets; a
+        // "stroke play Nassau" is not a thing this app offers, and letting the selector
+        // suggest otherwise is what made a real round look like stroke play.
+        const scoringGroup = document.getElementById("sm-scoring-group");
+        if (scoringGroup && isNassau) scoringGroup.setAttribute('data-nassau-matchplay', 'true');
 
         const sideBox = document.getElementById('sm-picker-box');
         if (sideBox) sideBox.style.display = fieldGame ? 'none' : 'block';
@@ -1854,6 +1928,26 @@
         } else {
             payload.stake = parseFloat(document.getElementById("sm-stake").value) || 0;
             payload.pressRule = document.getElementById("sm-press-rule").value;
+            if (format === 'nassau') {
+                // THREE INDEPENDENT WAGERS, persisted separately. `stake` is still
+                // written and mirrors Overall, so a record saved here stays readable to
+                // any surface that has not learned the new fields - and a legacy record
+                // carrying only `stake` keeps settling exactly as it does today.
+                const f = parseFloat(document.getElementById("sm-front-stake").value) || 0;
+                const b = parseFloat(document.getElementById("sm-back-stake").value) || 0;
+                const o = parseFloat(document.getElementById("sm-overall-stake").value) || 0;
+                payload.frontStake = f;
+                payload.backStake = b;
+                payload.overallStake = o;
+                payload.stake = o || payload.stake;
+                // null means "same as segment" - the default. Absence is the signal, so
+                // nothing needs migrating.
+                const apMode = document.getElementById("sm-autopress-mode");
+                const apVal = parseFloat(document.getElementById("sm-autopress-stake").value);
+                payload.autoPressStake = (apMode && apMode.value === 'custom' && apVal > 0) ? apVal : null;
+                // Nassau is Match Play, always.
+                payload.scoring = document.getElementById("sm-scoring").value || 'net';
+            }
         }
 
         const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
@@ -2482,7 +2576,7 @@
             }
 
             const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-            const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+            const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));
 
             if (!calc) {
                 html += `<div class="side-match-card"><div style="color:var(--accent-red); font-size:0.8rem;">Couldn't calculate this match.</div></div>`;
