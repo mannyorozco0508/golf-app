@@ -144,3 +144,178 @@ describe('PARITY — index.html\'s independent Match/Stroke engines vs canonical
         assert.equal(canonicalResult.t1TotalMoney, indexResult.t1TotalMoney);
     });
 });
+
+// ============================================================================
+// PARITY — Birdie Pool's THREE independent copies
+//
+// calculateBirdieGameTotals exists in three places and none of them was
+// guarded:
+//
+//     settlement-engine.js   calculateBirdieGameTotalsForSettle   (settles)
+//     index.html             calculateBirdieGameTotals            (scorecard)
+//     stats.html             calculateBirdieGameTotalsForSettle   (stats page)
+//
+// The name differs between files, so a grep for one name found only one copy -
+// which is part of why this went unguarded while Dots and Hi-Lo were caught.
+//
+// This is the same latent-drift class that cost a $15 discrepancy once before:
+// per-press stakes landed in money-engine.js and not in the page copies, and a
+// $10 Nassau with a $25 press showed $30 live while the Receipt paid $45. Three
+// copies is worse odds than two.
+//
+// The copies AGREE today - verified before writing this. These tests are the
+// tripwire, not a repair.
+// ============================================================================
+
+describe('PARITY — Birdie Pool\'s three independent copies', () => {
+    // settlement-engine.js calls getStrokes/parseHcp from money-engine.js, exactly as
+    // every page loads them: money-engine first, then settlement-engine. Loading it
+    // alone throws on any net-scoring round, so the sandbox mirrors production order
+    // rather than the file in isolation.
+    const settle = (() => {
+        const vm = require('node:vm');
+        const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
+                     parseInt, parseFloat, Date, Set, Map };
+        vm.createContext(sb);
+        ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+            .forEach(f => vm.runInContext(
+                fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
+        return sb;
+    })();
+    const ix = loadHtmlInlineScript('index.html');
+    const st = loadHtmlInlineScript('stats.html');
+
+    const cd = makeCourseData(18);
+    // One low handicap and one 18 so a net round genuinely differs from gross.
+    const players = makePlayers(['Marty', 'Manny', 'Carp', 'Scott'], [0, 18, 0, 0]);
+
+    // mut shapes individual holes; everything else is a par-4 par.
+    function scores(mut) {
+        const s = {};
+        players.forEach(p => cd.forEach(h => { s['p' + p.id + '_h' + h.hole] = h.par; }));
+        if (mut) mut(s, players, cd);
+        return s;
+    }
+    function allThree(data, sc) {
+        return {
+            settle: settle.calculateBirdieGameTotalsForSettle(data, cd, sc),
+            index: ix.calculateBirdieGameTotals(data, cd, sc),
+            stats: st.calculateBirdieGameTotalsForSettle(data, cd, sc),
+        };
+    }
+    // JSON round-trip: values crossing a vm boundary are not the test's own objects.
+    const norm = (o) => JSON.stringify(JSON.parse(JSON.stringify(o)));
+
+    function assertAgree(label, data, sc) {
+        const r = allThree(data, sc);
+        assert.equal(norm(r.index), norm(r.settle),
+            label + ': index.html has drifted from settlement-engine.js');
+        assert.equal(norm(r.stats), norm(r.settle),
+            label + ': stats.html has drifted from settlement-engine.js');
+        return JSON.parse(JSON.stringify(r.settle));
+    }
+
+    const ON = (over) => Object.assign({
+        players, birdieGameEnabled: true, birdieUnitVal: 2, birdieScoringType: 'gross',
+    }, over || {});
+
+    test('a single birdie: the whole field pays the one golfer', () => {
+        const totals = assertAgree('birdie', ON(), scores(s => { s.p101_h1 = 3; }));
+        // Zero-sum by construction, and the birdie maker is up.
+        assert.ok(totals[101] > 0, 'Marty made the birdie');
+        assert.equal(Object.values(totals).reduce((a, b) => a + b, 0), 0, 'zero-sum');
+    });
+
+    test('an eagle is worth double a birdie', () => {
+        const b = assertAgree('birdie', ON(), scores(s => { s.p101_h1 = 3; }));
+        const e = assertAgree('eagle', ON(), scores(s => { s.p101_h1 = 2; }));
+        assert.equal(e[101], b[101] * 2, 'Eagle = 2x, as the setup label promises');
+    });
+
+    test('an albatross is worth triple', () => {
+        const b = assertAgree('birdie', ON(), scores(s => { s.p101_h1 = 3; }));
+        const a = assertAgree('albatross', ON(), scores(s => { s.p101_h1 = 1; }));
+        assert.equal(a[101], b[101] * 3);
+    });
+
+    test('several birdies across several golfers', () => {
+        const totals = assertAgree('several', ON(),
+            scores(s => { s.p101_h1 = 3; s.p102_h4 = 3; s.p103_h5 = 2; }));
+        assert.equal(Object.values(totals).reduce((a, b) => a + b, 0), 0, 'still zero-sum');
+    });
+
+    test('a round with no birdies pays nobody', () => {
+        const totals = assertAgree('none', ON(), scores(null));
+        Object.values(totals).forEach(v => assert.equal(v, 0));
+    });
+
+    test('NET scoring differs from GROSS, and all three agree on both', () => {
+        // Manny plays off 18 - a shot every hole - so his net par is a net birdie.
+        const sc = scores(s => { s.p102_h1 = 4; });
+        const gross = assertAgree('gross', ON({ birdieScoringType: 'gross' }), sc);
+        const net = assertAgree('net', ON({ birdieScoringType: 'net' }), sc);
+        assert.notEqual(JSON.stringify(gross), JSON.stringify(net),
+            'a shot a hole must change who has a birdie');
+    });
+
+    test('a plus handicap is handled identically everywhere', () => {
+        const plus = makePlayers(['Marty', 'Manny'], ['+2', 10]);
+        const sc = {};
+        plus.forEach(p => cd.forEach(h => { sc['p' + p.id + '_h' + h.hole] = h.par; }));
+        sc['p' + plus[0].id + '_h1'] = 3;
+        assertAgree('plus hcp',
+            { players: plus, birdieGameEnabled: true, birdieUnitVal: 2, birdieScoringType: 'net' }, sc);
+    });
+
+    test('the unit value scales every copy the same way', () => {
+        const sc = scores(s => { s.p101_h1 = 3; });
+        const two = assertAgree('unit 2', ON({ birdieUnitVal: 2 }), sc);
+        const five = assertAgree('unit 5', ON({ birdieUnitVal: 5 }), sc);
+        assert.equal(five[101], two[101] / 2 * 5, 'linear in the unit value');
+    });
+
+    test('a partial round scores only the holes played', () => {
+        const sc = {};
+        players.forEach(p => cd.forEach(h => {
+            if (h.hole <= 6) sc['p' + p.id + '_h' + h.hole] = h.par;
+        }));
+        sc.p101_h1 = 3;
+        const totals = assertAgree('partial', ON(), sc);
+        assert.equal(Object.values(totals).reduce((a, b) => a + b, 0), 0);
+    });
+
+    test('the game switched off pays nobody, in every copy', () => {
+        const sc = scores(s => { s.p101_h1 = 3; });
+        const r = allThree(ON({ birdieGameEnabled: false }), sc);
+        [r.settle, r.index, r.stats].forEach(t =>
+            assert.equal(Object.keys(JSON.parse(JSON.stringify(t))).length, 0,
+                'disabled means no totals at all'));
+    });
+
+    test('a missing unit value is treated the same everywhere', () => {
+        // Absent unitVal defaults to 0 - nobody pays. Worth pinning: a copy that
+        // defaulted to 1 instead would invent money out of nothing.
+        const sc = scores(s => { s.p101_h1 = 3; });
+        const totals = assertAgree('no unit value',
+            { players, birdieGameEnabled: true, birdieScoringType: 'gross' }, sc);
+        Object.values(totals).forEach(v => assert.equal(v, 0));
+    });
+
+    test('all three copies still exist — this guard is not vacuous', () => {
+        // If a copy is ever deleted, that is good news, but this suite must be
+        // told rather than silently passing against two survivors.
+        const files = {
+            'settlement-engine.js': /function calculateBirdieGameTotalsForSettle\(/,
+            'index.html': /function calculateBirdieGameTotals\(/,
+            'stats.html': /function calculateBirdieGameTotalsForSettle\(/,
+        };
+        Object.keys(files).forEach(f => {
+            const src = fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+            assert.match(src, files[f], f + ' no longer has the copy this suite compares');
+        });
+        [settle.calculateBirdieGameTotalsForSettle,
+         ix.calculateBirdieGameTotals,
+         st.calculateBirdieGameTotalsForSettle].forEach((fn, i) =>
+            assert.equal(typeof fn, 'function', 'copy ' + i + ' must be callable'));
+    });
+});
