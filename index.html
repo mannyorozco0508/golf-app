@@ -858,6 +858,11 @@
         .lg-name { font-size: 0.8rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .lg-val { font-size: 0.85rem; font-weight: bold; white-space: nowrap; }
         .lg-quiet { color: var(--text-muted); font-style: italic; font-size: 0.78rem; }
+        .hl-split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-faint); }
+        .hl-col-title { font-size: 0.6rem; font-weight: bold; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 2px; }
+        .hl-line { display: flex; justify-content: space-between; gap: 6px; font-size: 0.74rem; }
+        .hl-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .hl-lead { font-size: 0.85rem; font-weight: bold; }
         .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
@@ -1827,6 +1832,43 @@
         return html + '</div>';
     }
 
+    // LIVE HI-LO. Reads buildLiveHiLoState() in money-engine.js - the same shared
+    // presenter the Leaderboard uses. Hi-Lo is two contests per hole, low ball and
+    // high ball, so the card shows the point standing and how each contest got
+    // there. No match-play UP/DOWN language: Hi-Lo does not work that way.
+    //
+    // NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake and belongs in
+    // Results; a running figure mid-round is not final.
+    function buildLiveHiLoHtml(data, courseData, savedScores) {
+        if (typeof buildLiveHiLoState !== 'function') return '';
+        const st = buildLiveHiLoState(data, courseData, savedScores);
+        if (!st) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let html = '<div class="lg-card"><div class="lg-head">'
+            + '<span class="lg-title">' + st.icon + ' LIVE GAME \u00B7 ' + esc(st.label) + '</span>'
+            + '<span class="lg-sub">' + (st.thru ? 'thru ' + st.thru : '') + '</span></div>';
+
+        if (!st.started) {
+            html += '<div class="lg-quiet">No scoring yet.</div>';
+            return html + '</div>';
+        }
+        html += '<div class="lg-row"><span class="lg-name">' + esc(st.t1Name) + '</span>'
+             + '<span class="lg-val">' + st.t1Points + '</span></div>'
+             + '<div class="lg-row"><span class="lg-name">' + esc(st.t2Name) + '</span>'
+             + '<span class="lg-val">' + st.t2Points + '</span></div>'
+             + '<div class="lg-row"><span class="hl-lead">' + esc(st.leadText) + '</span></div>';
+
+        // How each contest got there - the part net-to-par can never show.
+        const col = (title, t) => '<div><div class="hl-col-title">' + title + '</div>'
+            + '<div class="hl-line"><span>' + esc(st.t1Name) + '</span><span>' + t.t1 + '</span></div>'
+            + '<div class="hl-line"><span>' + esc(st.t2Name) + '</span><span>' + t.t2 + '</span></div>'
+            + (t.tied ? '<div class="hl-line lg-quiet"><span>halved</span><span>' + t.tied + '</span></div>' : '')
+            + '</div>';
+        html += '<div class="hl-split">' + col('LOW', st.low) + col('HIGH', st.high) + '</div>';
+        return html + '</div>';
+    }
+
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchStates !== 'function') return '';
         // EVERY wager visible to this viewer, not just the round format. A real
@@ -1904,8 +1946,11 @@
         // as a points game or a match format, not both, so this adds a card only
         // where one was missing entirely.
         const points = buildLivePointsHtml(currentData, currentData.courseData || [], currentData.scores || {});
-        const any = board || skins || matches || points;
-        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + '</div>' : '';
+        // Hi-Lo is a primary format, so it is mutually exclusive with the points and
+        // match cards - it adds a card only where the golfer previously had none.
+        const hilo = buildLiveHiLoHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        const any = board || skins || matches || points || hilo;
+        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + '</div>' : '';
     }
 
     function renderLeaderWidgetHtml() {
