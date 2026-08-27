@@ -107,6 +107,21 @@
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        /* THREE STAKES NEED THE WHOLE ROW.
+           .control-grid is two columns - the single Stake box was built to sit in one
+           of them beside Scoring. A three-column sub-grid inside that half-width cell
+           measures out at roughly 32-40px of usable input on a 375-430px phone, once
+           the modal's 20px padding, the 10px column gap, two 6px gaps and each input's
+           8px padding are taken out. The fields render; they cannot be read or tapped
+           accurately. Spanning both columns gives each box ~90-105px instead.
+           Scoped to this group so no other control-grid layout moves. */
+        #sm-nassau-stake-group { grid-column: 1 / -1; }
+        .sm-nassau-stakes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        /* Grid children default to min-content; without this three number inputs push
+           the modal sideways rather than sharing the row. */
+        .sm-nassau-stakes > div { min-width: 0; }
+        .sm-nassau-stakes input { width: 100%; box-sizing: border-box; }
+        .sm-nassau-stakes label { font-size: 0.68rem; color: var(--text-muted); font-weight: normal; white-space: nowrap; }
         .grid-4col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
         .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
         .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
@@ -328,19 +343,20 @@
                  wanted a real Nassau had to settle for three equal amounts. The presets
                  above fill all three at once; after that each stands alone. -->
             <div class="control-group" id="sm-nassau-stake-group" style="display:none;">
-                <label>Nassau Bets ($)</label>
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                <label>Nassau — Match Play</label>
+                <div style="font-size:0.7rem; color:var(--text-muted); font-weight:normal; margin:-2px 0 6px 0;">Three separate bets. Scoring basis (Net/Gross) is set above.</div>
+                <div class="sm-nassau-stakes">
                     <div>
-                        <label style="font-size:0.68rem; color:var(--text-muted);">Front 9</label>
-                        <input type="number" id="sm-front-stake" value="20" min="0">
+                        <label>Front 9</label>
+                        <input type="number" id="sm-front-stake" value="20" min="0" inputmode="numeric">
                     </div>
                     <div>
-                        <label style="font-size:0.68rem; color:var(--text-muted);">Back 9</label>
-                        <input type="number" id="sm-back-stake" value="20" min="0">
+                        <label>Back 9</label>
+                        <input type="number" id="sm-back-stake" value="20" min="0" inputmode="numeric">
                     </div>
                     <div>
-                        <label style="font-size:0.68rem; color:var(--text-muted);">Overall 18</label>
-                        <input type="number" id="sm-overall-stake" value="20" min="0">
+                        <label>Overall 18</label>
+                        <input type="number" id="sm-overall-stake" value="20" min="0" inputmode="numeric">
                     </div>
                 </div>
             </div>
