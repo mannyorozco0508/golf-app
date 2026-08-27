@@ -150,6 +150,12 @@
         .wizard-step { display: none; }
         .wizard-step.active { display: block; }
         .wizard-step-title { font-size: 1.05rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
+        /* Three stakes across the full width, same as the Action form. Squeezing them
+           into a half-width column leaves ~35px per box on a phone. */
+        .sm-nassau-stakes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .sm-nassau-stakes > div { min-width: 0; }
+        .sm-nassau-stakes input { width: 100%; box-sizing: border-box; }
+        .sm-nassau-stakes label { font-size: 0.68rem; color: var(--text-muted); font-weight: normal; white-space: nowrap; }
         .wizard-step-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
         .wizard-nav-row { display: flex; gap: 10px; margin-top: 20px; }
         .wizard-btn-back { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 0.95rem; cursor: pointer; }
@@ -833,6 +839,70 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-step-title">💰 Step 6: What's The Action?</div>
         <div class="wizard-step-sub">Money games that run alongside your scoring format. All optional — skip this if you're just keeping score.</div>
 
+        <!-- NASSAU AT SETUP TIME.
+             On the first tee the group already knows they are playing a $10/$10/$20
+             Nassau. Making them create the round, start it, then hunt through Action
+             was friction for the game they had already agreed on. Step 3 stays "how we
+             score"; this is Step 6, "what we're playing for", which is where money
+             already lives - so the model does not blur.
+             This writes the SAME modern wager Action writes, via the same shared
+             builder. There is no setup-only Nassau. -->
+        <div id="setup-nassau-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
+            <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="setup-nassau-enabled" onchange="toggleSetupNassau()" style="width:18px; height:18px; margin:0;">
+                <strong>⚔️ Nassau</strong>
+            </label>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 26px;">Match Play · Front / Back / Overall — three separate bets.</p>
+            <div id="setup-nassau-panel" style="display:none;">
+                <label style="font-size:0.75rem;">Nassau Bets ($)</label>
+                <div class="sm-nassau-stakes">
+                    <div>
+                        <label>Front 9</label>
+                        <input type="number" id="setup-nassau-front" value="10" min="0" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label>Back 9</label>
+                        <input type="number" id="setup-nassau-back" value="10" min="0" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label>Overall 18</label>
+                        <input type="number" id="setup-nassau-overall" value="20" min="0" inputmode="numeric">
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+                    <div>
+                        <label style="font-size:0.75rem;">Scoring Basis</label>
+                        <select id="setup-nassau-scoring">
+                            <option value="net">Net</option>
+                            <option value="gross">Gross</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;">Press Rule</label>
+                        <select id="setup-nassau-press">
+                            <option value="2down">Auto @ 2 Down</option>
+                            <option value="1down">Auto @ 1 Down</option>
+                            <option value="anytime">Press Any Hole</option>
+                            <option value="none">No Press</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <label style="font-size:0.75rem;">Auto Press Amount</label>
+                    <select id="setup-nassau-autopress-mode" onchange="toggleSetupNassauAutoAmount()">
+                        <option value="same">Same as Segment</option>
+                        <option value="custom">Custom Amount</option>
+                    </select>
+                    <input type="number" id="setup-nassau-autopress" value="" min="0" placeholder="$ per auto press" style="display:none; margin-top:6px;" inputmode="numeric">
+                </div>
+                <!-- WHO IS IN IT. Two players is unambiguous and defaults itself; more
+                     than that is a real choice and the app must not invent teams. -->
+                <div style="margin-top:10px;">
+                    <label style="font-size:0.75rem;">Players</label>
+                    <div id="setup-nassau-players"></div>
+                </div>
+            </div>
+        </div>
         <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
@@ -3007,6 +3077,82 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         el.style.display = 'block';
     }
 
+    // ---- STEP 6 NASSAU ------------------------------------------------------
+    function toggleSetupNassau() {
+        const on = document.getElementById('setup-nassau-enabled');
+        const panel = document.getElementById('setup-nassau-panel');
+        if (panel) panel.style.display = (on && on.checked) ? 'block' : 'none';
+        if (on && on.checked) renderSetupNassauPlayers();
+    }
+
+    function toggleSetupNassauAutoAmount() {
+        const mode = document.getElementById('setup-nassau-autopress-mode');
+        const amt = document.getElementById('setup-nassau-autopress');
+        if (mode && amt) amt.style.display = mode.value === 'custom' ? 'block' : 'none';
+    }
+
+    // TWO PLAYERS IS OBVIOUS; MORE IS A CHOICE.
+    // A heads-up round has exactly one possible Nassau, so it fills itself in. With
+    // more players the app must not invent the pairing - guessing who is playing whom
+    // for money is how a wrong bet gets settled.
+    function renderSetupNassauPlayers() {
+        const box = document.getElementById('setup-nassau-players');
+        if (!box) return;
+        const players = collectWizardPlayers().filter(p => p.name && p.name.trim());
+        if (players.length < 2) {
+            box.innerHTML = '<div style="font-size:0.74rem; color:var(--text-muted);">Add at least two players in Step 5 first.</div>';
+            return;
+        }
+        const opts = (sel) => players.map((p, i) =>
+            '<option value="' + p.id + '"' + (String(p.id) === String(sel) ? ' selected' : '') + '>'
+            + String(p.name).replace(/[<>&"]/g, '') + '</option>').join('');
+        // Default only in the unambiguous case.
+        const defA = players.length === 2 ? players[0].id : '';
+        const defB = players.length === 2 ? players[1].id : '';
+        box.innerHTML =
+            '<div style="display:grid; grid-template-columns:1fr auto 1fr; gap:6px; align-items:center;">'
+            + '<select id="setup-nassau-p1">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defA) + '</select>'
+            + '<span style="font-size:0.72rem; color:var(--text-muted);">vs</span>'
+            + '<select id="setup-nassau-p2">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defB) + '</select>'
+            + '</div>'
+            + (players.length > 2 ? '<div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">More action can be added from Action once the round starts.</div>' : '');
+
+        // Set the selection explicitly rather than trusting the `selected` attribute to
+        // survive innerHTML. Browsers honour it; relying on markup parsing for a value
+        // that decides who is in a money game is a needless dependency.
+        if (defA && defB) {
+            const a = document.getElementById('setup-nassau-p1');
+            const b = document.getElementById('setup-nassau-p2');
+            if (a) a.value = String(defA);
+            if (b) b.value = String(defB);
+        }
+    }
+
+    // Builds the wager from the Step 6 fields using the SHARED builder in
+    // action-model.js - the same one Action -> Add Wager uses. Returns null when
+    // Nassau is off or the pairing is incomplete, so a half-filled form never
+    // silently creates a money game.
+    function collectSetupNassauWager() {
+        const on = document.getElementById('setup-nassau-enabled');
+        if (!on || !on.checked) return null;
+        if (typeof buildNassauWagerPayload !== 'function') return null;
+        const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+        const p1 = v('setup-nassau-p1'), p2 = v('setup-nassau-p2');
+        if (!p1 || !p2 || String(p1) === String(p2)) return null;
+        const mode = v('setup-nassau-autopress-mode');
+        return buildNassauWagerPayload({
+            teamAIds: [p1],
+            teamBIds: [p2],
+            frontStake: v('setup-nassau-front'),
+            backStake: v('setup-nassau-back'),
+            overallStake: v('setup-nassau-overall'),
+            autoPressStake: mode === 'custom' ? v('setup-nassau-autopress') : null,
+            pressRule: v('setup-nassau-press'),
+            scoring: v('setup-nassau-scoring'),
+            startHole: 1,
+        });
+    }
+
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         const descEl = document.getElementById("format-description");
@@ -3828,6 +3974,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     alert('\u26A0\uFE0F Money Pool:\n' + mpCheck.errors.join('\n'));
                     return;
                 }
+            }
+
+            // The Step 6 Nassau is written to the STANDARD sideMatches location, the
+            // same one Action writes to - no setup-only path, no new permission. The
+            // round creator already owns events/{code}. Keyed by push() so adding more
+            // Nassau action later cannot collide with it.
+            const setupNassau = collectSetupNassauWager();
+            if (setupNassau && !payload.sideMatches) {
+                const nKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
+                payload[`sideMatches/${nKey}`] = setupNassau;
             }
 
             db.ref(`events/${currentMode}`).update(payload).then(() => {
