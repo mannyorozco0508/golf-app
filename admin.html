@@ -526,6 +526,16 @@
                 <option value="stroke" selected>Individual (Stroke Play)</option>
                 <option value="stableford">Stableford</option>
             </optgroup>
+            <optgroup label="Player vs player">
+                <!-- INTENT, NOT A STORED FORMAT.
+                     A golfer who says "we're playing a Nassau" should be able to pick
+                     Nassau. The legacy value below persists the old Nassau round format, which
+                     opens the deprecated single-stake editor AND creates a settling main
+                     wager - one click, three consequences. This token carries the intent
+                     through the wizard and normalizes to 'stroke' at save time; the
+                     Nassau itself is the modern Step 6 wager. -->
+                <option value="nassau-modern">Nassau</option>
+            </optgroup>
             <optgroup label="Team formats">
                 <option value="bestball">Best Ball</option>
                 <option value="scramble">Scramble</option>
@@ -3128,6 +3138,24 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // tell a duplicate from a legitimate second wager - a legacy 2v2 plus a
     // private 1v1 Nassau looks identical to a legacy 2v2 plus its own copy. A
     // generic dedupe would silently delete a bet two golfers actually struck.
+    // 'nassau-modern' is a wizard-only token. It must never reach Firebase: stored as
+    // a gameFormat it would revive the legacy editor and double-settle through
+    // legacyMainAsSideMatch. A Nassau round is scored on individual cards, so it
+    // normalizes to 'stroke' and the wager lives in sideMatches like any other.
+    //
+    // Called from the ONE place the stored format is read, so there is no second path
+    // for the token to escape through.
+    function normalizeGameFormatForSave(fmt) {
+        if (fmt === 'nassau-modern') return 'stroke';
+        return fmt;
+    }
+
+    // True when Step 3 expressed a Nassau intent, so Step 6 can arrive ready.
+    function wantsModernNassau() {
+        const sel = document.getElementById('game-format-select');
+        return !!sel && sel.value === 'nassau-modern';
+    }
+
     function legacyMainGameBlocksNassau() {
         const sel = document.getElementById('game-format-select');
         const fmt = sel ? sel.value : '';
@@ -3156,6 +3184,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     function syncSetupNassauAvailability() {
+        // Picking Nassau in Step 3 already said what the golfer wants; make Step 6
+        // reflect it rather than asking twice. The card keeps its own 10/10/20
+        // defaults - this sets no stakes, so there is one source of truth for them.
+        const wants = wantsModernNassau();
+        const box0 = document.getElementById('setup-nassau-enabled');
+        if (wants && box0 && !box0.disabled && !box0.checked) {
+            box0.checked = true;
+            toggleSetupNassau();
+        }
         const box = document.getElementById('setup-nassau-enabled');
         const note = document.getElementById('setup-nassau-legacy-note');
         const blocked = legacyMainGameBlocksNassau();
@@ -3860,7 +3897,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 return; 
             }
             
-            let gameFormat = document.getElementById("game-format-select").value;
+            let gameFormat = normalizeGameFormatForSave(
+                document.getElementById("game-format-select").value);
             // No forced betting decision. A Quick Round is an individual round unless the
             // organizer deliberately picks a team format.
             if (!gameFormat) gameFormat = 'stroke';
