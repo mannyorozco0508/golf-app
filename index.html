@@ -861,6 +861,9 @@
         .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.8rem; }
         .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 62px; }
         .lm-press-tag { font-size: 0.6rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .lm-stake { font-size: 0.72rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; margin-left: 6px; }
+        .lm-divider { border-top: 1px solid var(--border-mid); margin: 6px 0; }
+        .lm-wager-head { font-size: 0.66rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
         .lm-press-status { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
         .lm-closed { opacity: 0.6; }
         /* LIVE DASHBOARD WIDGETS. Stacked on a phone, side by side once there is room.
@@ -1769,30 +1772,45 @@
     //
     // NO SETTLEMENT ARITHMETIC HERE. During play a golfer needs to know who is up and
     // which presses are running - not what it pays. That belongs in Results.
-    function buildLiveMatchHtml(data, courseData, savedScores) {
-        if (typeof buildLiveMatchState !== 'function') return '';
-        const st = buildLiveMatchState(data, courseData, savedScores);
-        if (!st) return '';
+    function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof buildLiveMatchStates !== 'function') return '';
+        // EVERY wager visible to this viewer, not just the round format. A real
+        // Nassau is created from Action and lives in sideMatches, so reading only
+        // the round format left the supported path invisible on the scorecard.
+        const states = buildLiveMatchStates(data, courseData, savedScores, visibleIds);
+        if (!states || states.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        // The stake is what DEFINES the bet, so it belongs on screen. Amounts only -
+        // never a running total, which is settlement's job and is not final mid-round.
+        const money = v => (v === undefined || v === null || isNaN(Number(v))) ? '' : '$' + Number(v);
 
         let html = '<div class="lm-card"><div class="lm-head">'
             + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
-            + '<span class="lm-sub">' + esc(st.formatLabel) + ' \u00B7 ' + esc(st.t1Name)
-            + ' v ' + esc(st.t2Name) + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</span></div>';
+            + '<span class="lm-sub">' + states.length + ' wager' + (states.length === 1 ? '' : 's')
+            + '</span></div>';
 
-        st.segments.forEach(seg => {
-            html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
-                 + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
-                 + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
-                 + esc(seg.statusText) + (seg.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
-            seg.presses.forEach(p => {
-                html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
-                     + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
-                     + ' PRESS \u00B7 H' + p.startHole + '</span>'
-                     + '<span class="lm-press-status">' + esc(p.statusText)
-                     + (p.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
+        states.forEach((st, i) => {
+            if (i > 0) html += '<div class="lm-divider"></div>';
+            html += '<div class="lm-wager-head">' + esc(st.formatLabel) + ' \u00B7 '
+                 + esc(st.t1Name) + ' v ' + esc(st.t2Name)
+                 + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</div>';
+
+            st.segments.forEach(seg => {
+                html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
+                     + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
+                     + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
+                     + esc(seg.statusText) + (seg.closed ? ' \u00B7 FINAL' : '') + '</span>'
+                     + '<span class="lm-stake">' + money(seg.stake) + '</span></div>';
+                seg.presses.forEach(p => {
+                    html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
+                         + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
+                         + ' PRESS \u00B7 H' + p.startHole + '</span>'
+                         + '<span class="lm-press-status">' + esc(p.statusText)
+                         + (p.closed ? ' \u00B7 FINAL' : '') + '</span>'
+                         + '<span class="lm-stake">' + money(p.stake) + '</span></div>';
+                });
+                html += '</div>';
             });
-            html += '</div>';
         });
         return html + '</div>';
     }
@@ -1805,7 +1823,13 @@
         if (!mount) return;
         const board = renderLeaderWidgetHtml();
         const skins = renderSkinsWidgetHtml();
-        const matches = buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        // Scoped to the players this viewer can see - the same rule the scorecard's
+        // side-bet callout already uses, so a group scorekeeper sees the bets in front
+        // of them and a cross-group wager appears to both sides.
+        const lmVisible = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+            ? window.__scFilteredPlayers.map(p => String(p.id))
+            : (currentData.players || []).map(p => String(p.id));
+        const matches = buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
         const any = board || skins || matches;
         mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + '</div>' : '';
     }
