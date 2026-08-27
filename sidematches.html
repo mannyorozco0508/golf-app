@@ -136,6 +136,8 @@
         .pill-press { background-color: var(--danger-box-bg); color: var(--accent-red); border: 1px solid var(--accent-red); }
 
         .side-match-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--nassau-box-bg); }
+        /* Brief, so the golfer's eye lands on the wager they came here to press. */
+        .sm-card-focus { border: 2px solid var(--brand-green); box-shadow: 0 0 0 3px rgba(15,76,58,0.18); }
         .sm-scorecard-toggle {
             font-size: 0.78rem; font-weight: bold; color: var(--brand-navy); cursor: pointer;
             padding: 6px 0; border-top: 1px dashed var(--border-mid); margin-top: 6px;
@@ -646,6 +648,28 @@
             if (urlParams.get('add') === '1' && !window.__smAutoOpened && (currentData.players || []).length) {
                 window.__smAutoOpened = true;
                 openSideMatchModal();
+            }
+
+            // ?press=<wagerId> - arriving from the scorecard's PRESS control.
+            //
+            // The scorecard cannot write a side-match press: that writer lives here,
+            // with its amount prompt, its permission gate and its offline guard. Rather
+            // than build a second one, the scorecard hands the golfer to the wager and
+            // this brings it into view.
+            //
+            // IT DOES NOT PRESS ANYTHING. A press costs real money, so the golfer taps
+            // the button they can see, with the amount in front of them. Deep-linking
+            // straight into a write would mean money moving from a URL.
+            const pressTarget = urlParams.get('press');
+            if (pressTarget && !window.__smPressFocused && (currentData.players || []).length) {
+                window.__smPressFocused = true;
+                setTimeout(() => {
+                    const card = document.getElementById('sm-card-' + pressTarget);
+                    if (!card) return;
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.classList.add('sm-card-focus');
+                    setTimeout(() => card.classList.remove('sm-card-focus'), 2600);
+                }, 220);
             }
         });
     }
@@ -2514,7 +2538,7 @@
                 const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
                 const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
 
-                html += `<div class="side-match-card">
+                html += `<div class="side-match-card" id="sm-card-${matchId}">
                     <div class="side-match-players">${p1.name.split(' ')[0]} 🆚 ${p2.name.split(' ')[0]}</div>
                     <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
@@ -2586,7 +2610,7 @@
             const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
             const scoringLabel = (sm.scoring || 'net').toUpperCase();
 
-            html += `<div class="side-match-card">
+            html += `<div class="side-match-card" id="sm-card-${matchId}">
                 <div class="side-match-players">${calc.t1Name} 🆚 ${calc.t2Name}</div>
                 <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">${formatLabel} • ${scoringLabel} • $${sm.stake || 0}/match${sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
