@@ -863,6 +863,12 @@
         .hl-line { display: flex; justify-content: space-between; gap: 6px; font-size: 0.74rem; }
         .hl-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .hl-lead { font-size: 0.85rem; font-weight: bold; }
+        .sb-split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+        .sb-col-title { font-size: 0.6rem; font-weight: bold; letter-spacing: 0.04em; color: var(--accent-teal); margin-bottom: 2px; white-space: nowrap; }
+        .sb-line { display: flex; justify-content: space-between; gap: 6px; font-size: 0.74rem; }
+        .sb-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .sb-note { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+        .sb-lead { font-size: 0.78rem; font-weight: bold; margin-top: 2px; }
         .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
@@ -1869,6 +1875,57 @@
         return html + '</div>';
     }
 
+    // LIVE STROKE BET. Reads buildLiveStrokeBetStates() in money-engine.js - the
+    // shared presenter the Leaderboard also uses. A stroke side match is TWO bets,
+    // $/hole and $/overall, so the card shows them side by side rather than as one
+    // number that would hide which wager is which.
+    //
+    // Compact by design: this is the first live card that genuinely stacks with
+    // the leaderboard and Skins, so it stays two short columns, not a table.
+    //
+    // NO MONEY TOTALS. What the next hole is worth is game state - a running
+    // payout is settlement's, and is not final mid-round.
+    function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof buildLiveStrokeBetStates !== 'function') return '';
+        const states = buildLiveStrokeBetStates(data, courseData, savedScores, visibleIds);
+        if (!states || states.length === 0) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let html = '';
+        states.forEach(st => {
+            html += '<div class="lg-card"><div class="lg-head">'
+                 + '<span class="lg-title">' + st.icon + ' LIVE GAME \u00B7 ' + esc(st.label) + '</span>'
+                 + '<span class="lg-sub">' + esc(st.p1Name) + ' v ' + esc(st.p2Name)
+                 + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</span></div>';
+
+            if (!st.started) {
+                html += '<div class="lg-quiet">No scoring yet.</div></div>';
+                return;
+            }
+            html += '<div class="sb-split">';
+            if (st.hole) {
+                html += '<div><div class="sb-col-title">$/HOLE \u00B7 $' + st.hole.stake + '</div>'
+                     + '<div class="sb-line"><span>' + esc(st.p1Name) + '</span><span>' + st.hole.p1Holes + '</span></div>'
+                     + '<div class="sb-line"><span>' + esc(st.p2Name) + '</span><span>' + st.hole.p2Holes + '</span></div>'
+                     // A halved hole raises what the NEXT one is worth - the golfer
+                     // standing on the tee needs that, not a total.
+                     + (st.hole.carry > 0
+                        ? '<div class="sb-note">next hole $' + st.hole.currentStake + '</div>' : '')
+                     + '</div>';
+            }
+            if (st.overall) {
+                html += '<div><div class="sb-col-title">OVERALL \u00B7 $' + st.overall.stake + '</div>'
+                     + '<div class="sb-line"><span>' + esc(st.p1Name) + '</span><span>' + st.overall.p1Total + '</span></div>'
+                     + '<div class="sb-line"><span>' + esc(st.p2Name) + '</span><span>' + st.overall.p2Total + '</span></div>'
+                     + '<div class="sb-lead">' + esc(st.overall.leadText)
+                     + (st.overall.closed ? ' \u00B7 FINAL' : '') + '</div>'
+                     + '</div>';
+            }
+            html += '</div></div>';
+        });
+        return html;
+    }
+
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchStates !== 'function') return '';
         // EVERY wager visible to this viewer, not just the round format. A real
@@ -1949,8 +2006,10 @@
         // Hi-Lo is a primary format, so it is mutually exclusive with the points and
         // match cards - it adds a card only where the golfer previously had none.
         const hilo = buildLiveHiLoHtml(currentData, currentData.courseData || [], currentData.scores || {});
-        const any = board || skins || matches || points || hilo;
-        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + '</div>' : '';
+        // Scoped to the players this viewer can see, the same rule the match card uses.
+        const strokeBets = buildLiveStrokeBetHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
+        const any = board || skins || matches || points || hilo || strokeBets;
+        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + strokeBets + '</div>' : '';
     }
 
     function renderLeaderWidgetHtml() {
