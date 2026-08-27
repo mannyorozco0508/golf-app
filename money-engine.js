@@ -669,3 +669,117 @@ function formatToPar(v) {
     if (n === 0) return 'E';
     return (n > 0 ? '+' : '') + n;
 }
+
+// ============================================================================
+// LIVE MATCH & PRESS PRESENTER
+//
+// WHAT THIS EXISTS TO FIX. During a real Nassau — $5/$5/$10, 2-down auto press —
+// the engine correctly generated both auto-presses at Hole 3, and the golfer
+// could not see any of it. The Live Action dashboard had been deleted during a
+// consolidation, and what survived sat behind a collapsed "View All Action ▶".
+// The scorecard showed a stroke-play leaderboard for a match-play game.
+//
+// A PRESENTER, NOT AN ENGINE. This computes no golf and no money. It calls
+// calculateMatchEngine — the same function settlement uses, the one the audit
+// put through a 25-case torture matrix — and reshapes activeMatches into
+// segments with their presses attached, so the scorecard and the leaderboard
+// can render one identical answer instead of two hand-rolled ones.
+//
+// Returns null when the round has no match-play action, so callers can simply
+// omit the widget rather than drawing an empty box.
+function buildLiveMatchState(data, courseData, savedScores) {
+    if (typeof calculateMatchEngine !== 'function') return null;
+    const d = data || {};
+    const gameFormat = d.gameFormat;
+    if (!['nassau', 'match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) return null;
+
+    const holes = courseData || [];
+    if (holes.length === 0) return null;
+
+    // Only golfers actually in the money play the match, mirroring renderScorecard.
+    const moneyPlayers = (d.players || []).filter(p => p.playingForMoney !== false);
+    if (moneyPlayers.length < 2) return null;
+
+    const scoringType = gameFormat === 'nassau'
+        ? (d.nassauScoring || 'net')
+        : (d.matchScoring || 'net');
+    const pressRule = gameFormat === 'nassau'
+        ? (d.nassauPressRule || 'none')
+        : (d.matchPressRule || 'none');
+    const stake = gameFormat === 'nassau'
+        ? (d.nassauStake || 10)
+        : (d.matchStake || 0);
+    const holeBet = Number(d.holeBet) || 0;
+    const manualPresses = d.matchPresses ? Object.values(d.matchPresses) : [];
+
+    let calc;
+    try {
+        calc = calculateMatchEngine(moneyPlayers, holes, savedScores, scoringType,
+            gameFormat, pressRule, stake, holeBet, manualPresses);
+    } catch (e) { return null; }
+    if (!calc || !calc.activeMatches) return null;
+
+    // "2 UP" for the leader, "AS" when level - the language on a scoreboard, not a
+    // signed integer. status is positive when team 1 leads.
+    const statusText = m => {
+        if (m.status === 0) return 'AS';
+        const who = m.status > 0 ? calc.t1Name : calc.t2Name;
+        return who + ' ' + Math.abs(m.status) + ' UP';
+    };
+
+    // A press is MANUAL only when the golfer typed one that matches this segment
+    // and start hole; everything else the trigger rule invented.
+    const isManual = m => manualPresses.some(mp =>
+        mp.baseId === m.baseId && Number(mp.startHole) === Number(m.startHole));
+
+    const order = { F9: 0, B9: 1, '18': 2 };
+    const bases = calc.activeMatches.filter(m => m.pressNum === 0)
+        .sort((a, b) => (order[a.baseId] === undefined ? 9 : order[a.baseId])
+                      - (order[b.baseId] === undefined ? 9 : order[b.baseId]));
+
+    const segments = bases.map(base => {
+        // A segment nobody has teed off on yet is "Not Started" rather than a
+        // misleading All Square.
+        const played = holes.some(h => h.hole >= base.startHole && h.hole <= base.endHole
+            && moneyPlayers.some(p => savedScores && savedScores['p' + p.id + '_h' + h.hole] > 0));
+
+        const presses = calc.activeMatches
+            .filter(m => m.baseId === base.baseId && m.pressNum > 0)
+            .sort((a, b) => a.startHole - b.startHole)
+            .map(m => ({
+                pressNum: m.pressNum,
+                startHole: m.startHole,
+                status: m.status,
+                statusText: statusText(m),
+                closed: !!m.closed,
+                auto: !isManual(m),
+                stake: (m.stake === undefined || m.stake === null) ? stake : m.stake,
+            }));
+
+        return {
+            id: base.baseId,
+            label: base.label,
+            startHole: base.startHole,
+            endHole: base.endHole,
+            started: played,
+            status: base.status,
+            statusText: played ? statusText(base) : 'Not Started',
+            closed: !!base.closed,
+            stake: (base.stake === undefined || base.stake === null) ? stake : base.stake,
+            presses,
+        };
+    });
+
+    if (segments.length === 0) return null;
+
+    return {
+        gameFormat,
+        formatLabel: gameFormat === 'nassau' ? 'Nassau' : 'Match Play',
+        scoring: scoringType,
+        t1Name: calc.t1Name,
+        t2Name: calc.t2Name,
+        thru: calc.maxThru,
+        pressCount: calc.pressCount,
+        segments,
+    };
+}
