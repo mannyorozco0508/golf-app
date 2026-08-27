@@ -565,6 +565,11 @@
 
     <div class="wizard-step" id="wizard-step-4" data-step="4">
         <div class="wizard-step-title">⚙️ Step 4: Format Settings</div>
+        <!-- Shown only when a genuinely old round is loaded. Every legacy field stays
+             editable below it; this states what the screen is, nothing more. -->
+        <div id="legacy-round-notice" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.78rem; color:var(--text-main); line-height:1.45;"></div>
+        <!-- Shown when a copied round's legacy wager-format was normalized away. -->
+        <div id="copied-legacy-notice" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--brand-green); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.78rem; color:var(--text-main); line-height:1.45;"></div>
         <div class="wizard-step-sub" id="step4-sub">Options specific to the format you picked.</div>
     <div class="form-group">
         <div id="match-settings" class="extra-settings-box">
@@ -2975,6 +2980,33 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (grp) grp.style.display = '';
     }
 
+    // Guidance, not an error: the setup was copied fine, the wager just lives
+    // somewhere better now.
+    function showCopiedLegacyNotice(sourceFormat) {
+        const names = { nassau: 'Nassau', match: 'Match Play', skins: 'Skins', dots: 'Dots' };
+        const el = document.getElementById('copied-legacy-notice');
+        if (!el) return;
+        el.innerHTML = '<strong>Round setup copied.</strong> '
+            + (names[sourceFormat] || 'That game') + ' is now added from <strong>Action</strong>, '
+            + 'where you can set separate amounts per bet.';
+        el.style.display = 'block';
+    }
+
+    // A genuinely old round keeps every one of its fields - it still has to be
+    // editable and settle correctly. This only says what the screen IS, so nobody
+    // mistakes it for the way to start a new Nassau.
+    function showLegacyRoundNotice(format) {
+        if (!['nassau', 'match', 'skins', 'dots'].includes(format)) return;
+        const names = { nassau: 'Nassau', match: 'Match Play', skins: 'Skins', dots: 'Dots' };
+        const el = document.getElementById('legacy-round-notice');
+        if (!el) return;
+        el.innerHTML = '<strong>Legacy ' + (names[format] || '') + ' round.</strong> '
+            + 'This round uses the older single-stake setup and still works exactly as it did. '
+            + 'New wagers are created from <strong>Action</strong>'
+            + (format === 'nassau' ? ', with separate Front, Back and Overall amounts.' : '.');
+        el.style.display = 'block';
+    }
+
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         const descEl = document.getElementById("format-description");
@@ -3036,8 +3068,30 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 || (parseFloat(data.skinsBuyIn) || 0) > 0
                 || (parseFloat(data.dotPointVal) || 0) > 0;
             if (data.gameFormat && document.getElementById("game-format-select")) {
-                revealLegacyFormatOption(data.gameFormat);
-                document.getElementById("game-format-select").value = data.gameFormat;
+                // A COPIED ROUND IS A NEW ROUND.
+                //
+                // copyFrom pre-fills a brand-new round from an old one's setup. When the
+                // source was saved under a legacy wager-as-format (Nassau/Match/Skins/
+                // Dots), carrying that forward silently created ANOTHER legacy round -
+                // and handed the golfer the old single-stake Nassau screen as though it
+                // were the way to start one. That is how a deprecated path kept
+                // reproducing itself.
+                //
+                // The new round becomes an ordinary scoring round; the wager is added
+                // from Action, where Nassau has separate Front/Back/Overall amounts.
+                // The SOURCE round is never touched - this only affects what the new
+                // one starts as. A genuine load of an old round (no copyFrom) still
+                // reveals and selects its real format, exactly as before.
+                const isCopy = !!copyFromCode;
+                const legacyWagerFormat = ['nassau', 'match', 'skins', 'dots'].includes(data.gameFormat);
+                if (isCopy && legacyWagerFormat) {
+                    document.getElementById("game-format-select").value = 'stroke';
+                    showCopiedLegacyNotice(data.gameFormat);
+                } else {
+                    revealLegacyFormatOption(data.gameFormat);
+                    document.getElementById("game-format-select").value = data.gameFormat;
+                    if (!isCopy) showLegacyRoundNotice(data.gameFormat);
+                }
             }
             
             if (data.holeBetStake && document.getElementById("hole-bet-stake")) {
