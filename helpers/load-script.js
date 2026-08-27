@@ -64,6 +64,12 @@ function makeStubSandbox() {
         document: documentStub,
         window: {},
         navigator: { clipboard: { writeText() { return Promise.resolve(); } }, share: undefined },
+        // setTimeout was absent, so ANY code path with a deferred UI reset - the
+        // "Copied" button label, for instance - threw inside its own .then() and
+        // silently fell through to the catch branch. That made every clipboard copy
+        // look like it had failed. Real timers, so deferred work behaves as it does
+        // in a browser.
+        setTimeout, clearTimeout, setInterval, clearInterval,
         location: { search: '', href: 'https://golf-app-5a5.pages.dev/index.html', pathname: '/index.html' },
         localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
         firebase: { initializeApp() {}, database() { return dbStub; } },
