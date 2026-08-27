@@ -526,7 +526,39 @@
     }
 
     // --- Ported from settlement.html: handles Nassau / Match / Best Ball / Scramble / Ryder ---
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses) {
+    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
+    // THREE-STAKE NASSAU (authorized change).
+    //
+    // A real Nassau is three independent wagers - "$5 front, $5 back, $10 overall" -
+    // and the app could only express one number for all three. stakeConfig carries
+    // them; when it is absent EVERY segment falls back to `stake`, so a legacy round
+    // settles to the cent exactly as before. No historical data is migrated.
+    //
+    //   stakeConfig = { F9: 5, B9: 5, '18': 10, autoPress: <amount>|null }
+    //
+    // AUTO-PRESS AMOUNT is its own setting, defaulting to the segment's own stake.
+    // A press on the $5 front must never settle at the $10 overall stake - and a
+    // manually enlarged press never cascades into later automatic ones, because the
+    // golfers agreed to the house auto-press amount, not that one-off escalation.
+    const segCfg = stakeConfig || {};
+    const baseStakeFor = id => {
+        const v = segCfg[id];
+        return (v === undefined || v === null || v === '') ? stake : Number(v);
+    };
+    // AUTO-PRESS AMOUNT, most specific wins:
+    //   autoPress.F9 / .B9 / .18   a per-segment amount, if the players set one
+    //   autoPress                  a single amount for every segment
+    //   (neither)                  that segment's own stake - the default
+    // Manual presses never reach here; they keep the amount the golfer typed.
+    const autoPressStakeFor = id => {
+        const ap = segCfg.autoPress;
+        const blank = v => v === undefined || v === null || v === '';
+        if (ap !== null && typeof ap === 'object') {
+            if (!blank(ap[id])) return Number(ap[id]);
+            return baseStakeFor(id);
+        }
+        return blank(ap) ? baseStakeFor(id) : Number(ap);
+    };
         let teams = {};
         players.forEach(p => {
             let key = p.team || "Team 1";
@@ -552,17 +584,17 @@
         if (gameFormat === 'nassau') {
             if (hasFront && hasBack) {
                 activeMatches = [
-                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0 },
-                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0 },
-                    { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0 }
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('F9') },
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('B9') },
+                    { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('18') }
                 ];
             } else if (hasFront) {
                 activeMatches = [
-                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('F9') }
                 ];
             } else if (hasBack) {
                 activeMatches = [
-                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0 }
+                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('B9') }
                 ];
             }
         } else {
@@ -650,7 +682,8 @@
                                     // without a stake settles at the original wager, which keeps
                                     // every legacy round to the cent.
                                     stake: (manualPress && manualPress.stake !== undefined && manualPress.stake !== null)
-                                        ? manualPress.stake : undefined,
+                                        ? manualPress.stake
+                                        : (gameFormat === 'nassau' ? autoPressStakeFor(m.baseId) : undefined),
                                     startHole: hNum + 1,
                                     endHole: m.endHole,
                                     status: 0,
