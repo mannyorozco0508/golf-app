@@ -3088,10 +3088,58 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // are hidden from NEW rounds but revealed the moment an old round using one is
     // loaded, so the select can find its own value instead of silently falling back to
     // Stroke Play and rewriting the golfer's format the next time they save.
+    // REPRESENT THE SAVED VALUE WITHOUT OFFERING THE OTHERS.
+    //
+    // This used to unhide the whole "Legacy round types" optgroup so the browser
+    // could display one saved value. That put TWO options both labelled "Nassau"
+    // in front of the golfer - the modern shortcut and the deprecated format -
+    // and picking the wrong one landed on the old single-stake Step 4 panel. It
+    // also offered legacy Match, Skins and Dots as things to switch to, on a round
+    // that was none of them.
+    //
+    // Now a single option is created for THIS round's format only. The four-option
+    // group stays hidden permanently. The stored value is untouched: an old round
+    // still saves as 'nassau' and still settles exactly as it did.
     function revealLegacyFormatOption(format) {
-        if (!['nassau', 'match', 'skins', 'dots'].includes(format)) return;
-        const grp = document.getElementById('legacy-format-group');
-        if (grp) grp.style.display = '';
+        const LEGACY_NAMES = { nassau: 'Nassau', match: 'Match Play', skins: 'Skins', dots: 'Dot Game' };
+        if (!LEGACY_NAMES[format]) return;
+        const sel = document.getElementById('game-format-select');
+        if (!sel) return;
+
+        // Rebuilt each time so switching rounds cannot leave a previous round's
+        // format behind as a second choice - which would recreate the very problem
+        // this function exists to fix, just with different labels.
+        //
+        // Removed by asking the select for its own children rather than trusting
+        // getElementById().parentNode: an id lookup can hand back a detached node,
+        // and a stale option surviving here means two formats offered at once.
+        removeLegacyCurrentOption(sel);
+
+        const grp = document.createElement('optgroup');
+        grp.id = 'legacy-current-group';
+        grp.label = "This round's format";
+        const opt = document.createElement('option');
+        opt.value = format;
+        opt.textContent = 'Legacy ' + LEGACY_NAMES[format] + ' (existing round)';
+        grp.appendChild(opt);
+        sel.appendChild(grp);
+    }
+
+    // Removes the dedicated option by walking the select's real children, so it
+    // works whether or not an id lookup returns an attached node.
+    function removeLegacyCurrentOption(sel) {
+        const target = sel || document.getElementById('game-format-select');
+        if (!target) return;
+        const kids = Array.prototype.slice.call(target.children || target.childNodes || []);
+        kids.forEach(function (node) {
+            if (node && node.id === 'legacy-current-group') target.removeChild(node);
+        });
+    }
+
+    // A copied round is a new round, so anything left describing the source
+    // round's legacy format has to go.
+    function clearLegacyCurrentOption() {
+        removeLegacyCurrentOption(document.getElementById('game-format-select'));
     }
 
     // Guidance, not an error: the setup was copied fine, the wager just lives
@@ -3167,13 +3215,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // it IS legacy, so the selector never reads as the way to start a new one.
     function syncLegacyFormatBadge() {
         const badge = document.getElementById('legacy-format-badge');
-        const grp = document.getElementById('legacy-format-group');
-        if (!badge || !grp) return;
-        const revealed = grp.style.display === '';
+        if (!badge) return;
+        // Keyed off the round's actual format, not off the old optgroup-reveal
+        // signal. That signal no longer exists: representing a legacy value no
+        // longer means unhiding four legacy choices.
         const sel = document.getElementById('game-format-select');
         const fmt = sel ? sel.value : '';
         const names = { nassau: 'Nassau', match: 'Match Play', skins: 'Skins', dots: 'Dots' };
-        if (revealed && names[fmt]) {
+        if (names[fmt]) {
             badge.innerHTML = '<strong>Legacy round format.</strong> This older round stores '
                 + names[fmt] + ' as the round format. It still works exactly as it did. '
                 + 'New rounds set up games in <strong>Step 6</strong>.';
@@ -3371,6 +3420,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 const isCopy = !!copyFromCode;
                 const legacyWagerFormat = ['nassau', 'match', 'skins', 'dots'].includes(data.gameFormat);
                 if (isCopy && legacyWagerFormat) {
+                    clearLegacyCurrentOption();
                     document.getElementById("game-format-select").value = 'stroke';
                     showCopiedLegacyNotice(data.gameFormat);
                 } else {
