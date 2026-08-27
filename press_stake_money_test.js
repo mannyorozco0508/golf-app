@@ -138,8 +138,11 @@ describe('LEGACY PARITY — old presses settle exactly as before', () => {
         const blow = {}; for (let h = 1; h <= 18; h++) { blow[`p${A}_h${h}`] = 4; blow[`p${B}_h${h}`] = 6; }
         const withManual = matchEngine(V2, blow, 'gross', 'nassau', '2down', 50,
             [{ baseId: 'B9', startHole: 14, stake: 125 }]);
-        const auto = withManual.activeMatches.filter(x => x.pressNum > 0 && x.stake === undefined);
-        const manual = withManual.activeMatches.filter(x => x.stake === 125);
+        // Auto-presses now carry a RESOLVED stake rather than undefined, so they are
+        // identified by not matching the manual amount. With no segment config that
+        // resolved amount is the base wager - the money is unchanged.
+        const auto = withManual.activeMatches.filter(x => x.pressNum > 0 && Number(x.stake) === 50);
+        const manual = withManual.activeMatches.filter(x => Number(x.stake) === 125);
         assert.ok(auto.length > 0, 'the automatic 2-down presses still fire');
         assert.equal(manual.length, 1, 'and the manual $125 press exists beside them');
     });
