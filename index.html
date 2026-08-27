@@ -849,6 +849,15 @@
         /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
            through tabs during a real Nassau. Segments stack; presses indent under the
            segment they belong to so a press can never be mistaken for a base match. */
+        .lg-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        .lg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+        .lg-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
+        .lg-sub { font-size: 0.6rem; color: var(--text-muted); flex: 1; text-align: right; white-space: nowrap; }
+        .lg-row { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
+        .lg-rank { font-size: 0.62rem; font-weight: bold; color: var(--text-muted); width: 22px; flex-shrink: 0; }
+        .lg-name { font-size: 0.8rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lg-val { font-size: 0.85rem; font-weight: bold; white-space: nowrap; }
+        .lg-quiet { color: var(--text-muted); font-style: italic; font-size: 0.78rem; }
         .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
@@ -1783,6 +1792,41 @@
         return href + '&press=' + encodeURIComponent(wagerId);
     }
 
+    // LIVE GAME — Stableford / Wolf / Dots.
+    //
+    // These games showed only "NET TO PAR", which is not the game being played.
+    // Reads buildLivePointsState() in money-engine.js - the same shared presenter
+    // the Leaderboard uses - so the two surfaces cannot disagree. It formats;
+    // every number comes from the canonical engine.
+    //
+    // Points and dots only. No projected payout: what a game is worth is settled
+    // in Results, and a running dollar figure mid-round is not final.
+    function buildLivePointsHtml(data, courseData, savedScores) {
+        if (typeof buildLivePointsState !== 'function') return '';
+        const st = buildLivePointsState(data, courseData, savedScores);
+        if (!st) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const fmtVal = v => (st.signed && v > 0 ? '+' : '') + v + (st.unit ? ' ' + st.unit : '');
+
+        let html = '<div class="lg-card"><div class="lg-head">'
+            + '<span class="lg-title">' + st.icon + ' LIVE GAME \u00B7 ' + esc(st.label) + '</span>'
+            + '<span class="lg-sub">' + (st.thru ? 'thru ' + st.thru : '')
+            + (st.extra ? ' \u00B7 ' + esc(st.extra) : '') + '</span></div>';
+
+        if (!st.started) {
+            // Zeros for everyone would read as a genuine four-way tie.
+            html += '<div class="lg-quiet">No scoring yet.</div>';
+            return html + '</div>';
+        }
+        st.rows.forEach(r => {
+            html += '<div class="lg-row">'
+                 + '<span class="lg-rank">' + (r.tied ? 'T' : '') + r.rank + '</span>'
+                 + '<span class="lg-name">' + esc(r.name) + '</span>'
+                 + '<span class="lg-val">' + fmtVal(r.value) + '</span></div>';
+        });
+        return html + '</div>';
+    }
+
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchStates !== 'function') return '';
         // EVERY wager visible to this viewer, not just the round format. A real
@@ -1856,8 +1900,12 @@
             ? window.__scFilteredPlayers.map(p => String(p.id))
             : (currentData.players || []).map(p => String(p.id));
         const matches = buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
-        const any = board || skins || matches;
-        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + '</div>' : '';
+        // Mutually exclusive with the match widget in practice: a round is scored
+        // as a points game or a match format, not both, so this adds a card only
+        // where one was missing entirely.
+        const points = buildLivePointsHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        const any = board || skins || matches || points;
+        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + '</div>' : '';
     }
 
     function renderLeaderWidgetHtml() {
