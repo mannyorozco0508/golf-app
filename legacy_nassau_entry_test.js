@@ -111,10 +111,19 @@ describe('A BLANK NEW ROUND CANNOT BECOME A LEGACY NASSAU', () => {
 
 describe('A GENUINE LEGACY ROUND STILL LOADS, UNCHANGED', () => {
 
-    test('it reveals the legacy option and selects Nassau', () => {
+    test('it keeps its own format, represented without exposing the others', () => {
+        // This used to assert the whole "Legacy round types" optgroup was unhidden.
+        // That pinned an implementation, not the contract: unhiding it put TWO
+        // options both labelled "Nassau" in front of the golfer and offered legacy
+        // Match/Skins/Dots as things to switch to. The saved value is now
+        // represented by a single dedicated option instead.
+        //
+        // The contract this protects is unchanged: an old round keeps its format
+        // and stays editable. Option-level coverage lives in legacy_option_test.js.
         const r = loadRound({ gameFormat: 'nassau', nassauStake: 10 });
         assert.equal(r.format, 'nassau', 'an old round keeps its own format');
-        assert.equal(r.legacyGroup, '', 'and the option is revealed so the select can find it');
+        assert.notEqual(r.legacyGroup, '',
+            'and the four-option legacy group is NOT thrown open to do it');
     });
 
     test('it is NOT converted to stroke', () => {
