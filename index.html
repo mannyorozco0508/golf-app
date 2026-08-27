@@ -4665,6 +4665,57 @@
         return { p1: original.p1, p2: original.p2, original, pressResults, combinedT1Money };
     }
 
+    // ============================================================================
+    // NASSAU STAKE CONFIG — read the persisted fields into the runtime shape
+    //
+    // Flat fields, matching every other Nassau setting:
+    //   nassauFrontStake / nassauBackStake / nassauOverallStake / nassauAutoPressStake
+    //
+    // LEGACY IS THE ABSENCE OF THESE FIELDS. A round carrying only nassauStake gets
+    // undefined for each segment, calculateMatchEngine falls back to the single
+    // wager, and it settles to the cent exactly as it always has. Nothing is
+    // migrated; old rounds are simply never asked the new question.
+    //
+    // nassauAutoPressStake null/absent means "same as segment" - the default most
+    // groups play. A number applies to every automatic press. Manual presses are
+    // untouched either way: whatever the golfer typed at the moment of pressing.
+    function nassauStakeConfig(data) {
+        const d = data || {};
+        // TWO SHAPES, ONE CONTRACT.
+        //
+        //   ROUND FORMAT (legacy, hidden): nassauFrontStake / nassauBackStake / ...
+        //   SIDE MATCH   (the supported path today): frontStake / backStake / overallStake
+        //
+        // Nassau is a WAGER in this app, created from Action, not a round type - the
+        // round format lives on only so existing rounds stay readable. Both shapes
+        // normalize here so no consumer has to know which one it is holding.
+        const isSideMatch = d.format === 'nassau';
+        if (isSideMatch) {
+            const pickS = v => (v === undefined || v === null || v === '') ? undefined : Number(v);
+            const c = {
+                F9: pickS(d.frontStake),
+                B9: pickS(d.backStake),
+                '18': pickS(d.overallStake),
+                autoPress: pickS(d.autoPressStake),
+            };
+            if (c.F9 === undefined && c.B9 === undefined && c['18'] === undefined
+                && c.autoPress === undefined) return undefined;   // legacy: single `stake`
+            return c;
+        }
+        if (d.gameFormat !== 'nassau') return undefined;
+        const pick = v => (v === undefined || v === null || v === '') ? undefined : Number(v);
+        const cfg = {
+            F9: pick(d.nassauFrontStake),
+            B9: pick(d.nassauBackStake),
+            '18': pick(d.nassauOverallStake),
+            autoPress: pick(d.nassauAutoPressStake),
+        };
+        // Nothing configured at all -> behave exactly like a legacy round.
+        if (cfg.F9 === undefined && cfg.B9 === undefined && cfg['18'] === undefined
+            && cfg.autoPress === undefined) return undefined;
+        return cfg;
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
     // THREE-STAKE NASSAU (authorized change).
     //
@@ -5525,7 +5576,7 @@
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
             manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
-            matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+            matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
         }
 
         let wolfCalc = null, stablefordCalc = null;
