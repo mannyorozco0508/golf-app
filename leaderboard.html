@@ -151,6 +151,7 @@
         .lm-stake { font-size: 0.72rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; margin-left: 6px; }
         .lm-divider { border-top: 1px solid var(--border-mid); margin: 6px 0; }
         .lm-wager-head { font-size: 0.66rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
+        .lm-press-link { float: right; font-size: 0.68rem; font-weight: bold; color: var(--brand-navy); text-decoration: none; padding: 6px 8px; margin: -6px -4px 0 0; min-height: 44px; display: inline-flex; align-items: center; }
         .lm-press-status { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
         .lm-closed { opacity: 0.6; }
         .ls-card { background: var(--bg-card); border-radius: 12px; padding: 12px 14px; margin-top: 14px; box-shadow: 0 2px 6px var(--shadow-color); }
@@ -474,6 +475,17 @@
     //
     // NO SETTLEMENT ARITHMETIC HERE. During play a golfer needs to know who is up and
     // which presses are running - not what it pays. That belongs in Results.
+    // The leaderboard has no group lock of its own - it shows the whole field - so
+    // the link carries only the game and the wager to focus.
+    function sideMatchPressHref(wagerId) {
+        const loc = window.location;
+        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
+        const game = (typeof currentMode !== 'undefined' && currentMode) ? currentMode
+                   : (new URLSearchParams(loc.search).get('game') || '');
+        return loc.origin + dir + 'sidematches.html?game=' + encodeURIComponent(game)
+             + '&press=' + encodeURIComponent(wagerId);
+    }
+
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchStates !== 'function') return '';
         // EVERY wager visible to this viewer, not just the round format. A real
@@ -495,7 +507,22 @@
             if (i > 0) html += '<div class="lm-divider"></div>';
             html += '<div class="lm-wager-head">' + esc(st.formatLabel) + ' \u00B7 '
                  + esc(st.t1Name) + ' v ' + esc(st.t2Name)
-                 + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</div>';
+                 + (st.thru ? ' \u00B7 thru ' + st.thru : '');
+            // PRESS, WITHOUT A SECOND WRITE PATH.
+            //
+            // The writer for a side-match press lives in sidematches.html with its
+            // amount prompt, permission gate and offline guard. Porting it here would
+            // mean two implementations of a money write, and a write-side divergence
+            // corrupts data rather than merely displaying it wrong.
+            //
+            // So this is a LINK, not a button: it carries the golfer to the wager on
+            // the Matches tab with the card highlighted, and they press there with the
+            // amount in front of them. One tap more, one write path.
+            if (st.isSideMatch && st.canPress && st.wagerId) {
+                html += '<a class="lm-press-link" href="' + esc(sideMatchPressHref(st.wagerId))
+                     + '">\uD83D\uDD25 Press \u00B7 H' + st.nextPressHole + ' \u203A</a>';
+            }
+            html += '</div>';
 
             st.segments.forEach(seg => {
                 html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
