@@ -133,6 +133,23 @@
         .board-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid var(--border-light); }
         .row-leader { background-color: var(--leader-bg); font-weight: bold; }
         .player-name { text-align: left; font-weight: bold; }
+        /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
+           through tabs during a real Nassau. Segments stack; presses indent under the
+           segment they belong to so a press can never be mistaken for a base match. */
+        .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+        .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
+        .lm-sub { font-size: 0.6rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lm-seg { padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
+        .lm-seg:last-child { border-bottom: none; }
+        .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
+        .lm-seg-name { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-muted); width: 62px; flex-shrink: 0; }
+        .lm-seg-status { font-size: 0.9rem; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.8rem; }
+        .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 62px; }
+        .lm-press-tag { font-size: 0.6rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .lm-press-status { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+        .lm-closed { opacity: 0.6; }
         .ls-card { background: var(--bg-card); border-radius: 12px; padding: 12px 14px; margin-top: 14px; box-shadow: 0 2px 6px var(--shadow-color); }
         .ls-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); margin-bottom: 6px; }
         .ls-summary { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
@@ -220,6 +237,10 @@
     <div id="board-content">
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading Leaderboard...</div>
     </div>
+    <!-- NET TO PAR above answers "who is leading the round". This answers "what is
+         happening in the bets" - a different question, deliberately separated so the
+         general leaderboard can never masquerade as the Nassau result. -->
+    <div id="live-matches-mount"></div>
     <!-- Live Skins sits BELOW the standings: who is leading, then who has won what. -->
     <div id="live-skins-mount"></div>
 </div>
@@ -444,6 +465,40 @@
              + '</td>';
     }
 
+    // LIVE MATCHES & PRESSES - reads buildLiveMatchState() in money-engine.js, the
+    // shared presenter the Leaderboard also uses, so the two surfaces cannot tell
+    // different stories about the same match. It formats; it decides nothing.
+    //
+    // NO SETTLEMENT ARITHMETIC HERE. During play a golfer needs to know who is up and
+    // which presses are running - not what it pays. That belongs in Results.
+    function buildLiveMatchHtml(data, courseData, savedScores) {
+        if (typeof buildLiveMatchState !== 'function') return '';
+        const st = buildLiveMatchState(data, courseData, savedScores);
+        if (!st) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        let html = '<div class="lm-card"><div class="lm-head">'
+            + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
+            + '<span class="lm-sub">' + esc(st.formatLabel) + ' \u00B7 ' + esc(st.t1Name)
+            + ' v ' + esc(st.t2Name) + (st.thru ? ' \u00B7 thru ' + st.thru : '') + '</span></div>';
+
+        st.segments.forEach(seg => {
+            html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
+                 + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
+                 + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
+                 + esc(seg.statusText) + (seg.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
+            seg.presses.forEach(p => {
+                html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
+                     + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
+                     + ' PRESS \u00B7 H' + p.startHole + '</span>'
+                     + '<span class="lm-press-status">' + esc(p.statusText)
+                     + (p.closed ? ' \u00B7 FINAL' : '') + '</span></div>';
+            });
+            html += '</div>';
+        });
+        return html + '</div>';
+    }
+
     // ---- LIVE SKINS ---------------------------------------------------------
     //
     // WHO WON WHAT HOLE - never how much it is worth. Until the round finishes the
@@ -468,6 +523,14 @@
             if (idx >= b.startIdx && idx < b.startIdx + b.size) return b.group;
         }
         return null;
+    }
+
+    function renderLiveMatchesBoard() {
+        const mount = document.getElementById('live-matches-mount');
+        if (!mount) return;
+        mount.innerHTML = buildLiveMatchHtml(currentBoardData || {},
+            (currentBoardData && currentBoardData.courseData) || [],
+            (currentBoardData && currentBoardData.scores) || {});
     }
 
     function renderLiveSkinsBoard() {
@@ -650,6 +713,7 @@
             return;
         }
 
+        renderLiveMatchesBoard();
         renderLiveSkinsBoard();
 
         if (activeView === "individual") {
