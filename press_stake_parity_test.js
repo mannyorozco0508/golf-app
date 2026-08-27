@@ -159,10 +159,14 @@ describe('LEGACY BEHAVIOUR IS UNCHANGED', () => {
         // Nobody typed an amount, so the trigger rule's press settles at the wager -
         // byte-for-byte the behaviour before per-press stakes existed.
         const r = runAll({ winners:{1:'A',2:'A'}, pressRule:'2down' });
+        // Three-stake Nassau made the auto-press amount an explicit setting, so a
+        // press now CARRIES its resolved stake instead of leaving it undefined for
+        // segStake to fill in. What must not change is the money: with no segment
+        // config, that resolved amount is still the base wager.
         const presses = r['money-engine.js'].activeMatches.filter(m => m.pressNum > 0);
         assert.ok(presses.length > 0, 'the 2-down rule must fire');
-        presses.forEach(p => assert.equal(p.stake, undefined,
-            'an auto press stores no stake; segStake resolves it to the wager'));
+        presses.forEach(p => assert.equal(Number(p.stake), 10,
+            'an auto press resolves to the base wager when no segment stakes are set'));
         assertParity(r, 'auto press fallback');
     });
 
