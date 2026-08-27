@@ -256,6 +256,10 @@ class MiniNode {
     }
     focus() { }
     blur() { }
+    // The iOS clipboard fallback selects a hidden textarea before execCommand.
+    // Without this, every fallback copy threw and the path could not be tested.
+    select() { }
+    setSelectionRange() { }
     scrollIntoView() { }
     getBoundingClientRect() { return { top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 }; }
 }
