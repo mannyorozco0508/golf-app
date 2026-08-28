@@ -98,8 +98,13 @@ describe('A BLANK NEW ROUND CANNOT BECOME A LEGACY NASSAU', () => {
     });
 
     test('the legacy optgroup ships hidden in the markup', () => {
-        assert.match(read('admin.html'),
-            /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
+        // OBSOLETE UI: the hidden legacy optgroup was deleted with the editor, so
+        // there is nothing left to hide. The contract it protected - a new round
+        // cannot choose a legacy money format - is asserted directly instead.
+        const src = read('admin.html');
+        ['nassau','match','skins','dots'].forEach(f =>
+            assert.ok(!new RegExp('<option value="' + f + '"').test(src),
+                'legacy ' + f + ' must not be selectable anywhere'));
     });
 
     test('only one line in admin.html selects a format', () => {
