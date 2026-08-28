@@ -1813,7 +1813,25 @@
     // toggle over there must not change what this line means.
     function liveStandings() {
         if (typeof computeNetToParStandings !== 'function') return [];
-        const players = (currentData && currentData.players) || [];
+        // THE SCORECARD IS A WORKING VIEW FOR ONE FOURSOME.
+        //
+        // This read currentData.players - the whole field - while every other widget
+        // on the same row scoped to __scFilteredPlayers. A Group 1 scorekeeper's top
+        // card therefore mixed in golfers from Group 2: people they are not tracking
+        // and cannot score. The dedicated Leaderboard page is where the whole field
+        // belongs; here it was noise.
+        //
+        // Same expression the match, points, Hi-Lo and stroke-bet cards use, rather
+        // than a second scoping rule that could drift away from them. With no group
+        // lock the filtered set is empty and this falls back to the whole field, so
+        // an organizer's view is unchanged.
+        //
+        // A cross-group wager still appears in LIVE MATCHES & PRESSES and names the
+        // opponent there - but it does not add that golfer to these standings, which
+        // represent the group being scored.
+        const players = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+            ? window.__scFilteredPlayers
+            : ((currentData && currentData.players) || []);
         const courseData = (currentData && currentData.courseData) || [];
         const savedScores = (currentData && currentData.scores) || {};
         if (players.length === 0 || courseData.length === 0) return [];
