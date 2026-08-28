@@ -3277,7 +3277,22 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (typeof syncLegacyFormatBadge === 'function') syncLegacyFormatBadge();
         const descEl = document.getElementById("format-description");
         if (descEl) descEl.textContent = formatDescriptions[format] || "";
-        const formatsWithHoleBets = ['hilo', 'nassau', 'wolf', 'bestball', 'scramble', 'stableford', 'skins'];
+        // ONLY THE FORMATS THAT CAN ACTUALLY PAY IT.
+        //
+        // holeBetStake is consumed by exactly one settlement function -
+        // computeHiLoSettlementNet - which Hi-Lo, Nassau, Best Ball and Scramble
+        // reach. Wolf, Stableford and Skins were also offered the control and paid
+        // NOTHING: a golfer could set $5 a hole, play eighteen, and settle zero with
+        // no warning anywhere.
+        //
+        // Removed rather than wired up, because those three are already configured
+        // with their own money - Wolf has a point value, Stableford has points,
+        // Skins has a buy-in. Making the hole bet pay there would be inventing new
+        // settlement for games that did not ask for it.
+        //
+        // Stored data is untouched: a round already saved with a dead holeBetStake
+        // still settles exactly as before, at zero. Nothing is migrated.
+        const formatsWithHoleBets = ['hilo', 'nassau', 'bestball', 'scramble'];
         
         if (document.getElementById("hole-bet-settings")) {
             document.getElementById("hole-bet-settings").style.display = formatsWithHoleBets.includes(format) ? "block" : "none";
