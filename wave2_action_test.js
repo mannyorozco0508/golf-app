@@ -308,7 +308,7 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     });
 
     test('money-only formats are no longer offered for NEW rounds', () => {
-        const visible = adm.slice(adm.indexOf('id="game-format-select"'), adm.indexOf('legacy-format-group'));
+        const visible = adm.slice(adm.indexOf('id="game-format-select"'), adm.indexOf('</select>', adm.indexOf('id="game-format-select"')));
         ['nassau', 'match', 'skins', 'dots'].forEach(f =>
             assert.ok(!visible.includes(`value="${f}"`), `${f} must not be a setup choice any more`));
         ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf'].forEach(f =>
@@ -318,12 +318,17 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     test('LEGACY SAFETY: old money formats are hidden, not deleted, and reappear when editing', () => {
         // Deleting the options would make an old Nassau round unselectable, and saving it
         // would silently rewrite its format. They are hidden instead, and revealed on load.
-        assert.ok(adm.includes('id="legacy-format-group"'));
+        // RETARGETED under the retirement decision. "Hidden, not deleted" protected
+        // the ability to EDIT an old round in the deprecated panel. The product
+        // contract is now narrower and clearer: old rounds stay readable, scoreable
+        // and settleable, with no legacy editor. The money proof lives in
+        // legacy_retirement_test.js; what belongs here is that opening one is safe.
         ['nassau', 'match', 'skins', 'dots'].forEach(f =>
-            assert.ok(adm.includes(`value="${f}"`), `${f} must still exist for legacy rounds`));
-        assert.ok(/function revealLegacyFormatOption/.test(adm));
-        assert.ok(/revealLegacyFormatOption\(data\.gameFormat\)/.test(adm),
-            'loading a saved round must reveal its own format before selecting it');
+            assert.ok(!adm.includes(`<option value="${f}"`), `${f} must not be a setup choice`));
+        assert.ok(/document\.getElementById\("game-format-select"\)\.value = data\.gameFormat/.test(adm),
+            'a saved legacy round still carries its own format');
+        assert.ok(/function legacyMainGameBlocksNassau\(/.test(adm),
+            'and the double-billing guard survives, because old rounds still exist');
     });
 
     test('the choices are driven by the shared catalog, not a hardcoded list', () => {
