@@ -543,12 +543,7 @@
                 <option value="hilo">Hi-Lo</option>
                 <option value="wolf">Wolf</option>
             </optgroup>
-            <optgroup label="Legacy round types — older rounds only" id="legacy-format-group" style="display:none;">
-                <option value="nassau">Nassau</option>
-                <option value="match">Match Play</option>
-                <option value="skins">Skins</option>
-                <option value="dots">Dot Game</option>
-            </optgroup>
+            
         </select>
         <!-- Shown only once a legacy round has revealed its own format. Without it the
              selector reads as though Nassau were a normal way to start a round - exactly
@@ -651,51 +646,12 @@
             </div>
         </div>
 
-        <div id="nassau-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">💵 Nassau Bet Options</label>
-            <div class="grid-3col">
-                <div>
-                    <label style="font-size: 0.75rem;">Match Type</label>
-                    <select id="nassau-type" onchange="renderPlayerList(false)">
-                        <option value="team">2v2 Team (Best Ball)</option>
-                        <option value="1v1">1v1 Match</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size: 0.75rem;">Scoring Type</label>
-                    <div class="toggle-row">
-                        <span class="toggle-label-sm active" id="nassau-scoring-label-net" onclick="setNassauScoring('net')">Net</span>
-                        <label class="toggle-switch toggle-switch-sm">
-                            <input type="checkbox" id="nassau-scoring-switch" onchange="setNassauScoring(this.checked ? 'gross' : 'net')">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="toggle-label-sm" id="nassau-scoring-label-gross" onclick="setNassauScoring('gross')">Gross</span>
-                    </div>
-                    <input type="hidden" id="nassau-scoring" value="net">
-                </div>
-                <div>
-                    <label style="font-size: 0.75rem;" id="nassau-stake-label">Nassau Bet ($)</label>
-                    <div class="grid-4col" id="nassau-stake-presets" style="margin-bottom:4px;">
-                        <button type="button" class="preset-btn active" onclick="setStakePreset('nassau-stake', 10, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
-                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 2, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$2</button>
-                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 5, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
-                        <button type="button" class="preset-btn" onclick="setStakePreset('nassau-stake', 20, 'nassau-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$20</button>
-                    </div>
-                    <input type="number" id="nassau-stake" value="10" min="1" oninput="clearStakePresetHighlight('nassau-stake-presets'); updateBetExplainers();">
-                </div>
-            </div>
-            <p style="font-size: 0.72rem; color: var(--brand-navy); margin: 6px 0 0 0;" id="nassau-bet-explainer"></p>
-            <div style="margin-top: 8px;">
-                <label style="font-size: 0.75rem;">Press Rule</label>
-                <select id="nassau-press-rule" onchange="updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation')">
-                    <option value="2down">Auto @ 2 Down</option>
-                    <option value="1down">Auto @ 1 Down</option>
-                    <option value="anytime">Press Any Hole</option>
-                    <option value="none">No Press</option>
-                </select>
-                <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="nassau-press-explanation">Automatically starts a new bet on the next hole once a side falls 2 holes behind — the original bet keeps going too.</p>
-            </div>
-        </div>
+        <!-- The Step 4 "Nassau Bet Options" editor was removed when the legacy Nassau
+             product was retired. A golfer sets up a Nassau in Step 6 now, with
+             independent Front / Back / Overall amounts.
+             Old rounds saved as gameFormat 'nassau' are still READ correctly:
+             nassauStakeConfig() adapts the single stake into three segments, and
+             settlement is unchanged. They simply no longer get a deprecated editor. -->
 
         <div id="wolf-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🐺 Wolf Game Options</label>
@@ -1331,9 +1287,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // the review screen answers "how much are we playing for," not just "which game."
         let stakeText = '';
         if (currentFormat === 'nassau') {
-            const stake = document.getElementById('nassau-stake') ? document.getElementById('nassau-stake').value : '10';
-            const pressLabel = document.getElementById('nassau-press-rule') ? document.getElementById('nassau-press-rule').options[document.getElementById('nassau-press-rule').selectedIndex].text : '';
-            stakeText = `$${stake} — ${pressLabel}`;
+            // The legacy Nassau editor was retired, so there are no controls to read.
+            // An old round's settings live in its saved data and are shown as-is;
+            // they still score and settle exactly as before.
+            const stake = loadedLegacyNassau && loadedLegacyNassau.stake;
+            stakeText = stake
+                ? `$${stake} — older Nassau round, settings preserved`
+                : 'Older Nassau round — settings preserved';
         } else if (currentFormat === 'match') {
             const stake = document.getElementById('match-stake') ? (document.getElementById('match-stake').value || '0') : '0';
             stakeText = `$${stake} flat bet`;
@@ -1587,6 +1547,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // True when the round being edited ALREADY had a money-bearing main game. Those
     // rounds keep their money untouched; the new rule applies to new rounds only.
     let loadedLegacyMainStake = false;
+    // An old Nassau round's own settings, captured when it loads. The Review reads
+    // this instead of the retired editor's controls, so the golfer can still SEE
+    // what the round is playing for without being offered a way to change it.
+    let loadedLegacyNassau = null;
     const teamOptions = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9", "Team 10", "Team 11", "Team 12", "Team 13", "Team 14", "Team 15", "Team 16"];
 
     if (!currentMode) {
@@ -1678,10 +1642,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (onlySettings) onlySettings.style.display = (val === 'stroke') ? 'none' : 'block';
     }
 
-    function setNassauScoring(val) {
-        document.getElementById('nassau-scoring').value = val;
-        syncToggle('nassau-scoring', 'nassau-scoring-switch', 'nassau-scoring-label-net', 'nassau-scoring-label-gross', 'net');
-    }
+    // Retired with the legacy Nassau editor. Kept as a no-op because older inline
+    // handlers may still reference it; removing the name outright would throw.
+    function setNassauScoring() { /* legacy Nassau editor retired */ }
 
     function setWolfTieRule(val) {
         document.getElementById('wolf-tie-rule').value = val;
@@ -3088,59 +3051,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // are hidden from NEW rounds but revealed the moment an old round using one is
     // loaded, so the select can find its own value instead of silently falling back to
     // Stroke Play and rewriting the golfer's format the next time they save.
-    // REPRESENT THE SAVED VALUE WITHOUT OFFERING THE OTHERS.
-    //
-    // This used to unhide the whole "Legacy round types" optgroup so the browser
-    // could display one saved value. That put TWO options both labelled "Nassau"
-    // in front of the golfer - the modern shortcut and the deprecated format -
-    // and picking the wrong one landed on the old single-stake Step 4 panel. It
-    // also offered legacy Match, Skins and Dots as things to switch to, on a round
-    // that was none of them.
-    //
-    // Now a single option is created for THIS round's format only. The four-option
-    // group stays hidden permanently. The stored value is untouched: an old round
-    // still saves as 'nassau' and still settles exactly as it did.
-    function revealLegacyFormatOption(format) {
-        const LEGACY_NAMES = { nassau: 'Nassau', match: 'Match Play', skins: 'Skins', dots: 'Dot Game' };
-        if (!LEGACY_NAMES[format]) return;
-        const sel = document.getElementById('game-format-select');
-        if (!sel) return;
+    // revealLegacyFormatOption() and the "This round's format" option were removed
+    // with the legacy editor. Representing an old value as a CHOICE is what let a
+    // golfer pick the deprecated Nassau by accident. An old round keeps its saved
+    // gameFormat and settles exactly as before; it just has no editor here.
+    function revealLegacyFormatOption() { /* legacy editor retired */ }
+    function clearLegacyCurrentOption() { /* legacy editor retired */ }
 
-        // Rebuilt each time so switching rounds cannot leave a previous round's
-        // format behind as a second choice - which would recreate the very problem
-        // this function exists to fix, just with different labels.
-        //
-        // Removed by asking the select for its own children rather than trusting
-        // getElementById().parentNode: an id lookup can hand back a detached node,
-        // and a stale option surviving here means two formats offered at once.
-        removeLegacyCurrentOption(sel);
-
-        const grp = document.createElement('optgroup');
-        grp.id = 'legacy-current-group';
-        grp.label = "This round's format";
-        const opt = document.createElement('option');
-        opt.value = format;
-        opt.textContent = 'Legacy ' + LEGACY_NAMES[format] + ' (existing round)';
-        grp.appendChild(opt);
-        sel.appendChild(grp);
-    }
-
-    // Removes the dedicated option by walking the select's real children, so it
-    // works whether or not an id lookup returns an attached node.
-    function removeLegacyCurrentOption(sel) {
-        const target = sel || document.getElementById('game-format-select');
-        if (!target) return;
-        const kids = Array.prototype.slice.call(target.children || target.childNodes || []);
-        kids.forEach(function (node) {
-            if (node && node.id === 'legacy-current-group') target.removeChild(node);
-        });
-    }
-
-    // A copied round is a new round, so anything left describing the source
-    // round's legacy format has to go.
-    function clearLegacyCurrentOption() {
-        removeLegacyCurrentOption(document.getElementById('game-format-select'));
-    }
 
     // Guidance, not an error: the setup was copied fine, the wager just lives
     // somewhere better now.
@@ -3398,6 +3315,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // Detect a saved money-bearing main game before anything re-renders, so an
             // old multi-group Best Ball round keeps its stake instead of being quietly
             // converted to a no-money round the next time it is saved.
+            loadedLegacyNassau = (data.gameFormat === 'nassau')
+                ? { stake: data.nassauStake, pressRule: data.nassauPressRule, scoring: data.nassauScoring }
+                : null;
             loadedLegacyMainStake = (parseFloat(data.matchStake) || 0) > 0
                 || (parseFloat(data.nassauStake) || 0) > 0
                 || (parseFloat(data.skinsBuyIn) || 0) > 0
@@ -4028,7 +3948,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
-            const nassauStake = parseFloat(document.getElementById("nassau-stake").value) || 10;
+            // Guarded because the legacy Nassau editor was retired: this element no
+            // longer exists, and an unguarded .value here would throw on save. An
+            // old round's own stake is preserved from its saved data below rather
+            // than being re-read from a control the golfer can no longer see.
+            const nassauStake = (loadedLegacyNassau && parseFloat(loadedLegacyNassau.stake))
+                || (document.getElementById("nassau-stake")
+                    ? (parseFloat(document.getElementById("nassau-stake").value) || 10)
+                    : 0);
             const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
             const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 0;
             const wolfLoneMult = document.getElementById("wolf-lone-mult") ? document.getElementById("wolf-lone-mult").value : "2";
