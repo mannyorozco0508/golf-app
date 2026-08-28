@@ -170,10 +170,13 @@ describe('A NEW ROUND OFFERS EXACTLY ONE NASSAU', () => {
         assert.match(g.label, /player/i);
     });
 
-    test('the four-option legacy group stays hidden', () => {
-        const g = parseFormatSelect().find(x => x.id === 'legacy-format-group');
-        assert.ok(g, 'the legacy group must still exist for old rounds');
-        assert.equal(g.hidden, true, 'but never as a normal set of choices');
+    test('the four-option legacy group no longer exists at all', () => {
+        // OBSOLETE UI CONTRACT. The legacy Nassau editor and its hidden optgroup
+        // were retired: a golfer configures Nassau once, in Step 6. Old rounds stay
+        // readable, scoreable and settleable - proven in legacy_retirement_test.js -
+        // they simply have no deprecated editor. What still matters is asserted here.
+        assert.equal(parseFormatSelect().find(x => x.id === 'legacy-format-group'), undefined,
+            'nothing can reveal what is not there');
     });
 
     ['nassau','match','skins','dots'].forEach(f => {
@@ -190,117 +193,12 @@ describe('A NEW ROUND OFFERS EXACTLY ONE NASSAU', () => {
     });
 });
 
-describe('AN EXISTING LEGACY ROUND SHOWS ONLY ITS OWN FORMAT', () => {
-
-    Object.keys(LEGACY_LABELS).forEach(fmt => {
-        test(`legacy ${fmt} gets one dedicated current-format option`, () => {
-            const r = loadRound(fmt);
-            assert.equal(r.currentGroupPresent, true,
-                'the saved value needs representing so the round can be edited');
-            assert.deepEqual(r.currentGroup.opts.map(o => o.value), [fmt],
-                'ONE option, for this round only');
-            assert.equal(r.currentGroup.id, 'legacy-current-group');
-            assert.match(r.currentGroup.label, /this round/i);
-        });
-
-        test(`legacy ${fmt} does not expose the other three formats`, () => {
-            // The whole point: representing one value must not hand the golfer
-            // three more legacy formats to switch to.
-            const r = loadRound(fmt);
-            assert.notEqual(r.legacyGroupDisplay, '',
-                'the four-option legacy group must stay hidden');
-            const others = Object.keys(LEGACY_LABELS).filter(x => x !== fmt);
-            others.forEach(o => assert.ok(!r.currentGroupHtml.includes('value="' + o + '"'),
-                'must not offer legacy ' + o));
-        });
-    });
-
-    test('the label says plainly that it is a legacy round', () => {
-        const r = loadRound('nassau');
-        assert.match(r.currentGroupHtml, /Legacy Nassau/);
-        assert.match(r.currentGroupHtml, /existing round/i);
-    });
-
-    test('each legacy format is named for what it is', () => {
-        assert.match(loadRound('match').currentGroupHtml, /Legacy Match Play/);
-        assert.match(loadRound('skins').currentGroupHtml, /Legacy Skins/);
-        assert.match(loadRound('dots').currentGroupHtml, /Legacy Dot Game/);
-    });
-
-    test('the saved value is preserved, not converted', () => {
-        Object.keys(LEGACY_LABELS).forEach(f =>
-            assert.equal(loadRound(f).storedValue, f, f + ' must stay ' + f));
-    });
-
-    test('the legacy Step 4 editor still opens for a legacy Nassau', () => {
-        assert.equal(loadRound('nassau').legacyPanel, 'block',
-            'the old single-stake settings must remain editable');
-    });
-
-    test('the legacy badge still explains the round', () => {
-        assert.equal(loadRound('nassau').badgeShown, true);
-    });
-
-    test('the duplicate-wager guard still blocks a modern Nassau there', () => {
-        assert.equal(loadRound('nassau').nassauBlocked, true);
-        assert.equal(loadRound('match').nassauBlocked, true);
-    });
-
-    test('switching legacy rounds replaces the option, never stacks it', () => {
-        // A stale option surviving here would recreate the exact problem this
-        // function exists to fix - two formats offered at once, just with
-        // different labels. The stub's getElementById returns detached nodes, so
-        // this drives a select with a LIVE children array, as a browser has.
-        const sb = loadHtmlInlineScript('admin.html', DEPS);
-        vm.runInContext(`
-            alert = function(){};
-            var kids = [];
-            var fake = { id: 'game-format-select', value: '', children: kids,
-                appendChild: function(n){ kids.push(n); return n; },
-                removeChild: function(n){ var i = kids.indexOf(n); if (i > -1) kids.splice(i, 1); return n; } };
-            var _g = document.getElementById;
-            document.getElementById = function(id){
-                return id === 'game-format-select' ? fake : _g.call(document, id);
-            };
-            revealLegacyFormatOption('nassau');
-            window.__afterFirst = kids.length;
-            revealLegacyFormatOption('match');
-            window.__afterSecond = kids.length;
-            window.__values = kids.map(function(g){
-                return (g.__kids || []).map(function(c){ return c.value; }).join(',');
-            });
-        `, sb);
-        assert.equal(vm.runInContext('window.__afterFirst', sb), 1, 'one group after the first round');
-        assert.equal(vm.runInContext('window.__afterSecond', sb), 1,
-            'still one after switching rounds - replaced, not stacked');
-    });
-
-    test('and the copy path removes it too', () => {
-        const sb = loadHtmlInlineScript('admin.html', DEPS);
-        vm.runInContext(`
-            alert = function(){};
-            var kids = [];
-            var fake = { id: 'game-format-select', value: '', children: kids,
-                appendChild: function(n){ kids.push(n); return n; },
-                removeChild: function(n){ var i = kids.indexOf(n); if (i > -1) kids.splice(i, 1); return n; } };
-            var _g = document.getElementById;
-            document.getElementById = function(id){
-                return id === 'game-format-select' ? fake : _g.call(document, id);
-            };
-            revealLegacyFormatOption('nassau');
-            clearLegacyCurrentOption();
-            window.__left = kids.length;
-        `, sb);
-        assert.equal(vm.runInContext('window.__left', sb), 0,
-            'a copied round keeps nothing describing the source round');
-    });
-
-    test('a normal round grows no current-format group at all', () => {
-        ['stroke','stableford','hilo','wolf'].forEach(f =>
-            assert.equal(loadRound(f).currentGroupPresent, false,
-                f + ' is not a legacy round and needs no special option'));
-    });
-});
+// REMOVED: 'AN EXISTING LEGACY ROUND SHOWS ONLY ITS OWN FORMAT'.
+// Those tests asserted a dedicated "This round's format" dropdown entry. That
+// entry was itself a way of offering the retired format as a CHOICE, which is
+// what the retirement removes. Old-round behaviour is now proven where it
+// actually lives - data, engine, live presenter and settlement - in
+// legacy_retirement_test.js.
 
 describe('A COPIED LEGACY ROUND IS A NEW ROUND', () => {
 
