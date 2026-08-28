@@ -752,8 +752,11 @@ describe('BET CLARITY — the app never advertises a wager nobody is playing for
     });
 
     test('"Base Bet" is gone — golfers do not use that term', () => {
+        // OBSOLETE UI: this used to also assert "Nassau Bet ($)" was on screen.
+        // That label belonged to the retired Step 4 single-stake editor. A golfer
+        // sets Nassau amounts in Step 6 now, so the label is gone by design; the
+        // wording rule it was really protecting still holds.
         assert.ok(!/Base Bet/.test(adm), '"Base Bet" is still on screen somewhere');
-        assert.ok(adm.includes('Nassau Bet ($)'));
     });
 
     test('the per-hole option states plainly that it replaces the set amount', () => {
