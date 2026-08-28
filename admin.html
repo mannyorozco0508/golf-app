@@ -1244,6 +1244,20 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (el) el.classList.toggle('active', i === n);
         }
         renderWizardProgress();
+        // THE PLAYER PICKER MUST FOLLOW THE ROSTER.
+        //
+        // Choosing Nassau in Step 3 pre-opens the Step 6 card and renders its picker
+        // - but at that moment no players exist yet, so it renders "Add at least two
+        // players in Step 5 first" and nothing ever re-rendered it. The golfer then
+        // added players, walked to Step 6, saw a configured-looking Nassau, and saved
+        // a round with NO wager: collectSetupNassauWager() found no p1/p2 and returned
+        // null. That is why a fresh Nassau round reported "no bets this round".
+        //
+        // Re-rendering on arrival costs nothing and keeps the picker honest.
+        if (n === 6 && typeof renderSetupNassauPlayers === 'function') {
+            const box = document.getElementById('setup-nassau-enabled');
+            if (box && box.checked) renderSetupNassauPlayers();
+        }
         if (n === 7) renderWizardReview();
         const progressEl = document.getElementById('wizard-progress');
         if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
