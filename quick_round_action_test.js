@@ -39,7 +39,7 @@ describe('STAGE A — a round can be created without a betting decision', () => 
     const adm = read('admin.html');
 
     test('Step 3 offers only structural round types', () => {
-        const visible = adm.slice(adm.indexOf('id="game-format-select"'), adm.indexOf('legacy-format-group'));
+        const visible = adm.slice(adm.indexOf('id="game-format-select"'), adm.indexOf('</select>', adm.indexOf('id="game-format-select"')));
         ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf'].forEach(f =>
             assert.ok(visible.includes(`value="${f}"`), `${f} changes how the scorecard is built and must remain`));
         ['nassau', 'match', 'skins', 'dots'].forEach(f =>
@@ -81,16 +81,26 @@ describe('STAGE A — a round can be created without a betting decision', () => 
 describe('STAGE A — legacy rounds are not disturbed', () => {
     const adm = read('admin.html');
 
-    test('the old money formats still exist in the document', () => {
+    test('the old money formats are gone from setup entirely', () => {
+        // OBSOLETE UI CONTRACT. These used to remain in a hidden optgroup so an old
+        // round could be represented. That representation was itself a way of
+        // offering the retired format as a choice. Old rounds keep their saved
+        // gameFormat and still score, press and settle - proven in
+        // legacy_retirement_test.js - without any setup control.
         ['nassau', 'match', 'skins', 'dots'].forEach(f =>
-            assert.ok(adm.includes(`value="${f}"`), `${f} must remain selectable for an old round`));
+            assert.ok(!adm.includes(`<option value="${f}"`), `${f} must not be a setup choice`));
     });
 
-    test('opening a saved round reveals its own format before selecting it', () => {
-        assert.ok(/function revealLegacyFormatOption/.test(adm), 'the reveal helper must exist');
-        assert.ok(/revealLegacyFormatOption\(data\.gameFormat\)/.test(adm));
-        const fn = adm.slice(adm.indexOf('function revealLegacyFormatOption'), adm.indexOf('function handleFormatChange'));
-        assert.ok(/\['nassau', 'match', 'skins', 'dots'\]/.test(fn));
+    test('opening a saved round keeps its own format, without an editor', () => {
+        // RETARGETED. The reveal helper existed to expose the retired Nassau editor.
+        // What must survive is the DATA contract, not that UI: an old round keeps
+        // its saved gameFormat and still settles. That is asserted here and proven
+        // end-to-end in legacy_retirement_test.js.
+        // The saved value is still read and still selected on the element.
+        assert.ok(/document\.getElementById\("game-format-select"\)\.value = data\.gameFormat/.test(adm),
+            'a legacy round must still carry its own format');
+        // And it is never rewritten just by opening it.
+        assert.ok(!/data\.gameFormat = /.test(adm), 'opening a round must not mutate its format');
     });
 
     test('every legacy main format still settles exactly as before', () => {
