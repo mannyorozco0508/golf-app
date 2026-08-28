@@ -1672,11 +1672,18 @@
         const par = cells[1] ? cells[1].textContent.trim() : '';
         const hcp = cells[2] ? cells[2].textContent.trim() : '';
 
-        let html = `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
-        // THE LIVE DASHBOARD, above score entry. Two bordered widgets - standings and
-        // skins - rather than a loose line of text floating under the hole heading.
-        // They stack on a phone and sit side by side once there is room.
-        html += '<div id="live-ticker-mount"></div>';
+        // THE LIVE DASHBOARD SITS ABOVE THE HOLE, NOT INSIDE IT.
+        //
+        // It used to render between the hole heading and the score boxes. With a
+        // Nassau running, several press rows can appear - AUTO PRESS H3, H5, H7 -
+        // and they pushed the inputs away from the hole they belong to, so "Hole 9"
+        // and Paul's score box were no longer visibly one thing.
+        //
+        // Live action is context; entering scores is the task. The dashboard now
+        // comes first and the hole block stays whole: heading, players, boxes,
+        // Prev/Next, uninterrupted.
+        let html = '<div id="live-ticker-mount"></div>';
+        html += `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
 
         // DOTS / JUNK on the hole a golfer is actually standing on.
         //
