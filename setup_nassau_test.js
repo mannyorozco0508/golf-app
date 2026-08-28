@@ -133,9 +133,13 @@ describe('STEP 6 OFFERS NASSAU — AND STEP 3 STAYS SCORING', () => {
         assert.match(src, /Match Play \u00b7 Front \/ Back \/ Overall/);
     });
 
-    test('Step 3 still hides the deprecated Nassau round type', () => {
-        assert.match(read('admin.html'),
-            /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
+    test('Step 3 no longer offers the deprecated Nassau round type at all', () => {
+        // RETARGETED: the hidden optgroup was deleted with the legacy editor, so
+        // there is nothing to hide. The contract - a new round cannot choose a
+        // legacy money format - is now asserted directly.
+        const src = read('admin.html');
+        ['nassau','match','skins','dots'].forEach(f =>
+            assert.ok(!src.includes('<option value="' + f + '"'), f + ' must not be pickable'));
     });
 
     test('a setup Nassau does NOT write gameFormat nassau', () => {
