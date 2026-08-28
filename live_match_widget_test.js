@@ -323,7 +323,13 @@ describe('THE WIDGET APPEARS ONLY WHEN THERE IS A MATCH', () => {
     test('the mounts exist in the real markup', () => {
         // Structural, as text: the harness returns an element for ANY id, so a DOM
         // check alone proves nothing - that is how a broken modal once shipped.
-        assert.match(read('index.html'), /html \+= '<div id="live-ticker-mount"><\/div>'/);
+        // Matches either emission form. The mount moved to the START of the hole
+        // view - it is now the first thing assigned rather than appended - because
+        // rendering it between the hole heading and the score boxes pushed the
+        // inputs away from their hole. What this test protects is that the mount is
+        // emitted at all, not which operator emits it.
+        assert.match(read('index.html'),
+            /html (\+?=) '<div id="live-ticker-mount"><\/div>'/);
         assert.match(read('leaderboard.html'), /<div id="live-matches-mount"><\/div>/);
     });
 
