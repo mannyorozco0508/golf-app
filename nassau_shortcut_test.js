@@ -195,10 +195,14 @@ describe('THE LEGACY PANEL NEVER APPEARS FOR A NEW NASSAU', () => {
             'old rounds must stay editable exactly as before');
     });
 
-    test('the legacy panel still exists in the file — not deleted', () => {
+    test('the legacy panel is gone — the editor was retired', () => {
+        // OBSOLETE UI CONTRACT. The legacy Nassau editor and its hidden optgroup
+        // were retired: a golfer configures Nassau once, in Step 6. Old rounds stay
+        // readable, scoreable and settleable - proven in legacy_retirement_test.js -
+        // they simply have no deprecated editor. What still matters is asserted here.
         const src = adm();
-        assert.match(src, /id="nassau-settings"/);
-        assert.match(src, /id="nassau-stake"/, 'the legacy single stake must remain for old rounds');
+        assert.ok(!src.includes('id="nassau-settings"'));
+        assert.ok(!src.includes('id="nassau-stake"'));
     });
 });
 
@@ -347,17 +351,24 @@ describe('STEP 3 OFFERS IT WITHOUT REVIVING THE OLD ONE', () => {
         assert.match(adm(), /<option value="nassau-modern">Nassau<\/option>/);
     });
 
-    test('and it is NOT inside the hidden legacy group', () => {
+    test('and it sits in a visible group, with no legacy group to confuse it', () => {
+        // OBSOLETE UI CONTRACT. The legacy Nassau editor and its hidden optgroup
+        // were retired: a golfer configures Nassau once, in Step 6. Old rounds stay
+        // readable, scoreable and settleable - proven in legacy_retirement_test.js -
+        // they simply have no deprecated editor. What still matters is asserted here.
         const src = adm();
-        const legacyAt = src.indexOf('id="legacy-format-group"');
-        const modernAt = src.indexOf('value="nassau-modern"');
-        assert.ok(modernAt < legacyAt, 'the modern option must sit in a visible optgroup');
+        assert.ok(src.indexOf('value="nassau-modern"') > -1);
+        assert.ok(!src.includes('id="legacy-format-group"'));
     });
 
-    test('the legacy option is still hidden and still present', () => {
+    test('no legacy format is selectable anywhere', () => {
+        // OBSOLETE UI CONTRACT. The legacy Nassau editor and its hidden optgroup
+        // were retired: a golfer configures Nassau once, in Step 6. Old rounds stay
+        // readable, scoreable and settleable - proven in legacy_retirement_test.js -
+        // they simply have no deprecated editor. What still matters is asserted here.
         const src = adm();
-        assert.match(src, /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
-        assert.match(src, /<option value="nassau">Nassau<\/option>/, 'old rounds still need it');
+        ['nassau','match','skins','dots'].forEach(f =>
+            assert.ok(!new RegExp('<option value="' + f + '"').test(src), f));
     });
 
     test('Match Play was deliberately left alone', () => {
