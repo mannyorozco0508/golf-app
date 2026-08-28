@@ -118,8 +118,9 @@ describe('STEP 3 ASKS HOW THE ROUND IS SCORED', () => {
     });
 
     test('a new round still cannot pick Nassau or Match', () => {
-        assert.match(adm(),
-            /<optgroup label="Legacy round types[^"]*" id="legacy-format-group" style="display:none;">/);
+        // RETARGETED: the hidden optgroup was deleted with the editor.
+        ['nassau','match','skins','dots'].forEach(f =>
+            assert.ok(!adm().includes(`<option value="${f}"`), f + ' must not be pickable'));
         ['stroke','stableford','hilo','wolf'].forEach(f => {
             assert.equal(loadRound(f).badgeShown, false, f + ' is not a legacy round');
         });
@@ -228,7 +229,7 @@ describe('STEP 7 SEPARATES SCORING FROM MONEY', () => {
         assert.ok(!/>Format</.test(html), 'internal vocabulary is gone from the review');
     });
 
-    test('a legacy Nassau is reviewed AS legacy, not as the modern wager', () => {
+    test('a legacy Nassau is still reviewed AS legacy', () => {
         const html = review('nassau');
         assert.match(html, /Legacy game/);
         assert.match(html, /Legacy Nassau/);
@@ -248,13 +249,14 @@ describe('STEP 7 SEPARATES SCORING FROM MONEY', () => {
 
 describe('BATCH A MOVED NO MONEY', () => {
 
-    test('Step 4 money panels are still exactly where they were', () => {
-        // Deliberate: moving holeBetStake is Batch B. It is Hi-Lo's only money
-        // field and appears on six formats - not a rename-batch change.
+    test('Step 4 money panels are still where they were — except the retired Nassau one', () => {
+        // Batch B (moving holeBetStake) is still not started. The Nassau panel is
+        // absent for a different reason: the legacy Nassau editor was retired.
         const src = adm();
-        ['hole-bet-settings','nassau-settings','match-settings','wolf-settings','stableford-settings']
+        ['hole-bet-settings','match-settings','wolf-settings','stableford-settings']
             .forEach(id => assert.ok(src.includes('id="' + id + '"'), id + ' must remain'));
         assert.match(src, /id="hole-bet-stake"/);
+        assert.ok(!src.includes('id="nassau-settings"'), 'the legacy Nassau editor is gone');
     });
 
     test('navigation is unchanged — no auto-skip yet', () => {
