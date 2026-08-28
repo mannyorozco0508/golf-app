@@ -442,11 +442,15 @@ describe('THE DASHBOARD WIDGETS', () => {
     });
 
     test('the widgets sit above score entry', () => {
+        // The mount moved to the START of the hole view: it is now the first thing
+        // assigned rather than appended, because rendering it between the hole
+        // heading and the score boxes pushed the inputs away from their hole. The
+        // contract - dashboard above score entry - is unchanged and still asserted.
         const src = read('index.html');
-        const mount = src.indexOf("html += '<div id=\"live-ticker-mount\"></div>'");
+        const mount = src.search(/html \+?= '<div id="live-ticker-mount"><\/div>'/);
         const boxes = src.indexOf('hv-score-box');
-        assert.notEqual(mount, -1);
-        assert.ok(mount < boxes || boxes === -1);
+        assert.notEqual(mount, -1, 'the mount must be emitted');
+        assert.ok(mount < boxes || boxes === -1, 'and it must come before the score boxes');
     });
 
     test('one layout rule, not a per-device pile', () => {
@@ -698,7 +702,10 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         // helpers/load-script.js returns a live element for ANY id, so a DOM check
         // alone proves nothing. Read as text.
         const src = read('index.html');
-        assert.match(src, /html \+= '<div id="live-ticker-mount"><\/div>'/,
+        // Matches either emission form: the mount is now the first assignment in
+        // renderHoleView rather than an append. What matters is that the scorecard
+        // itself inserts it, not which operator does so.
+        assert.match(src, /html \+?= '<div id="live-ticker-mount"><\/div>'/,
             'the mount must be inserted by the scorecard itself');
     });
 
