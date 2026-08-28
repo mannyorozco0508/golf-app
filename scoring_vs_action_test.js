@@ -32,9 +32,15 @@ describe('THE STORED SCHEMA DID NOT MOVE', () => {
     });
 
     test('no format was removed from setup — this phase clarifies, it does not migrate', () => {
-        ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo',
-            'wolf', 'nassau', 'match', 'skins', 'dots']
-            .forEach(f => assert.ok(adm.includes(`value="${f}"`), `${f} disappeared from setup`));
+        // RETARGETED: nassau/match/skins/dots were retired from setup. The structural
+        // scoring formats must all remain - that is what this test protects.
+        ['stroke', 'stableford', 'bestball', 'scramble', 'ryder', 'hilo', 'wolf']
+            .forEach(f => assert.ok(adm.includes(`<option value="${f}"`), `${f} disappeared from setup`));
+        ['nassau', 'match', 'skins', 'dots']
+            .forEach(f => assert.ok(!adm.includes(`<option value="${f}"`),
+                `${f} was retired from setup; old rounds keep working via their saved data`));
+        // Note: nassau/match/skins/dots are deliberately NOT in that list any more -
+        // they were retired from setup. See legacy_retirement_test.js.
     });
 
     test('Nassau and Match Play were NOT moved into the additional-game catalog', () => {
