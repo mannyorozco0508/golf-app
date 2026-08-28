@@ -1488,7 +1488,11 @@
             if (val > 0) gameLines.push(`🎯 $${val} per point Stableford`);
             else gameLines.push(`🎯 Stableford — points only, no money`);
         } else if (gameFormat === 'stroke') {
-            gameLines.push(`⛳ Stroke Play`);
+            // A Nassau round is stored as stroke, but "Stroke Play" above a Nassau
+            // line describes the storage rather than the game. The Nassau line
+            // names it, so this one is skipped.
+            const hasNassau = Object.values(currentData.sideMatches || {}).some(sm => sm && sm.format === 'nassau');
+            if (!hasNassau) gameLines.push(`⛳ Stroke Play`);
         }
 
         if (currentData.birdieGameEnabled) gameLines.push(`🐦 Birdie Game`);
@@ -1501,7 +1505,23 @@
             return teamAIds.some(id => filteredIds.includes(id)) || teamBIds.some(id => filteredIds.includes(id));
         });
         if (relevantSideMatches.length > 0) {
-            gameLines.push(`⚔️ ${relevantSideMatches.length} Side Bet${relevantSideMatches.length === 1 ? '' : 's'}`);
+            // NAME THE GAME THE GOLFER CHOSE.
+            //
+            // A Nassau round stores gameFormat 'stroke' because that is how the
+            // scorecard is built - but the golfer picked Nassau, so "1 Side Bet"
+            // told them nothing about the game they are playing or what it is
+            // worth. Nassau is named with its three stakes; anything else keeps
+            // the generic count.
+            const nassaus = relevantSideMatches.filter(sm => sm.format === 'nassau');
+            const others = relevantSideMatches.length - nassaus.length;
+            nassaus.forEach(sm => {
+                const amt = v => `$${Number(v) || 0}`;
+                const press = sm.pressRule === '2down' ? ' · Auto @ 2 Down'
+                    : sm.pressRule === '1down' ? ' · Auto @ 1 Down'
+                    : sm.pressRule === 'anytime' ? ' · Press any hole' : '';
+                gameLines.push(`⚔️ Nassau · F ${amt(sm.frontStake)} / B ${amt(sm.backStake)} / O ${amt(sm.overallStake)}${press}`);
+            });
+            if (others > 0) gameLines.push(`⚔️ ${others} Side Bet${others === 1 ? '' : 's'}`);
         }
 
         // A genuinely no-bet round (Stroke Play, nothing else enabled) stays plain rather than
@@ -1510,7 +1530,13 @@
         // the round is scored, then what money is running. The stored key is untouched.
         const scoringEl = document.getElementById('landing-scoring');
         if (scoringEl) {
-            scoringEl.textContent = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play';
+            // A Nassau round is scored hole-by-hole as match play, whatever the
+            // stored gameFormat says. Telling the golfer "Stroke Play" described
+            // the storage, not the game they are actually playing.
+            const primaryNassau = Object.values(currentData.sideMatches || {}).find(sm => sm && sm.format === 'nassau');
+            scoringEl.textContent = (gameFormat === 'stroke' && primaryNassau)
+                ? `Match Play · ${primaryNassau.scoring === 'gross' ? 'Gross' : 'Net'}`
+                : ((typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play');
         }
 
         const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0;
