@@ -250,10 +250,12 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
                         'settlement.html','stats.html','skins.html','trip.html',
                         'tournament.html','tournament-scorecard.html','shared.html'];
 
-    test('every data-bearing page still loads Firebase from the CDN', () => {
+    test('no data-bearing page loads Firebase from the CDN any more', () => {
+        // INVERTED IN BATCH 7B. Previously asserted every page loaded the SDK
+        // cross-origin - the condition that made a cold offline launch throw.
         DATA_PAGES.forEach(p => {
-            assert.match(read(p), /https:\/\/www\.gstatic\.com\/firebasejs\//,
-                p + ' loads the Firebase SDK cross-origin');
+            assert.ok(!read(p).includes('gstatic.com/firebasejs'),
+                p + ' still loads the Firebase SDK cross-origin');
         });
     });
 
@@ -275,13 +277,15 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         });
     });
 
-    test('the limitation is whole-PWA, not Tournament-specific', () => {
-        // Measured: index.html and admin.html throw the same ReferenceError as the
-        // tournament pages when the SDK is absent. Precaching cannot fix that.
+    test('the SDK now loads from this origin on every page', () => {
+        // INVERTED IN BATCH 7B. The ReferenceError this once described is gone: the
+        // SDK is precached and served locally, so it is present before page script
+        // runs even on a first-ever offline launch.
         ['index.html','admin.html'].forEach(p => {
             assert.match(read(p), /firebase\.initializeApp/,
                 p + ' initializes Firebase at page scope');
-            assert.match(read(p), /https:\/\/www\.gstatic\.com\/firebasejs\//);
+            assert.match(read(p), /src="\.\/firebase-app-compat\.js"/, p);
+            assert.match(read(p), /src="\.\/firebase-database-compat\.js"/, p);
         });
     });
 
@@ -304,18 +308,19 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         });
     });
 
-    test('THE REMAINING LIMITATION: the 11 pages still load from gstatic', () => {
-        // The reason COLD-OFFLINE FIX COMPLETE is still NO. The SDK is present and
-        // cached, but no page points at it yet - Batch 7B flips the script tags.
-        // Until then a first-ever offline launch still throws, and this assertion
-        // exists so a green suite cannot be read as "offline works".
+    test('THE REMAINING LIMITATION: SDK availability is not data availability', () => {
+        // What 7B did and did not achieve, kept permanent so the distinction is not
+        // collapsed into a generic "works offline" claim.
+        //
+        // DONE:     the Firebase JS SDK loads with no network, on every page, PWA
+        //           and native alike. The ReferenceError is gone.
+        // NOT DONE: a round that has never been opened online has no cached RTDB
+        //           data. It will initialize and find nothing. That is a graceful
+        //           empty state rather than a crash - an improvement, not a fix.
         DATA_PAGES.forEach(p => {
-            assert.match(read(p), /https:\/\/www\.gstatic\.com\/firebasejs\/9\.22\.2\//,
-                p + ' should still load the CDN SDK during 7A');
-            ['firebase-app-compat.js','firebase-database-compat.js'].forEach(f => {
-                assert.ok(!new RegExp('src="\\.?/?' + f.replace('.', '\\.') + '"').test(read(p)),
-                    p + ' switched to the local SDK early - that is 7B\u2019s job');
-            });
+            assert.match(read(p), /src="\.\/firebase-app-compat\.js"/, p + ' loads the SDK locally');
+            assert.match(read(p), /firebase\.database\(\)/,
+                p + ' still depends on RTDB, whose offline cache is a separate concern');
         });
     });
 });
