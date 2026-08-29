@@ -257,12 +257,22 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         });
     });
 
-    test('no Firebase SDK is vendored locally, so it cannot be precached', () => {
-        const local = fs.readdirSync(REPO_ROOT).filter(f => /firebase.*\.js$/i.test(f));
-        assert.deepEqual(local, [],
-            'if this fails, the SDK was vendored - revisit the offline claims above');
-        assert.ok(!shellFiles().some(f => /firebase/i.test(f)),
-            'and nothing Firebase-shaped is in the shell');
+    test('the Firebase SDK IS now vendored locally and precached', () => {
+        // RETARGETED IN BATCH 7A. This previously asserted that nothing was vendored,
+        // written deliberately so that vendoring the SDK would fail it and force the
+        // offline claims to be re-examined. That is exactly what happened.
+        //
+        // What changed: both compat builds now live at the repo root and are in the
+        // service-worker shell, so a cold offline launch has the SDK available.
+        // What did NOT change: the 11 pages still load from gstatic, so the
+        // cold-offline problem is not yet solved - asserted below and in 7A's own
+        // transitional block.
+        ['firebase-app-compat.js','firebase-database-compat.js'].forEach(f => {
+            assert.ok(fs.existsSync(path.join(REPO_ROOT, f)),
+                f + ' must exist at the repo root');
+            assert.ok(shellFiles().includes(f),
+                f + ' must be precached, or a cold offline launch still has no SDK');
+        });
     });
 
     test('the limitation is whole-PWA, not Tournament-specific', () => {
@@ -284,11 +294,29 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
             'no typeof guard today; if one is added, update these expectations');
     });
 
-    test('the native bundle carries the same remote dependency', () => {
-        // sync-mobile-web.js copies pages verbatim, so the wrapped app fetches the
-        // SDK over the network too. Service-worker precaching is not the lever there.
-        assert.ok(!filesToSync().some(f => /firebase/i.test(f)),
-            'no local SDK is shipped to the native bundle either');
+    test('the native bundle now ships the SDK locally too', () => {
+        // RETARGETED IN BATCH 7A. Previously asserted the wrapped app fetched the SDK
+        // over the network. sync-mobile-web.js now copies both compat builds into
+        // www/app/, so the Capacitor build carries them on disk.
+        ['firebase-app-compat.js','firebase-database-compat.js'].forEach(f => {
+            assert.ok(filesToSync().includes(f),
+                f + ' must ship to www/app/ or the native app still fetches gstatic');
+        });
+    });
+
+    test('THE REMAINING LIMITATION: the 11 pages still load from gstatic', () => {
+        // The reason COLD-OFFLINE FIX COMPLETE is still NO. The SDK is present and
+        // cached, but no page points at it yet - Batch 7B flips the script tags.
+        // Until then a first-ever offline launch still throws, and this assertion
+        // exists so a green suite cannot be read as "offline works".
+        DATA_PAGES.forEach(p => {
+            assert.match(read(p), /https:\/\/www\.gstatic\.com\/firebasejs\/9\.22\.2\//,
+                p + ' should still load the CDN SDK during 7A');
+            ['firebase-app-compat.js','firebase-database-compat.js'].forEach(f => {
+                assert.ok(!new RegExp('src="\\.?/?' + f.replace('.', '\\.') + '"').test(read(p)),
+                    p + ' switched to the local SDK early - that is 7B\u2019s job');
+            });
+        });
     });
 });
 
