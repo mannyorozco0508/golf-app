@@ -417,9 +417,23 @@
     // Same 4-character code format admin.html uses for game codes, so trip codes and
     // bulk-built round codes are indistinguishable from ones created the normal way.
     function generateRandomCode() {
+        // SIX CHARACTERS, NOT FOUR.
+        //
+        // A 4-character code from this 32-character alphabet is 1,048,576
+        // possibilities. There is no listing endpoint - every read names a specific
+        // code - but a million is small for a machine, and a hit grants full read
+        // and write to that round. Six raises it to 1,073,741,824: 1,024x.
+        //
+        // Not seven: every code input carries maxlength="6", so a 7-character code
+        // could be generated and linked but never typed.
+        //
+        // Existing 4-character codes are untouched and still join - joinRoom only
+        // rejects codes shorter than 2, and the security rules treat the code
+        // segment as a wildcard.
+
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let code = "";
-        for (let i = 0; i < 4; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
+        for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
         return code;
     }
 
