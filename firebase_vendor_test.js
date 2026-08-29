@@ -191,28 +191,48 @@ describe('THE SDK IS PRECACHED AND SHIPPED', () => {
     });
 });
 
-describe('TRANSITIONAL: THE PAGES HAVE NOT SWITCHED YET', () => {
+describe('EVERY PAGE NOW LOADS THE LOCAL SDK', () => {
 
-    // These assertions are the opposite of the end state ON PURPOSE. Batch 7B
-    // inverts them. Until then they stop anyone - including me - reporting the
-    // cold-offline problem as solved.
+    // INVERTED IN BATCH 7B. These previously asserted the opposite - that all 11
+    // pages still pointed at gstatic - written that way so finishing the migration
+    // would fail them and force a deliberate review. That is what happened.
 
     FIREBASE_PAGES.forEach(page => {
-        test(`${page} still loads both SDKs from gstatic`, () => {
+        test(`${page} loads both SDKs locally`, () => {
             const srcs = scriptSrcs(page);
-            SDK.forEach(s => assert.ok(srcs.includes(s.cdn),
-                page + ' no longer references ' + s.cdn + '. If Batch 7B has begun, ' +
-                'this whole describe block should be inverted, not deleted.'));
+            SDK.forEach(s => assert.ok(srcs.includes('./' + s.file),
+                page + ' must load ./' + s.file + ' from this origin'));
         });
     });
 
-    test('no page has switched to the local SDK early', () => {
+    test('no page still points at gstatic', () => {
         // A half-migrated app is worse than either end state: some pages offline-
         // capable, others not, with no obvious signal which is which.
         FIREBASE_PAGES.forEach(page => {
             const srcs = scriptSrcs(page);
-            SDK.forEach(s => assert.ok(!srcs.includes('./' + s.file) && !srcs.includes(s.file),
-                page + ' switched to the local SDK during 7A - that is 7B\u2019s job'));
+            SDK.forEach(s => assert.ok(!srcs.includes(s.cdn),
+                page + ' still references ' + s.cdn));
+        });
+    });
+
+    test('no production page references gstatic Firebase at all', () => {
+        FIREBASE_PAGES.concat(NO_FIREBASE_PAGES).forEach(page => {
+            assert.ok(!read(page).includes('gstatic.com/firebasejs'),
+                page + ' still carries a remote Firebase SDK URL');
+        });
+    });
+
+    test('SDK AVAILABILITY IS NOT DATA AVAILABILITY', () => {
+        // The boundary of what this migration proves, kept permanent on purpose.
+        //
+        // The Firebase JS SDK now loads with no network. That is NOT the same as a
+        // round's data being available: RTDB still needs to have cached that round
+        // at some point. A round never opened online will load the SDK, initialize,
+        // and find nothing. It fails gracefully instead of throwing - a real
+        // improvement, and not "the app works offline".
+        FIREBASE_PAGES.forEach(page => {
+            assert.match(read(page), /firebase\.database\(\)/,
+                page + ' still talks to RTDB, whose offline state is its own concern');
         });
     });
 
@@ -234,13 +254,16 @@ describe('TRANSITIONAL: THE PAGES HAVE NOT SWITCHED YET', () => {
         });
     });
 
-    test('the SDK version is pinned everywhere it appears', () => {
+    test('the version is pinned by the vendored file hashes, not by a URL', () => {
+        // With the CDN URLs gone there is no version string in the pages. The pin is
+        // now the SHA-256 of each vendored file, asserted at the top of this suite,
+        // plus the version string inside the app build.
         FIREBASE_PAGES.forEach(page => {
-            scriptSrcs(page).filter(s => s.includes('firebasejs')).forEach(s => {
-                assert.ok(s.includes('/' + FIREBASE_VERSION + '/'),
-                    page + ' loads a Firebase version other than ' + FIREBASE_VERSION + ': ' + s);
-            });
+            assert.equal(scriptSrcs(page).filter(s => s.includes('firebasejs')).length, 0,
+                page + ' should have no versioned CDN URL left');
         });
+        assert.ok(read(APP_SDK).includes(FIREBASE_VERSION),
+            'the vendored app build must still identify as ' + FIREBASE_VERSION);
     });
 });
 
@@ -253,11 +276,13 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
         });
     });
 
-    test('no page gained a local SDK script tag', () => {
-        FIREBASE_PAGES.concat(NO_FIREBASE_PAGES).forEach(page => {
-            SDK.forEach(s => assert.ok(!read(page).includes('"' + s.file + '"') &&
-                                       !read(page).includes('"./' + s.file + '"'),
-                page + ' references the local SDK; 7A does not touch pages'));
+    test('instructions.html gained nothing', () => {
+        // The one production page with no Firebase dependency. It must not have
+        // acquired one during the migration.
+        NO_FIREBASE_PAGES.forEach(page => {
+            SDK.forEach(s => assert.ok(!read(page).includes(s.file),
+                page + ' must remain Firebase-free'));
+            assert.ok(!read(page).includes('firebase'), page + ' must remain Firebase-free');
         });
     });
 
