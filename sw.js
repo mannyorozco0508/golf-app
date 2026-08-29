@@ -18,7 +18,12 @@
 // changes in a way people must see. Moved to v4 because the shell list below gained
 // pool-engine.js, and again to v5 when pwa-boot.js joined it - every already-installed
 // device is carrying a cache that is missing whatever the newest entry is.
-const CACHE_VERSION = 'golfapp-v5-pwa-activation';
+// Moved to v6 because the shell list below gained the three Tournament Mode files.
+// They were shipped to the mobile bundle by sync-mobile-web.js but never precached
+// here, so Tournament Mode only worked offline if it had been opened online first -
+// exactly the wrong failure for a buddies trip, where the first launch may well be
+// at a remote course with no signal.
+const CACHE_VERSION = 'golfapp-v6-tournament-shell';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -40,6 +45,11 @@ const SHELL_FILES = [
     './settlement.html',
     './sidematches.html',
     './trip.html',
+    // Tournament Mode. Linked from admin.html and trip.html, and shipped to the
+    // mobile bundle - but omitted here until v6, which is why a first-time offline
+    // launch showed the "No connection" page.
+    './tournament.html',
+    './tournament-scorecard.html',
     './instructions.html',
     './shared.html',
     // Shared engines. index.html cannot render a scorecard without these.
@@ -51,6 +61,10 @@ const SHELL_FILES = [
     './hole-events.js',
     './pool-engine.js',
     './course-data.js',
+    // Both tournament pages load this; a cached page without its engine renders a
+    // broken shell, which reads as "the app is working" and is worse than the
+    // offline notice.
+    './tournament-engine.js',
     './pwa-boot.js',
     './manifest.json',
     './icon-192.png',
