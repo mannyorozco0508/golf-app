@@ -37,6 +37,12 @@ const FILES_TO_SYNC = [
     'action-model.js', 'bet-strip.js', 'course-data.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'score-marks.js', 'settlement-engine.js',
     'tournament-engine.js', 'pwa-boot.js',
+    // Firebase SDK, vendored so the wrapped app carries no runtime CDN dependency.
+    // Flat repo-root filenames deliberately: the copy loop below writes into a flat
+    // DEST, and the bundle verifier skips any script path containing '/', so a
+    // vendor/ subdirectory would both break the copy and silently exempt these two
+    // from verification. App first, then database - that is their load order.
+    'firebase-app-compat.js', 'firebase-database-compat.js',
     // Shell assets
     'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
 ];
