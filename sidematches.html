@@ -2763,7 +2763,17 @@
         const p1 = players[0], p2 = players[1];
 
         if (config.overallMode === 'stroke') {
-            function segmentTotals(startHole) {
+            function segmentTotals(startHole, segStake) {
+            // A PRESS PAYS ITS OWN STAKE.
+            //
+            // segStake arrives from the press being evaluated. It used to be absent
+            // here, so every press fell back to config.overallStake below and a
+            // "press it for $25" on a $20 bet settled as $20. settlement-engine.js
+            // always passed it; these page copies did not, so the Matches tab and
+            // Stats page showed money that would not match the final receipt.
+            //
+            // Matches settlement-engine.js exactly - that copy is canonical.
+                const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
                 let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
                 courseData.forEach(h => {
                     if (h.hole < startHole) return;
@@ -2779,15 +2789,15 @@
                 const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
                 let winner = null, money = 0;
                 if (roundComplete) {
-                    if (p1Total < p2Total) { winner = p1.name; money = config.overallStake; }
-                    else if (p2Total < p1Total) { winner = p2.name; money = config.overallStake; }
+                    if (p1Total < p2Total) { winner = p1.name; money = stake; }
+                    else if (p2Total < p1Total) { winner = p2.name; money = stake; }
                 }
                 const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
                 return { startHole, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
             }
 
             const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
-            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole), { pressNum: i + 1 }));
+            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole, pr.stake), { pressNum: i + 1 }));
 
             let p1Money = base.p1Money;
             pressSegs.forEach(seg => { p1Money += seg.p1Money; });
