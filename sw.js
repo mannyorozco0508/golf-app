@@ -23,7 +23,10 @@
 // here, so Tournament Mode only worked offline if it had been opened online first -
 // exactly the wrong failure for a buddies trip, where the first launch may well be
 // at a remote course with no signal.
-const CACHE_VERSION = 'golfapp-v6-tournament-shell';
+// Moved to v7 because the shell gained the two local Firebase SDK files. Until
+// this bump reaches a device, an installed PWA keeps its v6 cache and would never
+// fetch them.
+const CACHE_VERSION = 'golfapp-v7-firebase-local';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -66,6 +69,22 @@ const SHELL_FILES = [
     // offline notice.
     './tournament-engine.js',
     './pwa-boot.js',
+    // THE FIREBASE SDK, SERVED FROM THIS ORIGIN.
+    //
+    // Every data-bearing page loads these from gstatic today, so a genuinely cold
+    // offline launch throws `ReferenceError: firebase is not defined` before any
+    // page script runs. Precaching them here removes that dependency.
+    //
+    // ORDER MATTERS AT RUNTIME: firebase-app-compat.js defines the global that
+    // firebase-database-compat.js attaches to, so a page must load app first. The
+    // order in this array does not itself control that - it is the <script> tags on
+    // each page that do - but they are listed in dependency order so the intent is
+    // visible to whoever edits this next.
+    //
+    // Batch 7A only makes them available. The 11 pages still point at gstatic; 7B
+    // flips them over.
+    './firebase-app-compat.js',
+    './firebase-database-compat.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
