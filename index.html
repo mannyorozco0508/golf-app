@@ -781,6 +781,25 @@
             border: 1px solid var(--brand-navy); pointer-events: none; z-index: 5;
         }
 
+        /* THE SUBORDINATE ADJUSTED-SCORE INDICATOR.
+           The primary box is ALWAYS the gross score the golfer actually shot, and
+           every mark on it represents gross golf. When a handicap stroke turns the
+           hole into a net birdie or better, that is a DIFFERENT FACT and gets its own
+           small line underneath - never a decoration on the gross number.
+           Deliberately smaller and lighter than the score: it is a footnote, not a
+           second score. */
+        .net-mark-line { display: flex; justify-content: center; margin-top: 3px; height: 15px; }
+        .net-mark {
+            position: relative; display: inline-flex; align-items: center; justify-content: center;
+            min-width: 15px; height: 15px; padding: 0 2px;
+            font-size: 0.6rem; font-weight: bold; line-height: 1;
+            color: var(--accent-red); border: 1px solid var(--accent-red); border-radius: 50%;
+        }
+        /* Net eagle or better takes a second concentric ring. box-shadow follows
+           border-radius, so this stays a circle; the transparent first stop leaves a
+           visible gap between the two rings rather than one thick one. */
+        .net-mark.net-eagle { box-shadow: 0 0 0 1px transparent, 0 0 0 2px var(--accent-red); }
+
         .stroke-dots {
             color: var(--accent-teal); font-size: 1.3rem; line-height: 0.5; height: 8px; 
             margin-top: 4px; font-weight: bold; letter-spacing: 1px;
@@ -6398,6 +6417,7 @@
                 let shapeHtml = "";
                 let currentToParHtml = "";
                 let earnedDotsHtml = "";
+                let netMarkHtml = "";
 
                 if (scoreVal !== "") {
                     let gross = parseInt(scoreVal, 10);
@@ -6406,16 +6426,47 @@
                     let holePar = parseInt(h.par, 10);
                     let diff = scoreToUse - holePar;
 
+                    // TO-PAR IS UNCHANGED. It keeps the round's own scoring type, so the
+                    // running figure under the card still matches the net leaderboard.
                     runningStats[p.id] += diff;
 
-                    if (diff === -1) {
-                        shapeHtml = `<div class="shape-circle-1"></div>`;
-                    } else if (diff <= -2) {
-                        shapeHtml = `<div class="shape-circle-1"></div><div class="shape-circle-2"></div>`;
-                    } else if (diff === 1) {
+                    // BOXES ONLY, AND GROSS ONLY.
+                    //
+                    // A handicap stroke must never change a mark on the gross number: a 4
+                    // on a par 4 is a par, whatever the golfer receives. This block used to
+                    // read `diff`, which is NET on a net round - so a gross par with a
+                    // stroke drew a birdie circle around the 4. That was the defect.
+                    //
+                    // Circles are NOT drawn here. score-marks.js owns birdie and eagle
+                    // rings, shared with the Receipt so the phone and the PDF cannot
+                    // disagree about what a birdie is; drawing a circle here as well would
+                    // put two rings on one fact.
+                    let grossDiff = gross - holePar;
+                    if (grossDiff === 1) {
                         shapeHtml = `<div class="shape-box-1"></div>`;
-                    } else if (diff >= 2) {
+                    } else if (grossDiff >= 2) {
                         shapeHtml = `<div class="shape-box-1"></div><div class="shape-box-2"></div>`;
+                    }
+
+                    // THE ADJUSTED RESULT, WHEN A STROKE CREATED ONE.
+                    //
+                    // dotStrokes is already the ACTIVE DOT CONTEXT - Course, Auto, or one
+                    // explicitly selected match - and already carries the start-hole gate
+                    // and the fallback for golfers outside the match. Reusing it means the
+                    // dots and this indicator can never tell different stories, and no new
+                    // handicap arithmetic exists.
+                    //
+                    // Shown only for a NET BIRDIE OR BETTER that a stroke actually
+                    // produced. A gross birdie with no stroke is already circled on the
+                    // gross number; repeating it here would be noise, not information.
+                    if (dotStrokes > 0) {
+                        const displayNet = gross - dotStrokes;
+                        const netDiff = displayNet - holePar;
+                        if (netDiff <= -1) {
+                            const eagleCls = netDiff <= -2 ? ' net-eagle' : '';
+                            netMarkHtml = `<div class="net-mark-line">`
+                                + `<span class="net-mark${eagleCls}">${displayNet}</span></div>`;
+                        }
                     }
 
                     let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
@@ -6460,6 +6511,7 @@
                                 ${scoreInputHtml}
                                 ${shapeHtml}
                             </div>
+                            ${netMarkHtml}
                             ${currentToParHtml}
                             <div class="stroke-dots">${handicapDots}</div>
                             ${earnedDotsHtml}
