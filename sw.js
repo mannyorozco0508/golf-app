@@ -31,7 +31,11 @@
 // shell. The shell FILE LIST is unchanged here; the key moves purely so the activate
 // handler drops every older cache and the next launch is provably the deployed build.
 // Ambiguity about which build is on the phone costs more than a single cold fetch.
-const CACHE_VERSION = 'golfapp-v8-dot-context';
+// Moved to v9 because index.html - a shell file - changed again: the handicap-dot
+// context gained an Auto mode that merges independent side matches, plus a start-hole
+// gate on which holes draw match dots. The shell FILE LIST is unchanged; the key moves
+// so an installed PWA cannot keep painting the v8 scorecard.
+const CACHE_VERSION = 'golfapp-v9-auto-dot-context';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
