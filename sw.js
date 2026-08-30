@@ -35,7 +35,11 @@
 // context gained an Auto mode that merges independent side matches, plus a start-hole
 // gate on which holes draw match dots. The shell FILE LIST is unchanged; the key moves
 // so an installed PWA cannot keep painting the v8 scorecard.
-const CACHE_VERSION = 'golfapp-v9-auto-dot-context';
+// Moved to v10 because index.html - a shell file - changed again: marks on the
+// primary gross score are now gross-only (boxes), and a subordinate net-birdie
+// indicator was added beneath it. The shell FILE LIST is unchanged; the key moves so
+// an installed PWA cannot keep painting the v9 card, which circled gross pars.
+const CACHE_VERSION = 'golfapp-v10-gross-marks';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
