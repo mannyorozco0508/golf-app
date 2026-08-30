@@ -786,6 +786,27 @@
             margin-top: 4px; font-weight: bold; letter-spacing: 1px;
         }
 
+        /* THE GOLFER'S OWN HANDICAP, UNDER THEIR NAME ON THE FULL CARD.
+           Deliberately a second line rather than "Lee (5)" on one: the column is
+           already as narrow as a score box, and widening it or shrinking the name
+           to fit would cost more than the handicap is worth. The name keeps its
+           size; this sits under it, quiet and nowrap so it never wraps mid-token. */
+        .fc-name { display: block; }
+        .fc-hcp {
+            display: block; font-size: 0.6rem; font-weight: normal; letter-spacing: 0.2px;
+            color: var(--text-muted); margin-top: 1px; white-space: nowrap;
+        }
+
+        /* ONE LINE, NOT A PANEL. Explains WHY the teal dots fall where they do:
+           who the match baseline is and what everyone is playing off. Subtle enough
+           to ignore, present enough to settle an argument on the tee. */
+        .match-hcp-note {
+            font-size: 0.68rem; line-height: 1.35; color: var(--text-muted);
+            padding: 5px 8px; margin: 0 0 6px 0; border-radius: 4px;
+            background: var(--nav-bg); border-left: 3px solid var(--accent-teal);
+        }
+        .match-hcp-note strong { color: var(--accent-teal); letter-spacing: 0.4px; }
+
         .match-status-cell {
             display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; padding: 4px; min-width: 95px;
         }
@@ -1076,6 +1097,7 @@
     </div>
 
     <div class="card-table-wrapper" id="full-card-container" style="display:none;">
+        <div id="match-hcp-note" class="match-hcp-note" style="display:none;"></div>
         <table class="card-table">
             <thead>
                 <tr id="table-head-row">
@@ -1426,6 +1448,29 @@
         }
     }
 
+    // THE GOLFER-FACING HANDICAP STRING.
+    //
+    // parseHcp() turns "+2" into -2 so the match arithmetic is plain subtraction.
+    // That negative is an INTERNAL representation and must never reach the card: a
+    // plus-2 golfer reads "HCP +2", never "HCP -2". Anything already stored with a
+    // leading + is passed through untouched, and a blank/scratch handicap reads 0.
+    function formatHcpDisplay(raw) {
+        const t = String(raw === undefined || raw === null ? '' : raw).trim();
+        if (t === '') return '0';
+        if (t.charAt(0) === '+') return t;
+        const n = Number(t);
+        if (!isFinite(n)) return t;
+        if (n < 0) return '+' + String(Math.abs(n));
+        return String(n);
+    }
+
+    // Attribute-safe. Player names are user-entered and land in a data- attribute.
+    function escapeAttr(v) {
+        return String(v === undefined || v === null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     function getInitials(name) {
         return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
@@ -1701,7 +1746,15 @@
 
         const playerCellCount = cells.length - 3 - (window.__scHasMatchColumn ? 1 : 0);
         for (let i = 3; i < 3 + playerCellCount; i++) {
-            const name = headCells[i] ? headCells[i].textContent.trim() : '';
+            // The header cell now carries a second line (HCP n). Read the NAME only -
+            // textContent would glue the two together into "LeeHCP 5".
+            const nameEl = headCells[i] && headCells[i].querySelector
+                ? headCells[i].querySelector('.fc-name') : null;
+            const name = nameEl ? nameEl.textContent.trim()
+                : (headCells[i]
+                    ? ((headCells[i].dataset && headCells[i].dataset.playerName)
+                        || headCells[i].textContent.trim())
+                    : '');
             html += `<div class="hv-player-row"><div class="hv-player-name">${name}`;
             if (dotsGame) {
                 // Match this row back to a player by name, the same way the header cells
@@ -5989,9 +6042,51 @@
         const headRow = document.getElementById("table-head-row");
         headRow.innerHTML = `<th style="width: 40px;">Hole</th><th style="width: 35px;">Par</th><th style="width: 35px;">HCP</th>`;
 
+        // Name on top, the golfer's OWN Playing Handicap underneath. This is the
+        // course handicap they know, not their relative match number - the two
+        // together are what make the teal dots legible ("Jeremy is a 12, the low
+        // man is a 5, so Jeremy strokes on seven holes").
+        //
+        // data-player-name carries the bare name because Hole View re-reads these
+        // header cells to label its rows; without it the added HCP line would be
+        // concatenated straight into the name and every row would read "LeeHCP 5".
         filteredPlayers.forEach(p => {
-            headRow.innerHTML += `<th>${p.name.split(" ")[0]}</th>`;
+            const first = p.name.split(" ")[0];
+            headRow.innerHTML += `<th data-player-name="${escapeAttr(first)}">`
+                + `<span class="fc-name">${first}</span>`
+                + `<span class="fc-hcp">HCP ${formatHcpDisplay(p.hcp)}</span></th>`;
         });
+
+        // THE MATCH-HANDICAP CONTEXT LINE.
+        //
+        // Rendered only when a match is genuinely driving the dots. When the dots are
+        // ordinary course dots the line is hidden outright rather than saying so -
+        // a Stroke Play round gains no vertical space and no new vocabulary.
+        const matchNoteEl = document.getElementById("match-hcp-note");
+        if (matchNoteEl) {
+            const inMatch = matchRelHcpById
+                ? filteredPlayers.filter(p => matchRelHcpById[String(p.id)] !== undefined)
+                : [];
+            if (inMatch.length >= 2) {
+                // The baseline golfer is whoever is playing off zero. Ties are real -
+                // two golfers can share the lowest handicap - so this joins rather
+                // than picking one arbitrarily.
+                const low = inMatch.filter(p => matchRelHcpById[String(p.id)] === 0);
+                const lowLabel = low.length
+                    ? low.map(p => p.name.split(" ")[0]).join(" / ")
+                        + " (" + formatHcpDisplay(low[0].hcp) + ")"
+                    : "\u2014";
+                const playing = inMatch
+                    .map(p => p.name.split(" ")[0] + " " + matchRelHcpById[String(p.id)])
+                    .join(" \u00B7 ");
+                matchNoteEl.innerHTML = `<strong>MATCH HCP</strong> \u00B7 Low: ${lowLabel}`
+                    + ` \u00B7 Playing: ${playing}`;
+                matchNoteEl.style.display = "block";
+            } else {
+                matchNoteEl.innerHTML = "";
+                matchNoteEl.style.display = "none";
+            }
+        }
 
         if (showMatchColumn) {
             let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : (gameFormat === 'wolf' ? "Wolf" : (gameFormat === 'stableford' ? "Stableford Pts" : "Match & Bets")));
