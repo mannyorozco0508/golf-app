@@ -213,13 +213,73 @@ function calcPointSettlement(players, totals, dollarPerPoint) {
 // GATED TO 1v1. The same loop serves team formats, taking min() for best ball, and
 // team handicap allowances are a separate rules question. Anything with more than
 // one player a side keeps its existing behaviour exactly.
-function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
-    const base = Math.min(ownHcp, oppHcp);
-    const rel = ownHcp - base;
-    if (rel <= 0) return 0;
-    // Generalises past 18: every hole gets a stroke per full 18, then the
-    // remainder falls on the lowest stroke indexes.
+
+// ============================================================================
+// RELATIVE MATCH-PLAY HANDICAPS - ONE BASELINE FOR THE WHOLE MATCH
+// ============================================================================
+// The lowest Playing Handicap among EVERY golfer in the match plays off zero, and
+// every other golfer - INCLUDING THE LOWEST GOLFER'S OWN PARTNER - receives the
+// arithmetic difference from that single baseline, allocated from stroke index 1
+// upward. There is exactly ONE baseline per match. It is never recomputed per
+// team, per Nassau segment, or per press.
+//
+// 2v2 worked example, 5 and 12 against 8 and 17:
+//   baseline = 5  ->  5 plays off 0, 12 receives 7, 8 receives 3, 17 receives 12
+// The 12 is the 5's own partner and still receives 7. That is the intended rule:
+// team membership does not decide the baseline, the field of the match does.
+//
+// parseHcp stores a plus handicap as a negative (+2 -> -2), so the differential is
+// plain arithmetic and needs no special case: +2, 3, 7, 10 gives a baseline of -2
+// and relative handicaps of 0, 5, 9, 12. The ordinary course-based plus-handicap
+// giveback that starts at SI 18 belongs to stroke-play net scoring and is
+// deliberately NOT used here; getStrokes() keeps it, untouched.
+
+// Allocate a RELATIVE handicap across stroke indexes. Generalises past 18: every
+// hole gets one stroke per full 18, and the remainder falls on the lowest indexes.
+// rel 20 -> one everywhere plus a second on SI 1-2. rel 36 -> two everywhere.
+// rel 40 -> two everywhere plus a third on SI 1-4.
+function allocateMatchStrokes(rel, hcpIndex) {
+    if (!(rel > 0)) return 0;
     return Math.floor(rel / 18) + ((hcpIndex <= (rel % 18)) ? 1 : 0);
+}
+
+// The one baseline for a match: the lowest parsed Playing Handicap among ALL
+// participants, both sides counted together. Which team a golfer is on is
+// irrelevant to this calculation, and player/team ORDER cannot change it because
+// a minimum is order-independent.
+function matchHandicapBaseline(matchPlayers) {
+    var base = null;
+    (matchPlayers || []).forEach(function (p) {
+        var h = parseHcp(p.hcp);
+        if (base === null || h < base) base = h;
+    });
+    return base === null ? 0 : base;
+}
+
+// playerId -> relative match handicap, SCOPED TO THIS MATCH ONLY. Never written
+// back onto the player record: the same golfer legitimately carries a different
+// relative handicap in a simultaneous match against different opponents.
+function matchRelativeHandicaps(matchPlayers) {
+    var base = matchHandicapBaseline(matchPlayers);
+    var out = {};
+    (matchPlayers || []).forEach(function (p) {
+        out[String(p.id)] = parseHcp(p.hcp) - base;
+    });
+    return out;
+}
+
+// Which formats are genuinely HOLE-BY-HOLE MATCH PLAY played with individual
+// balls. Scramble is excluded ON PURPOSE: it is a single-ball team format, so
+// there is no individual ball for an individual relative stroke to attach to. It
+// keeps its existing behaviour exactly. A 1v1 is always treated as a match
+// regardless of the format label, which preserves the committed singles contract.
+function isRelativeMatchFormat(gameFormat) {
+    return ['match', 'nassau', 'bestball', 'ryder'].indexOf(gameFormat) !== -1;
+}
+
+function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
+    // A two-player baseline is just the all-player baseline over a field of two.
+    return allocateMatchStrokes(ownHcp - Math.min(ownHcp, oppHcp), hcpIndex);
 }
 
 function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
@@ -301,6 +361,23 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
         ];
     }
 
+    // ONE relative handicap table for the ENTIRE match, computed once here rather
+    // than per hole. Presses reuse this table by construction - a press is another
+    // wager over the SAME hole decisions, so it cannot find a new lowest golfer,
+    // create a new baseline, or renumber stroke indexes from the press hole.
+    const allMatchPlayers = t1Players.concat(t2Players);
+    // A one-per-side match is always relative, whatever the format is labelled,
+    // which preserves the already-committed singles contract byte for byte.
+    const isSinglesMatch = t1Players.length === 1 && t2Players.length === 1;
+    const useRelativeHcp = scoringType === 'net'
+        && (isSinglesMatch || isRelativeMatchFormat(gameFormat));
+    const matchBaseline = useRelativeHcp ? matchHandicapBaseline(allMatchPlayers) : 0;
+    const relHcpById = useRelativeHcp ? matchRelativeHandicaps(allMatchPlayers) : {};
+    // Gross play and non-match team formats keep exactly what they had before.
+    const matchStrokesFor = (p, hcpIndex) => useRelativeHcp
+        ? allocateMatchStrokes(relHcpById[String(p.id)] || 0, hcpIndex)
+        : (scoringType === 'net' ? getStrokes(hcpIndex, parseHcp(p.hcp)) : 0);
+
     let pressCount = 0;
     let maxThru = 0;
     let holeLog = {};
@@ -310,19 +387,13 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
         let t1Best = 999, t2Best = 999;
         let t1Valid = false, t2Valid = false;
 
-        // A singles net match allocates strokes RELATIVE to the opponent; team
-        // matches keep each player's own handicap against the course. See
-        // relativeMatchStrokes().
-        const isSingles = scoringType === 'net' && t1Players.length === 1 && t2Players.length === 1;
-        const hcp1 = isSingles ? parseHcp(t1Players[0].hcp) : 0;
-        const hcp2 = isSingles ? parseHcp(t2Players[0].hcp) : 0;
-
+        // Strokes come from the ONE match-wide relative table built before this
+        // loop. Every golfer in the match, on either side, is measured against the
+        // same lowest handicap - see matchHandicapBaseline().
         t1Players.forEach(p => {
             let v = savedScores[`p${p.id}_h${hNum}`];
             if (v && v > 0) {
-                let str = isSingles
-                    ? relativeMatchStrokes(hole.hcpIndex, hcp1, hcp2)
-                    : (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                let str = matchStrokesFor(p, hole.hcpIndex);
                 let s = parseInt(v, 10) - str;
                 if (s < t1Best) t1Best = s;
                 t1Valid = true;
@@ -332,9 +403,7 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
         t2Players.forEach(p => {
             let v = savedScores[`p${p.id}_h${hNum}`];
             if (v && v > 0) {
-                let str = isSingles
-                    ? relativeMatchStrokes(hole.hcpIndex, hcp2, hcp1)
-                    : (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                let str = matchStrokesFor(p, hole.hcpIndex);
                 let s = parseInt(v, 10) - str;
                 if (s < t2Best) t2Best = s;
                 t2Valid = true;
@@ -447,7 +516,9 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
         });
     }
 
-    return { t1Name, t2Name, t1Players, t2Players, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount };
+    return { t1Name, t2Name, t1Players, t2Players, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount,
+
+             usesRelativeHandicap: useRelativeHcp, matchBaseline, relHcpById };
 }
 
 // ============================================================================
