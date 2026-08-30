@@ -807,6 +807,30 @@
         }
         .match-hcp-note strong { color: var(--accent-teal); letter-spacing: 0.4px; }
 
+        /* WHICH MATCH OWNS THE DOTS.
+           One quiet row, not a panel. It appears only when the round itself is not a
+           Match Play format AND at least one net Match Play side match exists - so an
+           ordinary Stroke Play round with no wagers gains nothing at all. */
+        .dot-context-row {
+            display: flex; align-items: center; gap: 8px;
+            margin: 0 0 8px 0; padding: 0 2px;
+            font-size: 0.72rem; color: var(--text-muted);
+        }
+        .dot-context-row label { white-space: nowrap; letter-spacing: 0.3px; }
+        .dot-context-row select {
+            flex: 1; min-width: 0; max-width: 100%;
+            font-size: 0.72rem; padding: 6px 8px; border-radius: 6px;
+            border: 1px solid var(--border-mid); background: var(--nav-bg);
+            color: var(--text-main);
+        }
+
+        /* Hole View's own handicap label. Hole View is the DEFAULT view, so a golfer
+           who never taps Full Card still sees what they are playing off. */
+        .hv-hcp {
+            display: block; font-size: 0.68rem; font-weight: normal;
+            color: var(--text-muted); letter-spacing: 0.2px; margin-top: 1px;
+        }
+
         .match-status-cell {
             display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; padding: 4px; min-width: 95px;
         }
@@ -1092,6 +1116,11 @@
         <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
     </div>
 
+    <div id="dot-context-row" class="dot-context-row" style="display:none;">
+        <label for="dot-context-select">Dots:</label>
+        <select id="dot-context-select" onchange="setDotContext(this.value)"></select>
+    </div>
+
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
     </div>
@@ -1299,6 +1328,13 @@
     let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
     let selectedGroup = lockedGroup ? lockedGroup : "all";
     let currentViewMode = 'hole';
+    // WHICH MATCH DRIVES THE HANDICAP DOTS. Display state only - never written to
+    // Firebase, never read back from it, and deliberately reset to 'course' on every
+    // page load. 'course' means ordinary course-handicap dots; any other value is a
+    // sideMatches key. It is never auto-set: the same golfer legitimately plays off a
+    // different number in two simultaneous matches, so one of them cannot silently
+    // own the card.
+    let selectedDotMatchId = 'course';
     let currentViewedHole = null; // set on first render to the first hole missing a score
     let currentData = {};
     
@@ -1446,6 +1482,79 @@
             if (hcpIndex > (18 - plusVal)) return -1;
             return 0;
         }
+    }
+
+    // ========================================================================
+    // MATCH DOT CONTEXT — which match, if any, the handicap dots represent.
+    // ========================================================================
+    // A Stroke Play round can carry several Match Play side matches at once, and a
+    // golfer's relative handicap differs between them: a 10 receives 5 in one match
+    // and plays off zero in another. There is therefore no universal set of match
+    // dots, and the card refuses to invent one. The golfer picks.
+    //
+    // DISPLAY ONLY. Nothing here writes to Firebase, touches a side match, alters a
+    // stored handicap, or reaches settlement. It selects which already-computed
+    // canonical allocation the teal dots render.
+
+    // Round formats that ALREADY have one unambiguous match context. These keep
+    // driving the dots themselves and never show a selector.
+    function isRoundLevelMatchFormat(fmt) {
+        return ['match', 'nassau', 'bestball', 'ryder'].indexOf(fmt) !== -1;
+    }
+
+    // Side matches eligible to drive dots: hole-by-hole match formats played NET.
+    // A gross side match allocates no strokes at all, so offering it would be a
+    // control that visibly does nothing. Presses are not listed - a press is another
+    // wager over the same holes and inherits its parent's allocation, so a match with
+    // three presses is still ONE entry here.
+    function eligibleDotMatches(data) {
+        const d = data || {};
+        const sms = d.sideMatches || {};
+        const byId = {};
+        (d.players || []).forEach(p => { byId[String(p.id)] = p; });
+        const nameOf = id => {
+            const p = byId[String(id)];
+            return p ? String(p.name).split(' ')[0] : null;
+        };
+        return Object.keys(sms).map(key => {
+            const sm = sms[key] || {};
+            if (['match', 'nassau'].indexOf(sm.format) === -1) return null;
+            if ((sm.scoring || 'net') !== 'net') return null;
+            const a = (sm.teamAIds || []).map(String);
+            const b = (sm.teamBIds || []).map(String);
+            if (a.length === 0 || b.length === 0) return null;
+            const an = a.map(nameOf).filter(Boolean);
+            const bn = b.map(nameOf).filter(Boolean);
+            if (an.length === 0 || bn.length === 0) return null;
+            return { id: key, label: an.join(' + ') + ' vs ' + bn.join(' + '), sm: sm };
+        }).filter(Boolean);
+    }
+
+    // The canonical allocation for ONE selected side match, produced by the SAME
+    // engine everything else uses. No second handicap algorithm exists for the UI.
+    function dotCalcForSideMatch(data, sm, courseData) {
+        if (!sm || typeof calculateMatchEngine !== 'function') return null;
+        const byId = {};
+        (data.players || []).forEach(p => { byId[String(p.id)] = p; });
+        const teamA = (sm.teamAIds || []).map(id => byId[String(id)]).filter(Boolean)
+            .map(p => Object.assign({}, p, { team: 'Team 1' }));
+        const teamB = (sm.teamBIds || []).map(id => byId[String(id)]).filter(Boolean)
+            .map(p => Object.assign({}, p, { team: 'Team 2' }));
+        if (teamA.length === 0 || teamB.length === 0) return null;
+        try {
+            // Stroke allocation depends only on the golfers, so the full card of holes
+            // is correct here regardless of which hole the wager actually started on.
+            return calculateMatchEngine(teamA.concat(teamB), courseData || [], data.scores || {},
+                sm.scoring || 'net', sm.format, 'none', 0, 0, []);
+        } catch (e) { return null; }
+    }
+
+    // Called from the selector. Re-renders the card, then Hole View if that is the
+    // view on screen - Hole View reads the freshly rebuilt Full Card cells.
+    function setDotContext(value) {
+        selectedDotMatchId = value || 'course';
+        renderScorecard();
+        if (currentViewMode === 'hole') renderHoleView();
     }
 
     // THE GOLFER-FACING HANDICAP STRING.
@@ -1755,7 +1864,15 @@
                     ? ((headCells[i].dataset && headCells[i].dataset.playerName)
                         || headCells[i].textContent.trim())
                     : '');
-            html += `<div class="hv-player-row"><div class="hv-player-name">${name}`;
+            // THE GOLFER'S OWN PLAYING HANDICAP, under their name. Taken positionally
+            // from the same filtered list the header cells were built from, so it can
+            // never mismatch the column. Deliberately the ACTUAL course handicap, not
+            // the selected match's relative number: this label answers "what am I?",
+            // while the teal dots answer "where do I stroke in this match?".
+            const hvPlayer = filteredPlayers[i - 3];
+            const hvHcpHtml = hvPlayer
+                ? `<div class="hv-hcp">HCP ${formatHcpDisplay(hvPlayer.hcp)}</div>` : '';
+            html += `<div class="hv-player-row"><div class="hv-player-name">${name}${hvHcpHtml}`;
             if (dotsGame) {
                 // Match this row back to a player by name, the same way the header cells
                 // were built. A golfer with no dots shows nothing at all.
@@ -6030,8 +6147,47 @@
         // DOTS ONLY. `strokes` below still drives net, to-par and the circle/box
         // shapes, deliberately untouched: those are stroke-play net displays and must
         // continue to agree with the net leaderboard.
-        const matchRelHcpById = (matchCalc && matchCalc.usesRelativeHandicap && matchCalc.relHcpById)
-            ? matchCalc.relHcpById : null;
+        // WHICH ALLOCATION THE DOTS RENDER.
+        //
+        // Priority 1 - the round is itself a hole-by-hole Match Play format, so it owns
+        // the dots and there is nothing to choose.
+        // Priority 2 - the round is not, but the golfer has explicitly selected one of
+        // its Match Play side matches.
+        // Priority 3 - neither: ordinary course dots. Never a guess.
+        //
+        // matchCalc itself is deliberately NOT reassigned. It drives the Match & Bets
+        // column, the bet registry and the press strip, all of which belong to the
+        // ROUND's game. Only the dots follow the selection.
+        const dotMatchOptions = eligibleDotMatches(currentData);
+        const selectorApplies = !isRoundLevelMatchFormat(gameFormat) && dotMatchOptions.length > 0;
+        // A selection pointing at a wager that has since been deleted falls back safely.
+        const selectedOption = selectorApplies
+            ? dotMatchOptions.find(o => o.id === selectedDotMatchId) : null;
+        if (selectedDotMatchId !== 'course' && !selectedOption) selectedDotMatchId = 'course';
+
+        let dotContextCalc = matchCalc;
+        if (!dotContextCalc && selectedOption) {
+            dotContextCalc = dotCalcForSideMatch(currentData, selectedOption.sm, courseData);
+        }
+
+        // The selector itself: one row, populated only when it can do something.
+        const dotRow = document.getElementById("dot-context-row");
+        const dotSel = document.getElementById("dot-context-select");
+        if (dotRow && dotSel) {
+            if (selectorApplies) {
+                dotSel.innerHTML = `<option value="course">Course</option>`
+                    + dotMatchOptions.map(o =>
+                        `<option value="${escapeAttr(o.id)}">${o.label}</option>`).join('');
+                dotSel.value = selectedDotMatchId;
+                dotRow.style.display = "flex";
+            } else {
+                dotSel.innerHTML = "";
+                dotRow.style.display = "none";
+            }
+        }
+
+        const matchRelHcpById = (dotContextCalc && dotContextCalc.usesRelativeHandicap && dotContextCalc.relHcpById)
+            ? dotContextCalc.relHcpById : null;
         const dotStrokesFor = (p, hcpIndex, courseStrokes) => {
             if (!matchRelHcpById) return courseStrokes;
             const rel = matchRelHcpById[String(p.id)];
