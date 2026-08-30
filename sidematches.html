@@ -729,6 +729,32 @@
         return c;
     }
 
+    // SINGLES NET MATCH PLAY: STROKES ARE RELATIVE TO THE OPPONENT.
+    //
+    // In a singles net match the lower Playing Handicap plays off zero and the other
+    // player receives the arithmetic difference, allocated from stroke index 1 upward
+    // (USGA/WHS). Applying each player's FULL handicap against the course instead -
+    // which is what this engine used to do - is stroke-play net scoring, and it lands
+    // the strokes on the wrong holes. For 7 vs 12 it put them on SI 6-10 rather than
+    // SI 1-5, so the receiving player got nothing on the stroke index 1 hole.
+    //
+    // parseHcp stores a plus handicap as a negative (+2 -> -2), so the differential is
+    // plain arithmetic and plus handicaps need no special case. The ordinary
+    // course-based behaviour, where a plus player gives a stroke back starting at
+    // SI 18, remains correct for stroke-play net and is untouched in getStrokes().
+    //
+    // GATED TO 1v1. The same loop serves team formats, taking min() for best ball, and
+    // team handicap allowances are a separate rules question. Anything with more than
+    // one player a side keeps its existing behaviour exactly.
+    function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
+        const base = Math.min(ownHcp, oppHcp);
+        const rel = ownHcp - base;
+        if (rel <= 0) return 0;
+        // Generalises past 18: every hole gets a stroke per full 18, then the
+        // remainder falls on the lowest stroke indexes.
+        return Math.floor(rel / 18) + ((hcpIndex <= (rel % 18)) ? 1 : 0);
+    }
+
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
     // THREE-STAKE NASSAU (authorized change).
     //
@@ -811,10 +837,20 @@
             let t1Best = 999, t2Best = 999;
             let t1Valid = false, t2Valid = false;
 
+            // A singles net match allocates strokes RELATIVE to the opponent; team
+            // matches keep each player's own handicap against the course. See
+            // relativeMatchStrokes().
+            const isSingles = scoringType === 'net' && t1Players.length === 1 && t2Players.length === 1;
+            const hcp1 = isSingles ? parseHcp(t1Players[0].hcp) : 0;
+            const hcp2 = isSingles ? parseHcp(t2Players[0].hcp) : 0;
+
             t1Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
-                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    let str = isSingles
+                        ? relativeMatchStrokes(hole.hcpIndex, hcp1, hcp2)
+                        : (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    let s = parseInt(v, 10) - str;
                     if (s < t1Best) t1Best = s;
                     t1Valid = true;
                 }
@@ -823,7 +859,10 @@
             t2Players.forEach(p => {
                 let v = savedScores[`p${p.id}_h${hNum}`];
                 if (v && v > 0) {
-                    let s = parseInt(v, 10) - (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    let str = isSingles
+                        ? relativeMatchStrokes(hole.hcpIndex, hcp2, hcp1)
+                        : (scoringType === 'net' ? getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : 0);
+                    let s = parseInt(v, 10) - str;
                     if (s < t2Best) t2Best = s;
                     t2Valid = true;
                 }
