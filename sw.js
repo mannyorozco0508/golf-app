@@ -39,7 +39,12 @@
 // primary gross score are now gross-only (boxes), and a subordinate net-birdie
 // indicator was added beneath it. The shell FILE LIST is unchanged; the key moves so
 // an installed PWA cannot keep painting the v9 card, which circled gross pars.
-const CACHE_VERSION = 'golfapp-v10-gross-marks';
+// Moved to v11 because two precached files changed: bet-strip.js now resolves each
+// press's own stake instead of the round's base stake, and index.html renders that
+// amount plus the start hole on the collapsed ladder and offers a press-amount
+// picker. An installed PWA on v10 would keep telling a golfer that a $50 press is
+// $20. The shell FILE LIST is unchanged.
+const CACHE_VERSION = 'golfapp-v11-press-stakes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
