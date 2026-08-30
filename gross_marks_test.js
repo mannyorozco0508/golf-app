@@ -308,8 +308,8 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v10-gross-marks';/);
-        assert.ok(!/const CACHE_VERSION = 'golfapp-v9-auto-dot-context';/.test(sw));
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v11-press-stakes';/);
+        assert.ok(!/const CACHE_VERSION = 'golfapp-v10-gross-marks';/.test(sw));
     });
 
     test('the shell file list did NOT change', () => {
