@@ -290,10 +290,18 @@ describe('SIMULTANEOUS MATCHES STAY INDEPENDENT', () => {
     });
 });
 
-describe('TEAM FORMATS ARE UNCHANGED', () => {
+describe('TEAM MATCH PLAY USES THE ALL-PLAYER BASELINE', () => {
 
-    // The singles rule must not leak into team play. These pin the CURRENT
-    // behaviour: each team member's own full handicap, best ball taken by min().
+    // SUPERSEDED BY DESIGN. This block previously pinned the singles GATE - that a
+    // 2v2 kept each golfer's full course handicap - and asserted a measured count of
+    // 5 decided holes. That gate was the bug, not the contract: the lowest handicap
+    // in the MATCH now plays off zero and everyone else, partner included, takes the
+    // arithmetic difference. The old assertions are gone rather than loosened,
+    // because a test that pins removed behaviour is worse than no test at all.
+    //
+    // The replacement contract lives in full in team_relative_handicap_test.js.
+    // What stays here is the part this file is responsible for: that extending the
+    // rule to teams did not disturb the singles work or stroke play.
     function teamMatch(hcps) {
         const E = engineRealm();
         const players = [
@@ -303,26 +311,27 @@ describe('TEAM FORMATS ARE UNCHANGED', () => {
         return plain(E.calculateMatchEngine(players, cd18, levelScores(players), 'net', 'match', 'none', 10, 0, []));
     }
 
-    test('a 2v2 net match still uses each player\u2019s own handicap', () => {
+    test('a 2v2 net match is measured against ONE baseline, not four handicaps', () => {
         const calc = teamMatch([7, 15, 12, 20]);
         assert.ok(calc && calc.holeLog, 'the team match must still calculate');
-        // Team 1's best net comes from the 15 (more strokes) on stroked holes; the
-        // exact tally is pinned so any singles-rule leak would move it.
-        const decided = Object.values(calc.holeLog)
-            .filter(h => h && h.holeWinner && h.holeWinner !== 'Halved').length;
-        assert.equal(decided, 5, 'pinned pre-fix team behaviour - measured, must not move');
+        assert.equal(calc.matchBaseline, 7, 'the lowest golfer in the match');
+        assert.deepEqual(calc.relHcpById, { '101': 0, '102': 8, '103': 5, '104': 13 });
     });
 
-    test('team allocation is not relative to the opposing team', () => {
+    test('the lowest golfer\u2019s PARTNER still receives strokes', () => {
+        const calc = teamMatch([7, 15, 12, 20]);
+        assert.equal(calc.relHcpById['102'], 8,
+            'the 15 partners the 7 and receives 8 - deliberate, not a leak');
+    });
+
+    test('stroke play\u2019s own allocation is untouched by any of this', () => {
         const E = engineRealm();
-        // If the singles rule leaked, min across the match would be 7 and Team 2's
-        // 12 would receive only 5. Under team rules the 12 gets its full 12.
         assert.equal(E.getStrokes(1, 12), 1);
-        assert.equal(E.getStrokes(12, 12), 1, 'a 12 still strokes at SI 12 in team play');
-        assert.equal(expectedRelative(7, 12, 12).b, 0, 'but would NOT in a singles match');
+        assert.equal(E.getStrokes(12, 12), 1, 'a 12 still strokes at SI 12 in STROKE PLAY');
+        assert.equal(expectedRelative(7, 12, 12).b, 0, 'but not in a match');
     });
 
-    test('a one-per-side match is treated as singles, not as a team', () => {
+    test('a one-per-side match is still treated as singles', () => {
         const won = strokeHolesFromMatch(7, 12);
         assert.equal(won.length, 5, 'one player a side is a singles match');
     });
