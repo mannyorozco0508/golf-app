@@ -1268,6 +1268,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const courseVal = document.getElementById('course-search-input').value.trim();
             if (!courseVal) { alert('⚠️ Please select a golf course before continuing.'); return; }
         }
+        // Step 2 owns the Par/HCP grid. Validate the COMPLETED card here, on the way
+        // out - the golfer has finished typing by the time they reach for Next.
+        if (fromStep === 2) {
+            const customBox = document.getElementById('enable-custom-course');
+            if (customBox && customBox.checked) {
+                const check = validateCourseGrid();
+                if (!check.ok) { alert('\u26A0\uFE0F ' + check.message); return; }
+            }
+        }
         if (fromStep === 3) {
             const formatVal = document.getElementById('game-format-select').value;
             if (!formatVal) { alert('⚠️ Please select a game format before continuing.'); return; }
@@ -2564,9 +2573,22 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             if (foundId) {
                 courseHiddenSelect.value = foundId;
-            } else if (getCourseNameById(courseHiddenSelect.value, globalCourses) !== typedVal) {
+            } else if (getCourseNameById(courseHiddenSelect.value, globalCourses) !== typedVal
+                       && lastCourseChangeKey !== customCourseKeyFor(typedVal)) {
                 // Typed text doesn't match any known course or the previous selection -
-                // treat it as a brand-new course name instead of silently discarding it
+                // treat it as a brand-new course name instead of silently discarding it.
+                //
+                // THE SECOND CONDITION IS THE BUG FIX. For an unmapped course
+                // courseHiddenSelect.value is "" forever, so getCourseNameById("") could
+                // never equal the typed name and this branch fired on EVERY click
+                // anywhere outside the course box - including every tap into a Par or
+                // HCP cell, and the Next button itself. Each firing re-ran
+                // handleCourseChange(), which reseeded all 36 inputs back to par 4 and
+                // hcp 1-18, so a golfer could not keep a single typed value.
+                //
+                // Comparing against the course this screen was LAST set up for makes the
+                // branch fire only on a genuine change of course, which is what it was
+                // always meant to detect.
                 courseHiddenSelect.value = "";
                 handleCourseChange();
             }
@@ -2709,6 +2731,26 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // WHICH COURSE THIS SCREEN IS CURRENTLY SET UP FOR.
+    //
+    // Identity, not a heuristic about whether the DOM happens to hold values. A
+    // mapped course is identified by its key; an unmapped one by its typed name,
+    // normalised the same way a custom key is built. handleCourseChange() repaints
+    // the grid only when this actually changes, so a genuine course switch still
+    // replaces everything while a redundant call leaves the golfer's work alone.
+    let lastCourseChangeKey = null;
+
+    function customCourseKeyFor(name) {
+        return 'custom::' + String(name || '').trim().toLowerCase();
+    }
+
+    function currentCourseIdentity() {
+        const key = courseHiddenSelect.value;
+        if (key) return key;
+        const typed = courseSearchInput.value.trim();
+        return typed ? customCourseKeyFor(typed) : null;
+    }
+
     function handleCourseChange() {
         const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
@@ -2753,10 +2795,20 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
         
         // Auto-fill Custom Course Grid
-        baseData.forEach(h => {
-            if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
-            if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
-        });
+        //
+        // ONLY WHEN THE COURSE ACTUALLY CHANGED. This write is unconditional and
+        // total - it stamps all 36 inputs - so re-running it for the course already
+        // on screen destroys everything the golfer typed. Guarding on course identity
+        // keeps a real switch repainting in full while making a redundant call inert.
+        const identity = currentCourseIdentity();
+        const courseActuallyChanged = (identity !== lastCourseChangeKey);
+        if (courseActuallyChanged) {
+            baseData.forEach(h => {
+                if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
+                if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+            });
+            lastCourseChangeKey = identity;
+        }
 
         updateCustomCoursePars();
 
@@ -2781,14 +2833,61 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // remapNineHandicaps now lives in course-data.js so admin.html and trip.html
     // combine modular nines (like Thistle's Cameron/MacKay/Stewart loops) identically.
 
-    function captureCourseDataGrid() {
-        let customData = [];
-        for(let i=1; i<=18; i++) {
-            let p = parseInt(document.getElementById(`c-par-${i}`).value) || 4;
-            let h = parseInt(document.getElementById(`c-hcp-${i}`).value) || i;
-            customData.push({ hole: i, par: p, hcpIndex: h });
+    // COMPLETED-CARD VALIDATION.
+    //
+    // Runs at the Next/save boundary ONLY - never while the golfer is typing. An
+    // empty cell, a half-finished number, or two holes briefly sharing a stroke
+    // index are all normal mid-edit states and must be left alone; a golfer swapping
+    // SI 1 and SI 7 necessarily passes through a moment with two 7s.
+    //
+    // PAR RANGE: 3-6. The app had no par constraint anywhere, so this is new. 3-5
+    // covers every hole in the entire bundled course library; 6 is included because
+    // real par-6 holes exist and refusing one would block a legitimate card. Anything
+    // outside that is a typo, not a golf hole.
+    //
+    // HCP: a strict 1-18 permutation - eighteen integers, each used exactly once.
+    // That is what a stroke index IS, and every handicap path in the app assumes it.
+    function validateCourseGrid() {
+        const rows = [], seen = {};
+        for (let i = 1; i <= 18; i++) {
+            const parEl = document.getElementById('c-par-' + i);
+            const hcpEl = document.getElementById('c-hcp-' + i);
+            const parRaw = parEl ? String(parEl.value).trim() : '';
+            const hcpRaw = hcpEl ? String(hcpEl.value).trim() : '';
+
+            if (parRaw === '') return { ok: false, message: 'Hole ' + i + ' is missing a Par.' };
+            if (!/^[0-9]+$/.test(parRaw)) return { ok: false, message: 'Hole ' + i + ' Par must be a whole number.' };
+            const par = parseInt(parRaw, 10);
+            if (par < 3 || par > 6) return { ok: false, message: 'Hole ' + i + ' Par is ' + par + '. Par must be between 3 and 6.' };
+
+            if (hcpRaw === '') return { ok: false, message: 'Hole ' + i + ' is missing a Handicap (stroke index).' };
+            if (!/^[0-9]+$/.test(hcpRaw)) return { ok: false, message: 'Hole ' + i + ' Handicap must be a whole number.' };
+            const hcp = parseInt(hcpRaw, 10);
+            if (hcp < 1 || hcp > 18) return { ok: false, message: 'Hole ' + i + ' Handicap is ' + hcp + '. Handicaps must be between 1 and 18.' };
+
+            rows.push({ hole: i, par: par, hcpIndex: hcp });
+            if (seen[hcp]) {
+                return { ok: false, message: 'Handicap ' + hcp + ' is used on both hole ' + seen[hcp] + ' and hole ' + i + '. Each handicap 1-18 must be used exactly once.' };
+            }
+            seen[hcp] = i;
         }
-        return customData;
+        const missing = [];
+        for (let n = 1; n <= 18; n++) if (!seen[n]) missing.push(n);
+        if (missing.length) {
+            return { ok: false, message: 'Handicap ' + missing.join(', ') + (missing.length === 1 ? ' is' : ' are') + ' not used on any hole. Each handicap 1-18 must be used exactly once.' };
+        }
+        return { ok: true, data: rows };
+    }
+
+    // NO SILENT DEFAULTS AT SAVE. This used to read parseInt(...) || 4 and
+    // parseInt(...) || i, so a blank or mistyped cell quietly became par 4 or a
+    // stroke index equal to the hole number - producing a plausible-looking course
+    // that was not the one the golfer played, and feeding wrong strokes into money
+    // games. Bad data now fails validation instead. Returns null when invalid; every
+    // caller must handle that.
+    function captureCourseDataGrid() {
+        const result = validateCourseGrid();
+        return result.ok ? result.data : null;
     }
 
     function captureCurrentPlayerInputs() {
@@ -3931,7 +4030,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             let finalCourseData = [];
 
             if (isEditing) {
-                finalCourseData = captureCourseDataGrid();
+                const gridCheck = validateCourseGrid();
+                if (!gridCheck.ok) {
+                    alert('\u26A0\uFE0F Course card problem: ' + gridCheck.message);
+                    saveBtn.innerText = originalText; saveBtn.disabled = false;
+                    return;
+                }
+                finalCourseData = gridCheck.data;
                 db.ref(`global_courses/${courseKey}`).set({
                     name: selectedCourseName,
                     data: finalCourseData
@@ -3957,7 +4062,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 } else if (coursePresets[courseKey]) {
                     finalCourseData = coursePresets[courseKey].data;
                 } else {
-                    finalCourseData = captureCourseDataGrid();
+                    const unmappedCheck = validateCourseGrid();
+                    if (!unmappedCheck.ok) {
+                        alert('\u26A0\uFE0F Course card problem: ' + unmappedCheck.message);
+                        saveBtn.innerText = originalText; saveBtn.disabled = false;
+                        return;
+                    }
+                    finalCourseData = unmappedCheck.data;
                 }
             }
 
