@@ -44,7 +44,11 @@
 // amount plus the start hole on the collapsed ladder and offers a press-amount
 // picker. An installed PWA on v10 would keep telling a golfer that a $50 press is
 // $20. The shell FILE LIST is unchanged.
-const CACHE_VERSION = 'golfapp-v11-press-stakes';
+// Moved to v12 because admin.html - a precached shell file - changed: the course
+// Par/HCP grid no longer reseeds itself on every outside tap, and a completed card is
+// now validated at the Next/save boundary. On v11 an installed PWA would keep the
+// build where a golfer literally cannot enter an unmapped course. Shell list unchanged.
+const CACHE_VERSION = 'golfapp-v12-course-grid';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
