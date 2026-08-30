@@ -800,6 +800,13 @@
            visible gap between the two rings rather than one thick one. */
         .net-mark.net-eagle { box-shadow: 0 0 0 1px transparent, 0 0 0 2px var(--accent-red); }
 
+        /* The amount and start hole on a collapsed ladder chip. Quiet and small: the
+           chip's job is still WHO IS UP, with the wager identity underneath it. */
+        .bc-meta {
+            display: block; font-size: 0.6rem; font-weight: normal; letter-spacing: 0.2px;
+            color: var(--text-muted); margin-top: 1px; white-space: nowrap;
+        }
+
         .stroke-dots {
             color: var(--accent-teal); font-size: 1.3rem; line-height: 0.5; height: 8px; 
             margin-top: 4px; font-weight: bold; letter-spacing: 1px;
@@ -3659,8 +3666,21 @@
 
         const chipsHtml = model.chips.map(c => {
             const sel = betStripSelectedChip === c.key ? ' selected' : '';
+            // STAKE AND START HOLE ON THE COLLAPSED ROW.
+            //
+            // With a mixed ladder - $20 main, $20 press, $50 press, $100 press - the
+            // row used to read "Press #2" and nothing else, so the only way to learn
+            // which one was the $50 was to leave the scorecard. Both facts now sit on
+            // the chip: the amount for every wager, and the start hole for presses
+            // (the main bet's start hole is hole 1 and says nothing).
+            //
+            // This is the WAGER AMOUNT, not a claim that anyone is owed it.
+            const amt = (c.stake > 0) ? '$' + c.stake : '';
+            const from = (c.isPress && c.startHole) ? 'H' + c.startHole : '';
+            const meta = [amt, from].filter(Boolean).join(' \u00B7 ');
             return '<button type="button" class="bet-chip tone-' + c.tone + sel + '" onclick="toggleBetChip(\'' + c.key + '\')">' +
                 '<span class="bc-key">' + c.short + '</span>' +
+                (meta ? '<span class="bc-meta">' + meta + '</span>' : '') +
                 '<span class="bc-status">' + c.statusText + '</span>' +
                 '</button>';
         }).join('');
@@ -3711,14 +3731,46 @@
     function buildPressPanelHtml(model) {
         const startHole = model.nextPressHole;
         if (model.mode === 'match') {
-            const stakeText = model.stakeIsPerHole ? ('$' + model.currentStake + '/hole') : ('$' + model.currentStake);
+            // A HOLE-BET MATCH HAS NO PER-PRESS AMOUNT TO CHOOSE. Its value is derived
+            // from holes won at $N/hole, so offering dollar buttons would be meaningless.
+            // That case keeps the original single-button panel exactly.
+            if (model.stakeIsPerHole) {
+                return '<div class="press-panel">' +
+                    '<div class="pp-title">\uD83D\uDD25 Press the bet</div>' +
+                    '<div class="pp-start">NEW PRESS STARTS HOLE ' + startHole + '</div>' +
+                    '<div class="bcd-meta" style="margin-top:6px;">A press runs from hole ' + startHole + ' to the end of that match, at $' + model.currentStake + '/hole.</div>' +
+                    '<div class="pp-amount-row">' +
+                        '<button type="button" class="pp-amount-btn primary" onclick="confirmMatchPress()">START PRESS</button>' +
+                    '</div>' +
+                    '<button type="button" class="pp-cancel" onclick="closePressPanel()">Cancel</button>' +
+                    '</div>';
+            }
+
+            // "Press it." and "Press it for fifty." are both one conversation on the
+            // tee, so both are two taps here. The FIRST button is always the parent
+            // stake, so the ordinary press stays the default and nobody types a number
+            // to do the normal thing. $50 and $100 are only offered when they are not
+            // already the parent amount - two identical buttons help nobody.
+            const mBase = model.currentStake || 0;
+            const mPresets = [];
+            if (mBase > 0) mPresets.push({ label: 'Same $' + mBase, amt: mBase });
+            [50, 100].forEach(v => { if (v !== mBase) mPresets.push({ label: '$' + v, amt: v }); });
+            const mPresetHtml = mPresets.map((pp, i) =>
+                '<button type="button" class="pp-amount-btn' + (i === 0 ? ' primary' : '') + '" onclick="confirmMatchPress(' + pp.amt + ')">' + pp.label + '</button>'
+            ).join('');
+            const mCustomHtml = pressPanelCustom
+                ? '<div class="pp-custom-row">' +
+                    '<input type="number" inputmode="decimal" id="press-custom-amt" placeholder="Amount" min="1" step="1">' +
+                    '<button type="button" class="pp-amount-btn primary" style="flex:0 0 auto;" onclick="confirmMatchPressCustom()">START</button>' +
+                  '</div>'
+                : '<div class="pp-amount-row"><button type="button" class="pp-amount-btn" onclick="showPressCustom()">Custom\u2026</button></div>';
+
             return '<div class="press-panel">' +
                 '<div class="pp-title">\uD83D\uDD25 Press the bet</div>' +
                 '<div class="pp-start">NEW PRESS STARTS HOLE ' + startHole + '</div>' +
-                '<div class="bcd-meta" style="margin-top:6px;">A press runs from hole ' + startHole + ' to the end of that match, at ' + stakeText + '.</div>' +
-                '<div class="pp-amount-row">' +
-                    '<button type="button" class="pp-amount-btn primary" onclick="confirmMatchPress()">START PRESS</button>' +
-                '</div>' +
+                '<div class="bcd-meta" style="margin-top:6px;">A press runs from hole ' + startHole + ' to the end of that match.</div>' +
+                '<div class="pp-amount-row">' + mPresetHtml + '</div>' +
+                mCustomHtml +
                 '<button type="button" class="pp-cancel" onclick="closePressPanel()">Cancel</button>' +
                 '</div>';
         }
@@ -3775,12 +3827,29 @@
         closePressPanel();
     }
 
-    function confirmMatchPress() {
+    function confirmMatchPressCustom() {
+        const el = document.getElementById('press-custom-amt');
+        const amt = el ? parseFloat(el.value) : NaN;
+        if (isNaN(amt) || amt <= 0) { alert('Enter a dollar amount above 0.'); return; }
+        confirmMatchPress(amt);
+    }
+
+    // stake is OPTIONAL and, when omitted, deliberately not written at all: a press
+    // with no stored amount settles at the parent wager, which is how every press
+    // created before this panel existed still settles to the cent. A hole-bet match
+    // passes nothing, because its value comes from holes won rather than a fixed sum.
+    //
+    // Only the NEW press record is written. The parent and every sibling press are
+    // untouched - a $50 press is a new wager, not a re-pricing of the ladder.
+    function confirmMatchPress(stake) {
         const model = currentBetStripModel();
         if (!model || !model.canPress || !model.pressBaseId) { closePressPanel(); alert('That match can no longer be pressed.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
+        const payload = { baseId: model.pressBaseId, startHole: model.nextPressHole };
+        const amt = Number(stake);
+        if (stake !== undefined && stake !== null && isFinite(amt) && amt > 0) payload.stake = amt;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
-        db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId: model.pressBaseId, startHole: model.nextPressHole })
+        db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set(payload)
             .catch(err => alert(`Press failed to save: ${err.message}`));
         closePressPanel();
     }
