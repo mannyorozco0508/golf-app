@@ -214,18 +214,34 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
         else if (m.status > 0) tone = 'up';
         else if (m.status < 0) tone = 'down';
 
-        const chipStake = holeBet > 0 ? Math.abs(m.status * holeBet) : stake;
+        // PER-SEGMENT STAKE.
+        //
+        // A press may carry its own amount - "press you for fifty" is a different
+        // wager from the $20 it sprang from - and calculateMatchEngine already stores
+        // that amount on the segment. This line used to read the ROUND's base stake,
+        // so every rung of a mixed-stake ladder reported $20: a golfer tapping Press #3
+        // to check what it was worth was told the wrong number. Settlement was never
+        // affected; it reads the segment. Only the presenter lied.
+        //
+        // undefined/null means the segment never stored an amount - true of every auto
+        // press and of every press created before per-press stakes existed - and those
+        // still resolve to the round stake, exactly as before.
+        const segStake = (m.stake === undefined || m.stake === null) ? stake : Number(m.stake);
+        const chipStake = holeBet > 0 ? Math.abs(m.status * holeBet) : segStake;
         let moneyLine, stateLabel;
         if (m.closed) {
             stateLabel = '\uD83D\uDD12 FINAL';
             moneyLine = m.status === 0 ? '$0' : `+$${chipStake}`;
         } else {
             stateLabel = '\uD83D\uDFE2 LIVE';
-            moneyLine = holeBet > 0 ? `$${holeBet}/hole \u2014 $${chipStake} AT STAKE` : `$${stake} AT STAKE`;
+            moneyLine = holeBet > 0 ? `$${holeBet}/hole \u2014 $${chipStake} AT STAKE` : `$${segStake} AT STAKE`;
         }
 
         chips.push({
+            // startHole rides on the chip itself so the COLLAPSED ladder can read
+            // "P2 - $50 - H9 - AS" without the golfer tapping into the detail panel.
             key: m.id, short, statusText, tone, closed: m.closed, stake: chipStake,
+            startHole: m.startHole,
             isPress: m.pressNum > 0,
             detail: {
                 title: titleText,
