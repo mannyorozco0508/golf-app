@@ -104,7 +104,9 @@ describe('ONE WRITE PATH — THE WHOLE POINT', () => {
 
     test('the existing round-format press writers are untouched', () => {
         const src = read('index.html');
-        assert.match(src, /function confirmMatchPress\(\)/);
+        // SUPERSEDED SIGNATURE. confirmMatchPress now takes an OPTIONAL stake so a
+        // match press can carry its own amount. It is still the same single writer.
+        assert.match(src, /function confirmMatchPress\(stake\)/);
         assert.match(src, /function pressMatchBet\(baseId, nextHole\)/);
         assert.equal((src.match(/matchPresses\/\$\{pushKey\}`\)\.set/g) || []).length, 2,
             'both round-format writers still present, unchanged in number');
