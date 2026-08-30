@@ -26,7 +26,12 @@
 // Moved to v7 because the shell gained the two local Firebase SDK files. Until
 // this bump reaches a device, an installed PWA keeps its v6 cache and would never
 // fetch them.
-const CACHE_VERSION = 'golfapp-v7-firebase-local';
+// Moved to v8 after a physical-device session where it was genuinely unclear whether
+// the phone had loaded the newly deployed index.html or was painting an older cached
+// shell. The shell FILE LIST is unchanged here; the key moves purely so the activate
+// handler drops every older cache and the next launch is provably the deployed build.
+// Ambiguity about which build is on the phone costs more than a single cold fetch.
+const CACHE_VERSION = 'golfapp-v8-dot-context';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
