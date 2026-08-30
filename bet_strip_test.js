@@ -619,10 +619,17 @@ describe('END-TO-END RENDER — the real production renderer, in a stubbed DOM',
 
     test('renders four chips with correct statuses and a visible PRESS button', () => {
         const out = html();
-        assert.ok(out.includes('>Main Bet</span><span class="bc-status">Marty +3<'));
-        assert.ok(out.includes('>Press #1</span><span class="bc-status">Marty +1<'));
-        assert.ok(out.includes('>Press #2</span><span class="bc-status">Bud +2<'));
-        assert.ok(out.includes('>Press #3</span><span class="bc-status">TIED<'));
+        // SUPERSEDED ADJACENCY. The chip now carries a <span class="bc-meta"> between
+        // the key and the status, holding the wager's own amount and (for presses) its
+        // start hole - the whole point of that batch. The contract being protected is
+        // unchanged: each chip pairs the right label with the right status.
+        const chipHas = (key, status) => new RegExp(
+            '>' + key.replace('#','\\#') + '<\\/span>(?:<span class="bc-meta">[^<]*<\\/span>)?'
+            + '<span class="bc-status">' + status.replace('+','\\+') + '<').test(out);
+        assert.ok(chipHas('Main Bet', 'Marty +3'));
+        assert.ok(chipHas('Press #1', 'Marty +1'));
+        assert.ok(chipHas('Press #2', 'Bud +2'));
+        assert.ok(chipHas('Press #3', 'TIED'));
         // The rendered strip must carry no developer shorthand at all.
         ['>MAIN<', '>P1<', '>P2<', '>P3<'].forEach(bad =>
             assert.ok(!out.includes(bad), `shorthand ${bad} reached the golfer-facing strip`));
