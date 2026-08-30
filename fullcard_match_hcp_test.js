@@ -463,10 +463,26 @@ describe('ROUND PERFORMANCE IS UNCHANGED', () => {
     });
 
     test('dotStrokes is used for the DOTS AND NOTHING ELSE', () => {
-        const uses = renderScorecardSrc.split('\n').filter(l => /\bdotStrokes\b/.test(l));
-        assert.equal(uses.length, 2, 'exactly two references: the assignment and the dot string');
+        // SUPERSEDED COUNT, STRICTER CONTRACT. dotStrokes now legitimately drives TWO
+        // display surfaces: the teal dots, and the subordinate net indicator beneath
+        // the gross score. What is protected is unchanged and is now asserted directly
+        // rather than by counting lines: dotStrokes must never reach the gross score,
+        // the ordinary net, to-par, or any section total.
+        // COMMENTS ARE STRIPPED FIRST. This block is commented, and a comment naming
+        // dotStrokes would otherwise be counted as a use - the exact way a source
+        // assertion passes against prose instead of code.
+        const uses = renderScorecardSrc.split('\n')
+            .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
+            .filter(l => /\bdotStrokes\b/.test(l));
+        assert.equal(uses.length, 4, 'expected four code references, got:\n' + uses.join('\n'));
         assert.match(uses[0], /const dotStrokes = dotStrokesFor\(p, h\.hcpIndex, strokes, h\.hole\);/);
-        assert.match(uses[1], /handicapDots = dotStrokes > 0/);
+        assert.match(uses[1], /handicapDots = dotStrokes > 0/, 'the teal dots');
+        assert.match(uses[2], /if \(dotStrokes > 0\) \{/, 'the net-indicator gate');
+        assert.match(uses[3], /const displayNet = gross - dotStrokes;/, 'the net indicator itself');
+        // The forbidden neighbours, named explicitly.
+        assert.ok(!/let net = gross - dotStrokes;/.test(renderScorecardSrc));
+        assert.ok(!/runningStats\[p\.id\] \+= .*dotStrokes/.test(renderScorecardSrc));
+        assert.ok(!/value="\$\{.*dotStrokes.*\}"/.test(renderScorecardSrc), 'the primary box is never dotStrokes');
     });
 
     test('ordinary Stroke Play handicap allocation is untouched', () => {
