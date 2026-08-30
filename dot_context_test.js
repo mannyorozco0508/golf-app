@@ -123,7 +123,8 @@ describe('WHEN THE SELECTOR APPEARS', () => {
         ['match','nassau','bestball','ryder'].forEach(f => {
             assert.equal(call('isRoundLevelMatchFormat(' + JSON.stringify(f) + ')'), true, f);
         });
-        assert.match(RS, /!isRoundLevelMatchFormat\(gameFormat\) && dotMatchOptions\.length > 0/,
+        assert.match(RS, /const roundOwnsDots = isRoundLevelMatchFormat\(gameFormat\);/);
+        assert.match(RS, /const selectorApplies = !roundOwnsDots && hasOptions;/,
             'the selector is suppressed when the round already owns one match context');
     });
 
@@ -142,8 +143,12 @@ describe('WHEN THE SELECTOR APPEARS', () => {
 // ============================================================================
 describe('COURSE IS THE DEFAULT, ALWAYS', () => {
 
-    test('the initial state is course, not a side match', () => {
-        assert.match(SRC, /let selectedDotMatchId = 'course';/);
+    test('the initial state is AUTO, never a specific side match', () => {
+        // SUPERSEDED VALUE, SAME GUARANTEE. The default was 'course'; it is now 'auto',
+        // which RESOLVES to course whenever Auto is unavailable. What is protected is
+        // unchanged: the initial state is never one particular wager.
+        assert.match(SRC, /let selectedDotMatchId = 'auto';/);
+        assert.ok(!/let selectedDotMatchId = '(?!auto)[^']*';/.test(SRC));
     });
 
     test('THE FIRST SIDE MATCH IS NEVER AUTO-PICKED', () => {
@@ -154,13 +159,16 @@ describe('COURSE IS THE DEFAULT, ALWAYS', () => {
         // 'course' default or the golfer's own explicit choice. Order in the file is
         // not pinned - only that no fourth, inferred assignment can appear.
         const assigns = SRC.split('\n').map(l => l.trim()).filter(l => /selectedDotMatchId\s*=[^=]/.test(l));
-        assert.equal(assigns.length, 3, 'expected exactly three assignments, got:\n' + assigns.join('\n'));
-        assert.ok(assigns.includes("let selectedDotMatchId = 'course';"), 'the default declaration');
+        assert.equal(assigns.length, 4, 'expected exactly four assignments, got:\n' + assigns.join('\n'));
+        assert.ok(assigns.includes("let selectedDotMatchId = 'auto';"), 'the default declaration');
         assert.ok(assigns.includes("selectedDotMatchId = value || 'course';"), 'the explicit choice');
-        assert.ok(assigns.some(l => /!selectedOption\) selectedDotMatchId = 'course';/.test(l)),
-            'the stale-wager reset');
-        assigns.forEach(l => assert.ok(/'course'/.test(l),
-            'every assignment must resolve to course or an explicit value: ' + l));
+        // Two fail-safe resets: Auto retired, and a chosen wager that no longer exists.
+        assert.equal(assigns.filter(l => /selectedDotMatchId = 'course';$/.test(l)).length, 2,
+            'both stale paths must drop to course');
+        // Every assignment is a literal or the golfer's own value - never derived from
+        // the options list, so no wager can be inferred into the slot.
+        assigns.forEach(l => assert.ok(/'auto'|'course'|value \|\| 'course'/.test(l),
+            'assignment must be a literal or the explicit choice: ' + l));
     });
 
     test('Course is the first option offered', () => {
@@ -168,7 +176,9 @@ describe('COURSE IS THE DEFAULT, ALWAYS', () => {
     });
 
     test('a selection pointing at a deleted wager falls back to course', () => {
-        assert.match(RS, /if \(selectedDotMatchId !== 'course' && !selectedOption\) selectedDotMatchId = 'course';/);
+        assert.match(RS, /!dotMatchOptions\.some\(o => o\.id === selectedDotMatchId\)/,
+            'a chosen wager that no longer exists must be detected');
+        assert.match(RS, /selectedDotMatchId = 'course';/);
     });
 
     test('a page reload resets to course', () => {
@@ -246,8 +256,8 @@ describe('SIDE MATCH 2 — Dave 10 vs Jeff 15', () => {
         assert.equal(c.relHcpById['102'], undefined, 'nor is Jeremy');
         assert.deepEqual(dotsSIs(c, P[0]), courseSIs(5),  'Lee keeps his 5-handicap dots');
         assert.deepEqual(dotsSIs(c, P[1]), courseSIs(7),  'Jeremy keeps his 7-handicap dots');
-        assert.match(RS, /if \(rel === undefined\) return courseStrokes;/,
-            'via the existing fallback, not a new branch');
+        assert.match(RS, /if \(!entry\) return courseStrokes;/,
+            'a golfer absent from the plan falls through to course dots, not a new branch');
     });
 
     test('THE SAME GOLFER IS ALLOCATED DIFFERENTLY IN THE TWO MATCHES', () => {
@@ -289,9 +299,11 @@ describe('THE SELECTION IS DISPLAY STATE ONLY', () => {
     test('the dot calc NEVER becomes matchCalc', () => {
         // matchCalc drives the Match & Bets column, the bet registry and the press
         // strip - all of which belong to the ROUND's game, not to a dot preference.
-        assert.match(RS, /let dotContextCalc = matchCalc;/);
+        assert.match(RS, /matchCalc itself is deliberately NOT reassigned/);
         assert.ok(!/matchCalc = dotCalcForSideMatch/.test(RS));
-        assert.ok(!/matchCalc = dotContextCalc/.test(RS));
+        assert.ok(!/matchCalc = buildDotPlan/.test(RS));
+        assert.ok(!/\bmatchCalc =(?!=)/.test(RS.slice(RS.indexOf('const dotMatchOptions'))),
+            'nothing after the dot-context block may reassign matchCalc');
     });
 
     test('no player handicap is mutated', () => {
@@ -381,12 +393,14 @@ describe('HOLE VIEW SHOWS THE GOLFER\u2019S OWN HANDICAP', () => {
 describe('THE CONTEXT NOTE FOLLOWS THE SELECTION', () => {
 
     test('the note reads the dot context, not the round format', () => {
-        assert.match(RS, /const matchRelHcpById = \(dotContextCalc && dotContextCalc\.usesRelativeHandicap && dotContextCalc\.relHcpById\)/);
+        assert.match(RS, /let dotPlanById = null;/,
+            'the dots and the note both read one per-golfer plan');
+        assert.match(RS, /let dotNoteMode = 'none';/);
     });
 
     test('Course selected leaves the note hidden', () => {
-        // matchRelHcpById is null -> inMatch is empty -> the note is display:none.
-        assert.match(RS, /const inMatch = matchRelHcpById/);
+        // Course mode builds no note html, so the element is hidden outright.
+        assert.match(RS, /if \(noteHtml\) \{/);
         assert.match(RS, /matchNoteEl\.style\.display = "none"/);
     });
 
@@ -509,8 +523,8 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v8-dot-context';/);
-        assert.ok(!/golfapp-v7-firebase-local';/.test(sw.slice(sw.indexOf('const CACHE_VERSION'))),
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v9-auto-dot-context';/);
+        assert.ok(!/const CACHE_VERSION = 'golfapp-v8-dot-context';/.test(sw),
             'the old key must not still be the active one');
     });
 
