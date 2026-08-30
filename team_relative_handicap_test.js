@@ -706,9 +706,15 @@ describe('THE SCORECARD PRINTS WHAT THE ENGINE USED', () => {
             'the old full-course-handicap dot line must be gone');
     });
 
-    test('the dot table is taken off matchCalc, never re-derived', () => {
+    test('the dot table is taken off the engine result, never re-derived', () => {
+        // SUPERSEDED NAME, SAME CONTRACT. The dot source was `matchCalc` when the round
+        // format was the only possible one. It is now `dotContextCalc`: the round's own
+        // match, or a side match the golfer explicitly selected on a Stroke Play round.
+        // The protected property is unchanged - the table is READ off an engine result.
         const fn = src.slice(src.indexOf('function renderScorecard'));
-        assert.match(fn, /matchCalc\.usesRelativeHandicap && matchCalc\.relHcpById/);
+        assert.match(fn, /dotContextCalc\.usesRelativeHandicap && dotContextCalc\.relHcpById/);
+        assert.match(fn, /let dotContextCalc = matchCalc;/,
+            'a round-level match still takes priority over any selection');
         assert.match(fn, /return allocateMatchStrokes\(rel, hcpIndex\);/);
     });
 
