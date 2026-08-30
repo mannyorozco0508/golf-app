@@ -1334,7 +1334,12 @@
     // sideMatches key. It is never auto-set: the same golfer legitimately plays off a
     // different number in two simultaneous matches, so one of them cannot silently
     // own the card.
-    let selectedDotMatchId = 'course';
+    // 'auto'   - each golfer sees dots from THEIR OWN unambiguous match
+    // 'course' - ordinary course-handicap dots for everyone
+    // <key>    - one explicitly chosen side match
+    // Starts at 'auto' and degrades to 'course' whenever Auto is not available, so a
+    // reload lands on the safest correct context without the golfer doing anything.
+    let selectedDotMatchId = 'auto';
     let currentViewedHole = null; // set on first render to the first hole missing a score
     let currentData = {};
     
@@ -1528,6 +1533,53 @@
             if (an.length === 0 || bn.length === 0) return null;
             return { id: key, label: an.join(' + ') + ' vs ' + bn.join(' + '), sm: sm };
         }).filter(Boolean);
+    }
+
+    // ARE THE ELIGIBLE MATCHES NON-OVERLAPPING?
+    //
+    // Non-overlapping means no golfer sits in more than one eligible parent match.
+    // Only then can the per-match tables be merged, because only then are their key
+    // sets disjoint and each golfer's allocation unambiguous.
+    //
+    // Ryder singles - Lee v Dave, Jeremy v Jeff - is the case this exists for. Lee v
+    // Dave PLUS Lee v Jeff is not: Lee has two different correct answers.
+    //
+    // FAILS SAFE. A golfer listed twice inside a SINGLE wager (a data error - the same
+    // id on both sides) also counts as overlap, because the wager itself is incoherent
+    // and guessing at it is worse than falling back to course dots.
+    function dotMatchesOverlap(options) {
+        const seen = {};
+        let overlap = false;
+        (options || []).forEach(o => {
+            const ids = ((o.sm.teamAIds || []).concat(o.sm.teamBIds || [])).map(String);
+            ids.forEach(id => {
+                if (seen[id]) overlap = true;
+                seen[id] = true;
+            });
+        });
+        return overlap;
+    }
+
+    // WHICH DOTS EACH GOLFER GETS, AND FROM WHICH HOLE.
+    //
+    // Returns playerId -> { rel, startHole }. A golfer absent from the map keeps their
+    // ordinary course dots, which is how unmatched golfers are handled - there is no
+    // separate branch for them.
+    //
+    // startHole is carried because a wager struck on the 6th tee did not exist on holes
+    // 1-5. The ALLOCATION is unchanged (stroke index is a property of the course, never
+    // renumbered from the press or start hole); only which holes DRAW match dots moves.
+    function buildDotPlan(data, options, courseData) {
+        const plan = {};
+        (options || []).forEach(o => {
+            const calc = dotCalcForSideMatch(data, o.sm, courseData);
+            if (!calc || !calc.usesRelativeHandicap || !calc.relHcpById) return;
+            const start = Number(o.sm.startHole) || 1;
+            Object.keys(calc.relHcpById).forEach(id => {
+                plan[id] = { rel: calc.relHcpById[id], startHole: start };
+            });
+        });
+        return plan;
     }
 
     // The canonical allocation for ONE selected side match, produced by the SAME
@@ -6159,23 +6211,70 @@
         // column, the bet registry and the press strip, all of which belong to the
         // ROUND's game. Only the dots follow the selection.
         const dotMatchOptions = eligibleDotMatches(currentData);
-        const selectorApplies = !isRoundLevelMatchFormat(gameFormat) && dotMatchOptions.length > 0;
-        // A selection pointing at a wager that has since been deleted falls back safely.
-        const selectedOption = selectorApplies
-            ? dotMatchOptions.find(o => o.id === selectedDotMatchId) : null;
-        if (selectedDotMatchId !== 'course' && !selectedOption) selectedDotMatchId = 'course';
+        const roundOwnsDots = isRoundLevelMatchFormat(gameFormat);
+        const hasOptions = dotMatchOptions.length > 0;
+        const selectorApplies = !roundOwnsDots && hasOptions;
+        // AUTO is offered only when every eligible match is independent of the others.
+        const autoAvailable = selectorApplies && !dotMatchesOverlap(dotMatchOptions);
 
-        let dotContextCalc = matchCalc;
-        if (!dotContextCalc && selectedOption) {
-            dotContextCalc = dotCalcForSideMatch(currentData, selectedOption.sm, courseData);
+        // RESOLVE THE CONTEXT, FAILING SAFE.
+        //
+        // Two ways a stored choice goes stale mid-round, both handled here rather than
+        // left to drift: the chosen wager is deleted, or a NEW wager is created that
+        // makes the eligible set overlap and retires Auto. In both cases the context
+        // drops to Course. A stale merged allocation is worse than plain course dots,
+        // because it looks authoritative while being wrong.
+        if (selectedDotMatchId === 'auto') {
+            if (!autoAvailable) selectedDotMatchId = 'course';
+        } else if (selectedDotMatchId !== 'course') {
+            if (!selectorApplies || !dotMatchOptions.some(o => o.id === selectedDotMatchId)) {
+                selectedDotMatchId = 'course';
+            }
         }
 
-        // The selector itself: one row, populated only when it can do something.
+        // WHICH DOTS, PER GOLFER, FROM WHICH HOLE.
+        //
+        // matchCalc itself is deliberately NOT reassigned. It drives the Match & Bets
+        // column, the bet registry and the press strip, all of which belong to the
+        // ROUND's game rather than to a dot preference.
+        let dotPlanById = null;          // playerId -> { rel, startHole }
+        let dotNoteMode = 'none';        // 'round' | 'auto' | 'single' | 'none'
+        let dotNoteMatches = [];
+        if (roundOwnsDots) {
+            // Case 1: the round is itself hole-by-hole Match Play and owns the dots.
+            if (matchCalc && matchCalc.usesRelativeHandicap && matchCalc.relHcpById) {
+                dotPlanById = {};
+                Object.keys(matchCalc.relHcpById).forEach(id => {
+                    dotPlanById[id] = { rel: matchCalc.relHcpById[id], startHole: 1 };
+                });
+                dotNoteMode = 'single';
+            }
+        } else if (selectedDotMatchId === 'auto' && autoAvailable) {
+            // Case 2: independent side matches, merged. The tables are disjoint by the
+            // overlap test above, so this union cannot collide and invents no arithmetic.
+            dotPlanById = buildDotPlan(currentData, dotMatchOptions, courseData);
+            dotNoteMode = 'auto';
+            dotNoteMatches = dotMatchOptions;
+        } else if (selectedDotMatchId !== 'course') {
+            // Case 3: one wager, chosen explicitly.
+            const one = dotMatchOptions.find(o => o.id === selectedDotMatchId);
+            if (one) {
+                dotPlanById = buildDotPlan(currentData, [one], courseData);
+                dotNoteMode = 'single';
+                dotNoteMatches = [one];
+            }
+        }
+        if (dotPlanById && Object.keys(dotPlanById).length === 0) dotPlanById = null;
+
+        // The control itself: one row, in the same place, whenever a side-match context
+        // could apply. It does not appear and vanish as wagers change shape - only the
+        // Auto entry comes and goes, and Course is always there.
         const dotRow = document.getElementById("dot-context-row");
         const dotSel = document.getElementById("dot-context-select");
         if (dotRow && dotSel) {
             if (selectorApplies) {
-                dotSel.innerHTML = `<option value="course">Course</option>`
+                dotSel.innerHTML = (autoAvailable ? `<option value="auto">Auto (each golfer's match)</option>` : '')
+                    + `<option value="course">Course</option>`
                     + dotMatchOptions.map(o =>
                         `<option value="${escapeAttr(o.id)}">${o.label}</option>`).join('');
                 dotSel.value = selectedDotMatchId;
@@ -6186,13 +6285,16 @@
             }
         }
 
-        const matchRelHcpById = (dotContextCalc && dotContextCalc.usesRelativeHandicap && dotContextCalc.relHcpById)
-            ? dotContextCalc.relHcpById : null;
-        const dotStrokesFor = (p, hcpIndex, courseStrokes) => {
-            if (!matchRelHcpById) return courseStrokes;
-            const rel = matchRelHcpById[String(p.id)];
-            if (rel === undefined) return courseStrokes;
-            return allocateMatchStrokes(rel, hcpIndex);
+        // DISPLAY-ONLY START-HOLE GATE. Before a wager's start hole the wager did not
+        // exist, so those holes show ordinary course dots. Stroke index is NOT
+        // renumbered from the start hole - if hole 7 is SI 1 it stays SI 1, and the
+        // allocation handed to allocateMatchStrokes is the engine's, untouched.
+        const dotStrokesFor = (p, hcpIndex, courseStrokes, holeNum) => {
+            if (!dotPlanById) return courseStrokes;
+            const entry = dotPlanById[String(p.id)];
+            if (!entry) return courseStrokes;
+            if (holeNum < entry.startHole) return courseStrokes;
+            return allocateMatchStrokes(entry.rel, hcpIndex);
         };
 
         const headRow = document.getElementById("table-head-row");
@@ -6220,23 +6322,35 @@
         // a Stroke Play round gains no vertical space and no new vocabulary.
         const matchNoteEl = document.getElementById("match-hcp-note");
         if (matchNoteEl) {
-            const inMatch = matchRelHcpById
-                ? filteredPlayers.filter(p => matchRelHcpById[String(p.id)] !== undefined)
-                : [];
-            if (inMatch.length >= 2) {
-                // The baseline golfer is whoever is playing off zero. Ties are real -
-                // two golfers can share the lowest handicap - so this joins rather
-                // than picking one arbitrarily.
-                const low = inMatch.filter(p => matchRelHcpById[String(p.id)] === 0);
-                const lowLabel = low.length
-                    ? low.map(p => p.name.split(" ")[0]).join(" / ")
-                        + " (" + formatHcpDisplay(low[0].hcp) + ")"
-                    : "\u2014";
-                const playing = inMatch
-                    .map(p => p.name.split(" ")[0] + " " + matchRelHcpById[String(p.id)])
-                    .join(" \u00B7 ");
-                matchNoteEl.innerHTML = `<strong>MATCH HCP</strong> \u00B7 Low: ${lowLabel}`
-                    + ` \u00B7 Playing: ${playing}`;
+            const firstName = p => p.name.split(" ")[0];
+            let noteHtml = "";
+            if (dotNoteMode === 'auto') {
+                // MERGED MODE HAS NO SINGLE "LOW". Two matches mean two baselines, so
+                // naming one would be false. What a golfer actually needs here is the
+                // pairing - which dots belong to which contest.
+                noteHtml = `<strong>DOTS BY MATCH</strong> \u00B7 `
+                    + dotNoteMatches.map(o => o.label.replace(/ vs /g, ' v ')).join(' \u00B7 ');
+            } else if (dotPlanById) {
+                const inMatch = filteredPlayers.filter(p => dotPlanById[String(p.id)] !== undefined);
+                if (inMatch.length >= 2) {
+                    // The baseline golfer is whoever is playing off zero. Ties are real -
+                    // two golfers can share the lowest handicap - so this joins rather
+                    // than picking one arbitrarily.
+                    const low = inMatch.filter(p => dotPlanById[String(p.id)].rel === 0);
+                    const lowLabel = low.length
+                        ? low.map(firstName).join(" / ") + " (" + formatHcpDisplay(low[0].hcp) + ")"
+                        : "\u2014";
+                    const playing = inMatch
+                        .map(p => firstName(p) + " " + dotPlanById[String(p.id)].rel)
+                        .join(" \u00B7 ");
+                    noteHtml = `<strong>MATCH HCP</strong> \u00B7 Low: ${lowLabel}`
+                        + ` \u00B7 Playing: ${playing}`;
+                }
+            }
+            // Course mode says nothing at all. A Stroke Play round gains no vertical
+            // space and no new vocabulary for behaviour that has not changed.
+            if (noteHtml) {
+                matchNoteEl.innerHTML = noteHtml;
                 matchNoteEl.style.display = "block";
             } else {
                 matchNoteEl.innerHTML = "";
@@ -6277,7 +6391,7 @@
             filteredPlayers.forEach(p => {
                 const scoreVal = savedScores[`p${p.id}_h${h.hole}`] || "";
                 const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                const dotStrokes = dotStrokesFor(p, h.hcpIndex, strokes);
+                const dotStrokes = dotStrokesFor(p, h.hcpIndex, strokes, h.hole);
                 const handicapDots = dotStrokes > 0 ? "•".repeat(dotStrokes) : (dotStrokes < 0 ? "+" : "");
                 const initials = getInitials(p.name);
 
