@@ -277,9 +277,16 @@ describe('CHANGE 2 — FULL CARD DOTS ARE THE MATCH\u2019S DOTS', () => {
     });
 
     test('the card reads the canonical table rather than recomputing it', () => {
-        assert.match(renderScorecardSrc, /matchCalc\.usesRelativeHandicap && matchCalc\.relHcpById/,
+        // SUPERSEDED NAME, SAME CONTRACT. This pinned `matchCalc` when the round
+        // format was the only possible source of match strokes. The dot source is now
+        // `dotContextCalc` - the round's own match, or a side match the golfer
+        // explicitly selected. What the assertion is actually protecting is unchanged:
+        // the table is READ off an engine result, never recomputed in the view layer.
+        assert.match(renderScorecardSrc, /dotContextCalc\.usesRelativeHandicap && dotContextCalc\.relHcpById/,
             'one definition of match strokes, taken off the engine result');
         assert.match(renderScorecardSrc, /return allocateMatchStrokes\(rel, hcpIndex\);/);
+        assert.match(renderScorecardSrc, /let dotContextCalc = matchCalc;/,
+            'a round-level match still takes priority over any selection');
     });
 });
 
