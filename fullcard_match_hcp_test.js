@@ -282,10 +282,15 @@ describe('CHANGE 2 — FULL CARD DOTS ARE THE MATCH\u2019S DOTS', () => {
         // `dotContextCalc` - the round's own match, or a side match the golfer
         // explicitly selected. What the assertion is actually protecting is unchanged:
         // the table is READ off an engine result, never recomputed in the view layer.
-        assert.match(renderScorecardSrc, /dotContextCalc\.usesRelativeHandicap && dotContextCalc\.relHcpById/,
-            'one definition of match strokes, taken off the engine result');
-        assert.match(renderScorecardSrc, /return allocateMatchStrokes\(rel, hcpIndex\);/);
-        assert.match(renderScorecardSrc, /let dotContextCalc = matchCalc;/,
+        // SUPERSEDED SHAPE, SAME CONTRACT. The source is now a per-golfer plan built
+        // from one or more engine results (Auto merges independent matches), but the
+        // protected property is unchanged: allocations are READ off calculateMatchEngine
+        // and never recomputed in the view layer.
+        // buildDotPlan is a top-level helper, so this one is asserted against the file.
+        assert.match(SRC, /const calc = dotCalcForSideMatch\(data, o\.sm, courseData\);/,
+            'plans are built from engine results');
+        assert.match(renderScorecardSrc, /return allocateMatchStrokes\(entry\.rel, hcpIndex\);/);
+        assert.match(renderScorecardSrc, /if \(roundOwnsDots\) \{/,
             'a round-level match still takes priority over any selection');
     });
 });
@@ -304,8 +309,8 @@ describe('CHANGE 3 — THE MATCH HANDICAP CONTEXT LINE', () => {
         assert.match(renderScorecardSrc, /<strong>MATCH HCP<\/strong>/);
         assert.match(renderScorecardSrc, /Low: \$\{lowLabel\}/);
         assert.match(renderScorecardSrc, /Playing: \$\{playing\}/);
-        assert.match(renderScorecardSrc, /matchRelHcpById\[String\(p\.id\)\] === 0/,
-            'the baseline is whoever plays off zero, read from the canonical table');
+        assert.match(renderScorecardSrc, /dotPlanById\[String\(p\.id\)\]\.rel === 0/,
+            'the baseline is whoever plays off zero, read from the canonical plan');
     });
 
     test('the baseline label uses the GOLFER-FACING handicap', () => {
@@ -319,8 +324,7 @@ describe('CHANGE 3 — THE MATCH HANDICAP CONTEXT LINE', () => {
         const zeros = tied.filter(p => calc.relHcpById[String(p.id)] === 0).map(p => p.name);
         assert.deepEqual(zeros, ['Lee', 'Dave'], 'both play off zero');
         // The whole `low` list is mapped - not a slice of it, and not [0].
-        assert.match(renderScorecardSrc,
-            /low\.map\(p => p\.name\.split\(" "\)\[0\]\)\.join\(" \/ "\)/,
+        assert.match(renderScorecardSrc, /low\.map\(firstName\)\.join\(" \/ "\)/,
             'every golfer playing off zero must be named');
         assert.ok(!/low\.slice\(/.test(renderScorecardSrc), 'the tied list must not be truncated');
         assert.ok(!/low\[0\]\.name/.test(renderScorecardSrc), 'and must not collapse to the first golfer');
@@ -400,7 +404,7 @@ describe('CONTEXT SELECTION — WHICH MATCH OWNS THE DOTS', () => {
         // dotStrokesFor falls through to the course strokes it was handed.
         assert.equal(cardDots(calc, outsider, 1, E.getStrokes(1, 20)), 2,
             'Sam still shows his own two dots at SI 1');
-        assert.match(renderScorecardSrc, /if \(rel === undefined\) return courseStrokes;/);
+        assert.match(renderScorecardSrc, /if \(!entry\) return courseStrokes;/);
     });
 
     test('PRESSES DO NOT CREATE A SECOND DOT CONTEXT', () => {
@@ -461,7 +465,7 @@ describe('ROUND PERFORMANCE IS UNCHANGED', () => {
     test('dotStrokes is used for the DOTS AND NOTHING ELSE', () => {
         const uses = renderScorecardSrc.split('\n').filter(l => /\bdotStrokes\b/.test(l));
         assert.equal(uses.length, 2, 'exactly two references: the assignment and the dot string');
-        assert.match(uses[0], /const dotStrokes = dotStrokesFor\(p, h\.hcpIndex, strokes\);/);
+        assert.match(uses[0], /const dotStrokes = dotStrokesFor\(p, h\.hcpIndex, strokes, h\.hole\);/);
         assert.match(uses[1], /handicapDots = dotStrokes > 0/);
     });
 
@@ -480,12 +484,12 @@ describe('ROUND PERFORMANCE IS UNCHANGED', () => {
         // matchRelHcpById null -> dotStrokesFor returns the course strokes unchanged.
         assert.equal(cardDots(null, ps[1], 12, E.getStrokes(12, 12)), 1,
             'a 12 still shows a dot at SI 12');
-        assert.match(renderScorecardSrc, /if \(!matchRelHcpById\) return courseStrokes;/);
+        assert.match(renderScorecardSrc, /if \(!dotPlanById\) return courseStrokes;/);
     });
 
     test('the leaderboard\u2019s own net calculation was not touched', () => {
         const lb = read('leaderboard.html');
-        assert.ok(!/dotStrokes|matchRelHcpById|allocateMatchStrokes/.test(lb),
+        assert.ok(!/dotStrokes|dotPlanById|allocateMatchStrokes/.test(lb),
             'leaderboard.html must not have acquired match-dot logic');
         assert.match(lb, /getStrokes\(hole\.hcpIndex, parseHcp\(p\.hcp\)\)/,
             'it still nets off the ordinary course allocation');
