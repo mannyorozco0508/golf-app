@@ -698,8 +698,8 @@ describe('THE SCORECARD PRINTS WHAT THE ENGINE USED', () => {
 
     test('the dots come from the match table, not the course handicap', () => {
         const fn = src.slice(src.indexOf('function renderScorecard'));
-        assert.match(fn, /const dotStrokes = dotStrokesFor\(p, h\.hcpIndex, strokes\);/,
-            'renderScorecard must resolve dots through dotStrokesFor');
+        assert.match(fn, /const dotStrokes = dotStrokesFor\(p, h\.hcpIndex, strokes, h\.hole\);/,
+            'renderScorecard must resolve dots through dotStrokesFor, hole included');
         assert.match(fn, /const handicapDots = dotStrokes > 0 \? "\u2022"\.repeat\(dotStrokes\)/,
             'the printed dots must be the MATCH strokes');
         assert.ok(!/const handicapDots = strokes > 0 \? "\u2022"\.repeat\(strokes\)/.test(fn),
@@ -712,10 +712,13 @@ describe('THE SCORECARD PRINTS WHAT THE ENGINE USED', () => {
         // match, or a side match the golfer explicitly selected on a Stroke Play round.
         // The protected property is unchanged - the table is READ off an engine result.
         const fn = src.slice(src.indexOf('function renderScorecard'));
-        assert.match(fn, /dotContextCalc\.usesRelativeHandicap && dotContextCalc\.relHcpById/);
-        assert.match(fn, /let dotContextCalc = matchCalc;/,
+        // SUPERSEDED SHAPE, SAME CONTRACT - the source is now a per-golfer plan built
+        // from engine results, still never recomputed in the view layer.
+        // buildDotPlan is a top-level helper, so this one is asserted against the file.
+        assert.match(src, /const calc = dotCalcForSideMatch\(data, o\.sm, courseData\);/);
+        assert.match(fn, /if \(roundOwnsDots\) \{/,
             'a round-level match still takes priority over any selection');
-        assert.match(fn, /return allocateMatchStrokes\(rel, hcpIndex\);/);
+        assert.match(fn, /return allocateMatchStrokes\(entry\.rel, hcpIndex\);/);
     });
 
     test('NET, TO-PAR and the shapes still use the course allocation', () => {
