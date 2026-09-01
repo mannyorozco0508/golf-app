@@ -213,8 +213,8 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        assert.match(c, /^consumer-v22-/);
-        assert.match(t, /^tournament-v22-/);
+        assert.match(c, /^consumer-v23-/);
+        assert.match(t, /^tournament-v23-/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {
