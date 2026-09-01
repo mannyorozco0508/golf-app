@@ -700,7 +700,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
             if (tripLinkCode) {
-                return db.ref(`trips/${tripLinkCode}/tournaments/${currentCode}`).set({ label: name, addedAt: Date.now() });
+                // BOTH POINTERS, THE SAME PAIR linkTournamentToTrip() writes.
+                //
+                // This path used to write only the forward one, so a tournament created
+                // from a trip appeared in that trip's list while renderTripLinkStatus()
+                // - which reads tripCode - showed the "link me to a trip" form as though
+                // it were unlinked. Two ways of being linked meant two behaviours.
+                //
+                // Records already stored the old way are NOT repaired here. There is no
+                // migration and no background rewrite; renderTripLinkStatus() reads the
+                // forward pointer instead, so they display correctly as they are.
+                return db.ref(`trips/${tripLinkCode}/tournaments/${currentCode}`)
+                    .set({ label: name, addedAt: Date.now() })
+                    .then(() => db.ref(`tournaments/${currentCode}/tripCode`).set(tripLinkCode));
             }
         }).then(() => {
             window.location.href = `tournament.html?tourney=${currentCode}`;
@@ -994,12 +1006,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).catch(err => alert(`Error linking to trip: ${err.message}`));
     }
 
+    // LINKED IS LINKED, WHICHEVER POINTER SAYS SO.
+    //
+    // Two shapes exist in stored data. Tournaments linked after the fact carry
+    // tripCode; tournaments created from a trip before this was fixed carry only the
+    // forward pointer at trips/{trip}/tournaments/{code}. Requiring tripCode showed
+    // those historical events as unlinked and offered to link them to a trip they
+    // were already in.
+    //
+    // tripLinkCode is the trip this page was opened from, which is the forward
+    // relationship expressed in the URL. Treating it as authoritative when tripCode
+    // is absent makes the older records read correctly WITHOUT touching them - no
+    // migration, no repair job, no background write.
+    function linkedTripCode() {
+        return currentData.tripCode || tripLinkCode || null;
+    }
+
     function renderTripLinkStatus() {
         const statusEl = document.getElementById('trip-link-status');
         const formEl = document.getElementById('trip-link-form');
-        if (currentData.tripCode) {
+        const code = linkedTripCode();
+        if (code) {
             statusEl.style.display = 'block';
-            statusEl.innerHTML = `🧳 Linked to trip <a href="${consumerUrl(`trip.html?trip=${currentData.tripCode}`)}" style="color:var(--brand-green);">${currentData.tripCode}</a>`;
+            const historical = !currentData.tripCode
+                ? ` <span style="color:var(--text-muted); font-weight:normal; font-size:0.8rem;">(linked from the trip)</span>`
+                : '';
+            statusEl.innerHTML = `🧳 Linked to trip <a href="${consumerUrl(`trip.html?trip=${code}`)}" style="color:var(--brand-green);">${code}</a>${historical}`;
             formEl.style.display = 'none';
         } else {
             statusEl.style.display = 'none';
