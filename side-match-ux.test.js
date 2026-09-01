@@ -210,16 +210,40 @@ describe('FIXED THIS BATCH — the picker is now fully deterministic, no auto-ba
         assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('already has 2'));
     });
 
-    test('Stroke Play format enforces a max of 1 per side, matching the engine\'s real 1v1-only constraint', () => {
+    test('Stroke Play now takes 2 per side, the same as every other match format', () => {
+        // REVERSED DELIBERATELY. This used to assert a max of one golfer per side for
+        // Stroke Play, described as "the engine's real 1v1-only constraint". That
+        // stopped being true when settlement-engine.js learned to score a whole stroke
+        // side best ball, and the cap was never a guard anyway - it lived in the picker
+        // only, so a format switch walked past it. Stroke Play is 1v1 or 2v2 now, and
+        // the picker says so.
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['A', 'B'], [0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
         sandbox.__setElement('sm-format', 'stroke');
         vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
         sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[1].id), 'a'); // 2nd player to side a under stroke play — should be rejected
+        sandbox.pickPlayerForSide(String(players[1].id), 'a');
         const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(state, JSON.stringify({ [players[0].id]: 'a' }));
+        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[1].id]: 'a' }),
+            'a second golfer must be accepted on a Stroke Play side');
+    });
+
+    test('Stroke Play still refuses a THIRD golfer on a side', () => {
+        // The cap moved, it did not disappear. Two per side is the supported shape for
+        // every format; three has never settled and still must not be buildable.
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C'], [0, 0, 0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        sandbox.__setElement('sm-format', 'stroke');
+        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id), 'a');
+        sandbox.pickPlayerForSide(String(players[1].id), 'a');
+        const before = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
+        sandbox.pickPlayerForSide(String(players[2].id), 'a');
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), before,
+            'state must be completely unchanged when a Stroke side is already full');
+        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('already has 2'));
     });
 
     test('ACCEPTANCE SCENARIO C: Manny+Mike vs John+Steve, created directly, no tricks, exactly 4 taps', () => {
