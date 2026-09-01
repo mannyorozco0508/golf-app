@@ -65,8 +65,13 @@ function shellFiles() {
 }
 function filesToSync() {
     const src = read('sync-mobile-web.js');
-    const m = src.match(/const FILES_TO_SYNC = \[([\s\S]*?)\];/);
-    assert.ok(m, 'FILES_TO_SYNC must exist in sync-mobile-web.js');
+    // FILES_TO_SYNC is now the union of the three product shell declarations rather
+    // than a literal - see sync-mobile-web.js. Rebuilt here the way production does.
+    const parts = ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL']
+        .map(name => src.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];')));
+    parts.forEach((p, i) => assert.ok(p,
+        ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL'][i] + ' must exist in sync-mobile-web.js'));
+    const m = [null, parts.map(p => p[1]).join(',')];
     return [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
 }
 function cacheVersion() {
