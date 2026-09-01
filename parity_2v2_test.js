@@ -263,7 +263,9 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
         // The stroke branch calls the engines unguarded, so removing the script tag
         // throws instead of paying nobody. Proved by loading the page WITHOUT the
         // dependency and watching the render fail.
-        const crippled = loadHtmlInlineScript('sidematches.html', ['action-model.js']);
+        // { only: true } - the harness now loads a page's real script tags by default,
+        // so a realm deliberately missing the engine has to say so explicitly.
+        const crippled = loadHtmlInlineScript('sidematches.html', ['action-model.js'], { only: true });
         assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined',
             'without the script tag the page should have no engine at all');
 
