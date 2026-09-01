@@ -12,6 +12,16 @@
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
          cannot drift on what a side match's hole range means. -->
     <script src="action-model.js"></script>
+    <!-- THE CANONICAL STROKE ENGINES. This page used to carry its own copies of
+         calculateHoleBetEngine / calculateOverallBetEngine, and those copies read
+         p1/p2 only - they ignored config.sideA/sideB entirely. So a 2v2 Stroke Play
+         match settled correctly on the Receipt and showed ALL SQUARE / $0 here, on
+         the very tab that created it. The copies are gone; there is now exactly one
+         implementation. Loaded AFTER action-model.js and BEFORE the inline block, so
+         nothing below can shadow it - re-declaring any of these functions inline
+         would silently restore the divergence. Depends on getStrokes / parseHcp,
+         which this page defines inline and parity_test.js pins to money-engine.js. -->
+    <script src="settlement-engine.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -2362,14 +2372,41 @@
         return true;
     }
 
-    function getLastPlayedHoleForSideMatch(p1, p2, courseData, savedScores) {
+    // THE LAST HOLE EVERY PARTICIPANT HAS POSTED.
+    //
+    // This decided where a press starts, and it only ever looked at two golfers. On a
+    // 2v2 that let a press start on a hole two of the four had not played: the engine
+    // holds a hole until every golfer on a side has posted (sideHoleScore in
+    // settlement-engine.js returns null otherwise), so a press begun early sits over
+    // holes that cannot be scored yet and settles for an amount nobody agreed to.
+    //
+    // The rule is not new - it is the SAME completion rule the engine already applies,
+    // stated once here: a hole counts when everyone in the match has a score on it. A
+    // 1v1 passes two golfers and gets precisely what it always got.
+    function getLastPlayedHoleForSideMatch(participants, courseData, savedScores) {
+        const people = Array.isArray(participants) ? participants.filter(Boolean) : [];
+        if (people.length === 0) return 0;
         let last = 0;
         (courseData || []).forEach(h => {
-            const v1 = savedScores[`p${p1.id}_h${h.hole}`];
-            const v2 = savedScores[`p${p2.id}_h${h.hole}`];
-            if (v1 && v1 > 0 && v2 && v2 > 0) last = Math.max(last, h.hole);
+            const everyonePosted = people.every(pl => {
+                const v = savedScores[`p${pl.id}_h${h.hole}`];
+                return v && v > 0;
+            });
+            if (everyonePosted) last = Math.max(last, h.hole);
         });
         return last;
+    }
+
+    // Every golfer in a stored side match, in side order. Read from the RECORD rather
+    // than from whatever the card happens to be rendering, so a press is measured
+    // against the wager that actually exists. Falls back to the two golfers the press
+    // button carried if the match cannot be read, which is the previous behaviour.
+    function sideMatchParticipants(sm, fallback) {
+        const players = currentData.players || [];
+        if (!sm) return (fallback || []).filter(Boolean);
+        const ids = (sm.teamAIds || []).concat(sm.teamBIds || []).map(String);
+        const found = players.filter(pl => ids.includes(String(pl.id)));
+        return found.length > 0 ? found : (fallback || []).filter(Boolean);
     }
 
     function showSideHolePressInput(matchId, p1Id, p2Id) {
@@ -2378,7 +2415,7 @@
         const p1 = players.find(p => String(p.id) === String(p1Id));
         const p2 = players.find(p => String(p.id) === String(p2Id));
         if (!p1 || !p2) return;
-        const nextHole = getLastPlayedHoleForSideMatch(p1, p2, currentData.courseData || [], currentData.scores || {}) + 1;
+        const nextHole = getLastPlayedHoleForSideMatch(sideMatchParticipants(sideMatchById(matchId), [p1, p2]), currentData.courseData || [], currentData.scores || {}) + 1;
         const row = document.getElementById(`sm-hole-press-row-${matchId}`);
         if (!row) return;
         row.innerHTML = `
@@ -2427,7 +2464,7 @@
         const p1 = players.find(p => String(p.id) === String(p1Id));
         const p2 = players.find(p => String(p.id) === String(p2Id));
         if (!p1 || !p2) return;
-        const nextHole = getLastPlayedHoleForSideMatch(p1, p2, currentData.courseData || [], currentData.scores || {}) + 1;
+        const nextHole = getLastPlayedHoleForSideMatch(sideMatchParticipants(sideMatchById(matchId), [p1, p2]), currentData.courseData || [], currentData.scores || {}) + 1;
         // THE $78 BUG LIVED HERE. This wrote { startHole } with no stake and never
         // asked for an amount, so every overall press silently inherited the original
         // wager - a $78 press printed and settled as $200. The engine honoured a
@@ -2659,16 +2696,39 @@
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
 
-                const holeConfig = { holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' };
-                const overallConfig = { overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' };
+                // THE WHOLE SIDE, NOT ITS FIRST GOLFER.
+                //
+                // sideA/sideB is the contract settlement-engine.js already uses for this
+                // exact match (see buildSideMatchReceipts). Passing it here is what makes
+                // this tab agree with the Receipt on a 2v2: the engine scores each side
+                // best ball and holds a hole until every golfer on the side has posted.
+                // A 1v1 carries one golfer per side and behaves exactly as it always has -
+                // the engine's own fallback is [p1]/[p2], which is what these arrays are.
+                const sides = { sideA: teamAPlayers, sideB: teamBPlayers };
+                const isTeamMatch = teamAPlayers.length > 1 || teamBPlayers.length > 1;
+
+                const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' }, sides);
+                const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];
 
                 const holeCalc = holeConfig.holeEnabled ? calculateHoleBetEngine([p1, p2], smCourse, savedScores, holeConfig, holePresses) : null;
                 const overallCalc = overallConfig.overallEnabled ? calculateOverallBetEngine([p1, p2], smCourse, savedScores, overallConfig, overallPresses) : null;
 
+                // ONE NAMING CONVENTION, THE SAME ONE THE ENGINE USES.
+                //
+                // calculateOverallBetEngine builds base.nameA/nameB by joining each side's
+                // first names, and the Match/Nassau cards below already read calc.t1Name
+                // built the same way. The per-hole engine returns money only, no names, so
+                // without this the two rows on one card could label the same wager
+                // differently. Derived once here and asserted equal to base.nameA/nameB in
+                // parity_2v2_test.js, so it cannot drift from the engine's own wording.
+                const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
+                const sideAName = sideName(teamAPlayers);
+                const sideBName = sideName(teamBPlayers);
+
                 html += `<div class="side-match-card" id="sm-card-${matchId}">
-                    <div class="side-match-players">${p1.name.split(' ')[0]} 🆚 ${p2.name.split(' ')[0]}</div>
+                    <div class="side-match-players">${sideAName} 🆚 ${sideBName}</div>
                     <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
                 if (holeCalc) {
@@ -2677,7 +2737,7 @@
                         <span style="font-size:0.8rem;">💵 $${holeCalc.currentStake}/hole${carryText}</span>
                         <span id="sm-hole-press-row-${matchId}">${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button>` : ''}</span>
                     </div>
-                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
+                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${sideAName}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${sideBName}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
                     // THE HOLE-PRESS LEDGER. The row above shows the CURRENT rate, which
                     // after a press is the pressed number - so "$125/hole" was true while
                     // the $78 press that got it there, and its start hole, appeared
@@ -2693,21 +2753,27 @@
                     let statusText = '';
                     if (overallCalc.mode === 'stroke') {
                         const b = overallCalc.base;
+                        // b.winner IS the side's name already - "Ann / Abe" on a 2v2. It
+                        // used to be split on the first space, which silently dropped the
+                        // partner from a match she won with him. A 1v1 side name has no
+                        // space, so this reads identically to before for every existing
+                        // match. Same reason the leader line reads nameA/nameB rather than
+                        // the first golfer's stored name.
                         statusText = b.roundComplete
-                            ? (b.winner ? `${b.winner.split(' ')[0]} won the base bet` : 'Base bet tied')
+                            ? (b.winner ? `${b.winner} won the base bet` : 'Base bet tied')
                             : (() => {
-                                const leader = b.p1Total < b.p2Total ? p1.name : (b.p2Total < b.p1Total ? p2.name : null);
-                                return leader ? `${leader.split(' ')[0]} leading thru ${b.holesCompleted}` : `Tied thru ${b.holesCompleted}`;
+                                const leader = b.p1Total < b.p2Total ? b.nameA : (b.p2Total < b.p1Total ? b.nameB : null);
+                                return leader ? `${leader} leading thru ${b.holesCompleted}` : `Tied thru ${b.holesCompleted}`;
                             })();
                     } else {
                         const s = overallCalc.baseStatus;
-                        statusText = s === 0 ? 'All Square' : (s > 0 ? `${p1.name.split(' ')[0]} ${s} UP` : `${p2.name.split(' ')[0]} ${Math.abs(s)} UP`);
+                        statusText = s === 0 ? 'All Square' : (s > 0 ? `${sideAName} ${s} UP` : `${sideBName} ${Math.abs(s)} UP`);
                     }
                     html += `<div class="side-match-row">
                         <span style="font-size:0.8rem;">🎯 Overall ($${sm.overallStake}): ${statusText}</span>
                         ${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>` : ''}
                     </div>
-                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${p1.name.split(' ')[0]}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${p2.name.split(' ')[0]}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
+                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${sideAName}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${sideBName}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
                     // Overall presses, same treatment: every press with its own start
                     // hole and its own stake. A press stored without one - every press
                     // saved before custom stakes existed - shows the original wager,
@@ -2722,7 +2788,35 @@
                     html += `<div style="font-size:0.8rem; color:var(--text-muted); padding:6px 0;">No $/hole or $/overall amount set for this match.</div>`;
                 }
 
-                html += buildSideMatchMiniScorecard(matchId, [p1, p2], smCourse, savedScores);
+                // WHAT EACH GOLFER ACTUALLY PAYS, ON A TEAM MATCH ONLY.
+                //
+                // The rows above report the SIDE's position, which is what the wager is.
+                // But the Receipt pays people, not sides: settlement-engine.js takes the
+                // side total and divides it by the number of golfers on that side
+                // (buildSideMatchReceipts - aShare / bShare). Showing only "+$50" next to
+                // a pair reads as though one of them collects all of it.
+                //
+                // Same total, same divisor, no second algorithm: the combined side result
+                // is the sum of the two bets exactly as settlement combines them, then
+                // divided the same way. A 1v1 renders nothing extra here, so every
+                // existing card is untouched.
+                if (isTeamMatch) {
+                    const sideTotal = (holeCalc ? holeCalc.p1Money : 0) + (overallCalc ? overallCalc.p1Money : 0);
+                    const aShare = sideTotal / teamAPlayers.length;
+                    const bShare = -sideTotal / teamBPlayers.length;
+                    const perGolfer = (side, share) => side
+                        .map(pl => `${pl.name.split(' ')[0]} ${fmtSideM(share)}`).join(' \u00B7 ');
+                    html += `<div class="side-match-row" style="font-size:0.76rem; color:var(--text-muted);">
+                        <span>Per golfer: ${perGolfer(teamAPlayers, aShare)}</span><span>${perGolfer(teamBPlayers, bShare)}</span>
+                    </div>`;
+                }
+
+                // ALL FOUR CARDS ON A 2v2. The mini scorecard is where a golfer checks the
+                // numbers the money came from, and best ball means a partner's score can
+                // decide a hole - so showing two of the four made the card unverifiable.
+                // virtualPlayers is teamAPlayers.concat(teamBPlayers), which on a 1v1 is
+                // exactly the [p1, p2] this used to pass.
+                html += buildSideMatchMiniScorecard(matchId, virtualPlayers, smCourse, savedScores);
                 if (canManageSideMatch(sm)) html += `<div class="side-match-row"><button class="btn-danger-sm" onclick="deleteSideMatch('${matchId}')">✕ Remove Match</button></div>`;
                 html += `</div>`;
                 return;
@@ -2794,159 +2888,6 @@
         // covers sideMatches. The two sets never overlap.
         list.innerHTML = roundGameCards + html;
     }
-
-    function getRichHoleBetScore(player, holeNum, courseHole, scoringType, savedScores) {
-        const v = savedScores[`p${player.id}_h${holeNum}`];
-        if (!v || v <= 0) return null;
-        const gross = parseInt(v, 10);
-        if (scoringType === 'gross') return gross;
-        return gross - getStrokes(courseHole.hcpIndex, parseHcp(player.hcp));
-    }
-
-    function calculateHoleBetEngine(players, courseData, savedScores, config, presses) {
-        if (!config || config.holeEnabled === false || players.length < 2) return null;
-        const p1 = players[0], p2 = players[1];
-        const sortedPresses = (presses || []).slice().sort((a, b) => a.fromHole - b.fromHole);
-
-        function getStake(holeNum) {
-            let stake = config.holeStake;
-            sortedPresses.forEach(pr => { if (holeNum >= pr.fromHole) stake = pr.newStake; });
-            return stake;
-        }
-
-        let segments = [];
-        if (config.segment === 'frontback') {
-            segments = [
-                { holes: courseData.filter(h => h.hole <= 9), label: 'Front 9' },
-                { holes: courseData.filter(h => h.hole > 9), label: 'Back 9' }
-            ];
-        } else {
-            segments = [{ holes: courseData, label: 'Full Round' }];
-        }
-
-        let p1Money = 0;
-        let holeLog = [];
-        let currentCarry = 0;
-        let lastPlayedHole = 0;
-
-        segments.forEach(seg => {
-            let carry = 0;
-            seg.holes.forEach(h => {
-                const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
-                if (s1 === null || s2 === null) return;
-                lastPlayedHole = Math.max(lastPlayedHole, h.hole);
-
-                const baseStake = getStake(h.hole);
-                const effectiveStake = baseStake + carry;
-
-                if (s1 < s2) {
-                    p1Money += effectiveStake;
-                    holeLog.push({ hole: h.hole, winner: p1.name, amount: effectiveStake });
-                    carry = 0;
-                } else if (s2 < s1) {
-                    p1Money -= effectiveStake;
-                    holeLog.push({ hole: h.hole, winner: p2.name, amount: effectiveStake });
-                    carry = 0;
-                } else {
-                    if (config.tieRule === 'carry') {
-                        carry = effectiveStake;
-                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: carry });
-                    } else {
-                        holeLog.push({ hole: h.hole, winner: null, amount: 0, carrying: 0 });
-                        carry = 0;
-                    }
-                }
-            });
-            currentCarry = carry;
-        });
-
-        const startHole = courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1;
-        const rateHistory = [{ stake: config.holeStake, fromHole: startHole, pressNum: 0 }]
-            .concat(sortedPresses.map((pr, i) => ({ stake: pr.newStake, fromHole: pr.fromHole, pressNum: i + 1 })));
-        const tiesCarried = holeLog.filter(h => h.winner === null && h.carrying > 0).map(h => h.hole);
-
-        return { p1, p2, p1Money, holeLog, currentCarry, currentStake: getStake(lastPlayedHole + 1) || config.holeStake, rateHistory, tiesCarried };
-    }
-
-    function calculateOverallBetEngine(players, courseData, savedScores, config, presses) {
-        if (!config || config.overallEnabled === false || players.length < 2) return null;
-        const p1 = players[0], p2 = players[1];
-
-        if (config.overallMode === 'stroke') {
-            function segmentTotals(startHole, segStake) {
-            // A PRESS PAYS ITS OWN STAKE.
-            //
-            // segStake arrives from the press being evaluated. It used to be absent
-            // here, so every press fell back to config.overallStake below and a
-            // "press it for $25" on a $20 bet settled as $20. settlement-engine.js
-            // always passed it; these page copies did not, so the Matches tab and
-            // Stats page showed money that would not match the final receipt.
-            //
-            // Matches settlement-engine.js exactly - that copy is canonical.
-                const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
-                let p1Total = 0, p2Total = 0, holesCompleted = 0, totalHolesInSeg = 0;
-                courseData.forEach(h => {
-                    if (h.hole < startHole) return;
-                    totalHolesInSeg++;
-                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
-                    if (s1 !== null && s2 !== null) {
-                        p1Total += s1;
-                        p2Total += s2;
-                        holesCompleted++;
-                    }
-                });
-                const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
-                let winner = null, money = 0;
-                if (roundComplete) {
-                    if (p1Total < p2Total) { winner = p1.name; money = stake; }
-                    else if (p2Total < p1Total) { winner = p2.name; money = stake; }
-                }
-                const segP1Money = winner === p1.name ? money : (winner === p2.name ? -money : 0);
-                return { startHole, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg, roundComplete, winner, p1Money: segP1Money };
-            }
-
-            const base = segmentTotals(courseData.length > 0 ? Math.min(...courseData.map(h => h.hole)) : 1);
-            const pressSegs = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => Object.assign(segmentTotals(pr.startHole, pr.stake), { pressNum: i + 1 }));
-
-            let p1Money = base.p1Money;
-            pressSegs.forEach(seg => { p1Money += seg.p1Money; });
-
-            return {
-                p1, p2, mode: 'stroke', base, pressSegs, p1Money,
-                p1Total: base.p1Total, p2Total: base.p2Total, holesCompleted: base.holesCompleted, totalHoles: base.totalHoles, roundComplete: base.roundComplete, winner: base.winner
-            };
-        } else {
-            function matchStatusFromHole(startHole) {
-                let status = 0;
-                courseData.forEach(h => {
-                    if (h.hole < startHole) return;
-                    const s1 = getRichHoleBetScore(p1, h.hole, h, config.scoringType, savedScores);
-                    const s2 = getRichHoleBetScore(p2, h.hole, h, config.scoringType, savedScores);
-                    if (s1 !== null && s2 !== null) {
-                        if (s1 < s2) status += 1;
-                        else if (s2 < s1) status -= 1;
-                    }
-                });
-                return status;
-            }
-
-            const baseStatus = matchStatusFromHole(1);
-            const pressResults = (presses || []).slice().sort((a, b) => a.startHole - b.startHole).map((pr, i) => ({ startHole: pr.startHole, status: matchStatusFromHole(pr.startHole), pressNum: i + 1 }));
-
-            let p1Money = 0;
-            if (baseStatus > 0) p1Money += config.overallStake;
-            else if (baseStatus < 0) p1Money -= config.overallStake;
-            pressResults.forEach(pr => {
-                if (pr.status > 0) p1Money += config.overallStake;
-                else if (pr.status < 0) p1Money -= config.overallStake;
-            });
-
-            return { p1, p2, mode: 'match', baseStatus, pressResults, p1Money };
-        }
-    }
-
 
     // Close the "More" popover when a tap lands outside it. Native <details> already
     // handles tapping the summary again, and navigating away closes it implicitly, so
