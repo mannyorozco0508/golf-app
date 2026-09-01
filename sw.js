@@ -115,7 +115,12 @@
 // not previously requested by them. An installed PWA on v22 would hold an organizer
 // page with no player field and a scorecard that cannot open a group link. Shell
 // MEMBERSHIP is unchanged: handicap.js was already precached for Consumer.
-const CACHE_VERSION = 'golfapp-v23-player-identity';
+// Moved to v24 for the multi-round wave. tournament.html, tournament-engine.js and
+// tournament-scorecard.html all changed - an organizer page with no round management
+// on it, and a scorecard that cannot read ?round=, would leave an installed PWA on
+// v23 unable to score the second day of a championship. Shell MEMBERSHIP is
+// unchanged: rounds live inside the existing tournament record.
+const CACHE_VERSION = 'golfapp-v24-multi-round';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
