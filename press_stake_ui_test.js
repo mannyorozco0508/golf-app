@@ -47,7 +47,7 @@ function stripRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','bet-strip.js']
+    ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','bet-strip.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v17-shared-core';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v18-shared-handicap';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -363,7 +363,7 @@ describe('SERVICE WORKER', () => {
         const raw = sw.slice(sw.indexOf('const SHELL_FILES'), sw.indexOf(']', sw.indexOf('const SHELL_FILES')));
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        assert.equal(entries.length, 28);
+        assert.equal(entries.length, 29);
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 
