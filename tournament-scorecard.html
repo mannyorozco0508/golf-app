@@ -202,6 +202,11 @@
     let currentCode = urlParams.get('tourney') ? urlParams.get('tourney').toUpperCase() : null;
     let myTeamNum = urlParams.get('team') ? parseInt(urlParams.get('team'), 10) : null;
     let myGroupId = urlParams.get('group') || null;
+    // ?round=R identifies WHICH round a group link is for. Saturday's link and
+    // Sunday's link carry the same group id, so without this a golfer who scrolled
+    // back to yesterday's message would post today's scores into yesterday's round -
+    // silently, because everything else about the two links is identical.
+    let myRoundId = urlParams.get('round') || null;
     let currentData = {};
     let hasAutoScrolled = false; // guards the shotgun starting-hole auto-scroll to fire once per page load
 
@@ -213,8 +218,32 @@
     } else {
         db.ref(`tournaments/${currentCode}`).on('value', (snap) => {
             currentData = snap.val();
-            const group = myGroupId ? (currentData && currentData.scoringGroups || {})[myGroupId] : null;
-            const teamOk = myTeamNum && currentData && currentData.teams && currentData.teams[`team${myTeamNum}`];
+            // ONE SEAM, THE SAME ONE THE ENGINE USES. roundView() hands back something
+            // shaped like a single-round record, so everything below is unchanged and
+            // there is no `if (rounds)` in the rendering.
+            const multi = isMultiRound(currentData);
+            if (multi && !myRoundId) {
+                document.getElementById('error-detail').textContent =
+                    "This event has more than one round, and this link doesn't say which one. Ask your organizer for the link for today's round.";
+                document.getElementById('error-content').style.display = 'block';
+                document.getElementById('main-content').style.display = 'none';
+                return;
+            }
+            const view = multi ? roundView(currentData, myRoundId) : currentData;
+            if (multi && !view) {
+                document.getElementById('error-detail').textContent =
+                    "That round is no longer part of this event. Ask your organizer for the current scoring link.";
+                document.getElementById('error-content').style.display = 'block';
+                document.getElementById('main-content').style.display = 'none';
+                return;
+            }
+            // A ROUND THAT IS NOT OPEN DOES NOT TAKE SCORES. Setup means the organizer
+            // is still building it; closed means the result is final. Either way a
+            // golfer typing into it would be entering strokes nobody will count, so
+            // the card is shown read-only rather than pretending to save.
+            const status = multi ? view.roundStatus : 'open';
+            const group = myGroupId ? (view && view.scoringGroups || {})[myGroupId] : null;
+            const teamOk = myTeamNum && view && view.teams && view.teams[`team${myTeamNum}`];
             if (!currentData || (!teamOk && !group)) {
                 document.getElementById('error-detail').textContent = !currentData
                     ? `No tournament found with the code ${currentCode}. Ask your organizer to check the link.`
@@ -226,6 +255,8 @@
                 return;
             }
             document.getElementById('main-content').style.display = 'block';
+            roundScope = view;   // for a single-round record this IS currentData
+            roundLocked = (status !== 'open');
             if (group) renderGroup(group); else renderAll();
         });
     }
@@ -304,14 +335,35 @@
     // not their name - so moving somebody to another group, or fixing the spelling of
     // their name, cannot move a single stroke. Scoped to this group's own players:
     // the id is checked against the group before anything is written.
+    // The round view this card is scoring, and whether it accepts writes.
+    let roundScope = null;
+    let roundLocked = false;
+
+    function scorePath(suffix) {
+        // Round identity lives in the PATH, not in the key - so the score key shape is
+        // the one already in production and a cross-round write is structurally
+        // impossible rather than merely validated against.
+        return myRoundId
+            ? `tournaments/${currentCode}/rounds/${myRoundId}/scores/${suffix}`
+            : `tournaments/${currentCode}/scores/${suffix}`;
+    }
+
     function saveIndividualScore(playerId, holeNum, val) {
-        const group = (currentData.scoringGroups || {})[myGroupId] || {};
+        if (roundLocked) return;
+        const scope = roundScope || currentData;
+        const group = (scope.scoringGroups || {})[myGroupId] || {};
         if ((group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer
-        const ref = db.ref(`tournaments/${currentCode}/scores/${playerId}_h${holeNum}`);
+        const ref = db.ref(scorePath(`${playerId}_h${holeNum}`));
         trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
 
     function renderGroup(group) {
+        // THE ROUND VIEW, NOT THE EVENT. Shadowing the outer currentData here is
+        // deliberate: everything below reads course, format, scoring mode, groups and
+        // scores, and in a multi-round event every one of those belongs to the round.
+        // A single-round record passes itself through roundScope, so this reads the
+        // same object it always did.
+        const currentData = roundScope || window.currentData;
         const players = currentData.players || {};
         const ids = (group.playerIds || []).filter(pid => players[pid]);
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
@@ -359,8 +411,18 @@
 
         const played = Math.max(0, ...ids.map(pid => thruCount[pid] || 0));
         document.getElementById('status-main').textContent = `Thru ${played}`;
-        document.getElementById('status-sub').textContent =
-            netMode ? 'Enter gross scores — net is worked out for you' : 'Enter gross scores';
+        document.getElementById('status-sub').textContent = roundLocked
+            ? (currentData.roundStatus === 'closed'
+                ? 'This round is closed — scores are final'
+                : 'This round is not open for scoring yet')
+            : (netMode ? 'Enter gross scores — net is worked out for you' : 'Enter gross scores');
+        if (roundLocked) {
+            document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
+        }
+        if (currentData.roundName) {
+            document.getElementById('event-sub').textContent =
+                `${currentData.courseName} • ${currentData.roundName} • Individual Stroke Play • ${netMode ? 'Net' : 'Gross'}`;
+        }
     }
 
     function renderAll() {
