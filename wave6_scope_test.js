@@ -12,7 +12,7 @@ function layered(files) {
     files.slice(1).forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
-const EV = layered(['action-model.js', 'money-engine.js', 'bet-strip.js', 'hole-events.js']);
+const EV = layered(['handicap.js', 'action-model.js', 'money-engine.js', 'bet-strip.js', 'hole-events.js']);
 const texts = evs => evs.map(e => e.text).join(' | ');
 
 // 12 golfers, three groups of four. Manny is in Group 1.
@@ -423,7 +423,7 @@ describe('EARLIER WAVES PRESERVED', () => {
     // called. The ban therefore narrows to what it was really protecting: display
     // helpers, and golf math.
     test('no PRESENTATION helper leaked into the money engines', () => {
-        ['money-engine.js', 'settlement-engine.js'].forEach(f => {
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js'].forEach(f => {
             assert.ok(!/sortActionRows|actionHeadline|buildActionRows|skinsStatus/.test(read(f)),
                 `${f} gained a display helper`);
         });
