@@ -56,10 +56,64 @@ function computeTeamTotals(data, team) {
 // flat number for the whole field — that made the handicap a no-op for standings), sorts
 // teams with scores ahead of teams that haven't started, and assigns competition-style ranks
 // (1, 1, 3...) so genuine ties are labeled instead of silently split apart.
-function computeTournamentLeaderboard(data) {
-    const teams = data.teams || {};
+// FLIGHTS FILTER THE FIELD; THEY DO NOT RANK IT DIFFERENTLY.
+//
+// A flight is a subset of the same teams, standing in the same competition, judged
+// by the same rule - so there is exactly one ranking implementation and the flight
+// view reaches it by narrowing the input, never by copying the sort. A second
+// ranking path would be a second definition of "tied", and the whole point of a
+// flight is that the B flight is scored the same way the Championship flight is.
+//
+// flightId omitted or null means OVERALL, which is every team including those with
+// no flight at all. That default is what keeps historical tournaments - which have
+// no flights node and no flightId on any team - behaving exactly as before.
+function teamsInFlight(teams, flightId) {
+    const ids = Object.keys(teams);
+    if (!flightId) return ids;
+    return ids.filter(tid => (teams[tid] || {}).flightId === flightId);
+}
 
-    let rows = Object.keys(teams).map(tid => {
+// Teams that belong to no flight the tournament actually has.
+//
+// A team with no flightId is obviously unassigned. So is a team pointing at a
+// flight that no longer exists - and that case matters, because without it such a
+// team appears in NO count at all and disappears from the organizer's view of the
+// field. The dropdown already falls back to Unassigned for a dangling id; this
+// makes the counts agree with it rather than quietly losing a team.
+function unassignedTeamIds(teams, flights) {
+    const all = teams || {};
+    const known = flights || {};
+    return Object.keys(all).filter(tid => {
+        const fid = (all[tid] || {}).flightId;
+        return !fid || !known[fid];
+    });
+}
+
+// How many teams sit in each flight, plus the unassigned count. Derived, never
+// stored - a cached count is a count that goes stale the first time a team moves.
+function flightTeamCounts(data) {
+    const teams = data.teams || {};
+    const flights = data.flights || {};
+    const counts = {};
+    Object.keys(flights).forEach(fid => { counts[fid] = 0; });
+    Object.keys(teams).forEach(tid => {
+        const fid = teams[tid].flightId;
+        // A team pointing at a deleted flight is counted as unassigned below rather
+        // than resurrecting the missing flight as a phantom row.
+        if (fid && counts[fid] !== undefined) counts[fid]++;
+    });
+    counts.__unassigned = unassignedTeamIds(teams, flights).length;
+    return counts;
+}
+
+// data      the tournament record
+// flightId  optional. Omitted or null ranks the whole field, which is what every
+//           existing caller does and what every historical record produces.
+function computeTournamentLeaderboard(data, flightId) {
+    const teams = data.teams || {};
+    const inScope = teamsInFlight(teams, flightId);
+
+    let rows = inScope.map(tid => {
         const t = teams[tid];
         const { strokes, thru, parPlayed } = computeTeamTotals(data, t);
         const handicap = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
