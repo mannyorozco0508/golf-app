@@ -109,7 +109,13 @@
 // v21 would keep an organizer page with no flight management on it. Shell MEMBERSHIP
 // is unchanged: flights are a node inside the existing tournament record, not a new
 // runtime module.
-const CACHE_VERSION = 'golfapp-v22-flights';
+// Moved to v23 for the player identity wave. tournament.html,
+// tournament-scorecard.html, tournament-engine.js and handicap.js all changed, and
+// the two tournament pages now load handicap.js - a file already in the shell but
+// not previously requested by them. An installed PWA on v22 would hold an organizer
+// page with no player field and a scorecard that cannot open a group link. Shell
+// MEMBERSHIP is unchanged: handicap.js was already precached for Consumer.
+const CACHE_VERSION = 'golfapp-v23-player-identity';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
