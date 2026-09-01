@@ -1,3 +1,10 @@
+// DEPENDS ON handicap.js. parseHcp, getStrokes and the relative match handicap
+// family used to be declared in this file. They are now the shared-core module
+// handicap.js owns, and every engine below calls them as plain globals exactly as
+// it always did - no signature changed, no calculation moved. Every page that
+// loads this file loads handicap.js first, and the test harness declares the same
+// prerequisite in helpers/load-script.js, so a realm holding money-engine.js
+// alone is not a thing that exists.
 // ============================================================================
 // GolfApp — Shared Money Engine
 // Used by settlement.html (per-round settlement) and trip.html (trip-wide
@@ -5,24 +12,7 @@
 // both pages load it via <script src="money-engine.js"></script>.
 // ============================================================================
 
-function parseHcp(hcpStr) {
-    if (!hcpStr) return 0;
-    const str = String(hcpStr).trim();
-    if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-    return parseFloat(str) || 0;
-}
 
-function getStrokes(hcpIndex, numericHcp) {
-    if (numericHcp >= 0) {
-        let strokes = Math.floor(numericHcp / 18);
-        if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-        return strokes;
-    } else {
-        const plusVal = Math.abs(numericHcp);
-        if (hcpIndex > (18 - plusVal)) return -1;
-        return 0;
-    }
-}
 
 // --- WOLF GAME ENGINE (mirrors index.html) ---
 function calcWolfEngine(data, courseData, savedScores) {
@@ -234,53 +224,9 @@ function calcPointSettlement(players, totals, dollarPerPoint) {
 // giveback that starts at SI 18 belongs to stroke-play net scoring and is
 // deliberately NOT used here; getStrokes() keeps it, untouched.
 
-// Allocate a RELATIVE handicap across stroke indexes. Generalises past 18: every
-// hole gets one stroke per full 18, and the remainder falls on the lowest indexes.
-// rel 20 -> one everywhere plus a second on SI 1-2. rel 36 -> two everywhere.
-// rel 40 -> two everywhere plus a third on SI 1-4.
-function allocateMatchStrokes(rel, hcpIndex) {
-    if (!(rel > 0)) return 0;
-    return Math.floor(rel / 18) + ((hcpIndex <= (rel % 18)) ? 1 : 0);
-}
 
-// The one baseline for a match: the lowest parsed Playing Handicap among ALL
-// participants, both sides counted together. Which team a golfer is on is
-// irrelevant to this calculation, and player/team ORDER cannot change it because
-// a minimum is order-independent.
-function matchHandicapBaseline(matchPlayers) {
-    var base = null;
-    (matchPlayers || []).forEach(function (p) {
-        var h = parseHcp(p.hcp);
-        if (base === null || h < base) base = h;
-    });
-    return base === null ? 0 : base;
-}
 
-// playerId -> relative match handicap, SCOPED TO THIS MATCH ONLY. Never written
-// back onto the player record: the same golfer legitimately carries a different
-// relative handicap in a simultaneous match against different opponents.
-function matchRelativeHandicaps(matchPlayers) {
-    var base = matchHandicapBaseline(matchPlayers);
-    var out = {};
-    (matchPlayers || []).forEach(function (p) {
-        out[String(p.id)] = parseHcp(p.hcp) - base;
-    });
-    return out;
-}
 
-// Which formats are genuinely HOLE-BY-HOLE MATCH PLAY played with individual
-// balls. Scramble is excluded ON PURPOSE: it is a single-ball team format, so
-// there is no individual ball for an individual relative stroke to attach to. It
-// keeps its existing behaviour exactly. A 1v1 is always treated as a match
-// regardless of the format label, which preserves the committed singles contract.
-function isRelativeMatchFormat(gameFormat) {
-    return ['match', 'nassau', 'bestball', 'ryder'].indexOf(gameFormat) !== -1;
-}
-
-function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
-    // A two-player baseline is just the all-player baseline over a field of two.
-    return allocateMatchStrokes(ownHcp - Math.min(ownHcp, oppHcp), hcpIndex);
-}
 
 function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
     // THREE-STAKE NASSAU (authorized change).
