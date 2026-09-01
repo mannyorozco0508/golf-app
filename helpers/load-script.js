@@ -117,9 +117,52 @@ function attachDomHelpers(sandbox) {
 // into the SAME sandbox first, in order — exactly mirroring real browser load order,
 // since e.g. trip.html's computeTripPointsRace calls getStrokes/parseHcp from
 // money-engine.js rather than duplicating them.
-function loadHtmlInlineScript(relativePath, dependencies = []) {
+// THE PAGE'S OWN <script src> TAGS, when a test does not name them.
+//
+// Tests used to hand-declare every shared file a page needed, and most of them
+// declared none at all - which was fine only for as long as the logic under test
+// happened to live inline. The moment a duplicated function moved into a shared
+// module, eighty-five call sites across forty-six suites started throwing
+// ReferenceError, because the harness was describing a page that no longer
+// existed.
+//
+// So the list is now derived from the page itself, always, and anything a test
+// names is loaded IN ADDITION rather than instead. A realm therefore describes
+// production by default and cannot silently fall behind it again the next time a
+// function moves into a shared module.
+//
+// A test that genuinely needs a realm missing something - the crippled-dependency
+// tests that prove a page fails loudly rather than computing $0 - passes
+// { only: true } and gets exactly what it asked for.
+//
+// The two Firebase vendor files are skipped. They are 190KB of browser SDK, every
+// page loads them, and no test has ever wanted them - makeStubSandbox() supplies a
+// firebase stub instead. pwa-boot.js is skipped for the same reason: it registers
+// a service worker, which is not a thing a page realm should do.
+const VENDOR_SKIP = /firebase-(app|database)-compat\.js$|^pwa-boot\.js$/;
+
+function scriptsDeclaredBy(html) {
+    return [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)]
+        .map(m => m[1].replace(/^\.\//, ''))
+        .filter(src => src.endsWith('.js') && !src.includes('//') && !src.includes('/'))
+        .filter(src => !VENDOR_SKIP.test(src))
+        .filter(src => fs.existsSync(path.join(REPO_ROOT, src)))
+        // A page may name the same file twice; load it once, in first-seen order.
+        .filter((src, i, all) => all.indexOf(src) === i);
+}
+
+// dependencies:  EXTRA files to load on top of the page's own script tags.
+// options.only:   load ONLY the listed files, ignoring the page's tags. Used by
+//                 the deliberately-crippled tests that prove a page fails loudly
+//                 when a shared module is missing - the one situation where a
+//                 realm should NOT describe production.
+function loadHtmlInlineScript(relativePath, dependencies, options) {
     const fullPath = path.join(REPO_ROOT, relativePath);
     const html = fs.readFileSync(fullPath, 'utf8');
+    const extra = dependencies || [];
+    dependencies = (options && options.only)
+        ? extra
+        : scriptsDeclaredBy(html).concat(extra.filter(d => !scriptsDeclaredBy(html).includes(d)));
     const matches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
     if (matches.length === 0) {
         throw new Error(`No inline <script> block found in ${relativePath}`);
