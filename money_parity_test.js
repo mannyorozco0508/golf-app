@@ -35,7 +35,7 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -48,8 +48,8 @@ const PAGE_DEPS = {
     // Their stroke entries below therefore resolve to the canonical implementation;
     // the OTHER families here (calcPointSettlement, nassauStakeConfig) are still
     // genuine stats.html duplicates and are still guarded as such.
-    'sidematches.html': ['money-engine.js','action-model.js','settlement-engine.js'],
-    'stats.html': ['money-engine.js','action-model.js','settlement-engine.js'],
+    'sidematches.html': ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'],
+    'stats.html': ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'],
 };
 const pageRealms = {};
 function fromPage(page, name) {
