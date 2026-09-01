@@ -42,7 +42,7 @@ const CANCELLED = { cancelled: true, cancelledAt: 1, cancelledBy: 'organizer' };
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -373,7 +373,7 @@ describe('FINISH ROUND — PERMISSION AND UX', () => {
 
 describe('RECEIPT', () => {
 
-    const SDEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+    const SDEPS = ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
     function receipt(opts) {
         const sb = loadHtmlInlineScript('settlement.html', SDEPS);
