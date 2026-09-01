@@ -70,7 +70,17 @@
 // $0.00 for a 2v2 Stroke Play side match on the card the group actually keeps,
 // while the Receipt paid it. The shell FILE LIST is unchanged - settlement-engine.js
 // was already precached for settlement.html and sidematches.html.
-const CACHE_VERSION = 'golfapp-v16-stats-canonical';
+// Moved to v17 for the shared-core wave. One new precached file - grouping.js -
+// now carries the group-sizing rule that used to be duplicated inside four pages.
+// An installed PWA on v16 does not have it cached, and the pages call it unguarded,
+// so it would not degrade quietly: it would break. The shell FILE LIST grew by
+// exactly that one entry and nothing else.
+//
+// The handicap half of this wave was deliberately NOT shipped - see the wave
+// report. Extracting it from money-engine.js is a correct change that 82 test
+// suites are wired against, and that is a separate, planned piece of work rather
+// than something to slip in behind a cache key.
+const CACHE_VERSION = 'golfapp-v17-shared-core';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -100,6 +110,10 @@ const SHELL_FILES = [
     './instructions.html',
     './shared.html',
     // Shared engines. index.html cannot render a scorecard without these.
+    // grouping.js decides which golfer is in which foursome, which every ?group=N
+    // link and every group-scoped write is measured against. Four pages load it;
+    // an offline launch without it would not degrade, it would break the page.
+    './grouping.js',
     './score-marks.js',
     './money-engine.js',
     './settlement-engine.js',
