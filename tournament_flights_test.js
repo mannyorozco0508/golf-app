@@ -276,8 +276,15 @@ describe('HISTORICAL — a tournament from before flights is unchanged', () => {
         const withoutFlights = sixTeamField();
         delete withoutFlights.flights;
         Object.values(withoutFlights.teams).forEach(t => { delete t.flightId; });
-        assert.deepEqual(lb(withFlights), lb(withoutFlights),
-            'flight metadata must be invisible to the overall leaderboard');
+        // Compared on the fields that decide the competition, not on the whole row:
+        // a row now carries its own flightId, so the two sets differ by exactly the
+        // tag under test. Everything that decides who won must match.
+        const ranked = (rows) => rows.map(r => ({
+            num: r.num, teamName: r.teamName, strokes: r.strokes,
+            thru: r.thru, toPar: r.toPar, hasScores: r.hasScores, rank: r.rank,
+        }));
+        assert.deepEqual(ranked(lb(withFlights)), ranked(lb(withoutFlights)),
+            'flight metadata must be invisible to the overall standings');
     });
 
     test('nothing is migrated or rewritten on load', () => {
@@ -297,7 +304,27 @@ describe('HISTORICAL — a tournament from before flights is unchanged', () => {
         const bravo = rows.find(r => r.teamName === 'Bravo');
         // Nine holes of 5 against par 4 is +9 gross; a flat 9 handicap makes it level.
         assert.equal(bravo.toPar, 0, 'flat team handicap subtraction must not change');
-        assert.match(codeOf('tournament-engine.js'), /const net = thru > 0 \? strokes - handicap : 0;/);
+        // The rule, not the line. The flat team-handicap subtraction moved into
+        // normalizeTeamEntries() when the engine learned to read a second storage
+        // model; pinning the old literal was pinning where the code lived rather than
+        // what it does. The behavioural assertion above is the real guard, and this
+        // keeps the arithmetic visible.
+        assert.match(codeOf('tournament-engine.js'),
+            /totals\.strokes - handicap/,
+            'a team is still handicapped by one flat number for the whole round');
+        // Scoped to the function body by brace matching. A proximity regex matched
+        // playerStrokesOnHole() sitting just above and reported a fault that was not
+        // there - a false positive is as much of a broken test as a false negative.
+        const eng = codeOf('tournament-engine.js');
+        const start = eng.indexOf('function normalizeTeamEntries');
+        let depth = 0, end = eng.indexOf('{', start);
+        for (let i = end; i < eng.length; i++) {
+            if (eng[i] === '{') depth++;
+            else if (eng[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        const teamBody = eng.slice(start, end + 1);
+        assert.ok(!/getStrokes\(|parseHcp\(/.test(teamBody),
+            'legacy team scoring must not acquire per-hole stroke allocation');
     });
 
     test('15. the stored score keys are unchanged', () => {
@@ -438,34 +465,43 @@ describe('PAYOUTS — canonical, and deliberately still overall-only', () => {
 
 describe('SCOPE — the deferred player model has not leaked in', () => {
 
-    test('19 & 20. no player schema and no new score-key shape', () => {
-        // Player identity is the NEXT wave. Tournament still stores players as bare
-        // strings inside teams and keys scores by array position; changing that is a
-        // change to what gets written and deserves its own wave.
-        ['tournament.html', 'tournament-engine.js', 'tournament-scorecard.html'].forEach(f => {
-            const src = codeOf(f);
-            assert.ok(!/players\/\$\{[^}]*\}|\/players\/`/.test(src),
-                f + ' must not introduce a players/{id} node');
-            assert.ok(!/scores\/player\$\{|player\$\{[^}]*\}_h\$\{/.test(src),
-                f + ' must not introduce a player-keyed score shape');
-        });
+    test('19 & 20. the player model arrived, and legacy storage did not change', () => {
+        // REVERSED DELIBERATELY. During the flights wave these asserted the player
+        // model had NOT arrived, because that wave had no business changing what gets
+        // written. The Player Identity wave landed it, so the useful statement flipped:
+        // the new shape exists AND the legacy shape is untouched beside it.
+        const t = codeOf('tournament.html');
+        assert.match(t, /players\/\$\{pid\}/, 'individual events store player records');
+        assert.match(codeOf('tournament-engine.js'), /scores\[`\$\{pid\}_h\$\{h\.hole\}`\]/,
+            'individual scores are keyed by player id');
+
+        // The legacy keys are still exactly what they were.
+        const eng = codeOf('tournament-engine.js');
+        assert.match(eng, /scores\[`team\$\{team\.num\}_h\$\{h\.hole\}`\]/);
+        assert.match(eng, /scores\[`team\$\{team\.num\}_p\$\{pIdx\}_h\$\{h\.hole\}`\]/);
     });
 
-    test('21. no individual format was added', () => {
+    test('21. Individual Stroke Play exists, and only alongside the team formats', () => {
         const src = codeOf('tournament.html');
         const formats = [...src.matchAll(/selectFormat\('([a-z]+)'\)/g)].map(m => m[1]);
-        assert.deepEqual([...new Set(formats)].sort(), ['bestball', 'scramble', 'shamble'],
-            'the format list must not have grown in a flights wave');
-        assert.ok(!/individual/i.test(codeOf('tournament-engine.js')));
+        assert.deepEqual([...new Set(formats)].sort(),
+            ['bestball', 'individual', 'scramble', 'shamble'],
+            'the three team formats must survive the arrival of the fourth');
     });
 
-    test('team and scoring group are still one concept, as the audit found', () => {
-        // All three formats genuinely use team == scoring group. Separating them
-        // before an individual format needs them separated adds a distinction the
-        // product cannot use.
+    test('team and scoring group are separate ONLY for individual events', () => {
+        // The audit found all three team formats genuinely use team == scoring group,
+        // and they still do. Individual play is the format that needed the
+        // distinction, so it is the only one that has it.
         const card = codeOf('tournament-scorecard.html');
-        assert.match(card, /myTeamNum = urlParams\.get\('team'\)/);
-        assert.ok(!/scoringGroupId|groupId/.test(card));
+        assert.match(card, /urlParams\.get\('team'\)/, 'legacy team scoring is unchanged');
+        assert.match(card, /urlParams\.get\('group'\)/, 'individual scoring is group-scoped');
+        const t = codeOf('tournament.html');
+        assert.match(t, /scoringGroups\/\$\{gid\}/);
+        assert.ok(!/scoringGroups/.test(codeOf('tournament-engine.js').slice(
+            codeOf('tournament-engine.js').indexOf('function normalizeTeamEntries'),
+            codeOf('tournament-engine.js').indexOf('function normalizePlayerEntries'))),
+            'legacy team scoring must not learn about scoring groups');
     });
 
     test('18 & 24. Firebase project and roots are unchanged, and Consumer is untouched', () => {
