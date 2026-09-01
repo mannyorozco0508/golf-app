@@ -213,11 +213,39 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
                 'tournament.html must still own ' + fn));
     });
 
-    test('8. the scorecard writes only team-scoped score keys', () => {
+    test('8. the scorecard writes only scores, scoped to the link it was opened with', () => {
+        // WIDENED FOR INDIVIDUAL EVENTS. This used to require every write to be
+        // team{myTeamNum}_… which was the only scope that existed. An individual link
+        // writes {playerId}_h{n} instead - still scoped, just to a player rather than
+        // a team. What must not change is that it writes ONLY scores, and only for the
+        // golfers this link covers.
         const w = writesIn('tournament-scorecard.html');
         assert.ok(w.length > 0, 'the scoring page must still write scores');
-        w.forEach(p => assert.match(p, /^tournaments\/\$\{currentCode\}\/scores\/team\$\{myTeamNum\}_/,
-            'the scoring link may only write its own group\u2019s scores, got: ' + p));
+        w.forEach(p => assert.match(p, /^tournaments\/\$\{currentCode\}\/scores\//,
+            'the scoring link may only write scores, got: ' + p));
+
+        assert.ok(w.some(p => /scores\/team\$\{myTeamNum\}_h/.test(p)),
+            'the legacy scramble write must survive');
+        assert.ok(w.some(p => /scores\/\$\{playerId\}_h/.test(p)),
+            'the individual write is player-keyed');
+        // savePlayerHoleScore builds its path into a variable before db.ref(), so the
+        // call-site scan above cannot see it. Asserted directly rather than left out -
+        // it is the per-player leg of legacy shamble and best ball scoring.
+        const cardSrc = codeOf('tournament-scorecard.html');
+        assert.match(cardSrc,
+            /const path = `tournaments\/\$\{currentCode\}\/scores\/team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}`/,
+            'the legacy per-player team key must survive');
+
+        // THE CROSS-GROUP GUARD. A player id arriving from anywhere must be checked
+        // against this group before a stroke is written, or one group's link could
+        // score another group's golfer.
+        const src = codeOf('tournament-scorecard.html');
+        const fn = src.slice(src.indexOf('function saveIndividualScore'),
+                             src.indexOf('function saveIndividualScore') + 700);
+        assert.match(fn, /group\.playerIds \|\| \[\]\)\.indexOf\(playerId\) === -1/,
+            'a write for a golfer outside this group must be refused');
+        assert.ok(fn.indexOf('indexOf(playerId) === -1') < fn.indexOf('db.ref('),
+            'the scope check must run before the write');
     });
 
     test('23. the stored score keys are unchanged', () => {
@@ -278,8 +306,18 @@ describe('TRIP \u2194 TOURNAMENT — one relationship, two pointers', () => {
     test('13. create-from-trip writes BOTH pointers', () => {
         // It used to write only the forward one, so a tournament created from a trip
         // showed the "link me to a trip" form as though it were unlinked.
+        // Sliced by brace matching, not a fixed length. saveTournament grew when
+        // individual events learned to write a player field, and a 3000-character
+        // window stopped reaching the trip pointers - reporting a missing write that
+        // was there all along.
         const t = codeOf('tournament.html');
-        const save = t.slice(t.indexOf('function saveTournament'), t.indexOf('function saveTournament') + 3000);
+        const start = t.indexOf('function saveTournament');
+        let depth = 0, end = t.indexOf('{', start);
+        for (let i = end; i < t.length; i++) {
+            if (t[i] === '{') depth++;
+            else if (t[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        const save = t.slice(start, end + 1);
         assert.match(save, /trips\/\$\{tripLinkCode\}\/tournaments\/\$\{currentCode\}/,
             'the forward pointer must be written');
         assert.match(save, /tournaments\/\$\{currentCode\}\/tripCode/,
@@ -313,12 +351,14 @@ describe('TRIP \u2194 TOURNAMENT — one relationship, two pointers', () => {
         assert.match(t, /urlParams\.get\('trip'\)/, '?trip= is how a trip hands off');
     });
 
-    test('17. the scorecard contract remains ?tourney=X&team=N', () => {
+    test('17. the legacy contract survives, and the new one sits beside it', () => {
         const s = codeOf('tournament-scorecard.html');
         assert.match(s, /urlParams\.get\('tourney'\)/);
-        assert.match(s, /urlParams\.get\('team'\)/);
-        // Both required, or the page must say so rather than half-render.
-        assert.match(s, /if \(!currentCode \|\| !myTeamNum\)/);
+        assert.match(s, /urlParams\.get\('team'\)/, '?team=N links are already in circulation');
+        assert.match(s, /urlParams\.get\('group'\)/, 'individual events are group-scoped');
+        // A tournament code plus ONE of the two scopes, or the page says so rather
+        // than half-rendering.
+        assert.match(s, /if \(!currentCode \|\| \(!myTeamNum && !myGroupId\)\)/);
     });
 
     test('18. scoring links stay SAME-ORIGIN inside the Tournament product', () => {
