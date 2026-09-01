@@ -245,6 +245,12 @@
         .grid-input:focus { border-color: var(--brand-green); outline: none; background: var(--nassau-box-bg); }
 
         /* Secret Panel Styles */
+        /* Deliberately reads as an exit, not a feature: muted, bordered off from the
+           setup card above it, and no primary-button styling anywhere near it. */
+        .cross-product-exit { margin-top: 26px; padding: 16px 14px; border: 1px dashed var(--border-faint); border-radius: 10px; text-align: center; background: transparent; }
+        .cpx-question { font-size: 0.92rem; font-weight: bold; color: var(--text-muted); }
+        .cpx-sub { font-size: 0.78rem; color: var(--text-muted); margin: 4px 0 10px 0; line-height: 1.4; }
+        .cpx-link { display: inline-block; font-size: 0.88rem; font-weight: bold; color: var(--brand-green); text-decoration: none; padding: 8px 14px; border: 1px solid var(--brand-green); border-radius: 8px; }
         #secret-master-panel { display: none; background: var(--brand-navy); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: left; }
         #secret-master-panel h3 { color: #a8dadc; margin-top: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
 
@@ -276,11 +282,6 @@
             <div class="hw-icon">🏆</div>
             <div class="hw-name">Club Event</div>
             <div class="hw-desc">Today's men's club or club competition</div>
-        </button>
-        <button type="button" class="home-widget" id="hw-tournament" onclick="selectHomeWidget('tournament')">
-            <div class="hw-icon">🎯</div>
-            <div class="hw-name">Tournament</div>
-            <div class="hw-desc">Scrambles, charity events & corporate outings</div>
         </button>
         <button type="button" class="home-widget active" id="hw-quick" onclick="selectHomeWidget('quick')">
             <div class="hw-icon">🏌️</div>
@@ -1041,6 +1042,20 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
         <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
         <button class="btn-danger" onclick="endAndClearRound()">📥 End & Wipe Round</button>
+    </div>
+
+    <!-- LEAVING THIS APP, AND IT SHOULD LOOK LIKE IT.
+         Tournaments used to be a fourth home tile next to Quick Round, Club Event and
+         Trip, which told a golfer this app runs tournaments. It does not - it never
+         created or edited a single tournament record; the tile was a link wearing a
+         mode's clothing. Organizing an event is a different product with a different
+         audience, so the route stays discoverable but stops pretending to be a way to
+         set up today's round. Routed through tournamentUrl() so it survives the two
+         deployments moving to separate origins. -->
+    <div class="cross-product-exit">
+        <div class="cpx-question">Running a tournament or charity event?</div>
+        <div class="cpx-sub">Scrambles, shambles and best-ball events with team leaderboards live in a separate app.</div>
+        <a class="cpx-link" id="open-tournaments-link" href="#" onclick="openTournamentsApp(); return false;">Open Tournaments ▶</a>
     </div>
 </div>
 
@@ -2333,8 +2348,23 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         quick: "Quick Round — just pick a course, add your group, choose a game, and go."
     };
 
+    // THE OUTBOUND ROUTE TO THE TOURNAMENT PRODUCT.
+    //
+    // Its own function rather than a bare href, because the destination is another
+    // deployment: tournamentUrl() returns a relative path while both products share
+    // an origin and an absolute one once they do not. A hard-coded 'tournament.html'
+    // here works today and breaks silently the day the origins differ.
+    function openTournamentsApp() {
+        window.location.href = tournamentUrl('tournament.html');
+    }
+
     function selectHomeWidget(type) {
-        if (type === 'tournament') { window.location.href = tournamentUrl('tournament.html'); return; }
+        // COMPATIBILITY BRANCH. The Tournament home tile is gone - organizing an event
+        // is a different product - but an installed PWA can still be holding a cached
+        // copy of the old markup, and that markup calls this with 'tournament'. Sending
+        // it to the same place the exit link goes is better than leaving a tile that
+        // silently does nothing. Same reasoning as setNassauScoring() below.
+        if (type === 'tournament') { openTournamentsApp(); return; }
         if (type === 'trip') { window.location.href = 'trip.html'; return; }
 
         selectedEventType = type; // 'club' or 'quick'
