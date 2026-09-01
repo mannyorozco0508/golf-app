@@ -469,7 +469,10 @@ describe('THE GOLFER CAN SEE IT', () => {
 describe('FROZEN — this batch scoped inputs, it did not change golf math', () => {
     test('the engines themselves are untouched', () => {
         const me = read('money-engine.js');
-        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(me));
+        // THE RULE DID NOT CHANGE, ITS HOME DID. getStrokes moved from
+        // money-engine.js into handicap.js in the shared-core extraction; the
+        // allocation itself is byte-identical and this still asserts it.
+        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(read('handicap.js')));
         const se = read('settlement-engine.js');
         assert.ok(/function calculateHoleBetEngine\(players, courseData, savedScores, config, presses\)/.test(se));
         assert.ok(/function calculateOverallBetEngine\(players, courseData, savedScores, config, presses\)/.test(se));
