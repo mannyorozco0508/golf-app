@@ -91,7 +91,14 @@
 // unguarded, so an installed PWA on v18 would break the prize table rather than
 // quietly misallocating a pot. The shell FILE LIST grew by exactly that one entry;
 // the shell DECLARATIONS added alongside it change no runtime behaviour.
-const CACHE_VERSION = 'golfapp-v19-payouts-and-shells';
+// Moved to v20 because the shell gained product-links.js, the seam that lets a
+// cross-product link survive the two deployments now built by build-shell.js.
+//
+// THIS IS THE COMBINED DEPLOYMENT'S KEY, and it stays 'golfapp-' prefixed. The two
+// split outputs generate their own workers with their own keys - consumer-v20-split
+// and tournament-v20-split - so all three cache identities are distinct and none
+// can evict another.
+const CACHE_VERSION = 'golfapp-v20-product-links';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -133,6 +140,10 @@ const SHELL_FILES = [
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.
     './payouts.js',
+    // product-links.js resolves cross-product navigation. Three pages call it
+    // unguarded; a cached shell without it breaks those links rather than
+    // silently sending a golfer to a page that does not exist.
+    './product-links.js',
     './score-marks.js',
     './money-engine.js',
     './settlement-engine.js',
