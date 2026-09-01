@@ -10,6 +10,15 @@
          same canonical resolver the scorecard uses. money-engine.js and action-model.js
          are its dependencies. This page previously carried its own byte-identical
          copies of parseHcp/getStrokes; those are gone now that the real ones load. -->
+    <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
+         decision a match makes, comes from these seven functions. They used to be
+         duplicated here and in four other places; this page now consumes the one
+         shared definition. Loaded ahead of the money and settlement engines,
+         because both call into it, and ahead of the inline block so nothing below
+         can shadow it. (Deliberately no engine filenames in this comment:
+         stack_action_test.js checks script order with a raw indexOf, and a comment
+         that names a file ahead of its real tag reads as the wrong order.) -->
+    <script src="handicap.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
