@@ -80,7 +80,12 @@
 // report. Extracting it from money-engine.js is a correct change that 82 test
 // suites are wired against, and that is a separate, planned piece of work rather
 // than something to slip in behind a cache key.
-const CACHE_VERSION = 'golfapp-v17-shared-core';
+// Moved to v18 because the handicap family - parseHcp, getStrokes and the relative
+// match handicap functions - moved out of money-engine.js and five page copies into
+// handicap.js, and eight pages now load it. An installed PWA on v17 has no copy of
+// that file, and the pages call into it unguarded, so it would break rather than
+// quietly miscalculate a stroke. The shell FILE LIST grew by exactly one entry.
+const CACHE_VERSION = 'golfapp-v18-shared-handicap';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -114,6 +119,10 @@ const SHELL_FILES = [
     // link and every group-scoped write is measured against. Four pages load it;
     // an offline launch without it would not degrade, it would break the page.
     './grouping.js',
+    // handicap.js is every stroke a golfer receives. Eight pages load it, and they
+    // call it unguarded, so a cached shell missing this file does not compute a
+    // wrong number - it fails to render at all, which is the correct failure.
+    './handicap.js',
     './score-marks.js',
     './money-engine.js',
     './settlement-engine.js',
