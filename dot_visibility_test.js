@@ -142,7 +142,7 @@ describe('THE INDICATOR IS SHARED, NOT DUPLICATED', () => {
     test('the Full Card no longer keys off the main format', () => {
         // Comments stripped first: this must assert on CODE, not on the prose that
         // explains which gate was removed.
-        const region = IDX.slice(IDX.indexOf('let earnedDotsHtml'), IDX.indexOf('const markClass'))
+        const region = IDX.slice(IDX.indexOf('let earnedDotsInner'), IDX.indexOf('const markClass'))
             .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
         assert.ok(!/gameFormat === 'dots'/.test(region),
             'that gate is what hid the indicator for an Action-created Dots game');
@@ -151,20 +151,33 @@ describe('THE INDICATOR IS SHARED, NOT DUPLICATED', () => {
             'the Full Card must use the shared builder, and pass the hole so a carried greenie paints its real value');
     });
 
-    test('Hole View puts the pips with the SCORE, not in a paragraph below', () => {
-        const region = IDX.slice(IDX.indexOf('let pipHtml'), IDX.indexOf('let pipHtml') + 700);
-        assert.ok(/dotIndicatorHtml\(holeDotsNow/.test(region));
-        assert.ok(/hv-player-cell">\$\{cells\[i\] \? cells\[i\]\.innerHTML : ''\}\$\{pipHtml\}/.test(IDX),
-            'the pips belong inside the score cell');
+    test('Hole View draws a dot EXACTLY ONCE', () => {
+        // cells[i] is cloned from the Full Card <td>, which already ends with the pips.
+        // Hole View previously added two more copies on top of that - a written label
+        // line under the name, and a pip span appended after the cell. Since
+        // .hv-player-cell is a flex row, that appended span sat beside the whole centred
+        // column while the cell's own pips sat under the box: one birdie, two pips, out
+        // of line with each other. Both extra copies are gone.
+        assert.ok(/hv-player-cell">\$\{cells\[i\] \? cells\[i\]\.innerHTML : ''\}<\/div>/.test(IDX),
+            'nothing may be appended after the cloned cell');
+        assert.ok(!/pipHtml/.test(IDX), 'the second pip render must not come back');
+        assert.ok(!/hv-dot-line/.test(IDX), 'the written label line must not come back');
     });
 
-    test('the written labels remain available under the name', () => {
-        assert.ok(/hv-dot-line/.test(IDX), 'Birdie / Sandy detail must still be readable');
+    test('the one surviving render is the cell\'s own, and it is carry-aware', () => {
+        // Removing the duplicates must not cost Hole View its dots altogether: the
+        // Full Card cell it clones is still required to draw them, with the hole passed
+        // so a carried greenie paints its real value.
+        assert.ok(/dotIndicatorHtml\(dotsForPlayerHole\(p\.id, h\.hole\), h\.hole\)/.test(IDX),
+            'the cloned cell must still build pips from the shared builder');
+        assert.ok(/<div class="cell-dots">\$\{earnedDotsInner\}<\/div>/.test(IDX),
+            'and the cell must still emit them, inside the reserved strip');
     });
 
     test('no Dots game means no indicator anywhere', () => {
-        const region = IDX.slice(IDX.indexOf('let pipHtml'), IDX.indexOf('let pipHtml') + 400);
-        assert.ok(/if \(dotsGame\)/.test(region), 'gated on an active game');
+        // The gate now lives in the cell that builds earnedDotsHtml rather than in a
+        // Hole View branch of its own.
+        assert.ok(/if \(hasDotsGame\)/.test(IDX), 'gated on an active game');
     });
 });
 
