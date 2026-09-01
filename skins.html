@@ -8,6 +8,15 @@
     <meta name="theme-color" content="#0f4c3a">
     <script src="pwa-boot.js" defer></script>
     <script src="./firebase-app-compat.js"></script>
+    <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
+         decision a match makes, comes from these seven functions. They used to be
+         duplicated here and in four other places; this page now consumes the one
+         shared definition. Loaded ahead of the money and settlement engines,
+         because both call into it, and ahead of the inline block so nothing below
+         can shadow it. (Deliberately no engine filenames in this comment:
+         stack_action_test.js checks script order with a raw indexOf, and a comment
+         that names a file ahead of its real tag reads as the wrong order.) -->
+    <script src="handicap.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <style>
         :root {
@@ -316,25 +325,6 @@
             renderSkinsEngine();
             renderBirdieGame();
         });
-    }
-
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
-    }
-
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
-        } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
-        }
     }
 
     function renderBirdieGame() {
