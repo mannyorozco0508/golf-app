@@ -155,6 +155,15 @@ describe('PARITY — index.html\'s independent Match/Stroke engines vs canonical
 //     index.html             calculateBirdieGameTotals            (scorecard)
 //     stats.html             calculateBirdieGameTotalsForSettle   (stats page)
 //
+// BATCH 3 UPDATE: stats.html's copy is GONE. That page now loads
+// settlement-engine.js and uses the canonical function - it was byte-identical
+// when it was deleted, so nothing about the Birdie Pool's behaviour changed, and
+// the golden Final Scorecard for a birdie round in
+// stats_canonical_render_test.js is unchanged too. Two independent copies remain
+// (settlement-engine.js and index.html) and are still compared below. stats.html
+// stays in the comparison as a CONSUMER: running it proves the page ends up with
+// canonical behaviour at runtime, which source text alone cannot show.
+//
 // The name differs between files, so a grep for one name found only one copy -
 // which is part of why this went unguarded while Dots and Hi-Lo were caught.
 //
@@ -183,7 +192,10 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         return sb;
     })();
     const ix = loadHtmlInlineScript('index.html');
-    const st = loadHtmlInlineScript('stats.html');
+    // stats.html loads action-model.js and settlement-engine.js in production, and
+    // owns no Birdie copy of its own since Batch 3 - so it must be given those, or
+    // this entry resolves to undefined and the suite guards nothing.
+    const st = loadHtmlInlineScript('stats.html', ['action-model.js', 'settlement-engine.js']);
 
     const cd = makeCourseData(18);
     // One low handicap and one 18 so a net round genuinely differs from gross.
@@ -301,18 +313,27 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         Object.values(totals).forEach(v => assert.equal(v, 0));
     });
 
-    test('all three copies still exist — this guard is not vacuous', () => {
-        // If a copy is ever deleted, that is good news, but this suite must be
-        // told rather than silently passing against two survivors.
+    test('two independent copies remain, and stats.html is now a consumer — this guard is not vacuous', () => {
+        // A copy WAS deleted, which is good news, and this suite was told rather
+        // than left silently passing against survivors. The two genuine copies are
+        // still pinned; stats.html is pinned the other way round.
         const files = {
             'settlement-engine.js': /function calculateBirdieGameTotalsForSettle\(/,
             'index.html': /function calculateBirdieGameTotals\(/,
-            'stats.html': /function calculateBirdieGameTotalsForSettle\(/,
         };
         Object.keys(files).forEach(f => {
             const src = fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
             assert.match(src, files[f], f + ' no longer has the copy this suite compares');
         });
+
+        // BATCH 3. Coverage is not weakened, it is inverted: stats.html must NOT
+        // declare its own, and must load the canonical engine instead.
+        const statsSrc = fs.readFileSync(path.join(REPO_ROOT, 'stats.html'), 'utf8');
+        const statsInline = statsSrc.replace(/<script src=[^>]*><\/script>/g, '');
+        assert.ok(!/function calculateBirdieGameTotalsForSettle\s*\(/.test(statsInline),
+            'stats.html must not redeclare calculateBirdieGameTotalsForSettle');
+        assert.match(statsSrc, /<script src="settlement-engine\.js">/,
+            'stats.html must load the canonical Birdie totals instead');
         [settle.calculateBirdieGameTotalsForSettle,
          ix.calculateBirdieGameTotals,
          st.calculateBirdieGameTotalsForSettle].forEach((fn, i) =>
