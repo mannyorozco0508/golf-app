@@ -85,7 +85,13 @@
 // handicap.js, and eight pages now load it. An installed PWA on v17 has no copy of
 // that file, and the pages call into it unguarded, so it would break rather than
 // quietly miscalculate a stroke. The shell FILE LIST grew by exactly one entry.
-const CACHE_VERSION = 'golfapp-v18-shared-handicap';
+// Moved to v19 for the payout extraction and the product shell declarations. One
+// new precached file - payouts.js - now carries the place and tie prize rule that
+// was written out twice, in trip.html and tournament-engine.js. Four pages call it
+// unguarded, so an installed PWA on v18 would break the prize table rather than
+// quietly misallocating a pot. The shell FILE LIST grew by exactly that one entry;
+// the shell DECLARATIONS added alongside it change no runtime behaviour.
+const CACHE_VERSION = 'golfapp-v19-payouts-and-shells';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -123,6 +129,10 @@ const SHELL_FILES = [
     // call it unguarded, so a cached shell missing this file does not compute a
     // wrong number - it fails to render at all, which is the correct failure.
     './handicap.js',
+    // payouts.js is the place/tie prize rule, shared by Trip Mode and both
+    // tournament pages. Called unguarded, so a cached shell without it breaks the
+    // prize table rather than quietly paying nobody.
+    './payouts.js',
     './score-marks.js',
     './money-engine.js',
     './settlement-engine.js',
