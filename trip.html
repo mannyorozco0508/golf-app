@@ -15,6 +15,10 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- Place and tie payout allocation, shared with Tournament Mode. The rule was
+         written out twice - here and in tournament-engine.js - until the shared-core
+         extraction. Loaded ahead of the inline block so nothing below can shadow it. -->
+    <script src="payouts.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
@@ -1538,12 +1542,6 @@
         const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
         const pool = parseFloat(document.getElementById('prize-pool-input').value) || 0;
 
-        const rankGroups = {};
-        cachedPointsStandings.forEach(s => {
-            if (!rankGroups[s.rank]) rankGroups[s.rank] = [];
-            rankGroups[s.rank].push(s);
-        });
-
         let html = '';
         if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:8px; margin-bottom:10px;">
@@ -1551,19 +1549,18 @@
             </div>`;
         }
 
-        Object.keys(rankGroups).map(Number).sort((a, b) => a - b).forEach(rank => {
-            const group = rankGroups[rank];
-            const lastPos = rank + group.length - 1; // positions this tie group occupies
-            let sumForGroup = 0;
-            for (let pos = rank; pos <= lastPos; pos++) {
-                if (pos >= 1 && pos <= n) sumForGroup += spotAmounts[pos - 1];
-            }
-            const perPlayer = sumForGroup / group.length;
+        // THE PLACE/TIE RULE LIVES IN payouts.js. It used to be written out here and
+        // again inside tournament-engine.js, and a tie straddling the last paid place
+        // is exactly the case a second copy gets wrong. Display is still this page's
+        // own - the (tied) tag, the ordinal and fmtAmt() are Trip's wording, and the
+        // shared primitive deliberately does no rounding.
+        const allocated = allocatePlacePayouts(cachedPointsStandings, spotAmounts);
+        const groupSize = {};
+        allocated.forEach(p => { groupSize[p.rank] = (groupSize[p.rank] || 0) + 1; });
 
-            group.forEach(s => {
-                const tieTag = group.length > 1 ? ' (tied)' : '';
-                html += `<div class="ledger-row"><span>${ordinal(rank)}${tieTag} — ${s.name}</span><span class="${perPlayer > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(perPlayer)}</span></div>`;
-            });
+        allocated.forEach(p => {
+            const tieTag = groupSize[p.rank] > 1 ? ' (tied)' : '';
+            html += `<div class="ledger-row"><span>${ordinal(p.rank)}${tieTag} — ${p.entry.name}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(p.amount)}</span></div>`;
         });
 
         resultsContainer.innerHTML = html;
