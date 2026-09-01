@@ -33,13 +33,13 @@ const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
-const LB = ['money-engine.js','action-model.js','settlement-engine.js'];
+const LB = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -124,6 +124,7 @@ describe('THE ENGINES ARE CANONICAL AND IN AGREEMENT', () => {
     });
 
     test('both copies still exist — this guard is not vacuous', () => {
+        // Search list. handicap.js owns no stroke-bet presenter to check.
         ['money-engine.js','index.html'].forEach(f => {
             assert.match(read(f), /function calculateStrokeHeadToHead\(/, f);
             assert.match(read(f), /function calculateStrokePressSet\(/, f);
@@ -338,6 +339,8 @@ describe('BOTH SURFACES, ONE STATE', () => {
     });
 
     test('one presenter, defined once', () => {
+        // A SEARCH LIST, NOT A REALM. handicap.js is deliberately absent: this asks
+        // which files DEFINE the presenter, and the answer must stay money-engine.js.
         const defs = ['money-engine.js','index.html','leaderboard.html','settlement-engine.js']
             .filter(f => /function buildLiveStrokeBetStates\(/.test(read(f)));
         assert.deepEqual(defs, ['money-engine.js']);
