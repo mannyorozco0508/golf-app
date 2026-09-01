@@ -38,7 +38,7 @@ const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -398,7 +398,7 @@ describe('FINAL SCORECARD — net must actually be printed', () => {
     // every suite green. The requirement was implemented and then untested, which
     // is the same as untested: a later edit could have deleted it silently.
     const { loadHtmlInlineScript } = require('./helpers/load-script.js');
-    const SDEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+    const SDEPS = ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
     function card({ hcps = [8,12,5,18,10,14,6,20,9,16,11,7], netGame = true } = {}) {
         const sb = loadHtmlInlineScript('settlement.html', SDEPS);
