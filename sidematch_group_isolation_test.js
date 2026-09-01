@@ -608,9 +608,19 @@ describe('PARITY — the two pages cannot drift apart', () => {
             'index.html must still carry the same clause');
     });
 
-    test('the group-boundary maths is identical in both files', () => {
-        assert.equal(ruleOf(idx, 'computeGroupSizes'), ruleOf(sm, 'computeGroupSizes'));
-        assert.equal(ruleOf(idx, 'computeGroupBoundaries'), ruleOf(sm, 'computeGroupBoundaries'));
+    test('the group-boundary maths is ONE implementation, loaded by both files', () => {
+        // WAS: compare the two page-local copies and require them to be identical.
+        // They were, for as long as they existed. The shared-core wave moved them
+        // into grouping.js, so the stronger statement is available: there is nothing
+        // left to compare, because neither page owns the rule any more.
+        [['index.html', idx], ['sidematches.html', sm]].forEach(([name, src]) => {
+            const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+            ['computeGroupSizes', 'computeGroupBoundaries'].forEach(fn =>
+                assert.ok(!new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
+                    name + ' must not redeclare ' + fn + ' - it would shadow grouping.js'));
+            assert.match(src, /<script src="grouping\.js">/,
+                name + ' must load the shared grouping module');
+        });
     });
 });
 
