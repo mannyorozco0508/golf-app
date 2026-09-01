@@ -34,7 +34,7 @@ const FILES_TO_SYNC = [
     'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
     'tournament.html', 'tournament-scorecard.html', 'instructions.html', 'shared.html',
     // Shared engines - see the note above before removing any of these
-    'action-model.js', 'bet-strip.js', 'course-data.js', 'hole-events.js',
+    'action-model.js', 'bet-strip.js', 'course-data.js', 'grouping.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'score-marks.js', 'settlement-engine.js',
     'tournament-engine.js', 'pwa-boot.js',
     // Firebase SDK, vendored so the wrapped app carries no runtime CDN dependency.
