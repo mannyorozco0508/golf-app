@@ -13,9 +13,9 @@ function layered(files) {
     files.slice(1).forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
-const EV = layered(['action-model.js', 'money-engine.js', 'bet-strip.js', 'hole-events.js']);
+const EV = layered(['handicap.js', 'action-model.js', 'money-engine.js', 'bet-strip.js', 'hole-events.js']);
 
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['handicap.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 function four() {
     const cd = makeCourseData(18);
@@ -532,7 +532,7 @@ describe('EARLIER WAVES PRESERVED', () => {
     const idx = read('index.html');
 
     test('money engines were not touched by Wave 5', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
             const s = read(f);
             assert.ok(!/buildHoleEvents|resolvedMeId|renderHoleRecap/.test(s), `${f} was modified`);
         });
