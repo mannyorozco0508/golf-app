@@ -6,44 +6,33 @@ const tourneyEngine = loadJsFile('tournament-engine.js');
 const { computeTournamentPayouts, ordinal } = tourneyEngine;
 
 // ============================================================================
-// IMPORTANT NOTE ON THIS FILE
-// trip.html's prize-payout tie-splitting algorithm (in renderPrizePayouts) is
-// embedded directly inside a DOM-dependent render function, reading module-level
-// `let` state (cachedPointsStandings, etc.) that isn't reachable from outside that
-// script's own lexical scope without either modifying production code to expose it
-// separately, or rewriting the extracted source text before executing it — both of
-// which cross the "don't touch production logic" line for this task. So:
+// THE TRANSCRIBED MIRROR IS GONE.
 //
-//   1. `payoutAllocation()` below is a verbatim-transcribed mirror of that exact
-//      algorithm (see trip.html's renderPrizePayouts, the rank-group/lastPos/
-//      sumForGroup loop) — used for comprehensive, fast edge-case coverage.
-//   2. The parity block at the bottom cross-checks that mirror against
-//      tournament-engine.js's `computeTournamentPayouts` — a genuinely separate,
-//      independently-callable implementation of the SAME tie-splitting algorithm
-//      (built this session specifically to match Trip's). If these two ever
-//      disagree, that's a real signal something drifted, even without a literal
-//      call into trip.html's embedded copy.
+// This file used to carry payoutAllocation() - a hand-transcribed copy of
+// trip.html's tie-splitting algorithm - because reaching the real one was judged
+// impossible: it lives inside renderPrizePayouts(), a DOM-dependent function
+// reading module-level state. The header said so honestly and treated the
+// transcription as the best available option.
+//
+// It was not. trip.html's real implementation is reachable through the mini-DOM
+// by setting cachedPointsStandings and the prize inputs, then reading the rows it
+// renders - which is what payouts_parity_test.js now does, against both real
+// products, across nineteen adversarial cases.
+//
+// A copied expected algorithm proves that the copy matches itself. The mirror has
+// been replaced by the canonical module: allocatePlacePayouts() in payouts.js,
+// which both products now call. The cases below are unchanged in substance and
+// now exercise production.
 // ============================================================================
 
+const { loadJsFile: _loadPayouts } = require('./helpers/load-script.js');
+const { allocatePlacePayouts } = _loadPayouts('payouts.js');
+
+// Same signature the transcribed mirror had, so every case below reads as it did -
+// but the body is now one call into the shared module.
 function payoutAllocation(standings, spotAmounts) {
-    const n = spotAmounts.length;
-    const rankGroups = {};
-    standings.forEach(s => {
-        if (!rankGroups[s.rank]) rankGroups[s.rank] = [];
-        rankGroups[s.rank].push(s);
-    });
-    let payouts = [];
-    Object.keys(rankGroups).map(Number).sort((a, b) => a - b).forEach(rank => {
-        const group = rankGroups[rank];
-        const lastPos = rank + group.length - 1;
-        let sumForGroup = 0;
-        for (let pos = rank; pos <= lastPos; pos++) {
-            if (pos >= 1 && pos <= n) sumForGroup += spotAmounts[pos - 1];
-        }
-        const perPlayer = sumForGroup / group.length;
-        group.forEach(s => payouts.push({ name: s.name, rank, amount: perPlayer }));
-    });
-    return payouts;
+    return allocatePlacePayouts(standings, spotAmounts)
+        .map(p => ({ name: p.entry.name, rank: p.rank, amount: p.amount }));
 }
 
 describe('trip.html payout mirror — normal cases', () => {
