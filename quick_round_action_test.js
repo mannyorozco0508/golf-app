@@ -272,7 +272,10 @@ describe('STAGE C — one authoritative money document', () => {
 describe('PROTECTED MATH — nothing in this batch touched an engine', () => {
     test('the canonical engines are intact', () => {
         const me = read('money-engine.js');
-        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(me));
+        // THE RULE DID NOT CHANGE, ITS HOME DID. getStrokes moved from
+        // money-engine.js into handicap.js in the shared-core extraction; the
+        // allocation itself is byte-identical and this still asserts it.
+        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(read('handicap.js')));
         const se = read('settlement-engine.js');
         ['computeCombinedNetTotals', 'computeSkinsSettlementNet', 'buildSideMatchReceipts',
             'calculateHoleBetEngine', 'calculateOverallBetEngine'].forEach(f =>
@@ -280,7 +283,7 @@ describe('PROTECTED MATH — nothing in this batch touched an engine', () => {
     });
 
     test('no UI wording leaked into the engines', () => {
-        ['money-engine.js', 'settlement-engine.js'].forEach(f => {
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/ADD ACTION|Round Type|sm-field-|Today's Action/.test(src),
                 `${f} must not know about the setup screen`);
