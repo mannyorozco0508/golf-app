@@ -35,7 +35,7 @@ const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
     vm.createContext(sb);
-    ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
