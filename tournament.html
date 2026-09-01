@@ -10,6 +10,11 @@
     <script src="course-data.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
     <script src="payouts.js"></script>
+    <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
+         relative paths they always did until two deployment origins are configured,
+         which is what lets Consumer and Tournament stop sharing an origin without
+         every link between them breaking. -->
+    <script src="product-links.js"></script>
     <script src="tournament-engine.js"></script>
     <style>
         :root {
@@ -994,7 +999,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const formEl = document.getElementById('trip-link-form');
         if (currentData.tripCode) {
             statusEl.style.display = 'block';
-            statusEl.innerHTML = `🧳 Linked to trip <a href="trip.html?trip=${currentData.tripCode}" style="color:var(--brand-green);">${currentData.tripCode}</a>`;
+            statusEl.innerHTML = `🧳 Linked to trip <a href="${consumerUrl(`trip.html?trip=${currentData.tripCode}`)}" style="color:var(--brand-green);">${currentData.tripCode}</a>`;
             formEl.style.display = 'none';
         } else {
             statusEl.style.display = 'none';
