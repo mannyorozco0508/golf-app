@@ -312,6 +312,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="shotgun-assignments-list"></div>
         </div>
 
+        <div class="form-group" style="border:1px dashed var(--border-faint); border-radius:10px; padding:10px 12px; margin-bottom:14px;">
+            <label style="font-size:0.86rem; font-weight:bold;">
+                <input type="checkbox" id="multi-round-toggle" onchange="setMultiRound(this.checked)"> This event has more than one round
+            </label>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
+                A club championship over two days, or a member-guest weekend. Each round gets its own course, format and scores; the field, flights and handicaps belong to the event.
+            </div>
+        </div>
+
         <div id="individual-setup-note" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:16px; font-size:0.82rem;">
             <strong>Individual Stroke Play.</strong> Add your player field below — teams are not used. After you save you'll build scoring groups (who plays together) and send each group its own link.
             <div style="margin-top:8px;">
@@ -330,6 +339,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <div id="flights-list"></div>
         <div id="flight-assign-list"></div>
+
+        <div id="rounds-section" style="display:none;">
+            <hr class="section-divider">
+            <h3>📅 Rounds</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each round has its own course, format and scores. Setup means nobody can enter scores yet; Open means scoring is live; Closed means the result is final.</p>
+            <button class="btn-outline" onclick="createRound()">+ Add Round</button>
+            <div id="rounds-list"></div>
+            <div id="round-editor"></div>
+        </div>
 
         <div id="player-field-section" style="display:none;">
             <hr class="section-divider">
@@ -396,6 +414,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
+        <!-- Only rendered for a multi-round event. A single-round tournament shows the
+             leaderboard it always showed, with no extra control to ignore. -->
+        <div id="lb-round-filter" style="display:none; text-align:center; margin-bottom:10px;"></div>
+        <div id="lb-combined-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;"></div>
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
         <div id="leaderboard-list"></div>
 
@@ -777,6 +799,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // an invented card. Written for every event so the flag means the same thing
         // whenever it is read.
         const syntheticIndex = !hasUsableStrokeIndex({ courseData: selectedCourseData });
+        let pendingFirstRound = null;
 
         const payload = {
             name: name,
@@ -791,6 +814,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             createdAt: Date.now()
         };
 
+        if (isMultiRoundSetup) {
+            // DECLARED, NEVER INFERRED - the same rule scoringModel follows. The
+            // event's own course/format fields stay written so a record opened by
+            // older code still reads sensibly; the ROUND is what scoring uses.
+            payload.eventModel = ROUND_MODEL;
+            payload.rounds = {};
+        }
+
         if (isIndividual()) {
             payload.scoringModel = PLAYER_MODEL;
             // Net is refused on a course with no genuine stroke index rather than
@@ -803,6 +834,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
+            if (isMultiRoundSetup) {
+                // ROUND 1 IS THE EVENT AS CONFIGURED. Everything the organizer just
+                // filled in describes the first round, so it becomes one rather than
+                // making them enter it twice.
+                const rid = newRoundId();
+                pendingFirstRound = {
+                    id: rid, name: 'Round 1', status: 'setup', createdAt: Date.now(),
+                    format: selectedFormat, scoringMode: payload.scoringMode || 'gross',
+                    shambleCountBest: shambleCountBest,
+                    courseName: selectedCourseName, activeCourseKey: selectedCourseKey,
+                    courseData: selectedCourseData, courseIndexSynthetic: syntheticIndex,
+                    scoringGroups: {}, scores: {},
+                };
+            }
+            if (pendingFirstRound) {
+                db.ref(`tournaments/${currentCode}/rounds/${pendingFirstRound.id}`).set(pendingFirstRound);
+            }
             if (tripLinkCode) {
                 // BOTH POINTERS, THE SAME PAIR linkTournamentToTrip() writes.
                 //
@@ -1003,6 +1051,34 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
+        const note = document.getElementById('lb-combined-note');
+        if (note) { note.style.display = 'none'; note.textContent = ''; }
+
+        if (recordIsMultiRound()) {
+            // THREE SOURCES, ONE RENDERER. A round board, a flight-filtered round
+            // board and the combined standings are the same rows in the same shape -
+            // only where they come from differs, and none of them re-ranks anything.
+            const viewing = lbRoundId || 'event';
+            if (viewing === 'event') {
+                const result = computeEventStandings(currentData, lbFlightId);
+                cachedLeaderboardRows = computeEventStandings(currentData).rows || [];
+                if (!result.available) {
+                    // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
+                    // every round leaderboard still works beside it.
+                    note.style.display = 'block';
+                    note.textContent = result.reason;
+                    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
+                    return;
+                }
+                renderLeaderboardRows(container, result.rows, 'event');
+                return;
+            }
+            const rows = computeRoundLeaderboard(currentData, viewing, lbFlightId);
+            cachedLeaderboardRows = computeRoundLeaderboard(currentData, viewing);
+            renderLeaderboardRows(container, rows, 'round');
+            return;
+        }
+
         // lbFlightId is null for Overall, which is what every historical tournament
         // and every tournament without flights produces - the same call, unchanged.
         const rows = computeTournamentLeaderboard(currentData, lbFlightId);
@@ -1013,30 +1089,46 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // prize money needs its own pot per flight, which is a decision, not a filter.
         cachedLeaderboardRows = computeTournamentLeaderboard(currentData);
 
+        renderLeaderboardRows(container, rows, 'round');
+    }
+
+    // ONE ROW RENDERER for every board. A round, a flight and the combined standings
+    // are the same shape, so a second renderer would be a second chance to disagree
+    // about what "tied" looks like. Only the Thru column differs, because "thru 14"
+    // means holes in a round and rounds in an event.
+    function renderLeaderboardRows(container, rows, kind) {
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
-                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams in ${flights[lbFlightId].name} yet.</div>`
-                : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams yet.</div>`;
-        } else {
-            let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-                <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
-            </div>`;
-            const rankCounts = {};
-            rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
-            rows.forEach(r => {
-                const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-                const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
-                html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
-                    <span class="lb-pos">${r.rank || '-'}</span>
-                    <span class="lb-team">${r.teamName}${tieTag}</span>
-                    <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
-                    <span class="lb-score">${toParStr}</span>
-                </div>`;
-            });
-            container.innerHTML = html;
+                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${flights[lbFlightId].name} yet.</div>`
+                : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No scores yet.</div>`;
+            return;
         }
-
+        const thruHead = kind === 'event' ? 'Rds' : 'Thru';
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">${kind === 'event' ? 'Golfer' : 'Team'}</span><span class="lb-thru">${thruHead}</span><span class="lb-score">To Par</span>
+        </div>`;
+        const rankCounts = {};
+        rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
+        rows.forEach(r => {
+            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+            const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
+            // AN INCOMPLETE EVENT ENTRY IS MARKED, not hidden and not silently ranked
+            // as though it were finished - a golfer who has played one of two rounds
+            // is behind, and the board should say why.
+            const partial = (kind === 'event' && r.hasScores && !r.completedAll)
+                ? '<span class="tie-tag" style="color:var(--text-muted);">(incomplete)</span>' : '';
+            const thru = kind === 'event'
+                ? (r.hasScores ? `${r.roundsComplete}/${r.countableRounds}` : '-')
+                : (r.hasScores ? r.thru : '-');
+            html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
+                <span class="lb-pos">${r.rank || '-'}</span>
+                <span class="lb-team">${r.teamName}${tieTag}${partial}</span>
+                <span class="lb-thru">${thru}</span>
+                <span class="lb-score">${toParStr}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
         renderPayoutSpotInputs();
     }
 
@@ -1106,6 +1198,237 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             });
         }
         resultsContainer.innerHTML = html;
+    }
+
+    // ========================================================================
+    // ROUNDS
+    //
+    // An event owns the field, the flights and the handicaps. A round owns the
+    // course, the format, the scoring mode, the groups and the scores. Nothing here
+    // runs for a single-round tournament: without eventModel it has no rounds node,
+    // and every function below returns early.
+    // ========================================================================
+
+    let isMultiRoundSetup = false;
+    function setMultiRound(on) {
+        isMultiRoundSetup = !!on;
+    }
+    const recordIsMultiRound = () => isMultiRound(currentData || {});
+
+    function newRoundId() { return mintId('r'); }
+
+    // A round is created in SETUP. It inherits the event's course and format as a
+    // starting point, because the second round of a championship is usually the same
+    // shape as the first - and every field is editable before it opens.
+    function createRound(seed) {
+        const rounds = currentData.rounds || {};
+        const n = Object.keys(rounds).length + 1;
+        const rid = newRoundId();
+        const base = seed || {};
+        const payload = {
+            id: rid,
+            name: base.name || `Round ${n}`,
+            status: 'setup',
+            createdAt: Date.now(),
+            format: base.format || currentData.format || 'individual',
+            scoringMode: base.scoringMode || currentData.scoringMode || 'gross',
+            shambleCountBest: base.shambleCountBest || currentData.shambleCountBest || 1,
+            courseName: base.courseName || currentData.courseName || '',
+            activeCourseKey: base.activeCourseKey || currentData.activeCourseKey || '',
+            courseData: base.courseData || currentData.courseData || [],
+            courseIndexSynthetic: base.courseIndexSynthetic !== undefined
+                ? base.courseIndexSynthetic : !!currentData.courseIndexSynthetic,
+            scoringGroups: {},
+            scores: {},
+        };
+        return db.ref(`tournaments/${currentCode}/rounds/${rid}`).set(payload)
+            .catch(err => alert(`Error adding round: ${err.message}`));
+    }
+
+    function renameRound(rid, name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed) { renderRounds(); return; }
+        db.ref(`tournaments/${currentCode}/rounds/${rid}/name`).set(trimmed)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // REORDERING WRITES sortOrder, NEVER createdAt. When a round was actually made is
+    // a fact about history; where it sits in the schedule is a decision. Rewriting the
+    // timestamp to reorder would destroy the first to express the second.
+    function moveRound(rid, delta) {
+        const ids = orderedRoundIds(currentData);
+        const at = ids.indexOf(rid);
+        const to = at + delta;
+        if (at === -1 || to < 0 || to >= ids.length) return;
+        ids.splice(to, 0, ids.splice(at, 1)[0]);
+        const updates = {};
+        ids.forEach((id, i) => { updates[`${id}/sortOrder`] = i; });
+        db.ref(`tournaments/${currentCode}/rounds`).update(updates)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // A ROUND WITH SCORES IS NOT DELETED. Those strokes are somebody's afternoon, and
+    // an accidental tap must not be the thing that ends them.
+    function deleteRound(rid) {
+        const r = (currentData.rounds || {})[rid] || {};
+        if (Object.keys(r.scores || {}).length > 0) {
+            alert(`⚠️ "${r.name || 'That round'}" already has scores in it. A round with scores can be closed, but not deleted.`);
+            return;
+        }
+        db.ref(`tournaments/${currentCode}/rounds/${rid}`).remove()
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function updateRoundField(rid, field, value) {
+        db.ref(`tournaments/${currentCode}/rounds/${rid}/${field}`).set(value)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // OPENING A ROUND TAKES THE HANDICAP SNAPSHOT.
+    //
+    // From this moment the round is scored with the numbers the field had when it
+    // started. Correcting somebody's handicap before round two is a normal thing for
+    // an organizer to do, and it must not silently restate a result that has already
+    // been posted on the wall.
+    //
+    // Reopening a CLOSED round deliberately does NOT retake the snapshot - the round
+    // was played off those numbers, and reopening it to fix a scorecard is not a
+    // reason to re-handicap it.
+    function setRoundStatus(rid, status) {
+        const round = (currentData.rounds || {})[rid] || {};
+        const updates = { [`${rid}/status`]: status };
+
+        if (status === 'open' && !round.handicaps) {
+            const snap = {};
+            Object.keys(currentData.players || {}).forEach(pid => {
+                const h = currentData.players[pid].handicap;
+                snap[pid] = (h === undefined || h === null || h === '') ? '0' : h;
+            });
+            updates[`${rid}/handicaps`] = snap;
+        }
+        if (status === 'closed' && !round.closedAt) {
+            updates[`${rid}/closedAt`] = Date.now();
+        }
+        db.ref(`tournaments/${currentCode}/rounds`).update(updates)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    let editingRoundId = null;
+    function editRound(rid) {
+        editingRoundId = (editingRoundId === rid) ? null : rid;
+        renderRounds();
+    }
+
+    function renderRounds() {
+        const section = document.getElementById('rounds-section');
+        if (!recordIsMultiRound()) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        const rounds = currentData.rounds || {};
+        const ids = orderedRoundIds(currentData);
+        const listEl = document.getElementById('rounds-list');
+
+        if (ids.length === 0) {
+            listEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No rounds yet.</p>`;
+            document.getElementById('round-editor').innerHTML = '';
+            return;
+        }
+
+        const label = { setup: '⚙️ Setup', open: '🟢 Open', closed: '🔒 Closed' };
+        listEl.innerHTML = ids.map((rid, i) => {
+            const r = rounds[rid];
+            const st = roundStatus(r);
+            const holes = (r.courseData || []).length;
+            const scored = Object.keys(r.scores || {}).length;
+            return `<div class="flight-row" style="flex-wrap:wrap;">
+                <input class="flight-name-input" type="text" value="${r.name || ''}" onchange="renameRound('${rid}', this.value)">
+                <span class="flight-count">${label[st]}</span>
+                <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+                <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', 1)" ${i === ids.length - 1 ? 'disabled' : ''}>▼</button>
+                <button class="flight-del" onclick="deleteRound('${rid}')" ${scored ? 'disabled title="This round has scores"' : ''}>✕</button>
+                <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
+                    ${r.courseName || 'No course set'} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + ((r.scoringMode === 'net') ? 'Net' : 'Gross') : ''} • ${holes} holes
+                </div>
+                <div style="flex-basis:100%; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+                    <button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="editRound('${rid}')">${editingRoundId === rid ? 'Done' : 'Edit'}</button>
+                    ${st === 'setup' ? `<button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="setRoundStatus('${rid}', 'open')">Open for scoring ▶</button>` : ''}
+                    ${st === 'open' ? `<button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="setRoundStatus('${rid}', 'closed')">Close round</button>` : ''}
+                    ${st === 'closed' ? `<button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="setRoundStatus('${rid}', 'open')">Reopen</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+
+        renderRoundEditor();
+    }
+
+    function formatLabelFor(fmt) {
+        return { scramble: 'Scramble', shamble: 'Shamble', bestball: '2-Man Best Ball',
+                 individual: 'Individual Stroke Play' }[fmt] || fmt || '—';
+    }
+
+    // A ROUND'S SETTINGS ARE LOCKED ONCE IT OPENS. Changing the course or the format
+    // underneath scores that have already been entered would reinterpret them - a
+    // par-4 becoming a par-5, or a gross round becoming net - so the editor is
+    // read-only from Open onwards and says why.
+    function renderRoundEditor() {
+        const el = document.getElementById('round-editor');
+        if (!editingRoundId) { el.innerHTML = ''; return; }
+        const r = (currentData.rounds || {})[editingRoundId];
+        if (!r) { el.innerHTML = ''; editingRoundId = null; return; }
+        const rid = editingRoundId;
+        const locked = roundStatus(r) !== 'setup';
+
+        if (locked) {
+            el.innerHTML = `<div style="border:1px solid var(--border-faint); border-radius:8px; padding:12px; margin-top:8px; font-size:0.8rem; color:var(--text-muted);">
+                <strong>${r.name}</strong> is ${roundStatus(r) === 'open' ? 'open for scoring' : 'closed'}, so its course, format and scoring can no longer be changed —
+                scores already entered were recorded against them. Put the round back into setup only if nobody has played it.
+            </div>`;
+            return;
+        }
+
+        const courseOptions = Object.keys(allCourses()).map(k =>
+            `<option value="${k}" ${r.activeCourseKey === k ? 'selected' : ''}>${allCourses()[k].name}</option>`).join('');
+
+        el.innerHTML = `<div style="border:1px solid var(--brand-green); border-radius:8px; padding:12px; margin-top:8px;">
+            <div class="form-group">
+                <label style="font-size:0.8rem;">Course</label>
+                <select onchange="setRoundCourse('${rid}', this.value)"><option value="">— Pick a course —</option>${courseOptions}</select>
+            </div>
+            <div class="form-group">
+                <label style="font-size:0.8rem;">Format</label>
+                <select onchange="updateRoundField('${rid}', 'format', this.value)">
+                    ${['individual','scramble','shamble','bestball'].map(f =>
+                        `<option value="${f}" ${r.format === f ? 'selected' : ''}>${formatLabelFor(f)}</option>`).join('')}
+                </select>
+            </div>
+            ${r.format === 'individual' ? `<div class="form-group">
+                <label style="font-size:0.8rem;">Scoring</label>
+                <select onchange="updateRoundField('${rid}', 'scoringMode', this.value)">
+                    <option value="gross" ${r.scoringMode !== 'net' ? 'selected' : ''}>Gross</option>
+                    <option value="net" ${r.scoringMode === 'net' ? 'selected' : ''}>Net</option>
+                </select>
+                ${(r.scoringMode === 'net' && !hasUsableStrokeIndex(r)) ? `<div style="color:var(--warn-text); font-size:0.76rem; margin-top:4px;">⚠️ This course has no real stroke index, so net strokes can't be allocated. The round will score Gross.</div>` : ''}
+            </div>` : ''}
+        </div>`;
+    }
+
+    function allCourses() {
+        const out = {};
+        Object.keys(coursePresets).forEach(k => { out[k] = coursePresets[k]; });
+        Object.keys(globalCourses).forEach(k => { out[k] = globalCourses[k]; });
+        return out;
+    }
+
+    function setRoundCourse(rid, key) {
+        if (!key) return;
+        const data = resolveTournamentCourseData(key);
+        const name = (allCourses()[key] || {}).name || key;
+        db.ref(`tournaments/${currentCode}/rounds/${rid}`).update({
+            activeCourseKey: key,
+            courseName: name,
+            courseData: data,
+            courseIndexSynthetic: !hasUsableStrokeIndex({ courseData: data }),
+        }).catch(err => alert(`Error: ${err.message}`));
     }
 
     // ========================================================================
@@ -1202,7 +1525,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     function removePlayerFromField(pid) {
-        const groups = currentData.scoringGroups || {};
+        const groups = recordIsMultiRound() ? allRoundGroups() : (currentData.scoringGroups || {});
         const inGroup = Object.keys(groups).find(gid => (groups[gid].playerIds || []).indexOf(pid) !== -1);
         if (inGroup) {
             alert(`⚠️ That golfer is in ${groups[inGroup].name || 'a scoring group'}. Take them out of the group first.`);
@@ -1278,11 +1601,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     // --- SCORING GROUPS ---
 
+    // GROUPS BELONG TO A ROUND when an event has rounds - Saturday's foursomes are not
+    // Sunday's. groupsPath() is the single place that decides where they live, so no
+    // caller has to branch on the model.
+    function groupsPath() {
+        return recordIsMultiRound() && editingRoundId
+            ? `tournaments/${currentCode}/rounds/${editingRoundId}/scoringGroups`
+            : `tournaments/${currentCode}/scoringGroups`;
+    }
+    function currentGroups() {
+        if (recordIsMultiRound()) {
+            const r = (currentData.rounds || {})[editingRoundId] || {};
+            return r.scoringGroups || {};
+        }
+        return currentData.scoringGroups || {};
+    }
+
     function createScoringGroup() {
-        const groups = currentData.scoringGroups || {};
+        const groups = currentGroups();
         const next = Object.keys(groups).length + 1;
         const gid = newGroupId();
-        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}`)
+        db.ref(`${groupsPath()}/${gid}`)
             .set({ id: gid, name: `Group ${next}`, playerIds: [], createdAt: Date.now() })
             .catch(err => alert(`Error adding group: ${err.message}`));
     }
@@ -1290,24 +1629,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renameScoringGroup(gid, name) {
         const trimmed = (name || '').trim();
         if (!trimmed) { renderScoringGroups(); return; }
-        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}/name`).set(trimmed)
+        db.ref(`${groupsPath()}/${gid}/name`).set(trimmed)
             .catch(err => alert(`Error: ${err.message}`));
     }
 
     function deleteScoringGroup(gid) {
-        const g = (currentData.scoringGroups || {})[gid] || {};
+        const g = currentGroups()[gid] || {};
         if ((g.playerIds || []).length > 0) {
             alert(`⚠️ ${g.name || 'That group'} still has golfers in it. Move them out first.`);
             return;
         }
-        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}`).remove()
+        db.ref(`${groupsPath()}/${gid}`).remove()
             .catch(err => alert(`Error: ${err.message}`));
     }
 
     function setGroupStartingHole(gid, hole) {
         // THE STARTING HOLE BELONGS TO THE GROUP, not to a golfer - a shotgun sends a
         // foursome to a tee, not four people to four tees.
-        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}/startingHole`).set((hole || '').trim())
+        db.ref(`${groupsPath()}/${gid}/startingHole`).set((hole || '').trim())
             .catch(err => alert(`Error: ${err.message}`));
     }
 
@@ -1315,7 +1654,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // were first, in the same write, so a golfer can never be scored twice - and
     // because scores are keyed by player id, moving them does not touch a stroke.
     function assignPlayerToGroup(pid, gid) {
-        const groups = currentData.scoringGroups || {};
+        const groups = currentGroups();
         const updates = {};
         Object.keys(groups).forEach(g => {
             const ids = (groups[g].playerIds || []).filter(x => x !== pid);
@@ -1324,23 +1663,44 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 updates[`${g}/playerIds`] = ids;
             }
         });
-        db.ref(`tournaments/${currentCode}/scoringGroups`).update(updates)
+        db.ref(groupsPath()).update(updates)
             .catch(err => alert(`Error: ${err.message}`));
     }
 
-    function groupScorecardUrl(gid) {
+    // A GROUP LINK CARRIES ITS ROUND WHEN THERE IS MORE THAN ONE.
+    //
+    // Saturday's link and Sunday's link are different links. Without the round in the
+    // URL a golfer who kept yesterday's message would enter today's scores into
+    // yesterday's round - silently, because the group id is the same either way.
+    // Single-round events keep exactly the link they already had.
+    function groupScorecardUrl(gid, rid) {
         // SAME ORIGIN, ALWAYS. This is an internal Tournament link, not a
         // cross-product one, so it is built the way team links are and never through
         // product-links.js.
-        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}`;
+        const roundPart = rid ? `&round=${rid}` : '';
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}${roundPart}`;
+    }
+
+    // Across every round, for the "can this golfer be removed from the field" check -
+    // a golfer in Sunday's draw must not be deletable while looking at Saturday.
+    function allRoundGroups() {
+        const out = {};
+        Object.values(currentData.rounds || {}).forEach(r =>
+            Object.keys(r.scoringGroups || {}).forEach(gid => { out[gid] = r.scoringGroups[gid]; }));
+        return out;
     }
 
     function renderScoringGroups() {
         const section = document.getElementById('scoring-groups-section');
         if (!recordIsIndividual()) { section.style.display = 'none'; return; }
         section.style.display = 'block';
+        if (recordIsMultiRound() && !editingRoundId) {
+            document.getElementById('scoring-groups-list').innerHTML =
+                `<p style="font-size:0.78rem; color:var(--text-muted);">Pick a round above (Edit) to set up its groups — each round has its own draw.</p>`;
+            return;
+        }
 
-        const groups = currentData.scoringGroups || {};
+        const groups = currentGroups();
         const players = currentData.players || {};
         const gids = Object.keys(groups).sort((a, b) => (groups[a].createdAt || 0) - (groups[b].createdAt || 0));
         const assigned = {};
@@ -1363,7 +1723,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     ${ids.length ? ids.map(pid => players[pid].name).join(', ') : 'Nobody assigned yet'}
                 </div>
                 <div style="flex-basis:100%; margin-top:6px;">
-                    <a class="rc-link" href="${groupScorecardUrl(gid)}">Open scoring link ▶</a>
+                    <a class="rc-link" href="${groupScorecardUrl(gid, recordIsMultiRound() ? editingRoundId : null)}">Open scoring link ▶</a>
                 </div>
             </div>`;
         }).join('');
@@ -1391,9 +1751,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // "First Flight" halfway through setup - and if the name were the key, every
     // team assigned to it would silently fall out of the flight. The id is minted
     // once and never changes; the name is just a label stored beside it.
-    function newFlightId() {
-        return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    }
+    // Routed through the same minter as players and groups. It was still on the old
+    // timestamp-plus-four-random-characters scheme, which collides about once in
+    // eighty over two hundred draws - fine for the handful of flights an organizer
+    // creates by hand, and not fine as the last place in this file where an id could
+    // silently duplicate. One generator, one guarantee.
+    function newFlightId() { return mintId('f'); }
 
     function createFlight() {
         const input = document.getElementById('new-flight-name');
@@ -1488,6 +1851,35 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <select onchange="assignTeamToFlight('${tid}', this.value)">${options(current)}</select>
             </div>`;
         }).join('');
+    }
+
+    // --- EVENT VS ROUND VIEW ---
+    //
+    // 'event' means combined standings; anything else is a round id. A single-round
+    // tournament never leaves the one view it has always had.
+    let lbRoundId = null;
+
+    function setLeaderboardRound(rid) {
+        lbRoundId = rid || null;
+        renderLeaderboardRoundFilter();
+        renderLeaderboard();
+    }
+
+    function renderLeaderboardRoundFilter() {
+        const el = document.getElementById('lb-round-filter');
+        if (!recordIsMultiRound()) { el.style.display = 'none'; el.innerHTML = ''; lbRoundId = null; return; }
+        const rounds = currentData.rounds || {};
+        const ids = orderedRoundIds(currentData);
+        if (ids.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+        // A round deleted while being viewed drops back to the combined board rather
+        // than showing an empty one.
+        if (lbRoundId && lbRoundId !== 'event' && !rounds[lbRoundId]) lbRoundId = null;
+        const active = lbRoundId || 'event';
+
+        el.style.display = 'block';
+        el.innerHTML = `<button class="lb-flight-btn ${active === 'event' ? 'active' : ''}" onclick="setLeaderboardRound('event')">Event</button>`
+            + ids.map(rid => `<button class="lb-flight-btn ${active === rid ? 'active' : ''}" onclick="setLeaderboardRound('${rid}')">${rounds[rid].name || 'Round'}</button>`).join('');
     }
 
     // --- LEADERBOARD FLIGHT VIEW ---
@@ -1617,12 +2009,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
             renderTeamLinks();
             renderShotgunAssignments();
+            renderRounds();
             renderFlights();
             renderPlayerField();
             renderScoringGroups();
             // Team scorecard links belong to team events only.
             const teamLinksHeading = document.getElementById('team-links-list');
             if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
+            renderLeaderboardRoundFilter();
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
