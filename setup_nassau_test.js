@@ -36,15 +36,15 @@ const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const P2 = [{ id:101, name:'Marty', hcp:'0' }, { id:102, name:'Manny', hcp:'0' }];
 const P4 = P2.concat([{ id:103, name:'Carp', hcp:'0' }, { id:104, name:'Scott', hcp:'0' }]);
 
-const ADMIN_DEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const SM_DEPS = ['money-engine.js','action-model.js','settlement-engine.js'];
+const ADMIN_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const SM_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 // Every engine in one context, loaded in production order.
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -337,6 +337,8 @@ describe('NOTHING ELSE MOVED', () => {
     });
 
     test('there is still exactly one Nassau settlement implementation', () => {
+        // A SEARCH LIST, NOT A REALM. handicap.js is deliberately absent: this asks
+        // which files DEFINE the builder, and the answer must stay money-engine.js.
         const defs = ['money-engine.js','settlement-engine.js','action-model.js']
             .filter(f => /function calculateMatchEngine\(/.test(read(f)));
         assert.deepEqual(defs, ['money-engine.js']);
