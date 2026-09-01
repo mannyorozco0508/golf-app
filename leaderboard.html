@@ -13,6 +13,13 @@
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
+    <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
+         in which foursome, which is what every ?group=N scorekeeper link and every
+         group-scoped write permission is measured against. This page carried its own
+         byte-identical copy until the shared-core wave; four copies of that rule, with
+         no coverage at all, was the worst-tested duplication in the app. Loaded before
+         the inline block so nothing below can shadow it. -->
+    <script src="grouping.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -335,34 +342,6 @@
     let activeView = "individual"; 
     let activeScoring = "net";
     let groupViewMode = "group"; // "all" | "group" — which mode the Individual view renders in
-
-    function computeGroupSizes(playerCount, overrides) {
-        overrides = overrides || {};
-        let sizes = [];
-        let sum = 0;
-        let gIdx = 0;
-        while (sum < playerCount) {
-            let remaining = playerCount - sum;
-            let defaultSize = Math.min(4, remaining);
-            let ov = overrides[gIdx];
-            let sz = (ov !== undefined && ov > 0) ? Math.min(ov, remaining) : defaultSize;
-            sizes.push(sz);
-            sum += sz;
-            gIdx++;
-        }
-        return sizes;
-    }
-
-    function computeGroupBoundaries(playerCount, overrides) {
-        const sizes = computeGroupSizes(playerCount, overrides);
-        let boundaries = [];
-        let idx = 0;
-        sizes.forEach((size, i) => {
-            boundaries.push({ group: i + 1, startIdx: idx, size: size });
-            idx += size;
-        });
-        return boundaries;
-    }
 
     if (!currentMode) {
         window.location.href = "admin.html";
