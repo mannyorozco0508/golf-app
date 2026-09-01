@@ -318,7 +318,7 @@
         </div>
     </details>
 
-    <button class="btn-outline" onclick="createTournamentForTrip()">🏆 Create a Tournament for This Trip</button>
+    <button class="btn-outline" onclick="createTournamentForTrip()">🏆 Manage in Tournaments ▶</button>
 
     <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
 
@@ -843,9 +843,12 @@
         window.location.href = `trip.html?trip=${code}`;
     }
 
-    // Sends the admin straight into the round-setup wizard with this trip's code attached —
-    // admin.html reads that param and, when the round is saved, links itself back to this
-    // trip automatically. No game code to copy, no coming back here to paste anything.
+    // AN OUTBOUND LINK, NOT A CREATE. This page writes nothing to tournaments/* and
+    // nothing to trips/*/tournaments/* - it hands the trip code to the Tournament
+    // product, which owns creating the record and writing both relationship pointers
+    // back. The old comment here described createRoundForTrip() instead and had
+    // already misled one architecture audit into thinking Consumer was secretly the
+    // tournament administrator. The function name is kept because callers exist.
     function createTournamentForTrip() {
         window.location.href = tournamentUrl(`tournament.html?trip=${currentTripCode}`);
     }
