@@ -77,8 +77,13 @@ function shellFiles() {
     return [...m[1].replace(/\/\/[^\n]*/g, '').matchAll(/'\.\/([^']+)'/g)].map(x => x[1]);
 }
 function filesToSync() {
-    const m = read('sync-mobile-web.js').match(/const FILES_TO_SYNC = \[([\s\S]*?)\];/);
-    assert.ok(m, 'FILES_TO_SYNC must exist');
+    // Derived from the three product shell declarations now - see sync-mobile-web.js.
+    const src = read('sync-mobile-web.js');
+    const parts = ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL']
+        .map(name => src.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];')));
+    parts.forEach((p, i) => assert.ok(p,
+        ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL'][i] + ' must exist'));
+    const m = [null, parts.map(p => p[1]).join(',')];
     // Comments stripped first: an earlier count read a path out of a comment and
     // reported one entry too many.
     return [...m[1].replace(/\/\/[^\n]*/g, '').matchAll(/'([^']+)'/g)].map(x => x[1]);
