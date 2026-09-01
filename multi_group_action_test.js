@@ -319,7 +319,15 @@ describe('PROTECTED MATH', () => {
     });
 
     test('the group model itself was not redefined', () => {
-        const fn = ADM.slice(ADM.indexOf('function computeGroupSizes'), ADM.indexOf('function computeGroupBoundaries'));
+        // The rule moved to grouping.js in the shared-core wave, so this reads the
+        // canonical module rather than admin.html's former copy. The point of the
+        // assertion is unchanged and still worth making: foursomes are the default,
+        // and a round that quietly started grouping in threes would move golfers
+        // between scorekeeper links.
+        const fn = read('grouping.js');
         assert.ok(/Math\.min\(4, remaining\)/.test(fn), 'default group size must remain 4');
+        assert.ok(!/function computeGroupSizes\s*\(/.test(
+            ADM.replace(/<script src=[^>]*><\/script>/g, '')),
+            'admin.html must consume the shared module, not its own copy');
     });
 });
