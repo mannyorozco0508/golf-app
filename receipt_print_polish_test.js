@@ -246,7 +246,7 @@ describe('THE PRINT GUARDS ARE ALL STILL THERE', () => {
 // ---------------------------------------------------------------------------
 describe('PROTECTED — formatting only', () => {
     test('no engine changed', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/nav-more|thousands|\\B\(\?=\(\\d\{3\}\)/.test(src), `${f} gained formatting code`);
         });
@@ -260,7 +260,10 @@ describe('PROTECTED — formatting only', () => {
     });
 
     test('handicap and settlement math untouched', () => {
-        assert.match(read('money-engine.js'), /function getStrokes\(hcpIndex, numericHcp\)/);
+        // THE RULE DID NOT CHANGE, ITS HOME DID. getStrokes moved from
+        // money-engine.js into handicap.js in the shared-core extraction; the
+        // allocation itself is byte-identical and this still asserts it.
+        assert.match(read('handicap.js'), /function getStrokes\(hcpIndex, numericHcp\)/);
         assert.equal((read('settlement-engine.js').match(/function computeCombinedNetTotals/g) || []).length, 1);
     });
 });
