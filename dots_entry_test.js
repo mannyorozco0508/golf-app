@@ -120,15 +120,25 @@ describe('CONFIRMATION — the golfer must see the tap landed', () => {
     // the right hole, and its COUNT reflects exactly the stored dots - which exercises
     // the same currentData.dots lookup the per-player line uses. The line's markup is
     // pinned by source assertion, and flagged for the real-device pass.
-    test('the per-golfer line is generated from the same stored data', () => {
+    test('confirmation comes from the score cell, drawn exactly once', () => {
         const src = read('index.html');
-        // The whole Hole View dots section: the lookup, the per-row line, and the button.
+        // The whole Hole View dots section: the lookup and the button.
         const start = src.indexOf('const dotsGame = activeDotsGame();');
         const fn = src.slice(start, src.indexOf("html += '<div id=\"whoami-mount\"></div>'", start));
         assert.ok(/currentData\.dots\[`h\$\{holeNum\}`\]/.test(fn), 'reads this hole only');
-        assert.ok(/hv-dot-line/.test(fn));
-        assert.ok(/if \(mine\.length\)/.test(fn), 'a golfer with no dots renders nothing');
-        assert.ok(/mine\.map\(dotLabel\)\.join/.test(fn), 'multiple dots read as a list');
+
+        // Hole View used to confirm the tap THREE times over: a written label line under
+        // the name, a pip span appended after the score cell, and the cell's own pips.
+        // The appended span was a flex sibling of the centred column, so it floated
+        // beside the box while the cell's pips sat under it - one dot, two pips, out of
+        // line. The cell's copy is the one that survives, because it is the same render
+        // the Full Card and the printed PDF use.
+        assert.ok(!/hv-dot-line/.test(src), 'the written label line must not come back');
+        assert.ok(!/pipHtml/.test(src), 'the appended pip span must not come back');
+        assert.ok(/<div class="cell-dots">\$\{earnedDotsInner\}<\/div>/.test(src),
+            'the cell must still draw the dots, inside the reserved strip');
+        assert.ok(/dotIndicatorHtml\(dotsForPlayerHole\(p\.id, h\.hole\), h\.hole\)/.test(src),
+            'built by the shared builder, with the hole passed so a carry paints true');
     });
 
     test('the button counts the dots on this hole', () => {
