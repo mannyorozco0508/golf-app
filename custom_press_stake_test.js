@@ -233,44 +233,44 @@ describe('NOTHING ELSE ABOUT THE ENGINE MOVED', () => {
         assert.match(src, /segmentTotals\(pr\.startHole, pr\.stake\)/);
     });
 
-    test("stats.html's remaining copy still passes the press stake", () => {
-        // WAS BOTH PAGES. sidematches.html no longer has a copy to check - it loads
-        // settlement-engine.js and uses the canonical engine, which the assertion
-        // below proves. stats.html still owns one, so it stays guarded here.
-        const src = read('stats.html');
-        const at = src.indexOf('function calculateOverallBetEngine');
-        const body = src.slice(at, at + 3000);
-        assert.match(body, /function segmentTotals\(startHole, segStake\)/,
-            'stats.html: segmentTotals must accept a per-press stake');
-        assert.match(body, /segmentTotals\(pr\.startHole, pr\.stake\)/,
-            'stats.html: the press stake must be passed through');
+    test('NEITHER page can get this wrong, because neither has a copy', () => {
+        // WAS A SOURCE CHECK ON BOTH PAGES' COPIES, then on stats.html's alone. A
+        // check for "does this page's copy handle press stakes" has no meaning once
+        // there is no copy - sidematches.html lost its in Batch 2 and stats.html in
+        // Batch 3. What matters instead is that none can come back and shadow the
+        // canonical engine both pages now load.
+        ['sidematches.html', 'stats.html'].forEach(page => {
+            const src = read(page);
+            const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+            assert.ok(!/function calculateOverallBetEngine\s*\(/.test(inline),
+                page + ' must not redeclare calculateOverallBetEngine');
+            assert.ok(!/function segmentTotals\s*\(/.test(inline),
+                page + ' must not redeclare segmentTotals');
+            assert.match(src, /<script src="settlement-engine\.js">/,
+                page + ' must load the canonical engine');
+        });
     });
 
-    test('sidematches.html cannot get this wrong, because it has no copy', () => {
-        // The stronger replacement for the half of the assertion above that was
-        // removed. A source check for "does the page's copy handle press stakes"
-        // has no meaning once there is no copy; what matters instead is that none
-        // can come back and shadow the canonical engine the page now loads.
-        const src = read('sidematches.html');
-        const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
-        assert.ok(!/function calculateOverallBetEngine\s*\(/.test(inline),
-            'sidematches.html must not redeclare calculateOverallBetEngine');
-        assert.ok(!/function segmentTotals\s*\(/.test(inline),
-            'sidematches.html must not redeclare segmentTotals');
-        assert.match(src, /<script src="settlement-engine\.js">/,
-            'and it must load the canonical engine');
+    test('the canonical copy still takes a per-press stake, which is the thing being protected', () => {
+        // The original finding, kept: settlement-engine.js was already right, and
+        // that is what every page now runs. Deleting the page checks without this
+        // would leave the per-press stake rule itself unguarded.
+        const src = read('settlement-engine.js');
+        assert.match(src, /function segmentTotals\(startHole, segStake\)/);
+        assert.match(src, /segmentTotals\(pr\.startHole, pr\.stake\)/);
     });
 
-    test('the sidematches.html realm resolves to the canonical engine at runtime', () => {
-        // Source text says the copy is gone; this says the page actually ENDS UP with
-        // the right function. Same fixture through the page realm and the engine realm
-        // must agree in every field, not merely on money - they are one implementation
-        // now, so anything less would mean a shadow survived the load order.
+    test('both page realms resolve to the canonical engine at runtime', () => {
+        // Source text says the copies are gone; this says each page actually ENDS UP
+        // with the right function once every script has run in browser order. Whole
+        // object, not just money - anything less would mean a shadow survived.
         const presses = [{ startHole: 8, stake: 25 }];
-        const viaPage = plain(fromPage('sidematches.html', 'calculateOverallBetEngine')(
-            PAIR, cd18, reproScores(), cfg(), presses));
         const viaEngine = plain(engineRealm().calculateOverallBetEngine(
             PAIR, cd18, reproScores(), cfg(), presses));
-        assert.deepEqual(viaPage, viaEngine);
+        ['sidematches.html', 'stats.html'].forEach(page => {
+            const viaPage = plain(fromPage(page, 'calculateOverallBetEngine')(
+                PAIR, cd18, reproScores(), cfg(), presses));
+            assert.deepEqual(viaPage, viaEngine, page + ' did not resolve to canonical');
+        });
     });
 });
