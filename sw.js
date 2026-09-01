@@ -59,7 +59,12 @@
 // the build where a 2v2 Stroke Play match reads ALL SQUARE and $0 on the tab that
 // created it while the Receipt pays it out. The shell FILE LIST is unchanged -
 // settlement-engine.js was already precached for settlement.html.
-const CACHE_VERSION = 'golfapp-v14-canonical-stroke';
+// Moved to v15 because sidematches.html - a precached shell file - changed again:
+// the side picker now offers 2v2 for Stroke Play as well as Match Play and Nassau,
+// and the instruction line no longer tells golfers 2v2 is unavailable to them. On
+// v14 an installed PWA would keep refusing the second golfer on a Stroke side and
+// keep printing copy that contradicts what the app now settles. Shell list unchanged.
+const CACHE_VERSION = 'golfapp-v15-2v2-stroke-picker';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
