@@ -37,15 +37,15 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
 const PAGE_DEPS = {
     'index.html': ['score-marks.js', 'money-engine.js', 'action-model.js',
                    'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'],
-    'sidematches.html': ['money-engine.js', 'action-model.js', 'settlement-engine.js'],
-    'stats.html': ['money-engine.js', 'action-model.js', 'settlement-engine.js'],
+    'sidematches.html': ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'],
+    'stats.html': ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'],
 };
 const realms = {};
 function fromPage(page, expr) {
@@ -626,6 +626,7 @@ describe('EVERY PRODUCTION COPY AGREES', () => {
     });
 
     test('no production copy still carries the old singles-only gate', () => {
+        // Search list over the files that USED to own a relative-handicap copy.
         ['money-engine.js', 'index.html', 'sidematches.html', 'stats.html'].forEach(f => {
             const src = read(f);
             assert.ok(!/const isSingles = scoringType === 'net' && t1Players\.length === 1/.test(src),
