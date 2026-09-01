@@ -85,14 +85,41 @@ function makeStubSandbox() {
     return sandbox;
 }
 
+// WHAT A MODULE NEEDS BEFORE IT CAN RUN.
+//
+// money-engine.js and settlement-engine.js call the handicap family as plain
+// globals - parseHcp inside calcWolfEngine, getStrokes inside calculateMatchEngine,
+// and so on. In the browser they are never loaded without handicap.js, because
+// every page that loads one loads the other. A test realm holding money-engine.js
+// alone therefore does not describe production, and used to only appear to work
+// because money-engine.js carried its own copy of the family.
+//
+// Declared here, once, rather than in forty test files.
+const MODULE_PREREQS = {
+    'money-engine.js': ['handicap.js'],
+    'settlement-engine.js': ['handicap.js'],
+};
+
 // Loads a plain, standalone .js file (money-engine.js, tournament-engine.js,
 // course-data.js) — these already run at global scope with no DOM/Firebase
 // references, so no extraction is needed, just execution in a sandbox.
-function loadJsFile(relativePath) {
+//
+// dependencies:  EXTRA modules to load first, on top of the prerequisites above.
+// options.only:  load ONLY what is listed, ignoring the prerequisites. For the
+//                deliberately-crippled realms that prove a module fails loudly
+//                without its dependency - the one case where a realm should NOT
+//                describe production.
+function loadJsFile(relativePath, dependencies, options) {
     const fullPath = path.join(REPO_ROOT, relativePath);
     const code = fs.readFileSync(fullPath, 'utf8');
     const sandbox = makeStubSandbox();
     vm.createContext(sandbox);
+    const before = (options && options.only)
+        ? (dependencies || [])
+        : (MODULE_PREREQS[relativePath] || []).concat(
+              (dependencies || []).filter(d => !(MODULE_PREREQS[relativePath] || []).includes(d)));
+    before.forEach(dep => vm.runInContext(
+        fs.readFileSync(path.join(REPO_ROOT, dep), 'utf8'), sandbox, { filename: dep }));
     vm.runInContext(code, sandbox, { filename: relativePath });
     attachDomHelpers(sandbox);
     return sandbox;
@@ -201,4 +228,4 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     return sandbox;
 }
 
-module.exports = { loadJsFile, loadHtmlInlineScript, REPO_ROOT };
+module.exports = { loadJsFile, loadHtmlInlineScript, REPO_ROOT, MODULE_PREREQS };
