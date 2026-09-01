@@ -235,8 +235,12 @@ describe('PLAYER IDENTITY — a score stays with the golfer', () => {
     });
 
     test('26 & 27. the new score key carries the id and no position', () => {
+        // Built through scorePath() now, which prefixes the round for a multi-round
+        // event. The KEY is unchanged - only where it is written moved.
         assert.match(codeOf('tournament-scorecard.html'),
-            /scores\/\$\{playerId\}_h\$\{holeNum\}/);
+            /scorePath\(`\$\{playerId\}_h\$\{holeNum\}`\)/);
+        assert.match(codeOf('tournament-scorecard.html'), /scores\/\$\{suffix\}/,
+            'the score key shape is the one already in production');
         assert.ok(!/scores\/\$\{playerIdx\}_|scores\/p\$\{i\}_/.test(codeOf('tournament-scorecard.html')
             .replace(/team\$\{myTeamNum\}_p\$\{playerIdx\}/g, '')),
             'no individual key may be built from an index');
@@ -415,8 +419,24 @@ describe('NORMALIZATION — two storage models, one competition', () => {
 
     test('30. ranking is not duplicated per storage model', () => {
         const eng = codeOf('tournament-engine.js');
-        assert.equal((eng.match(/rows\.sort\(/g) || []).length, 1, 'one sort');
-        assert.equal((eng.match(/r\.rank = idx \+ 1;/g) || []).length, 1, 'one rank pass');
+        // ONE RANK PASS, TWO SORTS - and that distinction is the point.
+        //
+        // A round board orders by to-par; an event board orders by completeness first,
+        // because a golfer who has played fewer rounds has fewer strokes and must not
+        // lead on that. Those are different orderings of different entities and they
+        // legitimately differ.
+        //
+        // What must NEVER differ is what counts as level, so the tie-and-rank loop is
+        // one function taking the sameness test as an argument. This caught a real
+        // duplicate: the first version of computeEventStandings grew its own rank loop.
+        assert.equal((eng.match(/r\.rank = idx \+ 1;/g) || []).length, 1,
+            'the competition rank pass must exist exactly once');
+        assert.equal((eng.match(/function rankRows/g) || []).length, 1,
+            'one sort-and-rank implementation');
+        assert.equal((eng.match(/rows\.sort\(/g) || []).length, 1,
+            'and exactly one sort, inside it');
+        assert.match(eng, /rankRows\(rows, compare, samePosition\)/, 'the round board uses it');
+        assert.match(eng, /rankRows\(rows,\n/, 'the event board uses it too');
         assert.equal((eng.match(/function computeTournamentLeaderboard/g) || []).length, 1);
         // And the fork is where it should be.
         assert.match(eng, /function normalizeLeaderboardEntries\(data\)[\s\S]{0,200}isPlayerModel\(data\)/);
@@ -494,13 +514,21 @@ describe('FLIGHTS AND GROUPS — attached to the right thing', () => {
                            t.indexOf('function assignPlayerToGroup') + 900);
         assert.match(fn, /\.filter\(x => x !== pid\)/,
             'the golfer must be removed from every other group in the same write');
-        assert.match(fn, /scoringGroups`\)\.update\(updates\)/,
+        assert.match(fn, /db\.ref\(groupsPath\(\)\)\.update\(updates\)/,
             'one atomic update, so a golfer is never briefly in two groups');
+        // groupsPath() is the single place that decides whether groups live on the
+        // event or on a round, so no caller has to branch on the model - and a
+        // multi-round event cannot accidentally write Saturday's draw onto Sunday.
+        const t2 = codeOf('tournament.html');
+        assert.match(t2, /function groupsPath\(\)[\s\S]{0,300}rounds\/\$\{editingRoundId\}\/scoringGroups/);
+        assert.match(t2, /function groupsPath\(\)[\s\S]{0,300}tournaments\/\$\{currentCode\}\/scoringGroups/,
+            'a single-round event keeps groups exactly where they were');
     });
 
     test('25. the starting hole belongs to the scoring group', () => {
         const t = codeOf('tournament.html');
-        assert.match(t, /scoringGroups\/\$\{gid\}\/startingHole/);
+        assert.match(t, /\$\{groupsPath\(\)\}\/\$\{gid\}\/startingHole/,
+            'the starting hole is written on the group, wherever that group lives');
         assert.ok(!/players\/\$\{pid\}\/startingHole/.test(t),
             'a shotgun sends a group to a tee, not each golfer separately');
     });
@@ -600,6 +628,9 @@ describe('LEGACY TEAM EVENTS — unchanged in every respect', () => {
         // players, scoringGroups and flights all live under the existing tournaments
         // root - no new root was created.
         assert.match(codeOf('tournament.html'), /tournaments\/\$\{currentCode\}\/players\//);
-        assert.match(codeOf('tournament.html'), /tournaments\/\$\{currentCode\}\/scoringGroups\//);
+        assert.match(codeOf('tournament.html'), /tournaments\/\$\{currentCode\}\/scoringGroups/,
+            'groups still live under the existing tournaments root');
+        assert.match(codeOf('tournament.html'), /tournaments\/\$\{currentCode\}\/rounds\/\$\{rid\}/,
+            'and rounds do too - no new root was created');
     });
 });
