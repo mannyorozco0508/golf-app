@@ -14,6 +14,15 @@
          every single round - the try/catch turned it into "Couldn't total the money -
          check the Results tab", which is why the end of the round sent golfers away
          from the one screen that should have answered everything. -->
+    <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
+         decision a match makes, comes from these seven functions. They used to be
+         duplicated here and in four other places; this page now consumes the one
+         shared definition. Loaded ahead of the money and settlement engines,
+         because both call into it, and ahead of the inline block so nothing below
+         can shadow it. (Deliberately no engine filenames in this comment:
+         stack_action_test.js checks script order with a raw indexOf, and a comment
+         that names a file ahead of its real tag reads as the wrong order.) -->
+    <script src="handicap.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
@@ -1475,25 +1484,6 @@
     // overrides is a sparse object keyed by 0-based group index -> explicit size.
     // Any group without an override defaults to 4 (or whatever's left). This lets an
     // admin pin specific groups (e.g. two 3-somes) while the rest auto-adjust to the roster.
-    function parseHcp(hcpStr) {
-        if (!hcpStr) return 0;
-        const str = String(hcpStr).trim();
-        if (str.startsWith("+")) return -Math.abs(parseFloat(str.substring(1)));
-        return parseFloat(str) || 0;
-    }
-
-    function getStrokes(hcpIndex, numericHcp) {
-        if (numericHcp >= 0) {
-            let strokes = Math.floor(numericHcp / 18);
-            if (hcpIndex <= (numericHcp % 18)) strokes += 1;
-            return strokes;
-        } else {
-            const plusVal = Math.abs(numericHcp);
-            if (hcpIndex > (18 - plusVal)) return -1;
-            return 0;
-        }
-    }
-
     // ========================================================================
     // MATCH DOT CONTEXT — which match, if any, the handicap dots represent.
     // ========================================================================
@@ -5300,50 +5290,18 @@
     // hole gets one stroke per full 18, and the remainder falls on the lowest indexes.
     // rel 20 -> one everywhere plus a second on SI 1-2. rel 36 -> two everywhere.
     // rel 40 -> two everywhere plus a third on SI 1-4.
-    function allocateMatchStrokes(rel, hcpIndex) {
-        if (!(rel > 0)) return 0;
-        return Math.floor(rel / 18) + ((hcpIndex <= (rel % 18)) ? 1 : 0);
-    }
-
     // The one baseline for a match: the lowest parsed Playing Handicap among ALL
     // participants, both sides counted together. Which team a golfer is on is
     // irrelevant to this calculation, and player/team ORDER cannot change it because
     // a minimum is order-independent.
-    function matchHandicapBaseline(matchPlayers) {
-        var base = null;
-        (matchPlayers || []).forEach(function (p) {
-            var h = parseHcp(p.hcp);
-            if (base === null || h < base) base = h;
-        });
-        return base === null ? 0 : base;
-    }
-
     // playerId -> relative match handicap, SCOPED TO THIS MATCH ONLY. Never written
     // back onto the player record: the same golfer legitimately carries a different
     // relative handicap in a simultaneous match against different opponents.
-    function matchRelativeHandicaps(matchPlayers) {
-        var base = matchHandicapBaseline(matchPlayers);
-        var out = {};
-        (matchPlayers || []).forEach(function (p) {
-            out[String(p.id)] = parseHcp(p.hcp) - base;
-        });
-        return out;
-    }
-
     // Which formats are genuinely HOLE-BY-HOLE MATCH PLAY played with individual
     // balls. Scramble is excluded ON PURPOSE: it is a single-ball team format, so
     // there is no individual ball for an individual relative stroke to attach to. It
     // keeps its existing behaviour exactly. A 1v1 is always treated as a match
     // regardless of the format label, which preserves the committed singles contract.
-    function isRelativeMatchFormat(gameFormat) {
-        return ['match', 'nassau', 'bestball', 'ryder'].indexOf(gameFormat) !== -1;
-    }
-
-    function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
-        // A two-player baseline is just the all-player baseline over a field of two.
-        return allocateMatchStrokes(ownHcp - Math.min(ownHcp, oppHcp), hcpIndex);
-    }
-
     function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
     // THREE-STAKE NASSAU (authorized change).
     //
