@@ -98,7 +98,13 @@
 // split outputs generate their own workers with their own keys - consumer-v20-split
 // and tournament-v20-split - so all three cache identities are distinct and none
 // can evict another.
-const CACHE_VERSION = 'golfapp-v20-product-links';
+// Moved to v21 for the product boundary wave. admin.html lost the Tournament home
+// tile and gained a deliberate outbound route; trip.html tells the truth about what
+// its button does; tournament-scorecard.html gained identity and save-state feedback;
+// tournament.html now writes both relationship pointers. All four are precached shell
+// files, so an installed PWA on v20 would keep showing a Tournament tile this product
+// no longer owns. Shell MEMBERSHIP is unchanged - no file was added or removed.
+const CACHE_VERSION = 'golfapp-v21-product-boundary';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
