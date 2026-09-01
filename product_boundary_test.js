@@ -226,8 +226,18 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
 
         assert.ok(w.some(p => /scores\/team\$\{myTeamNum\}_h/.test(p)),
             'the legacy scramble write must survive');
-        assert.ok(w.some(p => /scores\/\$\{playerId\}_h/.test(p)),
+        // The individual write now goes through scorePath(), which puts the ROUND in
+        // the path for a multi-round event and leaves a single-round event exactly
+        // where it was. The key shape is unchanged either way, which is the point -
+        // round identity lives in the path so a cross-round write is structurally
+        // impossible rather than merely validated against.
+        const card = codeOf('tournament-scorecard.html');
+        assert.match(card, /db\.ref\(scorePath\(`\$\{playerId\}_h\$\{holeNum\}`\)\)/,
             'the individual write is player-keyed');
+        assert.match(card, /rounds\/\$\{myRoundId\}\/scores\/\$\{suffix\}/,
+            'a multi-round score is written under its round');
+        assert.match(card, /tournaments\/\$\{currentCode\}\/scores\/\$\{suffix\}/,
+            'and a single-round score stays exactly where it was');
         // savePlayerHoleScore builds its path into a variable before db.ref(), so the
         // call-site scan above cannot see it. Asserted directly rather than left out -
         // it is the per-player leg of legacy shamble and best ball scoring.
