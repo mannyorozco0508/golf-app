@@ -16,37 +16,78 @@ const path = require('path');
 const ROOT = __dirname;
 const DEST = path.join(ROOT, 'www', 'app');
 
-// Exactly the production runtime files the app needs - no tests, no fallback/archive
-// copies, no dev tooling, no Firebase CLI config, no Node package files. Fallback copies
-// and the two legacy unauthenticated admin panels are deliberately excluded from the
-// packaged app bundle even though they still exist in the web repo for now.
+// ============================================================================
+// PRODUCT SHELL DECLARATIONS
 //
-// EVERY SHARED ENGINE MUST BE LISTED HERE. The pages load these as plain <script src>
-// globals, and the call sites guard them with `typeof fn === 'function'`. That means an
-// engine missing from this list does not crash the native app - it silently does nothing.
-// The Money Pool is the worst case: without pool-engine.js the pot computes as zero and
-// vanishes from the scorecard banner, the receipt and the settlement totals, with no
-// error anywhere. bundle_manifest_test.js now enforces that any page shipped here also
-// gets every script that page loads, so this list cannot quietly fall behind again.
-const FILES_TO_SYNC = [
-    // Pages
-    'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
-    'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
-    'tournament.html', 'tournament-scorecard.html', 'instructions.html', 'shared.html',
-    // Shared engines - see the note above before removing any of these
-    'action-model.js', 'bet-strip.js', 'course-data.js', 'grouping.js',
-    'handicap.js', 'hole-events.js',
-    'money-engine.js', 'pool-engine.js', 'score-marks.js', 'settlement-engine.js',
-    'tournament-engine.js', 'pwa-boot.js',
-    // Firebase SDK, vendored so the wrapped app carries no runtime CDN dependency.
-    // Flat repo-root filenames deliberately: the copy loop below writes into a flat
-    // DEST, and the bundle verifier skips any script path containing '/', so a
-    // vendor/ subdirectory would both break the copy and silently exempt these two
-    // from verification. App first, then database - that is their load order.
-    'firebase-app-compat.js', 'firebase-database-compat.js',
-    // Shell assets
+// The app is heading for two deployments - a golfer-facing Consumer product and
+// an organizer-facing Tournament product - out of one repository and one Firebase
+// project. These three lists declare which product OWNS each shipped file.
+//
+// THEY CHANGE NOTHING TODAY. FILES_TO_SYNC below is their union, so the bundle,
+// the service worker, every route and every URL behave exactly as before. This is
+// classification, so that when the deployments do split, ownership is something
+// that was decided deliberately here rather than invented under time pressure by
+// whoever is holding the build script.
+//
+// THE RULE FOR SHARED: a file is shared when divergence between the two products
+// would be a correctness or infrastructure problem - not merely because both
+// currently reference it. Everything in SHARED_SHELL is either a golf rule both
+// products must agree on, or runtime plumbing neither can boot without.
+//
+// A file belongs to exactly one list. A test asserts that, and asserts the union
+// still matches what actually ships.
+// ============================================================================
+
+// Golf rules both products must agree on, plus the runtime both must boot with.
+// grouping.js decides who is in which group; handicap.js decides every stroke a
+// golfer receives; payouts.js decides how a tied place is paid; course-data.js and
+// the global_courses schema behind it are one directory both products read and
+// write. Two answers to any of those is a correctness bug, not a style choice.
+const SHARED_SHELL = [
+    'grouping.js', 'handicap.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, the
+    // worker and manifest themselves, and the icons.
+    'firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
     'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
 ];
+
+// The golfer-facing product: quick rounds, boys trips, side matches, presses,
+// settlement, history. money-engine.js, settlement-engine.js and pool-engine.js
+// are here rather than in SHARED because wagering between golfers is Consumer's
+// domain - Tournament pays places from an entry fee and has never loaded them.
+const CONSUMER_SHELL = [
+    'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
+    'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
+    'instructions.html', 'shared.html',
+    'action-model.js', 'bet-strip.js', 'hole-events.js',
+    'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
+];
+
+// The organizer-facing product. tournament-scorecard.html stays HERE and not in
+// Consumer: it is the install-free scoring link a competitor opens, which makes it
+// TournamentApp's player surface rather than a Consumer page that happens to be
+// small. Moving it would hand Consumer a screen it has no reason to own.
+const TOURNAMENT_SHELL = [
+    'tournament.html', 'tournament-scorecard.html', 'tournament-engine.js',
+];
+
+// Exactly the production runtime files the app needs - no tests, no fallback/archive
+// copies, no dev tooling, no Firebase CLI config, no Node package files.
+//
+// DERIVED FROM THE DECLARATIONS ABOVE, not maintained separately, so the two can
+// never disagree about what ships. Today both products deploy together, so the
+// bundle is the union; when they split, B8 builds two outputs from the same three
+// lists rather than inventing ownership from scratch.
+//
+// EVERY SHARED ENGINE MUST BE DECLARED. The pages load these as plain <script src>
+// globals, and the call sites guard them with `typeof fn === 'function'`. That means
+// an engine missing from these lists does not crash the native app - it silently
+// does nothing. The Money Pool is the worst case: without pool-engine.js the pot
+// computes as zero and vanishes from the scorecard banner, the receipt and the
+// settlement totals, with no error anywhere. bundle_manifest_test.js enforces that
+// any page shipped here also gets every script that page loads.
+const FILES_TO_SYNC = SHARED_SHELL.concat(CONSUMER_SHELL).concat(TOURNAMENT_SHELL);
+
 
 // Wiped before every sync, not merged into. www/app/ is generated output, so a file
 // left behind from an earlier run is indistinguishable from a file that is supposed to
