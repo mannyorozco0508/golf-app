@@ -34,7 +34,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const adm = () => read('admin.html');
-const DEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const TWO = [{ id:101, name:'Marty', hcp:'0' }, { id:102, name:'Manny', hcp:'0' }];
 
@@ -42,7 +42,7 @@ function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     // Top-level `function` declarations land on the context, but reading them
     // through the sandbox object misses any that were declared with const/let.
@@ -328,7 +328,7 @@ describe('COMPATIBILITY CODE WAS NOT TOUCHED', () => {
     });
 
     test('the engines are untouched by this batch', () => {
-        ['money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
+        ['handicap.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('nassau-settings'),
                 f + ' never knew about the wizard panel'));
     });
