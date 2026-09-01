@@ -121,7 +121,7 @@ describe('FLIGHT MODEL — stable ids, organizer names', () => {
         // assigned to it would silently fall out of the flight.
         const src = codeOf('tournament.html');
         assert.match(src, /function newFlightId\(\)/);
-        assert.match(src, /'f' \+ Date\.now\(\)\.toString\(36\)/,
+        assert.match(src, /return prefix \+ Date\.now\(\)\.toString\(36\)/,
             'the id must be generated, not built from the display name');
         assert.ok(!/flights\/\$\{name\}|flights\/\$\{.*Name\}/.test(src),
             'a flight must never be keyed by its display name');
@@ -136,6 +136,10 @@ describe('FLIGHT MODEL — stable ids, organizer names', () => {
                                  src.indexOf('function createFlight') + 1400);
         assert.match(create, /const fid = newFlightId\(\);/,
             'the id must be minted, not taken from the form');
+        // newFlightId now delegates to the shared minter that players and groups use,
+        // so the guarantee it must carry is delegation - not a particular expression.
+        assert.match(src, /function newFlightId\(\) \{ return mintId\('f'\); \}/,
+            'flight ids come from the one generator, not a second scheme');
         assert.ok(!/(const|let|var)\s+fid\s*=\s*(name|trimmed|input)/.test(create),
             'fid must never be assigned from the display name or the input');
     });
@@ -146,14 +150,11 @@ describe('FLIGHT MODEL — stable ids, organizer names', () => {
         // Sliced by brace matching rather than a fixed character count - a fixed slice
         // cut the function mid-expression and threw a syntax error that looked like a
         // production fault.
+        // Pulls in the shared minter and its counter, since newFlightId delegates.
         const src = codeOf('tournament.html');
-        const start = src.indexOf('function newFlightId');
-        let depth = 0, end = src.indexOf('{', start);
-        for (let i = end; i < src.length; i++) {
-            if (src[i] === '{') depth++;
-            else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-        }
-        const fn = new Function(src.slice(start, end + 1) + '; return newFlightId;')();
+        const start = src.indexOf('let idSeq = 0;');
+        const fn = new Function(src.slice(start, src.indexOf('function newGroupId'))
+            + " function newFlightId() { return mintId('f'); } return newFlightId;")();
         const ids = new Set(Array.from({ length: 200 }, () => fn()));
         assert.equal(ids.size, 200, 'ids must not collide');
         ids.forEach(id => assert.match(id, /^f[a-z0-9]+$/,
@@ -401,10 +402,15 @@ describe('LEADERBOARD — the flight view filters, it does not re-rank', () => {
         // A copied sort for flights would be a second definition of "tied".
         const eng = codeOf('tournament-engine.js');
         assert.equal((eng.match(/function computeTournamentLeaderboard/g) || []).length, 1);
-        assert.equal((eng.match(/rows\.sort\(/g) || []).length, 1,
-            'the field is sorted in exactly one place');
+        // A second SORT appeared when events learned to aggregate rounds, and it is
+        // legitimate - an event orders by completeness before score. The tie-and-rank
+        // loop is what must stay single, and it does.
         assert.equal((eng.match(/r\.rank = idx \+ 1;/g) || []).length, 1,
             'ranks are assigned in exactly one place');
+        assert.equal((eng.match(/function rankRows/g) || []).length, 1,
+            'one definition of what counts as tied');
+        assert.equal((eng.match(/rows\.sort\(/g) || []).length, 1,
+            'and one sort, inside it - a round, a flight and an event share both');
         // And the pages must not rank anything themselves.
         ['tournament.html', 'tournament-scorecard.html'].forEach(p =>
             assert.ok(!/function computeTournamentLeaderboard/.test(codeOf(p)),
@@ -413,9 +419,16 @@ describe('LEADERBOARD — the flight view filters, it does not re-rank', () => {
 
     test('the flight filter runs before ranking, not after', () => {
         const eng = codeOf('tournament-engine.js');
-        const fn = eng.slice(eng.indexOf('function computeTournamentLeaderboard'));
-        assert.ok(fn.indexOf('teamsInFlight(teams, flightId)') < fn.indexOf('rows.sort('),
-            'filtering after ranking would leave gaps in the flight positions');
+        // The sort now lives in the shared rankRows() helper, so the ordering is
+        // asserted at the call site instead: the filter is applied to the rows handed
+        // IN, which means it can only run first. Filtering after ranking would leave
+        // gaps in the flight positions.
+        const fn = eng.slice(eng.indexOf('function computeTournamentLeaderboard'),
+                             eng.indexOf('function computeTournamentPayouts'));
+        assert.match(fn, /rankRows\(\s*\n?\s*normalizeLeaderboardEntries\(data\)\.filter\(r => !flightId \|\| r\.flightId === flightId\)/,
+            'the flight filter must be applied to the rows before they reach the ranker');
+        assert.ok(!/rows\.sort\(/.test(fn),
+            'the leaderboard must not sort for itself - one ranking path only');
     });
 
     test('an empty flight ranks nothing rather than throwing', () => {
@@ -444,12 +457,28 @@ describe('PAYOUTS — canonical, and deliberately still overall-only', () => {
         // which is a prize policy nobody has specified - per-flight money needs its
         // own pot per flight.
         const src = codeOf('tournament.html');
-        const fn = src.slice(src.indexOf('function renderLeaderboard()'),
-                             src.indexOf('function renderLeaderboard()') + 1400);
+        // Brace-matched: renderLeaderboard grew a multi-round branch and a fixed
+        // window stopped reaching the single-round assignment.
+        const start = src.indexOf('function renderLeaderboard()');
+        let depth = 0, end = src.indexOf('{', start);
+        for (let i = end; i < src.length; i++) {
+            if (src[i] === '{') depth++;
+            else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        const fn = src.slice(start, end + 1);
+
+        // EVERY board caches the UNFILTERED field for the prize calculator - the
+        // single-round board, the round board and the combined board alike. Paying
+        // places from a filtered view would silently mean "3rd in the B flight takes
+        // third prize", which is a prize policy nobody has specified.
         assert.match(fn, /cachedLeaderboardRows = computeTournamentLeaderboard\(currentData\);/,
-            'the payout cache must be the unfiltered field');
+            'the single-round payout cache must be the unfiltered field');
+        assert.match(fn, /cachedLeaderboardRows = computeRoundLeaderboard\(currentData, viewing\);/,
+            'a round board caches its round unfiltered');
+        assert.match(fn, /cachedLeaderboardRows = computeEventStandings\(currentData\)\.rows/,
+            'the combined board caches the whole field');
         assert.ok(!/cachedLeaderboardRows = rows;/.test(fn),
-            'the payout cache must not follow the flight view');
+            'no board may cache the flight-filtered rows');
     });
 
     test('and the payout answer does not move when a flight is being viewed', () => {
@@ -497,7 +526,8 @@ describe('SCOPE — the deferred player model has not leaked in', () => {
         assert.match(card, /urlParams\.get\('team'\)/, 'legacy team scoring is unchanged');
         assert.match(card, /urlParams\.get\('group'\)/, 'individual scoring is group-scoped');
         const t = codeOf('tournament.html');
-        assert.match(t, /scoringGroups\/\$\{gid\}/);
+        assert.match(t, /\$\{groupsPath\(\)\}\/\$\{gid\}/,
+            'individual events own scoring groups, wherever the model puts them');
         assert.ok(!/scoringGroups/.test(codeOf('tournament-engine.js').slice(
             codeOf('tournament-engine.js').indexOf('function normalizeTeamEntries'),
             codeOf('tournament-engine.js').indexOf('function normalizePlayerEntries'))),
