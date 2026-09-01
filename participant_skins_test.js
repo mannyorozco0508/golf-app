@@ -376,9 +376,12 @@ describe('NET SKINS AND THE bet-strip HANDICAP BUG', () => {
     });
 
     test('handicap allocation itself was NOT changed', () => {
-        const me = fs.readFileSync(path.join(REPO_ROOT, 'money-engine.js'), 'utf8');
-        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(me));
-        assert.ok(/Math\.floor\(numericHcp \/ 18\)/.test(me));
+        const hcp = fs.readFileSync(path.join(REPO_ROOT, 'handicap.js'), 'utf8');
+        // THE RULE DID NOT CHANGE, ITS HOME DID. getStrokes moved from
+        // money-engine.js into handicap.js in the shared-core extraction; the
+        // allocation itself is byte-identical and this still asserts it.
+        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(hcp));
+        assert.ok(/Math\.floor\(numericHcp \/ 18\)/.test(hcp));
     });
 });
 
