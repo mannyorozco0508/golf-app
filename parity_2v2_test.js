@@ -1,65 +1,54 @@
 // ============================================================================
-// 2v2 STROKE SIDE MATCHES — PARITY TRIPWIRE AND REACHABILITY PROOF
+// 2v2 STROKE SIDE MATCHES — CORRECTNESS PROTECTION
 //
-// BATCH 1. TESTS ONLY. This file changes no production behaviour and fixes
-// nothing. It exists to make the CURRENT state of the repo permanent and
-// visible before anything is repaired.
-//
-// ---------------------------------------------------------------------------
-// WHAT IS WRONG TODAY
-// ---------------------------------------------------------------------------
-//
-// settlement-engine.js supports 2v2 stroke side matches. calculateHoleBetEngine
-// and calculateOverallBetEngine each resolve a SIDE from config.sideA/sideB and
-// score it best ball through sideHoleScore(). The comment at the top of
-// buildSideMatchReceipts' stroke branch calls this out as a regression fix: the
-// engine used to receive only [p1, p2], so a 2v2 stroke match settled two
-// golfers and silently dropped the other two - money that was not zero-sum.
-//
-// The page-local copies of those two engines in sidematches.html and stats.html
-// never received that fix. They read p1/p2 only and ignore config.sideA/sideB
-// entirely. So on a 2v2 stroke side match:
-//
-//     the Receipt pays out            (settlement-engine.js)
-//     the Matches tab shows nothing   (sidematches.html)
-//     the Final Scorecard shows nothing (stats.html)
+// BATCH 1 wrote this file to PIN a defect. BATCH 2 fixed half of it, and the
+// assertions moved with the code rather than being deleted.
 //
 // ---------------------------------------------------------------------------
-// WHY THAT IS NOT MERELY THEORETICAL
+// WHERE THINGS STAND NOW
 // ---------------------------------------------------------------------------
 //
-// pickPlayerForSide() in sidematches.html caps a stroke match at one player per
-// side (maxPerSide). That cap looks like it prevents the divergence from ever
-// being reached. It does not, for two reasons proved behaviourally below:
+//     settlement-engine.js   CANONICAL. Resolves each side from
+//                            config.sideA/sideB and scores it best ball.
 //
-//   1. The cap lives in the PICKER only. saveSideMatch() validates that the two
-//      sides are equal and no larger than two, and never re-applies the
-//      stroke-specific limit at the write boundary.
+//     sidematches.html       CANONICAL CONSUMER. Loads settlement-engine.js and
+//                            owns no stroke-engine copy at all. Batch 2.
 //
-//   2. sidematchPickState is cleared in exactly one place - openSideMatchModal().
-//      Changing the format dropdown does not clear it. So picking 2v2 while the
-//      default Match Play format allows it, then switching to Stroke Play Bet,
-//      carries a 2v2 selection into a stroke save.
-//
-// The product also INTENDS 2v2 stroke to work: updateSideMatchPickerFeedback()
-// states that the engine takes the whole side and scores it best ball and that
-// settlement splits the stake evenly between teammates. maxPerSide contradicts
-// that intent rather than protecting it.
+//     stats.html             REMAINING DIVERGENT SHADOW. Still carries its own
+//                            p1/p2-only copies. Guarded below until Batch 3.
 //
 // ---------------------------------------------------------------------------
-// THE DEFECT-PINNING ASSERTIONS
+// WHAT WAS WRONG, AND WHAT BATCH 2 DID ABOUT IT
 // ---------------------------------------------------------------------------
 //
-// Several tests below assert that the canonical engine and a page copy
-// DISAGREE. Those are marked:
+// settlement-engine.js resolves a SIDE through sideHoleScore(); the copies that
+// used to live in sidematches.html and stats.html read p1/p2 and ignore
+// config.sideA/sideB entirely. On a 2v2 stroke match that meant the Receipt paid
+// out while the Matches tab that created the match showed ALL SQUARE and $0.
 //
-//     KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 2
+// Batch 1 proved that is reachable today: pickPlayerForSide() caps a stroke match
+// at one golfer per side, but the cap lives in the PICKER only, sidematchPickState
+// is cleared solely by openSideMatchModal(), and saveSideMatch() never re-applies
+// the stroke-specific limit at the write boundary. Pick 2v2 under Match Play,
+// switch the format, save.
 //
-// They document a defect, not a desired state. When Batch 2 teaches
-// sidematches.html (and later stats.html) to use the canonical engines, those
-// assertions MUST fail, and whoever does that work MUST rewrite them from
-// "these disagree" to "these agree". That failure is the point. Do not delete
-// or weaken an assertion to make a batch pass.
+// Batch 2 deleted sidematches.html's copies, loaded settlement-engine.js, passed
+// the real sides through, and corrected the five display sites that assumed one
+// golfer per side. The picker cap is deliberately UNTOUCHED - that is Batch 2b.
+//
+// ---------------------------------------------------------------------------
+// THE DEFECT-PINNING ASSERTIONS THAT REMAIN
+// ---------------------------------------------------------------------------
+//
+// The stats.html tests still assert that canonical and page DISAGREE, marked:
+//
+//     KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3
+//
+// They document a defect, not a desired state. When stats.html moves to the
+// canonical engine those assertions MUST fail, and whoever does that work MUST
+// rewrite them from "these disagree" to "these agree" - exactly as the
+// sidematches.html block below was rewritten. That failure is the point. Do not
+// delete or weaken an assertion to make a batch pass.
 //
 // ---------------------------------------------------------------------------
 // HARNESS HONESTY
@@ -77,19 +66,18 @@
 //     is normalised through plain() - the same JSON round-trip
 //     money_parity_test.js uses.
 //
-//   * Each page is loaded in its own realm with the dependency list that page
-//     actually carries in its <script src> tags - action-model.js for both
-//     sidematches.html and stats.html. Neither page loads money-engine.js or
-//     settlement-engine.js in production, and neither is given them here.
+//   * Each page is loaded with the dependency list that page actually carries in
+//     its <script src> tags. sidematches.html gets action-model.js AND
+//     settlement-engine.js because it really loads both now; stats.html gets
+//     action-model.js alone because that is still all it loads.
 //
-//   * The realms are proved distinct before anything is compared, so a
-//     collapsed harness cannot make two copies agree by accident.
+//   * The realms are proved distinct before anything is compared, so a collapsed
+//     harness cannot make two implementations agree by accident.
 //
-//   * The reachability proof EXECUTES saveSideMatch() and captures the Firebase
-//     write. It is not a regex for a missing validation line. To prove the
-//     mini-DOM harness is not silently inert, a paired test shows the SAME
-//     picker function correctly REFUSING a second player when stroke is chosen
-//     first. If the harness were dead, that refusal could not be observed.
+//   * The reachability, display and press-start proofs EXECUTE production
+//     functions and read what they produced - the saved Firebase write, the
+//     rendered card HTML, the onclick the press input emits. None of them is a
+//     regex standing in for behaviour.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -117,11 +105,15 @@ function engineRealm() {
     return sb;
 }
 
-// PRODUCTION DEPENDENCY LISTS, not convenient ones. Both pages load exactly one
-// shared engine file, and their inline copies of the stroke engines are the only
-// implementations those pages have at runtime.
+// PRODUCTION DEPENDENCY LISTS, not convenient ones.
+//
+// sidematches.html gained a real <script src="settlement-engine.js"> in Batch 2,
+// so the list below changed with the page. stats.html still loads action-model.js
+// alone, and its inline copies remain the only stroke engines it has at runtime.
+// A test asserts each list against the page's own markup, so neither can quietly
+// stop describing production.
 const PAGE_DEPS = {
-    'sidematches.html': ['action-model.js'],
+    'sidematches.html': ['action-model.js', 'settlement-engine.js'],
     'stats.html': ['action-model.js'],
 };
 
@@ -136,8 +128,14 @@ function realmFor(name) {
 }
 
 const CANONICAL = 'settlement-engine.js';
-const PAGE_COPIES = ['sidematches.html', 'stats.html'];
-const ALL_THREE = [CANONICAL].concat(PAGE_COPIES);
+// Pages that still own a stroke-engine copy of their own. sidematches.html left
+// this list in Batch 2; stats.html is the last member.
+const PAGE_COPIES = ['stats.html'];
+// Every realm whose stroke engines must agree. sidematches.html is here not as an
+// independent implementation but as the CONSUMER of the canonical one - running it
+// proves the page ends up with the right function at runtime, which source text
+// alone cannot show.
+const ALL_REALMS = [CANONICAL, 'sidematches.html'].concat(PAGE_COPIES);
 
 const plain = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
 
@@ -216,60 +214,111 @@ const callHole = (realm, cfg, scores, presses) =>
 // three separate loads of three separate implementations.
 // ===========================================================================
 
-describe('HARNESS INTEGRITY — three genuinely separate implementations', () => {
+describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
 
-    test('all three realms expose both stroke engines', () => {
-        ALL_THREE.forEach(name => {
+    test('every realm exposes both stroke engines', () => {
+        ALL_REALMS.forEach(name => {
             const r = realmFor(name);
             assert.equal(typeof r.calculateOverallBetEngine, 'function',
-                name + ' should define calculateOverallBetEngine');
+                name + ' should expose calculateOverallBetEngine');
             assert.equal(typeof r.calculateHoleBetEngine, 'function',
-                name + ' should define calculateHoleBetEngine');
+                name + ' should expose calculateHoleBetEngine');
         });
     });
 
-    test('the three copies are distinct function objects, not one shared realm', () => {
-        const fns = ALL_THREE.map(n => realmFor(n).calculateOverallBetEngine);
-        assert.notEqual(fns[0], fns[1]);
-        assert.notEqual(fns[0], fns[2]);
-        assert.notEqual(fns[1], fns[2]);
+    test('the dependency lists match what each page actually loads', () => {
+        // Fidelity, checked against the pages themselves rather than trusted. If a
+        // page starts or stops loading an engine and this list is not updated, the
+        // realm stops representing production and every comparison below softens
+        // into an opinion.
+        const loads = (page, src) => new RegExp('<script src="' + src.replace('.', '\\.') + '">')
+            .test(fs.readFileSync(path.join(REPO_ROOT, page), 'utf8'));
+
+        assert.ok(loads('sidematches.html', 'settlement-engine.js'),
+            'sidematches.html must load the canonical engine');
+        assert.deepEqual(PAGE_DEPS['sidematches.html'], ['action-model.js', 'settlement-engine.js']);
+
+        assert.ok(!loads('stats.html', 'settlement-engine.js'),
+            'stats.html does not load the canonical engine yet - if it now does, this file needs updating');
+        assert.deepEqual(PAGE_DEPS['stats.html'], ['action-model.js']);
     });
 
-    test('the page realms were NOT given money-engine.js or settlement-engine.js', () => {
-        // Fidelity check. sidematches.html and stats.html load exactly one shared
-        // engine file in production - action-model.js. If this harness quietly
-        // handed them settlement-engine.js, the canonical implementation would be
-        // loaded first and then SHADOWED by the page's own inline copy, which
-        // happens to produce the same function identity - but the realm would no
-        // longer represent what those pages actually ship.
-        PAGE_COPIES.forEach(page => {
-            assert.deepEqual(PAGE_DEPS[page], ['action-model.js'],
-                page + ' must be loaded with its real dependency list');
-            const r = realmFor(page);
-            assert.equal(typeof r.computeCombinedNetTotals, 'undefined',
-                page + ' does not load settlement-engine.js in production and must not here');
-            assert.equal(typeof r.computeRoundMoneyByPlayer, 'undefined',
-                page + ' does not load money-engine.js in production and must not here');
+    test('without the canonical engine the page FAILS LOUDLY, it does not compute zero', () => {
+        // The silent-failure class bundle_manifest_test.js exists to catch: these are
+        // plain <script src> globals, and much of this codebase guards call sites with
+        // `typeof fn === 'function'`, which turns a missing engine into a quiet $0.
+        // The stroke branch calls the engines unguarded, so removing the script tag
+        // throws instead of paying nobody. Proved by loading the page WITHOUT the
+        // dependency and watching the render fail.
+        const crippled = loadHtmlInlineScript('sidematches.html', ['action-model.js']);
+        assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined',
+            'without the script tag the page should have no engine at all');
+
+        vm.runInContext(
+            'currentMode = "TESTCD";' +
+            'currentData = ' + JSON.stringify({
+                players: FOURSOME, courseData: cd18, scores: lopsided2v2Scores(),
+                sideMatches: { m1: { format: 'stroke', scoring: 'gross',
+                    teamAIds: ['1', '2'], teamBIds: ['3', '4'], startHole: 1, createdAt: 1,
+                    holeStake: 0, overallStake: OVERALL_STAKE, overallMode: 'stroke',
+                    segment: 'full', tieRule: 'carry' } },
+            }) + ';' +
+            'lockedGroup = null; hasGroupLock = false;',
+            crippled
+        );
+        assert.throws(() => crippled.renderSideMatches(),
+            'a missing engine must break the card, not silently report no money');
+    });
+
+    test('sidematches.html owns NO stroke-engine copy that could shadow the canonical one', () => {
+        // The load order is <script src> first, inline block second, and both are
+        // plain globals - so a re-declared copy inline would WIN and silently
+        // restore the divergence Batch 2 removed. Adding the script tag is not the
+        // fix on its own; the absence of these five is.
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
+        const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+        ['calculateHoleBetEngine', 'calculateOverallBetEngine', 'getRichHoleBetScore',
+         'segmentTotals', 'matchStatusFromHole'].forEach(fn => {
+            assert.ok(!new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
+                'sidematches.html must not redeclare ' + fn + ' - it would shadow the canonical engine');
         });
     });
 
-    test('the pages carry their OWN getStrokes/parseHcp, which is why they run at all', () => {
-        // Not a style note. These pages compute net scores without money-engine.js
-        // loaded, so the inline copies are load-bearing. If they ever disappear
-        // without the page gaining <script src="money-engine.js">, the stroke
-        // engines here would throw rather than diverge, and every assertion below
-        // would change meaning.
-        PAGE_COPIES.forEach(page => {
-            const r = realmFor(page);
-            assert.equal(typeof r.getStrokes, 'function', page + ' defines getStrokes');
-            assert.equal(typeof r.parseHcp, 'function', page + ' defines parseHcp');
-        });
+    test('the sidematches.html realm resolves to the canonical function at runtime', () => {
+        // Source text says the copies are gone. This says the page ACTUALLY ends up
+        // with the canonical behaviour once every script has run in browser order.
+        const scores = lopsided2v2Scores();
+        const viaPage = callOverall(realmFor('sidematches.html'), overallCfg2v2(), scores);
+        const viaEngine = callOverall(realmFor(CANONICAL), overallCfg2v2(), scores);
+        assert.deepEqual(viaPage, viaEngine,
+            'one implementation now - the whole object should match, not just the money');
+    });
+
+    test('stats.html is still a genuinely separate implementation', () => {
+        // The premise of every KNOWN DEFECT assertion that remains. If this ever
+        // collapses to one function object, those tests would be comparing a thing
+        // to itself and would pass for the wrong reason.
+        assert.notEqual(realmFor('stats.html').calculateOverallBetEngine,
+                        realmFor(CANONICAL).calculateOverallBetEngine);
+        const st = fs.readFileSync(path.join(REPO_ROOT, 'stats.html'), 'utf8');
+        assert.match(st, /function calculateOverallBetEngine\s*\(/,
+            'stats.html still owns a copy - when it stops, Batch 3 rewrites this file');
+    });
+
+    test('stats.html carries its OWN getStrokes/parseHcp, which is why it runs at all', () => {
+        // Load-bearing, not a style note: stats.html computes net scores without
+        // money-engine.js. If those vanish without the page gaining the engine, the
+        // copies below would throw rather than diverge, and every KNOWN DEFECT
+        // assertion would change meaning.
+        const r = realmFor('stats.html');
+        assert.equal(typeof r.getStrokes, 'function');
+        assert.equal(typeof r.parseHcp, 'function');
     });
 
     test('cross-realm results normalise to comparable plain objects', () => {
-        // Guards the specific trap: deepStrictEqual rejects a foreign prototype
-        // even when every value matches, so a naive comparison would report a
-        // difference that does not exist and mask the one that does.
+        // Guards the specific trap: deepStrictEqual rejects a foreign prototype even
+        // when every value matches, so a naive comparison would report a difference
+        // that does not exist and mask the one that does.
         const raw = realmFor(CANONICAL)
             .calculateOverallBetEngine([ALPHA_1, BRAVO_1], cd18, lopsided2v2Scores(), overallCfg2v2(), []);
         const norm = plain(raw);
@@ -363,44 +412,38 @@ describe('CANONICAL — settlement-engine.js honours config.sideA / config.sideB
 });
 
 // ===========================================================================
-// 2. KNOWN DEFECT — the page copies ignore the sides
+// 2. THE PAGE COPIES — one fixed, one still divergent
 // ===========================================================================
 
-describe('KNOWN DEFECT — sidematches.html is not 2v2-aware', () => {
+describe('FIXED IN BATCH 2 — sidematches.html now agrees with canonical on 2v2', () => {
+    // These three assertions were the KNOWN DEFECT block. They said "these disagree"
+    // and named Batch 2 as the batch that must reverse them. It did, so they were
+    // rewritten rather than removed - the protection survives, inverted.
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 2.
-    test('the overall bet reports ALL SQUARE on a match the receipt pays out', () => {
+    test('the overall bet pays the side that won, exactly as the Receipt does', () => {
         const page = callOverall(realmFor('sidematches.html'), overallCfg2v2(), lopsided2v2Scores());
         const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
 
-        // The page looked at Ann v Ben only. Both shot 5 every hole.
-        assert.equal(page.base.p1Total, 5 * 18);
+        // The page used to report 90 v 90, winner null, $0 - Ann v Ben only, all halved.
+        assert.equal(page.base.p1Total, 3 * 18);
         assert.equal(page.base.p2Total, 5 * 18);
-        assert.equal(page.base.winner, null);
-        assert.equal(page.base.p1Money, 0);
-
-        // And the canonical engine, on the SAME input, pays the stake.
-        assert.equal(canon.base.p1Money, OVERALL_STAKE);
-        assert.notEqual(page.base.p1Money, canon.base.p1Money,
-            'BATCH 2 MUST REVERSE THIS: rewrite to assert.equal once the page uses the canonical engine');
+        assert.equal(page.base.p1Money, OVERALL_STAKE);
+        assert.equal(page.base.p1Money, canon.base.p1Money);
+        assert.deepEqual(page.base, canon.base);
     });
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 2.
-    test('the per-hole bet reports nothing on eighteen holes the receipt pays', () => {
+    test('the per-hole bet pays every hole, exactly as the Receipt does', () => {
         const page = callHole(realmFor('sidematches.html'), holeCfg2v2(), lopsided2v2Scores());
         const canon = callHole(realmFor(CANONICAL), holeCfg2v2(), lopsided2v2Scores());
-
-        assert.equal(page.p1Money, 0);
-        assert.equal(canon.p1Money, HOLE_STAKE * 18);
-        assert.notEqual(page.p1Money, canon.p1Money,
-            'BATCH 2 MUST REVERSE THIS: rewrite to assert.equal once the page uses the canonical engine');
+        assert.equal(page.p1Money, HOLE_STAKE * 18);
+        assert.equal(page.p1Money, canon.p1Money);
     });
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 2.
-    test('the divergence is caused by the SIDES being ignored, nothing else', () => {
-        // Same page copy, same scores, sides stripped from the config. If the page
-        // agreed with itself with and without sides, it is provably not reading
-        // them - which isolates the cause rather than merely observing a mismatch.
+    test('the sides are genuinely being read, not coincidentally agreeing', () => {
+        // The inverse of the Batch 1 isolation test. Back then the page produced
+        // identical output with and without sideA/sideB, proving it never read them.
+        // Now the two MUST differ, or the sides are being ignored again and the
+        // agreement above would be luck rather than correctness.
         const withSides = callOverall(realmFor('sidematches.html'), overallCfg2v2(), lopsided2v2Scores());
 
         const bare = overallCfg2v2();
@@ -408,15 +451,25 @@ describe('KNOWN DEFECT — sidematches.html is not 2v2-aware', () => {
         delete bare.sideB;
         const withoutSides = callOverall(realmFor('sidematches.html'), bare, lopsided2v2Scores());
 
-        assert.deepEqual(withSides.base, withoutSides.base,
-            'sidematches.html produces identical output with and without sideA/sideB, ' +
-            'proving it never reads them');
+        assert.notDeepEqual(withSides.base, withoutSides.base,
+            'sidematches.html must read sideA/sideB - identical output either way means it does not');
+        assert.equal(withoutSides.base.p1Money, 0, 'and without sides it correctly falls back to 1v1');
+    });
+
+    test('a partner who has not posted holds the hole here too', () => {
+        // Best ball needs every golfer on the side before a hole can be decided.
+        // Proving the page inherits that rule, not merely the arithmetic.
+        const scores = lopsided2v2Scores();
+        cd18.forEach(h => { delete scores[`p${ALPHA_2.id}_h${h.hole}`]; });
+        const page = callOverall(realmFor('sidematches.html'), overallCfg2v2(), scores);
+        assert.equal(page.base.roundComplete, false);
+        assert.equal(page.base.p1Money, 0);
     });
 });
 
 describe('KNOWN DEFECT — stats.html is not 2v2-aware', () => {
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN A LATER BATCH.
+    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3.
     test('the Final Scorecard would show all square where the receipt pays out', () => {
         const page = callOverall(realmFor('stats.html'), overallCfg2v2(), lopsided2v2Scores());
         const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
@@ -424,23 +477,27 @@ describe('KNOWN DEFECT — stats.html is not 2v2-aware', () => {
         assert.equal(page.base.p1Money, 0);
         assert.equal(canon.base.p1Money, OVERALL_STAKE);
         assert.notEqual(page.base.p1Money, canon.base.p1Money,
-            'A LATER BATCH MUST REVERSE THIS: rewrite to assert.equal once stats.html uses the canonical engine');
+            'BATCH 3 MUST REVERSE THIS: rewrite to assert.equal once stats.html uses the canonical engine');
     });
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN A LATER BATCH.
+    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3.
     test('the per-hole bet also reports nothing', () => {
         const page = callHole(realmFor('stats.html'), holeCfg2v2(), lopsided2v2Scores());
         assert.equal(page.p1Money, 0);
         assert.notEqual(page.p1Money, HOLE_STAKE * 18,
-            'A LATER BATCH MUST REVERSE THIS');
+            'BATCH 3 MUST REVERSE THIS');
     });
 
-    test('the two page copies currently agree with EACH OTHER, and only with each other', () => {
-        // They are the same defect twice, not two different defects. Recording that
-        // now means a future batch that fixes one and forgets the other fails here.
+    test('stats.html is now the ONLY place this defect still lives', () => {
+        // Batch 1 recorded that both page copies shared one defect. One of them is
+        // fixed, so the useful statement changed: sidematches.html has crossed over
+        // and stats.html has not. If these two ever agree again it means either
+        // Batch 3 landed (rewrite this file) or sidematches.html regressed.
         const sm = callOverall(realmFor('sidematches.html'), overallCfg2v2(), lopsided2v2Scores());
         const st = callOverall(realmFor('stats.html'), overallCfg2v2(), lopsided2v2Scores());
-        assert.deepEqual(sm.base, st.base);
+        assert.notEqual(sm.base.p1Money, st.base.p1Money);
+        assert.equal(sm.base.p1Money, OVERALL_STAKE, 'sidematches.html is on the canonical engine');
+        assert.equal(st.base.p1Money, 0, 'stats.html is not');
     });
 });
 
@@ -567,9 +624,10 @@ describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI
         assert.equal(w.value.overallStake, OVERALL_STAKE);
     });
 
-    test('the record that gets saved is exactly the shape the divergent engines disagree about', () => {
-        // Closes the loop between reachability and divergence: the thing that can be
-        // written is the thing settlement pays and the Matches tab does not.
+    test('the record that gets saved is the shape Batch 2 taught the tab to settle', () => {
+        // Closes the loop between reachability and correctness. Batch 1 ended this
+        // test by showing the creating tab reported $0 on a match the Receipt paid.
+        // The write is unchanged - the tab now agrees with the Receipt about it.
         const { sb, writes, setField } = pageWithCapture();
         setField('sm-format', 'match');
         [ALPHA_1, ALPHA_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'a'));
@@ -597,16 +655,255 @@ describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI
         assert.equal(nets.reduce((s, v) => s + v.net, 0), 0);
         assert.ok(nets.some(v => v.net > 0), 'somebody should be owed money');
 
-        // ...while the page that created it reports nothing at all.
-        // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 2.
+        // ...and the tab that created it now reports the same wager.
         const pageView = callOverall(realmFor('sidematches.html'), overallCfg2v2(), scores);
-        assert.equal(pageView.base.p1Money, 0,
-            'BATCH 2 MUST REVERSE THIS: the tab that created the match currently shows no money for it');
+        assert.equal(pageView.base.p1Money, OVERALL_STAKE,
+            'the tab that created the match must show the money the Receipt pays');
+
+        // Same economic reality, stated in the two vocabularies: one side wins the
+        // whole stake, and settlement halves it between that side's two golfers.
+        const share = pageView.base.p1Money / 2;
+        nets.filter(v => v.net > 0).forEach(v => assert.equal(v.net, share));
     });
 });
 
 // ===========================================================================
-// 4. 1v1 REGRESSION LOCK
+// 4. RENDERED 2v2 CARD
+//
+// Money being right is half of it. Batch 1 found five places in the stroke card
+// that assumed one golfer per side, and the engine swap made one of them ACTIVELY
+// WRONG: b.winner used to be "Ann Alpha" and is now "Ann / Abe", so the old
+// .split(' ')[0] would have dropped the partner from a match she won with him.
+//
+// These tests run renderSideMatches() - the real production render - and read the
+// HTML it produced. No regex stands in for behaviour.
+// ===========================================================================
+
+describe('RENDERED 2v2 CARD — both sides, and money that matches the Receipt', () => {
+
+    // A page realm with a whole round loaded, rendered through production.
+    function renderRound(players, sideMatch, scores) {
+        const sb = loadHtmlInlineScript('sidematches.html', PAGE_DEPS['sidematches.html']);
+        vm.runInContext(
+            'currentMode = "TESTCD";' +
+            'currentData = ' + JSON.stringify({
+                players: players, courseData: cd18, scores: scores,
+                sideMatches: { m1: sideMatch },
+            }) + ';' +
+            'lockedGroup = null; hasGroupLock = false;',
+            sb
+        );
+        sb.renderSideMatches();
+        return { sb, html: sb.document.getElementById('sidematches-list').innerHTML || '' };
+    }
+
+    const SM_2V2 = {
+        format: 'stroke', scoring: 'gross',
+        teamAIds: ['1', '2'], teamBIds: ['3', '4'],
+        startHole: 1, createdAt: 1,
+        holeStake: 0, overallStake: OVERALL_STAKE,
+        overallMode: 'stroke', segment: 'full', tieRule: 'carry',
+    };
+
+    test('the render actually ran and produced a card', () => {
+        // Everything below reads this string. If the render silently no-oped, the
+        // assertions would be searching an empty page and passing on absence.
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        assert.ok(html.length > 500, 'renderSideMatches() should have produced a card');
+        assert.match(html, /side-match-card/);
+    });
+
+    test('renderSideMatches passes the WHOLE side to the engine', () => {
+        // The call-site guard. The engine-level tests above hand the config in
+        // themselves, so they cannot see whether the page builds it correctly.
+        // Strip sideA/sideB at the call site and the card falls back to Ann v Ben,
+        // which is all square - so this is the assertion that fails.
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
+        assert.equal(canon.base.p1Money, OVERALL_STAKE);
+        assert.ok(html.includes('+$' + canon.base.p1Money.toFixed(2)),
+            'the card must show the canonical 2v2 result, which means it passed both golfers per side');
+        assert.ok(!html.includes('Base bet tied'),
+            'a tied card means only the first golfer of each side reached the engine');
+    });
+
+    test('the header names BOTH golfers on BOTH sides', () => {
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const header = html.match(/<div class="side-match-players">([^<]*)<\/div>/);
+        assert.ok(header, 'the card should have a players header');
+        ['Ann', 'Abe', 'Ben', 'Bo'].forEach(name =>
+            assert.ok(header[1].includes(name), 'the header should name ' + name + ', got: ' + header[1]));
+    });
+
+    test('the winning SIDE is named in full — a 1v1-only winner render must fail here', () => {
+        // THE REGRESSION GUARD. b.winner is "Ann / Abe". Reintroducing
+        // winner.split(' ')[0] renders "Ann won the base bet" and this fails.
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
+
+        assert.ok(html.includes(canon.base.winner + ' won the base bet'),
+            'the card should name the whole winning side, got winner: ' + canon.base.winner);
+        assert.ok(!/(^|[^/\w])Ann won the base bet/.test(html),
+            'a truncated winner name means the partner was dropped from a match she won');
+    });
+
+    test('the money row reports the SIDE, and the per-golfer row matches settlement exactly', () => {
+        const scores = lopsided2v2Scores();
+        const { html } = renderRound(FOURSOME, SM_2V2, scores);
+
+        // The side's position.
+        assert.ok(html.includes('+$' + OVERALL_STAKE.toFixed(2)),
+            'the side that won should show the whole stake');
+
+        // What each golfer actually settles for, taken from canonical settlement
+        // rather than recomputed here.
+        const data = { gameFormat: 'stroke', players: FOURSOME, courseData: cd18,
+                       scores: scores, sideMatches: { m1: SM_2V2 } };
+        const result = plain(realmFor(CANONICAL).computeCombinedNetTotals(data, cd18, scores));
+
+        assert.ok(html.includes('Per golfer:'), 'a team match should break the side total down per golfer');
+        Object.values(result.netByName).forEach(v => {
+            const first = v.name.split(' ')[0];
+            const amount = v.net > 0
+                ? '+$' + v.net.toFixed(2)
+                : '-$' + Math.abs(v.net).toFixed(2);
+            assert.ok(html.includes(first) && html.includes(amount),
+                'the card should show ' + first + ' at ' + amount + ' — the same figure the Receipt pays');
+        });
+    });
+
+    test('all four golfers appear in the mini scorecard', () => {
+        // Best ball means a partner's score can decide a hole, so a verify-scores card
+        // showing two of the four cannot be used to check the money.
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const card = html.slice(html.indexOf('sm-scorecard-body'));
+        ['Ann', 'Abe', 'Ben', 'Bo'].forEach(name =>
+            assert.ok(card.includes('sm-row-label">' + name),
+                name + ' should have a row in the mini scorecard'));
+    });
+
+    test('the page names each side the way the engine does', () => {
+        // The card derives sideAName/sideBName for the per-hole row, which the engine
+        // returns no names for. This pins that convention to base.nameA/nameB so one
+        // card cannot label the same wager two different ways.
+        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
+        assert.ok(html.includes(canon.base.nameA), 'side A should be named as the engine names it');
+        assert.ok(html.includes(canon.base.nameB), 'side B should be named as the engine names it');
+    });
+
+    test('a 1v1 card shows NO per-golfer breakdown, because there is nothing to split', () => {
+        const solo = [ALPHA_1, BRAVO_1];
+        const sm1v1 = Object.assign({}, SM_2V2, { teamAIds: ['1'], teamBIds: ['3'] });
+        const scores = {};
+        cd18.forEach(h => {
+            scores[`p${ALPHA_1.id}_h${h.hole}`] = (h.hole <= 2) ? 4 : 5;
+            scores[`p${BRAVO_1.id}_h${h.hole}`] = 5;
+        });
+        const { html } = renderRound(solo, sm1v1, scores);
+        assert.ok(!html.includes('Per golfer:'),
+            'a 1v1 card must be untouched - the split row is for team matches only');
+        assert.ok(html.includes('Ann') && html.includes('Ben'));
+    });
+});
+
+// ===========================================================================
+// 5. PRESS START HOLE
+//
+// Where a press begins is money. getLastPlayedHoleForSideMatch used to look at
+// exactly two golfers, so on a 2v2 a press could start on a hole two of the four
+// had not played - sitting over holes the engine cannot score yet.
+//
+// The rule is the engine's own, not a new one: a hole counts once EVERY golfer in
+// the match has posted, which is what sideHoleScore() already requires.
+// ===========================================================================
+
+describe('PRESS START HOLE — every participant counts', () => {
+
+    function pressRealm(scores, sideMatch, players) {
+        const sb = loadHtmlInlineScript('sidematches.html', PAGE_DEPS['sidematches.html']);
+        vm.runInContext(
+            'currentMode = "TESTCD";' +
+            'currentData = ' + JSON.stringify({
+                players: players, courseData: cd18, scores: scores,
+                sideMatches: { m1: sideMatch },
+            }) + ';' +
+            'lockedGroup = null; hasGroupLock = false;',
+            sb
+        );
+        return sb;
+    }
+
+    const SM_2V2 = {
+        format: 'stroke', scoring: 'gross', teamAIds: ['1', '2'], teamBIds: ['3', '4'],
+        startHole: 1, createdAt: 1, holeStake: HOLE_STAKE, overallStake: OVERALL_STAKE,
+        overallMode: 'stroke', segment: 'full', tieRule: 'carry',
+    };
+
+    // Scores for holes 1..thru, optionally leaving one golfer short.
+    function postedThrough(ids, thru, shortId, shortAfter) {
+        const s = {};
+        cd18.filter(h => h.hole <= thru).forEach(h => {
+            ids.forEach(id => {
+                if (shortId && String(id) === String(shortId) && h.hole > shortAfter) return;
+                s[`p${id}_h${h.hole}`] = 5;
+            });
+        });
+        return s;
+    }
+
+    // The press hole the production UI actually offers, read out of the onclick that
+    // showSideHolePressInput() writes into the card. Behavioural, not a source read.
+    function offeredPressHole(sb) {
+        sb.showSideHolePressInput('m1', '1', '3');
+        const row = sb.document.getElementById('sm-hole-press-row-m1').innerHTML || '';
+        const m = row.match(/confirmSideHolePress\('m1', (\d+)/);
+        assert.ok(m, 'the press input should carry a start hole, got: ' + row);
+        return parseInt(m[1], 10);
+    }
+
+    test('2v2 — with all four posted through 6, the press starts on 7', () => {
+        const sb = pressRealm(postedThrough([1, 2, 3, 4], 6), SM_2V2, FOURSOME);
+        assert.equal(offeredPressHole(sb), 7);
+    });
+
+    test('2v2 — a partner short of the group holds the press back', () => {
+        // Abe has posted only through 4 while the other three are through 6. The last
+        // hole EVERYONE played is 4, so the press starts on 5 - not 7.
+        const sb = pressRealm(postedThrough([1, 2, 3, 4], 6, 2, 4), SM_2V2, FOURSOME);
+        assert.equal(offeredPressHole(sb), 5,
+            'a press must not start on holes two of the four have not played');
+    });
+
+    test('2v2 — the golfer left behind can be on either side', () => {
+        // Bo is on side B. The rule is about the match, not about one team.
+        const sb = pressRealm(postedThrough([1, 2, 3, 4], 6, 4, 3), SM_2V2, FOURSOME);
+        assert.equal(offeredPressHole(sb), 4);
+    });
+
+    test('1v1 — behaviour is exactly what it always was', () => {
+        const sm1v1 = Object.assign({}, SM_2V2, { teamAIds: ['1'], teamBIds: ['3'] });
+        const sb = pressRealm(postedThrough([1, 3], 6), sm1v1, [ALPHA_1, BRAVO_1]);
+        assert.equal(offeredPressHole(sb), 7);
+
+        const behind = pressRealm(postedThrough([1, 3], 6, 3, 4), sm1v1, [ALPHA_1, BRAVO_1]);
+        assert.equal(offeredPressHole(behind), 5,
+            'one golfer short has always held a 1v1 press back - unchanged');
+    });
+
+    test('the helper reads the participants from the STORED match, not from the card', () => {
+        // The press buttons still carry p1Id/p2Id. If the helper trusted those, a 2v2
+        // would silently be measured on two golfers again. It resolves the full side
+        // list from the saved record instead, which is the wager that actually exists.
+        const sb = pressRealm(postedThrough([1, 2, 3, 4], 6, 2, 4), SM_2V2, FOURSOME);
+        const people = plain(vm.runInContext(
+            'sideMatchParticipants(sideMatchById("m1"), []).map(p => p.name)', sb));
+        assert.deepEqual(people.sort(), ['Abe Alpha', 'Ann Alpha', 'Ben Bravo', 'Bo Bravo']);
+    });
+});
+
+// ===========================================================================
+// 6. 1v1 REGRESSION LOCK
 //
 // Batch 2 must fix 2v2 WITHOUT moving a single cent of existing 1v1 money. This
 // is not a copy of money_parity_test.js - it is a deliberately small set of
@@ -616,7 +913,7 @@ describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI
 // and 2v2 coverage are provably about the same code paths.
 // ===========================================================================
 
-describe('1v1 REGRESSION LOCK — all three copies still agree without sides', () => {
+describe('1v1 REGRESSION LOCK — every realm still agrees without sides', () => {
 
     // One player per side, no sideA/sideB: the shape every existing side match has.
     function cfg1v1Overall(extra) {
@@ -702,9 +999,9 @@ describe('1v1 REGRESSION LOCK — all three copies still agree without sides', (
     const decided = (seg) => (seg.winner === null || seg.winner === undefined) ? 'none' : 'someone';
 
     CASES.forEach(({ label, cfg, scores, presses, call }) => {
-        test(`overall bet — ${label} — settles identically in all three copies`, () => {
+        test(`overall bet — ${label} — settles identically in every realm`, () => {
             const run = call || callOverall;
-            const results = ALL_THREE.map(name => run(realmFor(name), cfg, scores, presses));
+            const results = ALL_REALMS.map(name => run(realmFor(name), cfg, scores, presses));
 
             // Something must actually have been computed, or three empty answers
             // would agree trivially and this lock would be worthless.
@@ -713,44 +1010,44 @@ describe('1v1 REGRESSION LOCK — all three copies still agree without sides', (
             const canonical = pickMoney(results[0].base);
             results.slice(1).forEach((r, i) => {
                 assert.deepEqual(pickMoney(r.base), canonical,
-                    PAGE_COPIES[i] + ' diverged from settlement-engine.js on a 1v1 case');
+                    ALL_REALMS[i + 1] + ' diverged from settlement-engine.js on a 1v1 case');
                 assert.equal(decided(r.base), decided(results[0].base),
-                    PAGE_COPIES[i] + ' disagreed about whether the segment was won at all');
+                    ALL_REALMS[i + 1] + ' disagreed about whether the segment was won at all');
             });
 
             // Presses too, segment by segment.
             const canonPresses = (results[0].pressSegs || []).map(pickMoney);
             results.slice(1).forEach((r, i) => {
                 assert.deepEqual((r.pressSegs || []).map(pickMoney), canonPresses,
-                    PAGE_COPIES[i] + ' diverged on press segments for a 1v1 case');
+                    ALL_REALMS[i + 1] + ' diverged on press segments for a 1v1 case');
                 assert.deepEqual((r.pressSegs || []).map(decided),
                     (results[0].pressSegs || []).map(decided),
-                    PAGE_COPIES[i] + ' disagreed about which presses were won');
+                    ALL_REALMS[i + 1] + ' disagreed about which presses were won');
             });
         });
     });
 
-    test('per-hole bet — 1v1 money is identical in all three copies', () => {
+    test('per-hole bet — 1v1 money is identical in every realm', () => {
         const scores = narrowScores();
-        const results = ALL_THREE.map(name => callHole(realmFor(name), cfg1v1Hole(), scores));
+        const results = ALL_REALMS.map(name => callHole(realmFor(name), cfg1v1Hole(), scores));
         assert.notEqual(results[0].p1Money, 0, 'the fixture must move money');
         results.slice(1).forEach((r, i) => {
             assert.equal(r.p1Money, results[0].p1Money,
-                PAGE_COPIES[i] + ' diverged on 1v1 per-hole money');
+                ALL_REALMS[i + 1] + ' diverged on 1v1 per-hole money');
             assert.equal(r.currentCarry, results[0].currentCarry,
-                PAGE_COPIES[i] + ' diverged on 1v1 carry');
+                ALL_REALMS[i + 1] + ' diverged on 1v1 carry');
             assert.equal(r.currentStake, results[0].currentStake,
-                PAGE_COPIES[i] + ' diverged on 1v1 current stake');
+                ALL_REALMS[i + 1] + ' diverged on 1v1 current stake');
         });
     });
 
-    test('the net case genuinely exercises stroke allocation, in all three copies', () => {
+    test('the net case genuinely exercises stroke allocation, in every realm', () => {
         // Without this, "net scoring" above could be a case that quietly proves
         // nothing - three copies agreeing on a card where no stroke was ever given
         // is not evidence they agree about handicaps. Same card, same stake: gross
         // and net must reach DIFFERENT money, or the case is inert.
         const scores = narrowScores();
-        ALL_THREE.forEach(name => {
+        ALL_REALMS.forEach(name => {
             const gross = callOverall(realmFor(name), cfg1v1Overall(), scores);
             const net = callOverallNet(realmFor(name), cfg1v1Overall({ scoringType: 'net' }), scores);
             assert.notEqual(net.base.p1Money, gross.base.p1Money,
