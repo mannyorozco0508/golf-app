@@ -17,11 +17,12 @@ const { makeCourseData, makePlayers, buildScores } = require('./helpers/fixtures
 const canonical = loadJsFile('money-engine.js');
 
 describe('PARITY — parseHcp / getStrokes local copies vs canonical (money-engine.js)', () => {
-    // NOTE: admin.html's local copies are actually named parseHcpAdmin/getStrokesAdmin, not
-    // parseHcp/getStrokes — a correction to the original audit, which matched on a grep prefix
-    // that didn't distinguish the two. Every other file below genuinely uses the exact names.
+    // ADMIN'S ALIASES ARE GONE. admin.html carried parseHcpAdmin/getStrokesAdmin -
+    // byte-identical to canonical under different names, which is why a grep for the
+    // real names never found them. The shared-handicap extraction moved admin.html
+    // onto handicap.js and deleted both aliases; a test at the foot of this file
+    // proves they cannot come back.
     const filesWithLocalCopies = [
-        { label: 'admin.html', loader: () => loadHtmlInlineScript('admin.html', ['course-data.js']), parseFn: 'parseHcpAdmin', strokesFn: 'getStrokesAdmin' },
         { label: 'index.html', loader: () => loadHtmlInlineScript('index.html'), parseFn: 'parseHcp', strokesFn: 'getStrokes' },
         // leaderboard.html is deliberately ABSENT from this list now: it no longer has
         // local copies to drift. It loads money-engine.js and uses the canonical pair
@@ -44,6 +45,36 @@ describe('PARITY — parseHcp / getStrokes local copies vs canonical (money-engi
             'leaderboard.html must not redeclare getStrokes');
         assert.match(src, /<script src="money-engine\.js">/,
             'and it must load the canonical pair instead');
+    });
+
+    test('NO page has a local copy left to drift, and admin has no aliases either', () => {
+        // The strongest form of parity generalised: not "the duplicates match" but
+        // "there are no duplicates". Every page that owned parseHcp/getStrokes now
+        // loads handicap.js instead, and admin.html's two aliases - byte-identical to
+        // canonical under different names, which is why a grep for the real names
+        // never found them - are gone with the rest.
+        ['admin.html', 'index.html', 'leaderboard.html', 'sidematches.html',
+         'settlement.html', 'skins.html', 'stats.html', 'trip.html'].forEach(page => {
+            const src = fs.readFileSync(path.join(REPO_ROOT, page), 'utf8');
+            const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+            ['parseHcp', 'getStrokes', 'parseHcpAdmin', 'getStrokesAdmin'].forEach(fn =>
+                assert.ok(!new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
+                    page + ' must not redeclare ' + fn));
+            assert.match(src, /<script src="handicap\.js">/,
+                page + ' must load the canonical module instead');
+        });
+    });
+
+    test('admin.html calls the canonical names, not the retired aliases', () => {
+        // The aliases had call sites. Deleting the declarations without rewriting
+        // those would leave a page that throws the moment somebody opens Step 5.
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
+        assert.ok(!/parseHcpAdmin/.test(src), 'no reference to parseHcpAdmin may remain');
+        assert.ok(!/getStrokesAdmin/.test(src), 'no reference to getStrokesAdmin may remain');
+        const sandbox = loadHtmlInlineScript('admin.html');
+        assert.equal(typeof sandbox.parseHcp, 'function', 'admin.html must reach canonical parseHcp');
+        assert.equal(typeof sandbox.getStrokes, 'function', 'admin.html must reach canonical getStrokes');
+        assert.equal(sandbox.parseHcp('+2'), -2);
     });
 
     const parseHcpCases = ['0', '12', '8.4', '+2', '+5.5', '', undefined, '18', '-3'];
@@ -186,7 +217,7 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                      parseInt, parseFloat, Date, Set, Map };
         vm.createContext(sb);
-        ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+        ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
             .forEach(f => vm.runInContext(
                 fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
         return sb;
