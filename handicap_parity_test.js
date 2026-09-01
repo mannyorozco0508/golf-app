@@ -148,6 +148,24 @@ describe('handicap.js — a shared module with nothing behind it', () => {
         assert.equal(bare.getStrokes(1, 18), 1);
     });
 
+    test('every canonical function is declared EXACTLY ONCE inside it', () => {
+        // A duplicate declaration in the module whose whole job is to be the single
+        // owner is the same defect as a copy in another file, only harder to see -
+        // the later declaration silently wins and nothing complains.
+        //
+        // This caught a real one: the extraction script that created handicap.js
+        // captured comment-plus-function and grabbed isRelativeMatchFormat twice. The
+        // bodies were byte-identical so nothing misbehaved, but the ownership tests
+        // above all passed because they only ever asked WHICH FILE owns a function,
+        // never how many times.
+        const src = read('handicap.js');
+        FAMILY.forEach(fn => {
+            const count = (src.match(new RegExp('function\\s+' + fn + '\\s*\\(', 'g')) || []).length;
+            assert.equal(count, 1,
+                fn + ' is declared ' + count + ' times in handicap.js - it must be declared exactly once');
+        });
+    });
+
     test('it runs no top-level code', () => {
         const src = read('handicap.js')
             .replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
