@@ -153,6 +153,16 @@
             body.printing-results #manage-screen > *:not(#tournament-print-view) { display: none !important; }
             body.printing-results #tournament-print-view { display: block !important; }
         }
+        .flight-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border-faint); border-radius:8px; margin-bottom:6px; }
+        .flight-row input.flight-name-input { flex:1; min-width:0; padding:6px 8px; font-size:0.9rem; }
+        .flight-count { font-size:0.75rem; color:var(--text-muted); white-space:nowrap; }
+        .flight-del { background:none; border:none; color:var(--accent-red); font-size:0.85rem; cursor:pointer; padding:4px; }
+        .flight-del[disabled] { color:var(--text-muted); cursor:not-allowed; }
+        .fa-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-faint); }
+        .fa-team { flex:1; font-size:0.88rem; min-width:0; }
+        .fa-row select { font-size:0.85rem; padding:5px 6px; max-width:52%; }
+        .lb-flight-btn { display:inline-block; font-size:0.8rem; padding:6px 12px; margin:3px; border:1px solid var(--brand-green); border-radius:14px; color:var(--brand-green); background:transparent; cursor:pointer; }
+        .lb-flight-btn.active { background:var(--brand-green); color:#fff; }
     </style>
 </head>
 <body>
@@ -294,6 +304,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
 
         <hr class="section-divider">
+        <h3>🚩 Flights / Divisions</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Optional. Split the field into divisions — Championship, A, B, Senior, whatever you call them — and the leaderboard can be viewed by flight as well as overall. Teams you don't assign still appear in Overall.</p>
+        <div class="form-group" style="display:flex; gap:8px; margin-bottom:10px;">
+            <input type="text" id="new-flight-name" placeholder="Flight name (e.g. Championship)" style="flex:1;">
+            <button class="btn-outline" style="white-space:nowrap;" onclick="createFlight()">+ Add</button>
+        </div>
+        <div id="flights-list"></div>
+        <div id="flight-assign-list"></div>
+
+        <hr class="section-divider">
         <h3>🔒 Team Scorecard Links</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Send each team ONLY their own link. They can only enter their own team's scores. Tap 📤 to get a QR code or copy the link.</p>
         <div id="team-links-list"></div>
@@ -335,6 +355,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="manage-tab-leaderboard" style="display:none;">
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
+        <!-- Only rendered when flights exist. A tournament without them shows exactly
+             the leaderboard it always did, with no extra control to ignore. -->
+        <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
         <div id="leaderboard-list"></div>
 
         <hr class="section-divider">
@@ -899,11 +922,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
-        const rows = computeTournamentLeaderboard(currentData);
-        cachedLeaderboardRows = rows;
+        // lbFlightId is null for Overall, which is what every historical tournament
+        // and every tournament without flights produces - the same call, unchanged.
+        const rows = computeTournamentLeaderboard(currentData, lbFlightId);
+
+        // PAYOUTS STAY ON THE OVERALL FIELD. The prize calculator below reads this
+        // cache, and paying places out of a filtered board would quietly mean "3rd in
+        // the B flight takes third prize" - a policy nobody has specified. Per-flight
+        // prize money needs its own pot per flight, which is a decision, not a filter.
+        cachedLeaderboardRows = computeTournamentLeaderboard(currentData);
 
         if (rows.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams yet.</div>`;
+            const flights = currentData.flights || {};
+            container.innerHTML = lbFlightId && flights[lbFlightId]
+                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams in ${flights[lbFlightId].name} yet.</div>`
+                : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No teams yet.</div>`;
         } else {
             let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
                 <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
@@ -992,6 +1025,146 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             });
         }
         resultsContainer.innerHTML = html;
+    }
+
+    // ========================================================================
+    // FLIGHTS / DIVISIONS
+    //
+    // Entirely additive. A tournament with no flights node and no flightId on any
+    // team is exactly the tournament it was before this existed - the section below
+    // renders empty, the leaderboard filter stays hidden, and Overall is every team.
+    // Nothing is written on load and nothing is migrated.
+    // ========================================================================
+
+    // A FLIGHT ID IS NOT ITS NAME. Organizers rename divisions - "A" becomes
+    // "First Flight" halfway through setup - and if the name were the key, every
+    // team assigned to it would silently fall out of the flight. The id is minted
+    // once and never changes; the name is just a label stored beside it.
+    function newFlightId() {
+        return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function createFlight() {
+        const input = document.getElementById('new-flight-name');
+        const name = input.value.trim();
+        if (!name) { alert('⚠️ Give the flight a name.'); return; }
+
+        // Duplicate names are REFUSED rather than allowed. Two flights called "A" are
+        // indistinguishable on the leaderboard filter and in the team dropdown, so a
+        // duplicate is almost always a mis-tap rather than an intention.
+        const existing = currentData.flights || {};
+        const clash = Object.keys(existing)
+            .some(fid => (existing[fid].name || '').toLowerCase() === name.toLowerCase());
+        if (clash) { alert(`⚠️ There is already a flight called "${name}".`); return; }
+
+        const fid = newFlightId();
+        db.ref(`tournaments/${currentCode}/flights/${fid}`)
+            .set({ id: fid, name: name, createdAt: Date.now() })
+            .then(() => { input.value = ''; })
+            .catch(err => alert(`Error adding flight: ${err.message}`));
+    }
+
+    function renameFlight(fid, name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed) return; // an empty rename is a mis-tap; leave the old name alone
+        const existing = currentData.flights || {};
+        const clash = Object.keys(existing)
+            .some(other => other !== fid && (existing[other].name || '').toLowerCase() === trimmed.toLowerCase());
+        if (clash) { alert(`⚠️ There is already a flight called "${trimmed}".`); renderFlights(); return; }
+        db.ref(`tournaments/${currentCode}/flights/${fid}/name`).set(trimmed)
+            .catch(err => alert(`Error renaming flight: ${err.message}`));
+    }
+
+    // A FLIGHT IN USE IS NOT DELETED. Removing it would leave every assigned team
+    // pointing at a flight that no longer exists - the leaderboard would count them
+    // as unassigned without anyone being told. The organizer moves the teams out
+    // first, which is a decision they should be making consciously anyway.
+    function deleteFlight(fid) {
+        const counts = flightTeamCounts(currentData);
+        const inUse = counts[fid] || 0;
+        if (inUse > 0) {
+            const flight = (currentData.flights || {})[fid] || {};
+            alert(`⚠️ "${flight.name || 'That flight'}" still has ${inUse} team${inUse === 1 ? '' : 's'} in it. Move them to another flight (or to Unassigned) first.`);
+            return;
+        }
+        db.ref(`tournaments/${currentCode}/flights/${fid}`).remove()
+            .catch(err => alert(`Error removing flight: ${err.message}`));
+    }
+
+    // Assigning to '' clears the field rather than storing an empty string, so an
+    // unassigned team looks identical to a team from before flights existed.
+    function assignTeamToFlight(teamId, fid) {
+        const ref = db.ref(`tournaments/${currentCode}/teams/${teamId}/flightId`);
+        (fid ? ref.set(fid) : ref.remove())
+            .catch(err => alert(`Error assigning flight: ${err.message}`));
+    }
+
+    function renderFlights() {
+        const listEl = document.getElementById('flights-list');
+        const assignEl = document.getElementById('flight-assign-list');
+        const flights = currentData.flights || {};
+        const teams = currentData.teams || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        const counts = flightTeamCounts(currentData);
+
+        listEl.innerHTML = fids.length === 0
+            ? `<p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">No flights yet — the whole field competes as one.</p>`
+            : fids.map(fid => {
+                const n = counts[fid] || 0;
+                return `<div class="flight-row">
+                    <input class="flight-name-input" type="text" value="${flights[fid].name || ''}"
+                        onchange="renameFlight('${fid}', this.value)">
+                    <span class="flight-count">${n} team${n === 1 ? '' : 's'}</span>
+                    <button class="flight-del" onclick="deleteFlight('${fid}')" ${n > 0 ? 'disabled title="Move its teams out first"' : ''}>✕</button>
+                </div>`;
+            }).join('');
+
+        // The assignment list only appears once there is somewhere to assign to.
+        const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
+        if (fids.length === 0 || teamIds.length === 0) { assignEl.innerHTML = ''; return; }
+
+        const options = (selected) => `<option value="">— Unassigned —</option>` + fids.map(fid =>
+            `<option value="${fid}" ${selected === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+
+        assignEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">
+            Assign teams — ${counts.__unassigned} unassigned</p>` + teamIds.map(tid => {
+            const t = teams[tid];
+            // A team pointing at a deleted flight falls back to Unassigned in the
+            // dropdown rather than showing a blank selection.
+            const current = flights[t.flightId] ? t.flightId : '';
+            return `<div class="fa-row">
+                <span class="fa-team">${t.name || `Team ${t.num}`}</span>
+                <select onchange="assignTeamToFlight('${tid}', this.value)">${options(current)}</select>
+            </div>`;
+        }).join('');
+    }
+
+    // --- LEADERBOARD FLIGHT VIEW ---
+    //
+    // A view selection, not a second leaderboard. lbFlightId is passed straight to
+    // computeTournamentLeaderboard(), which narrows the team set and then runs the
+    // one ranking path - so a flight's ties behave the way the field's ties do
+    // because it is literally the same code.
+    let lbFlightId = null;
+
+    function setLeaderboardFlight(fid) {
+        lbFlightId = fid || null;
+        renderLeaderboard();
+    }
+
+    function renderLeaderboardFlightFilter() {
+        const el = document.getElementById('lb-flight-filter');
+        const flights = currentData.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        if (fids.length === 0) { el.style.display = 'none'; el.innerHTML = ''; lbFlightId = null; return; }
+
+        // A flight deleted while being viewed drops the view back to Overall rather
+        // than showing an empty board.
+        if (lbFlightId && !flights[lbFlightId]) lbFlightId = null;
+
+        el.style.display = 'block';
+        el.innerHTML = `<button class="lb-flight-btn ${!lbFlightId ? 'active' : ''}" onclick="setLeaderboardFlight('')">Overall</button>`
+            + fids.map(fid => `<button class="lb-flight-btn ${lbFlightId === fid ? 'active' : ''}" onclick="setLeaderboardFlight('${fid}')">${flights[fid].name || 'Flight'}</button>`).join('');
     }
 
     // --- TRIP LINKING ---
@@ -1093,6 +1266,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
             renderTeamLinks();
             renderShotgunAssignments();
+            renderFlights();
+            renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
         });
