@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v18-shared-handicap';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v19-payouts-and-shells';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -363,7 +363,7 @@ describe('SERVICE WORKER', () => {
         const raw = sw.slice(sw.indexOf('const SHELL_FILES'), sw.indexOf(']', sw.indexOf('const SHELL_FILES')));
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        assert.equal(entries.length, 29);
+        assert.equal(entries.length, 30);
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 
