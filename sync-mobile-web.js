@@ -47,6 +47,9 @@ const SHARED_SHELL = [
     'grouping.js', 'handicap.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, the
     // worker and manifest themselves, and the icons.
+    // product-links.js is the only place that knows the two products may live at
+    // different origins. Shared because both sides link across the boundary.
+    'product-links.js',
     'firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
     'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
 ];
