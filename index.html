@@ -838,6 +838,31 @@
             margin-top: 4px; font-weight: bold; letter-spacing: 1px;
         }
 
+        /* THE EARNED-JUNK STRIP. Reserved, never conditional.
+           
+           This slot used to be an empty string when a golfer had no dots, so the whole
+           centred column grew the moment one was tapped. In a table row that re-centres
+           every score box in the row, and in Hole View it moved the box relative to the
+           name - the score, which is the primary thing on the screen, jumped because of
+           a secondary marker. .stroke-dots and .net-mark-line already solve this by
+           holding a fixed height whether or not they have content; this follows them.
+
+           WIDTH IS CAPPED AT THE SCORE BOX. The pips are repeated emoji, so four of them
+           already equalled the 48px box and a greenie carrying at 5 was wider than it -
+           which widened the <td> and pushed the whole score-entry column. Capping at the
+           box width means the column's geometry is set by the box alone and no amount of
+           junk can change it. The pips carry their net total as a title for the overflow
+           case, and the Dots modal is always the full answer.
+
+           Smaller than it was, deliberately: the score is primary, this is a footnote. */
+        .cell-dots {
+            height: 13px; line-height: 13px; margin-top: 4px;
+            width: 48px; max-width: 48px; overflow: hidden;
+            white-space: nowrap; text-overflow: ellipsis; text-align: center;
+            font-size: 0.6rem; font-weight: bold;
+        }
+        .cell-dots .dot-pips { margin-left: 0; font-size: 0.5rem; letter-spacing: 0; }
+
         /* THE GOLFER'S OWN HANDICAP, UNDER THEIR NAME ON THE FULL CARD.
            Deliberately a second line rather than "Lee (5)" on one: the column is
            already as narrow as a score box, and widening it or shrinking the name
@@ -925,7 +950,6 @@
         /* Red pips sit with the score they came from. Snake is rendered as a snake, not
            another red dot - it costs a unit, so showing it as one would read backwards. */
         .dot-pips { display: inline-block; margin-left: 6px; font-size: 0.8rem; letter-spacing: 1px; white-space: nowrap; vertical-align: middle; }
-        .hv-dot-line { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); margin-top: 2px; line-height: 1.3; }
 
         .dots-btn { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
         .dots-btn.has-dots { background-color: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
@@ -1925,16 +1949,11 @@
         //
         // The entry control used to exist only inside a Full Card table cell, which meant
         // recording a dot required leaving the hole you were playing. It belongs here,
-        // next to the scores, with each golfer's dots shown underneath their name so the
-        // tap is visibly confirmed without opening anything.
+        // next to the scores. Each golfer's dots are drawn by their own score cell, so a
+        // tap is visibly confirmed without opening anything and without repeating itself.
         const dotsGame = activeDotsGame();
         const holeDotsNow = (dotsGame && currentData.dots && currentData.dots[`h${holeNum}`])
             ? currentData.dots[`h${holeNum}`] : {};
-        const dotLabel = id => {
-            const t = DOT_TYPES.find(x => x.id === id);
-            return t ? t.label : id;
-        };
-
         const playerCellCount = cells.length - 3 - (window.__scHasMatchColumn ? 1 : 0);
         for (let i = 3; i < 3 + playerCellCount; i++) {
             // The header cell now carries a second line (HCP n). Read the NAME only -
@@ -1955,24 +1974,21 @@
             const hvHcpHtml = hvPlayer
                 ? `<div class="hv-hcp">HCP ${formatHcpDisplay(hvPlayer.hcp)}</div>` : '';
             html += `<div class="hv-player-row"><div class="hv-player-name">${name}${hvHcpHtml}`;
-            if (dotsGame) {
-                // Match this row back to a player by name, the same way the header cells
-                // were built. A golfer with no dots shows nothing at all.
-                const pl = filteredPlayers.find(p => String(p.name).trim() === name);
-                const mine = pl ? (holeDotsNow[`p${pl.id}`] || []) : [];
-                if (mine.length) {
-                    html += `<div class="hv-dot-line">\uD83D\uDD34 ${mine.map(dotLabel).join(' \u00B7 ')}</div>`;
-                }
-            }
-            // Quick reference sits WITH the score, not in a paragraph below it: a golfer
-            // scanning the hole reads "Avery 4 (2 dots)" in one movement. The written
-            // labels stay under the name for anyone who wants to know which junk it was.
-            let pipHtml = '';
-            if (dotsGame) {
-                const pl2 = filteredPlayers.find(p => String(p.name).trim() === name);
-                if (pl2) pipHtml = dotIndicatorHtml(holeDotsNow[`p${pl2.id}`], parseInt(holeNum, 10));
-            }
-            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}${pipHtml}</div></div>`;
+            // DOTS ARE DRAWN ONCE, BY THE CELL ITSELF.
+            //
+            // cells[i] is cloned from the Full Card <td>, which already ends with the
+            // pips directly under the score box. Hole View used to add two more copies
+            // on top of that - a written "Birdie" line under the name, and a second pip
+            // span appended here. Because .hv-player-cell is a flex row, that appended
+            // span became a sibling of the whole centred column and floated beside the
+            // box while the cell's own pips sat under it: one birdie, two pips, badly
+            // out of line with each other.
+            //
+            // Keeping the cell's copy means Hole View, the Full Card and the printed
+            // PDF all render a dot the same way, and a carried greenie is worth what it
+            // says everywhere. The pip span carries its net value as a title for anyone
+            // who taps it.
+            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
         }
 
         // SCORE -> NEXT.
@@ -6563,7 +6579,7 @@
 
                 let shapeHtml = "";
                 let currentToParHtml = "";
-                let earnedDotsHtml = "";
+                let earnedDotsInner = "";
                 let netMarkHtml = "";
 
                 if (scoreVal !== "") {
@@ -6622,9 +6638,16 @@
                     currentToParHtml = `<div style="font-size: 0.7rem; font-weight: bold; color: ${toParColor}; margin-top: 2px; text-align: center;">${toParText}</div>`;
                 }
                 
+                // RESERVED FOR THE WHOLE ROUND, NOT PER HOLE. The strip has to be present on
+                // every cell of a round that can produce junk, or the first tap still moves
+                // the box - reserving it only where a dot already exists would defeat the
+                // point. A round that can never produce one keeps its old height and loses
+                // nothing.
+                const reservesDotStrip = hasDotsGame || gameFormat === 'stableford';
+
                 if (gameFormat === 'stableford' && stablefordCalc && stablefordCalc.holeLog[h.hole] && stablefordCalc.holeLog[h.hole][p.id]) {
                     const entry = stablefordCalc.holeLog[h.hole][p.id];
-                    earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; font-weight:bold; color:var(--brand-green);">${entry.label} +${entry.pts}</div>`;
+                    earnedDotsInner = `<span style="color:var(--brand-green);">${entry.label} +${entry.pts}</span>`;
                 }
 
                 // WHERE the dots happened, not just a total - the Full Card is what gets
@@ -6637,7 +6660,7 @@
                 // collapsed several snakes into one; the builder counts them.
                 if (hasDotsGame) {
                     const pips = dotIndicatorHtml(dotsForPlayerHole(p.id, h.hole), h.hole);
-                    if (pips) earnedDotsHtml = `<div style="font-size: 0.65rem; margin-top: 4px; letter-spacing: 1px;">${pips}</div>`;
+                    if (pips) earnedDotsInner = pips;
                 }
 
                 // Birdie / eagle ring. GROSS score against the hole's par, from the one
@@ -6661,7 +6684,7 @@
                             ${netMarkHtml}
                             ${currentToParHtml}
                             <div class="stroke-dots">${handicapDots}</div>
-                            ${earnedDotsHtml}
+                            ${reservesDotStrip ? `<div class="cell-dots">${earnedDotsInner}</div>` : ''}
                         </div>
                     </td>
                 `;
