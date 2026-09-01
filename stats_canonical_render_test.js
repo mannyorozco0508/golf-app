@@ -399,12 +399,22 @@ describe('NO-COPY GUARD — stats.html owns no divergent Stroke engine', () => {
         // by accident - both worth failing over.
         const inline = inlineOnly();
         ['calcWolfEngine', 'calcStablefordEngine', 'calcPointSettlement',
-         'calculateMatchEngine', 'nassauStakeConfig', 'parseHcp', 'getStrokes',
-         'allocateMatchStrokes', 'matchHandicapBaseline', 'matchRelativeHandicaps',
-         'relativeMatchStrokes', 'isRelativeMatchFormat'].forEach(fn => {
+         'calculateMatchEngine', 'nassauStakeConfig'].forEach(fn => {
             assert.ok(new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
-                'stats.html should STILL own ' + fn + ' - Batch 3 deliberately deferred it');
+                'stats.html should STILL own ' + fn + ' - deliberately deferred');
         });
+
+        // THE HANDICAP FAMILY LEFT THIS LIST DELIBERATELY. Batch 3 deferred
+        // parseHcp, getStrokes and the five relative-handicap helpers because
+        // adopting them meant loading money-engine.js. The shared-handicap
+        // extraction gave them a home of their own instead, so stats.html consumes
+        // handicap.js and owns none of them. Asserted the other way round now.
+        ['parseHcp', 'getStrokes', 'allocateMatchStrokes', 'matchHandicapBaseline',
+         'matchRelativeHandicaps', 'relativeMatchStrokes', 'isRelativeMatchFormat']
+            .forEach(fn => assert.ok(!new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
+                'stats.html must not redeclare ' + fn + ' - handicap.js owns it now'));
+        assert.match(read('stats.html'), /<script src="handicap\.js">/,
+            'stats.html must load the shared handicap module');
     });
 
     test('money-engine.js is deliberately NOT loaded', () => {
