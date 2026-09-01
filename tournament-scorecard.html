@@ -52,6 +52,12 @@
 
         .event-title { text-align: center; font-size: 1.3rem; font-weight: bold; color: var(--brand-green); margin-bottom: 2px; }
         .event-sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 4px; }
+        .scoring-for-label { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; }
+        .scoring-for-label strong { color: var(--brand-green); }
+        .save-state { min-height: 18px; text-align: center; font-size: 0.78rem; color: var(--text-muted); margin: 6px 0 10px 0; transition: opacity 0.2s; }
+        .save-state.saving { color: var(--text-muted); }
+        .save-state.saved { color: var(--brand-green); font-weight: bold; }
+        .save-state.error { color: var(--accent-red); font-weight: bold; }
         .team-roster-box { background: var(--nassau-box-bg); border-radius: 8px; padding: 10px 14px; text-align: center; margin-bottom: 14px; font-size: 0.9rem; font-weight: bold; color: var(--brand-navy); }
 
         .status-bar { background: var(--brand-navy); color: white; border-radius: 10px; padding: 12px; text-align: center; margin-bottom: 16px; }
@@ -100,11 +106,23 @@
     <div id="starting-hole-banner" style="display:none; text-align:center; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:10px; margin-bottom:14px; font-weight:bold; color:var(--brand-green); font-size:1.05rem;"></div>
 
     <div id="tab-scorecard">
+        <!-- WHO AM I SCORING FOR. A golfer arrives here from a text message with no
+             app installed and no context beyond the link, so the page has to answer
+             that before anything else. The wording says "scoring group" alongside the
+             stored team name because on a shamble or best-ball the four names are a
+             group of individuals, not a side - but the STORAGE is untouched: every key
+             is still team{n}_… and every field still comes from teams.team{n}. -->
+        <div class="scoring-for-label" id="scoring-for"></div>
         <div class="team-roster-box" id="team-roster"></div>
         <div class="status-bar">
             <div class="status-main" id="status-main">Thru 0</div>
             <div class="status-sub" id="status-sub"></div>
         </div>
+        <!-- SAVE STATE. Scores were written fire-and-forget with no confirmation, so a
+             golfer on a thin signal had no way to tell a saved hole from a lost one.
+             One quiet line that settles back to idle, rather than a toast per keystroke -
+             rapid entry must stay uninterrupted. -->
+        <div class="save-state" id="save-state" aria-live="polite"></div>
         <div id="holes-list"></div>
     </div>
 
@@ -115,7 +133,11 @@
 
 <div class="container" id="error-content" style="display:none; text-align:center;">
     <h2>⚠️ Link Not Found</h2>
-    <p style="color:var(--text-muted);">This tournament scorecard link looks invalid or the tournament code doesn't match. Double check the link your organizer sent you.</p>
+    <!-- A GOLFER CANNOT FIX THIS THEMSELVES. The only useful action is going back to
+         whoever sent the link, so the message says which half of it did not work
+         rather than offering a retry that cannot succeed. Deliberately no route into
+         the organizer screens from here - this surface is for scoring, nothing else. -->
+    <p style="color:var(--text-muted);" id="error-detail">This tournament scorecard link looks invalid or the tournament code doesn't match. Double check the link your organizer sent you.</p>
 </div>
 
 <script>
@@ -168,11 +190,17 @@
     let hasAutoScrolled = false; // guards the shotgun starting-hole auto-scroll to fire once per page load
 
     if (!currentCode || !myTeamNum) {
+        document.getElementById('error-detail').textContent = !currentCode
+            ? "This link is missing its tournament code. Ask your organizer to send the scoring link again."
+            : "This link is missing its group number, so we don't know which scorecard to open. Ask your organizer to send the scoring link again.";
         document.getElementById('error-content').style.display = 'block';
     } else {
         db.ref(`tournaments/${currentCode}`).on('value', (snap) => {
             currentData = snap.val();
             if (!currentData || !currentData.teams || !currentData.teams[`team${myTeamNum}`]) {
+                document.getElementById('error-detail').textContent = (!currentData || !currentData.teams)
+                    ? `No tournament found with the code ${currentCode}. Ask your organizer to check the link.`
+                    : `That tournament exists, but it has no group ${myTeamNum}. Ask your organizer for your own scoring link.`;
                 document.getElementById('error-content').style.display = 'block';
                 document.getElementById('main-content').style.display = 'none';
                 return;
@@ -209,21 +237,47 @@
         container.innerHTML = html;
     }
 
-    function saveHoleScore(holeNum, val) {
-        if (val === '' || val === null) {
-            db.ref(`tournaments/${currentCode}/scores/team${myTeamNum}_h${holeNum}`).remove();
-        } else {
-            db.ref(`tournaments/${currentCode}/scores/team${myTeamNum}_h${holeNum}`).set(parseInt(val, 10));
+    // ONE LINE, NOT A TOAST PER KEYSTROKE.
+    //
+    // A golfer entering four holes in a row should not be fighting notifications, so
+    // "Saved" fades back to nothing and a newer write always supersedes an older
+    // message. An ERROR does not fade - a score that did not reach the database is
+    // the one thing worth leaving on screen until the next successful write.
+    let saveStateToken = 0;
+    function setSaveState(state, text) {
+        const el = document.getElementById('save-state');
+        if (!el) return;
+        const token = ++saveStateToken;
+        el.className = 'save-state ' + state;
+        el.textContent = text;
+        if (state === 'saved') {
+            setTimeout(() => {
+                if (token === saveStateToken && el.className === 'save-state saved') {
+                    el.textContent = '';
+                }
+            }, 2000);
         }
+    }
+
+    // The Firebase paths below are UNCHANGED - team{n}_h{h} and team{n}_p{i}_h{h},
+    // scoped to the team number this link carries. The promise is only observed so the
+    // golfer learns whether the write landed.
+    function trackWrite(promise) {
+        setSaveState('saving', 'Saving…');
+        return promise
+            .then(() => setSaveState('saved', '✓ Saved'))
+            .catch(() => setSaveState('error', '⚠️ Could not save — check your signal and re-enter that hole'));
+    }
+
+    function saveHoleScore(holeNum, val) {
+        const ref = db.ref(`tournaments/${currentCode}/scores/team${myTeamNum}_h${holeNum}`);
+        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
 
     function savePlayerHoleScore(holeNum, playerIdx, val) {
         const path = `tournaments/${currentCode}/scores/team${myTeamNum}_p${playerIdx}_h${holeNum}`;
-        if (val === '' || val === null) {
-            db.ref(path).remove();
-        } else {
-            db.ref(path).set(parseInt(val, 10));
-        }
+        const ref = db.ref(path);
+        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
 
     function renderAll() {
@@ -236,6 +290,8 @@
         document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
         document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
         const teamName = team.name || `Team ${team.num}`;
+        document.getElementById('scoring-for').innerHTML =
+            `You're scoring for <strong>${teamName}</strong>`;
         document.getElementById('team-roster').innerHTML = `${teamName}<br><span style="font-weight:normal; font-size:0.78rem; color:var(--text-muted);">${team.players.join(', ')}</span>`;
 
         let thru = 0, total = 0, parPlayed = 0;
