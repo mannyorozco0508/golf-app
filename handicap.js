@@ -113,12 +113,3 @@ function relativeMatchStrokes(hcpIndex, ownHcp, oppHcp) {
     // A two-player baseline is just the all-player baseline over a field of two.
     return allocateMatchStrokes(ownHcp - Math.min(ownHcp, oppHcp), hcpIndex);
 }
-
-// Which formats are genuinely HOLE-BY-HOLE MATCH PLAY played with individual
-// balls. Scramble is excluded ON PURPOSE: it is a single-ball team format, so
-// there is no individual ball for an individual relative stroke to attach to. It
-// keeps its existing behaviour exactly. A 1v1 is always treated as a match
-// regardless of the format label, which preserves the committed singles contract.
-function isRelativeMatchFormat(gameFormat) {
-    return ['match', 'nassau', 'bestball', 'ryder'].indexOf(gameFormat) !== -1;
-}
