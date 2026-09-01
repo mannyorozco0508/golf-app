@@ -66,7 +66,14 @@ function parseArrayLiteral(source, declaration, file) {
 }
 
 function getSyncList() {
-    return parseArrayLiteral(read('sync-mobile-web.js'), 'const FILES_TO_SYNC', 'sync-mobile-web.js');
+    // FILES_TO_SYNC IS NOW DERIVED from the three product shell declarations in
+    // sync-mobile-web.js - SHARED_SHELL, CONSUMER_SHELL, TOURNAMENT_SHELL - and is
+    // their union. Nothing about what ships changed; the list is simply no longer a
+    // literal, so it is rebuilt here exactly the way production builds it.
+    const src = read('sync-mobile-web.js');
+    return ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL']
+        .reduce((all, name) => all.concat(
+            parseArrayLiteral(src, 'const ' + name, 'sync-mobile-web.js')), []);
 }
 
 function getShellList() {
