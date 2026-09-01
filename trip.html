@@ -19,6 +19,11 @@
          written out twice - here and in tournament-engine.js - until the shared-core
          extraction. Loaded ahead of the inline block so nothing below can shadow it. -->
     <script src="payouts.js"></script>
+    <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
+         relative paths they always did until two deployment origins are configured,
+         which is what lets Consumer and Tournament stop sharing an origin without
+         every link between them breaking. -->
+    <script src="product-links.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
@@ -842,7 +847,7 @@
     // admin.html reads that param and, when the round is saved, links itself back to this
     // trip automatically. No game code to copy, no coming back here to paste anything.
     function createTournamentForTrip() {
-        window.location.href = `tournament.html?trip=${currentTripCode}`;
+        window.location.href = tournamentUrl(`tournament.html?trip=${currentTripCode}`);
     }
 
     function createRoundForTrip() {
@@ -963,7 +968,7 @@
                     <div class="rc-label">${t.label}</div>
                     <div class="rc-sub">Tournament code: ${code}</div>
                 </div>
-                <a class="rc-link" href="tournament.html?tourney=${code}">Open ▶</a>
+                <a class="rc-link" href="${tournamentUrl(`tournament.html?tourney=${code}`)}">Open ▶</a>
             </div>`;
         }).join('');
     }
