@@ -194,6 +194,276 @@ function normalizeLeaderboardEntries(data) {
     return isPlayerModel(data) ? normalizePlayerEntries(data) : normalizeTeamEntries(data);
 }
 
+// ===========================================================================
+// MULTI-ROUND EVENTS
+//
+// A tournament used to BE a round: one course, one format, one set of scores, all
+// at the record root. A club championship is an EVENT that contains rounds, and
+// the two must coexist without either learning about the other.
+//
+// The boundary is one function - roundContext() - which returns a view of a single
+// round shaped exactly like a single-round tournament record. Everything
+// downstream (normalization, flight filtering, sorting, competition ranking) is
+// handed that view and never discovers it was assembled. There is no
+// `if (rounds) … else …` anywhere in the scoring path, which is the whole point:
+// a third storage model would be a third view, not a third leaderboard.
+//
+// EVENT owns what persists: identity, the player field and their stable ids,
+// flights, teams, the trip link, entry fee.
+// ROUND owns what changes: course, format, scoring mode, groups, starting holes,
+// scores, handicap snapshots, status.
+// ===========================================================================
+
+var ROUND_MODEL = 'round-v1';
+
+// Declared, never inferred - the same rule the player model follows. A record
+// without the marker is a single-round tournament forever, and no rounds node can
+// appear later and change how its stored scores are read.
+function isMultiRound(data) {
+    return !!data && data.eventModel === ROUND_MODEL;
+}
+
+// A round can be configured, live, or finished. Status gates GOLFER writes only -
+// an organizer configures in SETUP and reviews in CLOSED.
+var ROUND_SETUP = 'setup';
+var ROUND_OPEN = 'open';
+var ROUND_CLOSED = 'closed';
+
+function roundStatus(round) {
+    const st = (round || {}).status;
+    return st === ROUND_OPEN || st === ROUND_CLOSED ? st : ROUND_SETUP;
+}
+
+// Only an open or closed round counts towards the event. A round still being
+// configured is not a round anybody has played.
+function countableRoundIds(data) {
+    // ONE ordering, filtered - not a second sort that could disagree with the first
+    // about which round is Round 1.
+    const rounds = (data || {}).rounds || {};
+    return orderedRoundIds(data).filter(rid => roundStatus(rounds[rid]) !== ROUND_SETUP);
+}
+
+// ROUNDS IN THE ORDER THEY ARE PLAYED.
+//
+// Creation order by default, because ids are opaque and a name can be changed -
+// "Round 1" means the first one created, not the one alphabetically first.
+//
+// An organizer who reorders gets an explicit sortOrder, and it is honoured ahead of
+// creation time. Reordering must not be done by rewriting createdAt: that field is
+// also what tells you when a round was actually made, and a reorder is not a
+// statement about history. Rounds without sortOrder keep their creation order
+// beneath any that have been placed deliberately.
+function orderedRoundIds(data) {
+    const rounds = (data || {}).rounds || {};
+    return Object.keys(rounds).sort((a, b) => {
+        const ao = rounds[a].sortOrder, bo = rounds[b].sortOrder;
+        const aHas = typeof ao === 'number', bHas = typeof bo === 'number';
+        if (aHas && bHas && ao !== bo) return ao - bo;
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        return (rounds[a].createdAt || 0) - (rounds[b].createdAt || 0);
+    });
+}
+
+// THE COMPATIBILITY SEAM.
+//
+// Given an event and a round id, returns something every existing function can
+// already read. Given a single-round record - or no round id - returns the record
+// itself, untouched, which is what keeps historical tournaments behaving exactly
+// as they always have.
+//
+// THE HANDICAP SNAPSHOT IS APPLIED HERE. A round records each player's handicap
+// when it opens; from then on that round is scored with those numbers. Correcting
+// a golfer's handicap before round two must not silently restate round one's
+// result, and because the overlay happens at this boundary, none of the scoring
+// code below has to know that snapshots exist.
+function roundView(data, roundId) {
+    if (!isMultiRound(data) || !roundId) return data;
+    const round = (data.rounds || {})[roundId];
+    if (!round) return null;
+
+    const snapshots = round.handicaps || {};
+    const eventPlayers = data.players || {};
+    const players = {};
+    Object.keys(eventPlayers).forEach(pid => {
+        const p = eventPlayers[pid];
+        // The snapshot wins when it exists. Absent - a round still in setup, or a
+        // player added after the round opened - falls back to the live handicap,
+        // which is exactly what a single-round record does.
+        players[pid] = (snapshots[pid] !== undefined && snapshots[pid] !== null)
+            ? Object.assign({}, p, { handicap: snapshots[pid] })
+            : p;
+    });
+
+    return {
+        // Event-level, carried through unchanged.
+        scoringModel: data.scoringModel,
+        players: players,
+        flights: data.flights,
+        teams: data.teams,
+        name: data.name,
+        // Round-level, resolved from the round.
+        format: round.format,
+        shambleCountBest: round.shambleCountBest,
+        courseName: round.courseName,
+        activeCourseKey: round.activeCourseKey,
+        courseData: round.courseData || [],
+        courseIndexSynthetic: round.courseIndexSynthetic,
+        scoringMode: round.scoringMode,
+        scoringGroups: round.scoringGroups || {},
+        scores: round.scores || {},
+        // Carried so callers can gate on it without re-reading the round.
+        roundId: roundId,
+        roundName: round.name,
+        roundStatus: roundStatus(round),
+    };
+}
+
+// One round's standings. No new ranking code: the round view goes straight into
+// the same leaderboard every single-round tournament uses.
+function computeRoundLeaderboard(data, roundId, flightId) {
+    const view = roundView(data, roundId);
+    if (!view) return [];
+    return computeTournamentLeaderboard(view, flightId);
+}
+
+// ---------------------------------------------------------------------------
+// EVENT STANDINGS
+// ---------------------------------------------------------------------------
+
+// WHICH ROUNDS CAN BE ADDED TOGETHER.
+//
+// A scramble round produces TEAM rows and an individual round produces PLAYER
+// rows; there is no shared competitive entity to sum, and inventing one would be
+// inventing a points conversion nobody specified. Gross and net are likewise not
+// addable - a net total and a gross total are different competitions.
+//
+// So an event has a combined standing only when every countable round belongs to
+// one family. Otherwise the round leaderboards still work and the event says so
+// plainly rather than showing a number that means nothing.
+// WHY combined standings are or are not available. A bare false is
+// indistinguishable from a bug to the organizer looking at the screen, so every
+// refusal carries a sentence they can act on.
+function aggregateAvailability(data) {
+    if (!isMultiRound(data)) {
+        return { available: false, rows: [], reason:
+            'This event is a single round, so there are no rounds to combine. Round results are the event results.' };
+    }
+    const ids = countableRoundIds(data);
+    if (ids.length === 0) {
+        return { available: false, rows: [], reason:
+            'No rounds are open yet. A round has to be open or closed before it counts towards the event.' };
+    }
+    if (ids.length === 1) {
+        return { available: false, rows: [], reason:
+            'Only a single round is open, so the round leaderboard is already the event standing.' };
+    }
+    const rounds = data.rounds || {};
+    const anyTeam = ids.some(rid => rounds[rid].format !== 'individual');
+    const anyIndividual = ids.some(rid => rounds[rid].format === 'individual');
+    if (anyTeam && anyIndividual) {
+        return { available: false, rows: [], reason:
+            'This event mixes team rounds with Individual Stroke Play. A team score and an individual score are not the same thing, so they cannot be added together — each round still has its own leaderboard.' };
+    }
+    if (anyTeam) {
+        return { available: false, rows: [], reason:
+            'Combined standings are only worked out for Individual Stroke Play at the moment. Each team round still has its own leaderboard.' };
+    }
+    const modes = ids.map(rid => (rounds[rid].scoringMode === 'net' ? 'net' : 'gross'));
+    if (!modes.every(m => m === modes[0])) {
+        return { available: false, rows: [], reason:
+            'This event mixes Gross and Net rounds. Those are different competitions, so the totals cannot be added — each round still has its own leaderboard.' };
+    }
+    return { available: true, reason: null, family: 'individual:' + modes[0] };
+}
+
+function aggregateFamily(data) {
+    const a = aggregateAvailability(data);
+    if (!a.available) return null;
+    const ids = countableRoundIds(data);
+    const rounds = data.rounds || {};
+    const families = ids.map(rid => 'individual:' + (rounds[rid].scoringMode === 'net' ? 'net' : 'gross'));
+    const first = families[0];
+    return first;
+}
+
+function canAggregate(data) {
+    return aggregateFamily(data) !== null;
+}
+
+// EVENT STANDINGS, AGGREGATED BY PLAYER ID.
+//
+// Never by name: two golfers called Dave Smith are two competitors, and summing
+// them would hand one of them the other's rounds.
+//
+// THE COMPLETENESS RULE, stated once and pinned by tests:
+//
+//   A player who has completed every countable round ranks ahead of a player who
+//   has not, regardless of strokes. Fewer holes played is not a better score.
+//   Within the same completeness state, the canonical competition result decides -
+//   summed to-par, which is already relative to the holes actually played.
+//
+// That keeps a mid-round field ordered sensibly while a round is open, and stops a
+// golfer who skipped Saturday from leading on Sunday afternoon.
+function computeEventStandings(data, flightId) {
+    const availability = aggregateAvailability(data);
+    if (!availability.available) return availability;
+    const ids = countableRoundIds(data);
+    const players = data.players || {};
+    const totals = {};
+
+    ids.forEach(rid => {
+        const view = roundView(data, rid);
+        const holeCount = (view.courseData || []).length;
+        // The round's OWN leaderboard rows - same normalization, same handicap
+        // snapshot, same net decision - so a player's event total is built from the
+        // exact numbers their round card showed.
+        computeTournamentLeaderboard(view).forEach(row => {
+            if (row.entryType !== 'player') return;
+            const t = totals[row.playerId] || (totals[row.playerId] = {
+                playerId: row.playerId,
+                playerName: (players[row.playerId] || {}).name || row.playerName,
+                teamName: (players[row.playerId] || {}).name || row.playerName,
+                flightId: (players[row.playerId] || {}).flightId || null,
+                strokes: 0, strokesReceived: 0, toPar: 0,
+                holesPlayed: 0, roundsPlayed: 0, roundsComplete: 0,
+                entryType: 'event', entryKey: row.playerId,
+            });
+            if (!row.hasScores) return;
+            t.strokes += row.strokes;
+            t.strokesReceived += row.strokesReceived || 0;
+            t.toPar += row.toPar;
+            t.holesPlayed += row.thru;
+            t.roundsPlayed += 1;
+            if (holeCount > 0 && row.thru === holeCount) t.roundsComplete += 1;
+        });
+    });
+
+    let rows = Object.keys(totals).map(pid => totals[pid])
+        .filter(r => !flightId || r.flightId === flightId);
+
+    rows.forEach((r, i) => {
+        r.countableRounds = ids.length;
+        r.completedAll = r.roundsComplete === ids.length;
+        r.hasScores = r.roundsPlayed > 0;
+        r.num = i + 1;
+    });
+
+    // THE SAME sort-and-rank the round board uses. Only the ordering rule differs,
+    // because an event position depends on completeness as well as score.
+    rankRows(rows,
+        (a, b) => {
+            // COMPLETENESS BEFORE SCORE. A golfer who skipped Saturday has fewer
+            // strokes than one who played it, and fewer strokes must not buy the lead.
+            if (a.completedAll !== b.completedAll) return a.completedAll ? -1 : 1;
+            if (a.roundsComplete !== b.roundsComplete) return b.roundsComplete - a.roundsComplete;
+            return a.toPar - b.toPar;
+        },
+        (a, b) => a.completedAll === b.completedAll
+               && a.roundsComplete === b.roundsComplete
+               && a.toPar === b.toPar);
+    return { available: true, reason: null, rows: rows };
+}
+
 // FLIGHTS FILTER THE FIELD; THEY DO NOT RANK IT DIFFERENTLY.
 //
 // A flight is a subset of the same teams, standing in the same competition, judged
@@ -247,33 +517,41 @@ function flightTeamCounts(data) {
 // data      the tournament record
 // flightId  optional. Omitted or null ranks the whole field, which is what every
 //           existing caller does and what every historical record produces.
-function computeTournamentLeaderboard(data, flightId) {
-    // Storage is read once, here. The sort and the rank pass below never learn which
-    // model produced these rows, which is what stops a second definition of "tied"
-    // from appearing the moment a second storage shape does.
-    let rows = normalizeLeaderboardEntries(data)
-        .filter(r => !flightId || r.flightId === flightId);
-
+// THE ONE SORT AND THE ONE RANK PASS IN THIS ENGINE.
+//
+// A round leaderboard, a flight leaderboard and an event's combined standings are
+// three questions about the same competition, so they get one answer. Callers
+// supply a comparator and a same-position test; ranking itself is written once.
+//
+// Competition ranking (1, 1, 3, 4...) — and an entry that has not started gets no
+// numeric rank at all rather than being ranked last, because "hasn't teed off" is
+// not a position.
+function rankRows(rows, compare, samePosition) {
     rows.sort((a, b) => {
-        if (a.hasScores && !b.hasScores) return -1;
-        if (!a.hasScores && b.hasScores) return 1;
-        if (!a.hasScores && !b.hasScores) return a.num - b.num;
-        return a.toPar - b.toPar;
+        if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+        if (!a.hasScores && !b.hasScores) return (a.num || 0) - (b.num || 0);
+        return compare(a, b);
     });
-
-    // Competition ranking (1, 1, 3, 4...) — only among teams that actually have scores;
-    // teams that haven't started yet don't get a numeric rank at all.
-    let rank = 0;
     rows.forEach((r, idx) => {
         if (!r.hasScores) { r.rank = null; return; }
-        if (idx > 0 && rows[idx - 1].hasScores && r.toPar === rows[idx - 1].toPar) {
-            r.rank = rows[idx - 1].rank;
+        const prev = rows[idx - 1];
+        if (idx > 0 && prev.hasScores && samePosition(r, prev)) {
+            r.rank = prev.rank;
         } else {
             r.rank = idx + 1;
         }
     });
-
     return rows;
+}
+
+function computeTournamentLeaderboard(data, flightId) {
+    // Storage is read once, in normalizeLeaderboardEntries. Everything after this
+    // point is model-agnostic, which is what stops a second definition of "tied"
+    // appearing the moment a second storage shape does.
+    return rankRows(
+        normalizeLeaderboardEntries(data).filter(r => !flightId || r.flightId === flightId),
+        (a, b) => a.toPar - b.toPar,
+        (r, prev) => r.toPar === prev.toPar);
 }
 
 // Mirrors Trip Mode's prize-payout math exactly: maps final standings onto paid spots, and a
