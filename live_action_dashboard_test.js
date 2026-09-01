@@ -32,7 +32,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 function layered() {
     const sb = loadJsFile('action-model.js');
-    ['money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
+    ['handicap.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
         vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
