@@ -258,7 +258,10 @@ describe('PROTECTED — display only', () => {
 
     test('no press or handicap math changed', () => {
         const me = read('money-engine.js');
-        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(me));
+        // THE RULE DID NOT CHANGE, ITS HOME DID. getStrokes moved from
+        // money-engine.js into handicap.js in the shared-core extraction; the
+        // allocation itself is byte-identical and this still asserts it.
+        assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(read('handicap.js')));
         assert.ok(/function calculateMatchEngine/.test(me));
     });
 });
