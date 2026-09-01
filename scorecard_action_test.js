@@ -10,12 +10,12 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 function layered() {
     const sb = loadJsFile('action-model.js');
-    ['money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
+    ['handicap.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
         vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
 const BS = layered();
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
 // Marty vs John, $50 Stroke Play, pressed three times at three different stakes.
 // John takes holes 10-13 so P2 (H10-18) genuinely belongs to him.
@@ -375,7 +375,7 @@ describe('MONEY INTEGRITY — presentation only', () => {
     });
 
     test('the money engines were not modified', () => {
-        ['money-engine.js', 'settlement-engine.js'].forEach(f =>
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js'].forEach(f =>
             assert.ok(!/sideRow|sideMatchRoundConfig|buildSideActionRows/.test(read(f)), `${f} changed`));
     });
 });
@@ -819,7 +819,7 @@ describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
     });
 
     test('no money engine was touched by a layout batch', () => {
-        ['money-engine.js', 'settlement-engine.js'].forEach(f =>
+        ['handicap.js', 'money-engine.js', 'settlement-engine.js'].forEach(f =>
             assert.ok(!/renderActionCenter|sideRow|buildActionRows/.test(read(f)), `${f} changed`));
     });
 });
