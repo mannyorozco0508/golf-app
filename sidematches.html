@@ -448,7 +448,7 @@
         </div>
 
         <div id="sm-picker-box">
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap a golfer under the side you want them on. Tap again to remove them, or tap them under the other side to move them there. 2v2 works for Match Play and Nassau only.</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Build 1v1 or 2v2 sides — every format supports both. Tap a golfer under the side you want them on. Tap again to remove them, or tap them under the other side to move them there.</div>
         <div class="sm-side-zone-label">Side 1 (green)</div>
         <div id="sm-player-picker-a" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
         <div class="sm-side-zone-label">Side 2 (navy)</div>
@@ -1474,6 +1474,17 @@
         updateSideMatchPickerFeedback();
     }
 
+    // THE ONE SUPPORTED SHAPE, FOR EVERY MATCH FORMAT.
+    //
+    // Match Play, Nassau and Stroke Play all settle 1v1 or 2v2, and a 2v2 side is best
+    // ball in all three. Stroke Play used to be capped at one golfer per side here,
+    // which was stale rather than protective: settlement-engine.js has scored a full
+    // stroke side since the 2v2 regression fix, and the cap never guarded the write
+    // anyway - sidematchPickState survives a format change, so picking 2v2 under Match
+    // Play and switching to Stroke Play walked straight past it. The supported shape is
+    // now stated once, here and again at the save boundary, and the formats agree.
+    const MAX_PER_SIDE = 2;
+
     // Fully deterministic — no auto-balancing, ever. Tapping a golfer under a side always does
     // exactly one of three predictable things:
     //   - not currently on either side -> assigned to the tapped side (unless that side is
@@ -1481,11 +1492,12 @@
     //   - already on the OTHER side -> moves to the tapped side (a deliberate one-tap move,
     //     never a silent one — the organizer tapped that specific zone on purpose)
     //   - already on THIS side -> removed (toggle off)
-    // Max 2 per side, matching the engine's actual 1v1/2v2-only support.
+    //
+    // A golfer is a KEY in sidematchPickState, so being on both sides at once is not a
+    // state this can produce - a tap on the other side moves them, it does not add them.
     function pickPlayerForSide(playerId, side) {
         const current = sidematchPickState[playerId];
-        const format = document.getElementById('sm-format') ? document.getElementById('sm-format').value : 'match';
-        const maxPerSide = format === 'stroke' ? 1 : 2;
+        const maxPerSide = MAX_PER_SIDE;
 
         if (current === side) {
             delete sidematchPickState[playerId];
@@ -2016,14 +2028,37 @@
         const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
         const format = document.getElementById("sm-format").value;
 
+        // THE CONTRACT, ENFORCED WHERE IT COUNTS.
+        //
+        // The picker limits what can be built; this limits what can be SAVED, and the
+        // two are deliberately separate. A picker-only rule is not a rule: the old
+        // Stroke Play cap lived solely in pickPlayerForSide(), sidematchPickState is
+        // cleared only by openSideMatchModal(), and nothing here re-checked it - so a
+        // format switch carried an unsupported selection through to storage. Every
+        // format now has the same supported shape and it is checked again on the way
+        // out, so the old loophole leads somewhere valid instead of somewhere wrong.
+        //
+        // 1 vs 1 or 2 vs 2. Equal sides, at least one golfer each, never more than two.
         if (teamAIds.length < 1 || teamBIds.length < 1 || teamAIds.length !== teamBIds.length) {
             alert("⚠️ Pick an equal number of players per side — 1 vs 1 or 2 vs 2.");
             return;
         }
-        if (teamAIds.length > 2) {
+        if (teamAIds.length > MAX_PER_SIDE || teamBIds.length > MAX_PER_SIDE) {
             alert("⚠️ Side matches support 1v1 or 2v2 only.");
             return;
         }
+
+        // ONE GOLFER, ONE SIDE, BY CONSTRUCTION.
+        //
+        // There is deliberately no overlap check here. sidematchPickState maps a golfer
+        // to ONE side - they are keys, and both arrays above are Object.keys() of that
+        // same map partitioned by value - so a golfer on both sides is not a state this
+        // page can hold. pickPlayerForSide() enforces it where it is real: tapping the
+        // other side MOVES a golfer, it never adds a second entry.
+        //
+        // A check here would be unreachable, and unreachable guards cannot be tested -
+        // a negative control that mutates one changes nothing observable, which is the
+        // kind of assertion this project has already decided is worth less than none.
 
         // The anchor rule. Under Across Groups this now permits a genuine
         // cross-group match, provided this foursome is actually in it.
