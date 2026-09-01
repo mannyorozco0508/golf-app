@@ -453,7 +453,9 @@ describe('DEPENDENCY — no silent fallback to $0', () => {
         // sites with `typeof fn === 'function'`, which turns a missing engine into
         // a quiet zero on a printed scorecard. The Stroke branch calls them
         // unguarded, so absence breaks the card visibly instead.
-        const crippled = loadHtmlInlineScript('stats.html', ['action-model.js']);
+        // { only: true } - the harness now loads a page's real script tags by default,
+        // so a realm deliberately missing the engine has to say so explicitly.
+        const crippled = loadHtmlInlineScript('stats.html', ['action-model.js'], { only: true });
         assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined',
             'without the script tag the page should have no Stroke engine at all');
         const d = FIXTURES['08 stroke 2v2'];
