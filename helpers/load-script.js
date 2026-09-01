@@ -100,7 +100,10 @@ const MODULE_PREREQS = {
     'settlement-engine.js': ['handicap.js'],
     // computeTournamentPayouts() calls allocatePlacePayouts() as a global, exactly
     // as it does in the browser where both tournament pages load payouts.js first.
-    'tournament-engine.js': ['payouts.js'],
+    // tournament-engine.js calls allocatePlacePayouts() for prize money and
+    // getStrokes()/parseHcp() for individual net allocation, all as plain globals -
+    // exactly as it does in the browser, where both tournament pages load them first.
+    'tournament-engine.js': ['handicap.js', 'payouts.js'],
 };
 
 // Loads a plain, standalone .js file (money-engine.js, tournament-engine.js,
