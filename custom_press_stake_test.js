@@ -40,11 +40,11 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
-const PAGE_DEPS = ['money-engine.js','action-model.js','settlement-engine.js'];
+const PAGE_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
 const realms = {};
 function fromPage(page, name) {
     if (!realms[page]) realms[page] = loadHtmlInlineScript(page, PAGE_DEPS);
