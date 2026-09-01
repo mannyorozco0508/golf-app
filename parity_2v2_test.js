@@ -502,19 +502,30 @@ describe('KNOWN DEFECT — stats.html is not 2v2-aware', () => {
 });
 
 // ===========================================================================
-// 3. REACHABILITY
+// 3. SELECTING AND SAVING A 2v2 STROKE MATCH
 //
-// The whole defect would be academic if a 2v2 stroke side match could not be
-// created. It can. Proved by executing the real save path and capturing the
-// Firebase write, not by scanning for a missing validation line.
+// BATCH 1 wrote this section to prove a 2v2 stroke match was reachable BY ACCIDENT:
+// pickPlayerForSide() capped a stroke side at one golfer, but the cap lived in the
+// picker only, sidematchPickState survives a format change, and saveSideMatch()
+// never re-checked it. Pick 2v2 under Match Play, switch format, save.
+//
+// BATCH 2b removed the accident by making the behaviour intentional. Stroke Play
+// takes 1v1 or 2v2 like every other match format, the picker says so, and the save
+// boundary enforces the same contract - so the old bypass now leads somewhere
+// valid instead of somewhere wrong. The tests below moved with it: they still
+// execute the real picker and the real save path and read the real Firebase write,
+// but what they assert changed from "this leaks" to "this is supported".
+//
+// The supported shape, stated once: equal sides, one or two golfers each, and no
+// golfer on both sides.
 // ===========================================================================
 
-describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI path', () => {
+describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every format', () => {
 
     // A fresh page realm per test, with the Firebase write captured. Nothing in
     // production is altered: db.ref is replaced on the SAME stub object the page
     // already holds, which is what the harness hands every test.
-    function pageWithCapture() {
+    function pageWithCapture(roster) {
         const sb = loadHtmlInlineScript('sidematches.html', PAGE_DEPS['sidematches.html']);
         const writes = [];
         sb.db.ref = (refPath) => {
@@ -537,7 +548,7 @@ describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI
         // would have set them on load.
         vm.runInContext(
             'currentMode = "TESTCD";' +
-            'currentData = { players: ' + JSON.stringify(FOURSOME) + ', courseData: [], scores: {} };' +
+            'currentData = { players: ' + JSON.stringify(roster || FOURSOME) + ', courseData: [], scores: {} };' +
             'lockedGroup = null; hasGroupLock = false;' +
             'sidematchPickState = {}; actionScope = null; actionOwnerGroup = null;',
             sb
@@ -545,125 +556,258 @@ describe('REACHABILITY — a 2v2 stroke side match can be saved from the real UI
 
         const setField = (id, value) => { sb.document.getElementById(id).value = value; };
         const pickState = () => plain(vm.runInContext('sidematchPickState', sb));
-        return { sb, writes, setField, pickState };
+        const alerts = [];
+        sb.alert = (msg) => alerts.push(String(msg));
+        return { sb, writes, setField, pickState, alerts };
     }
 
-    test('HARNESS PROOF: the picker cap DOES fire when Stroke is chosen first', () => {
-        // This is the control that makes the next test meaningful. If the mini-DOM
-        // harness were inert, pickPlayerForSide would appear to accept everything
-        // and the bypass below would prove nothing. Here the very same function,
-        // in the very same harness, correctly refuses a second golfer on a side
-        // once the format is stroke - so the cap is genuinely executing.
-        const { sb, setField, pickState } = pageWithCapture();
-        setField('sm-format', 'stroke');
+    // Fill in whichever stake fields the chosen format reads, then save.
+    function saveAs(ctx, format) {
+        ctx.setField('sm-format', format);
+        ctx.sb.onSideMatchFormatChange();
+        ctx.setField('sm-scoring', 'gross');
+        if (format === 'stroke') {
+            ctx.setField('sm-holestake', '0');
+            ctx.setField('sm-overallstake', String(OVERALL_STAKE));
+            ctx.setField('sm-tie-rule', 'carry');
+            ctx.setField('sm-overall-mode', 'stroke');
+            ctx.setField('sm-segment', 'full');
+        } else {
+            ctx.setField('sm-stake', String(OVERALL_STAKE));
+            ctx.setField('sm-press-rule', 'none');
+            if (format === 'nassau') {
+                ctx.setField('sm-front-stake', String(OVERALL_STAKE));
+                ctx.setField('sm-back-stake', String(OVERALL_STAKE));
+                ctx.setField('sm-overall-stake', String(OVERALL_STAKE));
+                ctx.setField('sm-autopress-mode', 'auto');
+            }
+        }
+        ctx.sb.saveSideMatch();
+        return ctx.writes;
+    }
 
-        sb.pickPlayerForSide(String(ALPHA_1.id), 'a');
-        sb.pickPlayerForSide(String(ALPHA_2.id), 'a');
+    const pick = (ctx, player, side) => ctx.sb.pickPlayerForSide(String(player.id), side);
 
-        assert.deepEqual(pickState(), { '1': 'a' },
-            'with Stroke selected first, the picker must admit only one golfer per side');
+    // ---- 1. Stroke selected FIRST allows two per side -----------------------
+
+    test('Stroke Play, chosen first, accepts a second golfer on a side', () => {
+        // The exact thing Batch 1 proved impossible through the normal path. No format
+        // switch, no trick: pick Stroke, then build the sides.
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
+
+        pick(ctx, ALPHA_1, 'a');
+        pick(ctx, ALPHA_2, 'a');
+        pick(ctx, BRAVO_1, 'b');
+        pick(ctx, BRAVO_2, 'b');
+
+        assert.deepEqual(ctx.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' });
     });
 
-    test('the picker DOES allow 2v2 while Match Play is selected', () => {
-        const { sb, setField, pickState } = pageWithCapture();
-        setField('sm-format', 'match');
+    // ---- 2. A third golfer on one side is still refused ---------------------
 
-        sb.pickPlayerForSide(String(ALPHA_1.id), 'a');
-        sb.pickPlayerForSide(String(ALPHA_2.id), 'a');
-        sb.pickPlayerForSide(String(BRAVO_1.id), 'b');
-        sb.pickPlayerForSide(String(BRAVO_2.id), 'b');
+    test('a THIRD golfer on a side is refused, and nothing silently moves', () => {
+        const roster = FOURSOME.concat([{ id: 5, name: 'Cal Charlie', hcp: '0' }]);
+        const ctx = pageWithCapture(roster);
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
 
-        assert.deepEqual(pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' });
+        pick(ctx, ALPHA_1, 'a');
+        pick(ctx, ALPHA_2, 'a');
+        const before = ctx.pickState();
+        ctx.sb.pickPlayerForSide('5', 'a');
+
+        assert.deepEqual(ctx.pickState(), before,
+            'a full side must reject the tap outright - no reassignment, no swap');
+        assert.match(ctx.sb.document.getElementById('sm-team-size-indicator').innerHTML,
+            /already has 2/, 'and the golfer must be told why');
     });
 
-    test('switching the format to Stroke does NOT clear the 2v2 selection', () => {
-        const { sb, setField, pickState } = pageWithCapture();
-        setField('sm-format', 'match');
-        [ALPHA_1, ALPHA_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'a'));
-        [BRAVO_1, BRAVO_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'b'));
+    // ---- 3 & 4. Both supported shapes actually save -------------------------
 
-        setField('sm-format', 'stroke');
-        sb.onSideMatchFormatChange();
+    test('1v1 Stroke Play saves', () => {
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
+        pick(ctx, ALPHA_1, 'a');
+        pick(ctx, BRAVO_1, 'b');
 
-        assert.deepEqual(pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' },
-            'sidematchPickState is cleared only by openSideMatchModal(), never by a format change');
+        const writes = saveAs(ctx, 'stroke');
+        assert.equal(writes.length, 1);
+        assert.equal(writes[0].value.format, 'stroke');
+        assert.deepEqual(writes[0].value.teamAIds, ['1']);
+        assert.deepEqual(writes[0].value.teamBIds, ['3']);
     });
 
-    test('saveSideMatch() WRITES a 2v2 stroke side match — the write boundary is unguarded', () => {
-        const { sb, writes, setField } = pageWithCapture();
+    test('2v2 Stroke Play is intentionally selectable and saveable', () => {
+        // WAS: "saveSideMatch() WRITES a 2v2 stroke side match - the write boundary is
+        // unguarded". Same execution, same captured write; the finding is no longer a
+        // loophole but the supported behaviour, reached without touching the format
+        // selector twice.
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
+        pick(ctx, ALPHA_1, 'a');
+        pick(ctx, ALPHA_2, 'a');
+        pick(ctx, BRAVO_1, 'b');
+        pick(ctx, BRAVO_2, 'b');
 
-        // The exact sequence a golfer can perform today.
-        setField('sm-format', 'match');
-        [ALPHA_1, ALPHA_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'a'));
-        [BRAVO_1, BRAVO_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'b'));
-
-        setField('sm-format', 'stroke');
-        sb.onSideMatchFormatChange();
-
-        setField('sm-holestake', '0');
-        setField('sm-overallstake', String(OVERALL_STAKE));
-        setField('sm-scoring', 'gross');
-        setField('sm-tie-rule', 'carry');
-        setField('sm-overall-mode', 'stroke');
-        setField('sm-segment', 'full');
-
-        sb.saveSideMatch();
-
-        assert.equal(writes.length, 1, 'saveSideMatch() should have written exactly one record');
+        const writes = saveAs(ctx, 'stroke');
+        assert.equal(writes.length, 1, 'the match should have been written');
 
         const w = writes[0];
-        // Proves the function ran all the way to its own write, rather than a test
+        // Proves the function ran all the way to its own write rather than a test
         // fabricating a payload: the path is the one saveSideMatch() builds.
         assert.equal(w.path, 'events/TESTCD/sideMatches/PUSHKEY');
-
         assert.equal(w.value.format, 'stroke');
         assert.deepEqual(w.value.teamAIds, ['1', '2']);
         assert.deepEqual(w.value.teamBIds, ['3', '4']);
-        assert.equal(w.value.teamAIds.length, 2);
-        assert.equal(w.value.teamBIds.length, 2);
         assert.equal(w.value.overallStake, OVERALL_STAKE);
     });
 
-    test('the record that gets saved is the shape Batch 2 taught the tab to settle', () => {
-        // Closes the loop between reachability and correctness. Batch 1 ended this
-        // test by showing the creating tab reported $0 on a match the Receipt paid.
-        // The write is unchanged - the tab now agrees with the Receipt about it.
-        const { sb, writes, setField } = pageWithCapture();
-        setField('sm-format', 'match');
-        [ALPHA_1, ALPHA_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'a'));
-        [BRAVO_1, BRAVO_2].forEach(p => sb.pickPlayerForSide(String(p.id), 'b'));
-        setField('sm-format', 'stroke');
-        sb.onSideMatchFormatChange();
-        setField('sm-holestake', '0');
-        setField('sm-overallstake', String(OVERALL_STAKE));
-        setField('sm-scoring', 'gross');
-        setField('sm-tie-rule', 'carry');
-        setField('sm-overall-mode', 'stroke');
-        setField('sm-segment', 'full');
-        sb.saveSideMatch();
+    // ---- 5 & 6. What must NOT save -----------------------------------------
 
-        const saved = writes[0].value;
+    test('unequal sides do not save', () => {
+        // Built by hand rather than through the picker, because the picker cannot
+        // produce this - which is exactly why the SAVE boundary has to check. A
+        // picker-only rule was the whole Batch 1 finding.
+        const ctx = pageWithCapture();
+        vm.runInContext("sidematchPickState = { '1': 'a', '2': 'a', '3': 'b' };", ctx.sb);
+
+        const writes = saveAs(ctx, 'stroke');
+        assert.equal(writes.length, 0, '2 vs 1 must be refused');
+        assert.ok(ctx.alerts.some(a => /equal number/.test(a)), 'and the golfer must be told why');
+    });
+
+    test('three per side does not save', () => {
+        const ctx = pageWithCapture(FOURSOME.concat([
+            { id: 5, name: 'Cal Charlie', hcp: '0' }, { id: 6, name: 'Dan Delta', hcp: '0' }]));
+        vm.runInContext("sidematchPickState = { '1': 'a', '2': 'a', '5': 'a', '3': 'b', '4': 'b', '6': 'b' };", ctx.sb);
+
+        const writes = saveAs(ctx, 'stroke');
+        assert.equal(writes.length, 0, '3 vs 3 must be refused - two per side is the supported maximum');
+        assert.ok(ctx.alerts.some(a => /1v1 or 2v2/.test(a)));
+    });
+
+    test('a golfer cannot occupy both sides', () => {
+        // Prevention lives in the picker, and it is structural rather than a check:
+        // sidematchPickState maps a golfer to ONE side, so tapping the other side
+        // MOVES them. Both id lists in saveSideMatch() are Object.keys() of that same
+        // map partitioned by value, which makes overlap unrepresentable rather than
+        // merely rejected.
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
+
+        pick(ctx, ALPHA_1, 'a');
+        assert.deepEqual(ctx.pickState(), { '1': 'a' });
+
+        pick(ctx, ALPHA_1, 'b');
+        assert.deepEqual(ctx.pickState(), { '1': 'b' },
+            'tapping the other side must MOVE a golfer, never duplicate them');
+
+        // And what actually gets saved is disjoint, checked on the real write rather
+        // than on the intermediate state.
+        pick(ctx, BRAVO_1, 'a');
+        const w = saveAs(ctx, 'stroke')[0].value;
+        const overlap = w.teamAIds.filter(id => w.teamBIds.includes(id));
+        assert.deepEqual(overlap, [], 'no golfer may appear on both sides of a saved match');
+    });
+
+    // ---- 7 & 8. The other formats are unchanged ----------------------------
+
+    test('Match Play 2v2 still works', () => {
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'match');
+        ctx.sb.onSideMatchFormatChange();
+        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
+        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+
+        const writes = saveAs(ctx, 'match');
+        assert.equal(writes.length, 1);
+        assert.equal(writes[0].value.format, 'match');
+        assert.deepEqual(writes[0].value.teamAIds, ['1', '2']);
+        assert.deepEqual(writes[0].value.teamBIds, ['3', '4']);
+    });
+
+    test('Nassau 2v2 still works', () => {
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'nassau');
+        ctx.sb.onSideMatchFormatChange();
+        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
+        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+
+        const writes = saveAs(ctx, 'nassau');
+        assert.equal(writes.length, 1);
+        assert.equal(writes[0].value.format, 'nassau');
+        assert.deepEqual(writes[0].value.teamAIds, ['1', '2']);
+        assert.deepEqual(writes[0].value.teamBIds, ['3', '4']);
+    });
+
+    // ---- 9. Format switching in both directions ----------------------------
+
+    test('switching format preserves a valid 2v2 selection, both ways', () => {
+        // sidematchPickState is cleared only by openSideMatchModal(), so a selection
+        // survives a format change. That used to be the bypass; now every format
+        // accepts the same shape, so surviving is correct rather than dangerous.
+        const toStroke = pageWithCapture();
+        toStroke.setField('sm-format', 'match');
+        toStroke.sb.onSideMatchFormatChange();
+        pick(toStroke, ALPHA_1, 'a'); pick(toStroke, ALPHA_2, 'a');
+        pick(toStroke, BRAVO_1, 'b'); pick(toStroke, BRAVO_2, 'b');
+        toStroke.setField('sm-format', 'stroke');
+        toStroke.sb.onSideMatchFormatChange();
+        assert.deepEqual(toStroke.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' },
+            'Match Play -> Stroke Play must not drop a golfer');
+        assert.equal(saveAs(toStroke, 'stroke')[0].value.format, 'stroke');
+
+        const toMatch = pageWithCapture();
+        toMatch.setField('sm-format', 'stroke');
+        toMatch.sb.onSideMatchFormatChange();
+        pick(toMatch, ALPHA_1, 'a'); pick(toMatch, ALPHA_2, 'a');
+        pick(toMatch, BRAVO_1, 'b'); pick(toMatch, BRAVO_2, 'b');
+        toMatch.setField('sm-format', 'match');
+        toMatch.sb.onSideMatchFormatChange();
+        assert.deepEqual(toMatch.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' },
+            'Stroke Play -> Match Play must not drop a golfer either');
+        assert.equal(saveAs(toMatch, 'match')[0].value.format, 'match');
+    });
+
+    test('a saved 2v2 stroke match settles through the canonical engine', () => {
+        // Closes the loop: the record the picker now produces on purpose is the record
+        // Batch 2 taught the tab and the Receipt to agree about.
+        const ctx = pageWithCapture();
+        ctx.setField('sm-format', 'stroke');
+        ctx.sb.onSideMatchFormatChange();
+        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
+        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+        const saved = saveAs(ctx, 'stroke')[0].value;
+
         const scores = lopsided2v2Scores();
         const data = { gameFormat: 'stroke', players: FOURSOME, courseData: cd18,
                        scores: scores, sideMatches: { saved: saved } };
-
         const result = plain(realmFor(CANONICAL).computeCombinedNetTotals(data, cd18, scores));
         const nets = Object.values(result.netByName);
 
-        // Settlement pays all four golfers on the saved record...
         assert.equal(nets.length, 4);
         assert.equal(nets.reduce((s, v) => s + v.net, 0), 0);
-        assert.ok(nets.some(v => v.net > 0), 'somebody should be owed money');
 
-        // ...and the tab that created it now reports the same wager.
         const pageView = callOverall(realmFor('sidematches.html'), overallCfg2v2(), scores);
-        assert.equal(pageView.base.p1Money, OVERALL_STAKE,
-            'the tab that created the match must show the money the Receipt pays');
+        assert.equal(pageView.base.p1Money, OVERALL_STAKE);
+        nets.filter(v => v.net > 0).forEach(v => assert.equal(v.net, pageView.base.p1Money / 2));
+    });
 
-        // Same economic reality, stated in the two vocabularies: one side wins the
-        // whole stake, and settlement halves it between that side's two golfers.
-        const share = pageView.base.p1Money / 2;
-        nets.filter(v => v.net > 0).forEach(v => assert.equal(v.net, share));
+    // ---- 10. The instruction line tells the truth --------------------------
+
+    test('the picker instruction no longer limits 2v2 to Match Play and Nassau', () => {
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
+        assert.ok(!/2v2 works for Match Play and Nassau only/.test(src),
+            'the modal must not tell golfers 2v2 is unavailable to Stroke Play');
+        assert.ok(!/Match Play and Nassau only/.test(src),
+            'nor any rewording of the same claim');
+        assert.match(src, /Build 1v1 or 2v2 sides/,
+            'and it should say plainly that both shapes are available');
     });
 });
 
