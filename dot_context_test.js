@@ -540,7 +540,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v19-payouts-and-shells';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v20-product-links';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -562,7 +562,7 @@ describe('SERVICE WORKER', () => {
          './firebase-app-compat.js', './firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1,
                 'shell entry missing: ' + f + '\nactual entries:\n' + entries.join('\n')));
-        assert.equal(entries.length, 30, 'the shell list gained or lost an entry');
+        assert.equal(entries.length, 31, 'the shell list gained or lost an entry');
     });
 
     test('fetch strategy is unchanged - still network-first', () => {
