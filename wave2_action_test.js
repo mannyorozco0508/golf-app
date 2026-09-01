@@ -19,7 +19,7 @@ function loadLayered(files) {
     });
     return sandbox;
 }
-const BS = loadLayered(['action-model.js', 'money-engine.js', 'bet-strip.js']);
+const BS = loadLayered(['handicap.js', 'action-model.js', 'money-engine.js', 'bet-strip.js']);
 
 // The representative stacked round from the spec, played nine holes in.
 function stacked(opts) {
@@ -181,7 +181,7 @@ describe('SIDE ACTION — visible on the scorecard, scoped to this group', () =>
 
 describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
     function render(open, data, players) {
-        const sb = loadHtmlInlineScript('index.html', ['action-model.js', 'money-engine.js', 'bet-strip.js']);
+        const sb = loadHtmlInlineScript('index.html', ['handicap.js', 'action-model.js', 'money-engine.js', 'bet-strip.js']);
         vm.runInContext(
             `currentData = ${JSON.stringify(data)};` +
             `window.__scFilteredPlayers = currentData.players;` +
