@@ -104,7 +104,12 @@
 // tournament.html now writes both relationship pointers. All four are precached shell
 // files, so an installed PWA on v20 would keep showing a Tournament tile this product
 // no longer owns. Shell MEMBERSHIP is unchanged - no file was added or removed.
-const CACHE_VERSION = 'golfapp-v21-product-boundary';
+// Moved to v22 for the flights/divisions wave. tournament.html and
+// tournament-engine.js changed - both precached shell files - so an installed PWA on
+// v21 would keep an organizer page with no flight management on it. Shell MEMBERSHIP
+// is unchanged: flights are a node inside the existing tournament record, not a new
+// runtime module.
+const CACHE_VERSION = 'golfapp-v22-flights';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
