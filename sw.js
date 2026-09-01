@@ -64,7 +64,13 @@
 // and the instruction line no longer tells golfers 2v2 is unavailable to them. On
 // v14 an installed PWA would keep refusing the second golfer on a Stroke side and
 // keep printing copy that contradicts what the app now settles. Shell list unchanged.
-const CACHE_VERSION = 'golfapp-v15-2v2-stroke-picker';
+// Moved to v16 because stats.html - a precached shell file - changed: the Final
+// Scorecard now loads settlement-engine.js and uses the canonical stroke engines
+// instead of its own p1/p2-only copies. On v15 an installed PWA would keep printing
+// $0.00 for a 2v2 Stroke Play side match on the card the group actually keeps,
+// while the Receipt paid it. The shell FILE LIST is unchanged - settlement-engine.js
+// was already precached for settlement.html and sidematches.html.
+const CACHE_VERSION = 'golfapp-v16-stats-canonical';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
