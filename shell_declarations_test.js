@@ -180,16 +180,30 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
         // B8 creates two. B7 must not.
         assert.equal(SHARED.filter(f => f === 'sw.js').length, 1);
         assert.equal(SHARED.filter(f => f === 'manifest.json').length, 1);
+        // B8 gives each deployment its own worker and manifest, but they are
+        // GENERATED into dist/ by build-shell.js - there is still exactly one of
+        // each in the source tree, which is the thing that stays reviewable.
         ['sw-consumer.js', 'sw-tournament.js', 'manifest-consumer.json',
          'manifest-tournament.json'].forEach(f =>
             assert.ok(!fs.existsSync(path.join(REPO_ROOT, f)),
-                f + ' exists - that is B8, not B7'));
+                f + ' exists in source - the per-product files are generated, not committed'));
     });
 
-    test('no deployment output directories were created', () => {
-        ['dist', 'dist/consumer', 'dist/tournament'].forEach(d =>
-            assert.ok(!fs.existsSync(path.join(REPO_ROOT, d)),
-                d + ' exists - that is B8, not B7'));
+    test('dist/ is GENERATED output, never source', () => {
+        // REVERSED IN B8. This used to assert that dist/ did not exist at all,
+        // because a declaration batch had no business producing deployment
+        // artifacts. B8 produces exactly two, from these same declarations - so the
+        // useful statement is now that they are generated and ignored rather than
+        // checked in, and that nothing in the source tree depends on them existing.
+        const ignore = fs.readFileSync(path.join(REPO_ROOT, 'gitignore'), 'utf8');
+        assert.match(ignore, /^dist\/$/m, 'dist/ must be ignored - it is build output');
+        assert.ok(fs.existsSync(path.join(REPO_ROOT, 'build-shell.js')),
+            'the outputs must be reproducible from a build script in the repo');
+        // The source tree still stands on its own: every declared file exists at the
+        // root, which is what makes a rebuild from scratch possible.
+        [...SHARED, ...CONSUMER, ...TOURNAMENT].forEach(f =>
+            assert.ok(fs.existsSync(path.join(REPO_ROOT, f)),
+                f + ' is declared but no longer in the flat source tree'));
     });
 
     test('the service worker still serves one scope, network-first, ignoring queries', () => {
