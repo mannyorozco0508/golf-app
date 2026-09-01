@@ -4,6 +4,9 @@
 // tournament-scorecard.html (each team's own scoring/leaderboard view), so
 // both pages always compute totals and standings identically. Loaded via
 // <script src="tournament-engine.js"> — plain functions, no DOM references.
+//
+// DEPENDS ON payouts.js for allocatePlacePayouts(). Both tournament pages load
+// it; the mobile bundle and the service worker ship it.
 // ============================================================================
 
 // Works out a team's score for one hole from whichever players have posted a score so far.
@@ -91,27 +94,16 @@ function computeTournamentLeaderboard(data) {
 // tie that straddles the paid/unpaid line only splits whatever money actually falls within
 // the paid range.
 function computeTournamentPayouts(rows, spotAmounts) {
-    const n = spotAmounts.length;
+    // The place/tie rule lives in payouts.js, shared with Trip Mode's prize table.
+    // It was duplicated here and there until the shared-core extraction; the
+    // comment on this function used to say it "mirrors Trip Mode's prize-payout
+    // math exactly", which described a duplicate rather than replacing one.
+    //
+    // Teams with no scores are excluded first - they have no rank - and the
+    // team-shaped return is rebuilt here so every existing caller is untouched.
     const scoredRows = rows.filter(r => r.hasScores);
-    const rankGroups = {};
-    scoredRows.forEach(r => {
-        if (!rankGroups[r.rank]) rankGroups[r.rank] = [];
-        rankGroups[r.rank].push(r);
-    });
-
-    let payouts = [];
-    Object.keys(rankGroups).map(Number).sort((a, b) => a - b).forEach(rank => {
-        const group = rankGroups[rank];
-        const lastPos = rank + group.length - 1;
-        let sumForGroup = 0;
-        for (let pos = rank; pos <= lastPos; pos++) {
-            if (pos >= 1 && pos <= n) sumForGroup += spotAmounts[pos - 1];
-        }
-        const perTeam = sumForGroup / group.length;
-        group.forEach(r => payouts.push({ teamName: r.teamName, rank, amount: perTeam }));
-    });
-
-    return payouts;
+    return allocatePlacePayouts(scoredRows, spotAmounts)
+        .map(p => ({ teamName: p.entry.teamName, rank: p.rank, amount: p.amount }));
 }
 
 function ordinal(n) {
