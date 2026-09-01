@@ -7,6 +7,11 @@
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
+    <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
+         index through the shared primitives; tournament-engine.js calls them as
+         globals, so this must load first. Already in SHARED_SHELL, so it was already
+         shipping to this deployment - only the tag was missing. -->
+    <script src="handicap.js"></script>
     <script src="payouts.js"></script>
     <script src="tournament-engine.js"></script>
     <style>
@@ -183,30 +188,45 @@
         return 'Scramble';
     }
 
+    // ONE SCORING SURFACE, TWO SCOPES.
+    //
+    // ?team=N   a legacy team event. Untouched, forever - organizers have already
+    //           texted these links out and they must keep working exactly as they do.
+    // ?group=G  an individual event. The link identifies a SCORING GROUP - who is
+    //           physically playing together - and the golfer enters a gross score for
+    //           each person in it. Net is never entered; it is derived.
+    //
+    // Forking a second scorecard page would have meant two surfaces drifting apart on
+    // offline behaviour, theming and error states, so the page branches instead.
     const urlParams = new URLSearchParams(window.location.search);
     let currentCode = urlParams.get('tourney') ? urlParams.get('tourney').toUpperCase() : null;
     let myTeamNum = urlParams.get('team') ? parseInt(urlParams.get('team'), 10) : null;
+    let myGroupId = urlParams.get('group') || null;
     let currentData = {};
     let hasAutoScrolled = false; // guards the shotgun starting-hole auto-scroll to fire once per page load
 
-    if (!currentCode || !myTeamNum) {
+    if (!currentCode || (!myTeamNum && !myGroupId)) {
         document.getElementById('error-detail').textContent = !currentCode
             ? "This link is missing its tournament code. Ask your organizer to send the scoring link again."
-            : "This link is missing its group number, so we don't know which scorecard to open. Ask your organizer to send the scoring link again.";
+            : "This link is missing its group, so we don't know which scorecard to open. Ask your organizer to send the scoring link again.";
         document.getElementById('error-content').style.display = 'block';
     } else {
         db.ref(`tournaments/${currentCode}`).on('value', (snap) => {
             currentData = snap.val();
-            if (!currentData || !currentData.teams || !currentData.teams[`team${myTeamNum}`]) {
-                document.getElementById('error-detail').textContent = (!currentData || !currentData.teams)
+            const group = myGroupId ? (currentData && currentData.scoringGroups || {})[myGroupId] : null;
+            const teamOk = myTeamNum && currentData && currentData.teams && currentData.teams[`team${myTeamNum}`];
+            if (!currentData || (!teamOk && !group)) {
+                document.getElementById('error-detail').textContent = !currentData
                     ? `No tournament found with the code ${currentCode}. Ask your organizer to check the link.`
-                    : `That tournament exists, but it has no group ${myTeamNum}. Ask your organizer for your own scoring link.`;
+                    : (myGroupId
+                        ? `That tournament exists, but it has no group matching this link. Ask your organizer for your own scoring link.`
+                        : `That tournament exists, but it has no group ${myTeamNum}. Ask your organizer for your own scoring link.`);
                 document.getElementById('error-content').style.display = 'block';
                 document.getElementById('main-content').style.display = 'none';
                 return;
             }
             document.getElementById('main-content').style.display = 'block';
-            renderAll();
+            if (group) renderGroup(group); else renderAll();
         });
     }
 
@@ -278,6 +298,69 @@
         const path = `tournaments/${currentCode}/scores/team${myTeamNum}_p${playerIdx}_h${holeNum}`;
         const ref = db.ref(path);
         trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
+    }
+
+    // A GOLFER'S SCORE IS WRITTEN UNDER THEIR ID. Not their position in the group,
+    // not their name - so moving somebody to another group, or fixing the spelling of
+    // their name, cannot move a single stroke. Scoped to this group's own players:
+    // the id is checked against the group before anything is written.
+    function saveIndividualScore(playerId, holeNum, val) {
+        const group = (currentData.scoringGroups || {})[myGroupId] || {};
+        if ((group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer
+        const ref = db.ref(`tournaments/${currentCode}/scores/${playerId}_h${holeNum}`);
+        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
+    }
+
+    function renderGroup(group) {
+        const players = currentData.players || {};
+        const ids = (group.playerIds || []).filter(pid => players[pid]);
+        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const scores = currentData.scores || {};
+        const netMode = currentData.scoringMode === 'net';
+
+        document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
+        document.getElementById('event-sub').textContent =
+            `${currentData.courseName} • Individual Stroke Play • ${netMode ? 'Net' : 'Gross'}`;
+        document.getElementById('scoring-for').innerHTML =
+            `You're scoring for <strong>${group.name || 'your group'}</strong>`;
+        // Handicaps are shown because net is derived from them - a golfer needs to see
+        // WHY their net differs from their gross without the page explaining allocation.
+        document.getElementById('team-roster').innerHTML = ids.map(pid =>
+            `${players[pid].name}${netMode ? ` <span style="font-weight:normal; color:var(--text-muted);">(${players[pid].handicap || 0})</span>` : ''}`
+        ).join(' &nbsp;•&nbsp; ') || 'No golfers assigned yet';
+
+        if (group.startingHole) {
+            const banner = document.getElementById('starting-hole-banner');
+            banner.style.display = 'block';
+            banner.textContent = `🚀 Start on hole ${group.startingHole}`;
+        }
+
+        let html = '';
+        const thruCount = {};
+        courseData.forEach(h => {
+            html += `<div class="hole-row" id="hole-row-${h.hole}" style="flex-wrap:wrap;">
+                <div class="hole-info">
+                    <span class="hole-num">Hole ${h.hole}</span>
+                    <span class="hole-par">Par ${h.par}</span>
+                </div>
+                <div style="flex-basis:100%; display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">` +
+                ids.map(pid => {
+                    const v = scores[`${pid}_h${h.hole}`];
+                    if (v && v > 0) thruCount[pid] = (thruCount[pid] || 0) + 1;
+                    const first = (players[pid].name || '').split(' ')[0];
+                    return `<label style="display:flex; align-items:center; gap:4px; font-size:0.8rem;">
+                        <span style="color:var(--text-muted);">${first}</span>
+                        <input type="number" class="hole-score-input" inputmode="numeric" min="1" style="width:52px;"
+                            value="${v || ''}" onchange="saveIndividualScore('${pid}', ${h.hole}, this.value)">
+                    </label>`;
+                }).join('') + `</div></div>`;
+        });
+        document.getElementById('holes-list').innerHTML = html;
+
+        const played = Math.max(0, ...ids.map(pid => thruCount[pid] || 0));
+        document.getElementById('status-main').textContent = `Thru ${played}`;
+        document.getElementById('status-sub').textContent =
+            netMode ? 'Enter gross scores — net is worked out for you' : 'Enter gross scores';
     }
 
     function renderAll() {
