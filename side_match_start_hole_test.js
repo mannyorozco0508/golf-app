@@ -369,6 +369,24 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
         });
     });
 
+    // THE COURSE IS HALF THE ARGUMENT. `[p1, p2]` is still the players argument at
+    // every one of those call sites, and it always will be - the engine takes the
+    // whole side on the CONFIG, as sideA/sideB. So the assertions above would stay
+    // green while a page quietly dropped two of four golfers, which is exactly the
+    // defect Batches 2 and 3 fixed. Both halves are checked now: the scoped course
+    // reaches the engine, AND the complete sides do.
+    ['settlement-engine.js', 'stats.html', 'sidematches.html'].forEach(f => {
+        test(`${f} passes the COMPLETE sides, not just the first golfer of each`, () => {
+            const src = read(f);
+            assert.match(src, /sideA: team[AB]?Players|sideA: teamAPlayers/,
+                `${f} must hand the engine sideA built from the whole side`);
+            assert.match(src, /sideB: teamBPlayers/,
+                `${f} must hand the engine sideB built from the whole side`);
+            assert.ok(/Object\.assign\(\{ holeEnabled/.test(src) || /sides\)/.test(src) || /Object\.assign\(\{ overallEnabled/.test(src),
+                `${f} must merge those sides into the engine config`);
+        });
+    });
+
     // FOUND BY THE 100-SIMULATION AUDIT (P1, display only).
     //
     // A Nassau's F9/B9 windows are fixed at 1-9 and 10-18 inside the engine - they are
