@@ -14,8 +14,13 @@
 //     sidematches.html       CANONICAL CONSUMER. Loads settlement-engine.js and
 //                            owns no stroke-engine copy at all. Batch 2.
 //
-//     stats.html             REMAINING DIVERGENT SHADOW. Still carries its own
-//                            p1/p2-only copies. Guarded below until Batch 3.
+//     stats.html             CANONICAL CONSUMER TOO, as of Batch 3. Same move,
+//                            same reasons, and its own golden-render lock lives
+//                            in stats_canonical_render_test.js.
+//
+// There is no page-local Stroke engine left anywhere in the app. The KNOWN
+// DEFECT assertions this file was written to pin have all been reversed rather
+// than deleted, in the batch that earned each reversal.
 //
 // ---------------------------------------------------------------------------
 // WHAT WAS WRONG, AND WHAT BATCH 2 DID ABOUT IT
@@ -37,18 +42,16 @@
 // golfer per side. The picker cap is deliberately UNTOUCHED - that is Batch 2b.
 //
 // ---------------------------------------------------------------------------
-// THE DEFECT-PINNING ASSERTIONS THAT REMAIN
+// NO DEFECT-PINNING ASSERTIONS REMAIN
 // ---------------------------------------------------------------------------
 //
-// The stats.html tests still assert that canonical and page DISAGREE, marked:
+// Batch 1 pinned the divergence for both pages. Batch 2 reversed the
+// sidematches.html half; Batch 3 reversed the stats.html half. Every one was
+// rewritten from "these disagree" to "these agree" rather than removed, so the
+// coverage survived each transition and the file records which batch earned it.
 //
-//     KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3
-//
-// They document a defect, not a desired state. When stats.html moves to the
-// canonical engine those assertions MUST fail, and whoever does that work MUST
-// rewrite them from "these disagree" to "these agree" - exactly as the
-// sidematches.html block below was rewritten. That failure is the point. Do not
-// delete or weaken an assertion to make a batch pass.
+// If a page-local Stroke engine ever comes back, the no-copy assertions below
+// fail before any money does.
 //
 // ---------------------------------------------------------------------------
 // HARNESS HONESTY
@@ -107,14 +110,13 @@ function engineRealm() {
 
 // PRODUCTION DEPENDENCY LISTS, not convenient ones.
 //
-// sidematches.html gained a real <script src="settlement-engine.js"> in Batch 2,
-// so the list below changed with the page. stats.html still loads action-model.js
-// alone, and its inline copies remain the only stroke engines it has at runtime.
+// Both pages gained a real <script src="settlement-engine.js"> - sidematches.html
+// in Batch 2, stats.html in Batch 3 - so the lists below changed with the pages.
 // A test asserts each list against the page's own markup, so neither can quietly
 // stop describing production.
 const PAGE_DEPS = {
     'sidematches.html': ['action-model.js', 'settlement-engine.js'],
-    'stats.html': ['action-model.js'],
+    'stats.html': ['action-model.js', 'settlement-engine.js'],
 };
 
 const realms = {};
@@ -128,14 +130,16 @@ function realmFor(name) {
 }
 
 const CANONICAL = 'settlement-engine.js';
-// Pages that still own a stroke-engine copy of their own. sidematches.html left
-// this list in Batch 2; stats.html is the last member.
-const PAGE_COPIES = ['stats.html'];
-// Every realm whose stroke engines must agree. sidematches.html is here not as an
-// independent implementation but as the CONSUMER of the canonical one - running it
-// proves the page ends up with the right function at runtime, which source text
-// alone cannot show.
-const ALL_REALMS = [CANONICAL, 'sidematches.html'].concat(PAGE_COPIES);
+// Pages that own a stroke-engine copy of their own. sidematches.html left this
+// list in Batch 2 and stats.html in Batch 3, so it is now EMPTY - which is the
+// outcome this whole file existed to push toward. It stays declared because an
+// empty list is a statement, and because a page that regains a copy belongs here.
+const PAGE_COPIES = [];
+// Every realm whose stroke engines must agree. The two pages are here not as
+// independent implementations but as CONSUMERS of the canonical one - running
+// them proves each page ends up with the right function at runtime, which source
+// text alone cannot show.
+const ALL_REALMS = [CANONICAL, 'sidematches.html', 'stats.html'];
 
 const plain = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
 
@@ -238,9 +242,18 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
             'sidematches.html must load the canonical engine');
         assert.deepEqual(PAGE_DEPS['sidematches.html'], ['action-model.js', 'settlement-engine.js']);
 
-        assert.ok(!loads('stats.html', 'settlement-engine.js'),
-            'stats.html does not load the canonical engine yet - if it now does, this file needs updating');
-        assert.deepEqual(PAGE_DEPS['stats.html'], ['action-model.js']);
+        assert.ok(loads('stats.html', 'settlement-engine.js'),
+            'stats.html must load the canonical engine too, as of Batch 3');
+        assert.deepEqual(PAGE_DEPS['stats.html'], ['action-model.js', 'settlement-engine.js']);
+
+        // Neither page loads money-engine.js. Both still define parseHcp/getStrokes
+        // inline, and the canonical engines bind to those at call time - byte-identical
+        // copies pinned by parity_test.js. Recorded so the arrangement is a decision
+        // rather than something rediscovered later.
+        ['sidematches.html', 'stats.html'].forEach(page => {
+            assert.ok(!loads(page, 'money-engine.js'),
+                page + ' deliberately does not load money-engine.js');
+        });
     });
 
     test('without the canonical engine the page FAILS LOUDLY, it does not compute zero', () => {
@@ -294,22 +307,29 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
             'one implementation now - the whole object should match, not just the money');
     });
 
-    test('stats.html is still a genuinely separate implementation', () => {
-        // The premise of every KNOWN DEFECT assertion that remains. If this ever
-        // collapses to one function object, those tests would be comparing a thing
-        // to itself and would pass for the wrong reason.
-        assert.notEqual(realmFor('stats.html').calculateOverallBetEngine,
-                        realmFor(CANONICAL).calculateOverallBetEngine);
+    test('stats.html owns NO stroke-engine copy either, as of Batch 3', () => {
+        // REVERSED IN BATCH 3. This used to assert stats.html was a genuinely
+        // separate implementation, because that was the premise of the KNOWN
+        // DEFECT block below it. It is a consumer of the canonical engine now, so
+        // the useful statement is the opposite one - and it is the same assertion
+        // sidematches.html has carried since Batch 2.
         const st = fs.readFileSync(path.join(REPO_ROOT, 'stats.html'), 'utf8');
-        assert.match(st, /function calculateOverallBetEngine\s*\(/,
-            'stats.html still owns a copy - when it stops, Batch 3 rewrites this file');
+        const inline = st.replace(/<script src=[^>]*><\/script>/g, '');
+        ['calculateHoleBetEngine', 'calculateOverallBetEngine', 'getRichHoleBetScore',
+         'segmentTotals', 'matchStatusFromHole'].forEach(fn => {
+            assert.ok(!new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
+                'stats.html must not redeclare ' + fn);
+        });
+        assert.match(st, /<script src="settlement-engine\.js">/);
     });
 
     test('stats.html carries its OWN getStrokes/parseHcp, which is why it runs at all', () => {
-        // Load-bearing, not a style note: stats.html computes net scores without
-        // money-engine.js. If those vanish without the page gaining the engine, the
-        // copies below would throw rather than diverge, and every KNOWN DEFECT
-        // assertion would change meaning.
+        // Load-bearing, not a style note. stats.html computes net scores without
+        // money-engine.js, and the CANONICAL engines it now loads call these two as
+        // globals - so after Batch 3 the canonical code binds to these page copies
+        // at run time. They are byte-identical and pinned by parity_test.js. If they
+        // vanished without the page gaining money-engine.js, settlement's own
+        // functions would throw inside Stats.
         const r = realmFor('stats.html');
         assert.equal(typeof r.getStrokes, 'function');
         assert.equal(typeof r.parseHcp, 'function');
@@ -412,7 +432,7 @@ describe('CANONICAL — settlement-engine.js honours config.sideA / config.sideB
 });
 
 // ===========================================================================
-// 2. THE PAGE COPIES — one fixed, one still divergent
+// 2. THE PAGE CONSUMERS — both now canonical
 // ===========================================================================
 
 describe('FIXED IN BATCH 2 — sidematches.html now agrees with canonical on 2v2', () => {
@@ -467,37 +487,65 @@ describe('FIXED IN BATCH 2 — sidematches.html now agrees with canonical on 2v2
     });
 });
 
-describe('KNOWN DEFECT — stats.html is not 2v2-aware', () => {
+describe('FIXED IN BATCH 3 — stats.html now agrees with canonical on 2v2', () => {
+    // These were the last KNOWN DEFECT assertions in this file. They said "these
+    // disagree" and named Batch 3 as the batch that must reverse them. It did, so
+    // they were rewritten rather than removed - the protection survives, inverted,
+    // exactly as the sidematches.html block above was rewritten in Batch 2.
+    //
+    // The rendered Final Scorecard itself is locked separately, against thirteen
+    // pre-Batch-3 golden hashes, in stats_canonical_render_test.js.
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3.
-    test('the Final Scorecard would show all square where the receipt pays out', () => {
+    test('the Final Scorecard pays the side the receipt pays', () => {
         const page = callOverall(realmFor('stats.html'), overallCfg2v2(), lopsided2v2Scores());
         const canon = callOverall(realmFor(CANONICAL), overallCfg2v2(), lopsided2v2Scores());
 
-        assert.equal(page.base.p1Money, 0);
-        assert.equal(canon.base.p1Money, OVERALL_STAKE);
-        assert.notEqual(page.base.p1Money, canon.base.p1Money,
-            'BATCH 3 MUST REVERSE THIS: rewrite to assert.equal once stats.html uses the canonical engine');
+        // The page used to report 90 v 90, winner null, $0 - Ann v Ben only, all halved.
+        assert.equal(page.base.p1Total, 3 * 18);
+        assert.equal(page.base.p2Total, 5 * 18);
+        assert.equal(page.base.p1Money, OVERALL_STAKE);
+        assert.deepEqual(page.base, canon.base);
     });
 
-    // KNOWN DEFECT - EXPECTED TO BE REVERSED IN BATCH 3.
-    test('the per-hole bet also reports nothing', () => {
+    test('the per-hole bet pays every hole, exactly as the receipt does', () => {
         const page = callHole(realmFor('stats.html'), holeCfg2v2(), lopsided2v2Scores());
-        assert.equal(page.p1Money, 0);
-        assert.notEqual(page.p1Money, HOLE_STAKE * 18,
-            'BATCH 3 MUST REVERSE THIS');
+        const canon = callHole(realmFor(CANONICAL), holeCfg2v2(), lopsided2v2Scores());
+        assert.equal(page.p1Money, HOLE_STAKE * 18);
+        assert.equal(page.p1Money, canon.p1Money);
     });
 
-    test('stats.html is now the ONLY place this defect still lives', () => {
-        // Batch 1 recorded that both page copies shared one defect. One of them is
-        // fixed, so the useful statement changed: sidematches.html has crossed over
-        // and stats.html has not. If these two ever agree again it means either
-        // Batch 3 landed (rewrite this file) or sidematches.html regressed.
-        const sm = callOverall(realmFor('sidematches.html'), overallCfg2v2(), lopsided2v2Scores());
-        const st = callOverall(realmFor('stats.html'), overallCfg2v2(), lopsided2v2Scores());
-        assert.notEqual(sm.base.p1Money, st.base.p1Money);
-        assert.equal(sm.base.p1Money, OVERALL_STAKE, 'sidematches.html is on the canonical engine');
-        assert.equal(st.base.p1Money, 0, 'stats.html is not');
+    test('the sides are genuinely being read, not coincidentally agreeing', () => {
+        // The inverse of the Batch 1 isolation test. Back then stats.html produced
+        // identical output with and without sideA/sideB, proving it never read them.
+        // Now the two MUST differ, or the agreement above would be luck.
+        const withSides = callOverall(realmFor('stats.html'), overallCfg2v2(), lopsided2v2Scores());
+        const bare = overallCfg2v2();
+        delete bare.sideA;
+        delete bare.sideB;
+        const withoutSides = callOverall(realmFor('stats.html'), bare, lopsided2v2Scores());
+
+        assert.notDeepEqual(withSides.base, withoutSides.base,
+            'stats.html must read sideA/sideB - identical output either way means it does not');
+        assert.equal(withoutSides.base.p1Money, 0, 'and without sides it correctly falls back to 1v1');
+    });
+
+    test('a partner who has not posted holds the hole here too', () => {
+        const scores = lopsided2v2Scores();
+        cd18.forEach(h => { delete scores[`p${ALPHA_2.id}_h${h.hole}`]; });
+        const page = callOverall(realmFor('stats.html'), overallCfg2v2(), scores);
+        assert.equal(page.base.roundComplete, false);
+        assert.equal(page.base.p1Money, 0);
+    });
+
+    test('BOTH pages now agree with canonical and with each other', () => {
+        // Batch 1 recorded that the two page copies shared one defect; Batch 2
+        // recorded that one had crossed over and one had not. The end state is that
+        // all three realms are one implementation. If any of them ever disagrees
+        // again, a page-local engine has come back.
+        const results = ALL_REALMS.map(n => callOverall(realmFor(n), overallCfg2v2(), lopsided2v2Scores()));
+        results.forEach((r, i) => assert.deepEqual(r.base, results[0].base,
+            ALL_REALMS[i] + ' diverged from canonical on the 2v2 fixture'));
+        assert.equal(results[0].base.p1Money, OVERALL_STAKE);
     });
 });
 
