@@ -9,6 +9,11 @@
     <script src="./firebase-database-compat.js"></script>
     <script src="course-data.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
+    <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
+         index through the shared primitives; tournament-engine.js calls them as
+         globals, so this must load first. Already in SHARED_SHELL, so it was already
+         shipping to this deployment - only the tag was missing. -->
+    <script src="handicap.js"></script>
     <script src="payouts.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
@@ -206,6 +211,10 @@
                 <div class="fmt-name">Shamble</div>
                 <div class="fmt-desc">Best drive, then play your own ball</div>
             </div>
+            <div class="format-card" id="fmt-individual" onclick="selectFormat('individual')">
+                <div class="fmt-name">🏌️ Individual Stroke Play</div>
+                <div class="fmt-desc">Every golfer for themselves. Gross or Net, with flights and scoring groups.</div>
+            </div>
             <div class="format-card" id="fmt-bestball" onclick="selectFormat('bestball')">
                 <div class="fmt-icon">⛳</div>
                 <div class="fmt-name">2-Man Best Ball</div>
@@ -303,6 +312,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="shotgun-assignments-list"></div>
         </div>
 
+        <div id="individual-setup-note" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:16px; font-size:0.82rem;">
+            <strong>Individual Stroke Play.</strong> Add your player field below — teams are not used. After you save you'll build scoring groups (who plays together) and send each group its own link.
+            <div style="margin-top:8px;">
+                <label style="font-size:0.8rem;"><input type="radio" name="ind-mode" value="gross" checked onchange="setIndividualMode('gross')"> Gross</label>
+                <label style="font-size:0.8rem; margin-left:14px;"><input type="radio" name="ind-mode" value="net" onchange="setIndividualMode('net')"> Net</label>
+            </div>
+            <div id="ind-net-warning" style="display:none; margin-top:6px; color:var(--warn-text); font-size:0.78rem;"></div>
+        </div>
+
         <hr class="section-divider">
         <h3>🚩 Flights / Divisions</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Optional. Split the field into divisions — Championship, A, B, Senior, whatever you call them — and the leaderboard can be viewed by flight as well as overall. Teams you don't assign still appear in Overall.</p>
@@ -312,6 +330,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <div id="flights-list"></div>
         <div id="flight-assign-list"></div>
+
+        <div id="player-field-section" style="display:none;">
+            <hr class="section-divider">
+            <h3>🏌️ Player Field</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Every golfer in the event. Two golfers with the same name are two different people here — each keeps their own scores whatever group or flight they end up in.</p>
+            <div class="form-group" style="display:flex; gap:6px; margin-bottom:8px;">
+                <input type="text" id="new-player-name" placeholder="Name" style="flex:2;">
+                <input type="text" id="new-player-hcp" placeholder="Hcp" style="flex:1; max-width:80px;">
+                <button class="btn-outline" style="white-space:nowrap;" onclick="addPlayerToField()">+ Add</button>
+            </div>
+            <button class="btn-outline" onclick="openPastePlayersModal()" style="margin-bottom:10px;">📋 Paste Player List</button>
+            <div id="player-field-list"></div>
+        </div>
+
+        <div id="scoring-groups-section" style="display:none;">
+            <hr class="section-divider">
+            <h3>⛳ Scoring Groups</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Who plays together. A group gets one link and enters scores for everyone in it. A golfer belongs to exactly one group.</p>
+            <button class="btn-outline" onclick="createScoringGroup()">+ Add Group</button>
+            <div id="scoring-groups-list"></div>
+        </div>
 
         <hr class="section-divider">
         <h3>🔒 Team Scorecard Links</h3>
@@ -480,6 +519,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let selectedFormat = 'scramble';
     function selectFormat(fmt) {
         selectedFormat = fmt;
+        // Individual mode is a different setup: a field of golfers, not a set of
+        // teams. Showing team controls there would be showing controls the stored
+        // record will not have.
+        const indNote = document.getElementById('individual-setup-note');
+        if (indNote) indNote.style.display = (fmt === 'individual') ? 'block' : 'none';
+        const shamble = document.getElementById('shamble-count-wrap');
+        if (shamble && fmt === 'individual') shamble.style.display = 'none';
         document.querySelectorAll('#main-format-picker .format-card').forEach(c => c.classList.remove('active'));
         document.getElementById('fmt-' + fmt).classList.add('active');
         document.getElementById('shamble-count-group').style.display = (fmt === 'shamble') ? 'block' : 'none';
@@ -702,15 +748,40 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             teams[`team${teamNum}`] = { num: teamNum, name: teamName, players: players, handicap: teamHandicap };
         });
 
-        if (teamNum === 0) { alert("⚠️ Add at least one team with a player name."); return; }
+        // In individual mode the setup card collects a FIELD, not teams: every name
+        // typed becomes a player record with its own id. The team blocks are reused as
+        // an input surface only, and nothing team-shaped is stored.
+        let pendingPlayers = {};
+        if (isIndividual()) {
+            Object.values(teams).forEach(t => (t.players || []).forEach(nm => {
+                const pid = newPlayerId();
+                pendingPlayers[pid] = { id: pid, name: nm, handicap: '0', addedAt: Date.now() };
+            }));
+            if (Object.keys(pendingPlayers).length === 0) {
+                alert("⚠️ Add at least one golfer."); return;
+            }
+        } else if (teamNum === 0) {
+            alert("⚠️ Add at least one team with a player name."); return;
+        }
 
         currentCode = generateCode();
         const shambleCountBest = parseInt(document.getElementById('shamble-count-best').value, 10) || 1;
         const entryFee = parseFloat(document.getElementById('t-entry-fee').value) || 0;
 
+        // AN INDIVIDUAL EVENT DECLARES ITSELF. scoringModel is written once, at
+        // creation, and never inferred afterwards - a legacy record has no marker and
+        // stays legacy forever, so the meaning of a stored score can never flip.
+        //
+        // courseIndexSynthetic records that the course had no real stroke index and a
+        // 1..18 placeholder was used, which is what stops net from being allocated on
+        // an invented card. Written for every event so the flag means the same thing
+        // whenever it is read.
+        const syntheticIndex = !hasUsableStrokeIndex({ courseData: selectedCourseData });
+
         const payload = {
             name: name,
             format: selectedFormat,
+            courseIndexSynthetic: syntheticIndex,
             courseName: selectedCourseName,
             activeCourseKey: selectedCourseKey,
             courseData: selectedCourseData,
@@ -719,6 +790,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             teams: teams,
             createdAt: Date.now()
         };
+
+        if (isIndividual()) {
+            payload.scoringModel = PLAYER_MODEL;
+            // Net is refused on a course with no genuine stroke index rather than
+            // ranked on a fabricated one.
+            payload.scoringMode = (individualMode === 'net' && !syntheticIndex) ? 'net' : 'gross';
+            payload.players = pendingPlayers;
+            payload.scoringGroups = {};
+            payload.teams = {};   // an individual event has no teams
+        }
 
         db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
@@ -1028,6 +1109,276 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     // ========================================================================
+    // INDIVIDUAL STROKE PLAY — player identity, groups, links
+    //
+    // Only NEW individual events use any of this. A tournament without
+    // scoringModel: 'player-v1' is a legacy team event forever, reads through the
+    // legacy path, and none of the code below runs for it.
+    // ========================================================================
+
+    // PLAYER_MODEL is declared by tournament-engine.js, which this page loads first.
+    // Re-declaring it here as a const was a SyntaxError - `var` then `const` of the
+    // same name in one script scope kills the whole inline block, and the page with
+    // it. The engine owns the constant; this page reads it.
+    const isIndividual = () => selectedFormat === 'individual';
+    const recordIsIndividual = () => (currentData || {}).scoringModel === PLAYER_MODEL;
+
+    // OPAQUE, MINTED, PERMANENT. Not the name - two golfers are called Dave and one
+    // of them will be re-spelled. Not the array position - a golfer moves group
+    // halfway through setup. The id is what a score is attached to, so it is the one
+    // thing about a player that never changes.
+    // A MONOTONIC COUNTER, NOT JUST RANDOMNESS.
+    //
+    // Date.now() is constant inside a bulk import and four base36 characters is about
+    // 1.6 million values, which sounds like plenty until you draw five hundred from it
+    // - the birthday maths puts a collision at roughly one in thirteen. For an id that
+    // a golfer's scores hang off, one in thirteen is not a small number; two players
+    // sharing an id would silently share a scorecard.
+    //
+    // The counter makes a collision impossible within a page session, and the
+    // timestamp plus randomness keeps ids distinct across sessions and devices.
+    let idSeq = 0;
+    function mintId(prefix) {
+        idSeq += 1;
+        return prefix + Date.now().toString(36) + idSeq.toString(36)
+             + Math.random().toString(36).slice(2, 6);
+    }
+    function newPlayerId() { return mintId('p'); }
+    function newGroupId() { return mintId('g'); }
+
+    let individualMode = 'gross';
+    function setIndividualMode(mode) {
+        individualMode = mode === 'net' ? 'net' : 'gross';
+        const warn = document.getElementById('ind-net-warning');
+        // NET NEEDS A REAL STROKE INDEX. An unmapped course gets a fabricated 1..18
+        // allocation so the round can still be played gross; ranking net money on an
+        // invented index would be worse than refusing, so the organizer is told here
+        // rather than discovering it in the standings.
+        const synthetic = selectedCourseData && !hasUsableStrokeIndex({ courseData: selectedCourseData });
+        if (individualMode === 'net' && synthetic) {
+            warn.style.display = 'block';
+            warn.textContent = "⚠️ This course has no real stroke index saved, so net strokes can't be allocated honestly. The event will score Gross until the course card is added.";
+        } else {
+            warn.style.display = 'none';
+        }
+    }
+
+    // --- PLAYER FIELD ---
+
+    function addPlayerToField() {
+        const nameEl = document.getElementById('new-player-name');
+        const hcpEl = document.getElementById('new-player-hcp');
+        const name = nameEl.value.trim();
+        if (!name) { alert('⚠️ Give the golfer a name.'); return; }
+        const pid = newPlayerId();
+        // DUPLICATE NAMES ARE NOT MERGED. Two golfers called Dave Smith are two
+        // people; silently collapsing them would give one of them the other's score.
+        db.ref(`tournaments/${currentCode}/players/${pid}`)
+            .set({ id: pid, name: name, handicap: hcpEl.value.trim() || '0' })
+            .then(() => { nameEl.value = ''; hcpEl.value = ''; })
+            .catch(err => alert(`Error adding player: ${err.message}`));
+    }
+
+    function updatePlayerName(pid, name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed) { renderPlayerField(); return; }
+        // A rename touches the name field only. Scores are keyed by id, so correcting
+        // a spelling cannot move a single stroke.
+        db.ref(`tournaments/${currentCode}/players/${pid}/name`).set(trimmed)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function updatePlayerHandicap(pid, hcp) {
+        db.ref(`tournaments/${currentCode}/players/${pid}/handicap`).set((hcp || '').trim() || '0')
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function assignPlayerToFlight(pid, fid) {
+        // A PLAYER'S FLIGHT LIVES ON THE PLAYER. team.flightId stays exactly what it
+        // is for legacy team events; overloading it would mean one field with two
+        // meanings depending on a model marker.
+        const ref = db.ref(`tournaments/${currentCode}/players/${pid}/flightId`);
+        (fid ? ref.set(fid) : ref.remove()).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function removePlayerFromField(pid) {
+        const groups = currentData.scoringGroups || {};
+        const inGroup = Object.keys(groups).find(gid => (groups[gid].playerIds || []).indexOf(pid) !== -1);
+        if (inGroup) {
+            alert(`⚠️ That golfer is in ${groups[inGroup].name || 'a scoring group'}. Take them out of the group first.`);
+            return;
+        }
+        db.ref(`tournaments/${currentCode}/players/${pid}`).remove()
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function renderPlayerField() {
+        const section = document.getElementById('player-field-section');
+        if (!recordIsIndividual()) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        const players = currentData.players || {};
+        const flights = currentData.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        const pids = Object.keys(players).sort((a, b) => (players[a].addedAt || 0) - (players[b].addedAt || 0));
+        const list = document.getElementById('player-field-list');
+
+        if (pids.length === 0) {
+            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No golfers yet.</p>`;
+            return;
+        }
+        const flightOptions = (sel) => `<option value="">— No flight —</option>` + fids.map(fid =>
+            `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+
+        list.innerHTML = `<p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 6px 0;">${pids.length} golfer${pids.length === 1 ? '' : 's'}</p>`
+            + pids.map(pid => {
+            const p = players[pid];
+            const sel = flights[p.flightId] ? p.flightId : '';
+            return `<div class="fa-row">
+                <input class="fa-team" type="text" value="${p.name || ''}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;">
+                <input type="text" value="${p.handicap !== undefined ? p.handicap : '0'}" onchange="updatePlayerHandicap('${pid}', this.value)" style="width:52px;">
+                ${fids.length ? `<select onchange="assignPlayerToFlight('${pid}', this.value)">${flightOptions(sel)}</select>` : ''}
+                <button class="flight-del" onclick="removePlayerFromField('${pid}')">✕</button>
+            </div>`;
+        }).join('');
+    }
+
+    // --- PLAYER IMPORT ---
+    //
+    // THE HANDICAP IS KEPT NOW. The team import parsed "Name, Handicap", averaged the
+    // numbers into one team figure and threw the individual values away - an organizer
+    // was typing data the app did not store. Player records have somewhere to put it.
+
+    function openPastePlayersModal() {
+        document.getElementById('paste-players-textarea').value = '';
+        document.getElementById('paste-players-preview').textContent = '';
+        document.getElementById('paste-players-modal').style.display = 'block';
+    }
+    function closePastePlayersModal() {
+        document.getElementById('paste-players-modal').style.display = 'none';
+    }
+
+    function commitPastePlayers() {
+        const { validPlayers, flaggedLines } = parseTeamsPasteText(
+            document.getElementById('paste-players-textarea').value);
+        if (validPlayers.length === 0) {
+            document.getElementById('paste-players-preview').textContent = 'No usable lines found.';
+            return;
+        }
+        const updates = {};
+        validPlayers.forEach(p => {
+            const pid = newPlayerId();
+            updates[pid] = { id: pid, name: p.name, handicap: (p.hcp || '').trim() || '0', addedAt: Date.now() };
+        });
+        db.ref(`tournaments/${currentCode}/players`).update(updates).then(() => {
+            closePastePlayersModal();
+            if (flaggedLines.length) alert(`Added ${validPlayers.length} golfers. ${flaggedLines.length} line(s) were skipped.`);
+        }).catch(err => alert(`Error importing players: ${err.message}`));
+    }
+
+    // --- SCORING GROUPS ---
+
+    function createScoringGroup() {
+        const groups = currentData.scoringGroups || {};
+        const next = Object.keys(groups).length + 1;
+        const gid = newGroupId();
+        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}`)
+            .set({ id: gid, name: `Group ${next}`, playerIds: [], createdAt: Date.now() })
+            .catch(err => alert(`Error adding group: ${err.message}`));
+    }
+
+    function renameScoringGroup(gid, name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed) { renderScoringGroups(); return; }
+        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}/name`).set(trimmed)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function deleteScoringGroup(gid) {
+        const g = (currentData.scoringGroups || {})[gid] || {};
+        if ((g.playerIds || []).length > 0) {
+            alert(`⚠️ ${g.name || 'That group'} still has golfers in it. Move them out first.`);
+            return;
+        }
+        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}`).remove()
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function setGroupStartingHole(gid, hole) {
+        // THE STARTING HOLE BELONGS TO THE GROUP, not to a golfer - a shotgun sends a
+        // foursome to a tee, not four people to four tees.
+        db.ref(`tournaments/${currentCode}/scoringGroups/${gid}/startingHole`).set((hole || '').trim())
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // ONE ACTIVE GROUP PER GOLFER. Moving somebody removes them from wherever they
+    // were first, in the same write, so a golfer can never be scored twice - and
+    // because scores are keyed by player id, moving them does not touch a stroke.
+    function assignPlayerToGroup(pid, gid) {
+        const groups = currentData.scoringGroups || {};
+        const updates = {};
+        Object.keys(groups).forEach(g => {
+            const ids = (groups[g].playerIds || []).filter(x => x !== pid);
+            if (g === gid) ids.push(pid);
+            if (ids.length !== (groups[g].playerIds || []).length || g === gid) {
+                updates[`${g}/playerIds`] = ids;
+            }
+        });
+        db.ref(`tournaments/${currentCode}/scoringGroups`).update(updates)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function groupScorecardUrl(gid) {
+        // SAME ORIGIN, ALWAYS. This is an internal Tournament link, not a
+        // cross-product one, so it is built the way team links are and never through
+        // product-links.js.
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}`;
+    }
+
+    function renderScoringGroups() {
+        const section = document.getElementById('scoring-groups-section');
+        if (!recordIsIndividual()) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        const groups = currentData.scoringGroups || {};
+        const players = currentData.players || {};
+        const gids = Object.keys(groups).sort((a, b) => (groups[a].createdAt || 0) - (groups[b].createdAt || 0));
+        const assigned = {};
+        gids.forEach(gid => (groups[gid].playerIds || []).forEach(pid => { assigned[pid] = gid; }));
+        const unassigned = Object.keys(players).filter(pid => !assigned[pid]);
+        const list = document.getElementById('scoring-groups-list');
+
+        const groupOptions = (sel) => `<option value="">— Unassigned —</option>` + gids.map(gid =>
+            `<option value="${gid}" ${sel === gid ? 'selected' : ''}>${groups[gid].name || 'Group'}</option>`).join('');
+
+        let html = gids.map(gid => {
+            const g = groups[gid];
+            const ids = (g.playerIds || []).filter(pid => players[pid]);
+            return `<div class="flight-row" style="flex-wrap:wrap;">
+                <input class="flight-name-input" type="text" value="${g.name || ''}" onchange="renameScoringGroup('${gid}', this.value)">
+                <input type="text" value="${g.startingHole || ''}" placeholder="Hole" style="width:58px;" onchange="setGroupStartingHole('${gid}', this.value)">
+                <span class="flight-count">${ids.length} golfer${ids.length === 1 ? '' : 's'}</span>
+                <button class="flight-del" onclick="deleteScoringGroup('${gid}')" ${ids.length ? 'disabled' : ''}>✕</button>
+                <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
+                    ${ids.length ? ids.map(pid => players[pid].name).join(', ') : 'Nobody assigned yet'}
+                </div>
+                <div style="flex-basis:100%; margin-top:6px;">
+                    <a class="rc-link" href="${groupScorecardUrl(gid)}">Open scoring link ▶</a>
+                </div>
+            </div>`;
+        }).join('');
+
+        if (Object.keys(players).length > 0 && gids.length > 0) {
+            html += `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">Assign golfers — ${unassigned.length} unassigned</p>`
+                + Object.keys(players).map(pid => `<div class="fa-row">
+                    <span class="fa-team">${players[pid].name}</span>
+                    <select onchange="assignPlayerToGroup('${pid}', this.value)">${groupOptions(assigned[pid] || '')}</select>
+                </div>`).join('');
+        }
+        list.innerHTML = html || `<p style="font-size:0.78rem; color:var(--text-muted);">No groups yet.</p>`;
+    }
+
+    // ========================================================================
     // FLIGHTS / DIVISIONS
     //
     // Entirely additive. A tournament with no flights node and no flightId on any
@@ -1267,6 +1618,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderTeamLinks();
             renderShotgunAssignments();
             renderFlights();
+            renderPlayerField();
+            renderScoringGroups();
+            // Team scorecard links belong to team events only.
+            const teamLinksHeading = document.getElementById('team-links-list');
+            if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
@@ -1287,5 +1643,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
 </script>
+<div id="paste-players-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:900; padding:20px; overflow:auto;">
+    <div style="background:var(--card-bg); border-radius:12px; padding:18px; max-width:520px; margin:0 auto;">
+        <h3 style="margin-top:0;">📋 Paste Player List</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted);">One golfer per line. <strong>Name, Handicap</strong> — the handicap is optional and is now saved with the player.</p>
+        <textarea id="paste-players-textarea" rows="10" style="width:100%;" placeholder="Ann Alpha, 12&#10;Bo Bravo, +2&#10;Cal Charlie"></textarea>
+        <div id="paste-players-preview" style="font-size:0.78rem; color:var(--text-muted); margin:8px 0;"></div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn-outline" onclick="closePastePlayersModal()">Cancel</button>
+            <button class="btn-primary" onclick="commitPastePlayers()">Add Players</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
