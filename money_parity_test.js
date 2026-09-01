@@ -42,9 +42,12 @@ function engineRealm() {
 const PAGE_DEPS = {
     'index.html': ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
                    'pool-engine.js','bet-strip.js','hole-events.js'],
-    // sidematches.html now loads settlement-engine.js for real - it is a <script src>
-    // on the page, not a harness convenience - and carries no stroke-engine copies of
-    // its own. Its entries below therefore resolve to the canonical implementation.
+    // sidematches.html (Batch 2) and stats.html (Batch 3) both load
+    // settlement-engine.js for real - a <script src> on the page, not a harness
+    // convenience - and neither carries a stroke-engine copy of its own any more.
+    // Their stroke entries below therefore resolve to the canonical implementation;
+    // the OTHER families here (calcPointSettlement, nassauStakeConfig) are still
+    // genuine stats.html duplicates and are still guarded as such.
     'sidematches.html': ['money-engine.js','action-model.js','settlement-engine.js'],
     'stats.html': ['money-engine.js','action-model.js','settlement-engine.js'],
 };
@@ -103,30 +106,34 @@ function assertParity(label, copies, args, keys) {
 
 // ============================================================================
 
-describe('calculateHoleBetEngine — 2 copies', () => {
-    // WAS THREE. sidematches.html's copy was deleted when that page began loading
-    // settlement-engine.js, so it can no longer drift - the strongest form of parity
-    // is not "the duplicate agrees" but "there is no duplicate". Proved directly
-    // below; stats.html still owns a copy and stays guarded here until it does not.
+describe('calculateHoleBetEngine — 1 implementation, 2 consumers', () => {
+    // WAS THREE COPIES, THEN TWO, NOW ONE. sidematches.html's copy went in Batch 2
+    // and stats.html's in Batch 3, so nothing can drift - the strongest form of
+    // parity is not "the duplicates agree" but "there are no duplicates". The page
+    // entries stay because running them proves each page ENDS UP with the canonical
+    // function at runtime, which source text alone cannot show.
     const copies = () => ({
         'settlement-engine': engineRealm().calculateHoleBetEngine,
+        'sidematches.html': fromPage('sidematches.html', 'calculateHoleBetEngine'),
         'stats.html': fromPage('stats.html', 'calculateHoleBetEngine'),
     });
     const cfg = (o) => Object.assign({ holeEnabled:true, holeStake:5, segment:'full',
         tieRule:'carry', scoringType:'gross', p1:PAIR[0], p2:PAIR[1] }, o || {});
 
-    test('both remaining copies exist', () => {
-        assert.equal(Object.values(copies()).filter(f => typeof f === 'function').length, 2);
+    test('all three entries resolve to a function', () => {
+        assert.equal(Object.values(copies()).filter(f => typeof f === 'function').length, 3);
     });
-    test('sidematches.html has NO local copy left to drift', () => {
-        const src = read('sidematches.html');
-        const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
-        assert.ok(!/function calculateHoleBetEngine\s*\(/.test(inline),
-            'sidematches.html must not redeclare calculateHoleBetEngine - it would shadow the canonical one');
-        assert.ok(!/function getRichHoleBetScore\s*\(/.test(inline),
-            'sidematches.html must not redeclare getRichHoleBetScore');
-        assert.match(src, /<script src="settlement-engine\.js">/,
-            'and it must load the canonical engine instead');
+    test('NEITHER page has a local copy left to drift', () => {
+        ['sidematches.html', 'stats.html'].forEach(page => {
+            const src = read(page);
+            const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+            assert.ok(!/function calculateHoleBetEngine\s*\(/.test(inline),
+                page + ' must not redeclare calculateHoleBetEngine - it would shadow the canonical one');
+            assert.ok(!/function getRichHoleBetScore\s*\(/.test(inline),
+                page + ' must not redeclare getRichHoleBetScore');
+            assert.match(src, /<script src="settlement-engine\.js">/,
+                page + ' must load the canonical engine instead');
+        });
     });
     test('winner A', () => assertParity('holeBet A', copies(), [PAIR, cd18, scores(), cfg(), []]));
     test('winner B', () => assertParity('holeBet B', copies(),
@@ -150,30 +157,33 @@ describe('calculateHoleBetEngine — 2 copies', () => {
     test('empty card', () => assertParity('holeBet empty', copies(), [PAIR, cd18, {}, cfg(), []]));
 });
 
-describe('calculateOverallBetEngine — 2 copies, money contract', () => {
-    // Guarded on money, not shape: see the header note about base.stake/nameA/nameB/endHole.
-    // sidematches.html is absent for the reason given above - it has no copy left.
+describe('calculateOverallBetEngine — 1 implementation, 2 consumers', () => {
+    // Now that no page owns a copy, the whole object can be compared rather than
+    // just the money contract - see the note on the extras test below.
     const MONEY = ['p1Money','p1Total','p2Total','winner','roundComplete','holesCompleted','totalHoles'];
     const copies = () => ({
         'settlement-engine': engineRealm().calculateOverallBetEngine,
+        'sidematches.html': fromPage('sidematches.html', 'calculateOverallBetEngine'),
         'stats.html': fromPage('stats.html', 'calculateOverallBetEngine'),
     });
     const cfg = (o) => Object.assign({ overallEnabled:true, overallStake:20, overallMode:'stroke',
         segment:'full', scoringType:'gross', p1:PAIR[0], p2:PAIR[1] }, o || {});
 
-    test('both remaining copies exist', () => {
-        assert.equal(Object.values(copies()).filter(f => typeof f === 'function').length, 2);
+    test('all three entries resolve to a function', () => {
+        assert.equal(Object.values(copies()).filter(f => typeof f === 'function').length, 3);
     });
-    test('sidematches.html has NO local copy left to drift', () => {
-        const inline = read('sidematches.html').replace(/<script src=[^>]*><\/script>/g, '');
-        assert.ok(!/function calculateOverallBetEngine\s*\(/.test(inline),
-            'sidematches.html must not redeclare calculateOverallBetEngine');
-        // segmentTotals and matchStatusFromHole lived INSIDE that copy. If either
-        // reappears at any nesting level, a page-local money path has come back.
-        assert.ok(!/function segmentTotals\s*\(/.test(inline),
-            'sidematches.html must not redeclare segmentTotals');
-        assert.ok(!/function matchStatusFromHole\s*\(/.test(inline),
-            'sidematches.html must not redeclare matchStatusFromHole');
+    test('NEITHER page has a local copy left to drift', () => {
+        ['sidematches.html', 'stats.html'].forEach(page => {
+            const inline = read(page).replace(/<script src=[^>]*><\/script>/g, '');
+            assert.ok(!/function calculateOverallBetEngine\s*\(/.test(inline),
+                page + ' must not redeclare calculateOverallBetEngine');
+            // segmentTotals and matchStatusFromHole lived INSIDE that copy. If either
+            // reappears at any nesting level, a page-local money path has come back.
+            assert.ok(!/function segmentTotals\s*\(/.test(inline),
+                page + ' must not redeclare segmentTotals');
+            assert.ok(!/function matchStatusFromHole\s*\(/.test(inline),
+                page + ' must not redeclare matchStatusFromHole');
+        });
     });
     test('winner A', () => assertParity('overall A', copies(), [PAIR, cd18, scores(), cfg(), []], MONEY));
     test('winner B', () => assertParity('overall B', copies(),
@@ -194,35 +204,25 @@ describe('calculateOverallBetEngine — 2 copies, money contract', () => {
          [{ startHole:5, stake:50 }, { startHole:8, stake:25 }, { startHole:14, stake:12.5 }]], MONEY));
     test('partial round', () => assertParity('overall partial', copies(), [PAIR, cd18, partial(), cfg(), []], MONEY));
 
-    test('the display-only extras are intentional and stable', () => {
-        // Re-proved rather than assumed. If a page copy gains these, or settlement
-        // loses them, that is a real change to notice - in either direction.
-        //
-        // stats.html is the only page copy left, and it still lacks all four. Once it
-        // also moves to the canonical engine this whole assertion becomes obsolete
-        // rather than merely smaller - there will be nothing left that can lack them.
+    test('the display-only extras are no longer optional — nothing can lack them', () => {
+        // OBSOLETE RATHER THAN SMALLER. This used to assert that the page copies
+        // LACKED base.stake/nameA/nameB/endHole while settlement carried them, and
+        // it shrank in Batch 2 when sidematches.html stopped having a copy. Batch 3
+        // removed the last one, so there is nothing left that can lack them and the
+        // useful statement inverted: every consumer now gets the canonical shape,
+        // whole, and any page that starts differing has grown a local copy.
         const s = scores();
         const settle = plain(engineRealm().calculateOverallBetEngine(PAIR, cd18, s, cfg(), []));
-        const p = plain(fromPage('stats.html', 'calculateOverallBetEngine')(PAIR, cd18, s, cfg(), []));
-        assert.deepEqual(Object.keys(settle.base).filter(k => !(k in p.base)),
-            ['stake','nameA','nameB','endHole'],
-            'stats.html: the settlement-only extras changed');
-        MONEY.forEach(k => assert.equal(p.base[k], settle.base[k],
-            'stats.html: base.' + k + ' must match settlement'));
+        ['stake','nameA','nameB','endHole'].forEach(k =>
+            assert.ok(k in settle.base, 'settlement must still carry base.' + k));
+
+        ['sidematches.html','stats.html'].forEach(page => {
+            const p = plain(fromPage(page, 'calculateOverallBetEngine')(PAIR, cd18, s, cfg(), []));
+            assert.deepEqual(p, settle,
+                page + ': one implementation now - the WHOLE object should match, not just the money');
+        });
     });
 
-    test('sidematches.html now RECEIVES those extras, because it uses the canonical engine', () => {
-        // The inverse of the assertion above, and the reason it shrank. A page that
-        // consumes the canonical engine gets the canonical shape; if these vanish,
-        // a local copy has crept back in.
-        const s = scores();
-        const settle = plain(engineRealm().calculateOverallBetEngine(PAIR, cd18, s, cfg(), []));
-        const page = plain(fromPage('sidematches.html', 'calculateOverallBetEngine')(PAIR, cd18, s, cfg(), []));
-        ['stake','nameA','nameB','endHole'].forEach(k =>
-            assert.ok(k in page.base, 'sidematches.html should now carry base.' + k));
-        assert.deepEqual(page.base, settle.base,
-            'sidematches.html is the canonical engine now - the whole object should match, not just money');
-    });
 });
 
 describe('calcDotsEngine — 2 copies', () => {
@@ -372,7 +372,10 @@ describe('THE DUPLICATE INVENTORY IS EXACTLY WHAT WE THINK IT IS', () => {
             'money-engine.js': ['calcDotsEngine','calcPointSettlement','calculateStrokePressSet','nassauStakeConfig'],
             'index.html': ['calcDotsEngine','calculateHiLoEngine','calculateStrokePressSet','calcPointSettlement','nassauStakeConfig'],
             'sidematches.html': ['nassauStakeConfig'],
-            'stats.html': ['calculateHoleBetEngine','calculateOverallBetEngine','calcPointSettlement','nassauStakeConfig'],
+            // Batch 3 removed stats.html's two stroke engines. calcPointSettlement and
+            // nassauStakeConfig are byte-identical money-engine duplicates that were
+            // deliberately DEFERRED, so they must still be here.
+            'stats.html': ['calcPointSettlement','nassauStakeConfig'],
         };
         Object.entries(expected).forEach(([file, fns]) => {
             const src = read(file);
@@ -381,11 +384,19 @@ describe('THE DUPLICATE INVENTORY IS EXACTLY WHAT WE THINK IT IS', () => {
         });
     });
 
-    test('and the stroke engines are gone from sidematches.html for good', () => {
-        const inline = read('sidematches.html').replace(/<script src=[^>]*><\/script>/g, '');
-        ['calculateHoleBetEngine','calculateOverallBetEngine','getRichHoleBetScore',
-         'segmentTotals','matchStatusFromHole'].forEach(fn =>
-            assert.ok(!new RegExp('function ' + fn + '\\s*\\(').test(inline),
-                fn + ' must not return to sidematches.html'));
+    test('and the stroke engines are gone from BOTH pages for good', () => {
+        ['sidematches.html','stats.html'].forEach(page => {
+            const inline = read(page).replace(/<script src=[^>]*><\/script>/g, '');
+            ['calculateHoleBetEngine','calculateOverallBetEngine','getRichHoleBetScore',
+             'segmentTotals','matchStatusFromHole'].forEach(fn =>
+                assert.ok(!new RegExp('function ' + fn + '\\s*\\(').test(inline),
+                    fn + ' must not return to ' + page));
+        });
+        // Batch 3 also took the byte-identical Birdie copy, for the same reason: a
+        // shadow of a settlement-engine function on a page that now LOADS
+        // settlement-engine is a divergence that has not happened yet.
+        const statsInline = read('stats.html').replace(/<script src=[^>]*><\/script>/g, '');
+        assert.ok(!/function calculateBirdieGameTotalsForSettle\s*\(/.test(statsInline),
+            'calculateBirdieGameTotalsForSettle must not return to stats.html');
     });
 });
