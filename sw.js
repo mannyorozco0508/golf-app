@@ -53,7 +53,13 @@
 // date-based kill switch that blanked the page once a hardcoded date passed. Without
 // this bump an installed app would keep serving the expired shell from cache and stay
 // dark even though the deployed fix is live. Shell FILE LIST unchanged.
-const CACHE_VERSION = 'golfapp-v13-no-date-gate';
+// Moved to v14 because sidematches.html - a precached shell file - changed: the
+// Matches tab now loads settlement-engine.js and uses the canonical stroke engines
+// instead of its own p1/p2-only copies. On v13 an installed PWA would keep painting
+// the build where a 2v2 Stroke Play match reads ALL SQUARE and $0 on the tab that
+// created it while the Receipt pays it out. The shell FILE LIST is unchanged -
+// settlement-engine.js was already precached for settlement.html.
+const CACHE_VERSION = 'golfapp-v14-canonical-stroke';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
