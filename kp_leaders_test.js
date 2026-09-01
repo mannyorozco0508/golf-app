@@ -360,7 +360,7 @@ describe('SAFETY RAILS PRESERVED', () => {
         // assertion is inverted rather than removed: the gap it guarded is now closed.
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
         vm.createContext(sb);
-        ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+        ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
             .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
         const ps = NAMES.map((n,i)=>({id:101+i,name:n,hcp:'9',playingForMoney:true}));
