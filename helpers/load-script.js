@@ -98,6 +98,9 @@ function makeStubSandbox() {
 const MODULE_PREREQS = {
     'money-engine.js': ['handicap.js'],
     'settlement-engine.js': ['handicap.js'],
+    // computeTournamentPayouts() calls allocatePlacePayouts() as a global, exactly
+    // as it does in the browser where both tournament pages load payouts.js first.
+    'tournament-engine.js': ['payouts.js'],
 };
 
 // Loads a plain, standalone .js file (money-engine.js, tournament-engine.js,
