@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v9', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v30-live-dots';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v31-safe-text';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -527,7 +527,9 @@ describe('SERVICE WORKER', () => {
         // Comments in this block name the very files being checked, so strip them first.
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        assert.equal(entries.length, 31, 'the shell list gained or lost an entry');
+        // 32 since text-safe.js joined the shell: every page that renders a golfer's
+        // name loads it, so it has to be precached with them.
+        assert.equal(entries.length, 32, 'the shell list gained or lost an entry');
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js','./pwa-boot.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });
