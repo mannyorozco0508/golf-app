@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v33-rattle-identity';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v34-brand-mark';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -529,9 +529,10 @@ describe('SERVICE WORKER', () => {
         // Comments in this block name the very files being checked, so strip them first.
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        // 32 since text-safe.js joined the shell: every page that renders a golfer's
-        // name loads it, so it has to be precached with them.
-        assert.equal(entries.length, 32, 'the shell list gained or lost an entry');
+        // 33 since logo-mark.png joined the shell: the homepage brand mark is an
+        // <img>, so an offline first launch without it would paint the lobby with a
+        // broken image where the logo belongs.
+        assert.equal(entries.length, 33, 'the shell list gained or lost an entry');
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js','./pwa-boot.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });
