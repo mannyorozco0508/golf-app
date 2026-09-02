@@ -517,9 +517,11 @@ describe('SERVICE WORKER', () => {
 
     const sw = read('sw.js');
 
-    test('CACHE_VERSION moved to v9', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v32-consumer-ready';/);
+    test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v33-rattle-identity';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
+        assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
+            'the pre-rename shell must not be served to an installed device');
     });
 
     test('the shell file list did NOT change', () => {
