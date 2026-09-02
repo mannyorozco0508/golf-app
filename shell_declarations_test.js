@@ -76,11 +76,26 @@ describe('DECLARATIONS — three sets, no overlap, nothing orphaned', () => {
             f + ' is declared but does not exist'));
     });
 
-    test('FILES_TO_SYNC is the union, derived rather than maintained separately', () => {
-        // The one assertion that keeps the declarations from drifting into fiction.
+    test('FILES_TO_SYNC is derived from the declarations, and is CONSUMER ONLY', () => {
+        // Still derived, never written out again - that is the assertion that keeps
+        // the declarations from drifting into fiction. What changed is the scope:
+        // the native bundle used to be the union of all three shells, which put the
+        // tournament organizer console inside the golfer's iOS app. The native target
+        // is Consumer; TournamentApp gets its own binary from
+        // SHARED_SHELL.concat(TOURNAMENT_SHELL) when it gets one.
         assert.match(sync,
-            /const FILES_TO_SYNC = SHARED_SHELL\.concat\(CONSUMER_SHELL\)\.concat\(TOURNAMENT_SHELL\);/,
+            /const FILES_TO_SYNC = SHARED_SHELL\.concat\(CONSUMER_SHELL\);/,
             'FILES_TO_SYNC must be built from the declarations, not written out again');
+        assert.ok(!/FILES_TO_SYNC = .*TOURNAMENT_SHELL/.test(sync),
+            'the native bundle must not carry the other product');
+    });
+
+    test('SHARED_SHELL is untouched — no engine is forked for the native build', () => {
+        // Narrowing the bundle must not narrow the golf rules. Both products still
+        // read the identical shared core.
+        ['grouping.js', 'handicap.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+         'text-safe.js', 'product-links.js'].forEach(f =>
+            assert.ok(SHARED.includes(f), f + ' must remain shared'));
     });
 });
 
