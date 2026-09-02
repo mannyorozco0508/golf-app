@@ -44,6 +44,7 @@
             --text-main: #1a1a1a;
             --text-muted: #666;
             --brand-green: #0f4c3a;
+            --brand-cream: #F6F4EC;
             --brand-navy: #1d3557;
             --accent-teal: #2a9d8f;
             --accent-red: #e63946;
@@ -69,6 +70,7 @@
             --text-main: #e8ecec;
             --text-muted: #9aa8a7;
             --brand-green: #2f9e78;
+            --brand-cream: #F6F4EC;
             --brand-navy: #4a7bb5;
             --accent-teal: #3dbfae;
             --accent-red: #ff6b76;
@@ -115,6 +117,17 @@
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
         .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+        /* RATTLE GOLF BRAND MARK.
+           The symbol only - no wordmark. .lobby-title sits directly beneath this and
+           already says "Rattle Golf"; stacking a second wordmark would say the name
+           twice. The cream disc is not decoration: the forest-green R is nearly
+           invisible against the dark card, and this is what makes the mark read in
+           both themes. A circle also reads as a brand lockup where a rounded square
+           would read as a second app icon floating on the page. Sized to sit in the
+           same footprint the 3.5rem emoji occupied, not larger. */
+        .lobby-mark { width: 72px; height: 72px; margin: 0 auto 6px auto; border-radius: 50%;
+            background: var(--brand-cream); display: flex; align-items: center; justify-content: center; }
+        .lobby-mark img { width: 56px; height: 56px; display: block; }
         .lobby-title { font-size: 2rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; }
         .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
@@ -269,7 +282,7 @@
 
 <div class="container" id="lobby-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-    <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
+    <div class="lobby-logo lobby-mark" onclick="handleSecretTap()"><img src="logo-mark.png" alt="Rattle Golf" width="56" height="56"></div>
     <div class="lobby-title">Rattle Golf</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
 
