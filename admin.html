@@ -270,7 +270,7 @@
 <div class="container" id="lobby-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo" onclick="handleSecretTap()">⛳</div>
-    <div class="lobby-title">GolfApp</div>
+    <div class="lobby-title">Rattle Golf</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
 
     <div class="home-widgets">
@@ -1672,7 +1672,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
-            navigator.share({ title: `GolfApp Beta`, text: textMsg, url: baseUrl }).catch(console.error);
+            navigator.share({ title: `Rattle Golf`, text: textMsg, url: baseUrl }).catch(console.error);
         } else {
             navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
         }
