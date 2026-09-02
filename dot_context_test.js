@@ -340,7 +340,9 @@ describe('HOLE VIEW SHOWS THE GOLFER\u2019S OWN HANDICAP', () => {
         assert.match(HV, /const hvPlayer = filteredPlayers\[i - 3\];/,
             'matched positionally, so it can never mismatch the column');
         assert.match(HV, /<div class="hv-hcp">HCP \$\{formatHcpDisplay\(hvPlayer\.hcp\)\}<\/div>/);
-        assert.match(HV, /<div class="hv-player-name">\$\{name\}\$\{hvHcpHtml\}/);
+        // The name is escaped at the output boundary now - a golfer called
+        // "Bob <the Hammer>" used to vanish here, swallowed as an unknown tag.
+        assert.match(HV, /<div class="hv-player-name">\$\{escapeHtml\(name\)\}\$\{hvHcpHtml\}/);
     });
 
     test('HCP 5 / 7 / 10 / 15 all format correctly', () => {
@@ -540,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v30-live-dots';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v31-safe-text';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -562,7 +564,9 @@ describe('SERVICE WORKER', () => {
          './firebase-app-compat.js', './firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1,
                 'shell entry missing: ' + f + '\nactual entries:\n' + entries.join('\n')));
-        assert.equal(entries.length, 31, 'the shell list gained or lost an entry');
+        // 32 since text-safe.js joined the shell: every page that renders a golfer's
+        // name loads it, so it has to be precached with them.
+        assert.equal(entries.length, 32, 'the shell list gained or lost an entry');
     });
 
     test('fetch strategy is unchanged - still network-first', () => {
