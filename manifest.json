@@ -1,12 +1,12 @@
 {
-  "name": "GolfApp",
-  "short_name": "GolfApp",
+  "name": "Rattle Golf",
+  "short_name": "Rattle Golf",
   "description": "Live-syncing golf scorecard and betting tracker",
   "start_url": "./admin.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#0f4c3a",
+  "background_color": "#F6F4EC",
+  "theme_color": "#0E2B1F",
   "orientation": "portrait-primary",
   "icons": [
     {
