@@ -176,12 +176,16 @@ describe('HOLE NAVIGATION', () => {
         assert.equal(b.window.__h, 1);
     });
 
-    test('every hole change asks the viewport to return to the hole card', () => {
-        // The scroll itself cannot be observed without a real viewport; what IS provable
-        // is that navigation calls it every time, which is what regressed before.
-        const sb = page(heavy(), 5);
-        run(sb, `window.__scrolls = []; goToAdjacentHole(1); goToAdjacentHole(1); goToAdjacentHole(-1);`);
-        assert.equal(sb.window.__scrolls.length, 3, 'one scroll per hole change');
+    test('every hole change anchors the nav row instead of jumping to the card top', () => {
+        // REVERSED DELIBERATELY. Navigation used to end in scrollToHoleCard(), which
+        // anchors the CARD - and because holes differ in height, that moved the BUTTONS.
+        // A golfer tapping Next repeatedly had to chase the button up and down the
+        // screen. Navigation now routes through withNavAnchor(), which measures the nav
+        // row before and after and compensates by the difference.
+        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
+            IDX.indexOf('function goToAdjacentHole') + 700);
+        assert.match(fn, /withNavAnchor\(renderHoleView\)/, 'navigation must go through the anchor');
+        assert.ok(!/scrollToHoleCard\(\)/.test(fn), 'the card-top jump is what caused the problem');
     });
 
     test('the scroll targets the hole card, not the top of the page', () => {
@@ -191,10 +195,11 @@ describe('HOLE NAVIGATION', () => {
         assert.ok(!/top: 0/.test(fn), 'scrolling to page top would lose the hole heading');
     });
 
-    test('goToAdjacentHole still re-renders AND scrolls', () => {
-        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'), IDX.indexOf('function goToAdjacentHole') + 600);
-        assert.ok(/renderHoleView\(\);/.test(fn));
-        assert.ok(/scrollToHoleCard\(\);/.test(fn));
+    test('goToAdjacentHole still re-renders, now through the anchor', () => {
+        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
+            IDX.indexOf('function goToAdjacentHole') + 700);
+        assert.match(fn, /withNavAnchor\(renderHoleView\)/,
+            'the render still happens - it is simply wrapped so geometry can be measured around it');
     });
 
     test('navigating from deep in the page still lands on the new hole', () => {
@@ -206,7 +211,14 @@ describe('HOLE NAVIGATION', () => {
             window.__hv = document.getElementById('hole-view-card').innerHTML;
         `);
         assert.equal(sb.window.__h, 10);
-        assert.equal(sb.window.__scrolls.length, 1, 'a stale scroll position must be corrected');
+        // The viewport correction moved from scrollTo(card top) to a measured scrollBy
+        // delta inside withNavAnchor(). This harness stubs neither scrollBy nor
+        // requestAnimationFrame, so the anchor fails open here - which is itself the
+        // required behaviour: navigation must never depend on being able to scroll.
+        // The compensation itself is proven in viewport_anchor_test.js against a real
+        // geometry stub.
+        assert.equal(sb.window.__scrolls.length, 0,
+            'no card-top jump; anchoring is measured elsewhere and must fail open here');
         const h = sb.window.__hv;
         assert.ok(h.indexOf('hole-view-nav-row') > h.lastIndexOf('hv-player-row'),
             'and Prev/Next is still directly under the scores of the new hole');
@@ -312,7 +324,9 @@ describe('SCORE CORRECTIONS', () => {
         const sb = page(d, 5);
         run(sb, `window.__scrolls = []; goToAdjacentHole(1); window.__h = currentViewedHole;`);
         assert.equal(sb.window.__h, 6);
-        assert.equal(sb.window.__scrolls.length, 1);
+        // Same reason as above: no scrollTo-to-card any more, and the anchor fails open
+        // without a scroll API. Navigation still lands correctly, which is the point.
+        assert.equal(sb.window.__scrolls.length, 0);
     });
 });
 
