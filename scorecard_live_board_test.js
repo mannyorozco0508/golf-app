@@ -565,7 +565,16 @@ describe('THE SKINS WIDGET RENDERS ON A REAL ROUND', () => {
         const src = read('index.html');
         const ids = new Set([...src.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
         const written = [...src.matchAll(/getElementById\('(live-[a-z-]+)'\)/g)].map(m => m[1]);
-        assert.ok(written.includes('live-ticker-mount'));
+        // The ticker mounts moved into a registry so one presenter can feed both the
+        // Hole View and the Full Card, so they are no longer named in a literal
+        // getElementById call. Collected from the registry instead.
+        const registry = /const TICKER_MOUNTS = \[([^\]]+)\]/.exec(src);
+        assert.ok(registry, 'the mount registry must exist');
+        const mounts = registry[1].split(',').map(x => x.trim().replace(/'/g, ''));
+        assert.ok(mounts.includes('live-ticker-mount'));
+        assert.ok(mounts.includes('fc-ticker-mount'));
+        mounts.forEach(id => assert.ok(new RegExp('id="' + id + '"').test(src),
+            `${id} is written to but never created`));
         [...new Set(written)].forEach(id => {
             const inserted = new RegExp("id=\\\"" + id + "\\\"").test(src);
             assert.ok(ids.has(id) || inserted, `${id} is written to but never created`);
