@@ -120,7 +120,7 @@
 // on it, and a scorecard that cannot read ?round=, would leave an installed PWA on
 // v23 unable to score the second day of a championship. Shell MEMBERSHIP is
 // unchanged: rounds live inside the existing tournament record.
-const CACHE_VERSION = 'golfapp-v30-live-dots';
+const CACHE_VERSION = 'golfapp-v31-safe-text';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -167,6 +167,7 @@ const SHELL_FILES = [
     // silently sending a golfer to a page that does not exist.
     './product-links.js',
     './score-marks.js',
+    './text-safe.js',
     './money-engine.js',
     './settlement-engine.js',
     './action-model.js',
