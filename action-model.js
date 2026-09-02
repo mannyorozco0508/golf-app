@@ -63,7 +63,7 @@ const ADDITIONAL_GAME_CATALOG = {
     dots: {
         label: 'Dots / Junk',
         icon: '\uD83D\uDD34',
-        blurb: 'Greenies, sandies, birdies, snakes — a dollar a dot.',
+        blurb: 'KPs, sandies, birdies, snakes — a dollar a dot.',
         stakeField: 'dotPointVal',
         stakeLabel: 'Per dot',
         defaults: { dotPointVal: 2 }
