@@ -17,6 +17,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <style>
         :root {
@@ -386,7 +387,7 @@
         sorted.forEach(p => {
             const money = p.units * unitVal;
             html += `<tr>
-                <td class="winner-name">${p.name}</td>
+                <td class="winner-name">${escapeHtml(p.name)}</td>
                 <td>${p.birdies}</td>
                 <td>${p.eagles}</td>
                 <td>${p.albatrosses}</td>
@@ -625,7 +626,7 @@
                     html += `<tr>
                         <td>${s.hole}</td>
                         <td style="color:var(--text-muted);">${s.par}</td>
-                        <td class="winner-name">${s.player.name}</td>
+                        <td class="winner-name">${escapeHtml(s.player.name)}</td>
                         <td><span class="score-circle">${s.score}</span></td>
                         ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * grossSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${grossSkinValue.toFixed(2)}`}</td>` : ''}
                     </tr>`;
@@ -645,7 +646,7 @@
                     html += `<tr>
                         <td>${s.hole}</td>
                         <td style="color:var(--text-muted);">${s.par}</td>
-                        <td class="winner-name">${s.player.name}</td>
+                        <td class="winner-name">${escapeHtml(s.player.name)}</td>
                         <td><span class="score-circle">${s.score}</span></td>
                         ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * netSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${netSkinValue.toFixed(2)}`}</td>` : ''}
                     </tr>`;
@@ -671,7 +672,7 @@
         sortedPlayers.forEach(p => {
             let moneyClass = p.payout > 0 ? 'val-pos' : '';
             html += `<tr>
-                <td class="winner-name">${p.name}</td>
+                <td class="winner-name">${escapeHtml(p.name)}</td>
                 ${potFormat === 'split' || potFormat === 'gross' ? `<td>${p.grossCount}</td>` : ''}
                 ${potFormat === 'split' || potFormat === 'net' ? `<td>${p.netCount}</td>` : ''}
                 <td class="${moneyClass}">$${p.payout.toFixed(2)}</td>
