@@ -120,7 +120,7 @@
 // on it, and a scorecard that cannot read ?round=, would leave an installed PWA on
 // v23 unable to score the second day of a championship. Shell MEMBERSHIP is
 // unchanged: rounds live inside the existing tournament record.
-const CACHE_VERSION = 'golfapp-v27-kp-terms';
+const CACHE_VERSION = 'golfapp-v28-kp-carry';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
