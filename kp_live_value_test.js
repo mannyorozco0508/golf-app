@@ -180,7 +180,11 @@ describe('WINNER REMOVAL AND CHANGE RECOMPUTE FROM SOURCE', () => {
 // ---------------------------------------------------------------------------
 describe('BOTH SCORECARD VIEWS USE THE ONE PRESENTER', () => {
     test('Hole View and Full Card both call kpLiveLineHtml', () => {
-        assert.equal((IDX.match(/kpLiveLineHtml\(/g) || []).length, 3,
+        // Comments stripped first: prose that NAMES the presenter is not a call site,
+        // and counting it made this fail the moment another comment referred to it.
+        const code = IDX.replace(/\/\*[\s\S]*?\*\//g, '')
+            .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+        assert.equal((code.match(/kpLiveLineHtml\(/g) || []).length, 3,
             'one definition plus exactly two call sites');
         assert.match(IDX, /html \+= kpLiveLineHtml\(holeNum\);/, 'Hole View');
         assert.match(IDX, /inner \+= kpLiveLineHtml\(o\.hole\);/, 'Full Card');
