@@ -95,9 +95,9 @@ describe('THE LIVE DASHBOARD COMES FIRST', () => {
         // Both widgets render into live-ticker-mount, so placing the mount places
         // both. Asserted so a future split cannot quietly reintroduce the problem.
         const src = read('index.html');
-        const at = src.indexOf('function renderLiveTicker');
-        const fn = src.slice(at, at + 1600);
-        assert.match(fn, /live-ticker-mount/);
+        const at = src.indexOf('const TICKER_MOUNTS');
+        const fn = src.slice(at, at + 2000);
+        assert.match(fn, /'live-ticker-mount'/, 'Hole View mount is still in the registry');
         assert.match(fn, /buildLiveMatchHtml/);
         assert.match(fn, /renderLeaderWidgetHtml/);
     });
@@ -208,15 +208,19 @@ describe('OTHER ROUNDS KEEP THE SAME STRUCTURE', () => {
 
 describe('FULL CARD IS UNTOUCHED', () => {
 
-    test('the live mount belongs to Hole View only', () => {
-        // Full Card is a table; the dashboard was never part of it and this batch
-        // did not add it there.
+    test('the Full Card now carries the SAME board — one presenter, two mounts', () => {
+        // REVERSED, DELIBERATELY. This previously read "Full Card must not have grown a
+        // live dashboard". That decision is withdrawn: golfers wanted the standings in
+        // both scorecard views. What must NOT happen is a SECOND board - so the rule
+        // now guards the shape of the reuse rather than forbidding the feature.
         const src = read('index.html');
-        const at = src.indexOf('function renderScorecard');
-        assert.ok(at > -1, 'renderScorecard must exist');
-        const fn = src.slice(at, at + 4000);
-        assert.ok(!fn.includes('live-ticker-mount'),
-            'Full Card must not have grown a live dashboard');
+        assert.match(src, /id="fc-ticker-mount"/, 'Full Card has its own mount element');
+        assert.match(src, /const TICKER_MOUNTS = \['live-ticker-mount', 'fc-ticker-mount'\]/,
+            'both mounts are fed from one registry');
+        // Exactly one builder, one standings source, one grid.
+        assert.equal((src.match(/function renderLeaderWidgetHtml/g) || []).length, 1);
+        assert.equal((src.match(/function liveStandings/g) || []).length, 1);
+        assert.equal((src.match(/function renderLiveTicker/g) || []).length, 1);
     });
 
     test('Full Card still renders its table', () => {
