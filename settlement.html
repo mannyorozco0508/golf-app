@@ -1551,11 +1551,49 @@
                 <div class="settle-card">
                     <div class="settle-header">🎯 Final Dot Game Settlement</div>
                     ${ledgerHtml}
+                    ${unclaimedKpNoteHtml(data, courseData, savedScores)}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
                 <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
+        }
+
+        // ------------------------------------------------------------------
+        // THE KPs NOBODY WON.
+        //
+        // DESCRIPTIVE ONLY. This reads canonical state and returns text. It is
+        // appended INSIDE the Dots card, after the ledger that was already built,
+        // and touches no total, no net, no who-pays-whom and no receipt figure.
+        // A carry that died unclaimed is worth exactly nothing, because nobody ever
+        // put money in - there is no pot in this game, only per-opponent debts that
+        // arise when somebody actually wins. Saying so is the entire point: without
+        // this line the group sees a winner paid for one KP and no account of the
+        // two that rolled past unwon.
+        //
+        // Shown only when there is something true to say: carryovers on, and units
+        // still riding at the finish.
+        function unclaimedKpNoteHtml(data, courseData, savedScores) {
+            if (!data || data.greenieCarryover !== true) return '';
+            if (typeof greenieCarryMap !== 'function') return '';
+            let map;
+            try {
+                map = greenieCarryMap(data, courseData || [], savedScores || {}, data.players || []);
+            } catch (e) { return ''; }
+
+            // riding is the value the NEXT KP would have carried. It sits at 1 whenever
+            // the last eligible par 3 was won, so anything above 1 means unwon units
+            // outlived the round.
+            const unwon = (map.riding || 1) - 1;
+            if (unwon < 1) return '';
+
+            const dollars = parseFloat(data.dotPointVal) || 0;
+            const each = dollars > 0 ? '$' + (map.riding * dollars).toFixed(0) + ' each riding' : '';
+            const label = unwon === 1 ? '1 KP unclaimed at finish' : unwon + ' KPs unclaimed at finish';
+            return `<div class="settle-row" style="opacity:0.85;">
+                        <span>${label}${each ? ' \u00B7 ' + each : ''}</span>
+                        <span style="font-weight:bold;">No payout</span>
+                    </div>`;
         }
 
         if (gameFormat === 'stroke') {
