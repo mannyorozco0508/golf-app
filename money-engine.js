@@ -172,6 +172,20 @@ function calcStablefordEngine(data, courseData, savedScores) {
 //
 // A MISSING FLAG MEANS OFF. Rounds saved before this rule existed have no flag and
 // must settle exactly as they did the day they were played.
+// The one canonical ordering for dot types, used to break ties when a golfer earns
+// two awards on the same hole so the live board is stable across renders.
+//
+// A FUNCTION, NOT A CONST. index.html loads money-engine.js AND carries its own copy
+// of this engine in an inline script, sharing one global scope. A `const` in both
+// throws "already declared" and takes the whole inline script down with it - every
+// function after it silently ceases to exist. Function declarations redeclare safely,
+// which is why every other duplicated engine symbol here is one too.
+function dotTypeOrder(dotType) {
+    const order = ['greenie', 'birdie', 'eagle', 'sandy', 'barkie', 'polie', 'snake'];
+    const i = order.indexOf(dotType);
+    return i === -1 ? order.length : i;
+}
+
 function dotUnitValue(dotType) {
     if (dotType === 'snake') return -1;
     if (dotType === 'eagle') return 2;
@@ -241,7 +255,13 @@ function calcDotsEngine(data, courseData, savedScores) {
         : { byHole: {}, riding: 1 };
 
     let totals = {};
-    players.forEach(p => totals[p.id] = 0);
+    // AWARDS: the same tally, itemised. Built in the loop that already computes the
+    // units, so the board and the money can never disagree - a live card claiming six
+    // dots while settlement pays seven would be worse than no card at all.
+    // Firebase hands back object keys in insertion order, so both levels are sorted
+    // afterwards; without that the chips would reshuffle as the round went on.
+    let awards = {};
+    players.forEach(p => { totals[p.id] = 0; awards[p.id] = []; });
 
     const dots = data.dots || {};
     Object.keys(dots).forEach(hKey => {
@@ -251,16 +271,26 @@ function calcDotsEngine(data, courseData, savedScores) {
             let pid = pKey.replace('p', '');
             if (totals[pid] === undefined) return;
             normalizeDotList(holeDots[pKey]).forEach(dotType => {
+                let units;
                 if (dotType === 'greenie' && carryOn && carry.byHole[hole] !== undefined) {
-                    totals[pid] += carry.byHole[hole];
+                    units = carry.byHole[hole];
                 } else {
-                    totals[pid] += dotUnitValue(dotType);
+                    units = dotUnitValue(dotType);
                 }
+                totals[pid] += units;
+                awards[pid].push({ type: dotType, hole: hole, units: units });
             });
         });
     });
 
-    return { totals, greenieCarry: carry };
+    // Hole order first, so a golfer can trace their round top to bottom; then the
+    // canonical dot order, so two awards on one hole never swap places between renders.
+    players.forEach(p => {
+        awards[p.id].sort((a, b) => (a.hole - b.hole)
+            || (dotTypeOrder(a.type) - dotTypeOrder(b.type)));
+    });
+
+    return { totals, greenieCarry: carry, awards };
 }
 
 // Zero-sum $ settlement shared by Wolf and Stableford point totals
