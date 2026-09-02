@@ -1188,7 +1188,7 @@
          card and cannot be covered. -->
 
     <div class="view-mode-toggle">
-        <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">🎯 Hole View</button>
+        <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">Hole View</button>
         <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
     </div>
 
@@ -1495,7 +1495,7 @@
 
     // Dot categories a golfer can record. Snake subtracts a unit; everything else adds one.
     const DOT_TYPES = [
-        { id: 'greenie', label: '⛳ Greenie' },
+        { id: 'greenie', label: '⛳ KP' },
         { id: 'sandy', label: '🏖️ Sandy' },
         { id: 'barkie', label: '🌳 Barkie' },
         { id: 'polie', label: '📏 Polie' },
@@ -1745,8 +1745,8 @@
             gameLines.push(`🔴 $${currentData.dotPointVal || 0} per dot`);
         } else if (gameFormat === 'stableford') {
             const val = currentData.stablefordPointVal || 0;
-            if (val > 0) gameLines.push(`🎯 $${val} per point Stableford`);
-            else gameLines.push(`🎯 Stableford — points only, no money`);
+            if (val > 0) gameLines.push(`$${val} per point Stableford`);
+            else gameLines.push(`Stableford — points only, no money`);
         } else if (gameFormat === 'stroke') {
             // A Nassau round is stored as stroke, but "Stroke Play" above a Nassau
             // line describes the storage rather than the game. The Nassau line
@@ -3107,7 +3107,7 @@
             : (winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null);
         const distLine = leader ? kpDistanceLabel(leader.distanceInches) : null;
 
-        let head = '<div class="kp-block"><div class="kp-head">\uD83C\uDFAF Hole ' + h + ' KP</div>';
+        let head = '<div class="kp-block"><div class="kp-head">Hole ' + h + ' KP</div>';
         head += leaderName
             ? '<div class="kp-current">Current: <strong>' + leaderName + '</strong>'
               + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
@@ -7101,7 +7101,7 @@
             statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else if (gameFormat === 'stableford' && stablefordCalc) {
             payoutBox.style.display = "none";
-            titleEl.textContent = "🎯 LIVE STABLEFORD STANDINGS";
+            titleEl.textContent = "LIVE STABLEFORD STANDINGS";
 
             const sfMoneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
             const sfMoney = calcPointSettlement(sfMoneyPlayers, stablefordCalc.totals, currentData.stablefordPointVal || 0);
