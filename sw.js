@@ -120,7 +120,7 @@
 // on it, and a scorecard that cannot read ?round=, would leave an installed PWA on
 // v23 unable to score the second day of a championship. Shell MEMBERSHIP is
 // unchanged: rounds live inside the existing tournament record.
-const CACHE_VERSION = 'golfapp-v33-rattle-identity';
+const CACHE_VERSION = 'golfapp-v34-brand-mark';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -198,7 +198,8 @@ const SHELL_FILES = [
     './firebase-database-compat.js',
     './manifest.json',
     './icon-192.png',
-    './icon-512.png'
+    './icon-512.png',
+    './logo-mark.png'
 ];
 
 self.addEventListener('install', (event) => {
