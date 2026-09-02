@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v33-rattle-identity';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v34-brand-mark';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -564,9 +564,10 @@ describe('SERVICE WORKER', () => {
          './firebase-app-compat.js', './firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1,
                 'shell entry missing: ' + f + '\nactual entries:\n' + entries.join('\n')));
-        // 32 since text-safe.js joined the shell: every page that renders a golfer's
-        // name loads it, so it has to be precached with them.
-        assert.equal(entries.length, 32, 'the shell list gained or lost an entry');
+        // 33 since logo-mark.png joined the shell: the homepage brand mark is an
+        // <img>, so an offline first launch without it would paint the lobby with a
+        // broken image where the logo belongs.
+        assert.equal(entries.length, 33, 'the shell list gained or lost an entry');
     });
 
     test('fetch strategy is unchanged - still network-first', () => {
