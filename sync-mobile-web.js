@@ -45,6 +45,8 @@ const DEST = path.join(ROOT, 'www', 'app');
 // write. Two answers to any of those is a correctness bug, not a style choice.
 const SHARED_SHELL = [
     'grouping.js', 'handicap.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    // One HTML escaper for every page that renders a user-supplied name.
+    'text-safe.js',
     // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, the
     // worker and manifest themselves, and the icons.
     // product-links.js is the only place that knows the two products may live at
