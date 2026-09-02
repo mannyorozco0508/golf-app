@@ -203,7 +203,12 @@ function greenieCarryMap(data, courseData, savedScores, players) {
     const byHole = {};
     const holes = greeniePar3Holes(courseData, data.startHole);
     const dots = data.dots || {};
+    // PENDING, NOT PREDICTED. An eligible par 3 that nobody has won and that is not
+    // yet complete does not advance the pot - and must not be shown as if it had.
+    // Recording it lets the UI say "previous KP pending" from canonical state rather
+    // than running a second guess at the same completeness rule.
     let riding = 1;
+    const pending = [];
 
     holes.forEach(hole => {
         const holeDots = dots[`h${hole}`] || {};
@@ -221,9 +226,10 @@ function greenieCarryMap(data, courseData, savedScores, players) {
             return v !== undefined && v !== null && v !== '' && parseInt(v, 10) > 0;
         });
         if (complete) riding += 1;
+        else pending.push(hole);
     });
 
-    return { byHole, riding };
+    return { byHole, riding, pending };
 }
 
 function calcDotsEngine(data, courseData, savedScores) {
