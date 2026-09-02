@@ -304,7 +304,10 @@ function greenieCarriedEvent(cfg, gameCourse, scores, players, hole, carryOn, pu
 
     const riding = (map.byHole[hole] || 1) + 1;
     const dotVal = parseFloat(cfg.dotPointVal) || 0;
-    const money = dotVal > 0 ? ` \u00B7 $${(riding * dotVal).toFixed(0)}` : '';
+    // PER OPPONENT, SAID OUT LOUD. Dots are paid by every other player, so this
+    // figure is what each of them owes - not a pot. One surface saying "$10" while
+    // the tee banner says "$10 each" would be the app contradicting itself.
+    const money = dotVal > 0 ? ` \u00B7 $${(riding * dotVal).toFixed(0)} each` : '';
 
     if (!next) {
         push('GREENIE_CARRIED', '\u26F3', 'KP unwon \u00B7 nothing carries on');
