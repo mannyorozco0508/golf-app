@@ -15,6 +15,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
@@ -584,7 +585,7 @@
             const get = h => scores[`p${p.id}_h${h.hole}`] || null;
             const sum = list => list.reduce((s, h) => s + (get(h) || 0), 0);
             const o = sum(front), i = sum(back);
-            let r = `<tr><td class="rt-name">${p.name}</td>`;
+            let r = `<tr><td class="rt-name">${escapeHtml(p.name)}</td>`;
             if (hasFront) { front.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasBack) r += cell(o || '\u2013', 'rt-sec'); }
             if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
             r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
@@ -725,7 +726,7 @@
                 players.forEach(p => {
                     // Was `$${n.toFixed(2)}` on the raw signed number, which printed a
                     // loss as "$-210.00". Signed properly, and without phantom cents.
-                    html += `<div class="ledger-row"><span>${p.name}</span>${fmtSignedHtml(totals[p.id] || 0)}</div>`;
+                    html += `<div class="ledger-row"><span>${escapeHtml(p.name)}</span>${fmtSignedHtml(totals[p.id] || 0)}</div>`;
                 });
                 html += `</div>`;
             }
@@ -849,7 +850,7 @@
             // second implementation - the duplication this project keeps removing -
             // the Receipt says the detail is unavailable and still prints the money.
             r.skins.lines.forEach(l => {
-                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                html += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}</span><span class="val-pos">${$(l.cents)}</span></div>`;
             });
             return html;
         }
@@ -888,7 +889,7 @@
             }
             const cents = centsByHole[String(row.hole)];
             const units = row.unitsWon > 1 ? ` (${row.unitsWon} skins)` : '';
-            html += `<div class="ledger-row"><span>${label} \u2014 ${row.winner.name} \u2014 ${basisLabel} ${row.low} \u2014 Skin${units}</span>`
+            html += `<div class="ledger-row"><span>${label} \u2014 ${escapeHtml(row.winner.name)} \u2014 ${basisLabel} ${row.low} \u2014 Skin${units}</span>`
                 + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
         });
 
@@ -916,7 +917,7 @@
         if (winners.length > 0) {
             html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary</span><span></span></div>`;
             winners.forEach(w => {
-                html += `<div class="ledger-row"><span>${w.name} \u2014 ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
+                html += `<div class="ledger-row"><span>${escapeHtml(w.name)} \u2014 ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
                     + `<span class="val-pos">${$(w.cents)}</span></div>`;
             });
         } else {
@@ -971,7 +972,7 @@
                     ? ' \u2014 ' + Math.floor(led.distanceInches / 12) + "' " + (led.distanceInches % 12) + '"'
                     : '';
                 if (l.state === 'paid') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${l.winnerName}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
                 } else if (l.state === 'refunded') {
                     html += `<div class="ledger-row"><span>Hole ${l.hole}: no winner</span><span>${$(l.cents)} refunded</span></div>`;
                 } else {
@@ -1129,7 +1130,7 @@
         order.forEach(k => {
             const c = contributions[k];
             const lines = payoutLines(c);
-            html += `<div class="pl-block"><div class="pl-name">${c.name}</div>`;
+            html += `<div class="pl-block"><div class="pl-name">${escapeHtml(c.name)}</div>`;
 
             // ONE EXIT PATH. Two returns here each closed pl-block correctly at
             // runtime, but the div-balance check counts markup statically and saw an
@@ -1373,7 +1374,7 @@
                 return '🏁 Final Results';
             })()}</div>`;
         sorted.forEach(t => {
-            html += `<div class="ledger-row"><span>${t.name}</span>${fmt(t.net)}</div>`;
+            html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`;
         });
         html += `</div>`;
 
@@ -1439,7 +1440,7 @@
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = skinsNet[p.id] || 0;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
+                ledgerHtml += `<div class="ledger-row"><span>${escapeHtml(p.name)}:</span>${fmtSignedHtml(money)}</div>`;
             });
             container.innerHTML = `
                 <div class="settle-card">
@@ -1458,7 +1459,7 @@
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = hiloNet[p.id] || 0;
-                ledgerHtml += `<div class="ledger-row"><span>${p.name}:</span>${fmtSignedHtml(money)}</div>`;
+                ledgerHtml += `<div class="ledger-row"><span>${escapeHtml(p.name)}:</span>${fmtSignedHtml(money)}</div>`;
             });
             const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
             container.innerHTML = `
@@ -1483,7 +1484,7 @@
                 let money = wolfMoney[p.id] || 0;
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span>${escapeHtml(p.name)} (${pts} pt${pts === 1 ? '' : 's'}):</span>
                         ${fmtSignedHtml(money)}
                     </div>
                 `;
@@ -1514,7 +1515,7 @@
                 let money = sfMoney[p.id] || 0;
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span>${escapeHtml(p.name)} (${pts} pt${pts === 1 ? '' : 's'}):</span>
                         ${fmtSignedHtml(money)}
                     </div>
                 `;
@@ -1541,7 +1542,7 @@
                 let money = pts * dotVal;
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} Dots):</span>
+                        <span>${escapeHtml(p.name)} (${pts} Dots):</span>
                         ${fmtSignedHtml(money)}
                     </div>
                 `;
@@ -1637,7 +1638,7 @@
                 const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
                 const prStatus = !pr.roundComplete
                     ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
-                    : (winnerName ? `${winnerName} won $${pr.stake}` : 'Tied, no money');
+                    : (winnerName ? `${escapeHtml(winnerName)} won $${pr.stake}` : 'Tied, no money');
                 pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
             });
 
