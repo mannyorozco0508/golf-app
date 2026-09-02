@@ -307,11 +307,11 @@ function greenieCarriedEvent(cfg, gameCourse, scores, players, hole, carryOn, pu
     const money = dotVal > 0 ? ` \u00B7 $${(riding * dotVal).toFixed(0)}` : '';
 
     if (!next) {
-        push('GREENIE_CARRIED', '\u26F3', 'Greenie unclaimed \u00B7 pot dies');
+        push('GREENIE_CARRIED', '\u26F3', 'KP unwon \u00B7 nothing carries on');
         return;
     }
     push('GREENIE_CARRIED', '\u26F3',
-        `Greenie carries \u00B7 ${riding} riding${money} on Hole ${next.hole}`);
+        `KP carries \u00B7 ${riding} riding${money} on Hole ${next.hole}`);
 }
 
 // ---------------------------------------------------------------------------
