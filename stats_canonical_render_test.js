@@ -219,9 +219,60 @@ const GOLDEN = {
     '15 stroke 2v2 all square': '679a62b83305052cf6614caa194379edafb3f20489850c4b7097b777ee69c107',   // INTENTIONAL — side name only; money is $0 either way
 };
 
+// ---------------------------------------------------------------------------
+// THE CLOCK, PINNED.
+//
+// stats.html prints the day the card was produced - `new Date()` at line 1199,
+// formatted with toLocaleDateString. That is correct product behaviour: a printed
+// scorecard should say when it was printed. It is only a problem HERE, because
+// this suite SHA-256s the rendered HTML, so the golden hashes silently encoded
+// whatever day the host happened to be on. The suite passed on the day the goldens
+// were taken and failed every day after, from source that had not changed - green
+// yesterday, red today, for no reason a reader could see.
+//
+// The realm gets its Date from helpers/load-script.js line 80, which hands through
+// the host's real constructor. Swapping it per render is enough; nothing global is
+// touched, so every other suite keeps the real clock and test isolation holds.
+//
+// PINNED WITH LOCAL COMPONENTS, NOT AN INSTANT. `new Date(2026, 8, 1, 12)` is noon
+// on 1 September in whatever zone the host is in, so toLocaleDateString reads
+// "September 1, 2026" everywhere. An absolute instant would not survive this: noon
+// UTC is already 2 September in Kiritimati, and the goldens would break for anyone
+// running east of the dateline.
+const RealDate = Date;
+const PINNED_RENDER_DATE = [2026, 8, 1, 12, 0, 0, 0];
+
+function pinnedDateClass() {
+    const pinnedMs = new RealDate(...PINNED_RENDER_DATE).getTime();
+    // Extends the real Date, so instanceof, the prototype chain and the inherited
+    // statics (parse, UTC) all keep working untouched.
+    class PinnedDate extends RealDate {
+        constructor(...args) {
+            if (args.length === 0) super(pinnedMs);
+            else super(...args);
+        }
+        static now() { return pinnedMs; }
+    }
+    return PinnedDate;
+}
+
 // Renders one fixture through production and returns the card HTML.
-function renderStats(data, deps) {
+// `dateParts` overrides the pin so the determinism tests can move the clock.
+function renderStats(data, deps, dateParts) {
     const sb = loadHtmlInlineScript('stats.html', deps || STATS_DEPS);
+    if (dateParts) {
+        const ms = new RealDate(...dateParts).getTime();
+        class OverrideDate extends RealDate {
+            constructor(...args) {
+                if (args.length === 0) super(ms);
+                else super(...args);
+            }
+            static now() { return ms; }
+        }
+        sb.Date = OverrideDate;
+    } else {
+        sb.Date = pinnedDateClass();
+    }
     vm.runInContext('currentData = ' + JSON.stringify(data) + '; currentMode = "TESTCD";', sb);
     sb.renderCleanCard(data);
     return sb.document.getElementById('stats-content').innerHTML || '';
@@ -239,6 +290,108 @@ function engineRealm() {
     return sb;
 }
 const plain = (v) => (v === undefined ? null : JSON.parse(JSON.stringify(v)));
+
+// ===========================================================================
+// 0. THE GOLDEN LOCK IS INDEPENDENT OF THE HOST CLOCK
+//
+// This section exists because the lock below once failed 15/15 purely because the
+// container crossed midnight UTC. The source had not changed; only the day had.
+// A golden hash that moves with the calendar protects nothing and cries wolf every
+// morning, so these run first: if the pin ever comes loose, the reason is stated
+// here rather than inferred from fifteen mystery hash mismatches.
+// ===========================================================================
+
+describe('GOLDEN RENDER — same bytes on any day, in any zone', () => {
+    const SAMPLE = '01 stroke 1v1 gross';
+
+    test('the pinned render matches the golden hash', () => {
+        assert.equal(sha(renderStats(FIXTURES[SAMPLE])), GOLDEN[SAMPLE]);
+    });
+
+    test('every fixture matches its golden whatever the HOST clock says', () => {
+        // The real proof. The host clock is moved across the exact boundary that broke
+        // this - 23:59 on 1 September to 00:01 on 2 September - and on to a date months
+        // away, and every fixture must still hash to its golden. Before the pin, the
+        // second of these dates turned all fifteen red.
+        const ambientDates = [
+            new RealDate(2026, 8, 1, 23, 59, 0, 0),
+            new RealDate(2026, 8, 2, 0, 1, 0, 0),
+            new RealDate(2027, 2, 14, 9, 30, 0, 0),
+        ];
+        const savedDate = global.Date;
+        try {
+            ambientDates.forEach(when => {
+                const ms = when.getTime();
+                class AmbientDate extends RealDate {
+                    constructor(...args) {
+                        if (args.length === 0) super(ms);
+                        else super(...args);
+                    }
+                    static now() { return ms; }
+                }
+                global.Date = AmbientDate;   // what load-script.js hands to a new realm
+                Object.keys(FIXTURES).forEach(name => {
+                    assert.equal(sha(renderStats(FIXTURES[name])), GOLDEN[name],
+                        name + ': the golden moved when the host clock did (' + when.toDateString() + ')');
+                });
+            });
+        } finally {
+            global.Date = savedDate;
+        }
+        assert.equal(global.Date, savedDate, 'the host clock must be handed back');
+    });
+
+    test('the lock still SEES a date change — it is not hashing the date away', () => {
+        // If moving the pinned date left the hash untouched, the pin would be hiding
+        // the field rather than fixing it, and the lock would have stopped protecting
+        // the header entirely.
+        const pinned = sha(renderStats(FIXTURES[SAMPLE]));
+        const moved = sha(renderStats(FIXTURES[SAMPLE], undefined, [2027, 2, 14, 9, 30, 0, 0]));
+        assert.notEqual(pinned, moved, 'the rendered date must still be inside the hash');
+    });
+
+    test('the ambient host clock cannot reach the render', () => {
+        // The realm's Date must be the pin, not the one load-script.js passes through.
+        const sb = loadHtmlInlineScript('stats.html', STATS_DEPS);
+        const ambient = sb.Date;
+        assert.equal(ambient, Date, 'the harness still hands through the real Date by default');
+        // ...and renderStats must replace it, or this whole section is theatre.
+        const seen = renderStats(FIXTURES[SAMPLE]);
+        assert.ok(seen.includes('September 1, 2026'),
+            'the card must print the PINNED date, whatever day the host is on');
+    });
+
+    test('a pinned Date still behaves like a Date', () => {
+        // Pinning must not cost correctness for code that passes real arguments.
+        const sb = loadHtmlInlineScript('stats.html', STATS_DEPS);
+        renderStats(FIXTURES[SAMPLE]);
+        const D = pinnedDateClass();
+        assert.ok(new D() instanceof Date, 'instanceof must survive');
+        assert.equal(new D(2020, 0, 15).getFullYear(), 2020, 'explicit args must be honoured');
+        assert.equal(D.parse('2020-01-15T00:00:00Z'), Date.parse('2020-01-15T00:00:00Z'));
+        assert.equal(D.UTC(2020, 0, 15), Date.UTC(2020, 0, 15));
+        assert.equal(typeof D.now(), 'number');
+        assert.equal(D.now(), new D().getTime(), 'now() and the no-arg constructor must agree');
+        assert.ok(sb);
+    });
+
+    test('pinning is local-component based, so host timezone cannot move the day', () => {
+        // An absolute instant would not survive this: noon UTC is already the 2nd in
+        // Kiritimati. Local components mean the card reads 1 September in every zone.
+        const d = new (pinnedDateClass())();
+        assert.equal(d.getFullYear(), 2026);
+        assert.equal(d.getMonth(), 8, 'September');
+        assert.equal(d.getDate(), 1);
+    });
+
+    test('the pin does not leak into other realms', () => {
+        renderStats(FIXTURES[SAMPLE]);
+        const fresh = loadHtmlInlineScript('stats.html', STATS_DEPS);
+        assert.equal(fresh.Date, Date, 'a new realm must still get the real clock');
+        assert.notEqual(Date.now(), new (pinnedDateClass())().getTime(),
+            'the host clock must be untouched');
+    });
+});
 
 // ===========================================================================
 // 1. THE GOLDEN LOCK
