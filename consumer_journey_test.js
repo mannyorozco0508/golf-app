@@ -140,7 +140,7 @@ describe('THE TOURNAMENT TRANSITION IS OUTBOUND, AND CONFIGURED', () => {
 // ---------------------------------------------------------------------------
 describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () => {
     test('each product declares its own identity', () => {
-        assert.match(BUILD, /appName: 'GolfApp',[\s\S]{0,80}shortName: 'GolfApp',/);
+        assert.match(BUILD, /appName: 'Rattle Golf',[\s\S]{0,80}shortName: 'Rattle Golf',/);
         assert.match(BUILD, /appName: 'GolfApp Tournaments',/);
     });
 
@@ -166,10 +166,10 @@ describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () =
         // If this count moves, the rename surface moved with it and the handoff note
         // in the next batch is out of date.
         const surfaces = [
-            ['admin.html', /<div class="lobby-title">GolfApp<\/div>/],
-            ['admin.html', /title: `GolfApp Beta`/],
-            ['instructions.html', /<title>How GolfApp Works<\/title>/],
-            ['instructions.html', /How GolfApp Works<\/h1>/],
+            ['admin.html', /<div class="lobby-title">Rattle Golf<\/div>/],
+            ['admin.html', /title: `Rattle Golf`/],
+            ['instructions.html', /<title>How Rattle Golf Works<\/title>/],
+            ['instructions.html', /How Rattle Golf Works<\/h1>/],
         ];
         surfaces.forEach(([f, re]) => assert.match(read(f), re, `${f} identity surface moved`));
     });
@@ -189,7 +189,9 @@ describe('MANIFEST AND INSTALL METADATA', () => {
     });
 
     test('the two products have distinct theme colours and caches', () => {
-        assert.match(BUILD, /themeColor: '#0f4c3a'/);
+        // Consumer moved to the locked Rattle Golf forest green. Tournament did not
+        // move — it is a separate product and was not rebranded.
+        assert.match(BUILD, /themeColor: '#0E2B1F'/);
         assert.match(BUILD, /themeColor: '#1d3557'/);
         assert.match(BUILD, /cacheName: 'consumer-v/);
         assert.match(BUILD, /cacheName: 'tournament-v/);
