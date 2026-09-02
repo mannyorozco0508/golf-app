@@ -91,7 +91,22 @@ const TOURNAMENT_SHELL = [
 // computes as zero and vanishes from the scorecard banner, the receipt and the
 // settlement totals, with no error anywhere. bundle_manifest_test.js enforces that
 // any page shipped here also gets every script that page loads.
-const FILES_TO_SYNC = SHARED_SHELL.concat(CONSUMER_SHELL).concat(TOURNAMENT_SHELL);
+// THE NATIVE BUNDLE IS CONSUMER ONLY.
+//
+// This was the union of all three shells, which put tournament.html,
+// tournament-scorecard.html and tournament-engine.js inside the iOS app. That is
+// the wrong product: the native target being built is the golfer-facing Single
+// Round / Trip app, and TournamentApp is a separate product with its own eventual
+// binary. Shipping an organizer console inside a golfer's app is both a review
+// risk and a boundary the rest of the repo already enforces everywhere else -
+// build-shell.js has produced two separate web outputs for several batches, and
+// only this one script still merged them.
+//
+// TournamentApp is NOT abandoned. When it gets a native target it takes
+// SHARED_SHELL.concat(TOURNAMENT_SHELL), by the same rule, from the same lists.
+// Nothing here forks an engine: SHARED_SHELL is unchanged and both products keep
+// reading the identical golf rules.
+const FILES_TO_SYNC = SHARED_SHELL.concat(CONSUMER_SHELL);
 
 
 // Wiped before every sync, not merged into. www/app/ is generated output, so a file
