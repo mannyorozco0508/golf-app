@@ -19,6 +19,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
@@ -831,12 +832,12 @@
         `;
         sorted.forEach((r, idx) => {
             if (r.thru === 0) {
-                html += `<tr><td>-</td><td class="player-name">${r.name}</td><td>-</td><td>-</td><td>0</td></tr>`;
+                html += `<tr><td>-</td><td class="player-name">${escapeHtml(r.name)}</td><td>-</td><td>-</td><td>0</td></tr>`;
             } else {
                 let posClass = idx === 0 ? 'row-leader' : '';
                 html += `<tr class="${posClass}">
                     <td>${idx + 1}</td>
-                    <td class="player-name">${r.name}<span class="player-hcp">HCP: ${r.hcp}</span></td>
+                    <td class="player-name">${escapeHtml(r.name)}<span class="player-hcp">HCP: ${r.hcp}</span></td>
                     ${scoreCellHtml(r)}
                     <td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
                     <td>${r.thru}</td>
@@ -864,7 +865,7 @@
         if (fieldLeader) {
             const toParPlain = fieldLeader.toPar === 0 ? 'E' : (fieldLeader.toPar > 0 ? `+${fieldLeader.toPar}` : `${fieldLeader.toPar}`);
             html += `<div class="h2h-banner">
-                <div class="h2h-status">🏆 Leading the Field: ${fieldLeader.name}</div>
+                <div class="h2h-status">🏆 Leading the Field: ${escapeHtml(fieldLeader.name)}</div>
                 <div class="h2h-sub">${toParPlain} thru ${fieldLeader.thru}</div>
             </div>`;
         }
@@ -887,12 +888,12 @@
                     <tbody>`;
             sortedGroup.forEach((r, idx) => {
                 if (r.thru === 0) {
-                    html += `<tr><td style="width:30px;">-</td><td class="player-name">${r.name}</td><td>-</td><td>-</td><td>0</td></tr>`;
+                    html += `<tr><td style="width:30px;">-</td><td class="player-name">${escapeHtml(r.name)}</td><td>-</td><td>-</td><td>0</td></tr>`;
                 } else {
                     let posClass = idx === 0 ? 'row-leader' : '';
                     html += `<tr class="${posClass}">
                         <td style="width:30px;">${idx + 1}</td>
-                        <td class="player-name">${r.name}<span class="player-hcp">HCP: ${r.hcp}</span></td>
+                        <td class="player-name">${escapeHtml(r.name)}<span class="player-hcp">HCP: ${r.hcp}</span></td>
                         ${scoreCellHtml(r)}
                         <td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
                         <td>${r.thru}</td>
