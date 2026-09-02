@@ -23,6 +23,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
@@ -2118,7 +2119,7 @@
             const hvPlayer = filteredPlayers[i - 3];
             const hvHcpHtml = hvPlayer
                 ? `<div class="hv-hcp">HCP ${formatHcpDisplay(hvPlayer.hcp)}</div>` : '';
-            html += `<div class="hv-player-row"><div class="hv-player-name">${name}${hvHcpHtml}`;
+            html += `<div class="hv-player-row"><div class="hv-player-name">${escapeHtml(name)}${hvHcpHtml}`;
             // DOTS ARE DRAWN ONCE, BY THE CELL ITSELF.
             //
             // cells[i] is cloned from the Full Card <td>, which already ends with the
@@ -5276,7 +5277,7 @@
             html += `
                 <div class="history-row">
                     <div class="history-row-info">
-                        <strong>${e.playerName}</strong> · Hole ${e.hole}<br>
+                        <strong>${escapeHtml(e.playerName)}</strong> · Hole ${e.hole}<br>
                         <span class="history-row-detail">${fromText} → ${toText} <span class="history-row-time">${time}</span></span>
                     </div>
                     <button class="history-undo-btn" onclick="undoAuditEntry('${k}')">Undo</button>
@@ -5306,7 +5307,7 @@
         filteredPlayers.forEach(p => {
             let pDots = tempDots[`p${p.id}`] || [];
             html += `<div class="dot-player-block">
-                <div class="dot-player-name">${p.name}</div>
+                <div class="dot-player-name">${escapeHtml(p.name)}</div>
                 <div class="dot-badges">`;
             
             DOT_TYPES.forEach(dt => {
@@ -5743,7 +5744,7 @@
                         if (Math.abs(m.status) > hLeft) {
                             m.closed = true;
                             let winnerName = m.status > 0 ? t1Name : t2Name;
-                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                            m.finalResult = `${escapeHtml(winnerName)} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
                         if (hNum < m.endHole) {
@@ -6372,7 +6373,7 @@
             let rotationHtml = upcoming.map(h => {
                 const isLastPlaceHole = lastPlaceOn && (h.hole === 17 || h.hole === 18);
                 const wolfName = isLastPlaceHole ? 'TBD — last place picks' : players[(h.hole - 1) % 4].name.split(' ')[0];
-                return `<span style="white-space:nowrap;">H${h.hole}: ${wolfName}</span>`;
+                return `<span style="white-space:nowrap;">H${h.hole}: ${escapeHtml(wolfName)}</span>`;
             }).join(' <span style="opacity:0.4;">→</span> ');
             html += `<div style="font-size:0.68rem; color:var(--text-muted); margin-top:8px; padding-top:6px; border-top:1px solid var(--border-faint); display:flex; gap:6px; flex-wrap:wrap;">🔄 ${rotationHtml}</div>`;
         }
@@ -7119,7 +7120,7 @@
                     moneyText = `<span style="color:var(--text-muted);">$${pr.stake} at stake</span>`;
                 } else if (pr.roundComplete) {
                     const winnerName = pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name).split(' ')[0] : null;
-                    statusText = winnerName ? `FINAL — ${winnerName} won $${pr.stake}` : 'FINAL — Tied, no money';
+                    statusText = winnerName ? `FINAL — ${escapeHtml(winnerName)} won $${pr.stake}` : 'FINAL — Tied, no money';
                     moneyText = `<span style="color:var(--accent-teal); font-weight:bold;">🔒 LOCKED</span>`;
                 } else {
                     statusText = strokeLeadText(pr.p1Total, pr.p2Total, pr.holesCompleted, pr.p1.name, pr.p2.name) + ` (Thru ${pr.startHole - 1 + pr.holesCompleted})`;
@@ -7360,7 +7361,7 @@
                     let m = wolfMoney[p.id] || 0;
                     moneyTxt = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
                 }
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
+                scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
             });
             statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else if (gameFormat === 'stableford' && stablefordCalc) {
@@ -7379,7 +7380,7 @@
                     let m = sfMoney[p.id] || 0;
                     moneyTxt = ` (${m >= 0 ? '+' : '-'}$${Math.abs(m).toFixed(2)})`;
                 }
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
+                scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${pts} pt${pts === 1 ? '' : 's'}</strong>${moneyTxt}</span>`);
             });
             statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
         } else if (gameFormat === 'dots') {
@@ -7400,7 +7401,7 @@
             let scoresList = [];
             filteredPlayers.forEach(p => {
                 let shortName = p.name.split(" ")[0];
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${playerDots[p.id]}</strong></span>`);
+                scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${playerDots[p.id]}</strong></span>`);
             });
             
             statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');
@@ -7423,7 +7424,7 @@
                 let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
                 let shortName = p.name.split(" ")[0]; 
                 
-                scoresList.push(`<span style="white-space:nowrap;">${shortName}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
+                scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
             });
 
             if (maxThru === 0) {
