@@ -19,6 +19,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
          which is what lets Consumer and Tournament stop sharing an origin without
@@ -1174,7 +1175,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         const players = data.players || [];
         document.getElementById('rr-players-list').innerHTML = players.length > 0
-            ? players.map(p => `${p.name}${p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${p.hcp})</span>` : ''}`).join('<br>')
+            ? players.map(p => `${escapeHtml(p.name)}${p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${p.hcp})</span>` : ''}`).join('<br>')
             : `<span style="color:var(--text-muted);">No players added yet</span>`;
 
         // SCORING vs ACTION.
@@ -1799,7 +1800,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                        border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
                        background:${on ? 'var(--brand-green)' : 'transparent'};
                        color:${on ? '#fff' : 'var(--text-muted)'};">
-                ${on ? '\u2713 ' : ''}${pl.name}</button>`;
+                ${on ? '\u2713 ' : ''}${escapeHtml(pl.name)}</button>`;
         }).join('');
 
         return `
@@ -1938,7 +1939,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     style="padding:7px 11px; min-height:44px; border-radius:20px; font-size:0.8rem; cursor:pointer;
                            border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
                            background:${on ? 'var(--brand-green)' : 'transparent'};
-                           color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
+                           color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${escapeHtml(pl.name)}</button>`;
             }).join('');
 
             const modeBtn = (val, label) => `<button type="button" onclick="setInstanceField('${inst.id}','skinsPotFormat','${val}')"
@@ -3682,7 +3683,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 : 'None (plays scratch on this course)';
             html += `
                 <div style="padding:6px 0; border-bottom:1px solid #eee; font-size:0.8rem;">
-                    <strong>${p.name}</strong> (HCP ${formatHcpDisplay(p.numericHcp)}) — <strong>${p.totalStrokes}</strong> strokes<br>
+                    <strong>${escapeHtml(p.name)}</strong> (HCP ${formatHcpDisplay(p.numericHcp)}) — <strong>${p.totalStrokes}</strong> strokes<br>
                     <span style="color:var(--text-muted); font-size:0.75rem;">Holes: ${holesList}</span>
                 </div>`;
         });
@@ -3692,9 +3693,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             playerResults.forEach(p => {
                 const relativeStrokes = Math.round(p.numericHcp - lowestHcp);
                 if (relativeStrokes > 0) {
-                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> would receive <strong>${relativeStrokes}</strong> strokes head-to-head against the lowest handicap in this group.</div>`;
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${escapeHtml(p.name)}</strong> would receive <strong>${relativeStrokes}</strong> strokes head-to-head against the lowest handicap in this group.</div>`;
                 } else {
-                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${p.name}</strong> plays scratch (lowest handicap in this group).</div>`;
+                    html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${escapeHtml(p.name)}</strong> plays scratch (lowest handicap in this group).</div>`;
                 }
             });
             html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
@@ -3790,7 +3791,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         row.className = "player-row";
         row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${name}">
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
             ${teamFieldHtml}
             ${squadFieldHtml}
