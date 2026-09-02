@@ -58,7 +58,7 @@ const GENERATED = ['sw.js', 'manifest.json'];
 const PRODUCTS = {
     consumer: {
         files: SHARED.concat(CONSUMER),
-        cacheName: 'consumer-v28-kp-carry',
+        cacheName: 'consumer-v29-live-nav',
         appName: 'GolfApp',
         shortName: 'GolfApp',
         description: 'Live-syncing golf scorecard and betting tracker',
@@ -67,7 +67,7 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
-        cacheName: 'tournament-v28-kp-carry',
+        cacheName: 'tournament-v29-live-nav',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',
