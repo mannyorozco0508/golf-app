@@ -860,6 +860,25 @@
            value that grows from "$5 each" to "$15 each · 3 riding" must not be
            able to widen them. Nowrap and a single line, so a longer carry label
            cannot reflow the block underneath it either. */
+        /* LIVE DOTS. One row per golfer: name left, total right, awards breathing
+           underneath as wrapping chips. min-width:0 on the name is what lets a long
+           name ellipsis instead of shoving the total off a narrow phone. */
+        .ld-row { padding: 7px 0; border-bottom: 1px solid var(--border-faint); }
+        .ld-row:last-child { border-bottom: none; }
+        .ld-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .ld-name {
+            font-size: 0.85rem; font-weight: bold; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ld-total { font-size: 0.85rem; font-weight: bold; color: var(--accent-red); white-space: nowrap; flex: 0 0 auto; }
+        .ld-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .ld-chip {
+            font-size: 0.68rem; font-weight: bold; padding: 2px 7px; border-radius: 999px;
+            background: var(--bg-soft); color: var(--text-muted); white-space: nowrap;
+        }
+        .ld-chip.ld-kp { color: var(--brand-green); }
+        .ld-chip.ld-neg { color: var(--accent-red); }
+
         .kp-live {
             display: flex; align-items: baseline; gap: 8px; flex-wrap: nowrap;
             margin: 0 0 8px 0; padding: 6px 10px; border-radius: 8px;
@@ -2460,8 +2479,12 @@
         const hilo = buildLiveHiLoHtml(currentData, currentData.courseData || [], currentData.scores || {});
         // Scoped to the players this viewer can see, the same rule the match card uses.
         const strokeBets = buildLiveStrokeBetHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
-        const any = board || skins || matches || points || hilo || strokeBets;
-        const html = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + strokeBets + '</div>' : '';
+        // LIVE DOTS answers a different question from the to-par board above it, so it
+        // is an additional card rather than a replacement. It rides the same grid, which
+        // means Part 3's two mounts carry it with no extra plumbing.
+        const dotsBoard = renderDotsWidgetHtml();
+        const any = board || skins || matches || points || hilo || strokeBets || dotsBoard;
+        const html = any ? '<div class="lw-grid">' + board + dotsBoard + skins + matches + points + hilo + strokeBets + '</div>' : '';
         // ONE PRESENTER, TWO MOUNTS. The markup is built once, above, from
         // liveStandings() -> computeNetToParStandings(). Hole View and the Full Card
         // then receive the same string. Nothing about ranking, ties, net handicaps or
@@ -2472,6 +2495,65 @@
             const el = document.getElementById(id);
             if (el) el.innerHTML = html;
         });
+    }
+
+    // ------------------------------------------------------------------
+    // LIVE DOTS — who is winning the junk, and what for.
+    //
+    // ONE ENGINE. Totals and the itemised awards both come out of a single
+    // calcDotsEngine() call, which is the same call settlement uses. Nothing is
+    // counted twice and nothing is counted differently, so the card cannot say six
+    // dots while the receipt pays seven.
+    //
+    // WHOLE FIELD, DELIBERATELY. Every other widget on this row scopes to
+    // __scFilteredPlayers because they describe the group being scored. Dots does not:
+    // calcDotsEngine settles across data.players, so this board must show that same
+    // set or it would be describing a different game from the one being paid out.
+    //
+    // WON KP vs CURRENT KP. A chip reading "KP 8" means this golfer WON the KP on
+    // hole 8. What the next KP is currently WORTH is a different question, answered by
+    // kpLiveLineHtml() on the hole itself. The two must never be blended into one
+    // ambiguous string.
+    function renderDotsWidgetHtml() {
+        const game = activeDotsGame();
+        if (!game) return '';
+        const players = (currentData && currentData.players) || [];
+        if (players.length === 0) return '';
+
+        const res = calcDotsEngine(currentData, currentData.courseData || [], currentData.scores || {});
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        // "⛳ KP" -> "KP". The picker needs the icon; a chip has no room for it.
+        const shortLabel = id => {
+            const t = DOT_TYPES.find(x => x.id === id);
+            if (!t) return id;
+            return t.label.replace(/^[^\sA-Za-z]+\s*/, '').replace(/\s*\(-1\)$/, '');
+        };
+
+        const rows = players.map((p, i) => ({
+            p, i,
+            units: res.totals[p.id] || 0,
+            awards: (res.awards && res.awards[p.id]) || []
+        }));
+        // Most dots first. Ties fall back to the round's own player order, which is
+        // stable and already meaningful - not an invented tiebreaker.
+        rows.sort((a, b) => (b.units - a.units) || (a.i - b.i));
+
+        const body = rows.map(r => {
+            const noun = Math.abs(r.units) === 1 ? 'dot' : 'dots';
+            const chips = r.awards.map(a => {
+                const cls = a.type === 'greenie' ? ' ld-kp' : (a.type === 'snake' ? ' ld-neg' : '');
+                return '<span class="ld-chip' + cls + '">' + esc(shortLabel(a.type)) + ' ' + a.hole + '</span>';
+            }).join('');
+            return '<div class="ld-row">'
+                + '<div class="ld-head"><span class="ld-name">' + esc(r.p.name) + '</span>'
+                + '<span class="ld-total">' + r.units + ' ' + noun + '</span></div>'
+                // No chip row at all when nothing has been won - an empty strip would
+                // just be a gap the golfer has to interpret.
+                + (r.awards.length ? '<div class="ld-chips">' + chips + '</div>' : '')
+                + '</div>';
+        }).join('');
+
+        return '<div class="lm-card"><div class="lm-card-title">\uD83D\uDD34 LIVE DOTS</div>' + body + '</div>';
     }
 
     function renderLeaderWidgetHtml() {
@@ -5961,6 +6043,20 @@
     //
     // A MISSING FLAG MEANS OFF. Rounds saved before this rule existed have no flag and
     // must settle exactly as they did the day they were played.
+    // The one canonical ordering for dot types, used to break ties when a golfer earns
+    // two awards on the same hole so the live board is stable across renders.
+    //
+    // A FUNCTION, NOT A CONST. index.html loads money-engine.js AND carries its own copy
+    // of this engine in an inline script, sharing one global scope. A `const` in both
+    // throws "already declared" and takes the whole inline script down with it - every
+    // function after it silently ceases to exist. Function declarations redeclare safely,
+    // which is why every other duplicated engine symbol here is one too.
+    function dotTypeOrder(dotType) {
+        const order = ['greenie', 'birdie', 'eagle', 'sandy', 'barkie', 'polie', 'snake'];
+        const i = order.indexOf(dotType);
+        return i === -1 ? order.length : i;
+    }
+
     function dotUnitValue(dotType) {
         if (dotType === 'snake') return -1;
         if (dotType === 'eagle') return 2;
@@ -6030,7 +6126,13 @@
             : { byHole: {}, riding: 1 };
 
         let totals = {};
-        players.forEach(p => totals[p.id] = 0);
+        // AWARDS: the same tally, itemised. Built in the loop that already computes the
+        // units, so the board and the money can never disagree - a live card claiming six
+        // dots while settlement pays seven would be worse than no card at all.
+        // Firebase hands back object keys in insertion order, so both levels are sorted
+        // afterwards; without that the chips would reshuffle as the round went on.
+        let awards = {};
+        players.forEach(p => { totals[p.id] = 0; awards[p.id] = []; });
 
         const dots = data.dots || {};
         Object.keys(dots).forEach(hKey => {
@@ -6040,16 +6142,26 @@
                 let pid = pKey.replace('p', '');
                 if (totals[pid] === undefined) return;
                 normalizeDotList(holeDots[pKey]).forEach(dotType => {
+                    let units;
                     if (dotType === 'greenie' && carryOn && carry.byHole[hole] !== undefined) {
-                        totals[pid] += carry.byHole[hole];
+                        units = carry.byHole[hole];
                     } else {
-                        totals[pid] += dotUnitValue(dotType);
+                        units = dotUnitValue(dotType);
                     }
+                    totals[pid] += units;
+                    awards[pid].push({ type: dotType, hole: hole, units: units });
                 });
             });
         });
 
-        return { totals, greenieCarry: carry };
+        // Hole order first, so a golfer can trace their round top to bottom; then the
+        // canonical dot order, so two awards on one hole never swap places between renders.
+        players.forEach(p => {
+            awards[p.id].sort((a, b) => (a.hole - b.hole)
+                || (dotTypeOrder(a.type) - dotTypeOrder(b.type)));
+        });
+
+        return { totals, greenieCarry: carry, awards };
     }
 
     // --- WOLF GAME ENGINE ---
