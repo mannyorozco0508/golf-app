@@ -15,6 +15,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <!-- Place and tie payout allocation, shared with Tournament Mode. The rule was
          written out twice - here and in tournament-engine.js - until the shared-core
          extraction. Loaded ahead of the inline block so nothing below can shadow it. -->
@@ -643,9 +644,14 @@
             if (matches.length > 0) {
                 html += `<div class="course-picker-group-label">${g.group}</div>`;
                 matches.forEach(item => {
-                    const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    // NO USER STRING IN THE HANDLER. The course name used to be
+                    // hand-escaped into an onclick argument, which is JavaScript
+                    // syntax - one apostrophe away from a broken handler and one
+                    // crafted name away from arbitrary code. The click now carries
+                    // only the course id, and the name is read back from the
+                    // directory, so nothing typed by a golfer ever becomes code.
                     const warnTag = isCourseMapped(item.id) ? '' : ` <span style="color:var(--warn-border); font-size:0.72rem; font-weight:bold;">⚠️ not mapped yet</span>`;
-                    html += `<div class="course-picker-option" onclick="selectRoundCourse(${i}, '${item.id}', '${safeName}')">${item.name}${warnTag}</div>`;
+                    html += `<div class="course-picker-option" onclick="selectRoundCourseById(${i}, '${escapeHtml(String(item.id).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(item.name)}${warnTag}</div>`;
                 });
             }
         });
@@ -656,6 +662,16 @@
 
     // Selecting a course re-renders this round's card so a nine-hole-loop course (like
     // Thistle) immediately reveals the Nine #1/#2 pickers.
+    // Looks the name up rather than being handed it. Course ids are the app's own
+    // keys, not user text, which is what makes this safe to put in a handler.
+    function selectRoundCourseById(i, id) {
+        let found = null;
+        (courseDirectory || []).forEach(g => (g.items || []).forEach(item => {
+            if (String(item.id) === String(id)) found = item;
+        }));
+        selectRoundCourse(i, id, found ? found.name : '');
+    }
+
     function selectRoundCourse(i, id, name) {
         // Write straight to the DOM first — renderRoundPlanner's very first step re-reads these
         // same fields to "preserve" whatever's currently on screen, so if we only updated the
@@ -1117,7 +1133,7 @@
             // names as the round leaderboard, so the two screens read identically.
             html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
                 <span class="lb-pos">${i + 1}</span>
-                <span class="lb-team">${r.name}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
+                <span class="lb-team">${escapeHtml(r.name)}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
                 <span class="lb-score score-cell"><span class="score-gross">${r.gross}</span><span class="score-net">Net ${r.net}</span></span>
             </div>`;
         });
@@ -1260,7 +1276,7 @@
         if (Object.keys(netByName).length > 0) {
             html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
             Object.values(netByName).sort((a, b) => b.net - a.net).forEach(v => {
-                html += `<div class="ledger-row"><span>${v.name}</span><span>${fmtMoney(v.net)}</span></div>`;
+                html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span>${fmtMoney(v.net)}</span></div>`;
             });
             html += `</div>`;
         }
@@ -1272,7 +1288,7 @@
                 html += `<div style="font-size:0.78rem; color:var(--text-muted); padding:4px 0;">${r.message || 'No money data yet.'}</div>`;
             } else {
                 r.rows.forEach(row => {
-                    html += `<div class="ledger-row" style="margin-top:6px;"><span>${row.name}</span><span>${fmtMoney(row.net || 0)}</span></div>`;
+                    html += `<div class="ledger-row" style="margin-top:6px;"><span>${escapeHtml(row.name)}</span><span>${fmtMoney(row.net || 0)}</span></div>`;
                 });
                 if (r.message) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:4px 0 2px;">${r.message}</div>`;
                 if (r.splitNote) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:2px 0 4px;">${r.splitNote}</div>`;
@@ -1366,16 +1382,16 @@
 
         const cards = [];
         if (awards.mostBirdies) {
-            cards.push({ emoji: '🐦', title: 'Most Birdies', line: `${awards.mostBirdies.name} — ${awards.mostBirdies.count} birdie${awards.mostBirdies.count === 1 ? '' : 's'}` });
+            cards.push({ emoji: '🐦', title: 'Most Birdies', line: `${escapeHtml(awards.mostBirdies.name)} — ${awards.mostBirdies.count} birdie${awards.mostBirdies.count === 1 ? '' : 's'}` });
         }
         if (awards.blowUp) {
-            cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole', line: `${awards.blowUp.name} — Hole ${awards.blowUp.hole} (Par ${awards.blowUp.par}, shot ${awards.blowUp.score}) on ${awards.blowUp.label}` });
+            cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole', line: `${escapeHtml(awards.blowUp.name)} — Hole ${awards.blowUp.hole} (Par ${awards.blowUp.par}, shot ${awards.blowUp.score}) on ${awards.blowUp.label}` });
         }
         if (awards.comeback) {
-            cards.push({ emoji: '📈', title: 'Best Comeback', line: `${awards.comeback.name} — ${awards.comeback.frontGross} on the front, ${awards.comeback.backGross} on the back (${awards.comeback.label})` });
+            cards.push({ emoji: '📈', title: 'Best Comeback', line: `${escapeHtml(awards.comeback.name)} — ${awards.comeback.frontGross} on the front, ${awards.comeback.backGross} on the back (${awards.comeback.label})` });
         }
         if (awards.sandbagger) {
-            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${awards.sandbagger.name} — ${Math.abs(awards.sandbagger.netToPar)} net strokes under par for the trip` });
+            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${escapeHtml(awards.sandbagger.name)} — ${Math.abs(awards.sandbagger.netToPar)} net strokes under par for the trip` });
         }
 
         if (cards.length === 0) {
@@ -1485,7 +1501,7 @@
             const displayPoints = s.points % 1 === 0 ? s.points : s.points.toFixed(1);
             html += `<div class="lb-row ${s.rank === 1 ? 'leader' : ''}">
                 <span class="lb-pos">${s.rank}</span>
-                <span class="lb-team">${s.name}<br><span class="lb-sub">${s.roundsPlayed} round${s.roundsPlayed === 1 ? '' : 's'} played</span></span>
+                <span class="lb-team">${escapeHtml(s.name)}<br><span class="lb-sub">${s.roundsPlayed} round${s.roundsPlayed === 1 ? '' : 's'} played</span></span>
                 <span class="lb-score">${displayPoints}</span>
             </div>`;
         });
@@ -1568,7 +1584,7 @@
 
         allocated.forEach(p => {
             const tieTag = groupSize[p.rank] > 1 ? ' (tied)' : '';
-            html += `<div class="ledger-row"><span>${ordinal(p.rank)}${tieTag} — ${p.entry.name}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(p.amount)}</span></div>`;
+            html += `<div class="ledger-row"><span>${ordinal(p.rank)}${tieTag} — ${escapeHtml(p.entry.name)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(p.amount)}</span></div>`;
         });
 
         resultsContainer.innerHTML = html;
@@ -1588,7 +1604,7 @@
             hilo: 'Hi-Lo', ryder: 'Ryder Cup'
         };
 
-        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🧳 ${tripData.name}</h1>
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🧳 ${escapeHtml(tripData.name)}</h1>
             <p style="color:#666; margin-top:0;">Trip Itinerary</p>`;
 
         if (roundCodes.length === 0) {
@@ -1606,7 +1622,7 @@
 
                 html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
                     <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
-                    <div style="margin-top:6px;"><strong>Course:</strong> ${courseName}</div>
+                    <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
                     <div><strong>Format:</strong> ${formatLabel}</div>
                     <div><strong>Players (${players.length}):</strong> ${playerNames}</div>
                 </div>`;
