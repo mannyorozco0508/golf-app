@@ -58,12 +58,13 @@ const GENERATED = ['sw.js', 'manifest.json'];
 const PRODUCTS = {
     consumer: {
         files: SHARED.concat(CONSUMER),
-        cacheName: 'consumer-v32-consumer-ready',
-        appName: 'GolfApp',
-        shortName: 'GolfApp',
+        cacheName: 'consumer-v33-rattle-identity',
+        appName: 'Rattle Golf',
+        shortName: 'Rattle Golf',
         description: 'Live-syncing golf scorecard and betting tracker',
         startUrl: './admin.html',
-        themeColor: '#0f4c3a',
+        themeColor: '#0E2B1F',
+        backgroundColor: '#F6F4EC',
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
@@ -75,6 +76,7 @@ const PRODUCTS = {
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
         themeColor: '#1d3557',
+        backgroundColor: '#f4f6f8',
     },
 };
 
@@ -191,7 +193,7 @@ function manifestFor(product) {
         start_url: p.startUrl,
         scope: './',
         display: 'standalone',
-        background_color: '#f4f6f8',
+        background_color: p.backgroundColor,
         theme_color: p.themeColor,
         orientation: 'portrait-primary',
         icons: [
