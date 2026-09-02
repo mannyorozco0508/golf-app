@@ -855,6 +855,22 @@
            case, and the Dots modal is always the full answer.
 
            Smaller than it was, deliberately: the score is primary, this is a footnote. */
+        /* THE LIVE KP BANNER. Its own row above score entry, never inside a player
+           row: the score-entry columns are sized by the 48px box alone, and a
+           value that grows from "$5 each" to "$15 each · 3 riding" must not be
+           able to widen them. Nowrap and a single line, so a longer carry label
+           cannot reflow the block underneath it either. */
+        .kp-live {
+            display: flex; align-items: baseline; gap: 8px; flex-wrap: nowrap;
+            margin: 0 0 8px 0; padding: 6px 10px; border-radius: 8px;
+            background: var(--bg-soft); overflow: hidden; white-space: nowrap;
+        }
+        .kp-live-main { font-size: 0.85rem; font-weight: bold; color: var(--brand-green); }
+        .kp-live-sub {
+            font-size: 0.7rem; font-weight: bold; color: var(--accent-red);
+            letter-spacing: 0.02em;
+        }
+
         .cell-dots {
             height: 13px; line-height: 13px; margin-top: 4px;
             width: 48px; max-width: 48px; overflow: hidden;
@@ -1468,6 +1484,62 @@
         return `<span class="dot-pips" title="${title}">${out}</span>`;
     }
 
+    // ------------------------------------------------------------------
+    // WHAT THE KP IS WORTH RIGHT NOW.
+    //
+    // ONE SOURCE. This reads greenieCarryMap() - the same canonical function
+    // calcDotsEngine() settles from - and multiplies by the round's single
+    // dotPointVal. It performs no carry arithmetic of its own, so the number a
+    // golfer reads on the tee and the number they are paid at the end cannot
+    // disagree. Hole View and the Full Card both call this; neither owns a copy.
+    //
+    // "EACH", ALWAYS. Dots are paid by every other player, so a 2-unit KP at $5
+    // is $10 from each opponent - $30 to the winner in a foursome. Printing "$10"
+    // alone would read as a pot, which is what the Money Pool KP is and this is
+    // not. The word is not decoration.
+    //
+    // Returns null when there is nothing truthful to say: no Dots game, no stake,
+    // or a hole that is not an eligible par 3.
+    function kpLiveState(holeNum) {
+        if (!activeDotsGame()) return null;
+        const hole = parseInt(holeNum, 10);
+        const course = (currentData && currentData.courseData) || [];
+        const meta = course.find(h => parseInt(h.hole, 10) === hole);
+        if (!meta || parseInt(meta.par, 10) !== 3) return null;
+        if (hole < (parseInt(currentData.startHole, 10) || 1)) return null;
+
+        const dollars = parseFloat(currentData.dotPointVal) || 0;
+        if (dollars <= 0) return null;
+
+        const carryOn = currentData.greenieCarryover === true;
+        let units = 1, pendingEarlier = false;
+        if (carryOn && typeof greenieCarryMap === 'function') {
+            try {
+                const map = greenieCarryMap(currentData, course,
+                    currentData.scores || {}, currentData.players || []);
+                if (map.byHole[hole] !== undefined) units = map.byHole[hole];
+                // An earlier eligible par 3 that is unwon and not yet finished by the
+                // WHOLE FIELD has not carried yet. Group 1 must not be told the KP has
+                // doubled because they finished it - Group 2 has not.
+                pendingEarlier = (map.pending || []).some(h => h < hole);
+            } catch (e) { units = 1; pendingEarlier = false; }
+        }
+        return { units, each: units * dollars, carryOn, pendingEarlier };
+    }
+
+    // The one-line KP banner. Compact by design: it sits above score entry and
+    // must not push it down.
+    function kpLiveLineHtml(holeNum) {
+        const st = kpLiveState(holeNum);
+        if (!st) return '';
+        const money = '$' + (Number.isInteger(st.each) ? st.each : st.each.toFixed(2)) + ' each';
+        let sub = '';
+        if (st.units > 1) sub = st.units + ' riding';
+        else if (st.pendingEarlier) sub = 'Previous KP pending';
+        return '<div class="kp-live"><span class="kp-live-main">KP \u00B7 ' + money + '</span>'
+            + (sub ? '<span class="kp-live-sub">' + sub + '</span>' : '') + '</div>';
+    }
+
     // The junk recorded for one player on one hole, straight from stored events.
     function dotsForPlayerHole(playerId, holeNum) {
         const all = currentData.dots || {};
@@ -2009,6 +2081,9 @@
             const multiGroup = (currentData.players || []).length > 4;
             const allowed = !multiGroup || hasGroupLock;
             const label = total > 0 ? `\uD83D\uDD34 Dots (${total})` : '\uD83D\uDD34 + DOT';
+            // What this KP is worth, BEFORE anyone picks a winner. Nothing renders on
+            // a hole that is not an eligible par 3.
+            html += kpLiveLineHtml(holeNum);
             html += allowed
                 ? `<button type="button" class="hv-dots-btn${total > 0 ? ' has-dots' : ''}" onclick="openDotsModal(${holeNum})">${label}</button>`
                 : `<button type="button" class="hv-dots-btn" disabled style="opacity:0.5; cursor:not-allowed;">${label}</button>`;
@@ -5710,6 +5785,9 @@
                 ? 'onclick="openDotsModal(' + o.hole + ')"'
                 : 'disabled style="opacity:0.5; cursor:not-allowed;"';
             inner += '<button class="' + cls + '" ' + attrs + '>' + label + '</button>';
+            // SAME PRESENTER, not a second calculation. If these two views could ever
+            // disagree about what a KP is worth, one of them would be lying.
+            inner += kpLiveLineHtml(o.hole);
         } else if (o.gameFormat === 'wolf' && o.wolfLog) {
             const log = o.wolfLog;
             if (log.call) {
@@ -5846,7 +5924,12 @@
         const byHole = {};
         const holes = greeniePar3Holes(courseData, data.startHole);
         const dots = data.dots || {};
+        // PENDING, NOT PREDICTED. An eligible par 3 that nobody has won and that is not
+        // yet complete does not advance the pot - and must not be shown as if it had.
+        // Recording it lets the UI say "previous KP pending" from canonical state rather
+        // than running a second guess at the same completeness rule.
         let riding = 1;
+        const pending = [];
 
         holes.forEach(hole => {
             const holeDots = dots[`h${hole}`] || {};
@@ -5864,9 +5947,10 @@
                 return v !== undefined && v !== null && v !== '' && parseInt(v, 10) > 0;
             });
             if (complete) riding += 1;
+            else pending.push(hole);
         });
 
-        return { byHole, riding };
+        return { byHole, riding, pending };
     }
 
     function calcDotsEngine(data, courseData, savedScores) {
