@@ -204,7 +204,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v33-rattle-identity';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v34-brand-mark';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -390,5 +390,109 @@ describe('SERVICE WORKER SUPPRESSION SURVIVES THE RENAME', () => {
     test('the native bundle ships no service worker registration path by accident', () => {
         const boot = codeOnly(read('pwa-boot.js'));
         assert.ok(/isNativeShell/.test(boot), 'native detection must remain live code');
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('THE HOMEPAGE BRAND MARK', () => {
+
+    // The lobby header is: theme toggle / brand mark / "Rattle Golf" / prompt.
+    // Everything here is scoped to that header. ⛳ is still perfectly legitimate
+    // elsewhere on the page — the Club Round widget uses it — so a blanket ban on
+    // the emoji would be wrong and would fail for the wrong reason.
+    const header = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'), ADMIN.indexOf('class="home-widgets"'));
+
+    test('the header shows the Stroke R mark, not a generic emoji', () => {
+        assert.match(header, /<img src="logo-mark\.png"/,
+            'the homepage brand mark must be the approved artwork');
+        assert.ok(!/class="lobby-logo[^"]*"[^>]*>\u26f3</.test(header),
+            'the generic golf-hole emoji must not return as the brand mark');
+    });
+
+    test('the five-tap admin gesture still lives on the mark', () => {
+        // The hidden admin panel is opened by tapping this element five times. A
+        // visual change that dropped the handler would silently remove the only way
+        // into the course-database tools.
+        assert.match(header, /class="lobby-logo lobby-mark" onclick="handleSecretTap\(\)"/,
+            'handleSecretTap must survive any restyling of the brand mark');
+    });
+
+    test('the mark is the symbol only — the wordmark is not doubled', () => {
+        assert.match(header, /<div class="lobby-title">Rattle Golf<\/div>/);
+        // Case-insensitive on purpose: a stacked wordmark would very likely be set
+        // in caps, and a case-sensitive count let exactly that slip through a
+        // negative control.
+        const marks = header.match(/rattle\s+golf/gi) || [];
+        assert.equal(marks.length, 2,
+            'exactly two: the img alt text and the heading. A third means a wordmark was stacked above the title.');
+    });
+
+    test('the other homepage emojis were not touched', () => {
+        assert.match(ADMIN, /<div class="hw-icon">\u{1F9F3}<\/div>/u, 'Golf Trip');
+        assert.match(ADMIN, /<div class="hw-icon">\u26f3<\/div>/u, 'Club Round keeps its golf-hole emoji');
+        assert.match(ADMIN, /<div class="hw-icon">\u{1F3CC}/u, 'Quick Round');
+    });
+
+    test('the Round Ready screen keeps its own separate logo', () => {
+        assert.match(ADMIN, /<div class="lobby-logo">\u2705<\/div>/u,
+            'that is a different screen and must not inherit the brand mark');
+    });
+
+    test('the mark reads in both themes', () => {
+        // The forest-green R is nearly invisible on the dark card. The cream disc is
+        // what makes it legible, so it is declared for BOTH themes, not just one.
+        assert.match(ADMIN, /--brand-cream: #F6F4EC;/);
+        const light = ADMIN.slice(ADMIN.indexOf(':root'), ADMIN.indexOf('html.dark-mode'));
+        const dark = ADMIN.slice(ADMIN.indexOf('html.dark-mode'));
+        assert.match(light, /--brand-cream: #F6F4EC;/, 'light theme');
+        assert.match(dark, /--brand-cream: #F6F4EC;/, 'dark theme');
+        assert.match(ADMIN, /\.lobby-mark \{[^}]*background: var\(--brand-cream\)/,
+            'the disc must use the brand variable, not a hardcoded colour');
+    });
+
+    test('the mark is proportional to the header, not oversized', () => {
+        const [, size] = /\.lobby-mark \{ width: (\d+)px/.exec(ADMIN);
+        assert.ok(Number(size) <= 96,
+            `the disc is ${size}px; it should sit in roughly the footprint the 3.5rem emoji had`);
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('THE BRAND MARK ASSET', () => {
+
+    test('logo-mark.png is committed and square', () => {
+        assert.ok(exists('logo-mark.png'));
+        const buf = fs.readFileSync(path.join(__dirname, 'logo-mark.png'));
+        assert.equal(buf.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
+        const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+        assert.equal(w, h);
+        assert.equal(w, 256, 'sized for retina at the 56px display size');
+    });
+
+    test('the mark is transparent — it sits on the disc, it does not carry a field', () => {
+        // Colour type 6 is RGBA. Unlike the app icon (which must be opaque), this one
+        // must have alpha or it would paint its own cream rectangle over the disc.
+        const buf = fs.readFileSync(path.join(__dirname, 'logo-mark.png'));
+        assert.equal(buf[25], 6, 'logo-mark.png needs an alpha channel');
+    });
+
+    test('the mark ships to Consumer and to the native bundle', () => {
+        assert.ok(read('sw.js').includes("'./logo-mark.png'"), 'must be precached');
+        assert.ok(read('sync-mobile-web.js').includes("'logo-mark.png'"), 'must ship natively');
+    });
+
+    test('the mark is Consumer-only — Tournament has no use for it', () => {
+        const sync = read('sync-mobile-web.js');
+        const shared = /const SHARED_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
+        const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
+        assert.ok(!shared.includes('logo-mark.png'), 'not shared');
+        assert.ok(!tournament.includes('logo-mark.png'), 'not Tournament');
+    });
+
+    test('the cache moved — the header changed and installed devices must see it', () => {
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v34-brand-mark';/);
+        assert.match(BUILD, /cacheName: 'consumer-v34-brand-mark'/);
+        assert.match(BUILD, /cacheName: 'tournament-v32-consumer-ready'/,
+            'Tournament assets did not change, so its cache must not move');
     });
 });
