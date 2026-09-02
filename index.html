@@ -1218,6 +1218,10 @@
     </div>
 
     <div class="card-table-wrapper" id="full-card-container" style="display:none;">
+        <!-- The SAME live leaderboard Hole View shows, in the second scorecard view.
+             Its own id because two elements cannot share one; the markup inside is
+             written by renderLiveTicker(), so there is one presenter and two mounts. -->
+        <div id="fc-ticker-mount"></div>
         <div id="match-hcp-note" class="match-hcp-note" style="display:none;"></div>
         <table class="card-table">
             <thead>
@@ -1941,6 +1945,55 @@
         if (mode === 'hole') renderHoleView();
     }
 
+    // ------------------------------------------------------------------
+    // KEEP THE PREV/NEXT ROW WHERE THE THUMB LEFT IT.
+    //
+    // THE BUG. goToAdjacentHole() ended with scrollToHoleCard(), which scrolls to the
+    // TOP of the hole card. Holes are not the same height - a par 3 carries a KP
+    // banner, some holes have dots, matches, presses, longer names - so anchoring the
+    // CARD moved the BUTTONS. A golfer tapping Next four times had to chase the button
+    // up and down the screen between taps.
+    //
+    // THE FIX IS GEOMETRY, NOT GUESSWORK. Measure where the nav row actually sits,
+    // re-render, measure again, scroll by the difference. Nothing is assumed about
+    // header height, KP banner height, name length or browser chrome, because nothing
+    // is assumed at all - the browser is asked both times. That is also why no case
+    // here mentions KP or the leaderboard: content that changes height is exactly what
+    // the measurement already accounts for.
+    //
+    // FAIL OPEN, ALWAYS. If the row cannot be found, or the harness has no scroll API,
+    // navigation still happens. Anchoring is a comfort, never a precondition.
+    //
+    // ONE COMPENSATION PER NAVIGATION. No scroll listener, no observer. Once the golfer
+    // scrolls after landing, the page is theirs.
+    function withNavAnchor(render) {
+        const navSel = '.hole-view-nav-row';
+        const before = (() => {
+            try {
+                const el = document.querySelector(navSel);
+                return el && el.getBoundingClientRect ? el.getBoundingClientRect().top : null;
+            } catch (e) { return null; }
+        })();
+
+        render();
+
+        if (before === null) return;                      // nothing to anchor to
+        const settle = () => {
+            try {
+                const el = document.querySelector(navSel);
+                if (!el || !el.getBoundingClientRect) return;
+                const delta = el.getBoundingClientRect().top - before;
+                if (!delta) return;
+                // Direct, not animated: this is positional continuity, not a journey.
+                if (typeof window.scrollBy === 'function') window.scrollBy(0, delta);
+            } catch (e) { /* navigation already happened; anchoring is optional */ }
+        };
+        // After layout, not after a guessed delay. One frame, because the render path
+        // above is synchronous - stacked timers would only hide a real ordering bug.
+        if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(settle);
+        else settle();
+    }
+
     function goToAdjacentHole(delta) {
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         if (courseData.length === 0) return;
@@ -1948,9 +2001,10 @@
         let idx = holeNumbers.indexOf(currentViewedHole);
         if (idx === -1) idx = 0;
         idx = Math.max(0, Math.min(holeNumbers.length - 1, idx + delta));
+        // Boundary behaviour unchanged: clamped, never wrapped.
+        if (holeNumbers[idx] === currentViewedHole) return;
         currentViewedHole = holeNumbers[idx];
-        renderHoleView();
-        scrollToHoleCard();
+        withNavAnchor(renderHoleView);
     }
 
     // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
@@ -2381,8 +2435,12 @@
     // TWO WIDGETS, ONE DASHBOARD. The loose ticker line is gone: leader information
     // now lives in exactly one place, inside a bordered card, so nothing duplicates
     // it further down the page.
+    // Hole View's mount and the Full Card's. Adding a view means adding an id here,
+    // never a second copy of the widget.
+    const TICKER_MOUNTS = ['live-ticker-mount', 'fc-ticker-mount'];
+
     function renderLiveTicker() {
-        const mount = document.getElementById('live-ticker-mount');
+        const mount = TICKER_MOUNTS.map(id => document.getElementById(id)).find(Boolean);
         if (!mount) return;
         const board = renderLeaderWidgetHtml();
         const skins = renderSkinsWidgetHtml();
@@ -2403,7 +2461,17 @@
         // Scoped to the players this viewer can see, the same rule the match card uses.
         const strokeBets = buildLiveStrokeBetHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
         const any = board || skins || matches || points || hilo || strokeBets;
-        mount.innerHTML = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + strokeBets + '</div>' : '';
+        const html = any ? '<div class="lw-grid">' + board + skins + matches + points + hilo + strokeBets + '</div>' : '';
+        // ONE PRESENTER, TWO MOUNTS. The markup is built once, above, from
+        // liveStandings() -> computeNetToParStandings(). Hole View and the Full Card
+        // then receive the same string. Nothing about ranking, ties, net handicaps or
+        // group scoping is decided twice, so the two views cannot disagree about who
+        // is leading - which is the only thing that would make a second board worse
+        // than no board at all.
+        TICKER_MOUNTS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = html;
+        });
     }
 
     function renderLeaderWidgetHtml() {
