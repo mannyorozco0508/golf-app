@@ -204,7 +204,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v34-brand-mark';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v35-consumer-separation';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -427,10 +427,12 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'exactly two: the img alt text and the heading. A third means a wordmark was stacked above the title.');
     });
 
-    test('the other homepage emojis were not touched', () => {
-        assert.match(ADMIN, /<div class="hw-icon">\u{1F9F3}<\/div>/u, 'Golf Trip');
-        assert.match(ADMIN, /<div class="hw-icon">\u26f3<\/div>/u, 'Club Round keeps its golf-hole emoji');
-        assert.match(ADMIN, /<div class="hw-icon">\u{1F3CC}/u, 'Quick Round');
+    test('the two Consumer mode icons are the approved pair', () => {
+        assert.match(ADMIN, /<div class="hw-icon">\u{1F690}<\/div>/u, 'Road Trip is the van');
+        assert.match(ADMIN, /<div class="hw-icon">\u{1F3CC}/u, 'Game Day is the golfer');
+        assert.ok(!/<div class="hw-icon">\u26f3<\/div>/u.test(ADMIN),
+            'the Club Round tile and its flag left with the product separation');
+        assert.ok(!/\u{1F9F3}/u.test(ADMIN), 'luggage was retired in favour of the van');
     });
 
     test('the Round Ready screen keeps its own separate logo', () => {
@@ -490,8 +492,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v34-brand-mark';/);
-        assert.match(BUILD, /cacheName: 'consumer-v34-brand-mark'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v35-consumer-separation';/);
+        assert.match(BUILD, /cacheName: 'consumer-v35-consumer-separation'/);
         assert.match(BUILD, /cacheName: 'tournament-v32-consumer-ready'/,
             'Tournament assets did not change, so its cache must not move');
     });
