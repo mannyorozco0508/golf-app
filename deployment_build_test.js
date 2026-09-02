@@ -213,8 +213,12 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        assert.match(c, /^consumer-v32-/);
-        assert.match(t, /^tournament-v32-/);
+        // The two versions are ALLOWED to diverge, and here they do: only Consumer
+        // assets changed in the Rattle Golf identity batch, so only Consumer bumped.
+        assert.match(c, /^consumer-v\d+-/);
+        assert.match(t, /^tournament-v\d+-/);
+        assert.match(c, /^consumer-v33-rattle-identity$/);
+        assert.match(t, /^tournament-v32-consumer-ready$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {
