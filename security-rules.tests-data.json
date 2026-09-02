@@ -257,6 +257,269 @@
           "data": 4
         }
       ]
+    },
+    "events/ABCD/dotPointVal": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        },
+        {
+          "auth": "nobody",
+          "data": 0
+        },
+        {
+          "auth": "nobody",
+          "data": 2.5
+        },
+        {
+          "auth": "nobody",
+          "data": 100000
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "5"
+        },
+        {
+          "auth": "nobody",
+          "data": "abc"
+        },
+        {
+          "auth": "nobody",
+          "data": -5
+        },
+        {
+          "auth": "nobody",
+          "data": 100001
+        },
+        {
+          "auth": "nobody",
+          "data": true
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "v": 5
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": [
+            5
+          ]
+        }
+      ]
+    },
+    "events/ABCD/nassauStake": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 10
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "10"
+        },
+        {
+          "auth": "nobody",
+          "data": -1
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "amt": 10
+          }
+        }
+      ]
+    },
+    "events/ABCD/matchStake": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 20
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "twenty"
+        },
+        {
+          "auth": "nobody",
+          "data": -20
+        }
+      ]
+    },
+    "events/ABCD/skinsBuyIn": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "5"
+        },
+        {
+          "auth": "nobody",
+          "data": -5
+        }
+      ]
+    },
+    "events/ABCD/birdieUnitVal": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 1
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "1"
+        },
+        {
+          "auth": "nobody",
+          "data": -1
+        }
+      ]
+    },
+    "events/ABCD/wolfPointVal": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 2
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "2"
+        },
+        {
+          "auth": "nobody",
+          "data": -2
+        }
+      ]
+    },
+    "events/ABCD/stablefordPointVal": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 1
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "1"
+        },
+        {
+          "auth": "nobody",
+          "data": -1
+        }
+      ]
+    },
+    "events/ABCD/holeBetStake": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "5"
+        },
+        {
+          "auth": "nobody",
+          "data": -5
+        }
+      ]
+    },
+    "events/ABCD/wolfLoneMult": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 2
+        },
+        {
+          "auth": "nobody",
+          "data": 3
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "2"
+        },
+        {
+          "auth": "nobody",
+          "data": -1
+        },
+        {
+          "auth": "nobody",
+          "data": 1000
+        }
+      ]
+    },
+    "events/ABCD/wolfBlindMult": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 4
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "4"
+        },
+        {
+          "auth": "nobody",
+          "data": 500
+        }
+      ]
+    },
+    "events/ABCD/sideMatches/m1/stake": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 10
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "10"
+        },
+        {
+          "auth": "nobody",
+          "data": -10
+        }
+      ]
+    },
+    "events": {
+      "cannotRead": [
+        "nobody"
+      ]
+    },
+    "trips": {
+      "cannotRead": [
+        "nobody"
+      ]
+    },
+    "tournaments": {
+      "cannotRead": [
+        "nobody"
+      ]
     }
   }
 }
