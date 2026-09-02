@@ -100,12 +100,16 @@ describe('THE WRAPPER POINTS AT THE BUNDLE, NOT A SERVER', () => {
         assert.deepEqual(others, [], 'the native bundle id must not leak into web files');
     });
 
-    test('the native id is a placeholder, and is recorded as one', () => {
-        // com.golfapp.app is NOT a decision - it predates the naming discussion and
-        // must be replaced before the first TestFlight upload, because a bundle id
-        // cannot be changed once a record exists in App Store Connect.
-        assert.match(CAP, /appId: 'com\.golfapp\.app'/,
-            'if this changed, the pre-TestFlight blocker list is out of date');
+    test('the native id is the LOCKED production bundle identifier', () => {
+        // A bundle id cannot be changed once a record exists in App Store Connect,
+        // so com.rattlegolf.app is permanent from the first TestFlight upload on.
+        assert.match(CAP, /appId: 'com\.rattlegolf\.app'/,
+            'the production bundle identifier is com.rattlegolf.app and is permanent');
+    });
+
+    test('the retired placeholder bundle id cannot silently return', () => {
+        assert.ok(!/com\.golfapp\.app/.test(CAP),
+            'com.golfapp.app was retired at the Rattle Golf rename and must never come back');
     });
 });
 
