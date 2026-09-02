@@ -63,7 +63,7 @@ const SHARED_SHELL = [
 const CONSUMER_SHELL = [
     'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
     'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
-    'instructions.html', 'shared.html',
+    'instructions.html', 'shared.html', 'logo-mark.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
 ];
