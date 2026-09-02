@@ -18,6 +18,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="action-model.js"></script>
     <!-- THE CANONICAL STROKE ENGINES AND THE BIRDIE POOL TOTALS.
          This page used to carry its own calculateHoleBetEngine / calculateOverallBetEngine,
@@ -649,7 +650,7 @@
             if (players.length > 0) {
                 html += `<div class="settle-card"><div class="settle-header">🐦 Birdie Game (amount won)</div>`;
                 players.forEach(p => {
-                    html += `<div class="ledger-row"><span>${p.name}</span><span>$${(totals[p.id] || 0).toFixed(2)}</span></div>`;
+                    html += `<div class="ledger-row"><span>${escapeHtml(p.name)}</span><span>$${(totals[p.id] || 0).toFixed(2)}</span></div>`;
                 });
                 html += `</div>`;
             }
@@ -912,7 +913,7 @@
                         if (Math.abs(m.status) > hLeft) {
                             m.closed = true;
                             let winnerName = m.status > 0 ? t1Name : t2Name;
-                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                            m.finalResult = `${escapeHtml(winnerName)} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
                         if (hNum < m.endHole) {
@@ -1058,7 +1059,7 @@
 
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} Dots):</span>
+                        <span>${escapeHtml(p.name)} (${pts} Dots):</span>
                         <span class="${moneyClass}">${moneyText}</span>
                     </div>
                 `;
@@ -1086,7 +1087,7 @@
 
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span>${escapeHtml(p.name)} (${pts} pt${pts === 1 ? '' : 's'}):</span>
                         <span class="${moneyClass}">${moneyText}</span>
                     </div>
                 `;
@@ -1114,7 +1115,7 @@
 
                 ledgerHtml += `
                     <div class="ledger-row">
-                        <span>${p.name} (${pts} pt${pts === 1 ? '' : 's'}):</span>
+                        <span>${escapeHtml(p.name)} (${pts} pt${pts === 1 ? '' : 's'}):</span>
                         <span class="${moneyClass}">${moneyText}</span>
                     </div>
                 `;
@@ -1238,7 +1239,7 @@
         let html = `
             <div class="clean-scorecard" id="capture-area">
                 <div class="course-header">
-                    <h2 class="course-name">${courseName}</h2>
+                    <h2 class="course-name">${escapeHtml(courseName)}</h2>
                     <div class="round-date">${dateString}</div>
                 </div>
                 <div class="card-table-wrapper">
