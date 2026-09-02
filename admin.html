@@ -279,10 +279,17 @@
             <div class="hw-name">Golf Trip</div>
             <div class="hw-desc">Multiple rounds, games, teams, standings & money</div>
         </button>
+        <!-- NOT A THIRD PRODUCT. This creates exactly the same round as Quick Round -
+             same wizard, same engine, same code - and differs only in which game
+             formats are suggested first. It was called "Club Event" under a trophy,
+             which read as tournament administration and made Consumer look like it
+             held a third category alongside Trips and Quick Round. Organising a
+             tournament is the OTHER product; this is a preset, and the label and icon
+             now say so. -->
         <button type="button" class="home-widget" id="hw-club" onclick="selectHomeWidget('club')">
-            <div class="hw-icon">🏆</div>
-            <div class="hw-name">Club Event</div>
-            <div class="hw-desc">Today's men's club or club competition</div>
+            <div class="hw-icon">⛳</div>
+            <div class="hw-name">Club Round</div>
+            <div class="hw-desc">Same round, set up for club formats</div>
         </button>
         <button type="button" class="home-widget active" id="hw-quick" onclick="selectHomeWidget('quick')">
             <div class="hw-icon">🏌️</div>
@@ -2352,7 +2359,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // Trip and Tournament are genuinely separate flows and navigate away immediately.
     let selectedEventType = 'quick';
     const eventTypeFraming = {
-        club: "Club Event — nudges toward common club formats like Stroke Play, Skins, or Stableford. Every other format is still available in Step 3.",
+        club: "Club Round — the same round as Quick Round, with club formats like Stroke Play, Skins or Stableford suggested first. Every format is still available in Step 3.",
         quick: "Quick Round — just pick a course, add your group, choose a game, and go."
     };
 
