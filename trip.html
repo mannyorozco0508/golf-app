@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trip</title>
+    <title>Road Trip</title>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
@@ -35,6 +35,1867 @@
 <script src="pool-engine.js"></script>
     <script src="course-data.js"></script>
     <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            /* Between --text-main and --text-muted. Introduced because the net rows
+               on the scorecard and leaderboards need to be clearly readable while
+               staying subordinate to gross - muted was too faint, main too loud.
+               It was previously referenced without ever being defined, so those rows
+               ran on a hard-coded fallback and did not react to dark mode. */
+            --text-secondary: #4a5568;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --warn-bg: #fff4e5;
+            --warn-border: #e08a00;
+            --warn-text: #7a4a00;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --text-secondary: #c2cecd;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --warn-bg: #332508;
+            --warn-border: #c98a2b;
+            --warn-text: #f0b84f;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        .container { max-width: 720px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h2, h3 { color: var(--brand-green); margin-top: 0; }
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
+
+        .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
+        .lobby-title { font-size: 1.7rem; color: var(--brand-navy); text-align: center; margin-bottom: 10px; font-weight: bold; }
+        .lobby-sub { color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 20px; line-height: 1.4; }
+
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
+        input[type="text"], input[type="number"], select {
+            width: 100%; padding: 10px; border: 1px solid var(--border-mid);
+            border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
+        }
+
+        .holes-toggle-btn {
+            flex: 1; padding: 10px 6px; border: 2px solid var(--border-mid); border-radius: 8px;
+            background: var(--bg-card); color: var(--text-main); font-size: 0.85rem; font-weight: bold; cursor: pointer;
+        }
+        .holes-toggle-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
+
+        .course-picker-wrapper { position: relative; }
+        .course-picker-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
+        .course-picker-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--accent-teal);
+            border-top: none; border-radius: 0 0 6px 6px; max-height: 250px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        }
+        .course-picker-group-label { background: var(--bg-page); font-weight: bold; font-size: 0.72rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
+        .course-picker-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; color: var(--text-main); }
+        .course-picker-option:last-child { border-bottom: none; }
+        .course-picker-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .course-picker-empty { padding: 12px 14px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+
+        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
+        .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 6px; }
+
+        .lobby-divider { margin: 24px 0; border-top: 1px solid var(--border-light); position: relative; text-align: center; }
+        .lobby-divider span { position: relative; top: -11px; background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
+
+        .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
+        .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
+
+        .round-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--nassau-box-bg); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .round-card .rc-info { flex: 1; }
+        .round-card .rc-label { font-weight: bold; color: var(--brand-green); font-size: 0.9rem; }
+        .round-card .rc-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+        .round-card .rc-link { font-size: 0.78rem; color: var(--brand-navy); font-weight: bold; text-decoration: none; white-space: nowrap; }
+        .rc-counts-toggle { font-size: 0.72rem; color: var(--accent-teal); cursor: pointer; margin-top: 4px; font-weight: bold; }
+        .rc-counts-toggle.excluded { color: var(--text-muted); }
+
+        .lb-row { display: flex; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .lb-pos { width: 28px; font-weight: bold; color: var(--text-muted); }
+        .lb-team { flex: 1; font-weight: bold; }
+        .lb-sub { font-size: 0.72rem; color: var(--text-muted); font-weight: normal; }
+        .lb-score { width: 70px; text-align: right; font-weight: bold; }
+        /* Same stacked gross-over-net treatment as the round leaderboard. Net stays
+           subordinate through size and weight, not by being muted into invisibility. */
+        .lb-score.score-cell { line-height: 1.15; white-space: nowrap; }
+        .score-gross { display: block; font-size: 1.05rem; font-weight: bold; }
+        .score-net { display: block; font-size: 0.8rem; color: var(--text-secondary, #4a5568); font-weight: 600; }
+        .toggle-rank-label { font-size: 0.72rem; color: var(--text-muted); margin-right: 6px; }
+        .lb-row.leader { background: #fff8e1; }
+        html.dark-mode .lb-row.leader { background: #2b2712; }
+
+        .toggle-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0; }
+        .toggle-label-sm { font-size: 0.78rem; font-weight: bold; color: var(--text-muted); cursor: pointer; user-select: none; }
+        .toggle-label-sm.active { color: var(--brand-green); }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .toggle-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 22px; }
+        .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+        /* RECAP CARD. Full-screen so a screenshot captures the card and nothing else.
+           Portrait-shaped and self-contained - it has to read as a finished thing when
+           it lands in a group chat with no surrounding context. */
+        .recap-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; align-items: center; justify-content: center; padding: 10px; overflow-y: auto; }
+        .recap-sheet { width: 100%; max-width: 460px; }
+        .recap-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .recap-hint { font-size: 0.72rem; color: #fff; opacity: 0.85; }
+        .recap-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; line-height: 1; background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 10px; cursor: pointer; }
+        .recap-share { margin-top: 10px; }
+        /* The card itself pins its own colours rather than inheriting the theme: a
+           screenshot taken in dark mode must not arrive as pale text on white. */
+        .recap-card { background: #0f4c3a; color: #fff; border-radius: 16px; padding: 18px 16px; }
+        .rc-title { font-size: 1.25rem; font-weight: bold; line-height: 1.15; }
+        .rc-sub { font-size: 0.74rem; opacity: 0.8; margin-bottom: 12px; }
+        .rc-block { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+        .rc-head { font-size: 0.64rem; font-weight: bold; letter-spacing: 0.06em; opacity: 0.75; margin-bottom: 5px; }
+        .rc-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 0.86rem; }
+        .rc-pos { width: 22px; flex-shrink: 0; font-weight: bold; opacity: 0.7; font-size: 0.74rem; }
+        .rc-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rc-val { font-weight: bold; white-space: nowrap; }
+        .rc-award { display: flex; gap: 8px; padding: 3px 0; font-size: 0.82rem; }
+        .rc-award-name { font-weight: 600; }
+        .rc-detail { font-size: 0.72rem; opacity: 0.8; }
+        .rc-none { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
+        .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
+        .rc-foot { font-size: 0.66rem; opacity: 0.75; text-align: center; margin-top: 10px; font-weight: 600; }
+        .trip-share-btn { margin-top: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--subtle-bg); color: var(--brand-green); font-size: 0.82rem; font-weight: bold; cursor: pointer; }
+        .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
+        .val-pos { color: var(--accent-teal); }
+        .val-neg { color: var(--accent-red); }
+        .val-even { color: var(--text-muted); }
+
+        .trip-section { border: 1px solid var(--border-mid); border-radius: 10px; margin-bottom: 14px; background: var(--bg-card); overflow: hidden; }
+        .trip-section summary {
+            list-style: none; cursor: pointer; padding: 14px 16px; font-weight: bold; font-size: 1rem;
+            color: var(--brand-green); display: flex; justify-content: space-between; align-items: center;
+            background: var(--nav-bg); -webkit-tap-highlight-color: transparent;
+        }
+        .trip-section summary::-webkit-details-marker { display: none; }
+        .trip-section summary::after { content: '▼'; font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s ease; margin-left: 10px; flex-shrink: 0; }
+        .trip-section[open] summary::after { transform: rotate(180deg); }
+        .trip-section-body { padding: 14px 16px; }
+        .trip-section-sub { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px 0; }
+
+        #trip-itinerary-print-view { display: none; }
+        @media print {
+            body.printing-itinerary > *:not(#manage-screen) { display: none !important; }
+            body.printing-itinerary #manage-screen > *:not(#trip-itinerary-print-view) { display: none !important; }
+            body.printing-itinerary #trip-itinerary-print-view { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="setup-screen">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo">🚐</div>
+    <div class="lobby-title">Road Trip</div>
+    <p class="lobby-sub">Tie multiple rounds together into one trip — a running leaderboard across every day, not just one round at a time.</p>
+
+    <div id="resume-trip-container" style="display:none; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border-light);">
+        <span style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px; font-weight:bold; text-transform:uppercase;">Recent Trip Found</span>
+        <button class="btn-primary" style="background-color:var(--accent-teal);" onclick="resumeTrip()">▶️ Resume Trip (<span id="resume-trip-badge"></span>)</button>
+    </div>
+
+    <button class="btn-primary" onclick="showCreateTripForm()">➕ Start a New Trip</button>
+
+    <div id="create-trip-form" style="display:none; margin-top:14px;">
+        <div class="form-group">
+            <label>Trip Name</label>
+            <input type="text" id="trip-name-input" placeholder="e.g. Myrtle Beach 2026">
+        </div>
+
+        <div class="form-group">
+            <label>How Many Days?</label>
+            <input type="number" id="trip-days-input" min="1" max="14" placeholder="e.g. 4" oninput="renderDayPlanner()">
+        </div>
+
+        <div id="day-planner"></div>
+
+        <div id="round-planner-section" style="display:none; margin-top:8px;">
+            <h3 style="margin-bottom:2px;">🗓️ Set Up Each Round</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Pick the course and a rough headcount now — you'll add real player names later. This just builds the skeleton so nothing's left to remember.</p>
+            <div id="round-planner"></div>
+        </div>
+
+        <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">🏗️ Build Trip &amp; All Rounds</button>
+
+        <div style="text-align:center; margin-top:12px;">
+            <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline;" onclick="createTripBlank()">Skip planning — just create an empty trip</span>
+        </div>
+    </div>
+
+    <div class="lobby-divider"><span>OR</span></div>
+
+    <div class="form-group">
+        <label>Enter Trip Code</label>
+        <input type="text" id="join-trip-input" placeholder="ENTER TRIP CODE" maxlength="6" style="text-transform:uppercase;">
+    </div>
+    <button class="btn-outline" onclick="joinTrip()">📥 Open Trip</button>
+
+    <button class="btn-outline" style="margin-top: 20px; border-color: var(--border-mid); color: var(--text-muted);" onclick="window.location.href='admin.html'">← Back to Home</button>
+</div>
+
+<div class="container" id="manage-screen" style="display:none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div style="text-align:center;">
+        <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Trip Code</span><br>
+        <span class="room-badge" id="manage-room-badge"></span>
+        <!-- SHARING A TRIP USED TO MEAN READING FOUR CHARACTERS ALOUD. trip.html?trip=CODE
+             already worked; it simply was not surfaced anywhere, so twelve people each
+             typed the code by hand. A round has had copyable group links for months. -->
+        <div><button class="trip-share-btn" id="trip-share-btn" onclick="copyTripLink(this)">🔗 Share Trip Link</button></div>
+    </div>
+    <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
+
+    <hr class="section-divider">
+    <h3>🔗 Add a Round to This Trip</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+
+    <div class="form-group" id="copy-from-round-group" style="display:none; margin-bottom:8px;">
+        <label>Start From (optional)</label>
+        <select id="copy-from-round-select">
+            <option value="">🆕 Blank round</option>
+        </select>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Copies course/format/side games from that round — handy for a 36-hole day. Players stay editable either way.</p>
+    </div>
+
+    <button class="btn-primary" onclick="createRoundForTrip()">➕ Create New Round for This Trip</button>
+
+    <div style="margin-top:14px; border-top:1px solid var(--border-light); padding-top:12px;">
+        <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 8px 0;">Already set up a round on Home before starting this trip? Link it manually instead:</p>
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Game Code</label>
+            <input type="text" id="link-round-code" placeholder="e.g. A656" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+            <label>Day Label</label>
+            <input type="text" id="link-round-label" placeholder="e.g. Day 1 - Caledonia">
+        </div>
+        <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
+    </div>
+
+    <hr class="section-divider">
+
+    <details class="trip-section" open>
+        <summary>📅 Rounds in This Trip</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
+            <div id="rounds-list"></div>
+            <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
+        </div>
+    </details>
+
+    <!-- TOURNAMENT SURFACE REMOVED FROM CONSUMER — DATA DELIBERATELY UNTOUCHED.
+         A trip record can legitimately contain a `tournaments` node: the Tournament
+         product writes both relationship pointers when an organiser attaches a
+         tournament day to a trip. Road Trip belongs to Rattle Golf Consumer and
+         tournament management does not, so the LIST and the MANAGE button are gone.
+         What is NOT gone, and must not be "cleaned up" later:
+           - trips/<code>/tournaments in the schema. No migration was run. Existing
+             trips keep the node and it still round-trips through every read/write
+             on this page. rattle_consumer_separation_test.js pins this.
+           - createTournamentForTrip(), retained as an outbound helper.
+           - renderTournamentsList(), retained and now self-guarding.
+         The Club/Tournament app reads this same node to find its trip context. -->
+
+    <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
+
+    <details class="trip-section" open>
+        <summary>🏆 Cumulative Leaderboard</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Totals across every linked round so far. Matches players by name across rounds.</p>
+            <div class="toggle-row">
+                <span class="toggle-rank-label">Ranking:</span>
+                <span class="toggle-label-sm active" id="lb-mode-label-gross" onclick="setLbMode('gross')">Gross</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="lb-mode-switch" onchange="setLbMode(this.checked ? 'net' : 'gross')">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label-sm" id="lb-mode-label-net" onclick="setLbMode('net')">Net</span>
+            </div>
+            <div id="trip-leaderboard"></div>
+        </div>
+    </details>
+
+    <details class="trip-section">
+        <summary>💵 Trip Money Settlement</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Nets every linked round's main-format bet into one final "who pays who" list. Settle up for real over Venmo — this is just the math.</p>
+            <div id="trip-money-settlement"></div>
+        </div>
+    </details>
+
+    <details class="trip-section">
+        <summary>🎖️ Points Race &amp; Prizes</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
+            <div id="trip-points-race"></div>
+
+            <hr class="section-divider" style="margin:18px 0;">
+
+            <p class="trip-section-sub" style="margin-bottom:8px;"><strong>Prize Payout Calculator</strong> — set the pool and how many spots pay, and it maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label>Total Pool ($)</label>
+                <input type="number" id="prize-pool-input" min="0" value="0" oninput="renderPrizeSpotInputs()">
+            </div>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label>Paid Spots</label>
+                <input type="number" id="prize-spots-input" min="1" max="20" value="3" oninput="renderPrizeSpotInputs()">
+            </div>
+            <div id="prize-spot-amounts"></div>
+            <div id="prize-payout-results" style="margin-top:10px;"></div>
+        </div>
+    </details>
+
+    <details class="trip-section" open>
+        <summary>🏅 Trip Awards</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Auto-computed from the scores already entered — nothing extra to fill in.</p>
+            <div id="trip-awards"></div>
+        </div>
+    </details>
+
+    <!-- THE RECAP CARD. A full-screen overlay so the card fills the phone and a
+         screenshot captures it cleanly, with nothing from the page bleeding in. -->
+    <div class="recap-overlay" id="trip-recap-overlay" onclick="if (event.target === this) closeTripRecap();">
+        <div class="recap-sheet">
+            <div class="recap-bar">
+                <span class="recap-hint">Screenshot this \u2014 or use Share below</span>
+                <button class="recap-close" onclick="closeTripRecap()" aria-label="Close recap" title="Close">&times;</button>
+            </div>
+            <div id="trip-recap-card" class="recap-card"></div>
+            <button class="btn-primary recap-share" onclick="shareRecap()">\uD83D\uDCE4 Share as Text</button>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+    <!-- TWO WAYS TO SHARE. The text recap pastes into a group chat; the visual one
+         is the thing somebody screenshots. Both read the same cached state, so they
+         cannot tell different stories about the same trip. -->
+    <button class="btn-primary" onclick="openTripRecap()">📸 Trip Recap Card</button>
+    <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap (Text)</button>
+    <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:6px;">Standings, settlement, and awards in one message for the group chat.</p>
+
+    <hr class="section-divider">
+    <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='trip.html'">➕ Start a Different Trip</button>
+
+    <div id="trip-itinerary-print-view"></div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode'; });
+    }
+    if (localStorage.getItem('golfapp-theme') === 'dark') document.documentElement.classList.add('dark-mode');
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.documentElement.classList.contains('dark-mode')) {
+            document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = '☀️ Light Mode'; });
+        }
+    });
+
+    // getStrokes, parseHcp, and every money-calc engine live in money-engine.js
+    // (loaded above) so this page always agrees with each round's own Settle page.
+
+    // Same 4-character code format admin.html uses for game codes, so trip codes and
+    // bulk-built round codes are indistinguishable from ones created the normal way.
+    function generateRandomCode() {
+        // SIX CHARACTERS, NOT FOUR.
+        //
+        // A 4-character code from this 32-character alphabet is 1,048,576
+        // possibilities. There is no listing endpoint - every read names a specific
+        // code - but a million is small for a machine, and a hit grants full read
+        // and write to that round. Six raises it to 1,073,741,824: 1,024x.
+        //
+        // Not seven: every code input carries maxlength="6", so a 7-character code
+        // could be generated and linked but never typed.
+        //
+        // Existing 4-character codes are untouched and still join - joinRoom only
+        // rejects codes shorter than 2, and the security rules treat the code
+        // segment as a wildcard.
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let code = "";
+        for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
+        return code;
+    }
+
+    function generateTripCode() {
+        return generateRandomCode();
+    }
+
+    function showCreateTripForm() {
+        document.getElementById('create-trip-form').style.display = 'block';
+        renderDayPlanner();
+        if (globalCoursesCache === null) {
+            db.ref('global_courses').once('value').then(snap => {
+                globalCoursesCache = snap.val() || {};
+                renderRoundPlanner(); // refresh any already-drawn cards now that real mapping data is in
+            }).catch(() => { globalCoursesCache = {}; });
+        }
+    }
+
+    // null = not fetched yet (treat as "unknown", not "unmapped", to avoid a flash of false
+    // warnings before the read completes). {} once the fetch resolves either way.
+    let globalCoursesCache = null;
+
+    // A course counts as "mapped" if it has real hole-by-hole data from either source —
+    // the local seed set in course-data.js, or Firebase's live community database. Thistle's
+    // nine-hole loops always have real data by construction, so they're always mapped.
+    function isCourseMapped(courseId) {
+        if (!courseId) return true; // nothing selected yet — not this check's job to flag that
+        if (nineHoleLoops[courseId]) return true;
+        if (coursePresets[courseId]) return true;
+        if (globalCoursesCache && globalCoursesCache[courseId]) return true;
+        return globalCoursesCache === null ? true : false; // unknown yet -> don't falsely warn
+    }
+
+    // ============================================================================
+    // TRIP PLANNING WIZARD
+    // Lets the whole trip skeleton get built in one shot: N days, 1 or 2 rounds
+    // per day (18 vs 36 holes), a real course per round, and a headcount that
+    // pre-builds that many blank player slots ("Player 1", "Player 2"...).
+    // Nobody's name gets typed here — that happens later, per round, whenever
+    // the actual roster is known. Add/remove players anytime from that round's
+    // own Admin setup, same as any other round.
+    // ============================================================================
+    let plannedDays = [];   // [{ roundsToday: 1 or 2 }, ...]
+    let roundConfigs = [];  // flattened per-round: [{ label, courseId, playerCount }, ...]
+
+    function renderDayPlanner() {
+        const daysInput = document.getElementById('trip-days-input');
+        let numDays = parseInt(daysInput.value, 10);
+        if (isNaN(numDays) || numDays < 0) numDays = 0;
+        if (numDays > 14) { numDays = 14; daysInput.value = 14; }
+        // Never rewrite daysInput.value on the low end — doing so fights backspace/delete,
+        // since the field goes empty (NaN) for an instant while the user clears it to retype.
+
+        // Preserve each day's 18/36 choice when the day count changes instead of resetting everyone.
+        let newPlannedDays = [];
+        for (let i = 0; i < numDays; i++) {
+            newPlannedDays.push(plannedDays[i] || { roundsToday: 1 });
+        }
+        plannedDays = newPlannedDays;
+
+        const container = document.getElementById('day-planner');
+        let html = '';
+        plannedDays.forEach((d, i) => {
+            html += `<div class="settle-card" style="margin-bottom:10px;">
+                <div style="font-weight:bold; margin-bottom:8px; color:var(--brand-green);">Day ${i + 1}</div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 1 ? 'active' : ''}" onclick="setDayRounds(${i}, 1)">⛳ 18 Holes</button>
+                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 2 ? 'active' : ''}" onclick="setDayRounds(${i}, 2)">⛳⛳ 36 Holes</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+        renderRoundPlanner();
+    }
+
+    function setDayRounds(dayIndex, roundsToday) {
+        plannedDays[dayIndex].roundsToday = roundsToday;
+        renderDayPlanner();
+    }
+
+    function renderRoundPlanner() {
+        // Capture whatever's currently in the round-config form fields before rebuilding,
+        // so toggling a day's hole count elsewhere doesn't wipe course/headcount choices
+        // already made for other rounds.
+        roundConfigs.forEach((cfg, i) => {
+            const courseEl = document.getElementById(`round-course-${i}`);
+            const playersEl = document.getElementById(`round-players-${i}`);
+            const frontEl = document.getElementById(`round-frontnine-${i}`);
+            const backEl = document.getElementById(`round-backnine-${i}`);
+            if (courseEl) cfg.courseId = courseEl.value;
+            if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
+            if (frontEl) cfg.frontNineKey = frontEl.value;
+            if (backEl) cfg.backNineKey = backEl.value;
+        });
+
+        let newFlat = [];
+        plannedDays.forEach((d, dayIdx) => {
+            for (let r = 0; r < d.roundsToday; r++) {
+                const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '' });
+            }
+        });
+        // Carry forward previously entered values by position — good enough for the common
+        // case of adjusting day count or 18-vs-36 without having re-pick everything.
+        newFlat.forEach((cfg, i) => {
+            if (roundConfigs[i]) {
+                cfg.courseId = roundConfigs[i].courseId || '';
+                cfg.playerCount = roundConfigs[i].playerCount || 4;
+                cfg.frontNineKey = roundConfigs[i].frontNineKey || '';
+                cfg.backNineKey = roundConfigs[i].backNineKey || '';
+            }
+        });
+        roundConfigs = newFlat;
+
+        const section = document.getElementById('round-planner-section');
+        const container = document.getElementById('round-planner');
+        if (roundConfigs.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+
+        let html = '';
+        roundConfigs.forEach((cfg, i) => {
+            const loops = nineHoleLoops[cfg.courseId];
+            const selectedName = cfg.courseId ? (getCourseNameById(cfg.courseId, {}) || cfg.courseId) : '';
+            let coursePickerHtml = `
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label>Course</label>
+                    <div class="course-picker-wrapper">
+                        <input type="text" id="round-course-input-${i}" value="${selectedName.replace(/"/g, '&quot;')}"
+                               placeholder="-- Search / Select Course --" autocomplete="off"
+                               oninput="filterRoundCourseDropdown(${i})" onfocus="filterRoundCourseDropdown(${i})">
+                        <input type="hidden" id="round-course-${i}" value="${cfg.courseId}">
+                        <div class="course-picker-dropdown" id="round-course-dropdown-${i}"></div>
+                    </div>
+                </div>`;
+
+            if (loops) {
+                const loopKeys = Object.keys(loops);
+                const frontKey = cfg.frontNineKey || loopKeys[0];
+                const backKey = cfg.backNineKey || (loopKeys.length > 1 ? loopKeys[1] : 'none');
+                coursePickerHtml += `
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 8px 0;">Thistle's three interchangeable 9-hole loops — pick any two to make an 18-hole round. Reusing the same loop across different rounds that day is fine.</p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <div class="form-group" style="margin-bottom:0; flex:1;">
+                        <label>Nine #1</label>
+                        <select id="round-frontnine-${i}">
+                            ${loopKeys.map(k => `<option value="${k}" ${k === frontKey ? 'selected' : ''}>${loops[k].name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0; flex:1;">
+                        <label>Nine #2</label>
+                        <select id="round-backnine-${i}">
+                            ${loopKeys.map(k => `<option value="${k}" ${k === backKey ? 'selected' : ''}>${loops[k].name}</option>`).join('')}
+                            <option value="none" ${backKey === 'none' ? 'selected' : ''}>-- None (9 Holes Only) --</option>
+                        </select>
+                    </div>
+                </div>`;
+            }
+
+            if (cfg.courseId && !loops && !isCourseMapped(cfg.courseId)) {
+                coursePickerHtml += `
+                <div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:10px; margin-bottom:8px; font-size:0.76rem; color:var(--warn-text);">
+                    ⚠️ <strong>This course hasn't been mapped yet</strong> — nobody's entered its real par/handicap layout. Building this round now will use placeholder data (Par 4 on every hole), which will throw off net scores and handicap strokes. After building, open this round from Home, tap the course again, and enter the real scorecard (or map it individually first, then use "Start From" to copy it in here).
+                </div>`;
+            }
+
+            html += `<div class="settle-card" style="margin-bottom:10px;">
+                <div style="font-weight:bold; margin-bottom:8px;">${cfg.label}</div>
+                ${coursePickerHtml}
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Players</label>
+                    <input type="number" id="round-players-${i}" min="0" max="40" value="${cfg.playerCount}">
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // Filters the searchable course dropdown for round i as the person types — grouped by
+    // region, same directory the regular per-round Admin setup searches, so there's nothing
+    // to scroll through blindly for a ~150-course list.
+    function filterRoundCourseDropdown(i) {
+        const input = document.getElementById(`round-course-input-${i}`);
+        const dropdown = document.getElementById(`round-course-dropdown-${i}`);
+        const typed = input.value.trim().toLowerCase();
+
+        let html = '';
+        courseDirectory.forEach(g => {
+            const matches = g.items.filter(item => item.name.toLowerCase().includes(typed));
+            if (matches.length > 0) {
+                html += `<div class="course-picker-group-label">${g.group}</div>`;
+                matches.forEach(item => {
+                    // NO USER STRING IN THE HANDLER. The course name used to be
+                    // hand-escaped into an onclick argument, which is JavaScript
+                    // syntax - one apostrophe away from a broken handler and one
+                    // crafted name away from arbitrary code. The click now carries
+                    // only the course id, and the name is read back from the
+                    // directory, so nothing typed by a golfer ever becomes code.
+                    const warnTag = isCourseMapped(item.id) ? '' : ` <span style="color:var(--warn-border); font-size:0.72rem; font-weight:bold;">⚠️ not mapped yet</span>`;
+                    html += `<div class="course-picker-option" onclick="selectRoundCourseById(${i}, '${escapeHtml(String(item.id).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(item.name)}${warnTag}</div>`;
+                });
+            }
+        });
+
+        dropdown.innerHTML = html || `<div class="course-picker-empty">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
+        dropdown.style.display = 'block';
+    }
+
+    // Selecting a course re-renders this round's card so a nine-hole-loop course (like
+    // Thistle) immediately reveals the Nine #1/#2 pickers.
+    // Looks the name up rather than being handed it. Course ids are the app's own
+    // keys, not user text, which is what makes this safe to put in a handler.
+    function selectRoundCourseById(i, id) {
+        let found = null;
+        (courseDirectory || []).forEach(g => (g.items || []).forEach(item => {
+            if (String(item.id) === String(id)) found = item;
+        }));
+        selectRoundCourse(i, id, found ? found.name : '');
+    }
+
+    function selectRoundCourse(i, id, name) {
+        // Write straight to the DOM first — renderRoundPlanner's very first step re-reads these
+        // same fields to "preserve" whatever's currently on screen, so if we only updated the
+        // JS state and not the actual input, that re-read would stomp the selection right back
+        // to whatever stale value was already sitting in the hidden input (usually empty).
+        const hiddenEl = document.getElementById(`round-course-${i}`);
+        const textEl = document.getElementById(`round-course-input-${i}`);
+        if (hiddenEl) hiddenEl.value = id;
+        if (textEl) textEl.value = name;
+
+        roundConfigs[i].courseId = id;
+        roundConfigs[i].frontNineKey = '';
+        roundConfigs[i].backNineKey = '';
+        renderRoundPlanner();
+    }
+
+    // Closes whichever course dropdown is open when the person taps anywhere else on the page.
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.course-picker-wrapper')) {
+            document.querySelectorAll('.course-picker-dropdown').forEach(d => d.style.display = 'none');
+        }
+    });
+
+    // Firebase's global_courses is the live source of truth for a course's real hole data
+    // (see the course-data-override note in project memory) - falls back to the local
+    // seed data in course-data.js, then a flat placeholder if neither has it yet.
+    function resolveCourseData(courseId, globalCoursesData) {
+        if (globalCoursesData[courseId] && globalCoursesData[courseId].data) return globalCoursesData[courseId].data;
+        if (coursePresets[courseId]) return coursePresets[courseId].data;
+        let fallback = [];
+        for (let h = 1; h <= 18; h++) fallback.push({ hole: h, par: 4, hcpIndex: h });
+        return fallback;
+    }
+
+    // Resolves both the final courseData AND display name for a round config — handles the
+    // nine-hole-loop special case (like Thistle) exactly the way admin.html's saveSettings()
+    // does, so a trip-built round and a manually-built round produce identical data.
+    function resolveCourseDataAndName(cfg, globalCoursesData) {
+        const loops = nineHoleLoops[cfg.courseId];
+        const baseName = getCourseNameById(cfg.courseId, globalCoursesData) || 'Selected Course';
+
+        if (loops) {
+            const loopKeys = Object.keys(loops);
+            const frontKey = cfg.frontNineKey || loopKeys[0];
+            const backKey = cfg.backNineKey || (loopKeys.length > 1 ? loopKeys[1] : 'none');
+
+            let courseData = [];
+            const frontRemapped = remapNineHandicaps(loops[frontKey].data, true);
+            frontRemapped.forEach((item, idx) => { courseData.push({ hole: idx + 1, par: item.par, hcpIndex: item.hcpIndex }); });
+
+            let courseName;
+            if (backKey !== 'none') {
+                const backRemapped = remapNineHandicaps(loops[backKey].data, false);
+                backRemapped.forEach((item, idx) => { courseData.push({ hole: idx + 10, par: item.par, hcpIndex: item.hcpIndex }); });
+                courseName = `${baseName.split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} / ${loops[backKey].name.split(' ')[0]})`;
+            } else {
+                courseName = `${baseName.split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
+            }
+            return { courseData, courseName };
+        }
+
+        return { courseData: resolveCourseData(cfg.courseId, globalCoursesData), courseName: baseName };
+    }
+
+    function buildTrip() {
+        const name = document.getElementById('trip-name-input').value.trim();
+        if (!name) { alert('⚠️ Give your trip a name first.'); return; }
+        if (roundConfigs.length === 0) { alert('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
+
+        // Pull one final read of every field in case the last edit didn't fire onchange yet.
+        roundConfigs.forEach((cfg, i) => {
+            cfg.courseId = document.getElementById(`round-course-${i}`).value;
+            cfg.playerCount = parseInt(document.getElementById(`round-players-${i}`).value, 10) || 0;
+            const frontEl = document.getElementById(`round-frontnine-${i}`);
+            const backEl = document.getElementById(`round-backnine-${i}`);
+            if (frontEl) cfg.frontNineKey = frontEl.value;
+            if (backEl) cfg.backNineKey = backEl.value;
+        });
+
+        if (roundConfigs.some(cfg => !cfg.courseId)) {
+            alert('⚠️ Pick a course for every round before building the trip.');
+            return;
+        }
+
+        const buildBtn = document.getElementById('build-trip-btn');
+        const originalText = buildBtn.innerText;
+        buildBtn.innerText = '⏳ Building...';
+        buildBtn.disabled = true;
+
+        db.ref('global_courses').once('value').then(snap => {
+            const globalCoursesData = snap.val() || {};
+            const tripCode = generateRandomCode();
+            const usedCodes = new Set([tripCode]);
+            let updates = {};
+            updates[`trips/${tripCode}/name`] = name;
+            updates[`trips/${tripCode}/createdAt`] = Date.now();
+
+            roundConfigs.forEach(cfg => {
+                let roundCode = generateRandomCode();
+                while (usedCodes.has(roundCode)) { roundCode = generateRandomCode(); }
+                usedCodes.add(roundCode);
+
+                const { courseData, courseName } = resolveCourseDataAndName(cfg, globalCoursesData);
+                const players = [];
+                for (let p = 0; p < cfg.playerCount; p++) {
+                    players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
+                }
+
+                updates[`events/${roundCode}`] = {
+                    eventName: cfg.label,
+                    roundDay: cfg.label,
+                    eventCategory: 'weekend',
+                    categoryIcon: '⛳',
+                    activeCourseKey: cfg.courseId,
+                    courseName: courseName,
+                    gameFormat: 'stroke',
+                    courseData: courseData,
+                    players: players
+                };
+                updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
+            });
+
+            return db.ref().update(updates).then(() => tripCode);
+        }).then(tripCode => {
+            window.location.href = `trip.html?trip=${tripCode}`;
+        }).catch(err => {
+            buildBtn.innerText = originalText;
+            buildBtn.disabled = false;
+            alert(`Error building trip: ${err.message}`);
+        });
+    }
+
+    // Fallback for anyone who just wants an empty trip container with no upfront planning —
+    // the original one-field flow, still available for whenever that's genuinely what's wanted.
+    function createTripBlank() {
+        const name = document.getElementById('trip-name-input').value.trim();
+        if (!name) { alert('⚠️ Give your trip a name first.'); return; }
+        const code = generateTripCode();
+        db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} }).then(() => {
+            window.location.href = `trip.html?trip=${code}`;
+        }).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // ONE LINK, NO TYPING. Same shape the scorecard's group links use:
+    // window.location.href minus any existing query, plus ?trip=CODE.
+    function tripShareUrl() {
+        const base = window.location.href.split('?')[0];
+        return base + '?trip=' + encodeURIComponent(currentTripCode || '');
+    }
+
+    function copyTripLink(btn) {
+        if (!currentTripCode) { alert('\u26A0\uFE0F Open a trip first.'); return; }
+        const url = tripShareUrl();
+        const done = () => {
+            if (!btn) return;
+            const original = btn.innerHTML;
+            btn.innerHTML = '\u2705 Copied';
+            setTimeout(() => { btn.innerHTML = original; }, 1800);
+        };
+        // navigator.clipboard needs a secure context and can reject silently; the
+        // textarea fallback is what actually works on older iOS webviews. Ported
+        // verbatim from index.html rather than reinvented.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(() => tripFallbackCopy(url, done));
+        } else {
+            tripFallbackCopy(url, done);
+        }
+    }
+
+    function tripFallbackCopy(text, onDone) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); onDone(); }
+        catch (e) { alert(text); }
+        document.body.removeChild(ta);
+    }
+
+    function joinTrip() {
+        const code = document.getElementById('join-trip-input').value.trim().toUpperCase();
+        if (code.length < 2) { alert('⚠️ Enter a valid trip code.'); return; }
+        window.location.href = `trip.html?trip=${code}`;
+    }
+
+    // AN OUTBOUND LINK, NOT A CREATE. This page writes nothing to tournaments/* and
+    // nothing to trips/*/tournaments/* - it hands the trip code to the Tournament
+    // product, which owns creating the record and writing both relationship pointers
+    // back. The old comment here described createRoundForTrip() instead and had
+    // already misled one architecture audit into thinking Consumer was secretly the
+    // tournament administrator. The function name is kept because callers exist.
+    function createTournamentForTrip() {
+        window.location.href = tournamentUrl(`tournament.html?trip=${currentTripCode}`);
+    }
+
+    function createRoundForTrip() {
+        const copyFrom = document.getElementById('copy-from-round-select').value;
+        let dest = `admin.html?trip=${currentTripCode}`;
+        if (copyFrom) dest += `&copyFrom=${copyFrom}`;
+        window.location.href = dest;
+    }
+
+    function linkRound() {
+        const roundCode = document.getElementById('link-round-code').value.trim().toUpperCase();
+        const label = document.getElementById('link-round-label').value.trim();
+        if (!roundCode) { alert('⚠️ Enter the game code for the round.'); return; }
+        if (!label) { alert('⚠️ Give this round a short label.'); return; }
+
+        db.ref(`events/${roundCode}`).once('value').then(snap => {
+            if (!snap.exists()) {
+                alert("⚠️ Couldn't find a round with that game code. Double check it's already been set up on Home.");
+                return;
+            }
+            db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).set({ label: label, addedAt: Date.now() }).then(() => {
+                document.getElementById('link-round-code').value = '';
+                document.getElementById('link-round-label').value = '';
+            });
+        });
+    }
+
+    function removeRound(roundCode) {
+        if (!confirm('Remove this round from the trip? The round itself is untouched, just its trip link.')) return;
+        db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).remove();
+    }
+
+    // Lets a round stay linked (still scoreable, still settleable on its own) without counting
+    // toward the trip-wide leaderboard, money settlement, points race, or awards — for practice
+    // rounds, scrambles, or a rained-out day that shouldn't affect the real competition.
+    function toggleRoundCounted(roundCode, currentlyCounts) {
+        db.ref(`trips/${currentTripCode}/rounds/${roundCode}/countsTowardTrip`).set(!currentlyCounts);
+    }
+
+    let currentTripCode = null;
+    let tripData = {};
+    let lbMode = 'gross';
+
+    // ONE AMOUNT RULE for the whole page. Whole dollars unless the figure genuinely
+    // carries cents, which only a legacy cent-settled round produces.
+    function fmtAmt(v) {
+        const n = Math.abs(Number(v) || 0);
+        return Math.abs(n - Math.round(n)) < 0.005 ? String(Math.round(n)) : n.toFixed(2);
+    }
+
+    function setLbMode(mode) {
+        lbMode = mode;
+        document.getElementById('lb-mode-switch').checked = (mode === 'net');
+        document.getElementById('lb-mode-label-gross').classList.toggle('active', mode === 'gross');
+        document.getElementById('lb-mode-label-net').classList.toggle('active', mode === 'net');
+        renderCumulativeLeaderboard();
+    }
+
+    function renderRoundsList() {
+        const container = document.getElementById('rounds-list');
+        const rounds = tripData.rounds || {};
+        const roundCodes = Object.keys(rounds).sort((a, b) => (rounds[a].addedAt || 0) - (rounds[b].addedAt || 0));
+
+        const copyGroup = document.getElementById('copy-from-round-group');
+        const copySelect = document.getElementById('copy-from-round-select');
+        if (roundCodes.length === 0) {
+            copyGroup.style.display = 'none';
+        } else {
+            copyGroup.style.display = 'block';
+            const currentSelection = copySelect.value;
+            copySelect.innerHTML = '<option value="">🆕 Blank round</option>' +
+                roundCodes.map(code => `<option value="${code}">${rounds[code].label}</option>`).join('');
+            if (roundCodes.includes(currentSelection)) copySelect.value = currentSelection;
+        }
+
+        if (roundCodes.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No rounds linked yet. Add one above.</div>`;
+            return;
+        }
+        container.innerHTML = roundCodes.map(code => {
+            const r = rounds[code];
+            const counts = r.countsTowardTrip !== false; // undefined/true = counts, only explicit false excludes
+            return `<div class="round-card">
+                <div class="rc-info">
+                    <div class="rc-label">${r.label}</div>
+                    <div class="rc-sub">Game code: ${code}</div>
+                    <div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
+                        ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                    <a class="rc-link" href="admin.html?game=${code}">⚙️ Edit</a>
+                    <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
+                </div>
+                <span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>
+            </div>`;
+        }).join('');
+    }
+
+    // Tournaments are informational links only — different data shape than regular rounds
+    // (team-based, not individual net scores), so they don't feed the trip's leaderboard,
+    // money settlement, or points race. This just makes them easy to find and open.
+    function renderTournamentsList() {
+        const section = document.getElementById('tournaments-section');
+        const container = document.getElementById('tournaments-list');
+        // Consumer no longer renders this section. The function is retained rather than
+        // deleted because the Club/Tournament app will reuse it verbatim, and because a
+        // silent early return is safer than a null dereference if the markup ever
+        // returns. THE READ BELOW IS THE POINT: it proves the node still exists.
+        const tournaments = tripData.tournaments || {};
+        if (!section || !container) return;
+        const codes = Object.keys(tournaments).sort((a, b) => (tournaments[a].addedAt || 0) - (tournaments[b].addedAt || 0));
+
+        if (codes.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = 'block';
+        container.innerHTML = codes.map(code => {
+            const t = tournaments[code];
+            return `<div class="round-card">
+                <div class="rc-info">
+                    <div class="rc-label">${t.label}</div>
+                    <div class="rc-sub">Tournament code: ${code}</div>
+                </div>
+                <a class="rc-link" href="${tournamentUrl(`tournament.html?tourney=${code}`)}">Open ▶</a>
+            </div>`;
+        }).join('');
+    }
+
+    let cachedRoundResults = [];      // every linked round, regardless of counted status
+    let cachedCountedResults = [];    // only rounds still counting toward trip totals
+    let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
+    let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
+    let cachedTripSettled = true;     // false while any linked round still has unresolved money
+    let cachedAwards = {};         // trip awards — reused by the share recap
+    let cachedPointsStandings = []; // points race standings — reused by the share recap and prize calculator
+
+    // Fetches every linked round exactly once per refresh, then hands the same
+    // results to the score leaderboard, money settlement, awards, and points race
+    // renderers - avoids double-reading Firebase for four views of the same rounds.
+    function refreshTripComputations() {
+        const scoreContainer = document.getElementById('trip-leaderboard');
+        const moneyContainer = document.getElementById('trip-money-settlement');
+        const awardsContainer = document.getElementById('trip-awards');
+        const pointsContainer = document.getElementById('trip-points-race');
+        const rounds = tripData.rounds || {};
+        const roundCodes = Object.keys(rounds);
+
+        if (roundCodes.length === 0) {
+            scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the leaderboard.</div>`;
+            moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the money settlement.</div>`;
+            awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the awards.</div>`;
+            pointsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the points race.</div>`;
+            document.getElementById('trip-placeholder-warning').style.display = 'none';
+            return;
+        }
+
+        scoreContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        moneyContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+        pointsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
+
+        Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({
+            code,
+            label: rounds[code].label,
+            countsTowardTrip: rounds[code].countsTowardTrip !== false,
+            data: s.val() || {}
+        }))))
+            .then(results => {
+                cachedRoundResults = results;
+                cachedCountedResults = results.filter(r => r.countsTowardTrip);
+                renderPlaceholderNameWarning(results);
+                renderCumulativeLeaderboard();
+                renderTripMoneySettlement();
+                renderTripAwards();
+                renderPointsRace();
+            })
+            .catch(err => {
+                scoreContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                moneyContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                awardsContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+                pointsContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
+            });
+    }
+
+    // The trip planner pre-fills rounds with generic "Player 1", "Player 2"... slots meant
+    // to be renamed per round. Everything above matches players BY NAME across rounds, so if
+    // the same generic name is still sitting in two or more rounds, their scores/money would
+    // silently get merged as if they were the same real person. This catches that before it
+    // produces a confusing wrong number on the leaderboard or settlement.
+    function renderPlaceholderNameWarning(results) {
+        const banner = document.getElementById('trip-placeholder-warning');
+        const nameToRounds = {};
+        results.forEach(({ label, data }) => {
+            (data.players || []).forEach(p => {
+                const key = (p.name || '').trim().toLowerCase();
+                if (!/^player \d+$/.test(key)) return;
+                if (!nameToRounds[key]) nameToRounds[key] = new Set();
+                nameToRounds[key].add(label);
+            });
+        });
+
+        const collisions = Object.keys(nameToRounds).filter(key => nameToRounds[key].size > 1);
+        if (collisions.length === 0) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        const exampleRounds = Array.from(nameToRounds[collisions[0]]).join(', ');
+        banner.innerHTML = `⚠️ <strong>Rename placeholder players before trusting the totals below.</strong> "${collisions[0].replace(/^\w/, c => c.toUpperCase())}" appears in more than one round (${exampleRounds}) — since names are matched across rounds, they'll get counted as the same person until renamed. Open each round from Home to swap in real names.`;
+        banner.style.display = 'block';
+    }
+
+    // Sums gross/net strokes per player (matched by name) across every linked round.
+    // Works no matter what format each individual round used, since it's built
+    // directly from raw hole scores, not from any one format's settlement math.
+    function renderCumulativeLeaderboard() {
+        const container = document.getElementById('trip-leaderboard');
+        if (cachedRoundResults.length === 0) return;
+        if (cachedCountedResults.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
+            return;
+        }
+
+        const playerTotals = {}; // name -> { gross, net, roundsPlayed }
+
+        cachedCountedResults.forEach(({ data }) => {
+            const courseData = data.courseData || [];
+            const scores = data.scores || {};
+            const players = data.players || [];
+            players.forEach(p => {
+                let gross = 0, strokesOff = 0, holesPlayed = 0;
+                courseData.forEach(h => {
+                    const v = scores[`p${p.id}_h${h.hole}`];
+                    if (v > 0) {
+                        gross += parseInt(v, 10);
+                        strokesOff += getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                        holesPlayed++;
+                    }
+                });
+                if (holesPlayed === 0) return; // didn't actually play this round
+                const net = gross - strokesOff;
+                const key = p.name.trim().toLowerCase();
+                if (!playerTotals[key]) playerTotals[key] = { name: p.name, gross: 0, net: 0, roundsPlayed: 0 };
+                playerTotals[key].gross += gross;
+                playerTotals[key].net += net;
+                playerTotals[key].roundsPlayed += 1;
+            });
+        });
+
+        let rows = Object.values(playerTotals);
+        cachedPlayerTotals = rows;
+        rows.sort((a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
+
+        if (rows.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered in any linked round yet.</div>`;
+            return;
+        }
+
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">Score</span>
+        </div>`;
+        rows.forEach((r, i) => {
+            // BOTH TOTALS, ALWAYS. This computed gross and net for every golfer and
+            // then showed whichever the toggle happened to be on - so comparing the
+            // trip board against a paper card meant flipping the toggle and holding a
+            // number in your head. Same fix, same stacked shape and the same class
+            // names as the round leaderboard, so the two screens read identically.
+            html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
+                <span class="lb-pos">${i + 1}</span>
+                <span class="lb-team">${escapeHtml(r.name)}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
+                <span class="lb-score score-cell"><span class="score-gross">${r.gross}</span><span class="score-net">Net ${r.net}</span></span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // Nets every linked round's main-format money result per player (via the shared
+    // computeRoundMoneyByPlayer engine), sums across the whole trip matched by name,
+    // then runs debt simplification into one minimal "who pays who" list.
+    function renderTripMoneySettlement() {
+        const container = document.getElementById('trip-money-settlement');
+        if (cachedRoundResults.length === 0) return;
+        if (cachedCountedResults.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
+            return;
+        }
+
+        const netByName = {}; // lowercased key -> { name, net }
+        const perRoundBreakdown = [];
+        const unresolvedRounds = [];   // linked rounds whose money is not settled yet
+        const tripContributions = {};  // merged moving lines, for the relevance rule
+
+        cachedCountedResults.forEach(({ label, data }) => {
+            const courseData = data.courseData || [];
+            const savedScores = data.scores || {};
+            if (!data.players || data.players.length === 0) {
+                perRoundBreakdown.push({ label, formatLabel: '', rows: [], message: 'No players set up yet.' });
+                return;
+            }
+            // THE canonical single-round money picture - main game + Skins + Hi-Lo +
+            // Birdie Pool + KPs + every Side Match - identical to what this round's own
+            // Results page shows. Trip totals are now the sum of finalized round
+            // settlements, not a narrower second opinion about what counts as money.
+            const combined = computeCombinedNetTotals(data, courseData, savedScores);
+
+            // MERGED ACROSS THE WEEK. "Does anybody owe another golfer money" is asked
+            // of the trip as a whole, so a side match on any single day makes the
+            // trip-wide list meaningful.
+            Object.keys(combined.contributions || {}).forEach(k => {
+                if (!tripContributions[k]) tripContributions[k] = { name: combined.contributions[k].name, lines: [] };
+                tripContributions[k].lines = tripContributions[k].lines.concat(combined.contributions[k].lines || []);
+            });
+
+            // IS THIS ROUND'S MONEY ACTUALLY SETTLED?
+            //
+            // A round with unresolved KP money has a ledger that deliberately sums to
+            // -kpUnresolvedCents rather than zero - that share is withheld until the
+            // organizer confirms or cancels it. Summing such a round into a trip
+            // inherits the imbalance, and the trip would then present a distorted
+            // total under the heading "Final". One unconfirmed KP on day one quietly
+            // skews the whole week's settlement, which is what everybody actually
+            // pays from.
+            //
+            // Canonical read only: pool-engine already decided this in Wave B, so the
+            // question is asked, not re-derived.
+            try {
+                if (typeof computeMoneyPool === 'function') {
+                    const rp = computeMoneyPool(data, courseData, savedScores);
+                    if (rp && rp.valid && rp.settled === false) {
+                        unresolvedRounds.push({ label, cents: rp.kpUnresolvedCents || 0 });
+                    }
+                }
+            } catch (e) { /* a round we cannot read is not claimed as settled either */ }
+
+            // The main-format label is still useful context in the per-round breakdown,
+            // but it no longer decides what money is counted.
+            const mainCalc = computeRoundMoneyByPlayer(data, courseData, savedScores);
+            const rows = Object.values(combined.netByName)
+                .filter(v => Math.abs(v.net) > 0.005)
+                .map(v => ({ name: v.name, net: v.net }));
+
+            perRoundBreakdown.push({
+                label,
+                formatLabel: mainCalc.formatLabel,
+                rows,
+                message: rows.length === 0 ? 'No money settled in this round yet.' : '',
+                splitNote: mainCalc.splitNote
+            });
+
+            rows.forEach(p => {
+                const key = p.name.trim().toLowerCase();
+                if (!netByName[key]) netByName[key] = { name: p.name, net: 0 };
+                netByName[key].net += (p.net || 0);
+            });
+        });
+
+        // WHOLE DOLLARS, like the Receipt. Round nets are already whole in
+        // whole-dollar mode, so "$40.00" was two decimal places of noise that made
+        // the trip look like a different system from the round it summed. A genuine
+        // fraction from a legacy cent round still prints its cents.
+        function fmtMoney(amt) {
+            const whole = Math.abs(amt - Math.round(amt)) < 0.005;
+            const show = v => whole ? String(Math.round(v)) : v.toFixed(2);
+            if (amt > 0.005) return `<span class="val-pos">+$${show(amt)}</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-$${show(Math.abs(amt))}</span>`;
+            return `<span class="val-even">$0</span>`;
+        }
+
+        const netTotals = {};
+        Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
+        const transactions = simplifyDebts(netTotals);
+        cachedMoneyTransactions = transactions;
+
+        let html = "";
+
+        // "FINAL" IS EARNED, HERE AS ON THE RECEIPT. The list below is still shown -
+        // hiding it would be worse, since the group wants to see where the week stands -
+        // but it is not called final while a linked round still has money hanging, and
+        // the rounds responsible are named so somebody can go and resolve them.
+        const tripSettled = unresolvedRounds.length === 0;
+        cachedTripSettled = tripSettled;
+        if (!tripSettled) {
+            const pending = unresolvedRounds
+                .map(u => u.label + (u.cents ? ' ($' + Math.round(u.cents / 100) + ')' : ''))
+                .join(', ');
+            html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
+                <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Not Settled Yet</div>
+                <div style="font-size:0.85rem; color:var(--warn-text); text-align:center;">
+                    KP results are still unconfirmed in: ${pending}.<br>
+                    These totals will change once those rounds are resolved.
+                </div></div>`;
+        }
+
+        // ONLY WHEN SOMEBODY ACTUALLY OWES SOMEBODY. A week of shared Money Pool
+        // rounds produces no debts between people - everyone paid the same pot each
+        // day and the winners were paid by it. The engine can still net those balances
+        // into transfers, but printing them tells Marty to pay Carp for a debt neither
+        // of them has. Same predicate the Receipt uses, in action-model.js, so the two
+        // surfaces cannot drift.
+        if (transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
+            html += `<div class="settle-card"><div class="settle-header">${tripSettled
+                ? '🏁 Final "Who Pays Who"'
+                : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
+            transactions.forEach(t => {
+                html += `<div class="ledger-row"><span>${t.from} \u2192 ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
+            });
+            html += `</div>`;
+        }
+
+        if (Object.keys(netByName).length > 0) {
+            html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
+            Object.values(netByName).sort((a, b) => b.net - a.net).forEach(v => {
+                html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span>${fmtMoney(v.net)}</span></div>`;
+            });
+            html += `</div>`;
+        }
+
+        html += `<div class="settle-card"><div class="settle-header">Per-Round Breakdown</div>`;
+        perRoundBreakdown.forEach(r => {
+            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${r.label}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
+            if (r.rows.length === 0) {
+                html += `<div style="font-size:0.78rem; color:var(--text-muted); padding:4px 0;">${r.message || 'No money data yet.'}</div>`;
+            } else {
+                r.rows.forEach(row => {
+                    html += `<div class="ledger-row" style="margin-top:6px;"><span>${escapeHtml(row.name)}</span><span>${fmtMoney(row.net || 0)}</span></div>`;
+                });
+                if (r.message) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:4px 0 2px;">${r.message}</div>`;
+                if (r.splitNote) html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:2px 0 4px;">${r.splitNote}</div>`;
+            }
+        });
+        html += `</div>`;
+
+        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Main-format bets only for now — Side Games, Side Matches, and one-off Side Bets aren't included yet.</div>`;
+
+        container.innerHTML = html;
+    }
+
+    // Computes trip-wide awards straight from raw hole scores — no extra input required.
+    // Definitions (documented since these are judgment calls, not official rules):
+    //   Most Birdies    — most gross birdies (score = par - 1) across every linked round
+    //   Biggest Blow-Up — single worst score-vs-par on any one hole, trip-wide
+    //   Best Comeback   — biggest front-9-to-back-9 gross improvement in a single round
+    //   Sandbagger      — most net strokes under par, summed across the whole trip
+    function computeTripAwards(results) {
+        const birdieCounts = {};   // name -> count
+        const sandbaggerTotals = {}; // name -> net-to-par total (more negative = bigger sandbagger)
+        let blowUp = null;   // { name, label, hole, par, score, diff }
+        let comeback = null; // { name, label, frontGross, backGross, improvement }
+
+        results.forEach(({ label, data }) => {
+            const courseData = data.courseData || [];
+            const scores = data.scores || {};
+            const players = data.players || [];
+
+            players.forEach(p => {
+                let frontGross = 0, backGross = 0, frontHoles = 0, backHoles = 0;
+
+                courseData.forEach(h => {
+                    const v = scores[`p${p.id}_h${h.hole}`];
+                    if (!v || v <= 0) return;
+                    const gross = parseInt(v, 10);
+                    const par = parseInt(h.par, 10);
+                    const diff = gross - par;
+
+                    if (diff === -1) {
+                        birdieCounts[p.name] = (birdieCounts[p.name] || 0) + 1;
+                    }
+
+                    if (h.hole <= 9) { frontGross += gross; frontHoles++; }
+                    else { backGross += gross; backHoles++; }
+
+                    const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
+                    sandbaggerTotals[p.name] = (sandbaggerTotals[p.name] || 0) + ((gross - strokes) - par);
+
+                    if (!blowUp || diff > blowUp.diff) {
+                        blowUp = { name: p.name, label, hole: h.hole, par, score: gross, diff };
+                    }
+                });
+
+                if (frontHoles === 9 && backHoles === 9) {
+                    const improvement = frontGross - backGross; // positive = played better on the back nine
+                    if (improvement > 0 && (!comeback || improvement > comeback.improvement)) {
+                        comeback = { name: p.name, label, frontGross, backGross, improvement };
+                    }
+                }
+            });
+        });
+
+        let mostBirdies = null;
+        Object.keys(birdieCounts).forEach(name => {
+            if (birdieCounts[name] > 0 && (!mostBirdies || birdieCounts[name] > mostBirdies.count)) {
+                mostBirdies = { name, count: birdieCounts[name] };
+            }
+        });
+
+        let sandbagger = null;
+        Object.keys(sandbaggerTotals).forEach(name => {
+            if (sandbaggerTotals[name] < 0 && (!sandbagger || sandbaggerTotals[name] < sandbagger.netToPar)) {
+                sandbagger = { name, netToPar: sandbaggerTotals[name] };
+            }
+        });
+
+        return { mostBirdies, blowUp, comeback, sandbagger };
+    }
+
+    function renderTripAwards() {
+        const container = document.getElementById('trip-awards');
+        if (cachedRoundResults.length === 0) return;
+        if (cachedCountedResults.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
+            return;
+        }
+
+        const awards = computeTripAwards(cachedCountedResults);
+        cachedAwards = awards;
+
+        const cards = [];
+        if (awards.mostBirdies) {
+            cards.push({ emoji: '🐦', title: 'Most Birdies', line: `${escapeHtml(awards.mostBirdies.name)} — ${awards.mostBirdies.count} birdie${awards.mostBirdies.count === 1 ? '' : 's'}` });
+        }
+        if (awards.blowUp) {
+            cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole', line: `${escapeHtml(awards.blowUp.name)} — Hole ${awards.blowUp.hole} (Par ${awards.blowUp.par}, shot ${awards.blowUp.score}) on ${awards.blowUp.label}` });
+        }
+        if (awards.comeback) {
+            cards.push({ emoji: '📈', title: 'Best Comeback', line: `${escapeHtml(awards.comeback.name)} — ${awards.comeback.frontGross} on the front, ${awards.comeback.backGross} on the back (${awards.comeback.label})` });
+        }
+        if (awards.sandbagger) {
+            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${escapeHtml(awards.sandbagger.name)} — ${Math.abs(awards.sandbagger.netToPar)} net strokes under par for the trip` });
+        }
+
+        if (cards.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered yet — awards show up once rounds are underway.</div>`;
+            return;
+        }
+
+        let html = "";
+        cards.forEach(c => {
+            html += `<div class="ledger-row" style="flex-direction:column; align-items:flex-start; gap:2px;">
+                <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">${c.emoji} ${c.title}</span>
+                <span style="font-size:0.95rem;">${c.line}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // ============================================================================
+    // POINTS RACE (Order of Merit)
+    // Every round, players are ranked by net score among whoever's actually
+    // started that day; points = fieldSize - position + 1, so they scale
+    // automatically no matter how many played. Ties split the combined points
+    // for their tied spots evenly. Totals accumulate across every counted round.
+    // ============================================================================
+    function computeTripPointsRace(results) {
+        const totals = {}; // lowercased name -> { name, points, roundsPlayed }
+
+        results.forEach(({ data }) => {
+            const courseData = data.courseData || [];
+            const scores = data.scores || {};
+            const players = data.players || [];
+            const totalHoles = courseData.length;
+
+            // Points only get awarded once a round is fully finished — ranking someone off a
+            // partial handful of holes (e.g. 3 or 9 of 18) would let a small, unrepresentative
+            // sample look artificially good or bad and distort the standings mid-round.
+            let roundResults = [];
+            players.forEach(p => {
+                let net = 0, holesPlayed = 0;
+                courseData.forEach(h => {
+                    const v = scores[`p${p.id}_h${h.hole}`];
+                    if (v > 0) {
+                        net += (parseInt(v, 10) - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
+                        holesPlayed++;
+                    }
+                });
+                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net });
+            });
+
+            if (roundResults.length === 0) return; // nobody's finished this round yet
+
+            roundResults.sort((a, b) => a.net - b.net);
+            const fieldSize = roundResults.length;
+
+            let i = 0;
+            while (i < roundResults.length) {
+                let j = i;
+                while (j + 1 < roundResults.length && roundResults[j + 1].net === roundResults[i].net) j++;
+                // positions i+1..j+1 (1-indexed) are tied — split the combined points for those spots evenly
+                let pointsSum = 0;
+                for (let pos = i + 1; pos <= j + 1; pos++) pointsSum += (fieldSize - pos + 1);
+                const avgPoints = pointsSum / (j - i + 1);
+                for (let k = i; k <= j; k++) {
+                    const key = roundResults[k].name.trim().toLowerCase();
+                    if (!totals[key]) totals[key] = { name: roundResults[k].name, points: 0, roundsPlayed: 0 };
+                    totals[key].points += avgPoints;
+                    totals[key].roundsPlayed += 1;
+                }
+                i = j + 1;
+            }
+        });
+
+        let standings = Object.values(totals).sort((a, b) => b.points - a.points);
+
+        // Competition-style ranking (1, 2, 2, 4) — identical total points share a rank,
+        // which the prize calculator below relies on to split money for tied finishers.
+        standings.forEach((s, idx) => {
+            s.rank = (idx > 0 && s.points === standings[idx - 1].points) ? standings[idx - 1].rank : idx + 1;
+        });
+
+        return standings;
+    }
+
+    function renderPointsRace() {
+        const container = document.getElementById('trip-points-race');
+        if (cachedRoundResults.length === 0) return;
+        if (cachedCountedResults.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
+            cachedPointsStandings = [];
+            renderPrizePayouts();
+            return;
+        }
+
+        const standings = computeTripPointsRace(cachedCountedResults);
+        cachedPointsStandings = standings;
+
+        if (standings.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered in any counted round yet.</div>`;
+            renderPrizePayouts();
+            return;
+        }
+
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">Points</span>
+        </div>`;
+        standings.forEach(s => {
+            const displayPoints = s.points % 1 === 0 ? s.points : s.points.toFixed(1);
+            html += `<div class="lb-row ${s.rank === 1 ? 'leader' : ''}">
+                <span class="lb-pos">${s.rank}</span>
+                <span class="lb-team">${escapeHtml(s.name)}<br><span class="lb-sub">${s.roundsPlayed} round${s.roundsPlayed === 1 ? '' : 's'} played</span></span>
+                <span class="lb-score">${displayPoints}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+
+        renderPrizePayouts(); // keep the payout calculator in sync whenever standings change
+    }
+
+    function ordinal(n) {
+        const s = ["th", "st", "nd", "rd"];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    // Rebuilds the per-spot $ inputs whenever pool size or paid-spot count changes, preserving
+    // whatever the person already typed into any spot that still exists after the change.
+    function renderPrizeSpotInputs() {
+        const spotsInput = document.getElementById('prize-spots-input');
+        let n = parseInt(spotsInput.value, 10);
+        if (isNaN(n) || n < 1) n = 1;
+        if (n > 20) { n = 20; spotsInput.value = 20; }
+
+        const pool = parseFloat(document.getElementById('prize-pool-input').value) || 0;
+        const container = document.getElementById('prize-spot-amounts');
+
+        let existing = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`prize-spot-${i}`);
+            existing.push(el ? el.value : null);
+        }
+
+        let html = '';
+        for (let i = 0; i < n; i++) {
+            const defaultVal = existing[i] !== null ? existing[i] : (Math.round((pool / n) * 100) / 100);
+            html += `<div class="form-group" style="margin-bottom:6px;">
+                <label>${ordinal(i + 1)} Place ($)</label>
+                <input type="number" id="prize-spot-${i}" min="0" value="${defaultVal}" oninput="renderPrizePayouts()">
+            </div>`;
+        }
+        container.innerHTML = html;
+        renderPrizePayouts();
+    }
+
+    // Maps the Points Race standings onto the paid spots — a tie that straddles the paid/unpaid
+    // line only splits whatever prize money actually falls within the paid range (e.g. a tie for
+    // the last paid spot doesn't reach into money for a spot nobody's actually paying).
+    function renderPrizePayouts() {
+        const resultsContainer = document.getElementById('prize-payout-results');
+        if (!cachedPointsStandings || cachedPointsStandings.length === 0) {
+            resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No Points Race standings yet — link rounds with scores first.</div>`;
+            return;
+        }
+
+        const spotsInput = document.getElementById('prize-spots-input');
+        const n = parseInt(spotsInput.value, 10) || 0;
+        let spotAmounts = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`prize-spot-${i}`);
+            spotAmounts.push(el ? parseFloat(el.value) || 0 : 0);
+        }
+
+        const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
+        const pool = parseFloat(document.getElementById('prize-pool-input').value) || 0;
+
+        let html = '';
+        if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
+            html += `<div style="font-size:0.75rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:8px; margin-bottom:10px;">
+                ⚠️ Payout amounts add up to $${fmtAmt(totalAllocated)}, but the pool is $${fmtAmt(pool)}. Adjust the per-place amounts so they match.
+            </div>`;
+        }
+
+        // THE PLACE/TIE RULE LIVES IN payouts.js. It used to be written out here and
+        // again inside tournament-engine.js, and a tie straddling the last paid place
+        // is exactly the case a second copy gets wrong. Display is still this page's
+        // own - the (tied) tag, the ordinal and fmtAmt() are Trip's wording, and the
+        // shared primitive deliberately does no rounding.
+        const allocated = allocatePlacePayouts(cachedPointsStandings, spotAmounts);
+        const groupSize = {};
+        allocated.forEach(p => { groupSize[p.rank] = (groupSize[p.rank] || 0) + 1; });
+
+        allocated.forEach(p => {
+            const tieTag = groupSize[p.rank] > 1 ? ' (tied)' : '';
+            html += `<div class="ledger-row"><span>${ordinal(p.rank)}${tieTag} — ${escapeHtml(p.entry.name)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${fmtAmt(p.amount)}</span></div>`;
+        });
+
+        resultsContainer.innerHTML = html;
+    }
+
+    // ============================================================================
+    // TRIP ITINERARY (pre-trip PDF, via the browser's own print-to-PDF)
+    // ============================================================================
+    function buildItineraryPrintView() {
+        const container = document.getElementById('trip-itinerary-print-view');
+        const rounds = tripData.rounds || {};
+        const roundCodes = Object.keys(rounds).sort((a, b) => (rounds[a].addedAt || 0) - (rounds[b].addedAt || 0));
+
+        const formatLabels = {
+            stroke: 'Stroke Play', nassau: 'Nassau', match: 'Match Play', bestball: '2-Man Best Ball',
+            scramble: '4-Man Scramble', wolf: 'Wolf', stableford: 'Net Stableford', dots: 'Dot Game',
+            hilo: 'Hi-Lo', ryder: 'Ryder Cup'
+        };
+
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🚐 ${escapeHtml(tripData.name)}</h1>
+            <p style="color:#666; margin-top:0;">Trip Itinerary</p>`;
+
+        if (roundCodes.length === 0) {
+            html += `<p>No rounds set up yet.</p>`;
+        } else {
+            roundCodes.forEach(code => {
+                const r = rounds[code];
+                const cached = cachedRoundResults.find(cr => cr.code === code);
+                const data = cached ? cached.data : {};
+                const courseName = data.courseName || 'Course TBD';
+                const formatLabel = formatLabels[data.gameFormat] || data.gameFormat || 'Format TBD';
+                const players = data.players || [];
+                const playerNames = players.length > 0 ? players.map(p => p.name).join(', ') : 'No players added yet';
+                const excludedNote = r.countsTowardTrip === false ? ' <span style="color:#999;">(excluded from trip totals)</span>' : '';
+
+                html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
+                    <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
+                    <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
+                    <div><strong>Format:</strong> ${formatLabel}</div>
+                    <div><strong>Players (${players.length}):</strong> ${playerNames}</div>
+                </div>`;
+            });
+        }
+        container.innerHTML = html;
+    }
+
+    function printItinerary() {
+        if (Object.keys(tripData.rounds || {}).length === 0) {
+            alert('⚠️ Add at least one round to this trip before printing an itinerary.');
+            return;
+        }
+        buildItineraryPrintView();
+        document.body.classList.add('printing-itinerary');
+        window.print();
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('printing-itinerary');
+        }, { once: true });
+    }
+
+
+    // caches populated by the leaderboard/settlement/awards renderers above, so
+    // it always matches exactly what's on screen with no recomputation.
+    // ---- THE VISUAL RECAP CARD ----------------------------------------------
+    //
+    // THE THING SOMEBODY SCREENSHOTS. The text recap pastes into a group chat; this
+    // is what gets posted. Both read the SAME cached state - cachedPlayerTotals,
+    // cachedMoneyTransactions, cachedTripSettled, cachedPointsStandings,
+    // cachedAwards - so the two can never tell different stories about one trip.
+    //
+    // NOTHING IS RECOMPUTED HERE. Every figure was already produced by the canonical
+    // engines when the page rendered; this arranges them.
+    //
+    // IT MUST SURVIVE LEAVING THE APP. A screenshot lands in a chat with no
+    // surrounding context, so the card carries the trip name, the round count and -
+    // when money is still unresolved - the caveat. A recap that says FINAL when a
+    // round is unconfirmed is worse than no recap at all.
+    function openTripRecap() {
+        if (cachedRoundResults.length === 0) {
+            alert('\u26A0\uFE0F Link at least one round with scores before making a recap card.');
+            return;
+        }
+        renderTripRecapCard();
+        const el = document.getElementById('trip-recap-overlay');
+        if (el) el.style.display = 'flex';
+    }
+    function closeTripRecap() {
+        const el = document.getElementById('trip-recap-overlay');
+        if (el) el.style.display = 'none';
+    }
+
+    function renderTripRecapCard() {
+        const mount = document.getElementById('trip-recap-card');
+        if (!mount) return;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+        const counted = cachedCountedResults.length;
+        let html = '<div class="rc-title">\uD83E\uDDF3 ' + esc(tripData.name || 'Trip') + '</div>'
+                 + '<div class="rc-sub">' + counted + ' round' + (counted === 1 ? '' : 's')
+                 + (cachedTripSettled ? '' : ' \u00B7 still in progress') + '</div>';
+
+        // ---- STANDINGS, top 5 ----
+        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
+        html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC6 STANDINGS \u00B7 NET</div>';
+        if (netRows.length === 0) {
+            html += '<div class="rc-none">No scores yet.</div>';
+        } else {
+            netRows.slice(0, 5).forEach((r, i) => {
+                html += '<div class="rc-row"><span class="rc-pos">' + (i + 1) + '</span>'
+                     + '<span class="rc-name">' + esc(r.name) + '</span>'
+                     + '<span class="rc-val">' + r.net + '</span></div>';
+            });
+            if (netRows.length > 5) {
+                html += '<div class="rc-detail">+ ' + (netRows.length - 5) + ' more</div>';
+            }
+        }
+        html += '</div>';
+
+        // ---- MONEY. The caveat travels with the card, not just the screen. ----
+        html += '<div class="rc-block"><div class="rc-head">\uD83D\uDCB5 '
+             + (cachedTripSettled ? 'FINAL SETTLEMENT' : 'SETTLEMENT SO FAR') + '</div>';
+        if (cachedMoneyTransactions.length === 0) {
+            html += '<div class="rc-none">Everyone\u2019s settled up.</div>';
+        } else {
+            cachedMoneyTransactions.slice(0, 6).forEach(t => {
+                html += '<div class="rc-row"><span class="rc-name">' + esc(t.from)
+                     + ' \u2192 ' + esc(t.to) + '</span>'
+                     + '<span class="rc-val">$' + fmtAmt(t.amount) + '</span></div>';
+            });
+            if (cachedMoneyTransactions.length > 6) {
+                html += '<div class="rc-detail">+ ' + (cachedMoneyTransactions.length - 6) + ' more</div>';
+            }
+        }
+        if (!cachedTripSettled) {
+            html += '<div class="rc-warn">\u26A0\uFE0F Not final \u2014 some rounds still have unconfirmed results.</div>';
+        }
+        html += '</div>';
+
+        // ---- POINTS RACE, only when the trip is running one ----
+        if (cachedPointsStandings && cachedPointsStandings.length > 0) {
+            html += '<div class="rc-block"><div class="rc-head">\uD83C\uDF96\uFE0F POINTS RACE</div>';
+            cachedPointsStandings.slice(0, 5).forEach(sd => {
+                const pts = sd.points % 1 === 0 ? sd.points : sd.points.toFixed(1);
+                html += '<div class="rc-row"><span class="rc-pos">' + sd.rank + '</span>'
+                     + '<span class="rc-name">' + esc(sd.name) + '</span>'
+                     + '<span class="rc-val">' + pts + '</span></div>';
+            });
+            html += '</div>';
+        }
+
+        // ---- AWARDS, only the ones that were actually earned ----
+        const a = cachedAwards || {};
+        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+            html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC5 AWARDS</div>';
+            if (a.mostBirdies) {
+                html += '<div class="rc-award">\uD83D\uDC26<span><span class="rc-award-name">'
+                     + esc(a.mostBirdies.name) + '</span> \u00B7 Most Birdies ('
+                     + a.mostBirdies.count + ')</span></div>';
+            }
+            if (a.blowUp) {
+                html += '<div class="rc-award">\uD83D\uDCA5<span><span class="rc-award-name">'
+                     + esc(a.blowUp.name) + '</span> \u00B7 Biggest Blow-Up<br>'
+                     + '<span class="rc-detail">' + a.blowUp.score + ' on a par '
+                     + a.blowUp.par + ' \u00B7 Hole ' + a.blowUp.hole + ', ' + esc(a.blowUp.label)
+                     + '</span></span></div>';
+            }
+            if (a.comeback) {
+                html += '<div class="rc-award">\uD83D\uDCC8<span><span class="rc-award-name">'
+                     + esc(a.comeback.name) + '</span> \u00B7 Best Comeback<br>'
+                     + '<span class="rc-detail">' + a.comeback.frontGross + ' front, '
+                     + a.comeback.backGross + ' back \u00B7 ' + esc(a.comeback.label)
+                     + '</span></span></div>';
+            }
+            if (a.sandbagger) {
+                html += '<div class="rc-award">\uD83C\uDFAD<span><span class="rc-award-name">'
+                     + esc(a.sandbagger.name) + '</span> \u00B7 Sandbagger of the Week</span></div>';
+            }
+            html += '</div>';
+        }
+
+        // THE SCREENSHOT IS THE INVITATION. This card is what gets posted to the group
+        // chat, so it is the one place a join instruction reaches somebody not yet in
+        // the trip. Code only - a URL wraps badly at this size and is untappable in an
+        // image anyway.
+        if (currentTripCode) {
+            html += '<div class="rc-foot">Join this trip \u00B7 Trip Code '
+                 + esc(currentTripCode) + '</div>';
+        }
+
+        mount.innerHTML = html;
+    }
+
+    function buildShareRecapText() {
+        let text = `🚐 ${tripData.name} — Trip Recap\n\n`;
+
+        text += `🏆 STANDINGS (Net)\n`;
+        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
+        if (netRows.length === 0) {
+            text += `No scores yet.\n`;
+        } else {
+            netRows.forEach((r, i) => { text += `${i + 1}. ${r.name} — ${r.net}\n`; });
+        }
+
+        // The recap is the text people paste into the group chat, so it carries the
+        // same caveat as the screen - otherwise the caveat is the one thing that does
+        // not get shared.
+        text += cachedTripSettled
+            ? `\n💵 FINAL SETTLEMENT\n`
+            : `\n💵 SETTLEMENT SO FAR — NOT FINAL\n`;
+        if (cachedMoneyTransactions.length === 0) {
+            text += `Everyone's settled up — no money changes hands.\n`;
+        } else {
+            cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
+        }
+
+        if (cachedPointsStandings && cachedPointsStandings.length > 0) {
+            text += `\n🎖️ POINTS RACE\n`;
+            cachedPointsStandings.forEach(s => {
+                const pts = s.points % 1 === 0 ? s.points : s.points.toFixed(1);
+                text += `${s.rank}. ${s.name} — ${pts} pts\n`;
+            });
+        }
+
+        const a = cachedAwards || {};
+        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+            text += `\n🏅 AWARDS\n`;
+            if (a.mostBirdies) text += `🐦 Most Birdies: ${a.mostBirdies.name} (${a.mostBirdies.count})\n`;
+            if (a.blowUp) text += `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
+            if (a.comeback) text += `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
+            if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name}\n`;
+        }
+
+        // Unlike the card, pasted text carries a tappable link - so it does.
+        if (currentTripCode) {
+            text += `\n\uD83D\uDD17 Join: ${tripShareUrl()}\n`;
+        }
+
+        return text;
+    }
+
+    function shareRecap() {
+        if (cachedRoundResults.length === 0) {
+            alert('⚠️ Link at least one round with scores before sharing the recap.');
+            return;
+        }
+        const text = buildShareRecapText();
+        if (navigator.share) {
+            navigator.share({ title: `${tripData.name} Recap`, text: text }).catch(() => {});
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('📋 Recap copied to clipboard — paste it into your group chat.');
+            }).catch(() => {
+                alert(text);
+            });
+        } else {
+            alert(text);
+        }
+    }
+
+    let tripLoadedOnce = false;
+
+    function loadTrip(code) {
+        db.ref(`trips/${code}`).on('value', (snap) => {
+            tripData = snap.val();
+            if (!tripData) {
+                alert("Trip not found.");
+                window.location.href = "trip.html";
+                return;
+            }
+            localStorage.setItem('lastTripCode', code);
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('manage-screen').style.display = 'block';
+            document.getElementById('manage-room-badge').textContent = code;
+            document.getElementById('manage-trip-name').textContent = `🚐 ${tripData.name}`;
+            if (!tripLoadedOnce) {
+                tripLoadedOnce = true;
+                renderPrizeSpotInputs(); // build the $ inputs once before points race tries to sync payouts against them
+            }
+            renderRoundsList();
+            renderTournamentsList();
+            refreshTripComputations();
+        });
+    }
+
+    function resumeTrip() {
+        const lastTrip = localStorage.getItem('lastTripCode');
+        if (lastTrip) window.location.href = `trip.html?trip=${lastTrip}`;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tripParam = urlParams.get('trip');
+    if (tripParam) {
+        currentTripCode = tripParam.toUpperCase();
+        loadTrip(currentTripCode);
+    } else {
+        const lastTrip = localStorage.getItem('lastTripCode');
+        if (lastTrip) {
+            document.getElementById('resume-trip-container').style.display = 'block';
+            document.getElementById('resume-trip-badge').textContent = lastTrip;
+        }
+    }
+</script>
+</body>
+</html>    <style>
         :root {
             --bg-page: #f4f6f8;
             --bg-card: #ffffff;
