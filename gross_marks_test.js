@@ -322,7 +322,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v30-live-dots';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v31-safe-text';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -330,7 +330,8 @@ describe('SERVICE WORKER', () => {
         const raw = sw.slice(sw.indexOf('const SHELL_FILES'), sw.indexOf(']', sw.indexOf('const SHELL_FILES')));
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        assert.equal(entries.length, 31);
+        // 32 since text-safe.js joined the shell.
+        assert.equal(entries.length, 32);
         ['./index.html','./score-marks.js','./firebase-app-compat.js','./firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });
