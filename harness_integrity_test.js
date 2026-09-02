@@ -70,6 +70,51 @@ describe('TEST FILE DISCOVERY — nothing is silently skipped', () => {
         });
     });
 
+    // ------------------------------------------------------------------
+    // WHY THIS EXISTS. A Part 2 test file was committed from a tablet as
+    // "\u6b62 kp_live_value_test.js" - a stray CJK character and a space in front of an
+    // otherwise correct name. It still ended in _test.js, so the pattern check above
+    // passed it. `node --test` walks the directory and ran it, so the totals looked
+    // right. But the filename carried a SPACE, and every argument-based run - the
+    // glob invocations used for the date and timezone sweeps - split it into two
+    // arguments and silently dropped all 38 tests. Green either way; coverage present
+    // in one runner and absent in the other, with nothing to say so.
+    //
+    // The rule is therefore about the CHARACTERS, not the suffix.
+    const PLAIN_BASENAME = /^[A-Za-z0-9._-]+$/;
+
+    test('no test filename carries whitespace or non-ASCII characters', () => {
+        const testFiles = rootFiles.filter(f => DISCOVERED.test(f));
+        testFiles.forEach(f => {
+            assert.match(f, PLAIN_BASENAME,
+                `"${f}" contains a character that breaks argument-based test runs. ` +
+                'A space splits it into two arguments; anything non-ASCII may not survive ' +
+                'a shell or CI runner. Rename it to plain [A-Za-z0-9._-].');
+        });
+    });
+
+    test('a malformed filename cannot shadow a canonical one', () => {
+        // TWO CONDITIONS, BOTH REQUIRED. Name shape alone is not enough:
+        // auto_dot_context_test.js legitimately ends with dot_context_test.js, and a
+        // rule that fired on that would be noise. Content alone is not enough either -
+        // a repo-wide hash-uniqueness rule would be brittle the first time two fixtures
+        // coincide. So this fires only where BOTH hold: one basename ends with another
+        // complete basename AND the two files are byte-identical. That is precisely the
+        // shape of a prefix-corrupted duplicate, and essentially nothing else.
+        const testFiles = rootFiles.filter(f => DISCOVERED.test(f));
+        const bytes = {};
+        testFiles.forEach(f => { bytes[f] = fs.readFileSync(path.join(REPO_ROOT, f)); });
+        testFiles.forEach(a => {
+            testFiles.forEach(b => {
+                if (a === b || !a.endsWith(b)) return;
+                assert.ok(!bytes[a].equals(bytes[b]),
+                    `"${a}" ends with the whole name of "${b}" and is byte-identical to it. ` +
+                    'One is a corrupted copy of the other, and both are being discovered ' +
+                    'and run - delete the malformed one.');
+            });
+        });
+    });
+
     test('the naming conventions in use are exactly the ones node discovers', () => {
         const testFiles = rootFiles.filter(f => DISCOVERED.test(f));
         const underscore = testFiles.filter(f => /_test\.js$/.test(f)).length;
