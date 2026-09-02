@@ -20,6 +20,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
     <script src="action-model.js"></script>
     <!-- THE CANONICAL STROKE ENGINES. This page used to carry its own copies of
          calculateHoleBetEngine / calculateOverallBetEngine, and those copies read
@@ -930,7 +931,7 @@
                         if (Math.abs(m.status) > hLeft) {
                             m.closed = true;
                             let winnerName = m.status > 0 ? t1Name : t2Name;
-                            m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                            m.finalResult = `${escapeHtml(winnerName)} ${Math.abs(m.status)}&${hLeft}`;
                         }
 
                         if (hNum < m.endHole) {
@@ -1347,7 +1348,7 @@
                 style="padding:8px 12px; min-height:44px; border-radius:20px; font-size:0.82rem; cursor:pointer;
                        border:1px solid ${on ? 'var(--brand-green)' : 'var(--border-mid)'};
                        background:${on ? 'var(--brand-green)' : 'transparent'};
-                       color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${pl.name}</button>`;
+                       color:${on ? '#fff' : 'var(--text-muted)'};">${on ? '\u2713 ' : ''}${escapeHtml(pl.name)}</button>`;
         }).join('');
 
         // Said plainly, because a golfer left out of dots must not think they have been
@@ -2700,7 +2701,7 @@
                 const sideBName = sideName(teamBPlayers);
 
                 html += `<div class="side-match-card" id="sm-card-${matchId}">
-                    <div class="side-match-players">${sideAName} 🆚 ${sideBName}</div>
+                    <div class="side-match-players">${escapeHtml(sideAName)} 🆚 ${escapeHtml(sideBName)}</div>
                     <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
                 if (holeCalc) {
@@ -2709,7 +2710,7 @@
                         <span style="font-size:0.8rem;">💵 $${holeCalc.currentStake}/hole${carryText}</span>
                         <span id="sm-hole-press-row-${matchId}">${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="showSideHolePressInput('${matchId}', '${p1.id}', '${p2.id}')">🔥 Press</button>` : ''}</span>
                     </div>
-                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${sideAName}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${sideBName}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
+                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideAName)}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideBName)}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
                     // THE HOLE-PRESS LEDGER. The row above shows the CURRENT rate, which
                     // after a press is the pressed number - so "$125/hole" was true while
                     // the $78 press that got it there, and its start hole, appeared
@@ -2739,13 +2740,13 @@
                             })();
                     } else {
                         const s = overallCalc.baseStatus;
-                        statusText = s === 0 ? 'All Square' : (s > 0 ? `${sideAName} ${s} UP` : `${sideBName} ${Math.abs(s)} UP`);
+                        statusText = s === 0 ? 'All Square' : (s > 0 ? `${escapeHtml(sideAName)} ${s} UP` : `${escapeHtml(sideBName)} ${Math.abs(s)} UP`);
                     }
                     html += `<div class="side-match-row">
                         <span style="font-size:0.8rem;">🎯 Overall ($${sm.overallStake}): ${statusText}</span>
                         ${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>` : ''}
                     </div>
-                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${sideAName}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${sideBName}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
+                    <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideAName)}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideBName)}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
                     // Overall presses, same treatment: every press with its own start
                     // hole and its own stake. A press stored without one - every press
                     // saved before custom stakes existed - shows the original wager,
