@@ -279,7 +279,7 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
             .forEach(h => assert.ok(adm.includes(h), 'missing section heading: ' + h));
         assert.ok(adm.includes('stacked-games-list'));
         assert.ok(adm.includes('Also Playing'), 'the setup wizard keeps its own wording');
-        assert.ok(adm.includes('\uD83C\uDFAF Extras'), 'the birdie/KP extras keep their own heading');
+        assert.ok(adm.includes('\u2728 Extras'), 'the birdie/KP extras keep their own heading');
     });
 
     // BEHAVIOUR CHANGE (Quick Round Action model): Step 3 no longer asks which GAME is
