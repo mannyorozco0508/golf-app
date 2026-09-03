@@ -213,7 +213,10 @@ const GOLDEN = {
     '09 legacy nassau round': 'c79a96f13de1b87d67a9a63253c76716dbc514f9abd10691e8497025bbef6118',
     '10 money pool round': '24cc53526012abeba1f0b76bc67369fe5335b48348baf7a5d850985b4f25320a',
     '11 wolf round': '0cd128cb2bf50dbbe4d04bd51e73143716df024f675700d979d4f26a0bbc8aa3',
-    '12 stableford round': '3664ab5a65e2fbf09e6bba32249ca5805fc03cd08d159f1c622c11bf66368808',
+    // Moved once, at the B2 icon cleanup: the Stableford settle-header emoji went
+    // 🎯 -> ⭐. PROVEN to be the only change - reverting just that character in
+    // stats.html makes all 15 fixtures hash green again, so no money or markup moved.
+    '12 stableford round': 'bd7ee929b83acf95fcaa71ac2edcdcf1dbf75c3abf64e0f9a8323f90c9c50e4e',
     '13 birdie pool round': '2d6d3b299d0c11ca8621a007f8188ccb96243c09ba95b37e63cc3dff3fa1ed3f',
     '14 stroke 1v1 all square': '8f4626495317cb96a3ec6f6b95ac3b635925b456ab7147bc087934dad57badfe',
     '15 stroke 2v2 all square': '679a62b83305052cf6614caa194379edafb3f20489850c4b7097b777ee69c107',   // INTENTIONAL — side name only; money is $0 either way
