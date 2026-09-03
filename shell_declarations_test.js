@@ -210,8 +210,19 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
         // artifacts. B8 produces exactly two, from these same declarations - so the
         // useful statement is now that they are generated and ignored rather than
         // checked in, and that nothing in the source tree depends on them existing.
-        const ignore = fs.readFileSync(path.join(REPO_ROOT, 'gitignore'), 'utf8');
+        // THE DOT MATTERS. This read used to name 'gitignore' without it, and passed
+        // for months against a file Git never opened - the rules were real, the
+        // filename made them inert, and this test reported success either way. It now
+        // reads the only name Git honours, so a dotless copy cannot satisfy it again.
+        const ignorePath = path.join(REPO_ROOT, '.gitignore');
+        assert.ok(fs.existsSync(ignorePath),
+            '.gitignore must exist WITH the leading dot - Git reads no other name');
+        assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'gitignore')),
+            'a dotless gitignore is inert and invites edits to the wrong file');
+        const ignore = fs.readFileSync(ignorePath, 'utf8');
         assert.match(ignore, /^dist\/$/m, 'dist/ must be ignored - it is build output');
+        assert.match(ignore, /^www\/$/m, 'www/ is the generated native bundle');
+        assert.match(ignore, /^node_modules\/$/m, 'node_modules must never be committed');
         assert.ok(fs.existsSync(path.join(REPO_ROOT, 'build-shell.js')),
             'the outputs must be reproducible from a build script in the repo');
         // The source tree still stands on its own: every declared file exists at the
