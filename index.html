@@ -1157,7 +1157,7 @@
         <a href="index.html" class="top-nav-item active nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">💸 Results</a>
+        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
     </div>
     <details class="nav-more" id="nav-more-menu-wrap">
         <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
@@ -1272,7 +1272,7 @@
     <div class="end-box-card">
         <h3 style="color: var(--accent-red); margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
-        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">📥 End & Wipe Round</button>
+        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">🗑️ End & Wipe Round</button>
     </div>
 </div>
 
@@ -4160,10 +4160,10 @@
             const names = players.slice(b.start, b.start + b.size).map(p => p.name.split(' ')[0]).join(', ');
             return `<div class="group-link-row">
                 <div class="glr-info">
-                    <div class="glr-title">🏌️ Group ${b.group}</div>
+                    <div class="glr-title">👥 Group ${b.group}</div>
                     <div class="glr-names">${names}</div>
                 </div>
-                <button class="glr-copy" onclick="copyGroupLinkFromScorecard('${url}', ${b.group}, this)">📋 Copy</button>
+                <button class="glr-copy" onclick="copyGroupLinkFromScorecard('${url}', ${b.group}, this)">🔗 Copy</button>
             </div>`;
         }).join('');
 
@@ -4227,7 +4227,7 @@
             // could score THEIR foursome; handing them every other group's privileged
             // URL from inside that page defeats the point of scoping links at all.
             if (isOrganizerView()) {
-                html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">📋 Group Links</button>`;
+                html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">🔗 Group Links</button>`;
             }
         }
 
@@ -7077,7 +7077,7 @@
 
         if (strokeMatchCalc) {
             payoutBox.style.display = "block";
-            titleEl.textContent = "🥊 LIVE STROKE PLAY STATUS";
+            titleEl.textContent = "⚔️ LIVE STROKE PLAY STATUS";
 
             const s = strokeMatchCalc;
             function fmtStrokeM(amt) {
@@ -7155,7 +7155,7 @@
 
         } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
             payoutBox.style.display = "block";
-            titleEl.textContent = "🥊 LIVE MATCH PLAY STATUS";
+            titleEl.textContent = "⚔️ LIVE MATCH PLAY STATUS";
             
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
@@ -7321,7 +7321,7 @@
             `;
         } else if (gameFormat === 'hilo' && hiloCalc) {
             payoutBox.style.display = "block";
-            document.getElementById("nassau-payout-header").textContent = `♠️ Hi-Lo Standings (${hiloCalc.t1Name} vs ${hiloCalc.t2Name})`;
+            document.getElementById("nassau-payout-header").textContent = `↕️ Hi-Lo Standings (${hiloCalc.t1Name} vs ${hiloCalc.t2Name})`;
             
             let t1Money = (hiloCalc.t1Points - hiloCalc.t2Points) * (holeBet > 0 ? holeBet : 0);
             function fmtM(amt) {
@@ -7340,7 +7340,7 @@
                     <span>${hiloCalc.t1Name}: ${fmtM(t1Money)} | ${hiloCalc.t2Name}: ${fmtM(-t1Money)}</span>
                 </div>
             `;
-            titleEl.textContent = `♠️ HI-LO (LOW BALL / HIGH BALL)`;
+            titleEl.textContent = `↕️ HI-LO (LOW BALL / HIGH BALL)`;
             statusEl.innerHTML = `
                 <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
                 <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
