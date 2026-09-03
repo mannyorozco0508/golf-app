@@ -193,9 +193,13 @@ describe('THE DECORATIVE BULLSEYES ARE GONE', () => {
         assert.ok(!BULLSEYE.test(read('index.html')), 'index.html still renders a target emoji');
     });
 
-    test('the out-of-scope bullseyes elsewhere were left untouched', () => {
-        assert.ok(BULLSEYE.test(read('settlement.html')), 'Settlement was not in scope for Part 1');
-        assert.ok(BULLSEYE.test(read('admin.html')), 'Setup was not in scope for Part 1');
+    test('the bullseye is now retired everywhere in Consumer', () => {
+        // Part 1 deliberately scoped this to the scorecard and left Settlement and Setup
+        // alone. The B2 icon cleanup finished the job: 🎯 had drifted across six
+        // unrelated meanings and now has none, so it carries no meaning to protect.
+        ['index.html', 'admin.html', 'settlement.html', 'stats.html',
+         'sidematches.html', 'instructions.html'].forEach(f =>
+            assert.ok(!BULLSEYE.test(read(f)), f + ' still renders a target emoji'));
     });
 
     test('the four audited labels survive without their icon', () => {
