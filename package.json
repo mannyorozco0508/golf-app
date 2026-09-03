@@ -8,9 +8,15 @@
     "mobile:sync": "node sync-mobile-web.js"
   },
   "devDependencies": {
-    "targaryen": "^3.1.0"
+    "targaryen": "^3.1.0",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1"
   }
 }
