@@ -243,7 +243,7 @@
             <div id="round-planner"></div>
         </div>
 
-        <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">🏗️ Build Trip &amp; All Rounds</button>
+        <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">➕ Build Trip &amp; All Rounds</button>
 
         <div style="text-align:center; margin-top:12px;">
             <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline;" onclick="createTripBlank()">Skip planning — just create an empty trip</span>
@@ -352,7 +352,7 @@
     </details>
 
     <details class="trip-section">
-        <summary>🎖️ Points Race &amp; Prizes</summary>
+        <summary>🏆 Points Race &amp; Prizes</summary>
         <div class="trip-section-body">
             <p class="trip-section-sub">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
             <div id="trip-points-race"></div>
@@ -523,7 +523,7 @@
                 <div style="font-weight:bold; margin-bottom:8px; color:var(--brand-green);">Day ${i + 1}</div>
                 <div style="display:flex; gap:8px;">
                     <button type="button" class="holes-toggle-btn ${d.roundsToday === 1 ? 'active' : ''}" onclick="setDayRounds(${i}, 1)">⛳ 18 Holes</button>
-                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 2 ? 'active' : ''}" onclick="setDayRounds(${i}, 2)">⛳⛳ 36 Holes</button>
+                    <button type="button" class="holes-toggle-btn ${d.roundsToday === 2 ? 'active' : ''}" onclick="setDayRounds(${i}, 2)">⛳ 36 Holes</button>
                 </div>
             </div>`;
         });
@@ -1808,7 +1808,7 @@
         }
 
         if (cachedPointsStandings && cachedPointsStandings.length > 0) {
-            text += `\n🎖️ POINTS RACE\n`;
+            text += `\n🏆 POINTS RACE\n`;
             cachedPointsStandings.forEach(s => {
                 const pts = s.points % 1 === 0 ? s.points : s.points.toFixed(1);
                 text += `${s.rank}. ${s.name} — ${pts} pts\n`;
@@ -1842,7 +1842,7 @@
             navigator.share({ title: `${tripData.name} Recap`, text: text }).catch(() => {});
         } else if (navigator.clipboard) {
             navigator.clipboard.writeText(text).then(() => {
-                alert('📋 Recap copied to clipboard — paste it into your group chat.');
+                alert('⧉ Recap copied to clipboard — paste it into your group chat.');
             }).catch(() => {
                 alert(text);
             });
