@@ -185,6 +185,12 @@
         .wizard-step { display: none; }
         .wizard-step.active { display: block; }
         .wizard-step-title { font-size: 1.05rem; font-weight: bold; color: var(--brand-green); margin-bottom: 4px; }
+        /* Step 2 asks how many holes. No emoji says that - the previous ruler collided
+           with the Polie dot and communicated nothing about 9 vs 18 - so the number IS
+           the icon. Sized to sit in the same optical space the emoji occupied. */
+        .step-holes { display: inline-block; font-size: 0.72rem; font-weight: bold; letter-spacing: 0.5px;
+            color: var(--bg-card); background: var(--brand-green); border-radius: 5px;
+            padding: 2px 6px; vertical-align: 2px; margin-right: 2px; }
         .wizard-section-head { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.06em; color: var(--text-muted); margin: 14px 0 6px 0; }
         .review-section-head { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.06em; color: var(--brand-green); margin: 12px 0 4px 0; }
         /* Three stakes across the full width, same as the Action form. Squeezing them
@@ -354,7 +360,7 @@
 
     <p style="font-size:0.75rem; color:var(--text-muted); margin: 0 0 8px 0;">Playing 36 today, or running the same setup again? Copy an existing round's course/format/side games as a starting point — you can still edit players before saving.</p>
     <input type="text" id="duplicate-room-input" class="join-input" placeholder="GAME CODE TO COPY" maxlength="6">
-    <button class="btn-outline" onclick="duplicateRoom()">📋 Duplicate This Round's Setup</button>
+    <button class="btn-outline" onclick="duplicateRoom()">📑 Duplicate This Round's Setup</button>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -364,7 +370,7 @@
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">💸 Results</a>
+        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
         <details class="nav-more" open>
             <summary class="top-nav-item">⋯ More</summary>
             <div class="nav-more-menu">
@@ -386,14 +392,14 @@
     </div>
 
     <div id="copy-from-banner" style="display:none; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--text-main);">
-        📋 <strong>Copied settings from your other round</strong> — course, format, and side games are pre-filled. Double-check <strong>Step 5: Players</strong> since who's playing today may be different.
+        📑 <strong>Copied settings from your other round</strong> — course, format, and side games are pre-filled. Double-check <strong>Step 5: Players</strong> since who's playing today may be different.
     </div>
 
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
         <div id="qrcode"></div>
-        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">📋 Copy Invite Link</button>
+        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">⧉ Copy Invite Link</button>
     </div>
 
     <div class="share-box" id="group-links-box" style="display:none; border-color:var(--accent-red);">
@@ -438,7 +444,7 @@
     </div>
 
     <div class="wizard-step" id="wizard-step-2" data-step="2">
-        <div class="wizard-step-title">📏 Step 2: Round Length</div>
+        <div class="wizard-step-title"><span class="step-holes">9/18</span> Step 2: Round Length</div>
         <div class="wizard-step-sub">Full 18, front/back 9, or a custom 9-hole loop.</div>
     <div class="form-group">
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
@@ -542,7 +548,7 @@
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">⛳ Step 3: How We're Scoring</div>
+        <div class="wizard-step-title">📝 Step 3: How We're Scoring</div>
         <div class="wizard-step-sub">Choose how scores are kept. Games and bets are added later.</div>
         <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Money games are added later, and you can skip this if everyone's just playing their own ball.</div>
     <div class="form-group">
@@ -627,7 +633,7 @@
         <div class="wizard-step-sub" id="step4-sub">Options specific to the format you picked.</div>
     <div class="form-group">
         <div id="match-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">🥊 1v1 Options</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">⚔️ 1v1 Options</label>
 
             <div style="margin-bottom: 10px;">
                 <label style="font-size: 0.75rem;">Scoring Style</label>
@@ -736,7 +742,7 @@
         </div>
 
         <div id="stableford-settings" class="extra-settings-box">
-            <label style="color:var(--brand-green); margin-bottom: 6px;">🎯 Stableford Points</label>
+            <label style="color:var(--brand-green); margin-bottom: 6px;">⭐ Stableford Points</label>
             <div class="grid-2col">
                 <div>
                     <label style="font-size: 0.8rem;">Scoring</label>
@@ -843,7 +849,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         </div>
     </div>
 
-    <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🎯 Preview Handicap Strokes</button>
+    <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🧮 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(5)">◀ Back</button>
@@ -933,7 +939,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             <div id="skins-instances-list"></div>
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
-            <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>🎯 Extras</strong></label>
+            <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>✨ Extras</strong></label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side pots. Set up who's in on the Action tab.</p>
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
@@ -1064,7 +1070,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     <div class="end-box">
         <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
         <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
-        <button class="btn-danger" onclick="endAndClearRound()">📥 End & Wipe Round</button>
+        <button class="btn-danger" onclick="endAndClearRound()">🗑️ End & Wipe Round</button>
     </div>
 
     <!-- THE TOURNAMENT EXIT CARD WAS REMOVED AT THE PRODUCT SEPARATION.
@@ -1279,7 +1285,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 const groupUrl = scorecardUrlFor(currentMode, b.group);
                 html += `<div class="group-link-row">
                     <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
-                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">🔗 Copy Link</button>
                 </div>`;
             });
             box.style.display = 'block';
@@ -3937,7 +3943,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             html += `
                 <div class="group-link-row">
                     <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
-                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">📋 Copy Link</button>
+                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">🔗 Copy Link</button>
                 </div>
             `;
         });
@@ -3984,9 +3990,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // only ever assigned from stored data.eventCategory or the "weekend" default,
         // so no new round can produce it. Removing the line would not lose data or
         // change any money - an old round would simply fall through to the default
-        // trophy icon - but rewriting stored values is a data migration, and this was
-        // a copy cleanup. It stays until a migration is done deliberately.
-        if (type === 'marty') return '🎰';
+        // trophy icon - which is exactly what now happens. The BRANCH was removed at the
+        // icon cleanup because a slot machine is casino imagery in an app whose App Store
+        // position is that it is not a betting product. No stored value was rewritten and
+        // no migration was run: an old round carrying eventCategory 'marty' still loads,
+        // and simply falls through to the default trophy below.
         if (type === 'myrtle') return '🏖️';
         if (type === 'weekday') return '🏌️‍♂️';
         return '🏆';
