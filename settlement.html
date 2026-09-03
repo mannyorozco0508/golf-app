@@ -289,7 +289,7 @@
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item active nav-link">💸 Results</a>
+        <a href="settlement.html" class="top-nav-item active nav-link">🤝 Results</a>
     </div>
     <details class="nav-more" id="nav-more-menu-wrap">
         <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
@@ -302,7 +302,7 @@
     </details>
     </div>
 
-    <h2 class="event-title" id="main-title">💸 Payout Settlement</h2>
+    <h2 class="event-title" id="main-title">🤝 Payout Settlement</h2>
 
     <div id="money-pool-section"></div>
     <div id="combined-settlement-summary"></div>
@@ -389,7 +389,7 @@
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
-            document.getElementById("main-title").textContent = `💸 Settle (${currentData.eventName || "Weekend Round"})`;
+            document.getElementById("main-title").textContent = `🤝 Settle (${currentData.eventName || "Weekend Round"})`;
             renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
@@ -1464,7 +1464,7 @@
             const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">♠️ Final Hi-Lo Settlement</div>
+                    <div class="settle-header">↕️ Final Hi-Lo Settlement</div>
                     ${pointsLine}
                     ${ledgerHtml}
                 </div>
@@ -1523,7 +1523,7 @@
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">🎯 Final Stableford Settlement</div>
+                    <div class="settle-header">⭐ Final Stableford Settlement</div>
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
@@ -1550,7 +1550,7 @@
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">🎯 Final Dot Game Settlement</div>
+                    <div class="settle-header">🔘 Final Dot Game Settlement</div>
                     ${ledgerHtml}
                     ${unclaimedKpNoteHtml(data, courseData, savedScores)}
                 </div>
