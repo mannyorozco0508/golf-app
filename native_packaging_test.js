@@ -77,8 +77,34 @@ describe('THE NATIVE TARGET IS CONSUMER, AND ONLY CONSUMER', () => {
 
 // ---------------------------------------------------------------------------
 describe('THE WRAPPER POINTS AT THE BUNDLE, NOT A SERVER', () => {
-    test('webDir is the local bundle', () => {
-        assert.match(CAP, /webDir: 'www'/);
+    test('webDir points at the Consumer bundle Capacitor actually copies', () => {
+        // NOT 'www'. sync-mobile-web.js writes the 31-file Consumer bundle into
+        // www/app/, so www/ itself holds no index.html and `npx cap add ios` fails
+        // outright with "The web assets directory (./www) must contain an index.html
+        // file." That was found by running Capacitor on a Mac, not by reading code -
+        // every test here passed while the config was wrong, because nothing asserted
+        // the path against the directory the sync script writes.
+        assert.match(CAP, /webDir: 'www\/app'/,
+            'webDir must be the directory mobile:sync writes, not its parent');
+        assert.ok(!/webDir: 'www'/.test(CAP), "'www' has no index.html and breaks cap sync");
+    });
+
+    test('webDir agrees with where the sync script actually writes', () => {
+        // The assertion above pins a string. This one pins the RELATIONSHIP, so the
+        // two cannot drift apart again: whatever directory sync-mobile-web.js targets
+        // is the directory Capacitor must be pointed at.
+        const syncTarget = /www\/app/.test(SYNC);
+        assert.ok(syncTarget, 'sync-mobile-web.js must write into www/app');
+        const webDir = /webDir: '([^']+)'/.exec(CAP)[1];
+        assert.equal(webDir, 'www/app',
+            'capacitor.config.ts and sync-mobile-web.js must name the same directory');
+    });
+
+    test('the native identity is the locked App Store record', () => {
+        // These three cannot change after the first App Store Connect upload.
+        assert.match(CAP, /appId: 'com\.rattlegolf\.app'/);
+        assert.match(CAP, /appName: 'Rattle Golf'/);
+        assert.match(CAP, /webDir: 'www\/app'/);
     });
 
     test('NEGATIVE CONTROL — no server URL, no localhost, no preview origin', () => {
