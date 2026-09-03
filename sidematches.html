@@ -267,7 +267,7 @@
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
         <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">💸 Results</a>
+        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
     </div>
     <details class="nav-more" id="nav-more-menu-wrap">
         <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
@@ -1809,7 +1809,7 @@
                 const url = `${scorecardBaseUrl()}?game=${currentMode}&group=${group}`;
                 html += `<div class="team-link-row">
                     <span>🏌️ ${namesInGroup} — Group ${group}</span>
-                    <button class="btn-outline" onclick="copySideMatchLink('${url}')">📋 Copy</button>
+                    <button class="btn-outline" onclick="copySideMatchLink('${url}')">⧉ Copy</button>
                 </div>`;
             });
         }
@@ -2743,7 +2743,7 @@
                         statusText = s === 0 ? 'All Square' : (s > 0 ? `${escapeHtml(sideAName)} ${s} UP` : `${escapeHtml(sideBName)} ${Math.abs(s)} UP`);
                     }
                     html += `<div class="side-match-row">
-                        <span style="font-size:0.8rem;">🎯 Overall ($${sm.overallStake}): ${statusText}</span>
+                        <span style="font-size:0.8rem;">Overall ($${sm.overallStake}): ${statusText}</span>
                         ${canPressSideMatch(sm) ? `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press</button>` : ''}
                     </div>
                     <div class="side-match-row"><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideAName)}: ${fmtSideM(overallCalc.p1Money)}</span><span style="font-size:0.8rem; font-weight:bold;">${escapeHtml(sideBName)}: ${fmtSideM(-overallCalc.p1Money)}</span></div>`;
