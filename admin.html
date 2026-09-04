@@ -2866,9 +2866,25 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const identity = currentCourseIdentity();
         const courseActuallyChanged = (identity !== lastCourseChangeKey);
         if (courseActuallyChanged) {
+            // UNMAPPED COURSES GET AN EMPTY GRID, NOT A PLAUSIBLE ONE.
+            //
+            // The unmapped fallback above builds par 4 on every hole with stroke
+            // indexes 1-18 in hole order. That is a complete, well-formed golf card
+            // that passes every check validateCourseGrid() makes - and it is fiction.
+            // Stamping it into the inputs meant a golfer could read the red "COURSE
+            // NOT MAPPED" warning, see 36 filled cells, assume the work was done, and
+            // save. Those invented handicaps then wrote to global_courses, where they
+            // are shared with every future golfer on that course and override any
+            // coursePresets fix shipped later.
+            //
+            // Leaving the cells blank makes the existing validator do the work: it
+            // already refuses to save on "Hole 1 is missing a Par", on both the
+            // editing and non-editing paths. Nothing new to enforce, nothing to
+            // bypass by inaction. The par total reads 0 instead of a confident 72,
+            // which is the honest summary of an empty card.
             baseData.forEach(h => {
-                if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = h.par;
-                if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = h.hcpIndex;
+                if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = isMapped ? h.par : '';
+                if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = isMapped ? h.hcpIndex : '';
             });
             lastCourseChangeKey = identity;
         }
