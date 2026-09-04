@@ -136,7 +136,14 @@
 // carries the Pot Format choice that only skins.html could set before. An
 // installed PWA on v38 would keep writing the leftover buy-in on every new round
 // it created. Shell MEMBERSHIP is unchanged.
-const CACHE_VERSION = 'golfapp-v39-skins-setup';
+// Moved to v40 for the Main Pool batch. Five precached shell files changed:
+// admin.html (previewCourseData seam, the pool restore fix, KP auto-fill, the
+// allocation breakdown), index.html and settlement.html (the Main Pool label),
+// action-model.js and settlement-engine.js (the shared MAIN_POOL_LEDGER_LABEL).
+// An installed PWA on v39 would keep ERASING a round's Main Pool on every
+// re-save, which is the one change here that loses data. Shell MEMBERSHIP is
+// unchanged; data.moneyPool is unchanged; no settlement arithmetic moved.
+const CACHE_VERSION = 'golfapp-v40-main-pool';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

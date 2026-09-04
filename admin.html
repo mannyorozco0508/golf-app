@@ -449,7 +449,7 @@
     <div class="form-group">
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
             <label style="color:var(--brand-green); font-size: 0.8rem;">Round Length</label>
-            <select id="round-length-select" style="border-color:var(--accent-teal);">
+            <select id="round-length-select" onchange="mpAutoFillKpHoles()" style="border-color:var(--accent-teal);">
                 <option value="18">Full 18 Holes</option>
                 <option value="front">Front 9 Only (Out)</option>
                 <option value="back">Back 9 Only (In)</option>
@@ -832,7 +832,7 @@
         <div class="wizard-step-title">👥 Step 5: Players</div>
         <div class="wizard-step-sub">Add everyone playing today and assign them to foursomes.</div>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-        ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Money Pool.
+        ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Main Pool.
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
@@ -971,9 +971,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-section-head">POOLS &amp; EXTRAS</div>
         <div class="extra-settings-box" style="display:block; border-color:#b8860b;">
             <label style="color:#b8860b; margin-bottom:4px; font-size:0.95rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Money Pool</strong>
+                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Main Pool</strong>
             </label>
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">One pot for the whole field. Everyone antes once; it pays KPs, net finishers and skins. Group bets stay separate.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Everyone playing for money pays one buy-in. You choose what goes to KPs and net finishers; Skins gets the rest. Unwon money is paid back. Group bets stay separate.</p>
             <div id="mp-panel" style="display:none;">
 
                 <div class="mp-section">
@@ -995,8 +995,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                          inputmode="text" gives the standard keyboard, whose 123 page carries
                          both the digits and the comma. Every other numeric field on this
                          screen keeps its numeric/decimal pad - they take one number each. -->
-                    <input type="text" id="mp-kp-holes" value="" oninput="mpRecalc()" placeholder="4, 14" inputmode="text">
+                    <input type="text" id="mp-kp-holes" value="" oninput="mpKpHolesEdited()" placeholder="4, 14" inputmode="text">
                     <div class="mp-hint">Hole numbers, separated by commas. Split evenly — <span id="mp-kp-split">$50 each</span></div>
+                    <div class="mp-hint" id="mp-kp-source"></div>
+                    <button type="button" id="mp-kp-suggest" class="btn-outline-sm" onclick="mpUseSuggestedKpHoles()" style="display:none; margin-top:6px;"></button>
                 </div>
 
                 <div class="mp-section">
@@ -1980,7 +1982,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <strong style="font-size:0.9rem; color:var(--brand-green);">\uD83E\uDD69 Skins</strong>
-                    <p id="mp-skins-note">Money Pool already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
+                    <p id="mp-skins-note">Main Pool already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
                     <button type="button" onclick="removeSkinsInstance('${inst.id}')"
                         style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; min-height:44px;">Remove</button>
                 </div>
@@ -2099,6 +2101,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const on = document.getElementById('mp-enabled').checked;
         document.getElementById('mp-panel').style.display = on ? 'block' : 'none';
         mpSyncPlaceRows();
+        // Ticking the box on a mapped course should not present an empty KP field
+        // and an instant error; the round already knows its par 3s.
+        if (on && typeof mpAutoFillKpHoles === 'function') mpAutoFillKpHoles();
         mpRecalc();
     }
 
@@ -2106,6 +2111,114 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // will be - so validateMoneyPool() here IS the settlement-time rule.
     function mpDraftData() {
         return { players: collectWizardPlayers(), moneyPool: captureMoneyPool() };
+    }
+
+    // WHAT THE ROUND ARRIVED WITH.
+    //
+    // Reopening a round restored its course, format, skins instances and stakes -
+    // but never the pool. The Main Pool box came up unticked, and because the save
+    // writes moneyPool: captureMoneyPool() unconditionally, an unticked box wrote
+    // null and Firebase DELETED the key. Editing a pool round to fix a player's
+    // handicap silently erased the buy-in, the KP holes, the net places and the
+    // skins mode. The copy-a-round flow ran through the same loader, so duplicating
+    // last Monday quietly dropped the pot it was set up for.
+    //
+    // This snapshot is the round's own configuration as saved. It exists for two
+    // jobs: to fill the controls, and to carry forward anything the form cannot
+    // represent (see mergePreservedPoolFields).
+    let loadedMoneyPool = null;
+
+    // A saved preset the four <option>s cannot express. Every pool written by this
+    // wizard uses one of them, so this stays null in practice - but a config that
+    // arrived some other way must not be quietly rewritten into the nearest option.
+    let mpUnrepresentableNet = null;
+
+    // TRUE once the KP hole list is the organizer's stated intent rather than a
+    // default: they typed it, or the round was saved with one. Auto-KP reads this
+    // and refuses to overwrite either.
+    let kpHolesTouched = false;
+
+    // FIELDS THE FORM DOES NOT OWN ARE CARRIED, NOT DROPPED.
+    //
+    // captureMoneyPool() rebuilds the pool from the controls, so any key the wizard
+    // has no input for would vanish on the next save. participantIds is the live
+    // example: pool-engine.js honours it, and Rattle Golf 1.0 deliberately does not
+    // expose a picker for it. A round that has one - set by hand, or by some future
+    // version - must not lose it because this screen cannot draw it.
+    //
+    // Only the five keys below are form-owned. Everything else on the saved pool
+    // rides along untouched.
+    const MP_FORM_OWNED = ['enabled', 'buyIn', 'kp', 'net', 'skins'];
+    function mergePreservedPoolFields(pool) {
+        if (!pool || !loadedMoneyPool) return pool;
+        Object.keys(loadedMoneyPool).forEach(k => {
+            if (MP_FORM_OWNED.indexOf(k) === -1 && pool[k] === undefined) {
+                pool[k] = loadedMoneyPool[k];
+            }
+        });
+        return pool;
+    }
+
+    // Restores a saved pool into the controls. Faithful, not clever: every value
+    // shown is a value that was stored.
+    function loadMoneyPool(data) {
+        loadedMoneyPool = null;
+        mpUnrepresentableNet = null;
+        const box = document.getElementById('mp-enabled');
+        if (!box) return;
+
+        const pool = data && data.moneyPool;
+        // A round that never had a pool must not grow one. enabled === false is a
+        // pool that was explicitly switched off; both leave the box untouched.
+        if (!pool || pool.enabled === false) { box.checked = false; mpToggle(); return; }
+
+        loadedMoneyPool = pool;
+        box.checked = true;
+
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        set('mp-buyin', pool.buyIn !== undefined ? pool.buyIn : 0);
+
+        const kp = pool.kp || {};
+        set('mp-kp-amount', kp.amount !== undefined ? kp.amount : 0);
+        const holes = Array.isArray(kp.holes) ? kp.holes : [];
+        set('mp-kp-holes', holes.join(', '));
+        // A SAVED KP LIST IS A DECISION, not a starting point. The group may have
+        // dropped a par 3 or added a short par 4; auto-fill must leave it alone.
+        kpHolesTouched = holes.length > 0;
+
+        const net = pool.net || null;
+        if (net && net.payoutMode === 'custom' && Array.isArray(net.amounts)) {
+            set('mp-net-mode', 'custom');
+            mpPlaceCount = Math.min(4, Math.max(1, net.amounts.length));
+            for (let i = 1; i <= 4; i++) {
+                const v = net.amounts[i - 1];
+                set('mp-net-c' + i, (v === undefined || v === null || v === '') ? '' : v);
+            }
+        } else {
+            set('mp-net-mode', 'preset');
+            set('mp-net-amount', net && net.amount !== undefined ? net.amount : 0);
+            if (net && Array.isArray(net.places) && net.places.length) {
+                const wanted = net.places.join(',');
+                const sel = document.getElementById('mp-net-places');
+                const options = ['100', '60,40', '50,30,20', '40,30,20,10'];
+                if (options.indexOf(wanted) !== -1) {
+                    if (sel) sel.value = wanted;
+                } else {
+                    // Cannot be shown without inventing an option, so it is preserved
+                    // verbatim through capture instead of being rounded to the nearest.
+                    mpUnrepresentableNet = net;
+                }
+            }
+        }
+        mpSyncPlaceRows();
+
+        const skins = pool.skins || {};
+        set('mp-skins-mode', skins.mode || 'none');
+        if (skins.amount !== undefined) set('mp-skins-amount', skins.amount);
+        set('mp-skins-scoring', skins.scoring || 'net');
+        set('mp-skins-carry', skins.carryOver === false ? 'no' : 'yes');
+
+        mpToggle();
     }
 
     function captureMoneyPool() {
@@ -2138,7 +2251,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             scoring: document.getElementById('mp-skins-scoring').value,
             carryOver: document.getElementById('mp-skins-carry').value !== 'no' };
         if (mode === 'fixed') pool.skins.amount = num('mp-skins-amount');
-        return pool;
+        // A preset the controls could not display is returned exactly as it arrived,
+        // rather than replaced by whatever the select happens to be showing.
+        if (mpUnrepresentableNet && mpNetMode() !== 'custom') pool.net = mpUnrepresentableNet;
+        return mergePreservedPoolFields(pool);
     }
 
     // Plain-English wording for the validator's findings. The engine's messages are
@@ -2265,26 +2381,145 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         // THE ALLOCATION SUMMARY. Where every dollar of the pot is going, in one
         // glance, ending in a single line the organizer can trust before saving.
+        //
+        // THE BREAKDOWN SURVIVES A BAD CONFIG. It used to be replaced wholesale by
+        // the error, so an organizer $100 over budget was told the total was wrong
+        // and simultaneously lost the only view of WHICH bucket to cut. The rows are
+        // the thing being corrected; hiding them to make room for the complaint is
+        // backwards. The error now sits underneath them.
+        //
+        // PRESENTATION ONLY. Every figure below comes from validateMoneyPool() -
+        // totalPool, fixedAllocated, remainder - and nothing here changes what that
+        // returns or what the save gate does with it. An over-budget or unallocated
+        // pot is refused at save exactly as before.
+        const skinsAmt = pool.skins && pool.skins.mode === 'remainder' ? Math.max(0, v.totalPool - v.fixedAllocated)
+            : (pool.skins && pool.skins.mode === 'fixed' ? (pool.skins.amount || 0) : 0);
+        const isRemainder = !!(pool.skins && pool.skins.mode === 'remainder');
+        // ONE definition of "allocated", used by every line below.
+        // validateMoneyPool() already counts KP, net and a FIXED skins bucket inside
+        // fixedAllocated. Only the REMAINDER sits outside it, so only the remainder
+        // is added back. Adding skinsAmt unconditionally double-counted a fixed
+        // bucket and reported a balanced $320 pot as "Allocated $440 of $320 ✓".
+        const allocated = v.fixedAllocated + (isRemainder ? skinsAmt : 0);
+
+        let rows = '<div class="mp-row"><span>Total pool</span><span>' + $0(v.totalPool) + '</span></div>';
+        if (pool.kp) rows += '<div class="mp-row"><span>KP</span><span>' + $0(pool.kp.amount) + '</span></div>';
+        if (pool.net && netTotal > 0) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(netTotal) + '</span></div>';
+        // Naming the remainder answers "where does the rest go" on screen, instead of
+        // leaving the organizer to infer it from a number that happens to fit.
+        if (skinsAmt > 0 || isRemainder) rows += '<div class="mp-row"><span>Skins'
+            + (isRemainder ? ' (remainder)' : '') + '</span><span>' + $0(skinsAmt) + '</span></div>';
+
         if (v.valid) {
             box.className = '';
-            const skinsAmt = pool.skins && pool.skins.mode === 'remainder' ? v.remainder
-                : (pool.skins && pool.skins.mode === 'fixed' ? (pool.skins.amount || 0) : 0);
-            let rows = '<div class="mp-row"><span>Total pool</span><span>' + $0(v.totalPool) + '</span></div>';
-            if (pool.kp) rows += '<div class="mp-row"><span>KP</span><span>' + $0(pool.kp.amount) + '</span></div>';
-            if (pool.net && netTotal > 0) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(netTotal) + '</span></div>';
-            if (skinsAmt > 0) rows += '<div class="mp-row"><span>Skins</span><span>' + $0(skinsAmt) + '</span></div>';
-            rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(v.fixedAllocated + skinsAmt)
+            rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(allocated)
                 + ' of ' + $0(v.totalPool) + ' \u2713</span></div>';
-            box.innerHTML = rows;
         } else {
             box.className = 'mp-bad';
-            box.innerHTML = '<div class="mp-row"><span>\u26A0\uFE0F ' + mpFriendlyError(v.errors[0], v) + '</span></div>';
+            const over = v.fixedAllocated - v.totalPool;
+            if (over > 0.001) {
+                rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(v.fixedAllocated)
+                    + ' of ' + $0(v.totalPool) + ' \u2014 over by ' + $0(over) + '</span></div>';
+            } else if (!isRemainder && (v.totalPool - allocated) > 0.001) {
+                rows += '<div class="mp-row mp-total"><span>Allocated</span><span>' + $0(allocated)
+                    + ' of ' + $0(v.totalPool) + ' \u2014 ' + $0(v.totalPool - allocated) + ' left</span></div>';
+            }
+            rows += '<div class="mp-row"><span>\u26A0\uFE0F ' + mpFriendlyError(v.errors[0], v) + '</span></div>';
         }
+        box.innerHTML = rows;
 
         // NO ACCIDENTAL DOUBLE SKINS. The pot already contains a skins game; a
         // stacked standalone Skins wager above would charge everyone a second time.
         // Stated, not enforced - a group is allowed both if they truly mean it.
         if (note) note.style.display = (pool.skins && pool.skins.mode !== 'none') ? 'block' : 'none';
+    }
+
+    // AUTO-KP — the app already knows which holes are par 3s.
+    //
+    // The organizer picks the course in Step 1. Asking them to retype its par 3s
+    // into a comma-separated box in Step 6 is asking for information the round is
+    // already holding.
+    //
+    // IT READS previewCourseData(), NOT THE COURSE RECORD. That is the whole point
+    // of the seam: the preview applies the loop remap and the round-length trim, so
+    // a Back 9 round suggests 12 and 16 rather than the 3 and 7 a raw read of the
+    // scorecard would produce. Wrong hole numbers here put KP money on holes the
+    // group is not playing, and they would look perfectly plausible.
+    //
+    // NEVER INVENTS. Trustworthy means every hole in the round carries a real par -
+    // a whole number from 3 to 6. An unmapped course seeds a BLANK grid on purpose,
+    // so it fails this test and the field stays manual with an honest message. No
+    // default set of holes, no guessing from hole numbers.
+    function mpParThreeSuggestion() {
+        const key = currentCourseIdentity();
+        if (!key) return { ok: false, holes: [] };
+        let preview;
+        try { preview = previewCourseData(key); } catch (e) { return { ok: false, holes: [] }; }
+        if (!preview || !preview.ok || !preview.data.length) return { ok: false, holes: [] };
+        const trustworthy = preview.data.every(h => {
+            const raw = String(h.par === undefined || h.par === null ? '' : h.par).trim();
+            const par = Number(raw);
+            return raw !== '' && Number.isFinite(par) && par >= 3 && par <= 6;
+        });
+        if (!trustworthy) return { ok: false, holes: [] };
+        return { ok: true, holes: preview.data.filter(h => Number(h.par) === 3).map(h => Number(h.hole)) };
+    }
+
+    // AUTO-FILL INTELLIGENTLY, ALLOW OVERRIDE.
+    //
+    // Untouched, the field follows the course. Once the organizer has stated a list -
+    // by typing one, or by reopening a round that was saved with one - it is theirs.
+    // A group that dropped a par 3 or added a short par 4 has a local rule, and a
+    // course change must not delete it. They get offered the new course's par 3s
+    // instead: one tap, their choice.
+    function mpAutoFillKpHoles() {
+        const field = document.getElementById('mp-kp-holes');
+        if (!field) return;
+        const note = document.getElementById('mp-kp-source');
+        const chip = document.getElementById('mp-kp-suggest');
+        const hideChip = () => { if (chip) chip.style.display = 'none'; };
+        const suggestion = mpParThreeSuggestion();
+
+        if (!suggestion.ok || suggestion.holes.length === 0) {
+            hideChip();
+            if (note) note.textContent = kpHolesTouched ? ''
+                : "Enter the KP holes for this course \u2014 we don't have its scorecard yet.";
+            return;
+        }
+
+        const text = suggestion.holes.join(', ');
+        if (!kpHolesTouched) {
+            field.value = text;
+            if (note) note.textContent = 'Par 3s from the course scorecard';
+            hideChip();
+        } else if (field.value.trim() === text) {
+            if (note) note.textContent = 'Par 3s from the course scorecard';
+            hideChip();
+        } else {
+            // Their list stands. The course's own par 3s are offered, not applied.
+            if (note) note.textContent = '';
+            if (chip) { chip.textContent = 'Use par 3s (' + text + ')'; chip.style.display = 'inline-block'; }
+        }
+        mpRecalc();
+    }
+
+    // Taking the suggestion hands the field back to the course: they have said the
+    // par 3s are what they want, so a later course change should follow again.
+    function mpUseSuggestedKpHoles() {
+        const suggestion = mpParThreeSuggestion();
+        if (!suggestion.ok || suggestion.holes.length === 0) return;
+        const field = document.getElementById('mp-kp-holes');
+        if (field) field.value = suggestion.holes.join(', ');
+        kpHolesTouched = false;
+        mpAutoFillKpHoles();
+    }
+
+    // Typing in the KP field is the organizer stating which holes carry the money.
+    // Recorded before the recalc so nothing downstream can overwrite the list on the
+    // same keystroke that created it.
+    function mpKpHolesEdited() {
+        kpHolesTouched = true;
+        mpRecalc();
     }
 
     function mpSetHint(id, text) {
@@ -2899,6 +3134,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         updateCustomCoursePars();
 
+        // A new course means new par 3s. Applied only if the organizer has not
+        // stated their own list; otherwise offered as a suggestion.
+        if (typeof mpAutoFillKpHoles === 'function') mpAutoFillKpHoles();
+
         // Smart Mapping Warning
         const customContainer = document.getElementById('custom-course-container');
         const customCheckbox = document.getElementById('enable-custom-course');
@@ -2934,6 +3173,86 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     //
     // HCP: a strict 1-18 permutation - eighteen integers, each used exactly once.
     // That is what a stroke index IS, and every handicap path in the app assumes it.
+    // THE ONE PLACE THE ROUND'S SCORECARD IS ASSEMBLED.
+    //
+    // saveSettings() used to build finalCourseData inline, which meant nothing else
+    // in the wizard could see the card the round would actually carry until the
+    // moment it was saved. Anything wanting to reason about the course beforehand -
+    // auto-detecting the par 3s for KP, say - had to re-derive it, and a second
+    // derivation is a second chance to disagree.
+    //
+    // TWO TRANSFORMS LIVE HERE AND NOWHERE ELSE, and both change hole NUMBERS:
+    //
+    //   LOOP COURSES  the chosen nines are renumbered 1-9 and 10-18
+    //   ROUND LENGTH  'front' keeps holes <= 9; 'back' keeps 10-18 AND LEAVES THEM
+    //                 NUMBERED 10-18. It does not renumber to 1-9.
+    //
+    // So a Back 9 round's par 3s are holes like 12 and 16. Any caller that reads
+    // globalCourses/coursePresets directly instead of calling this gets 3 and 7,
+    // and puts KP money on holes the group is not playing.
+    //
+    // PURE: no alerts, no button state, no Firebase writes. It reports a problem
+    // rather than handling one, so saveSettings keeps every decision it always made
+    // and callers that merely want to LOOK at the card cannot trip a side effect.
+    // The name pieces come back as data for the same reason - saveSettings still
+    // owns selectedCourseName.
+    function previewCourseData(courseKey) {
+        const out = { ok: true, reason: '', data: [], untrimmed: [],
+                      isEditing: false, courseNameOverride: null, nameSuffix: '' };
+        const editEl = document.getElementById('enable-custom-course');
+        out.isEditing = !!(editEl && editEl.checked);
+
+        let built = [];
+        if (out.isEditing) {
+            const gridCheck = validateCourseGrid();
+            if (!gridCheck.ok) return { ...out, ok: false, reason: gridCheck.message };
+            built = gridCheck.data;
+        } else if (nineHoleLoops[courseKey]) {
+            const loops = nineHoleLoops[courseKey];
+            const frontKey = document.getElementById("front-nine-select").value;
+            const backKey = document.getElementById("back-nine-select").value;
+
+            const frontRemapped = remapNineHandicaps(loops[frontKey].data, true);
+            frontRemapped.forEach((item, idx) => { built.push({ hole: idx + 1, par: item.par, hcpIndex: item.hcpIndex }); });
+
+            if (backKey !== "none") {
+                const backRemapped = remapNineHandicaps(loops[backKey].data, false);
+                backRemapped.forEach((item, idx) => { built.push({ hole: idx + 10, par: item.par, hcpIndex: item.hcpIndex }); });
+                out.courseNameOverride = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} / ${loops[backKey].name.split(' ')[0]})`;
+            } else {
+                out.courseNameOverride = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
+            }
+        } else if (globalCourses[courseKey]) {
+            built = globalCourses[courseKey].data;
+        } else if (coursePresets[courseKey]) {
+            built = coursePresets[courseKey].data;
+        } else {
+            const unmappedCheck = validateCourseGrid();
+            if (!unmappedCheck.ok) return { ...out, ok: false, reason: unmappedCheck.message };
+            built = unmappedCheck.data;
+        }
+
+        // The card as published to global_courses: BEFORE the round-length trim, so a
+        // group playing nine holes never shortens the course for everyone else.
+        out.untrimmed = built;
+
+        if (!nineHoleLoops[courseKey]) {
+            // Read plainly: this control is always in the markup, and dom_guard_test.js
+            // deliberately rejects blanket guards on elements that always exist.
+            const roundLength = document.getElementById("round-length-select").value;
+            if (roundLength === "front") {
+                built = built.filter(h => h.hole <= 9);
+                out.nameSuffix = " (Front 9)";
+            } else if (roundLength === "back") {
+                built = built.filter(h => h.hole > 9);
+                out.nameSuffix = " (Back 9)";
+            }
+        }
+
+        out.data = built;
+        return out;
+    }
+
     function validateCourseGrid() {
         const rows = [], seen = {};
         for (let i = 1; i <= 18; i++) {
@@ -3635,6 +3954,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
             if (data.nassauScoring && document.getElementById("nassau-scoring")) { document.getElementById("nassau-scoring").value = data.nassauScoring; syncToggle("nassau-scoring", "nassau-scoring-switch", "nassau-scoring-label-net", "nassau-scoring-label-gross", "net"); }
             loadAdditionalGames(data);
+            // Same loader serves reopening a round and copying one, so a duplicated
+            // round now brings its pot with it - which is the whole point of copying
+            // a setup.
+            loadMoneyPool(data);
             if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
             if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
@@ -4109,63 +4432,28 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 return;
             }
 
-            const isEditing = document.getElementById('enable-custom-course').checked;
-            let finalCourseData = [];
+            // The card comes from previewCourseData() - the same call the KP auto-fill
+            // uses - so what the organizer was shown during setup and what the round
+            // is saved with cannot be two different scorecards.
+            const preview = previewCourseData(courseKey);
+            if (!preview.ok) {
+                alert('\u26A0\uFE0F Course card problem: ' + preview.reason);
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                return;
+            }
+            let finalCourseData = preview.data;
 
-            if (isEditing) {
-                const gridCheck = validateCourseGrid();
-                if (!gridCheck.ok) {
-                    alert('\u26A0\uFE0F Course card problem: ' + gridCheck.message);
-                    saveBtn.innerText = originalText; saveBtn.disabled = false;
-                    return;
-                }
-                finalCourseData = gridCheck.data;
+            // Publishing order is deliberate and unchanged: the UNTRIMMED card, under
+            // the course's name WITHOUT the round-length suffix. A group playing the
+            // back nine must not shorten or rename the course for everyone else.
+            if (preview.isEditing) {
                 db.ref(`global_courses/${courseKey}`).set({
                     name: selectedCourseName,
-                    data: finalCourseData
+                    data: preview.untrimmed
                 });
-            } else {
-                if (nineHoleLoops[courseKey]) {
-                    const loops = nineHoleLoops[courseKey];
-                    const frontKey = document.getElementById("front-nine-select").value;
-                    const backKey = document.getElementById("back-nine-select").value;
-                    
-                    const frontRemapped = remapNineHandicaps(loops[frontKey].data, true);
-                    frontRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 1, par: item.par, hcpIndex: item.hcpIndex }); });
-                    
-                    if (backKey !== "none") {
-                        const backRemapped = remapNineHandicaps(loops[backKey].data, false);
-                        backRemapped.forEach((item, idx) => { finalCourseData.push({ hole: idx + 10, par: item.par, hcpIndex: item.hcpIndex }); });
-                        selectedCourseName = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} / ${loops[backKey].name.split(' ')[0]})`;
-                    } else {
-                        selectedCourseName = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
-                    }
-                } else if (globalCourses[courseKey]) {
-                    finalCourseData = globalCourses[courseKey].data;
-                } else if (coursePresets[courseKey]) {
-                    finalCourseData = coursePresets[courseKey].data;
-                } else {
-                    const unmappedCheck = validateCourseGrid();
-                    if (!unmappedCheck.ok) {
-                        alert('\u26A0\uFE0F Course card problem: ' + unmappedCheck.message);
-                        saveBtn.innerText = originalText; saveBtn.disabled = false;
-                        return;
-                    }
-                    finalCourseData = unmappedCheck.data;
-                }
             }
-
-            // Universal 9-Hole Trim Logic
-            if (!nineHoleLoops[courseKey]) {
-                const roundLength = document.getElementById("round-length-select").value;
-                if (roundLength === "front") {
-                    finalCourseData = finalCourseData.filter(h => h.hole <= 9);
-                    selectedCourseName += " (Front 9)";
-                } else if (roundLength === "back") {
-                    finalCourseData = finalCourseData.filter(h => h.hole > 9);
-                    selectedCourseName += " (Back 9)";
-                }
-            }
+            if (preview.courseNameOverride !== null) selectedCourseName = preview.courseNameOverride;
+            selectedCourseName += preview.nameSuffix;
 
             const roundDay = document.getElementById("round-day-select").value;
             const baseEventName = roundDay; 
@@ -4338,7 +4626,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (payload.moneyPool) {
                 const mpCheck = validateMoneyPool(payload, finalCourseData);
                 if (!mpCheck.valid) {
-                    alert('\u26A0\uFE0F Money Pool:\n' + mpCheck.errors.join('\n'));
+                    alert('\u26A0\uFE0F Main Pool:\n' + mpCheck.errors.join('\n'));
                     return;
                 }
             }

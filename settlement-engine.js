@@ -787,7 +787,7 @@
             linesByName[key].push({ label: label || 'Other', amount });
         }
 
-        // A ledger line that moves no money. Used for the Money Pool buy-in, which is
+        // A ledger line that moves no money. Used for the Main Pool buy-in, which is
         // a real debit a golfer must see even though it is already folded into the
         // pool's net, and for zero-balance golfers who must still appear.
         function addNote(player, amount, label) {
@@ -851,14 +851,14 @@
             const poolNet = computeMoneyPoolNetByPlayerId(data, courseData, savedScores);
             Object.keys(poolNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
-                addAmount(p, poolNet[pid], 'Money Pool');
+                addAmount(p, poolNet[pid], MAIN_POOL_LEDGER_LABEL);
             });
 
             // ---- ITEMISING THE POOL ----------------------------------------
             //
             // The line above is the one that MOVES the money, and it stays exactly as
             // it was. What follows adds detail lines only - marked `note: true` so
-            // nothing double-counts - because "Money Pool -$185" tells a golfer
+            // nothing double-counts - because "Main Pool -$185" tells a golfer
             // nothing about why.
             //
             // A golfer needs to see the $40 leaving, the KP they won on the 7th, their
@@ -874,7 +874,7 @@
                     const dollars = c => c / 100;
 
                     pool.participants.forEach(pp => {
-                        addNote(byId[String(pp.id)], -dollars(pool.buyInCents), 'Money Pool buy-in');
+                        addNote(byId[String(pp.id)], -dollars(pool.buyInCents), 'Main Pool buy-in');
                     });
 
                     // KP names its hole. A golfer who won two KPs gets two lines, so the

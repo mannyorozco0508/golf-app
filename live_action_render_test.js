@@ -3,7 +3,7 @@
 //
 // WHAT WAS ALREADY THERE, and deliberately not rebuilt: the Action Center
 // already renders Group Action, Side Matches, press lines with their stakes and
-// start holes, and a Money Pool header. Those are covered by bet-strip.js and
+// start holes, and a Main Pool header. Those are covered by bet-strip.js and
 // its own tests. Adding a second surface for them would have been the "another
 // dashboard" this work was told not to build.
 //
@@ -238,7 +238,7 @@ describe('SCORECARD ORDER CONTRACT', () => {
         assert.ok(mount > nav, 'live action must come after Prev/Next');
     });
 
-    test('the live cards live inside the existing Money Pool banner, not a new dashboard', () => {
+    test('the live cards live inside the existing Main Pool banner, not a new dashboard', () => {
         assert.match(src, /html \+= buildLiveNetFinish\(r\);/);
         assert.match(src, /html \+= buildLiveKpStatus\(r\);/);
         const banner = src.slice(src.indexOf('function buildMoneyPoolBanner'), src.indexOf('function buildLiveNetFinish'));

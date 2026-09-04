@@ -17,13 +17,13 @@
 // needs: it nets the pool position and the match together so nobody settles up
 // twice.
 //
-//   Money Pool only       -> Final Results + Player Payouts. No Who Pays Who.
-//   Money Pool + Side     -> Player Payouts, then the combined Who Pays Who.
+//   Main Pool only       -> Final Results + Player Payouts. No Who Pays Who.
+//   Main Pool + Side     -> Player Payouts, then the combined Who Pays Who.
 //   Side Matches only     -> Who Pays Who, which is the whole story.
 //
 // THE TEST IS WHAT MOVED THE MONEY, not how many transactions came back. Each
 // contribution carries MOVING lines - the ones that add up to a golfer's net -
-// and a pool-only round has exactly one such label: "Money Pool".
+// and a pool-only round has exactly one such label: "Main Pool".
 //
 // PRESENTATION ONLY. computeCombinedNetTotals still produces the same
 // transactions; this decides whether they are a meaningful thing to show.
@@ -187,7 +187,8 @@ describe('OTHER PLAYER-TO-PLAYER GAMES ALSO COUNT', () => {
         assert.notEqual(at, -1, 'the shared predicate must exist');
         const block = am.slice(at);
         assert.match(block, /!l\.note && !l\.rounding/, 'moving lines only');
-        assert.match(block, /every\(label => label === 'Money Pool'\)/);
+        assert.match(block, /every\(label => label === MAIN_POOL_LEDGER_LABEL\)/,
+            'the predicate must compare against the shared constant, never a literal');
         assert.ok(!/transactions\.length/.test(block),
             'counting transactions would break the moment a pool round produced one');
         assert.match(read(PAGE), /hasPlayerToPlayerSettlement\(contributions\)/,

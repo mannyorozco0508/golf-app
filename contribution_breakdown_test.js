@@ -143,7 +143,7 @@ describe('EVERY PARTICIPANT APPEARS', () => {
         const quiet = Object.values(r.contributions).filter(c => moving(c).length === 1);
         assert.ok(quiet.length > 0, 'expected at least one golfer with only pool money');
         quiet.forEach(c => {
-            assert.ok(labels(c).includes('Money Pool buy-in'),
+            assert.ok(labels(c).includes('Main Pool buy-in'),
                 `${c.name} has no buy-in line to explain their balance`);
         });
     });
@@ -151,7 +151,7 @@ describe('EVERY PARTICIPANT APPEARS', () => {
     test('the buy-in debit is itemised for every pool participant', () => {
         const { r } = acceptance();
         Object.values(r.contributions).forEach(c => {
-            const buyIn = c.lines.find(l => l.label === 'Money Pool buy-in');
+            const buyIn = c.lines.find(l => l.label === 'Main Pool buy-in');
             assert.ok(buyIn, `${c.name} has no buy-in line`);
             assert.equal(buyIn.amount, -40);
         });
@@ -288,7 +288,7 @@ describe('FIXTURES THAT ACTUALLY EXERCISE THE EDGE CASES', () => {
         assert.equal(zero.length, 4, 'every golfer should finish level here');
         zero.forEach(c => {
             assert.ok(c.lines.length > 0, `${c.name} appears but with no explanation`);
-            assert.ok(labels(c).includes('Money Pool buy-in'), `${c.name} is missing the buy-in line`);
+            assert.ok(labels(c).includes('Main Pool buy-in'), `${c.name} is missing the buy-in line`);
             assert.ok(labels(c).includes('Pool refund'), `${c.name} is missing the refund that squares them`);
         });
     });
@@ -296,7 +296,7 @@ describe('FIXTURES THAT ACTUALLY EXERCISE THE EDGE CASES', () => {
     test('a refunded pot is explained, not silently netted to nothing', () => {
         const { r } = allSquare();
         const c = Object.values(r.contributions)[0];
-        const buy = c.lines.find(l => l.label === 'Money Pool buy-in');
+        const buy = c.lines.find(l => l.label === 'Main Pool buy-in');
         const ref = c.lines.find(l => l.label === 'Pool refund');
         assert.equal(buy.amount, -40);
         assert.equal(ref.amount, 40, 'the refund must be visible, or $0 looks like a bug');

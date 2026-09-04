@@ -255,7 +255,7 @@ describe('THE FULL-FIELD OVERLAY', () => {
     test('NO MONEY ACCOUNTING anywhere in the overlay', () => {
         const t = strip(scorecard().board());
         assert.ok(!/\$/.test(scorecard().board()));
-        ['Player Payouts','Who Pays Who','Final Ledger','Money Pool','buy-in','TOTAL PAYOUT']
+        ['Player Payouts','Who Pays Who','Final Ledger','Main Pool','buy-in','TOTAL PAYOUT']
             .forEach(s => assert.ok(!new RegExp(s, 'i').test(t), `${s} belongs in Results, not here`));
     });
 });
@@ -437,7 +437,7 @@ describe('THE DASHBOARD WIDGETS', () => {
     test('NO MONEY of any kind in either widget', () => {
         const html = scorecard().ticker();
         assert.ok(!/\$/.test(html));
-        ['buy-in','Money Pool','payout','pot','Who Pays Who','Player Payouts']
+        ['buy-in','Main Pool','payout','pot','Who Pays Who','Player Payouts']
             .forEach(w => assert.ok(!new RegExp(w, 'i').test(strip(html)), `${w} is not live golf information`));
     });
 
@@ -601,7 +601,7 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
     // actually writes. Not invented: buyIn, kp{amount,holes}, net{amount,places},
     // skins{mode,scoring,carryOver} is the literal object that function returns.
     //
-    // A Money Pool is NOT a game. getRoundGames() enumerates games - the main format
+    // A Main Pool is NOT a game. getRoundGames() enumerates games - the main format
     // plus additionalGames / additionalGameInstances - and a pot with prize buckets
     // appears in none of them. So every detector the widget had was false while
     // settlement was simultaneously resolving $310 of net skins and naming winners.
@@ -643,7 +643,7 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         };
     }
 
-    test('A. the scorecard detects skins on the real Money Pool shape', () => {
+    test('A. the scorecard detects skins on the real Main Pool shape', () => {
         const b = poolRound();
         assert.notEqual(b.run('liveSkinsLedger()'), null,
             'this returned null on the deployed round, suppressing the widget');
@@ -689,7 +689,7 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         assert.match(strip(poolRound({ thru:[5,5,5] }).ticker()), /Official through Hole 5/);
     });
 
-    test('a Money Pool with NO skins bucket shows no widget', () => {
+    test('a Main Pool with NO skins bucket shows no widget', () => {
         // The distinction that keeps this from being a blanket "any pool = skins".
         const noSkins = JSON.parse(JSON.stringify(MONEY_POOL));
         noSkins.skins = { mode: 'none' };
@@ -725,7 +725,7 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         assert.match(fn, /roundHasSkinsGame\(data\)/, 'the page delegates');
         const am = read('action-model.js');
         assert.match(am, /mp\.enabled && mp\.skins && mp\.skins\.mode && mp\.skins\.mode !== 'none'/,
-            'the shared predicate reads the Money Pool bucket');
+            'the shared predicate reads the Main Pool bucket');
     });
 
     test('and settlement still agrees about the same round', () => {
@@ -782,7 +782,7 @@ describe('NOTHING ELSE MOVED', () => {
         const src = read('index.html');
         const at = src.indexOf('function renderLiveBoard');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.ok(!/Who Pays Who|Player Payouts|Money Pool/.test(fn));
+        assert.ok(!/Who Pays Who|Player Payouts|Main Pool/.test(fn));
     });
 
     test('no engine gained presentation code', () => {

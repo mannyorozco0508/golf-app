@@ -14,7 +14,7 @@
 //
 // THE INVARIANTS, stated once:
 //
-//   conservation   the Money Pool's buckets account for every buy-in dollar
+//   conservation   the Main Pool's buckets account for every buy-in dollar
 //   zero-sum       every golfer's net, summed, is exactly 0
 //   ledger parity  each golfer's MOVING lines sum to their FINAL NET
 //   note safety    NOTE lines explain, never add - counting them would break parity
@@ -307,7 +307,7 @@ describe('20 DETERMINISTIC SIMULATIONS', () => {
         assertSound('sim17', r);
     });
 
-    test('18. Group Dots alongside the Money Pool', () => {
+    test('18. Group Dots alongside the Main Pool', () => {
         const r = round({ games: GAMES, dots: DOTS });
         const dotsLines = Object.values(r.combined.contributions)
             .flatMap(c => c.lines.filter(l => /Dots/.test(l.label)));

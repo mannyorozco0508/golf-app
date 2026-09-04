@@ -946,7 +946,7 @@
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
         let html = `<div class="settle-card" style="border:2px solid #b8860b;">
-            <div class="settle-header">\uD83C\uDFC6 Money Pool \u2014 ${$(r.totalPoolCents)}</div>`;
+            <div class="settle-header">\uD83C\uDFC6 Main Pool \u2014 ${$(r.totalPoolCents)}</div>`;
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
@@ -1108,8 +1108,8 @@
         //
         // TWO LINES ARE EXCLUDED, for different reasons:
         //
-        //   'Money Pool buy-in'  what the golfer paid in, not what they won.
-        //   'Money Pool'         the AGGREGATE moving line. Its own note lines carry
+        //   'Main Pool buy-in'   what the golfer paid in, not what they won.
+        //   'Main Pool'          the AGGREGATE moving line. Its own note lines carry
         //                        the detail - Net Finish, skins, refund - so showing
         //                        both would count the same money twice.
         //
@@ -1117,7 +1117,7 @@
         // match won, a group game won, a refund. Negative lines are omitted because a
         // loss is not a payout; it remains in Who Pays Who where it belongs.
         const isBuyIn = l => /buy-in/i.test(l.label);
-        const isPoolAggregate = l => !l.note && l.label === 'Money Pool';
+        const isPoolAggregate = l => !l.note && l.label === MAIN_POOL_LEDGER_LABEL;
         const payoutLines = c => c.lines.filter(l =>
             !isBuyIn(l) && !isPoolAggregate(l) && l.amount > 0.005);
 

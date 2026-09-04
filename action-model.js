@@ -584,7 +584,27 @@ function roundHasSkinsGame(data) {
 // KEYED ON WHAT MOVED THE MONEY, never on transaction count: a pool round can
 // produce transactions, so counting them would suppress a real side match.
 // Each contribution carries MOVING lines - the ones summing to a golfer's net -
-// and a pool-only round has exactly one such label: "Money Pool".
+// and a pool-only round has exactly one such label: the Main Pool aggregate.
+// THE LEDGER LABEL IS A LOAD-BEARING VALUE, NOT A CAPTION.
+//
+// The whole-round pot is displayed as "Main Pool". That string is also how three
+// separate places recognise the pot's aggregate line:
+//
+//   settlement-engine.js  writes it onto the moving line
+//   this file             uses it to decide whether a round produced any real
+//                         golfer-to-golfer debt
+//   settlement.html       uses it to find the aggregate line on the Receipt
+//
+// Rename it in one place and not the others and hasPlayerToPlayerSettlement()
+// stops recognising a pool-only round, so the Receipt starts printing
+// "X pays Y $40" for a debt that never existed between those two people - the
+// exact fiction the comment above was written to prevent. Hence one constant,
+// and a regression test that fails the moment a consumer disagrees.
+//
+// STORAGE IS UNTOUCHED. The persisted field is still data.moneyPool; nothing
+// about historical rounds changes because a label was renamed.
+const MAIN_POOL_LEDGER_LABEL = 'Main Pool';
+
 function hasPlayerToPlayerSettlement(contributions) {
     const sources = new Set();
     Object.values(contributions || {}).forEach(c => {
@@ -593,7 +613,7 @@ function hasPlayerToPlayerSettlement(contributions) {
         });
     });
     if (sources.size === 0) return false;
-    return ![...sources].every(label => label === 'Money Pool');
+    return ![...sources].every(label => label === MAIN_POOL_LEDGER_LABEL);
 }
 
 // ============================================================================

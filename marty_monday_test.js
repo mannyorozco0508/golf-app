@@ -129,16 +129,16 @@ function martyRound() {
 
 // ---------------------------------------------------------------------------
 
-describe('MARTY MONDAY - 12 players, 3 groups, one whole-field Money Pool', () => {
+describe('MARTY MONDAY - 12 players, 3 groups, one whole-field Main Pool', () => {
 
     test('setup writes nobody out: every golfer is eligible for everything', () => {
         const players = makePlayers();
         assert.equal(players.length, 12);
         assert.equal(players.filter((p) => p.playingForMoney === false).length, 0,
-            'A golfer excluded at setup time would be silently dropped from the Money Pool too.');
+            'A golfer excluded at setup time would be silently dropped from the Main Pool too.');
     });
 
-    test('the Money Pool is all 12 and totals $480, regardless of who plays a group game', () => {
+    test('the Main Pool is all 12 and totals $480, regardless of who plays a group game', () => {
         const env = loadEngines();
         const data = martyRound();
         const r = env.computeMoneyPool(data, data.courseData, data.scores);
@@ -219,7 +219,7 @@ describe('GROUP GAMES - participation belongs to the game, not to the golfer', (
         const r = env.computeMoneyPool(data, data.courseData, data.scores);
         idsInGroup(3).forEach((id) => {
             assert.ok(r.participants.some((p) => String(p.id) === id),
-                `Group 3 golfer ${id} must still be in the Money Pool.`);
+                `Group 3 golfer ${id} must still be in the Main Pool.`);
         });
     });
 
@@ -305,7 +305,7 @@ describe('THE OLD CHECKBOX IS GONE FROM SETUP', () => {
         const html = read('admin.html');
         assert.match(html, /Each group picks its own games and who/,
             'The organizer needs to be told the decision moved, not just find the checkbox missing.');
-        assert.match(html, /Money Pool/,
+        assert.match(html, /Main Pool/,
             'It must be explicit that a group-game exclusion does not touch the whole-field pool.');
     });
 

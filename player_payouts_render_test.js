@@ -3,7 +3,7 @@
 //
 // WHAT CHANGED, AND WHAT DELIBERATELY DID NOT
 //
-// The section used to be an accounting view: a Money Pool aggregate with the
+// The section used to be an accounting view: a Main Pool aggregate with the
 // buy-in, the prizes and the refund indented beneath it, closing on FINAL NET.
 // Correct, and not the question a golfer is asking. Carp winning $30 + $89 + $9
 // read as "+$88" with a -$40 line above it.
@@ -18,8 +18,8 @@
 // did before. The presenter only chooses which canonical lines to show.
 //
 // TWO EXCLUSIONS, for different reasons:
-//   'Money Pool buy-in'  paid in, not won.
-//   'Money Pool'         the AGGREGATE line, whose own notes carry the detail.
+//   'Main Pool buy-in'  paid in, not won.
+//   'Main Pool'         the AGGREGATE line, whose own notes carry the detail.
 //                        Showing both would count the same money twice - which is
 //                        why the total is summed from the lines actually printed.
 // ============================================================================
@@ -105,8 +105,8 @@ function parse(html) {
 
 describe('THE BUY-IN IS GONE FROM THE GOLFER-FACING VIEW', () => {
 
-    test('"Money Pool buy-in" no longer appears', () => {
-        assert.ok(!/Money Pool buy-in/.test(boot().html()),
+    test('"Main Pool buy-in" no longer appears', () => {
+        assert.ok(!/Main Pool buy-in/.test(boot().html()),
             'nobody needs reminding they paid the same $40 everyone else did');
     });
 
@@ -126,10 +126,10 @@ describe('THE BUY-IN IS GONE FROM THE GOLFER-FACING VIEW', () => {
         });
     });
 
-    test('the aggregate Money Pool line is not shown alongside its own detail', () => {
+    test('the aggregate Main Pool line is not shown alongside its own detail', () => {
         const led = parse(boot().html());
         Object.entries(led).forEach(([n, rows]) => {
-            assert.ok(!rows.some(r => r.label === 'Money Pool'),
+            assert.ok(!rows.some(r => r.label === 'Main Pool'),
                 `${n}: showing the aggregate and its notes would count the same money twice`);
         });
     });
@@ -319,6 +319,11 @@ describe('NO PAYOUT ARITHMETIC IN THE PRESENTER', () => {
     test('the exclusions are explicit and narrow', () => {
         const f = fn();
         assert.match(f, /buy-in/i, 'the buy-in exclusion must be deliberate and findable');
-        assert.match(f, /label === 'Money Pool'/, 'and so must the aggregate exclusion');
+        // PINNED TO THE CONSTANT, NOT THE WORD. The label is produced by
+        // settlement-engine and consumed here and in hasPlayerToPlayerSettlement.
+        // A literal string in any one of those three is exactly the drift that makes
+        // the Receipt invent golfer-to-golfer debts, so matching a literal here would
+        // pass on the broken arrangement.
+        assert.match(f, /label === MAIN_POOL_LEDGER_LABEL/, 'and so must the aggregate exclusion');
     });
 });

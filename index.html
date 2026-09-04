@@ -3219,7 +3219,7 @@
         const r = computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {});
         if (!r) return '';
         const $ = c => '$' + (c / 100).toFixed(0);
-        let html = '<div class="action-section-label">\uD83C\uDFC6 Money Pool \u00B7 ' + $(r.totalPoolCents) + '</div>';
+        let html = '<div class="action-section-label">\uD83C\uDFC6 Main Pool \u00B7 ' + $(r.totalPoolCents) + '</div>';
         if (!r.valid) return html + '<div class="section-summary" style="color:var(--accent-red);">\u26A0\uFE0F ' + r.errors[0] + '</div>';
         const bits = [];
         if (r.kp) bits.push('\uD83D\uDCCD KP ' + r.kp.lines.filter(l => l.winnerId).length + '/' + r.kp.lines.length + ' claimed');
@@ -5051,7 +5051,7 @@
             && currentData.moneyPool.skins.mode) || 'none';
         if (skinsMode !== 'remainder') {
             alert('\u26A0\uFE0F CAN\u2019T CANCEL KPs\n\nThis round uses a fixed skins amount, so there is '
-                + 'nowhere for the KP money to go. Adjust the Money Pool setup first.');
+                + 'nowhere for the KP money to go. Adjust the Main Pool setup first.');
             return;
         }
 

@@ -690,7 +690,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
 
     test('SCORECARD banner: pot, KP progress, net leader, skins count', () => {
         const html = bootIndex(1, 7).document.getElementById('action-center-mount').innerHTML;
-        assert.match(html, /Money Pool \u00B7 \$480/);
+        assert.match(html, /Main Pool \u00B7 \$480/);
         assert.match(html, /KP 1\/2 claimed/);
         assert.match(html, /Marty leads net/);
         assert.match(html, /skins won/);
@@ -738,7 +738,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Money Pool \u2014 \$480/);
+        assert.match(html, /Main Pool \u2014 \$480/);
         // The per-head buy-in arithmetic was removed: the pot total is useful, what
         // each golfer paid in is not something the Receipt needs to state.
         assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');
@@ -763,7 +763,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             renderActionCenter();
         `, sb);
         const html = sb.document.getElementById('action-center-mount').innerHTML || '';
-        assert.ok(!/Money Pool/.test(html), 'legacy rounds see nothing new');
+        assert.ok(!/Main Pool/.test(html), 'legacy rounds see nothing new');
     });
 });
 
@@ -850,7 +850,7 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
             renderActionCenter();
         `, sb);
         const html = sb.document.getElementById('action-center-mount').innerHTML;
-        assert.match(html, /Money Pool \u00B7 \$560/, 'the pot is one truth for all seven groups');
+        assert.match(html, /Main Pool \u00B7 \$560/, 'the pot is one truth for all seven groups');
         assert.match(html, /KP 2\/3 claimed/);
         assert.match(html, /Hole 14 KP/, 'the unclaimed hole shows its marker to every group');
         assert.match(html, /Set KP Leader/, 'and offers the picker to the group standing on it');

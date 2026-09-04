@@ -39,7 +39,7 @@ const DEPS = ['score-marks.js','money-engine.js','action-model.js','settlement-e
 const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
                'Marcus','Rocco','Matt H','Jeremy'];
 
-// The production Money Pool shape from captureMoneyPool(): Net Finish, KP, Net Skins.
+// The production Main Pool shape from captureMoneyPool(): Net Finish, KP, Net Skins.
 const MONEY_POOL = {
     enabled: true, buyIn: 40,
     kp: { amount: 100, holes: [3,7,12,16] },
@@ -237,7 +237,7 @@ describe('LIVE KP — A STATUS LINE, NOT A LEDGER', () => {
 describe('LIVE MODE SHOWS NO MONEY AT ALL', () => {
 
     const banned = ['Player Payouts','Who Pays Who','Final Ledger','TOTAL PAYOUT',
-                    'Money Pool','Skins Pot','buy-in','Print / Save'];
+                    'Main Pool','Skins Pot','buy-in','Print / Save'];
 
     banned.forEach(w => {
         test(`"${w}" is absent while the round is live`, () => {

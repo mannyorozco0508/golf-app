@@ -104,7 +104,7 @@ describe('THE SHARED SKINS PREDICATE', () => {
 
     const m = () => loadJsFile('action-model.js');
 
-    test('the production Money Pool shape is recognised', () => {
+    test('the production Main Pool shape is recognised', () => {
         assert.equal(m().roundHasSkinsGame({ moneyPool: MONEY_POOL }), true,
             'this is the shape the setup wizard actually writes');
     });
@@ -149,7 +149,7 @@ describe('EVERY LIVE SKINS SURFACE AGREES', () => {
 
     const S = () => surfaces({ thru: [5,5,5] });
 
-    test('all four recognise the production Money Pool round', () => {
+    test('all four recognise the production Main Pool round', () => {
         const s = S();
         assert.match(strip(s.widget), /SKINS WON/, 'scorecard widget');
         assert.ok(s.strip.length > 0, 'scorecard live-skins strip');
@@ -219,12 +219,12 @@ describe('THE SHARED RELEVANCE PREDICATE', () => {
 
     test('pool only means nobody owes anybody', () => {
         assert.equal(m().hasPlayerToPlayerSettlement(
-            { a: { lines: [{ label: 'Money Pool', amount: 88 }] } }), false);
+            { a: { lines: [{ label: 'Main Pool', amount: 88 }] } }), false);
     });
 
     test('a side match creates a real debt', () => {
         assert.equal(m().hasPlayerToPlayerSettlement(
-            { a: { lines: [{ label: 'Money Pool', amount: 88 },
+            { a: { lines: [{ label: 'Main Pool', amount: 88 },
                            { label: 'Side Match · Marty vs Carp', amount: 50 }] } }), true);
     });
 
@@ -235,7 +235,7 @@ describe('THE SHARED RELEVANCE PREDICATE', () => {
 
     test('note and rounding lines are ignored', () => {
         assert.equal(m().hasPlayerToPlayerSettlement({ a: { lines: [
-            { label: 'Money Pool', amount: 88 },
+            { label: 'Main Pool', amount: 88 },
             { label: 'Net Skins · 2 skins', amount: 89, note: true },
             { label: 'Rounding to whole dollars', amount: 1, rounding: true },
         ] } }), false, 'only MOVING lines describe where money came from');

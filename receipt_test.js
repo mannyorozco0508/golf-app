@@ -327,7 +327,7 @@ describe('GROUP GAMES - participation is no longer decided at setup', () => {
         assert.ok(/function renderGroupGamesHint/.test(adm), 'the hint function should remain');
         assert.ok(/Groups choose their own games from their own link/.test(adm));
         assert.ok(/Side Matches pick their own players separately/.test(adm));
-        assert.ok(/Money Pool/.test(adm), 'the pool must be named, so the separation is explicit');
+        assert.ok(/Main Pool/.test(adm), 'the pool must be named, so the separation is explicit');
     });
 
     test('the stored field is unchanged, so legacy rounds still work', () => {

@@ -407,15 +407,35 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
         assert.match(SRC_CODE, /if \(customBox && customBox\.checked\) \{/);
     });
 
-    test('the save path validates before writing the global course', () => {
-        const save = SRC_CODE.slice(SRC_CODE.indexOf('const isEditing = document.getElementById'));
-        assert.match(save, /const gridCheck = validateCourseGrid\(\);/);
-        assert.match(save, /if \(!gridCheck\.ok\) \{/);
-        assert.match(save, /finalCourseData = gridCheck\.data;/);
+    // STRUCTURE MOVED, GUARANTEE UNCHANGED AND NOW STRICTER.
+    //
+    // This assembly used to sit inline in saveSettings(); it now lives in
+    // previewCourseData() so KP auto-fill can read the same card the round will be
+    // saved with. The contract being protected is identical - a course card is
+    // validated before it can be published to global_courses, on BOTH the editing
+    // and the unmapped branch - but it is now pinned to the refusal itself rather
+    // than to two functions' relative positions in the file. The write must sit
+    // behind `if (!preview.ok) return`, which is a stronger statement than
+    // "validation appears earlier in the source".
+    test('the course card is validated before the global course is written', () => {
+        const preview = SRC_CODE.slice(SRC_CODE.indexOf('function previewCourseData(courseKey)'));
+        const body = preview.slice(0, preview.indexOf('function validateCourseGrid()'));
+        assert.match(body, /const gridCheck = validateCourseGrid\(\);/,
+            'the editing branch must validate');
+        assert.match(body, /const unmappedCheck = validateCourseGrid\(\);/,
+            'the unmapped branch must validate too');
+        assert.match(body, /ok: false, reason: gridCheck\.message/,
+            'a bad grid must be refused, not returned');
+        assert.match(body, /ok: false, reason: unmappedCheck\.message/);
+
+        const save = SRC_CODE.slice(SRC_CODE.indexOf('function saveSettings()'));
+        assert.match(save, /const preview = previewCourseData\(courseKey\);/);
+        const refusal = save.indexOf('if (!preview.ok) {');
         const writeIdx = save.indexOf('db.ref(`global_courses/${courseKey}`).set(');
-        assert.ok(save.indexOf('const gridCheck') < writeIdx, 'validation precedes the write');
-        // The unmapped-but-not-editing branch is guarded too.
-        assert.match(save, /const unmappedCheck = validateCourseGrid\(\);/);
+        assert.ok(refusal > -1, 'saveSettings must refuse an invalid card');
+        assert.ok(refusal < writeIdx, 'the refusal must gate the write');
+        assert.match(save.slice(refusal, writeIdx), /return;/,
+            'the refusal must return before anything is published');
     });
 });
 

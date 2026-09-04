@@ -75,9 +75,9 @@ function boot({ confirmed = true, winners = ALL_WON, noWinner = null } = {}) {
 
 describe('THE BUY-IN IS NOWHERE ON SCREEN', () => {
 
-    test('the Money Pool header shows the pot, not the per-head stake', () => {
+    test('the Main Pool header shows the pot, not the per-head stake', () => {
         const t = strip(boot().pool());
-        assert.match(t, /Money Pool — \$480/);
+        assert.match(t, /Main Pool — \$480/);
         assert.ok(!/12 × \$40/.test(t), 'the per-head arithmetic must be gone');
         assert.ok(!/\(\d+ × \$\d+\)/.test(t), 'and no variant of it may return');
     });

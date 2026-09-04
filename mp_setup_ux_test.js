@@ -2,10 +2,10 @@
 // MONEY POOL SETUP UX — rendered, on the real markup
 //
 // WHY THIS FILE EXISTS
-// The Money Pool card's money was right and its LABELS were broken: the setup
+// The Main Pool card's money was right and its LABELS were broken: the setup
 // block is raw HTML, but it was written with \uXXXX escapes, which only resolve
 // inside JavaScript string literals. Marty opened Step 6 on a tablet and read
-// "\uD83C\uDFC6 Money Pool (whole-round pot)" and "Top 3 \u2014 50/30/20".
+// "\uD83C\uDFC6 Main Pool (whole-round pot)" and "Top 3 \u2014 50/30/20".
 //
 // No existing test could catch it: every other test asserted behaviour, and the
 // escapes were syntactically fine. So this file asserts what a HUMAN SEES -
@@ -26,10 +26,10 @@ const { makePlayers } = require('./helpers/fixtures.js');
 
 const ADMIN = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
 
-// The Money Pool setup card as the browser receives it.
+// The Main Pool setup card as the browser receives it.
 function poolCardMarkup() {
     const start = ADMIN.indexOf('<!-- MONEY POOL');
-    assert.ok(start > -1, 'the Money Pool setup card must exist');
+    assert.ok(start > -1, 'the Main Pool setup card must exist');
     const end = ADMIN.indexOf('<div class="wizard-nav-row">', start);
     return ADMIN.slice(start, end);
 }
@@ -55,7 +55,7 @@ describe('NO LITERAL UNICODE ESCAPES REACH THE ORGANIZER', () => {
     test('the setup card contains no escape text at all', () => {
         const text = visibleText(poolCardMarkup());
         PATTERNS.forEach(([re, label]) => {
-            assert.ok(!re.test(text), `the Money Pool card still shows ${label}: ${text.match(re)}`);
+            assert.ok(!re.test(text), `the Main Pool card still shows ${label}: ${text.match(re)}`);
         });
     });
 
@@ -81,7 +81,7 @@ describe('GOLFER LANGUAGE, NOT SPEC LANGUAGE', () => {
     const text = () => visibleText(poolCardMarkup());
 
     test('section headings read plainly', () => {
-        assert.match(text(), /Money Pool/);
+        assert.match(text(), /Main Pool/);
         assert.match(text(), /Buy-in per player/);
         assert.match(text(), /KP Pool/);
         assert.match(text(), /Net Finish Pool/);
@@ -181,7 +181,10 @@ describe('LIVE ALLOCATION SUMMARY — the organizer does no arithmetic', () => {
         assert.match(t, /Total pool \$480/);
         assert.match(t, /KP \$100/);
         assert.match(t, /Net finish \$100/);
-        assert.match(t, /Skins \$280/);
+        // CONTRACT MOVED, NOT WEAKENED. The remainder bucket now says so on screen:
+        // "where does the rest go" is answered rather than left to be inferred from a
+        // number that happens to fit. The dollar figure is still pinned exactly.
+        assert.match(t, /Skins \(remainder\) \$280/);
         assert.match(t, /Allocated \$480 of \$480/);
         assert.match(m, /\u2713/, 'a valid pot ends in a tick');
         assert.ok(!/mp-bad/.test(m));
@@ -327,7 +330,10 @@ describe('CUSTOM NET PAYOUTS — setup card', () => {
         assert.match(t, /Total pool \$480/);
         assert.match(t, /KP \$100/);
         assert.match(t, /Net finish \$70/);
-        assert.match(t, /Skins \$310/);
+        // CONTRACT MOVED, NOT WEAKENED. The remainder bucket now says so on screen:
+        // "where does the rest go" is answered rather than left to be inferred from a
+        // number that happens to fit. The dollar figure is still pinned exactly.
+        assert.match(t, /Skins \(remainder\) \$310/);
         assert.match(t, /Allocated \$480 of \$480/);
         assert.equal(boot2(12).cls(), '', 'a valid pot is not red');
     });
@@ -464,7 +470,7 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Money Pool/);
+        assert.match(html, /Main Pool/);
         assert.match(html, /Hole 3: Marty/);
         assert.match(html, /Hole 17: Steve/);
         assert.match(html, /1st: Marty[\s\S]*\$40/);
