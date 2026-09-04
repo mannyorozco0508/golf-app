@@ -73,22 +73,43 @@ function fillValid(sb) {
 // ============================================================================
 describe('SEEDING AN UNMAPPED COURSE', () => {
 
-    test('seeds par 4 and stroke index 1..18', () => {
+    // CONTRACT CHANGED, AND DELIBERATELY. This used to seed par 4 on every hole
+    // with stroke indexes 1..18 in hole order, and these tests asserted that.
+    // That card is complete, well-formed, passes validateCourseGrid() in full -
+    // and is fiction. A golfer could read the red COURSE NOT MAPPED warning, see
+    // 36 filled cells, assume the work was done, and save. The invented handicaps
+    // then wrote to global_courses, shared with every future golfer on that course.
+    //
+    // Unmapped courses now seed BLANK. These assertions are stronger than the ones
+    // they replace: the old pair only checked that 36 cells held specific numbers,
+    // while these check the safety property that nothing plausible-but-false can
+    // reach the database by inaction. The blank grid is what makes the existing
+    // "Hole 1 is missing a Par" refusal reachable at all.
+
+    test('seeds nothing - every par and stroke index is blank', () => {
         const sb = page();
         seed(sb, 'Manny Test Links');
         for (let i = 1; i <= 18; i++) {
-            assert.equal(par(sb, i), '4', 'hole ' + i + ' par');
-            assert.equal(hcp(sb, i), String(i), 'hole ' + i + ' hcp');
+            assert.equal(par(sb, i), '', 'hole ' + i + ' par must be blank');
+            assert.equal(hcp(sb, i), '', 'hole ' + i + ' hcp must be blank');
         }
     });
 
-    test('hole 9 and hole 18 are seeded, not just the visible middle', () => {
+    test('hole 9 and hole 18 are blank too, not just the visible middle', () => {
         const sb = page();
         seed(sb, 'Manny Test Links');
-        assert.equal(par(sb, 9), '4');
-        assert.equal(hcp(sb, 9), '9');
-        assert.equal(par(sb, 18), '4');
-        assert.equal(hcp(sb, 18), '18');
+        assert.equal(par(sb, 9), '');
+        assert.equal(hcp(sb, 9), '');
+        assert.equal(par(sb, 18), '');
+        assert.equal(hcp(sb, 18), '');
+    });
+
+    test('an untouched unmapped card cannot be saved', () => {
+        const sb = page();
+        seed(sb, 'Manny Test Links');
+        const v = validate(sb);
+        assert.equal(v.ok, false, 'a blank card must be refused');
+        assert.match(v.message, /Hole 1 is missing a Par/);
     });
 });
 
@@ -182,7 +203,12 @@ describe('MID-EDIT STATES ARE LEFT ALONE', () => {
     test('a temporarily DUPLICATE stroke index is allowed', () => {
         const sb = page();
         seed(sb, 'Manny Test Links');
-        // Mid-swap of SI 1 and SI 7: hole 1 becomes 7 before hole 7 becomes 1.
+        // The duplicate is now built explicitly. This used to lean on the seed
+        // putting SI 7 on hole 7 for free; an unmapped course seeds blank, so the
+        // collision has to be typed the way a golfer would type it. Same property
+        // under test either way: mid-swap of SI 1 and SI 7, hole 1 becomes 7
+        // before hole 7 becomes 1, and a repaint must not "correct" either cell.
+        setHcp(sb, 7, 7);
         setHcp(sb, 1, 7);
         repaintAgain(sb);
         assert.equal(hcp(sb, 1), '7');
@@ -205,13 +231,17 @@ describe('MID-EDIT STATES ARE LEFT ALONE', () => {
 // ============================================================================
 describe('A GENUINE COURSE CHANGE STILL REPAINTS', () => {
 
-    test('a different unmapped course gets a fresh seed', () => {
+    test('a different unmapped course clears the old card', () => {
         const sb = page();
         seed(sb, 'Manny Test Links');
         setPar(sb, 1, 6); setHcp(sb, 1, 12);
         seed(sb, 'Completely Different Muni');
-        assert.equal(par(sb, 1), '4', 'a real change must replace the old card');
-        assert.equal(hcp(sb, 1), '1');
+        // Still the point of the original test - a real course switch must not
+        // leave the previous course's numbers on screen - but the replacement is
+        // now blank rather than a seeded par 4, so the carried-over 6/12 cannot
+        // hide inside a card that looks filled in.
+        assert.equal(par(sb, 1), '', 'a real change must clear the old card');
+        assert.equal(hcp(sb, 1), '');
     });
 
     test('selecting a MAPPED course replaces the grid with that course\u2019s data', () => {
