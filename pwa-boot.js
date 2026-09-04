@@ -234,6 +234,11 @@
 
     // Public surface. Kept deliberately small.
     var GolfNet = {
+        // Already used internally to skip service-worker registration inside
+        // Capacitor. Exposed because the Consumer pages need the same answer for a
+        // different reason: the native bundle is Consumer ONLY, so any link to a
+        // Tournament page resolves to a file that is not there.
+        isNative: isNativeShell,
         isOnline: isOnline,
         state: state,
         track: track,

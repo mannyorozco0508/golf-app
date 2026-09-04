@@ -218,7 +218,13 @@ describe('THE ORGANIZER TOKEN', () => {
         const body = fn.slice(0, fn.indexOf('\n    }'));
         assert.match(body, /getRandomValues/, 'must use the platform CSPRNG');
         assert.ok(!/currentMode|gameCode|roomCode/.test(body), 'must not derive from the game code');
-        assert.match(src, /organizerToken: makeOrganizerToken\(\)/);
+        // SHAPE MOVED, CONTRACT UNCHANGED. The payload now reuses a round's existing
+        // token and mints only when there isn't one, because reminting on every save
+        // silently broke organizer links that had already been shared. What this test
+        // protects - that a NEW token comes from the CSPRNG and is never derived from
+        // the game code - is asserted above and is untouched.
+        assert.match(src, /organizerToken: loadedOrganizerToken \|\| makeOrganizerToken\(\)/,
+            'a round without a token must still mint a random one');
     });
 
     test('the organizer link is offered separately from the group links', () => {

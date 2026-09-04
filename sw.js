@@ -143,7 +143,15 @@
 // An installed PWA on v39 would keep ERASING a round's Main Pool on every
 // re-save, which is the one change here that loses data. Shell MEMBERSHIP is
 // unchanged; data.moneyPool is unchanged; no settlement arithmetic moved.
-const CACHE_VERSION = 'golfapp-v40-main-pool';
+// Moved to v41 for the 1.0 release batch. Four precached files changed:
+// admin.html (scanner removed, organizer token and settlement mode preserved on
+// re-save), trip.html (re-link no longer resets a round; no Tournament route in
+// the native shell), pwa-boot.js (exposes the native check), manifest.json
+// ("game tracker", not "betting tracker"). An installed PWA on v40 would keep
+// offering a camera scanner this build no longer supports, and would keep
+// reminting the organizer token on every save. Shell MEMBERSHIP is unchanged; no
+// settlement arithmetic moved.
+const CACHE_VERSION = 'golfapp-v41-consumer-rc';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

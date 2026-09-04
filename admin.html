@@ -428,7 +428,7 @@
         <div id="new-course-form" style="display:none; margin-top:10px; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:12px;">
             <label style="font-size:0.8rem;">New Course Name</label>
             <input type="text" id="new-course-name-input" placeholder="e.g. Pebble Beach Golf Links" style="margin-bottom:8px;">
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Next you'll get the option to snap a photo of the scorecard (free scan tries to read the pars/handicaps for you) or just type them in by hand.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Next you'll type in the pars and handicap indexes from the scorecard — once. After that this course is saved for every future round.</p>
             <div style="background:var(--bg-card); border:1px solid var(--brand-green); border-radius:6px; padding:8px 10px; margin-bottom:8px; font-size:0.72rem; color:var(--brand-green); font-weight:bold;">
                 ✅ One-time only — once this course's pars &amp; handicaps are saved, they're stored for good. Every future round at this course (yours or anyone else's) will find it automatically, no re-entry ever needed.
             </div>
@@ -472,10 +472,6 @@
             </label>
             <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
                 <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
-
-                <input type="file" accept="image/*" capture="environment" id="scorecard-photo-input" style="display:none;" onchange="handleScorecardPhoto(event)">
-                <button type="button" class="btn-add" style="margin-bottom:8px;" onclick="document.getElementById('scorecard-photo-input').click();">📷 Scan Scorecard Photo (Beta)</button>
-                <div id="ocr-status" style="display:none; font-size:0.78rem; padding:8px 10px; border-radius:6px; margin-bottom:10px; font-weight:bold;"></div>
 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
@@ -2621,6 +2617,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // an origin and an absolute one once they do not. A hard-coded 'tournament.html'
     // here works today and breaks silently the day the origins differ.
     function openTournamentsApp() {
+        // Same reason as trip.html: tournament.html is not in the native Consumer
+        // bundle, so this navigation is a dead end there. On the web it is unchanged.
+        if (window.GolfNet && typeof window.GolfNet.isNative === 'function' && window.GolfNet.isNative()) return;
         window.location.href = tournamentUrl('tournament.html');
     }
 
@@ -2920,122 +2919,23 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if(totEl) totEl.textContent = outPar + inPar;
     }
 
-    // --- SCORECARD PHOTO AUTOFILL (Beta) ---
-    // Runs entirely on-device via Tesseract.js - no server, no API key, no cost.
-    // Accuracy on real scorecards varies a lot (small grids, faint print, handwriting),
-    // so this only ever pre-fills the same editable grid above - nothing is saved
-    // to Firebase until the person reviews it and taps the normal Save button.
-    let tesseractLoaded = false;
-    let tesseractLoadingPromise = null;
-
-    function loadTesseractLib() {
-        if (tesseractLoaded && window.Tesseract) return Promise.resolve();
-        if (tesseractLoadingPromise) return tesseractLoadingPromise;
-        tesseractLoadingPromise = new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-            s.onload = () => { tesseractLoaded = true; resolve(); };
-            s.onerror = () => reject(new Error('Failed to load the scanner library. Check your connection and try again.'));
-            document.head.appendChild(s);
-        });
-        return tesseractLoadingPromise;
-    }
-
-    function setOcrStatus(message, tone) {
-        const statusEl = document.getElementById('ocr-status');
-        if (!statusEl) return;
-        statusEl.style.display = 'block';
-        if (tone === 'error') {
-            statusEl.style.background = 'var(--danger-box-bg)';
-            statusEl.style.color = 'var(--accent-red)';
-        } else if (tone === 'success') {
-            statusEl.style.background = 'var(--nassau-box-bg)';
-            statusEl.style.color = 'var(--brand-green)';
-        } else {
-            statusEl.style.background = 'var(--nav-bg)';
-            statusEl.style.color = 'var(--text-main)';
-        }
-        statusEl.textContent = message;
-    }
-
-    // Looks for rows labeled "Par" and "HCP/Handicap/Index" in the raw OCR text,
-    // and falls back to guessing based on typical value ranges (pars 3-6, handicaps 1-18)
-    // if no explicit labels were recognized.
-    function parseScorecardText(text) {
-        const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const parLabelRegex = /\bpar\b/i;
-        const hcpLabelRegex = /\b(hcp|handicap|hdcp|h'?cap|index)\b/i;
-
-        let parNumbers = [];
-        let hcpNumbers = [];
-
-        lines.forEach(line => {
-            const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
-            if (nums.length === 0) return;
-            if (parLabelRegex.test(line) && parNumbers.length < 18) {
-                parNumbers = parNumbers.concat(nums.filter(n => n >= 3 && n <= 6));
-            } else if (hcpLabelRegex.test(line) && hcpNumbers.length < 18) {
-                hcpNumbers = hcpNumbers.concat(nums.filter(n => n >= 1 && n <= 18));
-            }
-        });
-
-        // Fallback: no labeled rows found (or too few holes captured) - guess from value ranges
-        if (parNumbers.length < 9) {
-            lines.forEach(line => {
-                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
-                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 3 && n <= 6)) {
-                    if (nums.length > parNumbers.length) parNumbers = nums;
-                }
-            });
-        }
-        if (hcpNumbers.length < 9) {
-            lines.forEach(line => {
-                const nums = (line.match(/\d+/g) || []).map(n => parseInt(n, 10));
-                if ((nums.length === 9 || nums.length === 18) && nums.every(n => n >= 1 && n <= 18)) {
-                    if (nums.length > hcpNumbers.length) hcpNumbers = nums;
-                }
-            });
-        }
-
-        return { pars: parNumbers.slice(0, 18), hcps: hcpNumbers.slice(0, 18) };
-    }
-
-    function applyParsedScorecard(parsed) {
-        let parsFilled = 0, hcpsFilled = 0;
-        for (let i = 1; i <= 18; i++) {
-            const parEl = document.getElementById(`c-par-${i}`);
-            const hcpEl = document.getElementById(`c-hcp-${i}`);
-            if (parsed.pars[i - 1] !== undefined && parEl) { parEl.value = parsed.pars[i - 1]; parsFilled++; }
-            if (parsed.hcps[i - 1] !== undefined && hcpEl) { hcpEl.value = parsed.hcps[i - 1]; hcpsFilled++; }
-        }
-        updateCustomCoursePars();
-
-        if (parsFilled === 0 && hcpsFilled === 0) {
-            setOcrStatus('⚠️ Could not confidently read pars or handicaps from that photo. Please enter them manually below.', 'error');
-        } else {
-            setOcrStatus(`✅ Found ${parsFilled}/18 pars and ${hcpsFilled}/18 handicaps. Double-check every hole against your scorecard before saving - OCR can misread numbers.`, 'success');
-        }
-    }
-
-    async function handleScorecardPhoto(event) {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
-
-        setOcrStatus('⏳ Loading scanner...', 'neutral');
-
-        try {
-            await loadTesseractLib();
-            setOcrStatus('🔍 Reading scorecard photo... this can take 10-20 seconds.', 'neutral');
-            const result = await Tesseract.recognize(file, 'eng');
-            const parsed = parseScorecardText(result && result.data ? result.data.text : '');
-            applyParsedScorecard(parsed);
-        } catch (err) {
-            console.error('Scorecard OCR error:', err);
-            setOcrStatus('⚠️ Could not read that photo. Please enter pars/handicaps manually below.', 'error');
-        } finally {
-            event.target.value = '';
-        }
-    }
+    // SCORECARD PHOTO AUTOFILL - REMOVED FROM CONSUMER 1.0.
+    //
+    // An on-device Tesseract.js OCR pass used to pre-fill the par/handicap grid from
+    // a photo. It is gone for 1.0 because the accuracy was not good enough to put in
+    // front of golfers, and because it was the app's ONLY camera/photo-library entry
+    // point - which made privacy.html's "No contacts, photos, camera or microphone
+    // access" untrue, and would have required NSCameraUsageDescription and
+    // NSPhotoLibraryUsageDescription in the iOS build.
+    //
+    // DELETED RATHER THAN LEFT DORMANT, deliberately. Unreachable code still ships:
+    // it kept a cdn.jsdelivr.net Tesseract URL inside a precached page, and left a
+    // camera-capable file input pattern one uncommented line away from returning.
+    // Git history is the right home for code that is not running. The implementation
+    // is recoverable in full from the commit that removed it.
+    //
+    // Manual entry is unchanged and remains the supported path: the same editable
+    // grid the scanner only ever pre-filled.
 
     // WHICH COURSE THIS SCREEN IS CURRENTLY SET UP FOR.
     //
@@ -3863,9 +3763,33 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         updateBetExplainers();
     }
 
+    // WHAT THIS ROUND ALREADY DECIDED.
+    //
+    // Two fields are the round's own history rather than a setup choice, and the
+    // save path used to overwrite both on every re-save because nothing restored
+    // them:
+    //
+    //   organizerToken   a bearer secret. Reopening Setup to add a late player
+    //                    minted a new one, silently breaking the organizer link
+    //                    that had already been shared.
+    //   settlementMode   absent means the legacy cent behaviour. Writing
+    //                    'whole-dollar' unconditionally converted a round that was
+    //                    played and settled under the old rule.
+    //
+    // ONLY WHEN EDITING THIS ROUND, never when copying another. loadModeData() is
+    // also the copy-a-round loader, and inheriting the source round's organizer
+    // token would hand its secret to a different round.
+    let loadedOrganizerToken = null;
+    let loadedExistingRound = false;
+
     function loadModeData(modeKey) {
+        const isThisRound = String(modeKey) === String(currentMode);
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
+            if (isThisRound) {
+                loadedExistingRound = true;
+                loadedOrganizerToken = data.organizerToken || null;
+            }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
             if (data.eventCategory) currentCategory = data.eventCategory;
@@ -4574,7 +4498,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // ACCIDENTS - a golfer on the shared link quietly editing another
                 // foursome - not a determined party. That is the same protection group
                 // links provide today, and making it stronger needs real auth.
-                organizerToken: makeOrganizerToken(),
+                // Preserved when this round already has one; minted only for a round
+                // that has never had a token. A shared organizer link keeps working.
+                organizerToken: loadedOrganizerToken || makeOrganizerToken(),
                 eventCategory: currentCategory,
                 categoryIcon: categoryIcon,
                 activeCourseKey: courseKey,
@@ -4640,6 +4566,17 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 const nKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
                 payload[`sideMatches/${nKey}`] = setupNassau;
             }
+
+            // AN EXISTING ROUND KEEPS THE MODE IT WAS PLAYED UNDER.
+            //
+            // update() only writes the keys present on the payload, so DELETING the
+            // key is how an existing round's stored value - including a legacy
+            // round's deliberate ABSENCE, which means cents - survives untouched.
+            // Writing 'whole-dollar' here is correct for a brand-new round and only
+            // for a brand-new round. The organizer can still convert an in-progress
+            // round deliberately from the admin panel, which is where that decision
+            // belongs.
+            if (loadedExistingRound) delete payload.settlementMode;
 
             db.ref(`events/${currentMode}`).update(payload).then(() => {
                 if (tripLinkCode) {

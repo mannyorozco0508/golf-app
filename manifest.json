@@ -1,7 +1,7 @@
 {
   "name": "Rattle Golf",
   "short_name": "Rattle Golf",
-  "description": "Live-syncing golf scorecard and betting tracker",
+  "description": "Live-syncing golf scorecard and game tracker",
   "start_url": "./admin.html",
   "scope": "./",
   "display": "standalone",

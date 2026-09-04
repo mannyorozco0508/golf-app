@@ -890,7 +890,26 @@
                 alert("⚠️ Couldn't find a round with that game code. Double check it's already been set up on Home.");
                 return;
             }
-            db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).set({ label: label, addedAt: Date.now() }).then(() => {
+            // RE-LINKING EDITS THE LABEL. IT DOES NOT RESET THE ROUND.
+            //
+            // This was a .set(), which replaces the whole node - so re-linking a round
+            // to correct its label (the only way to change one) silently destroyed two
+            // things stored beside it:
+            //
+            //   countsTowardTrip  absence means COUNTS, so a round deliberately
+            //                     excluded from the trip quietly re-entered the
+            //                     leaderboard, the money settlement and the awards.
+            //   addedAt           orders the rounds, so the round jumped to the end
+            //                     of the week.
+            //
+            // update() touches only what is named. addedAt is stamped just once, when
+            // the round first joins the trip.
+            const roundRef = db.ref(`trips/${currentTripCode}/rounds/${roundCode}`);
+            roundRef.once('value').then(existing => {
+                const patch = { label: label };
+                if (!existing.exists()) patch.addedAt = Date.now();
+                return roundRef.update(patch);
+            }).then(() => {
                 document.getElementById('link-round-code').value = '';
                 document.getElementById('link-round-label').value = '';
             });
@@ -981,6 +1000,19 @@
         // returns. THE READ BELOW IS THE POINT: it proves the node still exists.
         const tournaments = tripData.tournaments || {};
         if (!section || !container) return;
+
+        // NOT IN THE NATIVE APP.
+        //
+        // tournament.html is deliberately excluded from the Consumer bundle
+        // (sync-mobile-web.js: "THE NATIVE BUNDLE IS CONSUMER ONLY"), and
+        // tournamentUrl() returns a RELATIVE path while both products share an
+        // origin. Inside Capacitor that link navigates to a file that does not
+        // exist - a dead end in a webview with no back button. The trip's data is
+        // untouched; only the route out of Consumer is withheld.
+        if (window.GolfNet && typeof window.GolfNet.isNative === 'function' && window.GolfNet.isNative()) {
+            section.style.display = 'none';
+            return;
+        }
         const codes = Object.keys(tournaments).sort((a, b) => (tournaments[a].addedAt || 0) - (tournaments[b].addedAt || 0));
 
         if (codes.length === 0) {

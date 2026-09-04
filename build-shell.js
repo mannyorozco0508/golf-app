@@ -58,7 +58,7 @@ const GENERATED = ['sw.js', 'manifest.json'];
 const PRODUCTS = {
     consumer: {
         files: SHARED.concat(CONSUMER),
-        cacheName: 'consumer-v40-main-pool',
+        cacheName: 'consumer-v41-consumer-rc',
         appName: 'Rattle Golf',
         shortName: 'Rattle Golf',
         description: 'Live-syncing golf scorecard and betting tracker',
