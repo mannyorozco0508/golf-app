@@ -217,7 +217,7 @@ describe('PWA — two independent installable apps', () => {
         // assets changed in the Rattle Golf identity batch, so only Consumer bumped.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v36-icon-system$/);
+        assert.match(c, /^consumer-v37-skins-gate$/);
         assert.match(t, /^tournament-v32-consumer-ready$/);
     });
 

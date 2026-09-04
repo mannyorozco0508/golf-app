@@ -18,6 +18,10 @@
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
     <script src="text-safe.js"></script>
+    <!-- roundHasSkinsGame(): the one predicate that knows a Money Pool bucket and a
+         participant-scoped instance are both real Skins games. Without this the gate
+         below degrades to the old unconditional render. -->
+    <script src="action-model.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <style>
         :root {
@@ -191,7 +195,7 @@
 
     <h2 class="event-title" id="main-title">💰 Skins Tracker</h2>
 
-    <div class="action-card">
+    <div class="action-card" id="skins-card">
         <div class="control-grid">
             <div class="control-group">
                 <label>Pot Format</label>
@@ -511,6 +515,29 @@
 
     function renderSkinsEngine() {
         if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) return;
+
+        // THIS CARD MUST NOT INVENT A GAME.
+        //
+        // It used to render on every round, so a group playing nothing but stroke
+        // play still got a buy-in box, a carry toggle and a "Final Payout Ledger" -
+        // a complete and entirely fictional Skins game. The Birdie card below has
+        // always gated itself on birdieGameEnabled; this one never did.
+        //
+        // roundHasSkinsGame() rather than a check on skinsBuyIn: the round-root
+        // buy-in is 0 for a Money Pool round and for participant-scoped wagers in
+        // additionalGameInstances, both of which ARE real Skins that settlement pays.
+        // A root-field test would hide a card on money that is genuinely moving.
+        //
+        // Guarded, so a realm without action-model.js degrades to the old
+        // unconditional render rather than throwing on a live round.
+        const skinsCard = document.getElementById("skins-card");
+        if (skinsCard && typeof roundHasSkinsGame === 'function' && !roundHasSkinsGame(currentData)) {
+            skinsCard.style.display = "none";
+            const emptied = document.getElementById("skins-content");
+            if (emptied) emptied.innerHTML = "";
+            return;
+        }
+        if (skinsCard) skinsCard.style.display = "";
 
         const allPlayers = currentData.players || [];
         // Only players opted in to money betting compete for skins - everyone still scores

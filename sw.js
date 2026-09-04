@@ -120,7 +120,12 @@
 // on it, and a scorecard that cannot read ?round=, would leave an installed PWA on
 // v23 unable to score the second day of a championship. Shell MEMBERSHIP is
 // unchanged: rounds live inside the existing tournament record.
-const CACHE_VERSION = 'golfapp-v36-icon-system';
+// Moved to v37 because skins.html - a precached shell file - changed: the Skins
+// card is now gated on roundHasSkinsGame() and the page loads action-model.js to
+// ask it. An installed PWA on v36 would keep drawing a buy-in box and a payout
+// ledger for a Skins game nobody is playing. Shell MEMBERSHIP is unchanged:
+// action-model.js was already precached for Consumer.
+const CACHE_VERSION = 'golfapp-v37-skins-gate';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
