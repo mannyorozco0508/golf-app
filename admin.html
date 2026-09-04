@@ -801,6 +801,14 @@
             </div>
             <input type="number" id="skins-buyin" value="0" min="0" style="margin-top:6px;" placeholder="Custom $ per skin" oninput="clearSkinsPresetHighlight()">
 
+            <label style="font-size: 0.75rem; margin-top:10px; display:block;">Pot — which scores win the money?</label>
+            <select id="skins-pot-format">
+                <option value="split">Gross &amp; Net (Split Pot)</option>
+                <option value="gross">Gross Skins Only</option>
+                <option value="net">Net Skins Only</option>
+            </select>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;">Split Pot runs two skins games at once — half the pot on gross scores, half on net.</p>
+
             <label style="font-size: 0.75rem; margin-top:10px; display:block;">Ties — what happens when nobody wins a hole outright?</label>
             <div class="toggle-row">
                 <span class="toggle-label-sm active" id="skins-carry-label-on" onclick="setSkinsCarrySetting(true)">Carry Over</span>
@@ -3203,6 +3211,35 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         el.select();
     }
 
+    // A STAKE BELONGS TO THE ROUND ONLY IF THE ROUND PLAYS THAT GAME.
+    //
+    // The Step 4 Skins box HIDES when the format is not Skins; it does not clear.
+    // So choosing Skins, setting $5, going Back and switching to Stroke Play used
+    // to save gameFormat 'stroke' WITH skinsBuyIn 5. getRoundGames() yields no
+    // skins game for that round and settlement pays nothing, while
+    // roundHasSkinsGame() answers true off the raw field - a buy-in attached to no
+    // game, which the Bets tab then had to explain away.
+    //
+    // Extracted rather than left inline because this decides what money enters the
+    // database, and a rule buried in the save routine cannot be tested.
+    function skinsBuyInForSave(format, raw) {
+        if (format !== 'skins') return 0;
+        const n = parseFloat(raw);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    // WHICH SCORES WIN THE POT. resolveSkinsMode() recognises exactly split /
+    // gross / net and falls back to 'split' for anything else.
+    //
+    // 'split' IS LOAD-BEARING. Until now the wizard never wrote this field at all,
+    // so every wizard-made Skins round arrived at settlement with it absent - and
+    // both settlement and the Bets tab read (skinsPotFormat || 'split'). Returning
+    // any other default here would quietly change what a new Skins round pays.
+    function skinsPotFormatForSave(format, raw) {
+        if (format !== 'skins') return null;
+        return (raw === 'gross' || raw === 'net' || raw === 'split') ? raw : 'split';
+    }
+
     // --- SKINS SETUP (Step 4) ---
     // Writes to the exact same skinsBuyIn / skinsCarryOver fields skins.html already reads and
     // writes after a round exists — this just gives the organizer a first, earlier place to set
@@ -3620,6 +3657,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }
             if (document.getElementById("skins-carryover")) {
                 setSkinsCarrySetting(data.skinsCarryOver !== false);
+            }
+            if (document.getElementById("skins-pot-format")) {
+                // Absent has always meant 'split' downstream; show the round the way
+                // it will actually settle, so re-saving cannot silently change it.
+                const pf = data.skinsPotFormat;
+                document.getElementById("skins-pot-format").value =
+                    (pf === 'gross' || pf === 'net' || pf === 'split') ? pf : 'split';
             }
             if (document.getElementById("nassau-stake")) {
                 const nStake = data.nassauStake || 10;
@@ -4161,7 +4205,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // day. That safety only holds if every new round states its own answer.
             const greenieCarryEl = document.getElementById("greenie-carryover");
             const greenieCarryover = greenieCarryEl ? !!greenieCarryEl.checked : true;
-            const skinsBuyIn = document.getElementById("skins-buyin") ? (parseFloat(document.getElementById("skins-buyin").value) || 0) : 0;
+            const skinsBuyInEl = document.getElementById("skins-buyin");
+            const skinsBuyIn = skinsBuyInForSave(gameFormat, skinsBuyInEl ? skinsBuyInEl.value : '');
+            const skinsPotFormatEl = document.getElementById("skins-pot-format");
+            const skinsPotFormat = skinsPotFormatForSave(gameFormat, skinsPotFormatEl ? skinsPotFormatEl.value : '');
             const skinsCarryOver = document.getElementById("skins-carryover") ? (document.getElementById("skins-carryover").value !== 'false') : true;
             const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
             const stablefordScoring = document.getElementById("stableford-scoring") ? document.getElementById("stableford-scoring").value : "net";
@@ -4278,6 +4325,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 dotPointVal: dotPointVal,
                 greenieCarryover: greenieCarryover,
                 skinsBuyIn: skinsBuyIn,
+                skinsPotFormat: skinsPotFormat,
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
                 players: playersList

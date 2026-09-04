@@ -131,7 +131,12 @@
 // of relying on a boot-time rewrite that had already run. An installed PWA on
 // v37 would keep paying an imaginary leader out of a leftover buy-in, and keep a
 // Receipt button that drops the round. Shell MEMBERSHIP is unchanged.
-const CACHE_VERSION = 'golfapp-v38-skins-honesty';
+// Moved to v39 because admin.html - a precached shell file - changed: Round Setup
+// no longer saves a Skins buy-in for a round that is not playing Skins, and now
+// carries the Pot Format choice that only skins.html could set before. An
+// installed PWA on v38 would keep writing the leftover buy-in on every new round
+// it created. Shell MEMBERSHIP is unchanged.
+const CACHE_VERSION = 'golfapp-v39-skins-setup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
