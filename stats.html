@@ -252,6 +252,19 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+
+    // LINKS BUILT DURING RENDER CANNOT USE THE BOOT-TIME REWRITE.
+    //
+    // The .nav-link pass below runs ONCE, against the markup that exists at boot.
+    // The Receipt button at the foot of this page is injected later, through
+    // container.innerHTML, so it never went through that pass - it linked to
+    // settlement.html with NO round code and bounced the golfer to Home.
+    function linkWithRound(page) {
+        let href = page + '?game=' + encodeURIComponent(currentMode || '');
+        const g = urlParams.get('group');
+        if (g) href += '&group=' + encodeURIComponent(g);
+        return href;
+    }
     let currentData = {};
 
     if (!currentMode) {
@@ -1325,7 +1338,7 @@
 
         html += `
             <!-- Stats prints remain possible via the browser; the MONEY document is canonical. -->
-            <a class="btn-primary nav-link" href="settlement.html" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+            <a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
         `;
 
         container.innerHTML = html;

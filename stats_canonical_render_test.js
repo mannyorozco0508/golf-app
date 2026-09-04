@@ -201,25 +201,38 @@ const FIXTURES = {
 // well, so a regression reports what broke rather than only that something did.
 // ---------------------------------------------------------------------------
 
+// GOLDENS MOVED ONCE, FOR ONE LINE.
+//
+// The Receipt button at the foot of the Stats page was injected through
+// container.innerHTML AFTER the boot-time .nav-link rewrite had already run, so it
+// linked to settlement.html carrying no round code and bounced the golfer to Home.
+// It now builds the round into the href via linkWithRound().
+//
+// That is a rendered byte, so all 15 hashes below moved. It was verified before
+// they were touched: every fixture was rendered on both sides of the change and
+// diffed, and across all 15 the ONLY differing line is that anchor - now reading
+// href="settlement.html?game=TESTCD" for the fixtures' own round code. No figure,
+// no row, no ordering changed. If a future change moves these hashes, do the same
+// diff first; a golden updated without one protects nothing.
 const GOLDEN = {
-    '01 stroke 1v1 gross': '2703164454e3ef05e9b0cc664ae5bd74234fefa5c30dda6bfa750705cfe904e6',
-    '02 stroke 1v1 net': 'c465914e8d802f0127904626f12c6083ef64894f42cb406b25ff3832af868b8c',
-    '03 stroke custom press stake': '4a695d586d7f8ddc691b95308f9ab6190c16bd7130e238ebacaf21d4ba475cd3',
-    '04 stroke multiple presses': '361c3fcbf1a3c313972e86dc21dbd52e3b8382f5a57549417ec84e20b587a795',
-    '05 stroke start-hole 6': 'd706b349329a710a4d5b6798d65b3cc5d86e724211660837fa6d1b0efc7cc629',
-    '06 side match play 2v2': 'ea8e19a541ed3a5ce6fe043048c78af6f822d38575f5e5dfe465eb9fa23fab2e',
-    '07 modern nassau 2v2': '13323d8e9427ad8a87d36ef2a6068b82760ad85a836679e11c5b29c9f1bc664e',
-    '08 stroke 2v2': '34788195a3eb21219df042734ee0672b6e9de25fa277c5937a01a9cda5629c0e',   // INTENTIONAL — the money defect, spelled out below
-    '09 legacy nassau round': 'c79a96f13de1b87d67a9a63253c76716dbc514f9abd10691e8497025bbef6118',
-    '10 money pool round': '24cc53526012abeba1f0b76bc67369fe5335b48348baf7a5d850985b4f25320a',
-    '11 wolf round': '0cd128cb2bf50dbbe4d04bd51e73143716df024f675700d979d4f26a0bbc8aa3',
+    '01 stroke 1v1 gross': 'ab6438691735145731b75f3aad03372861816ae7d8fd047dc4d8955345d542b8',
+    '02 stroke 1v1 net': '8c77e95bbeb7e48e5c11aeede5d17dfaccd0f0cbc1156bc5fc0413035edd07d1',
+    '03 stroke custom press stake': 'fda4d500635529f9cb722b7a088cf530e2768ccf27935dc0130db8885047a176',
+    '04 stroke multiple presses': 'c71d849e84be166c3d9c753ce1419b409af93d1d7d96e6dad560f92edec0317e',
+    '05 stroke start-hole 6': '7c65722f5e82de0761c248b712e3e9778a7e7f74e0aec68782479c8889d9297d',
+    '06 side match play 2v2': 'b70534e5f4471d57324930f21b241c17d496617382687fa9b5751b4f827319c3',
+    '07 modern nassau 2v2': '48ebf705c94b8030e2efa8f75c16ae580aacfa5151e71e3777d2688540ed7b27',
+    '08 stroke 2v2': 'c3ea512473304a84861a18f07308c4cf71e2b9568733d9e2d361469e61d31b06',   // INTENTIONAL — the money defect, spelled out below
+    '09 legacy nassau round': 'd959b691f9baa08e3d5b8e0f43db08d576da08b0bbb4406dccc8ed01416398aa',
+    '10 money pool round': '55cea65b2617d4eb7091e1ce1dc0d2628f6aae8dd93731578bc416765fb0cbb6',
+    '11 wolf round': '599a4cb3f2e8fc4c7492d2cadd6323c124a8a7eddd53c2ef4001bc3d287c268e',
     // Moved once, at the B2 icon cleanup: the Stableford settle-header emoji went
     // 🎯 -> ⭐. PROVEN to be the only change - reverting just that character in
     // stats.html makes all 15 fixtures hash green again, so no money or markup moved.
-    '12 stableford round': 'bd7ee929b83acf95fcaa71ac2edcdcf1dbf75c3abf64e0f9a8323f90c9c50e4e',
-    '13 birdie pool round': '2d6d3b299d0c11ca8621a007f8188ccb96243c09ba95b37e63cc3dff3fa1ed3f',
-    '14 stroke 1v1 all square': '8f4626495317cb96a3ec6f6b95ac3b635925b456ab7147bc087934dad57badfe',
-    '15 stroke 2v2 all square': '679a62b83305052cf6614caa194379edafb3f20489850c4b7097b777ee69c107',   // INTENTIONAL — side name only; money is $0 either way
+    '12 stableford round': '1385cc0d0376a87ba993c352fd3c9ea29b82c881b09d7989a362993226b93bb6',
+    '13 birdie pool round': 'd74a467457ae3d790b3119fff8515d2859b12657d1f06f72464522470e15474f',
+    '14 stroke 1v1 all square': '6bfd214d7f3f9850b598674d151b3388473aa36e588a26b9d5171766136d3377',
+    '15 stroke 2v2 all square': '530e22b6bbfdab81c3971d9c73fdbb6e98f3b85996d33b450e6ffa764ceb5d74',   // INTENTIONAL — side name only; money is $0 either way
 };
 
 // ---------------------------------------------------------------------------

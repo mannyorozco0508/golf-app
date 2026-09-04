@@ -125,7 +125,13 @@
 // ask it. An installed PWA on v36 would keep drawing a buy-in box and a payout
 // ledger for a Skins game nobody is playing. Shell MEMBERSHIP is unchanged:
 // action-model.js was already precached for Consumer.
-const CACHE_VERSION = 'golfapp-v37-skins-gate';
+// Moved to v38 because skins.html and stats.html - both precached shell files -
+// changed. The Bets tab now tells the truth about which Skins games it can see,
+// and both pages build the round code into their injected Receipt link instead
+// of relying on a boot-time rewrite that had already run. An installed PWA on
+// v37 would keep paying an imaginary leader out of a leftover buy-in, and keep a
+// Receipt button that drops the round. Shell MEMBERSHIP is unchanged.
+const CACHE_VERSION = 'golfapp-v38-skins-honesty';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

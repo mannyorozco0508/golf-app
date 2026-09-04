@@ -196,7 +196,7 @@
     <h2 class="event-title" id="main-title">💰 Skins Tracker</h2>
 
     <div class="action-card" id="skins-card">
-        <div class="control-grid">
+        <div class="control-grid" id="skins-config-grid">
             <div class="control-group">
                 <label>Pot Format</label>
                 <select id="skins-pot-format" onchange="saveSkinsConfig()">
@@ -211,7 +211,7 @@
             </div>
         </div>
 
-        <div class="control-group" style="margin-top:10px;">
+        <div class="control-group" id="skins-config-carry" style="margin-top:10px;">
             <label>Carry Over Ties</label>
             <div class="toggle-row">
                 <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarryOver(false)">Void Tied Holes</span>
@@ -445,6 +445,20 @@
     }
 
 
+    // LINKS BUILT DURING RENDER CANNOT USE THE BOOT-TIME REWRITE.
+    //
+    // The .nav-link pass near the top of this file runs ONCE, before Firebase has
+    // called back with the round. Anything injected later - the Receipt button at
+    // the foot of the ledger, and the disclosures below - never went through it,
+    // so it linked to settlement.html with NO round code and dropped the golfer on
+    // a page that could not tell which round they had been reading.
+    function linkWithRound(page) {
+        let href = page + '?game=' + encodeURIComponent(currentMode || '');
+        const g = urlParams.get('group');
+        if (g) href += '&group=' + encodeURIComponent(g);
+        return href;
+    }
+
     function saveSkinsConfig() {
         const potFormat = document.getElementById("skins-pot-format").value;
         const buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
@@ -538,6 +552,59 @@
             return;
         }
         if (skinsCard) skinsCard.style.display = "";
+
+        // WHICH STORY IS THIS PAGE ENTITLED TO TELL?
+        //
+        // It reads three round-ROOT fields and renders ONE game from them.
+        // Settlement pays from getRoundGames(). Those two agree in exactly one
+        // case: Skins as the round's MAIN format, where the game's config IS the
+        // round root. Anywhere else this page was narrating a game it could not
+        // see - a $0 pot for a scoped wager that pays real money, or a full
+        // ledger for a leftover buy-in that pays nobody at all.
+        const roundGames = (typeof getRoundGames === 'function') ? getRoundGames(currentData) : [];
+        const mainIsSkins = roundGames.some(g => g.role === 'main' && g.format === 'skins');
+        const otherSkins = roundGames.filter(g => g.role === 'additional' && g.format === 'skins');
+        const mpCfg = currentData.moneyPool;
+        const poolSkins = !!(mpCfg && mpCfg.enabled && mpCfg.skins && mpCfg.skins.mode && mpCfg.skins.mode !== 'none');
+        const elsewhereCount = otherSkins.length + (poolSkins ? 1 : 0);
+        const plural = (n) => n === 1 ? '' : 's';
+
+        // These controls write the round-ROOT fields, which only the round-wide game
+        // reads. Offering them anywhere else invites a golfer to "fix" a number that
+        // changes nothing - or, on a stroke round, to create the very leftover buy-in
+        // the second branch below exists to explain.
+        const cfgGrid = document.getElementById("skins-config-grid");
+        const cfgCarry = document.getElementById("skins-config-carry");
+        const showSkinsConfig = (on) => {
+            if (cfgGrid) cfgGrid.style.display = on ? "" : "none";
+            if (cfgCarry) cfgCarry.style.display = on ? "" : "none";
+        };
+
+        if (!mainIsSkins) {
+            showSkinsConfig(false);
+            const box = document.getElementById("skins-content");
+            if (box) {
+                if (elsewhereCount > 0) {
+                    box.innerHTML = `<div style="padding:14px 4px; font-size:0.85rem; line-height:1.55; color:var(--text-muted);">
+                            <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">Skins is running \u2014 just not here</div>
+                            This round has <strong>${elsewhereCount} Skins game${plural(elsewhereCount)}</strong> between specific players.
+                            This page only shows a round-wide Skins game, so ${elsewhereCount === 1 ? 'it is' : 'they are'} not shown here.
+                            The Receipt itemises every one, with who is in it and what it paid.
+                        </div>
+                        <a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">\uD83D\uDCC4 Final Results &amp; Receipt</a>`;
+                } else {
+                    const leftover = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
+                    box.innerHTML = `<div style="padding:14px 4px; font-size:0.85rem; line-height:1.55; color:var(--text-muted);">
+                            <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">No Skins game in this round</div>
+                            A <strong>$${leftover}</strong> buy-in is saved here, but it is not attached to any game \u2014 nothing will be paid out for it and no winner is being tracked.
+                            If the group meant to play Skins, add it in Round Setup.
+                        </div>
+                        <a class="btn-primary" href="${linkWithRound('admin.html')}" style="display:block; text-align:center; text-decoration:none;">\u2699\uFE0F Round Setup</a>`;
+                }
+            }
+            return;
+        }
+        showSkinsConfig(true);
 
         const allPlayers = currentData.players || [];
         // Only players opted in to money betting compete for skins - everyone still scores
@@ -706,10 +773,19 @@
             </tr>`;
         });
 
-        html += `</tbody></table>
-            <!-- This page cannot see participant-scoped Skins games, so its own payout was never
-                 a safe authoritative receipt. The canonical Receipt settles every wager. -->
-            <a class="btn-primary nav-link" href="settlement.html" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+        html += `</tbody></table>`;
+
+        // This page cannot see participant-scoped Skins games, so its own payout was
+        // never a safe authoritative receipt. Say so out loud rather than leaving the
+        // golfer to assume the ledger above is the whole round.
+        if (elsewhereCount > 0) {
+            html += `<div style="margin-top:10px; padding:10px 12px; border:1px solid var(--border-mid); border-radius:8px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;">
+                    <strong>${elsewhereCount} other Skins game${plural(elsewhereCount)}</strong> in this round ${elsewhereCount === 1 ? 'is' : 'are'} not shown here \u2014 the ledger above covers only the round-wide game. The Receipt has ${elsewhereCount === 1 ? 'it' : 'them'} all.
+                </div>`;
+        }
+
+        html += `
+            <a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
         `;
 
         container.innerHTML = html;

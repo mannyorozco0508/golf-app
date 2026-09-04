@@ -84,8 +84,17 @@ describe('skins.html — the Skins card only appears when Skins is being played'
             'skinsBuyIn: 0 means nobody bought in — that is not a Skins game.');
     });
 
-    test('ROUND_WIDE_SKINS_IS_SHOWN: the legacy round-wide game still renders', () => {
-        const { card, content } = render(baseRound({ skinsBuyIn: 5, skinsPotFormat: 'gross' }));
+    // CONTRACT MOVED, NOT WEAKENED. This originally passed skinsBuyIn on a STROKE
+    // round and expected a ledger. That shape is a leftover buy-in attached to no
+    // game: getRoundGames() yields no skins, settlement pays nothing, and the page
+    // was inventing a winner. skins_view_honesty_test.js now pins that case to "no
+    // ledger" outright. The assertion here is unchanged in strength - a real
+    // round-wide Skins game must still render its ledger - and now names the shape
+    // that genuinely is one.
+    test('ROUND_WIDE_SKINS_IS_SHOWN: the round-wide game still renders', () => {
+        const { card, content } = render(baseRound({
+            gameFormat: 'skins', skinsBuyIn: 5, skinsPotFormat: 'gross'
+        }));
         assert.ok(!hidden(card),
             'A real round-wide Skins game must still show its card.');
         assert.match(content, /Payout Ledger/,

@@ -248,13 +248,34 @@ describe('STAGE C — one authoritative money document', () => {
         });
     });
 
+    // THE ROUND CODE, NOT THE CLASS NAME.
+    //
+    // This used to require class="btn-primary nav-link" on all three pages, on the
+    // belief that .nav-link is what carries ?game= and &group=. That is true only
+    // for links present in the markup at BOOT: the rewrite is a single
+    // querySelectorAll pass that runs before Firebase calls back with the round.
+    // skins.html and stats.html both INJECT their Receipt button afterwards through
+    // innerHTML, so the class did nothing for them and each linked to a round-less
+    // Receipt, bouncing the golfer to Home. sidematches.html's button is static
+    // markup, where the class genuinely does the work.
+    //
+    // The contract is unchanged - every page must carry the round to the Receipt -
+    // and is now asserted against the mechanism that actually delivers it on each
+    // page, rather than against a class name that only worked on one of them.
     test('each routes to the canonical Receipt for the same round', () => {
         ['sidematches.html', 'skins.html', 'stats.html'].forEach(f => {
+            assert.ok(/Final Results &amp; Receipt/.test(read(f)), `${f} has no route to the Receipt`);
+        });
+
+        assert.ok(/class="btn-primary nav-link" href="settlement.html"/.test(read('sidematches.html')),
+            'sidematches.html Receipt link is static markup - .nav-link must stay on it');
+
+        ['skins.html', 'stats.html'].forEach(f => {
             const src = read(f);
-            assert.ok(/Final Results &amp; Receipt/.test(src), `${f} has no route to the Receipt`);
-            // .nav-link is what carries ?game= and &group= across pages.
-            assert.ok(/class="btn-primary nav-link" href="settlement.html"/.test(src),
-                `${f} must carry the game code to the Receipt`);
+            assert.ok(/href="\$\{linkWithRound\('settlement\.html'\)\}"/.test(src),
+                `${f} injects its Receipt link, so it must build the round code into the href`);
+            assert.ok(!/class="btn-primary nav-link" href="settlement\.html"/.test(src),
+                `${f} must not rely on the boot-time rewrite for a link that does not exist yet`);
         });
     });
 
