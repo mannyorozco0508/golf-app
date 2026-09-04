@@ -4135,8 +4135,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     : 0);
             const nassauPressRule = document.getElementById("nassau-press-rule") ? document.getElementById("nassau-press-rule").value : "2down";
             const wolfPointVal = parseFloat(document.getElementById("wolf-point-value").value) || 0;
-            const wolfLoneMult = document.getElementById("wolf-lone-mult") ? document.getElementById("wolf-lone-mult").value : "2";
-            const wolfBlindMult = document.getElementById("wolf-blind-mult") ? document.getElementById("wolf-blind-mult").value : "4";
+            const wolfLoneMult = document.getElementById("wolf-lone-mult") ? (parseFloat(document.getElementById("wolf-lone-mult").value) || 2) : 2;
+            const wolfBlindMult = document.getElementById("wolf-blind-mult") ? (parseFloat(document.getElementById("wolf-blind-mult").value) || 4) : 4;
             const wolfTieRule = document.getElementById("wolf-tie-rule") ? document.getElementById("wolf-tie-rule").value : "carry";
             const wolfLastPlaceRule = document.getElementById("wolf-lastplace-rule") ? document.getElementById("wolf-lastplace-rule").value : "off";
             const dotPointVal = parseFloat(document.getElementById("dot-point-value").value) || 0;
