@@ -127,10 +127,19 @@ describe('WHEN THE CARD RENDERS', () => {
         // changed no test result, because computeRyderCupStandings() returns null
         // for a legacy round and the next line catches it. Two guards is correct;
         // an unpinned one that can be deleted silently is not.
+        // UPDATED IN PHASE 4, and deliberately made stronger rather than relaxed.
+        // The gate moved: Phase 4 routes every surface through
+        // resolveRyderCupForRound(), which returns status 'none' for a round with
+        // neither a local Cup nor a pointer - legacy `gameFormat: 'ryder'` included.
+        // This now pins BOTH halves of that gate instead of one literal, so
+        // deleting either the resolution or the 'none' check fails here.
         const src = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
         const fn = src.slice(src.indexOf('function renderRyderCupHtml'));
-        assert.ok(/!hasRyderCup\(currentData\)\) return '';/.test(fn.slice(0, 800)),
-            'the explicit legacy gate must remain the first thing this function does');
+        const head = fn.slice(0, 900);
+        assert.ok(/ryderResolution\(\)/.test(head),
+            'the card must resolve before deciding anything');
+        assert.ok(/res\.status === 'none'\) return '';/.test(head),
+            'a round with no Cup and no pointer must render nothing');
     });
 
     test('a valid competition renders the card', () => {

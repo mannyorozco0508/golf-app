@@ -1072,6 +1072,7 @@
         .rc-sname { font-weight:bold; font-size:0.9rem; color:var(--text-main); }
         .rc-spts { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
         .rc-live { font-size:0.72rem; color:var(--text-muted); padding-top:2px; }
+        .rc-sess { font-size:0.72rem; font-weight:bold; color:var(--brand-navy); padding:2px 0 4px; }
         .rc-lab { font-size:0.66rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); letter-spacing:0.04em; }
         .rc-your { border-top:1px solid var(--border-soft, #ddd); margin-top:6px; padding-top:5px; }
         .rc-mside { font-weight:bold; font-size:0.86rem; }
@@ -1651,6 +1652,7 @@
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
+            loadRyderHostCup();
             renderScorecard();
         });
     }
@@ -2620,12 +2622,70 @@
     // only 1 point is banked is the scoreboard that starts an argument on the
     // 18th green. LIVE is printed only when it actually differs from OFFICIAL,
     // so a finished session shows one unambiguous score.
+    // THE HOST CUP, fetched once per host code and cached. A participating round
+    // carries only a pointer; the authoritative config lives on the host event and
+    // is read cross-event. events/$eventCode is already .read:true, so no
+    // permission is widened to do this.
+    //
+    // FAILS SOFT. If the host cannot be read the card renders an unavailable
+    // state and ordinary golf scoring is completely unaffected. It never falls
+    // back to creating a local Cup - that is how one config becomes two.
+    let __ryderHostCup = null;
+    let __ryderHostCode = null;
+
+    function loadRyderHostCup() {
+        const ref = currentData && currentData.ryderCupRef;
+        if (!ref || !ref.host || String(ref.host) === String(currentMode)) return;
+        if (String(ref.host) === String(__ryderHostCode)) return;
+        __ryderHostCode = String(ref.host);
+        db.ref('events/' + __ryderHostCode).once('value')
+            .then(snap => { __ryderHostCup = snap.val() || null; renderScorecard(); })
+            .catch(() => { __ryderHostCup = null; renderScorecard(); });
+    }
+
+    function ryderResolution() {
+        if (typeof resolveRyderCupForRound !== 'function') return null;
+        return resolveRyderCupForRound(currentData, __ryderHostCup, currentMode);
+    }
+
     function renderRyderCupHtml() {
-        if (typeof hasRyderCup !== 'function' || !hasRyderCup(currentData)) return '';
+        if (typeof hasRyderCup !== 'function') return '';
+        const res = ryderResolution();
+        if (!res || res.status === 'none') return '';
+        const esc0 = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        // A pointer we cannot follow says so quietly and gets out of the way.
+        // Scoring must never be blocked by a Cup that failed to load.
+        if (!ryderResolutionUsable(res)) {
+            return '<div class="lw-card rc-card"><div class="lw-head">'
+                + '<span class="lw-title">\uD83C\uDFC6 RYDER CUP</span></div>'
+                + '<div class="rcs-hint">Cup unavailable \u2014 scoring is unaffected.</div></div>';
+        }
+        const cup = res.cup;
         const cd = currentData.courseData || [];
         const sc = currentData.scores || {};
-        const st = computeRyderCupStandings(currentData, cd, sc);
-        if (!st || st.totalMatches === 0) return '';
+        // Scores for THIS round belong to the session this round is playing. Other
+        // sessions were played on other rounds and are not readable from here.
+        const bySession = {};
+        if (res.sessionId) bySession[res.sessionId] = { courseData: cd, scores: sc };
+        const totals = (typeof computeRyderCupTotals === 'function' && res.sessionId)
+            ? computeRyderCupTotals(cup, bySession) : null;
+        const st = totals
+            ? { sides: totals.sides, matches: [], totalMatches: 0, decidedCount: 0 }
+            : computeRyderCupStandings(cup, cd, sc);
+        if (!st) return '';
+        // Only the current session's matches belong on the scoring screen. The full
+        // five-session schedule lives in setup, not here.
+        const sessionMatches = res.sessionId
+            ? (computeRyderSessionResults(cup, bySession) || [])
+                .filter(x => x.id === res.sessionId).reduce((a, x) => a.concat(x.matches), [])
+            : st.matches;
+        st.matches = sessionMatches;
+        st.totalMatches = sessionMatches.length;
+        st.decidedCount = sessionMatches.filter(m => m.decided).length;
+        if (st.totalMatches === 0 && !res.sessionId) return '';
+        const sessLabel = (res.sessionId && ryderCupConfig(cup).sessions
+            && ryderCupConfig(cup).sessions[res.sessionId])
+            ? ryderCupConfig(cup).sessions[res.sessionId].label : '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
         const sides = Object.keys(st.sides).map(k => st.sides[k]);
         if (sides.length < 2) return '';
@@ -2647,7 +2707,13 @@
         // context, gets null, and sees no YOUR MATCH rather than a fabricated one.
         const ctxIds = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
             ? window.__scFilteredPlayers.map(p => p.id) : [];
-        const mine = ctxIds.length ? ryderMatchForPlayers(currentData, cd, sc, ctxIds) : null;
+        const want = ctxIds.map(String);
+        const mine = ctxIds.length
+            ? (sessionMatches.filter(m => (m.playersA || []).concat(m.playersB || []).length &&
+                (ryderMatchRoster(ryderCupConfig(cup).matches[m.matchId]).a
+                    .concat(ryderMatchRoster(ryderCupConfig(cup).matches[m.matchId]).b))
+                    .some(id => want.indexOf(String(id)) !== -1))[0] || null)
+            : null;
 
         const sideLine = arr => esc(arr.join(' / '));
         const yourHtml = mine
@@ -2663,8 +2729,11 @@
             + '<div class="rc-aside">' + sideLine(m.playersB) + '</div></div>').join('');
 
         return '<div class="lw-card rc-card">'
-            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 RYDER CUP</span>'
+            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 '
+            + esc0((typeof ryderCupName === 'function' && ryderCupName(cup)) || 'RYDER CUP').toUpperCase()
+            + '</span>'
             + '<span class="lw-sub">' + st.decidedCount + ' of ' + st.totalMatches + ' final</span></div>'
+            + (sessLabel ? '<div class="rc-sess">' + esc0(sessLabel) + '</div>' : '')
             + '<div class="rc-official">' + officialRows + '</div>'
             + liveRow
             + yourHtml

@@ -83,9 +83,14 @@ function ryderCupConfig(data) {
     if (sideIds.length < 2) return null;
     return {
         v: rc.v || RYDER_CUP_SCHEMA_VERSION,
-        // The competition's own name rides along with the config. Omitting it here
-        // made ryderCupName() fall back to "Ryder Cup" for every Cup ever named.
+        // EVERYTHING STORED RIDES ALONG. This normalizer is the only way any surface
+        // sees the Cup, so a field omitted here does not degrade - it vanishes.
+        // `name` was dropped in Phase 3B and every Cup was called "Ryder Cup";
+        // `sessions` was dropped in Phase 4 and the entire schedule was invisible.
+        // Twice is a pattern: add the field here whenever the schema gains one.
         name: rc.name,
+        preset: rc.preset,
+        sessions: rc.sessions,
         sides: sides,
         members: rc.members || {},
         matches: rc.matches || {}
@@ -152,6 +157,16 @@ function ryderMatchHasScores(courseData, savedScores, match) {
 }
 
 function ryderMatchLockState(data, courseData, savedScores, match) {
+    // SCORES LOCK ONLY THEIR OWN SESSION. With one round per session, a golfer who
+    // played Day 1 has scores in the Day 1 round - and their Day 2 pairing contains
+    // the same golfer. Without this scope, opening Day 1 would lock every future
+    // session the moment anyone teed off, which is exactly what a Cup must not do.
+    var ref = (data || {}).ryderCupRef;
+    if (ref && ref.sessionId && match && match.sessionId
+        && String(match.sessionId) !== String(ref.sessionId)) {
+        return { locked: !!match.lockedAt, snapshotted: !!match.lockedAt,
+                 reason: match.lockedAt ? 'locked-at-first-score' : null };
+    }
     var started = ryderMatchHasScores(courseData, savedScores, match);
     return {
         locked: !!(match && match.lockedAt) || started,
@@ -646,4 +661,256 @@ function ryderStatusLine(state) {
     }
     if (state.status === 0) return 'AS thru ' + state.thru;
     return Math.abs(state.status) + ' UP thru ' + state.thru;
+}
+
+// ============================================================================
+// PHASE 4 — CLASSIC SESSIONS AND THE POINTER ARCHITECTURE
+//
+// ONE AUTHORITATIVE CUP. The host round owns data.ryderCup. Every participating
+// round - including the host - carries only a pointer:
+//
+//     data.ryderCupRef = { host: 'ABCD', sessionId: 'd1s2' }
+//
+// The Cup object is NEVER copied into a participating round. Five copies of team
+// names, memberships and pairings diverge the first time an organizer edits one,
+// and points would then be computed five different ways from five different
+// truths. A pointer cannot diverge from itself.
+//
+// WHY A POINTER AND NOT TRIP OWNERSHIP. The trip->round link is one-directional:
+// trips/{code}/rounds/{code} exists, but a round records no trip. A group-locked
+// scorekeeper link carries no ?trip=, so a trip-owned Cup would be invisible to
+// exactly the person entering scores. The pointer lives on the round record, so
+// it survives any link. It also lets a Cup span rounds that were never gathered
+// into a Road Trip at all.
+// ============================================================================
+
+var RYDER_SESSION_FORMATS = { foursomes: 'Foursomes', fourball: 'Four-Ball', singles: 'Singles' };
+
+// FOURSOMES IS STRUCTURAL ONLY UNTIL PHASE 5. Alternate shot is one ball played by
+// two partners, and this app stores one gross score per individual golfer. There
+// is no honest way to write a side's single score into two individual records, so
+// the format is schedulable and its pairings storable, but it cannot be scored.
+// Nothing here fabricates an individual score to make it look playable.
+function ryderFormatPlayable(format) { return format === 'fourball' || format === 'singles'; }
+
+// ---------------------------------------------------------------------------
+// THE CLASSIC PRESET
+//
+// Day 1 Foursomes + Four-Ball, Day 2 Foursomes + Four-Ball, Day 3 Singles. The
+// real Ryder Cup is 12 v 12, but a trip is whatever showed up: the FORMAT is
+// authentic at every size, only the match COUNT scales.
+//
+// Partner sessions seat floor(n/2) matches, so an odd roster sits one golfer out
+// rather than inventing a partner. Singles seats everyone.
+// ---------------------------------------------------------------------------
+var RYDER_CLASSIC_SESSIONS = [
+    { id: 'd1s1', day: 1, order: 1, format: 'foursomes', label: 'Day 1 \u2014 Foursomes' },
+    { id: 'd1s2', day: 1, order: 2, format: 'fourball',  label: 'Day 1 \u2014 Four-Ball' },
+    { id: 'd2s1', day: 2, order: 3, format: 'foursomes', label: 'Day 2 \u2014 Foursomes' },
+    { id: 'd2s2', day: 2, order: 4, format: 'fourball',  label: 'Day 2 \u2014 Four-Ball' },
+    { id: 'd3s1', day: 3, order: 5, format: 'singles',   label: 'Day 3 \u2014 Singles' }
+];
+
+function buildClassicSessions() {
+    var out = {};
+    RYDER_CLASSIC_SESSIONS.forEach(function (s) {
+        out[s.id] = { id: s.id, day: s.day, order: s.order, format: s.format, label: s.label };
+    });
+    return out;
+}
+
+// How many matches a session seats for a given per-side roster size.
+function ryderSessionMatchCapacity(format, perSide) {
+    var n = Math.max(0, perSide | 0);
+    if (format === 'singles') return n;
+    return Math.floor(n / 2);
+}
+
+function ryderSessionsOf(data) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg || !cfg.sessions) return [];
+    return Object.keys(cfg.sessions)
+        .map(function (k) { return cfg.sessions[k]; })
+        .sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+}
+
+function ryderMatchesInSession(data, sessionId) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg) return [];
+    return Object.keys(cfg.matches)
+        .filter(function (mid) {
+            return (cfg.matches[mid].sessionId || RYDER_DEFAULT_SESSION) === sessionId;
+        })
+        .map(function (mid) { return cfg.matches[mid]; });
+}
+
+// SESSION STATE, derived rather than stored. A stored state is a second copy of
+// the truth that drifts the moment a score lands; every value below is a question
+// the config and the scores can already answer.
+function ryderSessionState(data, courseData, savedScores, sessionId) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg || !cfg.sessions || !cfg.sessions[sessionId]) return null;
+    var s = cfg.sessions[sessionId];
+    var ms = ryderMatchesInSession(data, sessionId);
+
+    if (!ryderFormatPlayable(s.format)) return 'UNAVAILABLE';
+    if (ms.length === 0) return 'NOT_SET';
+
+    var started = 0, decided = 0;
+    ms.forEach(function (m) {
+        if (ryderMatchLockState(data, courseData, savedScores, m).locked) started++;
+        var r = computeRyderMatchResult(data, courseData, savedScores, m.id);
+        if (r && r.decided) decided++;
+    });
+    if (decided === ms.length) return 'COMPLETE';
+    if (started > 0) return 'IN_PROGRESS';
+    return 'READY';
+}
+
+// ---------------------------------------------------------------------------
+// AGGREGATION ACROSS SESSIONS
+//
+// A Cup spans rounds, so its scores live in several places. scoresBySession maps
+// a session id to the round that played it:
+//
+//     { d1s2: { courseData: [...], scores: {...} }, d2s2: {...} }
+//
+// Matches in a session with no entry simply have no scores yet - they are not
+// halved, they are unplayed, and they contribute nothing to either total.
+// ---------------------------------------------------------------------------
+function computeRyderSessionResults(cupData, scoresBySession) {
+    var cfg = ryderCupConfig(cupData);
+    if (!cfg) return null;
+    var byId = scoresBySession || {};
+    var out = [];
+
+    ryderSessionsOf(cupData).forEach(function (s) {
+        var src = byId[s.id] || { courseData: [], scores: {} };
+        var ms = ryderMatchesInSession(cupData, s.id);
+        var official = { A: 0, B: 0 }, projected = { A: 0, B: 0 };
+        var results = [];
+
+        // AN UNPLAYABLE FORMAT SCORES NOTHING. Foursomes is alternate shot - one
+        // ball, two partners - and this app stores one gross score per individual.
+        // Reading those individual scores as a Foursomes result is precisely the
+        // fake implementation Phase 5 exists to replace, so the session is listed,
+        // its pairings are storable, and it banks zero until real team scoring ships.
+        var playable = ryderFormatPlayable(s.format);
+        ms.forEach(function (m) {
+            var r = computeRyderMatchResult(cupData, src.courseData || [], src.scores || {}, m.id);
+            if (!r) return;
+            results.push(r);
+            if (!playable) return;
+            // AN UNPLAYED MATCH PROJECTS NOTHING. Counting it as all-square would
+            // hand both sides half a point for golf nobody has played, and a
+            // five-session Cup would open at 10-10.
+            if (r.thru > 0 || r.decided) {
+                projected[r.sideA] += r.pointsA;
+                projected[r.sideB] += r.pointsB;
+            }
+            if (r.decided) {
+                official[r.sideA] += r.pointsA;
+                official[r.sideB] += r.pointsB;
+            }
+        });
+
+        out.push({
+            id: s.id, day: s.day, order: s.order, format: s.format, label: s.label,
+            playable: ryderFormatPlayable(s.format),
+            state: ryderSessionState(cupData, src.courseData || [], src.scores || {}, s.id),
+            matches: results,
+            official: official, projected: projected,
+            pointsAvailable: results.length * RYDER_POINTS_WIN
+        });
+    });
+    return out;
+}
+
+// THE CUP TOTAL. Sums sessions; never resets. Day 2 begins from wherever Day 1
+// finished, which is the entire point of a Cup.
+function computeRyderCupTotals(cupData, scoresBySession) {
+    var cfg = ryderCupConfig(cupData);
+    if (!cfg) return null;
+    var sessions = computeRyderSessionResults(cupData, scoresBySession) || [];
+    var sides = {};
+    Object.keys(cfg.sides).forEach(function (id) {
+        sides[id] = {
+            id: id, name: cfg.sides[id].name || id, color: cfg.sides[id].color || null,
+            official: 0, projected: 0, points: 0
+        };
+    });
+    var avail = 0;
+    sessions.forEach(function (s) {
+        Object.keys(sides).forEach(function (id) {
+            sides[id].official += s.official[id] || 0;
+            sides[id].projected += s.projected[id] || 0;
+        });
+        avail += s.pointsAvailable;
+    });
+    Object.keys(sides).forEach(function (id) { sides[id].points = sides[id].official; });
+    return { name: ryderCupName(cupData), sides: sides, sessions: sessions, pointsAvailable: avail };
+}
+
+// ---------------------------------------------------------------------------
+// THE CANONICAL RESOLVER
+//
+// Every surface asks this one question and nothing scatters host/reference logic
+// across the scorecard, setup, engine and leaderboard.
+//
+// FAILS SOFT, ALWAYS. A missing, malformed or unreachable host yields a status
+// the caller can render as "Cup unavailable" - never an exception, and never a
+// fabricated local Cup. Inventing a second Cup because the first could not be
+// read is how one authoritative config quietly becomes two.
+// ---------------------------------------------------------------------------
+function resolveRyderCupForRound(roundData, hostCupData, roundCode) {
+    var d = roundData || {};
+    var ref = d.ryderCupRef;
+
+    if (!ref || typeof ref !== 'object' || !ref.host) {
+        // No pointer. A Phase 1-3B Cup living directly on this round still works
+        // exactly as it always did - no migration required to reopen one.
+        if (hasRyderCup(d)) {
+            return { status: 'local', cup: d, sessionId: null, host: roundCode || null };
+        }
+        return { status: 'none', cup: null, sessionId: null, host: null };
+    }
+
+    if (String(ref.host) === String(roundCode) && hasRyderCup(d)) {
+        return { status: 'host', cup: d, sessionId: ref.sessionId || null, host: String(ref.host) };
+    }
+    if (!hostCupData) {
+        return { status: 'host-unavailable', cup: null, sessionId: ref.sessionId || null,
+                 host: String(ref.host) };
+    }
+    if (!hasRyderCup(hostCupData)) {
+        return { status: 'host-cup-missing', cup: null, sessionId: ref.sessionId || null,
+                 host: String(ref.host) };
+    }
+    var cfg = ryderCupConfig(hostCupData);
+    if (ref.sessionId && cfg.sessions && !cfg.sessions[ref.sessionId]) {
+        return { status: 'session-missing', cup: hostCupData, sessionId: ref.sessionId,
+                 host: String(ref.host) };
+    }
+    return { status: 'referenced', cup: hostCupData, sessionId: ref.sessionId || null,
+             host: String(ref.host) };
+}
+
+function ryderResolutionUsable(res) {
+    return !!(res && (res.status === 'local' || res.status === 'host'
+        || res.status === 'referenced' || res.status === 'session-missing') && res.cup);
+}
+
+// HOST DELETION GUARD, to the limit of what is cheap. Discovering every inbound
+// reference would need a reverse index or a scan of every event in the database;
+// neither belongs on this path. The organizer's own known participants are
+// checked, and the residual risk is reported rather than papered over.
+function canRemoveRyderCupHost(data, courseData, savedScores, knownParticipants) {
+    var base = canRemoveRyderCup(data, courseData, savedScores);
+    if (!base.ok) return base;
+    var refs = (knownParticipants || []).filter(function (r) { return r; });
+    if (refs.length > 0) {
+        return { ok: false, error: 'has-participants',
+            message: 'Other rounds are playing this Cup. Remove them first.' };
+    }
+    return { ok: true };
 }

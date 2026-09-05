@@ -183,7 +183,10 @@
 // Moved to v47 because sidematches.html gained the Ryder Cup setup surface and
 // now loads ryder-cup.js. An installed PWA on v46 would serve a Matches page that
 // cannot create a Cup, with no signal that anything is missing.
-const CACHE_VERSION = 'golfapp-v47-ryder-setup';
+// Moved to v48: index.html gained the Cup resolver and cross-event host load, and
+// sidematches.html gained the five-session schedule. An installed PWA on v47 would
+// serve a scorecard that cannot follow a ryderCupRef at all.
+const CACHE_VERSION = 'golfapp-v48-ryder-sessions';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

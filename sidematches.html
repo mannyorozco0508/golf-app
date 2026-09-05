@@ -200,6 +200,11 @@
         .rcs-remove { width: 100%; margin-top: 8px; border: 1px solid #b23; background: var(--bg-card); color: #b23; }
         .rcs-del { border: none; background: transparent; color: #b23; font-size: 0.78rem; }
         .rcs-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 6px; }
+        .rcs-day { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); margin: 8px 0 3px; }
+        .rcs-sess { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px; margin-bottom: 6px; }
+        .rcs-sess.off { opacity: 0.7; }
+        .rcs-sess > summary { font-size: 0.86rem; font-weight: bold; cursor: pointer; min-height: 32px; }
+        .rcs-cap { font-size: 0.72rem; font-weight: normal; color: var(--text-muted); }
         .rcs-problems:empty { display: none; }
         .rcs-prob { font-size: 0.8rem; color: #b23; padding: 3px 0; }
         /* Long names wrap rather than widening the card - the one way a 360px
@@ -2695,6 +2700,7 @@
             members: Object.assign({}, cfg.members),
             matches: Object.keys(cfg.matches).map(k => Object.assign({}, cfg.matches[k]))
         };
+        if (cfg.sessions) rcDraft.sessions = JSON.parse(JSON.stringify(cfg.sessions));
     }
 
     function rcMatchLocked(m) {
@@ -2714,6 +2720,8 @@
         if (!exists && !rcDraft.__open) {
             mount.innerHTML = '<div class="rcs-card"><button type="button" class="rcs-start"'
                 + ' onclick="rcOpen()">\uD83C\uDFC6 Set Up a Ryder Cup</button>'
+                + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
+                + ' onclick="rcOpenClassic()">\uD83D\uDCC5 Classic Ryder Cup \u2014 3 Days, 5 Sessions</button>'
                 + '<div class="rcs-hint">A team competition played on top of this round. '
                 + 'Points, not money \u2014 your side games are unaffected.</div></div>';
             return;
@@ -2745,6 +2753,7 @@
                 + rcPlayers().map(p => chip(p, side)).join('') + '</div>';
         });
 
+        if (rcDraft.sessions) html += rcSessionScheduleHtml();
         html += '<div class="rcs-sub">Matches</div>';
         if (rcDraft.matches.length === 0) html += '<div class="rcs-hint">No matches yet.</div>';
         rcDraft.matches.forEach((m, i) => {
@@ -2776,6 +2785,86 @@
     }
 
     function rcOpen() { rcLoadDraft(); rcDraft.__open = true; renderRyderCupSetup(); }
+
+    // THE CLASSIC PRESET. Authentic format at any roster size - Day 1 and Day 2
+    // each Foursomes then Four-Ball, Day 3 Singles. Only the match COUNT scales;
+    // the structure never does.
+    function rcOpenClassic() {
+        rcLoadDraft();
+        rcDraft.__open = true;
+        rcDraft.__classic = true;
+        rcDraft.sessions = buildClassicSessions();
+        renderRyderCupSetup();
+    }
+
+    // PROGRESSIVE DISCLOSURE. Five sessions on a 360px phone cannot all be open at
+    // once, so each is a collapsed row showing format, capacity and state; the
+    // lineup opens only when tapped. A Foursomes row is visibly not playable
+    // rather than silently broken.
+    function rcSessionScheduleHtml() {
+        if (!rcDraft || !rcDraft.sessions) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const perSide = side => Object.keys(rcDraft.members || {})
+            .filter(k => rcDraft.members[k] === side).length;
+        const cap = Math.min(perSide('A'), perSide('B'));
+        const byDay = {};
+        Object.keys(rcDraft.sessions).map(k => rcDraft.sessions[k])
+            .sort((a, b) => a.order - b.order)
+            .forEach(s => { (byDay[s.day] = byDay[s.day] || []).push(s); });
+
+        let html = '<div class="rcs-sub">Schedule</div>';
+        Object.keys(byDay).sort().forEach(day => {
+            html += '<div class="rcs-day">Day ' + day + '</div>';
+            byDay[day].forEach(s => {
+                const playable = ryderFormatPlayable(s.format);
+                const n = ryderSessionMatchCapacity(s.format, cap);
+                const set = (rcDraft.matches || []).filter(m => (m.sessionId || 's1') === s.id).length;
+                html += '<details class="rcs-sess' + (playable ? '' : ' off') + '">'
+                    + '<summary>' + esc(RYDER_SESSION_FORMATS[s.format] || s.format)
+                    + ' <span class="rcs-cap">' + (set > 0 ? set + ' set' : n + ' matches')
+                    + '</span></summary>'
+                    + (playable
+                        ? '<button type="button" class="rcs-add" style="width:100%"'
+                          + ' onclick="rcSeedSession(\'' + s.id + '\')">Set Lineup</button>'
+                        : '<div class="rcs-hint">Alternate Shot \u2014 not playable yet. '
+                          + 'Pairings can be set once team scoring ships.</div>')
+                    + '</details>';
+            });
+        });
+        return html;
+    }
+
+    // Seeds a session's matches from whoever is assigned and free IN THAT SESSION.
+    // Sit-outs are normal: a 6 v 6 Four-Ball seats 3 matches and nobody is invented
+    // to fill a gap.
+    function rcSeedSession(sessionId) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const s = rcDraft.sessions[sessionId];
+        if (!s || !ryderFormatPlayable(s.format)) return;
+        const need = s.format === 'singles' ? 1 : 2;
+        rcDraft.matches = (rcDraft.matches || []).filter(m => {
+            if ((m.sessionId || 's1') !== sessionId) return true;
+            return !!m.lockedAt;   // a started match is never re-seeded
+        });
+        const used = {};
+        rcDraft.matches.filter(m => (m.sessionId || 's1') === sessionId)
+            .forEach(m => (m.playersA || []).concat(m.playersB || [])
+                .forEach(id => { used[String(id)] = true; }));
+        const pool = side => rcPlayers()
+            .filter(p => rcDraft.members[String(p.id)] === side && !used[String(p.id)])
+            .map(p => String(p.id));
+        const a = pool('A'), b = pool('B');
+        const n = Math.min(Math.floor(a.length / need), Math.floor(b.length / need));
+        for (let i = 0; i < n; i++) {
+            rcDraft.matches.push({
+                id: sessionId + '-m' + (i + 1), sessionId: sessionId,
+                format: s.format, scoring: 'net', sideA: 'A', sideB: 'B',
+                playersA: a.slice(i * need, i * need + need),
+                playersB: b.slice(i * need, i * need + need)
+            });
+        }
+        renderRyderCupSetup();
+    }
 
     function rcToggle(pid, side) {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
@@ -2826,6 +2915,9 @@
     function rcSave() {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
         const next = buildRyderCupConfig(rcDraft);
+        // The schedule is configuration, not a derived value, so it rides along.
+        if (rcDraft.sessions) next.sessions = rcDraft.sessions;
+        if (rcDraft.__classic) next.preset = 'classic';
         const problems = validateRyderCupSave(currentData, currentData.courseData || [],
             currentData.scores || {}, next);
         if (problems.length > 0) { rcShowProblems(problems); return; }
