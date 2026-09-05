@@ -219,8 +219,23 @@
     }
 
     // ---- Boot --------------------------------------------------------------
+    // MARK THE NATIVE SHELL ON THE DOCUMENT.
+    //
+    // One class, set from the one detection mechanism, so a page can style itself
+    // differently inside Capacitor without inventing a second way to ask. Used by
+    // settlement.html and trip.html to hide the print controls, which cannot work
+    // in WKWebView - window.print() is a silent no-op there.
+    function markNativeShell() {
+        try {
+            if (isNativeShell() && document.documentElement) {
+                document.documentElement.classList.add('is-native');
+            }
+        } catch (e) { /* cosmetic only; never break boot */ }
+    }
+
     function boot() {
         try {
+            markNativeShell();
             registerServiceWorker();
             renderPill();
             listeners.push(renderPill);

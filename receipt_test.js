@@ -399,11 +399,23 @@ describe('ONE DOCUMENT — the competing print path is retired', () => {
         assert.ok(/Round Receipt/.test(idx));
     });
 
+    // CONTRACT MOVED, NOT WEAKENED. The guarantee is that the exported file names
+    // itself after the round rather than after the page. That used to be asserted
+    // against printReceipt's own document.title juggling; the title dance now lives
+    // in native-export.js, which owns BOTH deliveries - it sets and restores the
+    // title on the browser path, and uses the same string as the PDF filename on
+    // iOS. So the assertion follows the name to where it is now built, and gains a
+    // check that the native file is named from it too.
     test('the saved file names itself after the round', () => {
         const fn = st.slice(st.indexOf('function printReceipt'), st.indexOf('function buildReceiptHeader'));
-        assert.ok(/document\.title =/.test(fn));
+        assert.ok(/const title =/.test(fn), 'the round still composes its own filename');
         assert.ok(/Receipt/.test(fn));
-        assert.ok(/setTimeout/.test(fn), 'the page title must be restored afterwards');
+        assert.ok(/exportOrPrint\(\{ title: title/.test(fn), 'and hands it to the exporter');
+
+        const ex = read('native-export.js');
+        assert.ok(/document\.title = safeName\(title\)/.test(ex), 'browser: title drives the filename');
+        assert.ok(/document\.title = previous/.test(ex), 'and is restored afterwards');
+        assert.ok(/safeName\(title\) \+ '\.pdf'/.test(ex), 'native: the same name becomes the PDF filename');
     });
 });
 

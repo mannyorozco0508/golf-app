@@ -52,6 +52,7 @@ const SHARED_SHELL = [
     // product-links.js is the only place that knows the two products may live at
     // different origins. Shared because both sides link across the boundary.
     'product-links.js',
+    'native-export.js',
     'firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
     'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
 ];

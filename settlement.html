@@ -15,6 +15,16 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- pwa-boot.js owns GolfNet.isNative(), which native-export.js asks before
+         choosing between window.print() and the iOS share sheet. Build 4 shipped
+         without it on this page: GolfNet was undefined, the exporter concluded
+         "browser", and window.print() did nothing at all inside WKWebView. It must
+         load BEFORE native-export.js is used, which defer guarantees for a click
+         handler. -->
+    <script src="pwa-boot.js" defer></script>
+    <!-- window.print() is a no-op inside WKWebView. This routes the native build
+         through a real PDF + the iOS share sheet, and leaves the browser alone. -->
+    <script src="native-export.js"></script>
     <script src="text-safe.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
@@ -214,6 +224,16 @@
         }
 
         /* MAGIC PDF HIDING CSS */
+        /* NO PRINT CONTROLS IN THE NATIVE APP.
+           window.print() does nothing inside WKWebView - it is not implemented, so
+           the button cannot work there and there is no supported way to make it.
+           Rather than offer a control that fails, the native build hides it; the
+           Receipt itself is unchanged and still shows every figure on screen.
+           Browser and PWA are untouched and still print normally.
+           Matched on the handler rather than a class so every injected copy of the
+           button is covered - there are eleven of them, built into innerHTML. */
+        html.is-native [onclick*="printReceipt"] { display: none !important; }
+
         @media print {
             /* DARK MODE MUST NOT REACH PAPER.
                The theme is a class on <html>, and it survived into print. The block
@@ -437,10 +457,22 @@
             .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const d = new Date();
         const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const previous = document.title;
-        document.title = `${course}-${stamp}-Receipt`;
-        window.print();
-        setTimeout(() => { document.title = previous; }, 1000);
+        const title = `${course}-${stamp}-Receipt`;
+
+        // ONE EXPORT, TWO DELIVERIES. On the web this still ends in window.print()
+        // with the existing print CSS behind it. Inside Capacitor, window.print() is
+        // a silent no-op, so the same document is turned into a real PDF and handed
+        // to the iOS share sheet instead.
+        //
+        // The PDF is read out of THESE TWO NODES - the settlement document and the
+        // scorecard beneath it, exactly as rendered. Nothing is recalculated, so the
+        // exported money is the displayed money by construction.
+        const roots = [
+            document.getElementById('settle-content'),
+            document.getElementById('receipt-scorecard')
+        ].filter(Boolean);
+
+        return window.RattleExport.exportOrPrint({ title: title, roots: roots });
     }
 
     // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------

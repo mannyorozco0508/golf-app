@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v41-consumer-rc';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -364,7 +364,10 @@ describe('SERVICE WORKER', () => {
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
         // 33 since logo-mark.png joined the shell for the homepage brand mark.
-        assert.equal(entries.length, 33);
+        // 34 since native-export.js joined the shell: settlement.html and trip.html
+        // call it unguarded from their Print / Save buttons, so a cached shell without
+        // it would restore exactly the dead button that file was added to fix.
+        assert.equal(entries.length, 34);
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 

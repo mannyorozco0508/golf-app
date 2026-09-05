@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v41-consumer-rc';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -529,11 +529,14 @@ describe('SERVICE WORKER', () => {
         // Comments in this block name the very files being checked, so strip them first.
         const entries = raw.split('\n').map(l => l.trim())
             .filter(l => /^'\.\/[^']+',?$/.test(l)).map(l => l.replace(/^'|',?$/g, ''));
-        // 33 since logo-mark.png joined the shell: the homepage brand mark is an
-        // <img>, so an offline first launch without it would paint the lobby with a
-        // broken image where the logo belongs.
-        assert.equal(entries.length, 33, 'the shell list gained or lost an entry');
-        ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js','./pwa-boot.js']
+        // 34 since native-export.js joined the shell: settlement.html and trip.html
+        // call it unguarded from their Print / Save buttons, so a cached shell without
+        // it would restore exactly the dead button this file was added to fix.
+        // (33 was the count when logo-mark.png joined - the homepage brand mark is an
+        // <img>, and an offline first launch without it paints a broken image.)
+        assert.equal(entries.length, 34, 'the shell list gained or lost an entry');
+        ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
+         './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });
 

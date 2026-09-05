@@ -151,7 +151,32 @@
 // offering a camera scanner this build no longer supports, and would keep
 // reminting the organizer token on every save. Shell MEMBERSHIP is unchanged; no
 // settlement arithmetic moved.
-const CACHE_VERSION = 'golfapp-v41-consumer-rc';
+// Moved to v42 because Print / Save was dead in the native app. window.print()
+// is a silent no-op inside WKWebView, so settlement.html and trip.html now route
+// through native-export.js: the browser still prints, and iOS gets a real PDF
+// built from the rendered Receipt plus the system share sheet. New precached
+// file: native-export.js. An installed PWA on v41 would keep the dead button and,
+// worse, would load pages that call a helper it has never cached.
+// Moved to v43 because v42's native export never ran. Two defects: settlement.html
+// and trip.html did not load pwa-boot.js, so GolfNet was undefined and the exporter
+// took the BROWSER path into window.print() - a silent no-op in WKWebView; and the
+// plugins were read from Capacitor.Plugins, which @capacitor/core never populates
+// without a bundler. Both pages now load the detector, plugins come from
+// Capacitor.registerPlugin(), and a Capacitor build can no longer fall through to
+// print. Shell MEMBERSHIP is unchanged: pwa-boot.js was already precached.
+// Moved to v44. v43 reached the native path correctly but then refused to export:
+// it demanded Capacitor.registerPlugin, which the natively injected bridge does
+// NOT define. JSExport.swift injects Capacitor.Plugins['Filesystem'] directly at
+// documentStart, so the plugins were present all along. Resolution now reads
+// Capacitor.Plugins first and keeps registerPlugin only as a bundler fallback.
+// Shell MEMBERSHIP unchanged; no dependency, permission or money-math change.
+// Moved to v45. The native Print / Save control is hidden: window.print() is a
+// no-op in WKWebView and four builds of Capacitor Filesystem + Share never got an
+// export working on a device, so Consumer 1.0 stops offering a button that fails.
+// The Receipt is unchanged and still shows every figure; browser and PWA still
+// print normally. The export plumbing stays in the repo, unreachable from the
+// native UI. Shell MEMBERSHIP unchanged; no dependency, permission or money change.
+const CACHE_VERSION = 'golfapp-v45-no-native-print';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -197,6 +222,9 @@ const SHELL_FILES = [
     // unguarded; a cached shell without it breaks those links rather than
     // silently sending a golfer to a page that does not exist.
     './product-links.js',
+    // Print / Save on iOS. settlement.html and trip.html call it unguarded from
+    // their print buttons; a cached shell without it would restore the dead button.
+    './native-export.js',
     './score-marks.js',
     './text-safe.js',
     './money-engine.js',

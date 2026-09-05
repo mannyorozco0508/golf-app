@@ -15,6 +15,15 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- pwa-boot.js owns GolfNet.isNative(), which native-export.js asks before
+         choosing between window.print() and the iOS share sheet. Build 4 shipped
+         without it on this page: GolfNet was undefined, the exporter concluded
+         "browser", and window.print() did nothing at all inside WKWebView. It must
+         load BEFORE native-export.js is used, which defer guarantees for a click
+         handler. -->
+    <script src="pwa-boot.js" defer></script>
+    <!-- Same native print failure as the Receipt; same shared fix. -->
+    <script src="native-export.js"></script>
     <script src="text-safe.js"></script>
     <!-- Place and tie payout allocation, shared with Tournament Mode. The rule was
          written out twice - here and in tournament-engine.js - until the shared-core
@@ -202,6 +211,10 @@
         .trip-section-sub { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px 0; }
 
         #trip-itinerary-print-view { display: none; }
+        /* Same as the Receipt: window.print() is a no-op in WKWebView, so the
+           native build does not offer the control. Browser/PWA unchanged. */
+        html.is-native [onclick*="printItinerary"] { display: none !important; }
+
         @media print {
             body.printing-itinerary > *:not(#manage-screen) { display: none !important; }
             body.printing-itinerary #manage-screen > *:not(#trip-itinerary-print-view) { display: none !important; }
@@ -1677,11 +1690,19 @@
             return;
         }
         buildItineraryPrintView();
-        document.body.classList.add('printing-itinerary');
-        window.print();
-        window.addEventListener('afterprint', () => {
-            document.body.classList.remove('printing-itinerary');
-        }, { once: true });
+
+        // The itinerary print view is display:none until the printing-itinerary class
+        // is on, and the exporter reads innerText - which respects display - so the
+        // class must go on BEFORE the read and come off after, on both paths.
+        const view = document.getElementById('trip-itinerary-print-view');
+        const title = `${(tripData && tripData.name) || 'Road-Trip'}-Itinerary`;
+
+        return window.RattleExport.exportOrPrint({
+            title: title,
+            roots: [view].filter(Boolean),
+            onBefore: () => { document.body.classList.add('printing-itinerary'); },
+            onAfter: () => { document.body.classList.remove('printing-itinerary'); }
+        });
     }
 
 

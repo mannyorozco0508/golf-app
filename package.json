@@ -17,6 +17,8 @@
   "dependencies": {
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
-    "@capacitor/ios": "^8.5.1"
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/ios": "^8.5.1",
+    "@capacitor/share": "^8.0.0"
   }
 }

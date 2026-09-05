@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v41-consumer-rc';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -567,7 +567,10 @@ describe('SERVICE WORKER', () => {
         // 33 since logo-mark.png joined the shell: the homepage brand mark is an
         // <img>, so an offline first launch without it would paint the lobby with a
         // broken image where the logo belongs.
-        assert.equal(entries.length, 33, 'the shell list gained or lost an entry');
+        // 34 since native-export.js joined the shell: settlement.html and trip.html
+        // call it unguarded from their Print / Save buttons, so a cached shell without
+        // it would restore exactly the dead button that file was added to fix.
+        assert.equal(entries.length, 34, 'the shell list gained or lost an entry');
     });
 
     test('fetch strategy is unchanged - still network-first', () => {
