@@ -32,6 +32,10 @@
          would silently restore the divergence. Depends on getStrokes / parseHcp,
          which this page defines inline and parity_test.js pins to money-engine.js. -->
     <script src="settlement-engine.js"></script>
+    <!-- Ryder Cup. This page uses ONLY the setup-side helpers - config, validation,
+         lock state - none of which touch calculateMatchEngine, so the inline match
+         engine this page defines is neither needed nor disturbed. -->
+    <script src="ryder-cup.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
          in which foursome, which is what every ?group=N scorekeeper link and every
          group-scoped write permission is measured against. This page carried its own
@@ -173,6 +177,34 @@
         .btn-danger-sm { background-color: var(--bg-card); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         .btn-outline-sm { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
 
+        .rcs-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+        .rcs-head { font-weight: bold; color: var(--brand-green); margin-bottom: 8px; }
+        .rcs-lab { display:block; font-size: 0.7rem; text-transform: uppercase; font-weight: bold; color: var(--text-muted); margin: 8px 0 3px; }
+        .rcs-in { width: 100%; box-sizing: border-box; padding: 9px; border-radius: 8px; border: 1px solid var(--border-mid); font-size: 0.92rem; }
+        .rcs-two { display: flex; gap: 8px; flex-wrap: wrap; }
+        .rcs-two > div { flex: 1 1 45%; min-width: 0; }
+        .rcs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .rcs-chip { padding: 9px 12px; border-radius: 999px; border: 1px solid var(--border-mid); background: var(--bg-card); font-size: 0.85rem; min-height: 40px; cursor: pointer; }
+        .rcs-chip.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+        .rcs-sub { font-size: 0.7rem; text-transform: uppercase; font-weight: bold; color: var(--text-muted); margin: 12px 0 4px; }
+        .rcs-match { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px; margin-bottom: 6px; }
+        .rcs-match.locked { opacity: 0.75; }
+        .rcs-mtop { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); }
+        .rcs-lock { color: var(--brand-navy); }
+        .rcs-mrow { font-weight: bold; font-size: 0.88rem; }
+        .rcs-vs { font-size: 0.7rem; color: var(--text-muted); }
+        .rcs-del, .rcs-add, .rcs-start, .rcs-save, .rcs-remove { min-height: 44px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .rcs-addrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+        .rcs-add { flex: 1 1 45%; min-width: 0; border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); }
+        .rcs-start, .rcs-save { width: 100%; border: none; background: var(--brand-green); color: #fff; font-size: 0.95rem; }
+        .rcs-remove { width: 100%; margin-top: 8px; border: 1px solid #b23; background: var(--bg-card); color: #b23; }
+        .rcs-del { border: none; background: transparent; color: #b23; font-size: 0.78rem; }
+        .rcs-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 6px; }
+        .rcs-problems:empty { display: none; }
+        .rcs-prob { font-size: 0.8rem; color: #b23; padding: 3px 0; }
+        /* Long names wrap rather than widening the card - the one way a 360px
+           phone gets a horizontal scrollbar. */
+        .rcs-card, .rcs-card * { min-width: 0; overflow-wrap: anywhere; }
         .status-pill { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: bold; white-space: nowrap; }
         .pill-main { background-color: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); }
         .pill-press { background-color: var(--danger-box-bg); color: var(--accent-red); border: 1px solid var(--accent-red); }
@@ -290,6 +322,7 @@
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
+        <div id="ryder-cup-setup"></div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
         <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
@@ -2611,6 +2644,8 @@
     // Says plainly which link this is, so a scorekeeper who cannot see a Remove
     // button knows why rather than assuming the page is broken. Mirrors the badge
     // index.html already shows on the scorecard.
+    function rcRefresh() { if (!rcDraft || !rcDraft.__open) rcDraft = null; renderRyderCupSetup(); }
+
     function renderGroupLockBadge() {
         const badge = document.getElementById('sm-group-lock-badge');
         if (badge) {
@@ -2625,6 +2660,189 @@
         // confirmAutoPairCreate refuses independently of this.
         const autoPair = document.getElementById('sm-autopair-btn');
         if (autoPair) autoPair.style.display = isOrganizerView() ? '' : 'none';
+    }
+
+    // ==================== RYDER CUP SETUP (Phase 3B) ====================
+    //
+    // WHY THIS PAGE. Side Matches are the app's existing home for a competition
+    // layered over an already-created round: the admin wizard builds the ROUND,
+    // this page adds what is played ON it. A Ryder Cup is the same shape - created
+    // after, edited later, locked once play starts - so it belongs on the same
+    // shelf, not as an eighth wizard step and not as a new nav tab.
+    //
+    // ORGANIZER ONLY, through the gate this page already uses. isOrganizerView()
+    // is the same single definition as index.html:2293, and every mutation below
+    // refuses through refuseGroupWrite() exactly as cross-group wager setup does.
+    //
+    // CLIENT-SIDE ONLY, and that is a real limitation, not an oversight. This page
+    // already documents that real auth is out of scope; Firebase rules cannot tell
+    // an organizer from a group scorekeeper, so a determined holder of a ?group=
+    // link could still write via the console. Reported, not hidden.
+    let rcDraft = null;
+
+    function rcPlayers() { return (currentData.players || []); }
+
+    function rcLoadDraft() {
+        const cfg = (typeof ryderCupConfig === 'function') ? ryderCupConfig(currentData) : null;
+        if (!cfg) {
+            rcDraft = { name: '', nameA: 'Team A', nameB: 'Team B', members: {}, matches: [] };
+            return;
+        }
+        rcDraft = {
+            name: ryderCupName(currentData) || '',
+            nameA: cfg.sides.A ? cfg.sides.A.name : 'Team A',
+            nameB: cfg.sides.B ? cfg.sides.B.name : 'Team B',
+            members: Object.assign({}, cfg.members),
+            matches: Object.keys(cfg.matches).map(k => Object.assign({}, cfg.matches[k]))
+        };
+    }
+
+    function rcMatchLocked(m) {
+        if (typeof ryderMatchLockState !== 'function') return false;
+        return ryderMatchLockState(currentData, currentData.courseData || [],
+            currentData.scores || {}, m).locked;
+    }
+
+    function renderRyderCupSetup() {
+        const mount = document.getElementById('ryder-cup-setup');
+        if (!mount) return;
+        if (!isOrganizerView()) { mount.innerHTML = ''; return; }
+        if (!rcDraft) rcLoadDraft();
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const exists = (typeof hasRyderCup === 'function') && hasRyderCup(currentData);
+
+        if (!exists && !rcDraft.__open) {
+            mount.innerHTML = '<div class="rcs-card"><button type="button" class="rcs-start"'
+                + ' onclick="rcOpen()">\uD83C\uDFC6 Set Up a Ryder Cup</button>'
+                + '<div class="rcs-hint">A team competition played on top of this round. '
+                + 'Points, not money \u2014 your side games are unaffected.</div></div>';
+            return;
+        }
+
+        const roster = side => rcPlayers().filter(p => rcDraft.members[String(p.id)] === side);
+        const chip = (p, side) => '<button type="button" class="rcs-chip'
+            + (rcDraft.members[String(p.id)] === side ? ' on' : '')
+            + '" onclick="rcToggle(' + p.id + ',\'' + side + '\')">' + esc(p.name) + '</button>';
+
+        let html = '<div class="rcs-card">'
+            + '<div class="rcs-head">\uD83C\uDFC6 Ryder Cup</div>'
+            + '<label class="rcs-lab">Cup name</label>'
+            + '<input class="rcs-in" id="rc-name" value="' + esc(rcDraft.name)
+            + '" placeholder="Myrtle Cup" oninput="rcDraft.name=this.value">'
+            + '<div class="rcs-two">'
+            + '<div><label class="rcs-lab">Team 1</label><input class="rcs-in" id="rc-na" value="'
+            + esc(rcDraft.nameA) + '" oninput="rcDraft.nameA=this.value;renderRyderCupSetup()"></div>'
+            + '<div><label class="rcs-lab">Team 2</label><input class="rcs-in" id="rc-nb" value="'
+            + esc(rcDraft.nameB) + '" oninput="rcDraft.nameB=this.value;renderRyderCupSetup()"></div>'
+            + '</div>';
+
+        // Assignment. Tap a name under a side to put them there; tap again to remove.
+        // A golfer left out of both is simply not in this Cup, which is normal on a
+        // trip where someone sits a session out.
+        ['A', 'B'].forEach(side => {
+            html += '<label class="rcs-lab">' + esc(side === 'A' ? rcDraft.nameA : rcDraft.nameB)
+                + '</label><div class="rcs-chips">'
+                + rcPlayers().map(p => chip(p, side)).join('') + '</div>';
+        });
+
+        html += '<div class="rcs-sub">Matches</div>';
+        if (rcDraft.matches.length === 0) html += '<div class="rcs-hint">No matches yet.</div>';
+        rcDraft.matches.forEach((m, i) => {
+            const locked = m.lockedAt || rcMatchLocked(m);
+            const nm = ids => (ids || []).map(id => {
+                const p = rcPlayers().find(x => String(x.id) === String(id));
+                return p ? p.name : id;
+            }).join(' + ');
+            html += '<div class="rcs-match' + (locked ? ' locked' : '') + '">'
+                + '<div class="rcs-mtop">' + (m.format === 'singles' ? 'Singles' : 'Four-Ball')
+                + (locked ? ' <span class="rcs-lock">Match started \u2014 pairing locked</span>' : '')
+                + '</div>'
+                + '<div class="rcs-mrow">' + esc(nm(m.playersA) || '\u2014') + '</div>'
+                + '<div class="rcs-vs">vs</div>'
+                + '<div class="rcs-mrow">' + esc(nm(m.playersB) || '\u2014') + '</div>'
+                + (locked ? '' : '<button type="button" class="rcs-del" onclick="rcDropMatch(' + i + ')">Remove</button>')
+                + '</div>';
+        });
+
+        html += '<div class="rcs-addrow">'
+            + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'fourball\')">+ Four-Ball</button>'
+            + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'singles\')">+ Singles</button>'
+            + '</div>'
+            + '<div id="rc-problems" class="rcs-problems"></div>'
+            + '<button type="button" class="rcs-save" onclick="rcSave()">Save Ryder Cup</button>';
+        if (exists) html += '<button type="button" class="rcs-remove" onclick="rcRemove()">Remove Cup</button>';
+        html += '</div>';
+        mount.innerHTML = html;
+    }
+
+    function rcOpen() { rcLoadDraft(); rcDraft.__open = true; renderRyderCupSetup(); }
+
+    function rcToggle(pid, side) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const key = String(pid);
+        rcDraft.members[key] = (rcDraft.members[key] === side) ? undefined : side;
+        if (!rcDraft.members[key]) delete rcDraft.members[key];
+        renderRyderCupSetup();
+    }
+
+    // Seeds a pairing from whoever is assigned and not already playing this
+    // session. The organizer adjusts by reassigning; the save gate is the
+    // authority on whether the result is legal.
+    function rcAddMatch(format) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const need = format === 'singles' ? 1 : 2;
+        const used = {};
+        rcDraft.matches.forEach(m => (m.playersA || []).concat(m.playersB || [])
+            .forEach(id => { used[String(id)] = true; }));
+        const free = side => rcPlayers()
+            .filter(p => rcDraft.members[String(p.id)] === side && !used[String(p.id)])
+            .slice(0, need).map(p => String(p.id));
+        rcDraft.matches.push({
+            id: 'm' + (rcDraft.matches.length + 1),
+            sessionId: (typeof RYDER_DEFAULT_SESSION === 'string') ? RYDER_DEFAULT_SESSION : 's1',
+            format: format, scoring: 'net', sideA: 'A', sideB: 'B',
+            playersA: free('A'), playersB: free('B')
+        });
+        renderRyderCupSetup();
+    }
+
+    function rcDropMatch(i) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const m = rcDraft.matches[i];
+        if (m && (m.lockedAt || rcMatchLocked(m))) { alert('That match has started \u2014 it cannot be removed.'); return; }
+        rcDraft.matches.splice(i, 1);
+        renderRyderCupSetup();
+    }
+
+    function rcShowProblems(problems) {
+        const box = document.getElementById('rc-problems');
+        if (!box) return;
+        box.innerHTML = problems.map(p => '<div class="rcs-prob">\u26A0\uFE0F '
+            + String(p.message || p.type).replace(/[&<>]/g, '') + '</div>').join('');
+    }
+
+    // ONE AUTHORITY. The UI never decides legality; it asks the engine and prints
+    // what comes back.
+    function rcSave() {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const next = buildRyderCupConfig(rcDraft);
+        const problems = validateRyderCupSave(currentData, currentData.courseData || [],
+            currentData.scores || {}, next);
+        if (problems.length > 0) { rcShowProblems(problems); return; }
+        rcShowProblems([]);
+        db.ref('events/' + currentMode + '/ryderCup').set(next)
+            .then(() => { rcDraft = null; renderRyderCupSetup(); })
+            .catch(e => rcShowProblems([{ message: 'Could not save: ' + e.message }]));
+    }
+
+    function rcRemove() {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        const gate = canRemoveRyderCup(currentData, currentData.courseData || [],
+            currentData.scores || {});
+        if (!gate.ok) { rcShowProblems([{ message: gate.message || 'The Cup cannot be removed.' }]); return; }
+        if (!confirm('Remove this Ryder Cup? No scores are affected.')) return;
+        db.ref('events/' + currentMode + '/ryderCup').remove()
+            .then(() => { rcDraft = null; renderRyderCupSetup(); });
     }
 
     function renderSideMatches() {

@@ -180,7 +180,10 @@
 // loads it unguarded at parse time, so an already-installed PWA holding a v45
 // cache would serve a scorecard whose Ryder Cup card never renders. A bump is the
 // only thing that reaches those devices.
-const CACHE_VERSION = 'golfapp-v46-ryder-cup';
+// Moved to v47 because sidematches.html gained the Ryder Cup setup surface and
+// now loads ryder-cup.js. An installed PWA on v46 would serve a Matches page that
+// cannot create a Cup, with no signal that anything is missing.
+const CACHE_VERSION = 'golfapp-v47-ryder-setup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

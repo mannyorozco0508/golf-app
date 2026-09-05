@@ -83,6 +83,9 @@ function ryderCupConfig(data) {
     if (sideIds.length < 2) return null;
     return {
         v: rc.v || RYDER_CUP_SCHEMA_VERSION,
+        // The competition's own name rides along with the config. Omitting it here
+        // made ryderCupName() fall back to "Ryder Cup" for every Cup ever named.
+        name: rc.name,
         sides: sides,
         members: rc.members || {},
         matches: rc.matches || {}
@@ -436,6 +439,171 @@ function computeRyderCupStandings(data, courseData, savedScores) {
         // make this configurable; nothing here assumes it is 1 beyond this line.
         pointsAvailable: matches.length * RYDER_POINTS_WIN
     };
+}
+
+// ---------------------------------------------------------------------------
+// SETUP-SIDE HELPERS (Phase 3B)
+//
+// Everything below serves the organizer's setup screen. None of it scores a hole
+// or moves a dollar. It builds the stored competition, decides what may still be
+// changed, and answers whether the whole thing can be thrown away.
+//
+// The organizer UI must call these rather than re-deriving the rules, so there is
+// exactly one definition of "is this pairing legal" and one of "is it too late to
+// change it".
+// ---------------------------------------------------------------------------
+
+// The only session that exists until the three-day structure lands. Deliberately
+// an opaque id, not "Day 1 Morning": Phase 2 scoped exclusivity by session, and
+// the real ids ('d1-foursomes', 'd3-singles') slot in here later without a
+// migration. Nothing may assume the set of sessions is {this one}.
+var RYDER_DEFAULT_SESSION = 's1';
+
+// A COMPETITION HAS ITS OWN NAME. The sides are "Team Rattle" and "Team Chaos";
+// the competition is "The Myrtle Cup". Those are different things, and hardcoding
+// the title as "Ryder Cup" would make the format the name. Falls back only when a
+// competition predates this field.
+function ryderCupName(data) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg) return null;
+    var n = cfg.name;
+    return (typeof n === 'string' && n.trim()) ? n.trim() : 'Ryder Cup';
+}
+
+// Builds the stored object from what the organizer typed. PURE - it writes
+// nothing and reads no scores; the caller persists the result only after
+// validateRyderCupSave() approves it.
+//
+// NOTE THE ABSENT FIELDS. There is no stake, no press rule, no per-hole amount
+// and no payout anywhere in this shape, and a test asserts they can never appear.
+// A Cup match is worth a point.
+function buildRyderCupConfig(input) {
+    var inp = input || {};
+    var sides = {
+        A: { id: 'A', name: (inp.nameA || 'Team A').toString().trim() || 'Team A' },
+        B: { id: 'B', name: (inp.nameB || 'Team B').toString().trim() || 'Team B' }
+    };
+    if (inp.colorA) sides.A.color = inp.colorA;
+    if (inp.colorB) sides.B.color = inp.colorB;
+
+    var members = {};
+    Object.keys(inp.members || {}).forEach(function (pid) {
+        var side = inp.members[pid];
+        if (side === 'A' || side === 'B') members[String(pid)] = side;
+    });
+
+    var matches = {};
+    (inp.matches || []).forEach(function (m, i) {
+        var id = m.id || ('m' + (i + 1));
+        matches[id] = {
+            id: id,
+            sessionId: m.sessionId || RYDER_DEFAULT_SESSION,
+            format: m.format === 'singles' ? 'singles' : 'fourball',
+            scoring: m.scoring || 'net',
+            sideA: 'A', sideB: 'B',
+            playersA: (m.playersA || []).map(String),
+            playersB: (m.playersB || []).map(String)
+        };
+        // A pairing already locked keeps its snapshot across an edit of OTHER
+        // pairings. Dropping it here would silently unlock a started match.
+        if (m.lockedAt) {
+            matches[id].lockedAt = m.lockedAt;
+            matches[id].lockedA = (m.lockedA || []).map(String);
+            matches[id].lockedB = (m.lockedB || []).map(String);
+        }
+    });
+
+    return {
+        v: RYDER_CUP_SCHEMA_VERSION,
+        name: (inp.name || '').toString().trim() || 'Ryder Cup',
+        sides: sides,
+        members: members,
+        matches: matches
+    };
+}
+
+// A golfer may be in the round without being in the Cup - a trip has golfers who
+// sit a session out. Only those actually assigned are members.
+function ryderCupMemberIds(data) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg) return [];
+    return Object.keys(cfg.members);
+}
+
+// THE SAVE GATE. Everything an organizer's save must survive, in one place.
+//
+// Beyond the structural rules validateRyderCup() already enforces, this adds the
+// two that only exist once play has started:
+//
+//   a locked pairing may not be re-rostered
+//   a golfer inside a locked pairing may not change sides
+//
+// The second is the subtle one. Without it an organizer could leave Match 1
+// untouched, move Manny from Team Rattle to Team Chaos, and retroactively turn a
+// completed match into an illegal one. The roster snapshot protects who PLAYED;
+// this protects which side they played FOR.
+function validateRyderCupSave(data, courseData, savedScores, nextCup) {
+    var problems = [];
+    var candidate = { players: (data || {}).players || [], ryderCup: nextCup };
+    validateRyderCup(candidate).forEach(function (p) { problems.push(p); });
+
+    var prev = ryderCupConfig(data);
+    if (!prev) return problems;
+
+    Object.keys(prev.matches).forEach(function (mid) {
+        var before = prev.matches[mid];
+        var lock = ryderMatchLockState(data, courseData, savedScores, before);
+        if (!lock.locked) return;
+
+        var after = (nextCup.matches || {})[mid];
+        if (!after) {
+            problems.push({ type: 'locked-match-removed', matchId: mid,
+                message: 'that match has started and cannot be removed' });
+            return;
+        }
+        // THE DECLARED ROSTER, not ryderMatchRoster(after). That helper prefers the
+        // lock snapshot, so asking it about the incoming edit compared the snapshot
+        // to itself and reported no change - the check defeated by the very field
+        // it exists to protect.
+        var was = ryderMatchRoster(before);
+        var now = { a: (after.playersA || []).map(String), b: (after.playersB || []).map(String) };
+        if (was.a.join(',') !== now.a.join(',') || was.b.join(',') !== now.b.join(',')) {
+            problems.push({ type: 'locked-match-edited', matchId: mid,
+                message: 'that match has started - its pairing is locked' });
+        }
+        was.a.concat(was.b).forEach(function (pid) {
+            if (prev.members[pid] && nextCup.members[pid]
+                && prev.members[pid] !== nextCup.members[pid]) {
+                problems.push({ type: 'locked-member-moved', matchId: mid, playerId: pid,
+                    message: 'that golfer is in a match that has started and cannot change teams' });
+            }
+        });
+    });
+
+    return problems;
+}
+
+// Has ANY Cup match begun? Governs whether the competition may be thrown away.
+function ryderCupHasStarted(data, courseData, savedScores) {
+    var cfg = ryderCupConfig(data);
+    if (!cfg) return false;
+    return Object.keys(cfg.matches).some(function (mid) {
+        return ryderMatchLockState(data, courseData, savedScores, cfg.matches[mid]).locked;
+    });
+}
+
+// DELETION IS A ONE-WAY DOOR. Before anyone tees off, a Cup created by mistake is
+// just a bad draft and removing it costs nothing. After the first score it holds
+// results that exist nowhere else - points are derived from config plus scores, so
+// deleting the config destroys the history rather than archiving it. Blocked until
+// a future phase designs a real archive.
+function canRemoveRyderCup(data, courseData, savedScores) {
+    if (!hasRyderCup(data)) return { ok: false, error: 'no-competition' };
+    if (ryderCupHasStarted(data, courseData, savedScores)) {
+        return { ok: false, error: 'already-started',
+            message: 'A match has already started. The Cup cannot be removed.' };
+    }
+    return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
