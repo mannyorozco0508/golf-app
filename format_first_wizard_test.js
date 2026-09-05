@@ -137,7 +137,7 @@ describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
 
     test('the Cup workflow is Format, Players, Review — nothing else', () => {
         assert.deepEqual(JSON.parse(run(wizard('stroke'), "JSON.stringify(wizardWorkflow('ryder-cup'))")),
-            ['course', 'length', 'format', 'players', 'review']);
+            ['format', 'course', 'length', 'players', 'review']);
     });
 
     test('the Cup never reaches Format Settings', () => {
@@ -224,16 +224,18 @@ describe('NO FORMAT SEES CONTROLS THAT ARE NOT ITS OWN', () => {
 // ============================================================================
 describe('BACK AND NEXT WALK THE WORKFLOW', () => {
 
-    test('Next from Format lands on the step that actually exists', () => {
-        assert.equal(run(wizard('bestball'), 'wizardNeighbourStep(3, 1)'), 4);
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(3, 1)'), 5);
-        assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(3, 1)'), 5);
+    test('Next from Format always lands on Course, whatever the format', () => {
+        ['bestball', 'stroke', 'ryder-cup'].forEach((f) => {
+            assert.equal(run(wizard(f), 'wizardNeighbourStep(3, 1)'), 1, f);
+        });
     });
 
     test('Back from Players returns to the step that actually exists', () => {
+        // Best Ball has Format Settings between Round Length and Players; the other
+        // two do not, so Back from Players is Round Length for them.
         assert.equal(run(wizard('bestball'), 'wizardNeighbourStep(5, -1)'), 4);
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, -1)'), 3);
-        assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(5, -1)'), 3);
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, -1)'), 2);
+        assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(5, -1)'), 2);
     });
 
     test('Next from Players skips Games & Money for a Cup only', () => {

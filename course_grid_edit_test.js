@@ -383,19 +383,23 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
         run(sb, `window.__alerts = []; window.alert = m => window.__alerts.push(m);`);
         run(sb, `wizardNext(2);`);
         assert.equal(sb.window.__alerts.length, 0);
-        assert.equal(val(sb, 'currentWizardStep'), 3, 'must advance');
+        // Format moved to the front of the workflow, so Round Length no longer leads
+        // to it. What this test guards is the GATE and the edited values surviving the
+        // transition, so it asks the workflow where Next goes instead of naming a step.
+        assert.notEqual(val(sb, 'currentWizardStep'), 2, 'must advance');
+        assert.equal(val(sb, 'currentWizardStep'), val(sb, 'wizardNeighbourStep(2, 1)'));
         const by = {}; capture(sb).forEach(h => { by[h.hole] = h; });
         assert.equal(by[1].par, 5);
         assert.equal(by[9].par, 3);
         assert.equal(by[18].hcpIndex, 2);
     });
 
-    test('BACK from Format returns to the same edited values', () => {
+    test('BACK from the next step returns to the same edited values', () => {
         const sb = page();
         run(sb, `goToWizardStep(2); document.getElementById('enable-custom-course').checked = true;`);
         seed(sb, 'Manny Test Links'); fillValid(sb);
         setPar(sb, 1, 5); setHcp(sb, 18, 2); setHcp(sb, 2, 18);
-        run(sb, `wizardNext(2); wizardBack(3);`);
+        run(sb, `wizardNext(2); wizardBack(currentWizardStep);`);
         assert.equal(val(sb, 'currentWizardStep'), 2);
         assert.equal(par(sb, 1), '5', 'Back must not reseed');
         assert.equal(hcp(sb, 18), '2');

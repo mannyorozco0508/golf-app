@@ -469,6 +469,7 @@
         </div>
     </div>
         <div class="wizard-nav-row">
+            <button class="wizard-btn-back" id="wizard-back-1" onclick="wizardBack(1)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-1" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
         </div>
     </div>
@@ -568,7 +569,7 @@
         </div>
     </div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(2)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-2" onclick="wizardBack(2)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-2" onclick="wizardNext(2)">Next: Format ▶</button>
         </div>
     </div>
@@ -725,7 +726,7 @@
         </div>
     </div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(3)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-3" onclick="wizardBack(3)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-3" onclick="wizardNext(3)">Next: Format Settings ▶</button>
         </div>
     </div>
@@ -930,7 +931,7 @@
         </div>
     </div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(4)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-4" onclick="wizardBack(4)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-4" onclick="wizardNext(4)">Next: Players ▶</button>
         </div>
     </div>
@@ -967,7 +968,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     <button class="btn-add" style="background:var(--nassau-box-bg); border-color:var(--accent-teal); color:var(--brand-green);" onclick="previewStrokes()">🧮 Preview Handicap Strokes</button>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(5)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-5" onclick="wizardBack(5)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Side Games ▶</button>
         </div>
     </div>
@@ -1168,7 +1169,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         </div>
 
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(6)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-6" onclick="wizardBack(6)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-6" onclick="wizardNext(6)">Next: Review ▶</button>
         </div>
     </div>
@@ -1178,7 +1179,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-step-sub">Quick check before you start the round — tap any step above to jump back and change something.</div>
         <div id="wizard-review-summary"></div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-back" onclick="wizardBack(7)">◀ Back</button>
+            <button class="wizard-btn-back" id="wizard-back-7" onclick="wizardBack(7)">◀ Back</button>
         </div>
 
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
@@ -1284,7 +1285,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     const WIZARD_STEP_OF = { course: 1, length: 2, format: 3, settings: 4, players: 5, action: 6, review: 7 };
     const WIZARD_SEMANTIC_OF = { 1: 'course', 2: 'length', 3: 'format', 4: 'settings', 5: 'players', 6: 'action', 7: 'review' };
     const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Format', settings: 'Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
-    const WIZARD_NEXT_LABELS = { length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
+    const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
     // DOM step ids only. NEVER the length of a workflow.
     const WIZARD_TOTAL_STEPS = 7;
 
@@ -1315,17 +1316,35 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     // The single source of truth for the progress dots, for Back/Next, and for
     // which steps exist at all.
+    // FORMAT FIRST, AND FIRST MEANS FIRST.
+    //
+    // Course was step one because that is the order the wizard grew in, not because
+    // it is the order a golfer decides in. On the first tee the group already knows
+    // they are playing a scramble; being asked which course before being asked what
+    // game reads as a filing exercise. Worse, it meant the wizard could not shape
+    // itself until three screens in.
+    //
+    // Semantic ordering makes this a change to one array. The DOM ids are unchanged
+    // and unmoved - wizard-step-3 is still the format screen, it is simply the first
+    // one the workflow visits. Nothing about persistence, validation or the settings
+    // panels moved with it.
     function wizardWorkflow(fmt) {
         const format = (fmt === undefined) ? currentPrimaryFormat() : fmt;
         // A Cup carries no wizard money - no Format Settings, no Games & Money.
         // Optional side action is added afterwards from Matches, exactly as it is
-        // for every other round.
-        if (format === RYDER_CUP_FORMAT) return ['course', 'length', 'format', 'players', 'review'];
-        const flow = ['course', 'length', 'format'];
+        // for every other round. Course and Round Length stay: saveSettings() refuses
+        // without a course, and the Par/HCP grid for an unmapped course lives on the
+        // Round Length step, so a Cup needs both exactly as any other round does.
+        if (format === RYDER_CUP_FORMAT) return ['format', 'course', 'length', 'players', 'review'];
+        const flow = ['format', 'course', 'length'];
         if (FORMATS_WITH_SETTINGS.indexOf(format) !== -1) flow.push('settings');
         flow.push('players', 'action', 'review');
         return flow;
     }
+
+    // The step the wizard opens on. Never a literal, so this can never drift from
+    // the workflow again.
+    function wizardFirstStep() { return wizardStepNumbers()[0]; }
 
     function wizardStepNumbers(fmt) {
         return wizardWorkflow(fmt).map(function (s) { return WIZARD_STEP_OF[s]; });
@@ -1380,13 +1399,20 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const steps = wizardStepNumbers();
         for (let n = 1; n <= WIZARD_TOTAL_STEPS; n++) {
             const btn = document.getElementById('wizard-next-' + n);
-            if (!btn) continue;
-            const idx = steps.indexOf(n);
-            if (idx === -1 || idx === steps.length - 1) continue;
-            const target = WIZARD_SEMANTIC_OF[steps[idx + 1]];
-            btn.textContent = (target === 'review')
-                ? 'Review \u0026 Save \u25B6'
-                : 'Next: ' + WIZARD_NEXT_LABELS[target] + ' \u25B6';
+            if (btn) {
+                const idx = steps.indexOf(n);
+                if (idx !== -1 && idx !== steps.length - 1) {
+                    const target = WIZARD_SEMANTIC_OF[steps[idx + 1]];
+                    btn.textContent = (target === 'review')
+                        ? 'Review \u0026 Save \u25B6'
+                        : 'Next: ' + WIZARD_NEXT_LABELS[target] + ' \u25B6';
+                }
+            }
+            // Back on the FIRST step of the workflow has nowhere to go. It used to be
+            // absent from Course because Course happened to be step one; now that any
+            // step can be first, the button follows the workflow instead of the markup.
+            const back = document.getElementById('wizard-back-' + n);
+            if (back) back.style.display = (steps.indexOf(n) === 0) ? 'none' : '';
         }
         const saveBtn = document.getElementById('main-save-btn');
         if (saveBtn) {
@@ -1409,6 +1435,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     // The cards write to the hidden <select> and then call the SAME handler the
     // dropdown's onchange always called. There is no second format model.
+    // TAPPING THE WIDGET IS THE ANSWER. Making the golfer tap a card and then tap
+    // Next to confirm the card asks the same question twice - and a selected-but-not-
+    // confirmed card is exactly the state that let somebody walk into Players
+    // believing they had chosen Scramble when the round was still Stroke Play.
+    //
+    // Re-tapping the format the round is already on advances too, so the widget
+    // always does the same thing.
     function selectFormatCard(fmt) {
         const sel = document.getElementById('game-format-select');
         if (!sel) return;
@@ -1416,6 +1449,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (prev !== fmt) clearFormatCarryover(prev, fmt);
         sel.value = fmt;
         handleFormatChange();
+        // handleFormatChange() has just recomputed the workflow for the format that
+        // was tapped, so this advances into THAT format's flow, not the old one's.
+        goToWizardStep(wizardNeighbourStep(WIZARD_STEP_OF.format, 1));
     }
 
     // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
@@ -4945,7 +4981,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     syncFormatCards();
     renderWizardProgress();
-    goToWizardStep(1);
+    // Game Day lands here. The first thing a golfer sees is the format gallery.
+    goToWizardStep(wizardFirstStep());
 
     // Step 3's sub-header reflects which entry card the organizer chose — Club Event nudges
     // toward common club formats, Quick Round keeps it plain. Every format card is still
@@ -4954,7 +4991,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     if (step3SubEl) {
         step3SubEl.textContent = currentEventType === 'club'
             ? "Common club formats: Stroke Play, Stableford, Best Ball. Every other format below still works too."
-            : "Pick the golf first. Bets and side games come later, under Games & Money.";
+            : "Tap what you're playing. Course, players and any bets come next.";
     }
     // On the lobby screen itself (no game code yet), show the framing for the default
     // Quick Round selection, matching whichever card starts active in the HTML.
