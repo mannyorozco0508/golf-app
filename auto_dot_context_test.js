@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v46-ryder-cup';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -534,7 +534,10 @@ describe('SERVICE WORKER', () => {
         // it would restore exactly the dead button this file was added to fix.
         // (33 was the count when logo-mark.png joined - the homepage brand mark is an
         // <img>, and an offline first launch without it paints a broken image.)
-        assert.equal(entries.length, 34, 'the shell list gained or lost an entry');
+        // 35 since ryder-cup.js joined the shell: index.html loads it unguarded at
+        // parse time, so a cached shell without it does not lose the Ryder Cup card -
+        // it breaks the scorecard.
+        assert.equal(entries.length, 35, 'the shell list gained or lost an entry');
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
          './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));

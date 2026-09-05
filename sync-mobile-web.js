@@ -67,6 +67,10 @@ const CONSUMER_SHELL = [
     'instructions.html', 'shared.html', 'logo-mark.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
+    // The Ryder Cup competition layer, loaded by the scorecard. Without it here
+    // the iOS bundle would ship a scorecard that cannot render the Cup card while
+    // the browser can - the exact web/native divergence this list exists to stop.
+    'ryder-cup.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

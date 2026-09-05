@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v46-ryder-cup';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -367,7 +367,9 @@ describe('SERVICE WORKER', () => {
         // 34 since native-export.js joined the shell: settlement.html and trip.html
         // call it unguarded from their Print / Save buttons, so a cached shell without
         // it would restore exactly the dead button that file was added to fix.
-        assert.equal(entries.length, 34);
+        // 35 since ryder-cup.js joined the shell: index.html loads it unguarded at
+        // parse time, so a cached shell without it breaks the scorecard.
+        assert.equal(entries.length, 35);
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 

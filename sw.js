@@ -176,7 +176,11 @@
 // The Receipt is unchanged and still shows every figure; browser and PWA still
 // print normally. The export plumbing stays in the repo, unreachable from the
 // native UI. Shell MEMBERSHIP unchanged; no dependency, permission or money change.
-const CACHE_VERSION = 'golfapp-v45-no-native-print';
+// Moved to v46 because the shell list below gained ryder-cup.js. index.html now
+// loads it unguarded at parse time, so an already-installed PWA holding a v45
+// cache would serve a scorecard whose Ryder Cup card never renders. A bump is the
+// only thing that reaches those devices.
+const CACHE_VERSION = 'golfapp-v46-ryder-cup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -229,6 +233,9 @@ const SHELL_FILES = [
     './text-safe.js',
     './money-engine.js',
     './settlement-engine.js',
+    // ryder-cup.js is loaded unguarded by index.html, so a cached shell without it
+    // does not degrade the Cup card - it breaks the page. Precached for that reason.
+    './ryder-cup.js',
     './action-model.js',
     './bet-strip.js',
     './hole-events.js',

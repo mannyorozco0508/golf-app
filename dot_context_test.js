@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v45-no-native-print';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v46-ryder-cup';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -570,7 +570,10 @@ describe('SERVICE WORKER', () => {
         // 34 since native-export.js joined the shell: settlement.html and trip.html
         // call it unguarded from their Print / Save buttons, so a cached shell without
         // it would restore exactly the dead button that file was added to fix.
-        assert.equal(entries.length, 34, 'the shell list gained or lost an entry');
+        // 35 since ryder-cup.js joined the shell: index.html loads it unguarded at
+        // parse time, so a cached shell without it does not lose the Ryder Cup card -
+        // it breaks the scorecard.
+        assert.equal(entries.length, 35, 'the shell list gained or lost an entry');
     });
 
     test('fetch strategy is unchanged - still network-first', () => {

@@ -28,6 +28,10 @@
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
+    <!-- Ryder Cup competition layer. MUST load after money-engine.js: it adapts
+         calculateMatchEngine for hole arithmetic and does nothing on its own.
+         Carries no money - a Cup match awards points, never dollars. -->
+    <script src="ryder-cup.js"></script>
     <script src="pool-engine.js"></script>
     <script src="bet-strip.js"></script>
     <script src="hole-events.js"></script>
@@ -1064,6 +1068,22 @@
         .lw-scount { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
         .lw-sholes { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; }
         .lw-none { font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+        .rc-srow { display:flex; justify-content:space-between; align-items:baseline; padding:1px 0; }
+        .rc-sname { font-weight:bold; font-size:0.9rem; color:var(--text-main); }
+        .rc-spts { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
+        .rc-live { font-size:0.72rem; color:var(--text-muted); padding-top:2px; }
+        .rc-lab { font-size:0.66rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); letter-spacing:0.04em; }
+        .rc-your { border-top:1px solid var(--border-soft, #ddd); margin-top:6px; padding-top:5px; }
+        .rc-mside { font-weight:bold; font-size:0.86rem; }
+        .rc-mstat { font-size:0.78rem; color:var(--brand-green); font-weight:bold; padding:1px 0; }
+        .rc-all { margin-top:5px; }
+        .rc-all > summary { font-size:0.74rem; font-weight:bold; color:var(--brand-green); cursor:pointer; }
+        .rc-arow { padding:4px 0; border-top:1px solid var(--border-soft, #eee); }
+        .rc-aside { font-size:0.8rem; font-weight:bold; }
+        .rc-astat { font-size:0.74rem; color:var(--text-muted); }
+        /* Long partner pairs wrap instead of widening the card - the one way a
+           360px phone gets a horizontal scrollbar. */
+        .rc-card, .rc-card * { min-width:0; overflow-wrap:anywhere; }
         .lw-foot { font-size: 0.6rem; color: var(--text-muted); margin-top: 5px; }
         .lb-foot { font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 8px 0 2px 0; }
 
@@ -2484,8 +2504,11 @@
         // is an additional card rather than a replacement. It rides the same grid, which
         // means Part 3's two mounts carry it with no extra plumbing.
         const dotsBoard = renderDotsWidgetHtml();
-        const any = board || skins || matches || points || hilo || strokeBets || dotsBoard;
-        const html = any ? '<div class="lw-grid">' + board + dotsBoard + skins + matches + points + hilo + strokeBets + '</div>' : '';
+        // Ryder Cup rides the same grid and the same two mounts. Placed after the
+        // to-par board so the golfer's own score stays first on the phone.
+        const ryder = (typeof renderRyderCupHtml === 'function') ? renderRyderCupHtml() : '';
+        const any = board || skins || matches || points || hilo || strokeBets || dotsBoard || ryder;
+        const html = any ? '<div class="lw-grid">' + board + dotsBoard + ryder + skins + matches + points + hilo + strokeBets + '</div>' : '';
         // ONE PRESENTER, TWO MOUNTS. The markup is built once, above, from
         // liveStandings() -> computeNetToParStandings(). Hole View and the Full Card
         // then receive the same string. Nothing about ranking, ties, net handicaps or
@@ -2577,6 +2600,76 @@
             + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 LIVE LEADERBOARD \u2014 NET TO PAR</span>'
             + '<button type="button" class="lw-more" onclick="openLiveBoard()">Full Leaderboard \u203A</button></div>'
             + '<div class="lw-cols">' + cols + '</div>'
+            + '</div>';
+    }
+
+    // ---- RYDER CUP -------------------------------------------------------
+    //
+    // RENDERS ONLY FOR data.ryderCup. A legacy `gameFormat: 'ryder'` round is a
+    // field-wide money match with no competition structure and no sides, and it
+    // must never light this card up - hasRyderCup() is false for it, which is the
+    // whole gate.
+    //
+    // COMPACT ON PURPOSE. This sits above hole entry on a 360px phone, so it
+    // shows three things and stops: the Cup score, your own match, and a way to
+    // see the rest. ALL MATCHES is a <details> so the closed height is four lines
+    // regardless of how many pairings exist - a 12-match Cup pushes scoring no
+    // further down the page than a 1-match Cup.
+    //
+    // OFFICIAL AND LIVE ARE NEVER SUMMED INTO ONE NUMBER. A side showing 1.5 when
+    // only 1 point is banked is the scoreboard that starts an argument on the
+    // 18th green. LIVE is printed only when it actually differs from OFFICIAL,
+    // so a finished session shows one unambiguous score.
+    function renderRyderCupHtml() {
+        if (typeof hasRyderCup !== 'function' || !hasRyderCup(currentData)) return '';
+        const cd = currentData.courseData || [];
+        const sc = currentData.scores || {};
+        const st = computeRyderCupStandings(currentData, cd, sc);
+        if (!st || st.totalMatches === 0) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const sides = Object.keys(st.sides).map(k => st.sides[k]);
+        if (sides.length < 2) return '';
+        const fmtPts = n => (Math.round(n * 2) / 2).toString();
+
+        const officialRows = sides.map(s =>
+            '<div class="rc-srow"><span class="rc-sname">' + esc(s.name) + '</span>'
+            + '<span class="rc-spts">' + fmtPts(s.official) + '</span></div>').join('');
+
+        // Printed only when a live match is actually moving the number.
+        const differs = sides.some(s => Math.abs(s.projected - s.official) > 0.001);
+        const liveRow = differs
+            ? '<div class="rc-live"><span class="rc-lab">LIVE</span> '
+              + sides.map(s => esc(s.name) + ' ' + fmtPts(s.projected)).join(' \u00B7 ') + '</div>'
+            : '';
+
+        // YOUR MATCH comes from the golfers already on screen - the same scoped set
+        // every other widget here uses. An organizer or spectator has no group
+        // context, gets null, and sees no YOUR MATCH rather than a fabricated one.
+        const ctxIds = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+            ? window.__scFilteredPlayers.map(p => p.id) : [];
+        const mine = ctxIds.length ? ryderMatchForPlayers(currentData, cd, sc, ctxIds) : null;
+
+        const sideLine = arr => esc(arr.join(' / '));
+        const yourHtml = mine
+            ? '<div class="rc-your"><div class="rc-lab">YOUR MATCH</div>'
+              + '<div class="rc-mrow"><span class="rc-mside">' + sideLine(mine.playersA) + '</span></div>'
+              + '<div class="rc-mstat">' + esc(ryderStatusLine(mine)) + '</div>'
+              + '<div class="rc-mrow"><span class="rc-mside">' + sideLine(mine.playersB) + '</span></div></div>'
+            : '';
+
+        const allRows = st.matches.map(m =>
+            '<div class="rc-arow"><div class="rc-aside">' + sideLine(m.playersA) + '</div>'
+            + '<div class="rc-astat">' + esc(ryderStatusLine(m)) + '</div>'
+            + '<div class="rc-aside">' + sideLine(m.playersB) + '</div></div>').join('');
+
+        return '<div class="lw-card rc-card">'
+            + '<div class="lw-head"><span class="lw-title">\uD83C\uDFC6 RYDER CUP</span>'
+            + '<span class="lw-sub">' + st.decidedCount + ' of ' + st.totalMatches + ' final</span></div>'
+            + '<div class="rc-official">' + officialRows + '</div>'
+            + liveRow
+            + yourHtml
+            + '<details class="rc-all"><summary>All Matches (' + st.totalMatches + ')</summary>'
+            + allRows + '</details>'
             + '</div>';
     }
 
@@ -4406,6 +4499,26 @@
             window.GolfNet.track(writePromise);
         }
 
+        // RYDER CUP MATCH LOCK. A Cup pairing freezes the moment the first score
+        // for that match is posted, so a roster edit can never rewrite holes that
+        // have already been played.
+        //
+        // WHY HERE. saveScore() is the app's one score-writing function; the
+        // correction path calls it too. undoAuditEntry() writes without it, but it
+        // restores a PREVIOUS value - a score already existed, so the match was
+        // already locked, and undo can never be a match's first score.
+        //
+        // FAILS SAFE. This write is not atomic with the score write above, and it
+        // does not need to be: ryderMatchLockState() reports locked whenever scores
+        // exist, whether or not the snapshot ever landed. If this write fails the
+        // match is still locked by its scores; the snapshot is hardening, not the
+        // gate. The reverse failure - snapshot lands, score lost - freezes a roster
+        // identical to the one already stored, which changes nothing.
+        //
+        // SCORES REMAIN CORRECTABLE. What locks is WHO is playing the match, never
+        // the numbers. A 5 entered for a 4 is still fixable after the lock.
+        maybeLockRyderMatches(playerId, holeNum);
+
         if (oldVal !== newVal) {
             logAuditEntry(playerId, holeNum, oldVal, newVal);
             // VERIFICATION IS CLEARED HERE, in the one canonical score-write path, so
@@ -4415,6 +4528,28 @@
             // keep claiming the scores were checked after one of them moved.
             clearScoresVerified();
         }
+    }
+
+    // Snapshots the roster of any Ryder match this golfer plays in, once. Silent
+    // and idempotent: lockRyderMatch() returns false for an already-locked match,
+    // so re-entering a score writes nothing.
+    function maybeLockRyderMatches(playerId, holeNum) {
+        if (typeof hasRyderCup !== 'function' || !hasRyderCup(currentData)) return;
+        if (typeof lockRyderMatch !== 'function') return;
+        const cfg = ryderCupConfig(currentData);
+        if (!cfg) return;
+        const pid = String(playerId);
+        Object.keys(cfg.matches).forEach(mid => {
+            const m = cfg.matches[mid];
+            const roster = ryderMatchRoster(m);
+            if (roster.a.indexOf(pid) === -1 && roster.b.indexOf(pid) === -1) return;
+            if (m.lockedAt) return;
+            const snap = Object.assign({}, m);
+            if (!lockRyderMatch(snap, Date.now())) return;
+            db.ref('events/' + currentMode + '/ryderCup/matches/' + mid).update({
+                lockedAt: snap.lockedAt, lockedA: snap.lockedA, lockedB: snap.lockedB
+            });
+        });
     }
 
     // ---- PERSISTENT VERIFICATION STATE --------------------------------------
