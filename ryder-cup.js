@@ -167,7 +167,11 @@ function ryderMatchLockState(data, courseData, savedScores, match) {
         return { locked: !!match.lockedAt, snapshotted: !!match.lockedAt,
                  reason: match.lockedAt ? 'locked-at-first-score' : null };
     }
-    var started = ryderMatchHasScores(courseData, savedScores, match);
+    // A Foursomes pairing begins when a SIDE posts, because no individual score
+    // exists for it to begin with.
+    var started = (match && match.format === 'foursomes')
+        ? ryderFoursomesHasScores(data, match)
+        : ryderMatchHasScores(courseData, savedScores, match);
     return {
         locked: !!(match && match.lockedAt) || started,
         snapshotted: !!(match && match.lockedAt),
@@ -181,6 +185,10 @@ function ryderMatchLockState(data, courseData, savedScores, match) {
 function lockRyderMatch(match, whenMs) {
     if (!match || match.lockedAt) return false;
     match.lockedAt = whenMs || Date.now();
+    // The scoring mode is part of what was agreed at the first tee, so it freezes
+    // with the roster. Flipping scratch to handicap mid-match would rewrite holes
+    // already played.
+    match.lockedScoring = match.scoring === 'handicap' ? 'handicap' : 'scratch';
     match.lockedA = (match.playersA || []).map(String);
     match.lockedB = (match.playersB || []).map(String);
     return true;
@@ -387,12 +395,46 @@ function ryderMatchPoints(state) {
     return { pointsA: RYDER_POINTS_HALVE, pointsB: RYDER_POINTS_HALVE };
 }
 
-function computeRyderMatchResult(data, courseData, savedScores, matchId) {
+function computeRyderMatchResult(data, courseData, savedScores, matchId, roundData) {
     var cfg = ryderCupConfig(data);
     if (!cfg) return null;
     var match = cfg.matches[matchId];
     if (!match) return null;
-    var state = ryderFourBallState(data, courseData, savedScores, match);
+    var state;
+    if (match.format === 'foursomes') {
+        // ALTERNATE SHOT NEVER TOUCHES INDIVIDUAL SCORES. savedScores is not read
+        // for this branch at all; the side's own namespace is, and it lives on the
+        // round that played the session.
+        var src = roundData || data;
+        var mode = match.lockedAt
+            ? (match.lockedScoring || 'scratch')
+            : (match.scoring === 'handicap' ? 'handicap' : 'scratch');
+        var st = computeFoursomesState(src, courseData, match, (src.players || data.players || []), mode);
+        if (!st) return null;
+        state = {
+            matchId: match.id, sessionId: match.sessionId || 's1', format: 'foursomes',
+            sideA: match.sideA, sideB: match.sideB,
+            nameA: ryderSideName(data, match.sideA), nameB: ryderSideName(data, match.sideB),
+            playersA: ryderMatchRoster(match).a.map(function (id) {
+                var p = (src.players || data.players || []).filter(function (x) {
+                    return String(x.id) === String(id); })[0];
+                return p ? p.name : id; }),
+            playersB: ryderMatchRoster(match).b.map(function (id) {
+                var p = (src.players || data.players || []).filter(function (x) {
+                    return String(x.id) === String(id); })[0];
+                return p ? p.name : id; }),
+            status: st.status, closed: st.closed, thru: st.thru,
+            totalHoles: st.totalHoles, decided: st.decided,
+            allowance: st.allowance, scoringMode: st.scoringMode,
+            result: st.finalResult || (st.status === 0 ? 'All square'
+                : (st.status > 0 ? ryderSideName(data, match.sideA) : ryderSideName(data, match.sideB))
+                  + ' ' + Math.abs(st.status) + ' up')
+        };
+        var ptsF = ryderMatchPoints(state);
+        state.pointsA = ptsF.pointsA; state.pointsB = ptsF.pointsB;
+        return state;
+    }
+    state = ryderFourBallState(data, courseData, savedScores, match);
     if (!state) return null;
     var pts = ryderMatchPoints(state);
     state.pointsA = pts.pointsA;
@@ -514,7 +556,10 @@ function buildRyderCupConfig(input) {
             id: id,
             sessionId: m.sessionId || RYDER_DEFAULT_SESSION,
             format: m.format === 'singles' ? 'singles' : 'fourball',
-            scoring: m.scoring || 'net',
+            // A Foursomes match carries scratch/handicap; every other format keeps
+            // the existing net/gross meaning. Forcing 'net' here would silently
+            // turn every scratch alternate-shot match into a handicap one.
+            scoring: m.scoring || (m.format === 'singles' || m.format === 'fourball' ? 'net' : 'scratch'),
             sideA: 'A', sideB: 'B',
             playersA: (m.playersA || []).map(String),
             playersB: (m.playersB || []).map(String)
@@ -691,7 +736,12 @@ var RYDER_SESSION_FORMATS = { foursomes: 'Foursomes', fourball: 'Four-Ball', sin
 // is no honest way to write a side's single score into two individual records, so
 // the format is schedulable and its pairings storable, but it cannot be scored.
 // Nothing here fabricates an individual score to make it look playable.
-function ryderFormatPlayable(format) { return format === 'fourball' || format === 'singles'; }
+function ryderFormatPlayable(format) {
+    // Phase 5 made foursomes genuinely playable through its own team-hole-score
+    // namespace. It is listed here only because that namespace exists - nothing
+    // reads individual scores for a Foursomes match.
+    return format === 'fourball' || format === 'singles' || format === 'foursomes';
+}
 
 // ---------------------------------------------------------------------------
 // THE CLASSIC PRESET
@@ -797,7 +847,8 @@ function computeRyderSessionResults(cupData, scoresBySession) {
         // its pairings are storable, and it banks zero until real team scoring ships.
         var playable = ryderFormatPlayable(s.format);
         ms.forEach(function (m) {
-            var r = computeRyderMatchResult(cupData, src.courseData || [], src.scores || {}, m.id);
+            var r = computeRyderMatchResult(cupData, src.courseData || [], src.scores || {},
+                m.id, src.roundData || src);
             if (!r) return;
             results.push(r);
             if (!playable) return;
@@ -913,4 +964,168 @@ function canRemoveRyderCupHost(data, courseData, savedScores, knownParticipants)
             message: 'Other rounds are playing this Cup. Remove them first.' };
     }
     return { ok: true };
+}
+
+// ============================================================================
+// PHASE 5 — TRUE FOURSOMES (ALTERNATE SHOT)
+//
+// ONE BALL, ONE SCORE, OWNED BY THE SIDE.
+//
+// Two partners play a single ball and alternate strokes. The hole score belongs
+// to the PAIRING, not to either golfer, so it cannot live in the individual
+// namespace. Writing the side's 4 into both p101_h1 and p102_h1 would be a
+// fabrication: it would tell every individual surface in the app - net-to-par
+// standings, Skins, Dots, birdie marks, stats, handicap allocation - that two
+// golfers each shot 4 on a hole neither of them completed alone.
+//
+// So Foursomes gets its own namespace, stored on the ROUND that played it:
+//
+//     ryderFoursomes: { <matchId>: { A: { h1: 4, h2: 5 }, B: { h1: 5 } } }
+//
+// Keyed by match, side and hole. No player id appears anywhere in it. Cup
+// configuration stays on the authoritative host exactly as Phase 4 left it; only
+// the scores are round-local, because scores always belong to the round played.
+// ============================================================================
+
+function ryderFoursomesScores(roundData, matchId) {
+    var all = (roundData || {}).ryderFoursomes || {};
+    return all[matchId] || {};
+}
+
+function ryderTeamHoleScore(roundData, matchId, side, hole) {
+    var m = ryderFoursomesScores(roundData, matchId);
+    var s = m[side] || {};
+    var v = s['h' + hole];
+    return (v > 0) ? Number(v) : null;
+}
+
+// The Firebase path a single side's hole score is written to. NARROW BY DESIGN:
+// two groups scoring two different Foursomes matches at the same time write to
+// disjoint child keys, so neither can replace the other's data. Never write the
+// whole ryderFoursomes object.
+function ryderTeamScorePath(matchId, side, hole) {
+    return 'ryderFoursomes/' + matchId + '/' + side + '/h' + hole;
+}
+
+// ---------------------------------------------------------------------------
+// THE WHS FOURSOMES MATCH PLAY ALLOWANCE
+//
+//   higher-handicapped side receives 50% of the difference between the two
+//   sides' COMBINED Course Handicaps; the lower side plays from scratch.
+//
+// WHAT RATTLE STORES. There is no slope, no course rating and no tee data in
+// this app. A golfer's stored `hcp` is consumed directly by getStrokes() as a
+// full-round stroke allowance, which is precisely what a Course Handicap is - so
+// the combined figure is a plain sum and no Index conversion is required, because
+// there is no Index to convert.
+//
+// ROUNDING, STATED OUTRIGHT. WHS rounds the allowance to the nearest whole
+// stroke. Rattle had no handicap-rounding convention to inherit - parseHcp
+// returns floats - so Math.round is used here because the rule says so, not
+// because it was convenient. A difference of 9 gives 5, not 4.5 and not 4.
+//
+// PLUS HANDICAPS FALL OUT FOR FREE. parseHcp stores +2 as -2, so a plus golfer
+// lowers their side's combined figure by arithmetic alone and the comparison
+// needs no special case.
+// ---------------------------------------------------------------------------
+function ryderCombinedCourseHandicap(players, ids) {
+    var byId = {};
+    (players || []).forEach(function (p) { byId[String(p.id)] = p; });
+    var total = 0;
+    (ids || []).forEach(function (id) {
+        var p = byId[String(id)];
+        if (p) total += parseHcp(p.hcp);
+    });
+    return total;
+}
+
+function foursomesAllowance(roundPlayers, match, scoringMode) {
+    var roster = ryderMatchRoster(match);
+    var a = ryderCombinedCourseHandicap(roundPlayers, roster.a);
+    var b = ryderCombinedCourseHandicap(roundPlayers, roster.b);
+    if (scoringMode !== 'handicap') return { A: 0, B: 0, combinedA: a, combinedB: b };
+    var allowance = Math.round(Math.abs(a - b) / 2);
+    // Equal combined handicaps means nobody strokes, whichever way the tie falls.
+    if (a === b) return { A: 0, B: 0, combinedA: a, combinedB: b };
+    return (a > b)
+        ? { A: allowance, B: 0, combinedA: a, combinedB: b }
+        : { A: 0, B: allowance, combinedA: a, combinedB: b };
+}
+
+// A side's net score on one hole. THE STORED GROSS IS NEVER MUTATED - net is
+// derived on every read, so a later change of scoring mode cannot corrupt what
+// the golfers actually shot.
+function foursomesNetOnHole(gross, sideStrokes, hcpIndex) {
+    if (gross === null) return null;
+    return gross - allocateMatchStrokes(sideStrokes, hcpIndex);
+}
+
+// ---------------------------------------------------------------------------
+// TEAM-VERSUS-TEAM MATCH STATE
+//
+// A small pure helper rather than a contortion of calculateMatchEngine, which
+// takes individual players and individual scores and would have to be fed fake
+// ones. It mirrors that engine's closeout semantics exactly - lead greater than
+// holes remaining closes the match - and produces the same vocabulary Ryder
+// already speaks. It moves no money and has no stake.
+//
+// A HOLE COUNTS ONLY WHEN BOTH SIDES HAVE POSTED. Half a comparison decides
+// nothing, and golfers enter holes out of order, so the state is derived from
+// completed comparable holes rather than from write order.
+// ---------------------------------------------------------------------------
+function computeFoursomesState(roundData, courseData, match, roundPlayers, scoringMode) {
+    if (!match) return null;
+    var allow = foursomesAllowance(roundPlayers, match, scoringMode);
+    var holes = (courseData || []).slice().sort(function (x, y) { return x.hole - y.hole; });
+
+    var status = 0, thru = 0, closed = false, finalResult = null, decidedAt = null;
+    var played = [];
+
+    for (var i = 0; i < holes.length; i++) {
+        var h = holes[i];
+        var ga = ryderTeamHoleScore(roundData, match.id, 'A', h.hole);
+        var gb = ryderTeamHoleScore(roundData, match.id, 'B', h.hole);
+        if (ga === null || gb === null) continue;   // partial hole decides nothing
+        var na = foursomesNetOnHole(ga, allow.A, h.hcpIndex);
+        var nb = foursomesNetOnHole(gb, allow.B, h.hcpIndex);
+        if (na < nb) status += 1;
+        else if (nb < na) status -= 1;
+        thru++;
+        played.push(h.hole);
+
+        // Closeout, evaluated in hole order: a lead greater than the holes left
+        // ends it. Later holes cannot reopen a match that is already decided.
+        if (!closed) {
+            var remaining = holes.length - (i + 1);
+            if (Math.abs(status) > remaining) {
+                closed = true;
+                decidedAt = h.hole;
+                finalResult = Math.abs(status) + ' & ' + remaining;
+                if (remaining === 0) finalResult = Math.abs(status) + ' up';
+            }
+        }
+    }
+
+    var complete = thru >= holes.length;
+    return {
+        status: status, thru: thru, closed: closed, decidedAt: decidedAt,
+        decided: closed || complete,
+        totalHoles: holes.length,
+        holesPlayed: played,
+        allowance: allow,
+        scoringMode: scoringMode === 'handicap' ? 'handicap' : 'scratch',
+        finalResult: closed ? finalResult
+            : (complete ? (status === 0 ? 'Halved' : Math.abs(status) + ' up') : null)
+    };
+}
+
+// Does this match have ANY team score? The Foursomes equivalent of a first
+// individual score, and what locks the pairing. One side alone is enough - the
+// match has begun the moment anybody writes down a number.
+function ryderFoursomesHasScores(roundData, match) {
+    var m = ryderFoursomesScores(roundData, (match || {}).id);
+    return ['A', 'B'].some(function (side) {
+        var s = m[side] || {};
+        return Object.keys(s).some(function (k) { return s[k] > 0; });
+    });
 }

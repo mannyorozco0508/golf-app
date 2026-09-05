@@ -150,28 +150,35 @@ describe('CLASSIC PRESET STRUCTURE', () => {
 // ===========================================================================
 describe('FOURSOMES IS STRUCTURAL ONLY', () => {
 
-    test('foursomes is not playable; fourball and singles are', () => {
-        assert.equal(RC.ryderFormatPlayable('foursomes'), false);
+    test('foursomes became playable in Phase 5, through its OWN namespace', () => {
+        // UPDATED IN PHASE 5. Phase 4 asserted foursomes was unplayable, which was
+        // correct while no team-score namespace existed. Phase 5 built one, so the
+        // contract genuinely changed. The invariant that must NOT change is the
+        // next test: individual scores still cannot produce a Foursomes result.
+        assert.equal(RC.ryderFormatPlayable('foursomes'), true);
         assert.equal(RC.ryderFormatPlayable('fourball'), true);
         assert.equal(RC.ryderFormatPlayable('singles'), true);
     });
 
-    test('a foursomes session reports UNAVAILABLE', () => {
+    test('an unseated foursomes session is NOT_SET, not UNAVAILABLE', () => {
         const d = hostRound(classicCup(8));
-        assert.equal(RC.ryderSessionState(d, CD, {}, 'd1s1'), 'UNAVAILABLE');
+        assert.equal(RC.ryderSessionState(d, CD, {}, 'd1s1'), 'NOT_SET');
     });
 
-    test('a foursomes session contributes no points even with scores present', () => {
-        // The rule that matters: alternate shot cannot be faked from individual
-        // scores, so a scheduled Foursomes session must bank nothing.
+    test('INDIVIDUAL scores alone still produce no Foursomes result', () => {
+        // THE INVARIANT THAT SURVIVED PHASE 5, and the whole reason the namespace
+        // exists. A full set of individual scores for all eight golfers must still
+        // leave a Foursomes match at zero: alternate shot reads ONLY team scores.
         const cup = classicCup(8, seatFourball(8, 'd1s1'));
         Object.values(cup.matches).forEach(m => { m.format = 'foursomes'; });
         const d = hostRound(cup);
         const totals = RC.computeRyderCupTotals(d, { d1s1: { courseData: CD, scores: sweepA(8) } });
         const sess = totals.sessions.find(s => s.id === 'd1s1');
-        assert.equal(sess.playable, false);
-        assert.equal(sess.official.A, 0, 'a foursomes session must bank nothing yet');
+        assert.equal(sess.official.A, 0,
+            'individual scores must never decide an alternate-shot match');
         assert.equal(sess.official.B, 0);
+        sess.matches.forEach(m => assert.equal(m.thru, 0,
+            'a Foursomes match must read zero holes from individual scores'));
     });
 });
 
@@ -578,8 +585,17 @@ describe('PAGE WIRING AND MOBILE', () => {
             'an unplayable session must not be seedable');
     });
 
-    test('foursomes is visibly not playable in setup', () => {
-        assert.ok(/not playable yet/i.test(SM));
+    test('foursomes setup explains alternate shot and offers a scoring mode', () => {
+        // UPDATED IN PHASE 5. Phase 4 asserted "not playable yet"; Phase 5 made it
+        // playable, so the correct assertion is now that the session explains its
+        // one-ball nature, warns that individual side games are unavailable, and
+        // offers scratch-or-handicap with scratch first.
+        assert.ok(/one ball per side/i.test(SM));
+        assert.ok(/Individual side games are unavailable/i.test(SM));
+        assert.ok(/WHS Foursomes allowance/.test(SM));
+        const sel = SM.slice(SM.indexOf('rcSetSessionScoring'));
+        assert.ok(sel.indexOf('value="scratch"') < sel.indexOf('value="handicap"'),
+            'scratch must be the first and default option');
     });
 
     test('the schedule cannot overflow horizontally', () => {

@@ -186,7 +186,10 @@
 // Moved to v48: index.html gained the Cup resolver and cross-event host load, and
 // sidematches.html gained the five-session schedule. An installed PWA on v47 would
 // serve a scorecard that cannot follow a ryderCupRef at all.
-const CACHE_VERSION = 'golfapp-v48-ryder-sessions';
+// Moved to v49: index.html gained Foursomes team score entry and sidematches.html
+// gained the scratch/handicap choice. An installed PWA on v48 would serve a
+// scorecard that cannot enter an alternate-shot score at all.
+const CACHE_VERSION = 'golfapp-v49-foursomes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

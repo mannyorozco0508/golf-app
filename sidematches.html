@@ -2823,11 +2823,17 @@
                     + '<summary>' + esc(RYDER_SESSION_FORMATS[s.format] || s.format)
                     + ' <span class="rcs-cap">' + (set > 0 ? set + ' set' : n + ' matches')
                     + '</span></summary>'
-                    + (playable
-                        ? '<button type="button" class="rcs-add" style="width:100%"'
-                          + ' onclick="rcSeedSession(\'' + s.id + '\')">Set Lineup</button>'
-                        : '<div class="rcs-hint">Alternate Shot \u2014 not playable yet. '
-                          + 'Pairings can be set once team scoring ships.</div>')
+                    + (s.format === 'foursomes'
+                        ? '<div class="rcs-hint">Alternate Shot \u2014 one ball per side. '
+                          + 'Individual side games are unavailable during this session.</div>'
+                          + '<label class="rcs-lab">Scoring</label>'
+                          + '<select class="rcs-in" onchange="rcSetSessionScoring(\'' + s.id + '\', this.value)">'
+                          + '<option value="scratch"' + (rcSessionScoring(s.id) === 'handicap' ? '' : ' selected') + '>Scratch</option>'
+                          + '<option value="handicap"' + (rcSessionScoring(s.id) === 'handicap' ? ' selected' : '') + '>Handicap \u2014 WHS Foursomes allowance</option>'
+                          + '</select>'
+                        : '')
+                    + '<button type="button" class="rcs-add" style="width:100%"'
+                      + ' onclick="rcSeedSession(\'' + s.id + '\')">Set Lineup</button>'
                     + '</details>';
             });
         });
@@ -2837,6 +2843,27 @@
     // Seeds a session's matches from whoever is assigned and free IN THAT SESSION.
     // Sit-outs are normal: a 6 v 6 Four-Ball seats 3 matches and nobody is invented
     // to fill a gap.
+    // SCRATCH IS THE DEFAULT, because the authentic Ryder Cup is played without
+    // strokes. Handicap applies the WHS Foursomes allowance - the organizer never
+    // calculates anything.
+    function rcSessionScoring(sessionId) {
+        const m = (rcDraft.matches || []).find(x => (x.sessionId || 's1') === sessionId);
+        return (m && m.scoring === 'handicap') ? 'handicap' : 'scratch';
+    }
+
+    function rcSetSessionScoring(sessionId, mode) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        (rcDraft.matches || []).forEach(m => {
+            if ((m.sessionId || 's1') !== sessionId) return;
+            // A started match keeps what was agreed on the first tee.
+            if (m.lockedAt) return;
+            m.scoring = (mode === 'handicap') ? 'handicap' : 'scratch';
+        });
+        rcDraft.__scoring = rcDraft.__scoring || {};
+        rcDraft.__scoring[sessionId] = mode;
+        renderRyderCupSetup();
+    }
+
     function rcSeedSession(sessionId) {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
         const s = rcDraft.sessions[sessionId];
@@ -2858,7 +2885,11 @@
         for (let i = 0; i < n; i++) {
             rcDraft.matches.push({
                 id: sessionId + '-m' + (i + 1), sessionId: sessionId,
-                format: s.format, scoring: 'net', sideA: 'A', sideB: 'B',
+                format: s.format,
+                scoring: (s.format === 'foursomes'
+                    ? ((rcDraft.__scoring && rcDraft.__scoring[sessionId]) || 'scratch')
+                    : 'net'),
+                sideA: 'A', sideB: 'B',
                 playersA: a.slice(i * need, i * need + need),
                 playersB: b.slice(i * need, i * need + need)
             });

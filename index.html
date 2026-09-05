@@ -1073,6 +1073,14 @@
         .rc-spts { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
         .rc-live { font-size:0.72rem; color:var(--text-muted); padding-top:2px; }
         .rc-sess { font-size:0.72rem; font-weight:bold; color:var(--brand-navy); padding:2px 0 4px; }
+        .fs-card { background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+        .fs-head { font-size: 0.74rem; font-weight: bold; color: var(--brand-green); margin-bottom: 8px; }
+        .fs-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+        .fs-side { font-weight: bold; font-size: 0.95rem; }
+        .fs-str { display: block; font-size: 0.7rem; font-weight: normal; color: var(--text-muted); }
+        .fs-in { width: 64px; min-height: 48px; text-align: center; font-size: 1.3rem; font-weight: bold; border-radius: 10px; border: 1px solid var(--border-mid); }
+        .fs-vs { font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+        .fs-card, .fs-card * { min-width: 0; overflow-wrap: anywhere; }
         .rc-lab { font-size:0.66rem; text-transform:uppercase; font-weight:bold; color:var(--text-muted); letter-spacing:0.04em; }
         .rc-your { border-top:1px solid var(--border-soft, #ddd); margin-top:6px; padding-top:5px; }
         .rc-mside { font-weight:bold; font-size:0.86rem; }
@@ -2646,6 +2654,89 @@
     function ryderResolution() {
         if (typeof resolveRyderCupForRound !== 'function') return null;
         return resolveRyderCupForRound(currentData, __ryderHostCup, currentMode);
+    }
+
+    // ---- FOURSOMES TEAM SCORE ENTRY -------------------------------------
+    //
+    // ONE BOX PER SIDE. Two partners play one ball, so the pairing owns the
+    // number and no individual golfer does. This replaces the per-golfer rows for
+    // a Foursomes session ONLY - Four-Ball, Singles and every ordinary Rattle
+    // round keep individual entry untouched.
+    //
+    // Writes a NARROW child path so two groups scoring two different Foursomes
+    // matches at once cannot overwrite each other.
+    function ryderFoursomesContext() {
+        const res = ryderResolution();
+        if (!res || !ryderResolutionUsable(res) || !res.sessionId) return null;
+        const cfg = ryderCupConfig(res.cup);
+        const sess = cfg.sessions && cfg.sessions[res.sessionId];
+        if (!sess || sess.format !== 'foursomes') return null;
+        const visible = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+            ? window.__scFilteredPlayers.map(p => String(p.id))
+            : (currentData.players || []).map(p => String(p.id));
+        const mine = Object.keys(cfg.matches)
+            .map(k => cfg.matches[k])
+            .filter(m => (m.sessionId || 's1') === res.sessionId)
+            .filter(m => {
+                const r = ryderMatchRoster(m);
+                return r.a.concat(r.b).some(id => visible.indexOf(String(id)) !== -1);
+            })[0];
+        return mine ? { res: res, cup: res.cup, match: mine, session: sess } : null;
+    }
+
+    function saveFoursomesScore(matchId, side, hole, val) {
+        const ctx = ryderFoursomesContext();
+        if (!ctx || ctx.match.id !== matchId) return;
+        const n = parseInt(val, 10);
+        const path = 'events/' + currentMode + '/' + ryderTeamScorePath(matchId, side, hole);
+        const wp = (isNaN(n) || n <= 0) ? db.ref(path).remove() : db.ref(path).set(n);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(wp);
+        // The first team score locks the pairing on the AUTHORITATIVE host, never
+        // as a shadow copy on this round.
+        maybeLockFoursomesMatch(ctx, matchId);
+    }
+
+    function maybeLockFoursomesMatch(ctx, matchId) {
+        if (typeof lockRyderMatch !== 'function') return;
+        const m = ryderCupConfig(ctx.cup).matches[matchId];
+        if (!m || m.lockedAt) return;
+        const snap = Object.assign({}, m);
+        if (!lockRyderMatch(snap, Date.now())) return;
+        const hostCode = ctx.res.host || currentMode;
+        db.ref('events/' + hostCode + '/ryderCup/matches/' + matchId).update({
+            lockedAt: snap.lockedAt, lockedA: snap.lockedA, lockedB: snap.lockedB,
+            lockedScoring: snap.lockedScoring
+        });
+    }
+
+    function renderFoursomesEntryHtml(holeNum) {
+        const ctx = ryderFoursomesContext();
+        if (!ctx) return '';
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const cfg = ryderCupConfig(ctx.cup);
+        const nameOf = ids => ids.map(id => {
+            const p = (currentData.players || []).find(x => String(x.id) === String(id));
+            return p ? String(p.name).split(' ')[0] : id;
+        }).join(' / ');
+        const roster = ryderMatchRoster(ctx.match);
+        const st = computeRyderMatchResult(ctx.cup, currentData.courseData || [],
+            currentData.scores || {}, ctx.match.id, currentData);
+        const row = (side, ids) => {
+            const v = ryderTeamHoleScore(currentData, ctx.match.id, side, holeNum);
+            const strokes = st && st.allowance ? st.allowance[side] : 0;
+            return '<div class="fs-row"><div class="fs-side">' + esc(nameOf(ids))
+                + (strokes > 0 ? '<span class="fs-str">' + strokes + ' strokes</span>' : '')
+                + '</div><input type="tel" inputmode="numeric" pattern="[0-9]*" class="fs-in"'
+                + ' value="' + (v === null ? '' : v) + '" onfocus="this.select()"'
+                + ' onchange="saveFoursomesScore(\'' + ctx.match.id + '\',\'' + side + '\','
+                + holeNum + ', this.value)"></div>';
+        };
+        return '<div class="fs-card">'
+            + '<div class="fs-head">\uD83C\uDFCC\uFE0F Alternate Shot \u2014 one score per side'
+            + (st && st.scoringMode === 'handicap' ? ' \u00B7 WHS handicap' : ' \u00B7 Scratch')
+            + '</div>'
+            + row('A', roster.a) + '<div class="fs-vs">vs</div>' + row('B', roster.b)
+            + '</div>';
     }
 
     function renderRyderCupHtml() {
