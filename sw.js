@@ -189,7 +189,7 @@
 // Moved to v49: index.html gained Foursomes team score entry and sidematches.html
 // gained the scratch/handicap choice. An installed PWA on v48 would serve a
 // scorecard that cannot enter an alternate-shot score at all.
-const CACHE_VERSION = 'golfapp-v51-format-entry';
+const CACHE_VERSION = 'golfapp-v52-tile-gallery';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

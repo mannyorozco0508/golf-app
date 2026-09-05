@@ -89,6 +89,8 @@ describe('GAME DAY OPENS ON FORMAT CARDS', () => {
         // format IS, which is how "Ryder Cup" came to mean the money game.
         const descs = (ADMIN.match(/<span class="fmt-desc">/g) || []).length;
         assert.equal(descs, CARD_FORMATS.length);
+        // And an icon, which is what makes a tile readable at a glance.
+        assert.equal((ADMIN.match(/<span class="fmt-icon">/g) || []).length, CARD_FORMATS.length);
     });
 
     test('the legacy wager formats are still unreachable from a new round', () => {
@@ -441,9 +443,12 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
 // ============================================================================
 describe('THE CARDS FIT A PHONE', () => {
 
-    test('one card per row at every width — no two-column gamble', () => {
-        assert.match(ADMIN, /\.fmt-grid \{ display: grid; grid-template-columns: 1fr;/);
-        assert.ok(!/\.fmt-grid \{[^}]*1fr 1fr/.test(ADMIN), 'no two-column variant');
+    // SUPERSEDED. The one-column list was the cautious first cut; a real iPhone
+    // said it read as a settings form. Two columns of near-square tiles is now the
+    // requirement, and the geometry is proved in format_gallery_test.js rather than
+    // asserted as a slogan here.
+    test('two columns of tiles, sized from the grid rather than fixed', () => {
+        assert.match(ADMIN, /\.fmt-grid \{ display: grid; grid-template-columns: 1fr 1fr;/);
     });
 
     test('nothing in a card can push past the viewport', () => {
@@ -461,6 +466,7 @@ describe('THE CARDS FIT A PHONE', () => {
     });
 
     test('the tap target is thumb-sized', () => {
-        assert.match(ADMIN, /\.fmt-card \{[^}]*min-height: 60px/);
+        // A tile, not a row: 132px tall against a ~143px column at 360px.
+        assert.match(ADMIN, /\.fmt-card \{[^}]*min-height: 132px/);
     });
 });

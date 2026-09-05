@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Trip & Round Setup - Home</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f4c3a">
@@ -202,33 +202,42 @@
         .wizard-step-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
         .wizard-nav-row { display: flex; gap: 10px; margin-top: 20px; }
 
-        /* FORMAT CARDS.
-           ONE CARD PER ROW AT EVERY WIDTH. A two-column grid saves scrolling and
-           costs readability: at 360px each column is ~160px, which wraps
-           "Individual (Stroke Play)" onto three lines and shrinks the tap target
-           below what a thumb on a golf cart can hit. Scrolling is free; a mis-tap
-           that silently changes how the round scores is not. */
-        .fmt-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 6px; }
-        .fmt-group-head { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
-            color: var(--text-muted); margin: 10px 0 -2px 2px; }
-        .fmt-group-head:first-child { margin-top: 2px; }
-        .fmt-card { display: block; width: 100%; max-width: 100%; box-sizing: border-box;
-            text-align: left; font: inherit; color: var(--text-main); cursor: pointer;
+        /* FORMAT TILES.
+           SIBLINGS OF THE HOME WIDGETS. The first cut was full-width rows, which
+           worked and read as a settings form - nine stacked rectangles to scroll
+           past before Ryder Cup. A gallery of games should look like a gallery of
+           games, so these deliberately borrow the Road Trip / Game Day language:
+           same 2px border, same 12px radius, same centered icon-over-name-over-hint
+           composition, same selected treatment.
+           Two columns, near square. At 360px - the narrowest phone we support - a
+           column is (360 - 24 body - 40 container - 10 gap) / 2 = 143px against a
+           132px min-height, so the tile is square-ish and the tap target is far
+           larger than a list row ever was. The copy is what makes that possible:
+           these are menu labels now, not rule explanations. */
+        .fmt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+        .fmt-card { display: flex; flex-direction: column; justify-content: center;
+            width: 100%; max-width: 100%; box-sizing: border-box;
+            text-align: center; font: inherit; color: var(--text-main); cursor: pointer;
             background: var(--bg-card); border: 2px solid var(--border-mid);
-            border-radius: 12px; padding: 12px 14px; min-height: 60px; }
+            border-radius: 12px; padding: 14px 8px; min-height: 132px;
+            transition: all 0.15s ease; outline: none; -webkit-tap-highlight-color: transparent; }
         .fmt-card:focus-visible { outline: 3px solid var(--accent-teal); outline-offset: 2px; }
         .fmt-card.selected { border-color: var(--brand-green); background: var(--nassau-box-bg); }
-        .fmt-name { display: block; font-weight: bold; font-size: 0.92rem; line-height: 1.3;
-            overflow-wrap: anywhere; }
-        .fmt-desc { display: block; font-size: 0.74rem; color: var(--text-muted);
-            margin-top: 3px; line-height: 1.35; overflow-wrap: anywhere; }
+        .fmt-icon { display: block; font-size: 1.9rem; line-height: 1.1; }
+        .fmt-name { display: block; font-weight: bold; color: var(--brand-green);
+            font-size: 0.92rem; line-height: 1.25; margin-top: 6px; overflow-wrap: anywhere; }
+        .fmt-desc { display: block; font-size: 0.68rem; color: var(--text-muted);
+            margin-top: 4px; line-height: 1.3; overflow-wrap: anywhere; }
         .fmt-card.selected .fmt-desc { color: var(--text-main); }
-        .fmt-card-featured { border-color: var(--accent-teal); }
+        /* Ryder Cup spans the row and stands a little taller. It is a competition
+           mode rather than a scoring format, and the extra line earns the height. */
+        .fmt-card-featured { grid-column: 1 / -1; min-height: 148px;
+            border-color: var(--accent-teal); }
         .fmt-card-featured.selected { border-color: var(--brand-green); }
-        .fmt-badge { display: inline-block; font-size: 0.62rem; font-weight: bold;
-            letter-spacing: 0.05em; text-transform: uppercase; vertical-align: middle;
-            background: var(--accent-teal); color: #fff; border-radius: 999px;
-            padding: 2px 7px; margin-left: 6px; }
+        .fmt-card-featured .fmt-name { font-size: 1.05rem; letter-spacing: 0.02em; }
+        .fmt-sub { display: block; font-size: 0.66rem; color: var(--text-muted);
+            margin-top: 3px; line-height: 1.3; }
+        .fmt-card.selected .fmt-sub { color: var(--text-main); }
         .wiz-step-n { white-space: nowrap; font-weight: normal; font-size: 0.82em;
             color: var(--text-muted); }
         .wizard-btn-back { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 0.95rem; cursor: pointer; }
@@ -313,6 +322,23 @@
         .home-widget .hw-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; line-height: 1.3; }
         @media (max-width: 340px) { .home-widget .hw-desc { display: none; } }
     </style>
+<style>
+/* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
+   page keeps its own padding and simply starts below the status bar. Every value
+   here is 0px anywhere without an inset, which is why this is inert on the web. */
+html {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    background-color: var(--bg-page, transparent);
+}
+.modal-overlay {
+    padding-top: max(20px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+}
+</style>
 </head>
 <body>
 
@@ -592,68 +618,78 @@
              game and walked the organizer into 1v1 betting controls. -->
         <div class="fmt-grid" id="format-card-grid" role="radiogroup" aria-labelledby="format-question-label">
 
-            <div class="fmt-group-head">Everyone plays their own ball</div>
+            <!-- MENU LABELS, NOT RULES. Every tile is icon, name, one short line.
+                 The category headings that used to break this grid up are gone: they
+                 added three full-width rows of chrome to a screen whose whole job is
+                 "see the games, pick one, go". The tiles say what they are.
+                 Values and routing are untouched - each still writes its own token to
+                 the hidden select through selectFormatCard(). -->
             <button type="button" class="fmt-card" id="fmt-card-stroke" data-format="stroke"
                 role="radio" aria-checked="true" onclick="selectFormatCard('stroke')">
-                <span class="fmt-name">⛳ Individual (Stroke Play)</span>
-                <span class="fmt-desc">Total strokes for the round — low score wins.</span>
+                <span class="fmt-icon">⛳</span>
+                <span class="fmt-name">Stroke Play</span>
+                <span class="fmt-desc">Low total wins</span>
             </button>
             <button type="button" class="fmt-card" id="fmt-card-stableford" data-format="stableford"
                 role="radio" aria-checked="false" onclick="selectFormatCard('stableford')">
-                <span class="fmt-name">📈 Stableford</span>
-                <span class="fmt-desc">Points per hole instead of strokes — high score wins.</span>
+                <span class="fmt-icon">📈</span>
+                <span class="fmt-name">Stableford</span>
+                <span class="fmt-desc">Points per hole</span>
             </button>
-
-            <div class="fmt-group-head">Player vs player</div>
+            <!-- INTENT TOKEN, NOT A SCORING ENGINE. Still normalizes to 'stroke' on
+                 save; the three stakes are created under Games & Money. -->
             <button type="button" class="fmt-card" id="fmt-card-nassau-modern" data-format="nassau-modern"
                 role="radio" aria-checked="false" onclick="selectFormatCard('nassau-modern')">
-                <span class="fmt-name">🤝 Nassau</span>
-                <span class="fmt-desc">Front 9, back 9, and the whole round. Scored as an ordinary
-                    round; the three stakes are set under Games &amp; Money.</span>
+                <span class="fmt-icon">🤝</span>
+                <span class="fmt-name">Nassau</span>
+                <span class="fmt-desc">Front · Back · Overall</span>
             </button>
-
-            <div class="fmt-group-head">Team formats</div>
             <button type="button" class="fmt-card" id="fmt-card-bestball" data-format="bestball"
                 role="radio" aria-checked="false" onclick="selectFormatCard('bestball')">
-                <span class="fmt-name">👫 Best Ball</span>
-                <span class="fmt-desc">Partner up — the better of your team's two scores counts.</span>
+                <span class="fmt-icon">👫</span>
+                <span class="fmt-name">Best Ball</span>
+                <span class="fmt-desc">Best team score counts</span>
             </button>
             <button type="button" class="fmt-card" id="fmt-card-scramble" data-format="scramble"
                 role="radio" aria-checked="false" onclick="selectFormatCard('scramble')">
-                <span class="fmt-name">🏌️ Scramble</span>
-                <span class="fmt-desc">Everyone tees off, play the best shot, go again — as a team.</span>
+                <span class="fmt-icon">🏌️</span>
+                <span class="fmt-name">Scramble</span>
+                <span class="fmt-desc">Play one team ball</span>
             </button>
             <button type="button" class="fmt-card" id="fmt-card-hilo" data-format="hilo"
                 role="radio" aria-checked="false" onclick="selectFormatCard('hilo')">
-                <span class="fmt-name">⚖️ Hi-Lo</span>
-                <span class="fmt-desc">Teams battle for the low score and the high score on every hole.</span>
+                <span class="fmt-icon">⚖️</span>
+                <span class="fmt-name">Hi-Lo</span>
+                <span class="fmt-desc">High &amp; low each hole</span>
             </button>
             <button type="button" class="fmt-card" id="fmt-card-wolf" data-format="wolf"
                 role="radio" aria-checked="false" onclick="selectFormatCard('wolf')">
-                <span class="fmt-name">🐺 Wolf</span>
-                <span class="fmt-desc">Pick a partner each hole, or go alone for bigger stakes. Four players.</span>
+                <span class="fmt-icon">🐺</span>
+                <span class="fmt-name">Wolf</span>
+                <span class="fmt-desc">Partners each hole</span>
             </button>
             <!-- LEGACY. gameFormat:'ryder' is the old team-vs-team MONEY game and
                  settles off matchStake exactly as match/bestball/scramble do. It is
-                 NOT the Ryder Cup competition. Renamed on the chooser only - no stored
-                 round is touched and no settlement label changed. -->
+                 NOT the Ryder Cup competition below. Renamed on the chooser only -
+                 no stored round is touched and no settlement label changed. -->
             <button type="button" class="fmt-card" id="fmt-card-ryder" data-format="ryder"
                 role="radio" aria-checked="false" onclick="selectFormatCard('ryder')">
-                <span class="fmt-name">🛡️ Team Match</span>
-                <span class="fmt-desc">One side against the other for a set bet. This is the classic
-                    team money match, not the multi-session Cup below.</span>
+                <span class="fmt-icon">🛡️</span>
+                <span class="fmt-name">Team Match</span>
+                <span class="fmt-desc">Team vs. team, one bet</span>
             </button>
 
-            <div class="fmt-group-head">Multi-session competition</div>
             <!-- THE REAL RYDER CUP. Its own token, never the legacy 'ryder' value.
                  Normalizes to 'stroke' on save: the round is scored normally and the
                  Cup is built afterwards on the Matches page, where the roster is
-                 frozen and player ids are real. -->
+                 frozen and player ids are real. Full width because it is a
+                 competition mode, not a ninth scoring format. -->
             <button type="button" class="fmt-card fmt-card-featured" id="fmt-card-ryder-cup" data-format="ryder-cup"
                 role="radio" aria-checked="false" onclick="selectFormatCard('ryder-cup')">
-                <span class="fmt-name">🏆 Ryder Cup<span class="fmt-badge">Cup</span></span>
-                <span class="fmt-desc">Two sides, points not money. Foursomes · Four-Ball · Singles.
-                    You'll pick the teams straight after the round is created.</span>
+                <span class="fmt-icon">🏆</span>
+                <span class="fmt-name">Ryder Cup</span>
+                <span class="fmt-desc">Classic team competition</span>
+                <span class="fmt-sub">Foursomes · Four-Ball · Singles</span>
             </button>
         </div>
         <!-- STRUCTURAL CHOICES ONLY.

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Clean Scorecard</title>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
@@ -168,6 +168,19 @@
             .settle-card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
         }
     </style>
+<style>
+/* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
+   page keeps its own padding and simply starts below the status bar. Every value
+   here is 0px anywhere without an inset, which is why this is inert on the web. */
+html {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    background-color: var(--bg-page, transparent);
+}
+</style>
 </head>
 <body>
 
