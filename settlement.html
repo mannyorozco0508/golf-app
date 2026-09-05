@@ -212,6 +212,7 @@
         .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
         .pl-note { padding-left: 18px; font-size: 0.74rem; color: var(--text-muted); }
         .pl-round { font-size: 0.74rem; color: var(--text-muted); font-style: italic; }
+        .pl-group { font-size: 0.74rem; color: var(--text-muted); font-weight: bold; padding-top: 4px; }
         .pl-final { border-top: 1px solid var(--border-mid); margin-top: 4px; padding-top: 4px; font-weight: bold; }
         .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
@@ -1148,10 +1149,26 @@
         // Everything else positive is money coming to the golfer and is shown: a side
         // match won, a group game won, a refund. Negative lines are omitted because a
         // loss is not a payout; it remains in Who Pays Who where it belongs.
+        //   'Side Match . A vs B'  the same AGGREGATE problem, found the hard way.
+        //                        This line moves the money and its note lines explain
+        //                        it, so printing both counted one match twice - a
+        //                        golfer who won $40 of legs read $60. The match name
+        //                        is not lost: it heads the detail as a sub-header
+        //                        below, which is what it was really doing here.
         const isBuyIn = l => /buy-in/i.test(l.label);
         const isPoolAggregate = l => !l.note && l.label === MAIN_POOL_LEDGER_LABEL;
-        const payoutLines = c => c.lines.filter(l =>
-            !isBuyIn(l) && !isPoolAggregate(l) && l.amount > 0.005);
+        // SUPPRESSED ONLY WHEN SOMETHING REPLACES IT. A match with no presses has a
+        // single segment and therefore no detail lines at all - the rollup is the
+        // only thing describing it, and dropping it made a whole wager disappear
+        // from the panel. So a rollup gives way to its own detail and to nothing
+        // else, matched by the wager name the notes carry.
+        const payoutLines = c => {
+            const explained = c.lines.filter(l => l.note && l.group).map(l => l.group);
+            const isExplainedSideMatch = l => !l.note
+                && explained.some(g => l.label.indexOf('Side Match \u00B7 ' + g) === 0);
+            return c.lines.filter(l =>
+                !isBuyIn(l) && !isPoolAggregate(l) && !isExplainedSideMatch(l) && l.amount > 0.005);
+        };
 
         let html = `<div class="settle-card">
             <div class="settle-header">\uD83D\uDCB0 Player Payouts</div>
@@ -1174,7 +1191,15 @@
                 // they owe is Who Pays Who's job.
                 html += `<div class="pl-row pl-note"><span>No payout</span><span>$0</span></div>`;
             } else {
+                // A note tagged with a wager name gets that name printed above it,
+                // once, as a sub-header carrying no amount. Untagged lines - every
+                // group game, skin and refund - print exactly as they always have.
+                let lastGroup = null;
                 lines.forEach(l => {
+                    if (l.group && l.group !== lastGroup) {
+                        html += `<div class="pl-row pl-group"><span>${escapeHtml(l.group)}</span><span></span></div>`;
+                    }
+                    lastGroup = l.group || null;
                     total += l.amount;
                     html += `<div class="pl-row"><span>${l.label}</span>${money(l.amount)}</div>`;
                 });

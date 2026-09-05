@@ -735,7 +735,18 @@
                         result: m.closed && m.finalResult ? m.finalResult
                             : (m.status === 0 ? 'All square' : `${m.status > 0 ? calc.t1Name : calc.t2Name} ${Math.abs(m.status)} up`),
                         winner: m.closed ? (m.status > 0 ? calc.t1Name : (m.status < 0 ? calc.t2Name : null)) : null,
-                        money: (m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake,
+                        // A HALVED SEGMENT PAYS NOBODY. This used to book the full
+                        // stake unconditionally, and `toSideA: m.status > 0` then sent
+                        // that phantom money to side B on every all-square press.
+                        // money-engine.js's own accumulator adds nothing when status is
+                        // 0, so the receipt was contradicting the engine it reads from.
+                        // `result` and `winner` were always right, which is why the
+                        // Side Matches card printed "All square" while the ledger
+                        // underneath paid out - and `stake` is untouched, so the "$20"
+                        // beside a halved press still prints exactly as before.
+                        money: m.status === 0
+                            ? 0
+                            : ((m.stake === undefined || m.stake === null) ? (sm.stake || 0) : m.stake),
                         toSideA: m.status > 0
                     });
                 });
@@ -790,12 +801,18 @@
         // A ledger line that moves no money. Used for the Main Pool buy-in, which is
         // a real debit a golfer must see even though it is already folded into the
         // pool's net, and for zero-balance golfers who must still appear.
-        function addNote(player, amount, label) {
+        // `group` is optional and additive: a note that carries one names the wager
+        // it explains, so a presenter can head its detail lines with that name
+        // instead of relying on a money-moving aggregate line to do the job. Every
+        // existing caller omits it and behaves exactly as before.
+        function addNote(player, amount, label, group) {
             if (!player) return;
             const key = player.name.trim().toLowerCase();
             if (!netByName[key]) netByName[key] = { name: player.name, net: 0 };
             if (!linesByName[key]) linesByName[key] = [];
-            linesByName[key].push({ label: label || 'Other', amount: amount || 0, note: true });
+            const line = { label: label || 'Other', amount: amount || 0, note: true };
+            if (group) line.group = group;
+            linesByName[key].push(line);
         }
 
         const allPlayers = data.players || [];
@@ -1071,8 +1088,12 @@
                     // the segment split the same way the moving line was split.
                     const aShare = (money === 0) ? 0 : (seg.toSideA ? money : -money) / (d.teamA.length || 1);
                     const bShare = (money === 0) ? 0 : (seg.toSideA ? -money : money) / (d.teamB.length || 1);
-                    d.teamA.forEach(p => addNote(p, aShare, label));
-                    d.teamB.forEach(p => addNote(p, bShare, label));
+                    // Tagged with the match name so the Payouts panel can head these
+                    // lines with it. A golfer in two side matches would otherwise see
+                    // two "Overall Match . $20 . H1" rows with nothing to tell apart.
+                    const group = `${d.teamA.map(p => p.name).join('/')} vs ${d.teamB.map(p => p.name).join('/')}`;
+                    d.teamA.forEach(p => addNote(p, aShare, label, group));
+                    d.teamB.forEach(p => addNote(p, bShare, label, group));
                 });
             });
         }
