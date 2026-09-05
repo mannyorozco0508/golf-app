@@ -131,18 +131,22 @@ describe('THE BULLSEYE WAS REPLACED SEMANTICALLY, NOT SWEPT', () => {
 // ---------------------------------------------------------------------------
 describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
 
+    // The number now lives in its own span so the workflow can renumber it - a
+    // Ryder Cup must not read "Step 5: Players" while the progress dots say 4. The
+    // glyph assignment being tested here is unchanged.
     const STEPS = [
-        ['1', '\u26f3', 'Course'],
-        ['3', '\u{1F4DD}', "How We're Scoring"],
-        ['4', '\u2699\ufe0f', 'Format Settings'],
-        ['5', '\u{1F465}', 'Players'],
-        ['6', '\u{1F4B0}', 'Games'],
-        ['7', '\u2705', 'Review'],
+        ['1', 'course', '\u26f3', 'Course'],
+        ['3', 'format', '\u{1F4DD}', 'What Are We Playing\\?'],
+        ['4', 'settings', '\u2699\ufe0f', 'Format Settings'],
+        ['5', 'players', '\u{1F465}', 'Players'],
+        ['6', 'action', '\u{1F4B0}', 'Games &amp; Money'],
+        ['7', 'review', '\u2705', 'Review &amp; Save'],
     ];
 
-    STEPS.forEach(([n, glyph, label]) => {
+    STEPS.forEach(([n, sem, glyph, label]) => {
         test(`Step ${n} (${label}) uses ${glyph}`, () => {
-            const re = new RegExp('wizard-step-title">' + glyph + ' Step ' + n + ':', 'u');
+            const re = new RegExp('wizard-step-title">' + glyph + ' ' + label
+                + ' \u00b7 <span class="wiz-step-n" id="wiz-n-' + sem + '">Step ' + n + '</span>', 'u');
             assert.match(ADMIN, re);
         });
     });
@@ -150,20 +154,21 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
     test('Step 2 uses a numeric chip, not an emoji', () => {
         // No emoji says "how many holes". The previous ruler collided with the Polie
         // dot and communicated nothing, so the number is the icon.
-        assert.match(ADMIN, /<span class="step-holes">9\/18<\/span> Step 2: Round Length/);
+        assert.match(ADMIN,
+            /<span class="step-holes">9\/18<\/span> Round Length \u00b7 <span class="wiz-step-n" id="wiz-n-length">Step 2<\/span>/);
         assert.match(ADMIN, /\.step-holes \{[^}]*background: var\(--brand-green\)/,
             'the chip must be styled, not bare text');
         assert.ok(!/\u{1F4CF} Step 2/u.test(ADMIN), 'the ruler is retired from the wizard');
     });
 
     test('Step 1 and Step 3 no longer share a glyph', () => {
-        assert.ok(!/wizard-step-title">\u26f3 Step 3/u.test(ADMIN),
+        assert.ok(!/wizard-step-title">\u26f3 What Are We Playing/u.test(ADMIN),
             'two steps wearing the same flag is what made the wizard unreadable');
     });
 
     test('the seven step marks are all different', () => {
-        const marks = (ADMIN.match(/wizard-step-title">(.{1,40}?) Step \d:/gu) || [])
-            .map(m => m.replace(/wizard-step-title">/, '').replace(/ Step \d:$/, ''));
+        const marks = (ADMIN.match(/wizard-step-title">(\S+?) /gu) || [])
+            .map(m => m.replace(/wizard-step-title">/, '').trim());
         assert.equal(marks.length, 7, 'seven steps');
         assert.equal(new Set(marks).size, 7, 'duplicate step marks: ' + marks.join(' '));
     });
@@ -208,7 +213,7 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
                 assert.match(m, /Settings|Edit/,
                     `${f}: a gear must mean settings or edit, found: ${m.trim()}`));
         });
-        assert.match(ADMIN, /\u2699\ufe0f Step 4: Format Settings/u);
+        assert.match(ADMIN, /\u2699\ufe0f Format Settings/u);
     });
 
     test('Results is 🤝 and no longer 💸', () => {

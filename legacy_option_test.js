@@ -189,7 +189,7 @@ describe('A NEW ROUND OFFERS EXACTLY ONE NASSAU', () => {
 
     test('the normal option list is exactly what a golfer should see', () => {
         assert.deepEqual(selectableOptions(parseFormatSelect()).map(o => o.value),
-            ['stroke','stableford','nassau-modern','bestball','scramble','ryder','hilo','wolf']);
+            ['stroke','stableford','nassau-modern','bestball','scramble','ryder','hilo','wolf','ryder-cup']);
     });
 });
 

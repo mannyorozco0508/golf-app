@@ -186,7 +186,7 @@ describe('SETUP OFFERS EXACTLY ONE NASSAU', () => {
 
     test('the full list is exactly the modern scoring choices', () => {
         assert.deepEqual(selectableOptions().map(o => o.value),
-            ['stroke','stableford','nassau-modern','bestball','scramble','ryder','hilo','wolf']);
+            ['stroke','stableford','nassau-modern','bestball','scramble','ryder','hilo','wolf','ryder-cup']);
     });
 
     test('no legacy format value is selectable at all', () => {

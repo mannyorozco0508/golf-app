@@ -270,7 +270,8 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
     test('Step 6 offers additional games alongside the extras', () => {
         // Renamed to "Games & Money": "What's The Action?" is clubhouse language that
         // did not tell a golfer this is where every bet is configured.
-        assert.ok(adm.includes('Step 6: Games &amp; Money'));
+        // The number moved out of the heading and into a span the workflow renumbers.
+        assert.ok(adm.includes('Games &amp; Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6</span>'));
         assert.ok(adm.includes("Choose the games and bets you're playing. Everything here is optional."));
         assert.ok(!adm.includes("Step 6: What's The Action?"), 'the vaguer heading is gone');
         assert.ok(!adm.includes('Step 6: More Action'), 'the old undifferentiated wording is gone');
@@ -290,7 +291,10 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
         // Renamed from "Round Type": that title promised to answer "what are we
         // playing?" while hiding Nassau and Match, which is how a golfer ended up
         // configuring a Nassau twice. Games and bets are Step 6's job now.
-        assert.ok(adm.includes("Step 3: How We're Scoring"));
+        // FORMAT FIRST: the heading now asks the question a golfer actually answers.
+        // The helper line below still says where games live, which is what this
+        // test was really protecting.
+        assert.ok(adm.includes('What Are We Playing? \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3</span>'));
         assert.ok(adm.includes('Choose how scores are kept. Games and bets are added later.'),
             'the helper line must say where games actually live');
         assert.ok(!adm.includes('Step 3: Round Type'), 'the ambiguous heading is gone');

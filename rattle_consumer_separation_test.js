@@ -194,7 +194,7 @@ describe('NOTHING CONSUMER-FACING REGRESSED', () => {
                 assert.ok(/\u{1F3E0} Home/u.test(src), `${f}: Home is a house`);
             }
         });
-        assert.match(ADMIN, /\u2699\ufe0f Step 4: Format Settings/u,
+        assert.match(ADMIN, /\u2699\ufe0f Format Settings/u,
             'the gear survives where it genuinely means settings');
     });
 

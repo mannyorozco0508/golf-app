@@ -99,8 +99,11 @@ const sections = (html) =>
 describe('STEP 3 ASKS HOW THE ROUND IS SCORED', () => {
 
     test('the heading no longer promises to answer "what are we playing?"', () => {
-        assert.match(adm(), /Step 3: How We're Scoring/);
+        // FORMAT FIRST. "How We're Scoring" was honest but abstract; the question a
+        // golfer on the first tee actually answers is what game they are playing.
+        assert.match(adm(), /What Are We Playing\? \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3<\/span>/);
         assert.ok(!adm().includes('Step 3: Round Type'), 'the ambiguous heading is gone');
+        assert.ok(!adm().includes('Step 3: How We\'re Scoring'), 'the numbered heading is gone');
     });
 
     test('and the helper line says where games actually live', () => {
@@ -108,7 +111,7 @@ describe('STEP 3 ASKS HOW THE ROUND IS SCORED', () => {
     });
 
     test('the field label matches the question', () => {
-        assert.match(adm(), /<label>Scoring<\/label>/);
+        assert.match(adm(), /<label id="format-question-label">What are you playing today\?<\/label>/);
         assert.ok(!adm().includes('<label>Round Type</label>'));
     });
 
@@ -187,7 +190,7 @@ describe('A LEGACY ROUND SAYS SO', () => {
 describe('STEP 6 IS WHERE GAMES AND MONEY LIVE', () => {
 
     test('renamed from clubhouse language to what it does', () => {
-        assert.match(adm(), /Step 6: Games &amp; Money/);
+        assert.match(adm(), /Games &amp; Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6<\/span>/);
         assert.ok(!adm().includes("Step 6: What's The Action?"));
     });
 
@@ -259,10 +262,17 @@ describe('BATCH A MOVED NO MONEY', () => {
         assert.ok(!src.includes('id="nassau-settings"'), 'the legacy Nassau editor is gone');
     });
 
-    test('navigation is unchanged — no auto-skip yet', () => {
+    // SUPERSEDED BY THE FORMAT-FIRST WORKFLOW. Auto-skip is now the point: a format
+    // with no Format Settings must not walk the organizer onto a blank screen. What
+    // this test was really protecting - that Back and Next are the only movers and
+    // that neither jumps by a hardcoded number - is asserted here instead, and the
+    // skipping itself is proved in format_first_wizard_test.js.
+    test('navigation moves through the workflow, never by a hardcoded offset', () => {
         const src = adm();
-        assert.match(src, /goToWizardStep\(fromStep \+ 1\)/);
-        assert.match(src, /goToWizardStep\(fromStep - 1\)/);
+        assert.match(src, /goToWizardStep\(wizardNeighbourStep\(fromStep, 1\)\)/);
+        assert.match(src, /goToWizardStep\(wizardNeighbourStep\(fromStep, -1\)\)/);
+        assert.ok(!src.includes('goToWizardStep(fromStep + 1)'), 'no numeric Next');
+        assert.ok(!src.includes('goToWizardStep(fromStep - 1)'), 'no numeric Back');
     });
 
     test('no settlement or engine file was touched', () => {

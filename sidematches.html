@@ -327,6 +327,12 @@
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
+        <!-- Shown only when Game Day setup has just created a Ryder Cup round and sent
+             the organizer here. The setup surface below is unchanged; this says why
+             they are looking at it. -->
+        <div id="ryder-handoff-banner" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:0.82rem; line-height:1.45;">
+            🏆 <strong>Round created.</strong> Next, set up your Cup below — name it, tap each golfer onto a side, then pick <strong>Classic</strong> (3 days, 5 sessions) or build your own.
+        </div>
         <div id="ryder-cup-setup"></div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
@@ -742,6 +748,32 @@
             // IT DOES NOT PRESS ANYTHING. A press costs real money, so the golfer taps
             // the button they can see, with the amount in front of them. Deep-linking
             // straight into a write would mean money moving from a URL.
+            // ?setup=ryder — arriving from Game Day setup, which creates the ROUND and
+            // then sends the organizer here.
+            //
+            // THIS PAGE HAS ALWAYS BEEN WHERE A CUP IS BUILT. The Phase 3B setup below
+            // needs a frozen roster and real player ids, so it cannot run inside the
+            // creation wizard. Rather than duplicate it there, the wizard hands over and
+            // this brings the existing surface into view.
+            //
+            // IT CREATES NOTHING. Both entry buttons - "Set Up a Ryder Cup" and the
+            // Classic 3-day preset - stay exactly as they are, because auto-opening the
+            // blank builder would hide the preset most trips actually want.
+            if (urlParams.get('setup') === 'ryder' && !window.__smRyderHandoff
+                && isOrganizerView() && (currentData.players || []).length) {
+                window.__smRyderHandoff = true;
+                const rcBanner = document.getElementById('ryder-handoff-banner');
+                const alreadyHasCup = (typeof hasRyderCup === 'function') && hasRyderCup(currentData);
+                if (rcBanner && !alreadyHasCup) rcBanner.style.display = 'block';
+                setTimeout(() => {
+                    const mount = document.getElementById('ryder-cup-setup');
+                    if (!mount) return;
+                    mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    mount.classList.add('sm-card-focus');
+                    setTimeout(() => mount.classList.remove('sm-card-focus'), 2600);
+                }, 240);
+            }
+
             const pressTarget = urlParams.get('press');
             if (pressTarget && !window.__smPressFocused && (currentData.players || []).length) {
                 window.__smPressFocused = true;

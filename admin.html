@@ -201,6 +201,36 @@
         .sm-nassau-stakes label { font-size: 0.68rem; color: var(--text-muted); font-weight: normal; white-space: nowrap; }
         .wizard-step-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
         .wizard-nav-row { display: flex; gap: 10px; margin-top: 20px; }
+
+        /* FORMAT CARDS.
+           ONE CARD PER ROW AT EVERY WIDTH. A two-column grid saves scrolling and
+           costs readability: at 360px each column is ~160px, which wraps
+           "Individual (Stroke Play)" onto three lines and shrinks the tap target
+           below what a thumb on a golf cart can hit. Scrolling is free; a mis-tap
+           that silently changes how the round scores is not. */
+        .fmt-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 6px; }
+        .fmt-group-head { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+            color: var(--text-muted); margin: 10px 0 -2px 2px; }
+        .fmt-group-head:first-child { margin-top: 2px; }
+        .fmt-card { display: block; width: 100%; max-width: 100%; box-sizing: border-box;
+            text-align: left; font: inherit; color: var(--text-main); cursor: pointer;
+            background: var(--bg-card); border: 2px solid var(--border-mid);
+            border-radius: 12px; padding: 12px 14px; min-height: 60px; }
+        .fmt-card:focus-visible { outline: 3px solid var(--accent-teal); outline-offset: 2px; }
+        .fmt-card.selected { border-color: var(--brand-green); background: var(--nassau-box-bg); }
+        .fmt-name { display: block; font-weight: bold; font-size: 0.92rem; line-height: 1.3;
+            overflow-wrap: anywhere; }
+        .fmt-desc { display: block; font-size: 0.74rem; color: var(--text-muted);
+            margin-top: 3px; line-height: 1.35; overflow-wrap: anywhere; }
+        .fmt-card.selected .fmt-desc { color: var(--text-main); }
+        .fmt-card-featured { border-color: var(--accent-teal); }
+        .fmt-card-featured.selected { border-color: var(--brand-green); }
+        .fmt-badge { display: inline-block; font-size: 0.62rem; font-weight: bold;
+            letter-spacing: 0.05em; text-transform: uppercase; vertical-align: middle;
+            background: var(--accent-teal); color: #fff; border-radius: 999px;
+            padding: 2px 7px; margin-left: 6px; }
+        .wiz-step-n { white-space: nowrap; font-weight: normal; font-size: 0.82em;
+            color: var(--text-muted); }
         .wizard-btn-back { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 0.95rem; cursor: pointer; }
         .wizard-btn-next { flex: 2; padding: 12px; border-radius: 10px; border: none; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
@@ -411,7 +441,7 @@
     <div class="wizard-progress" id="wizard-progress"></div>
 
     <div class="wizard-step" id="wizard-step-1" data-step="1">
-        <div class="wizard-step-title">⛳ Step 1: Course</div>
+        <div class="wizard-step-title">⛳ Course · <span class="wiz-step-n" id="wiz-n-course">Step 1</span></div>
         <div class="wizard-step-sub">Search for your course.</div>
     <input type="hidden" id="round-day-select" value="Single Round">
 
@@ -439,12 +469,12 @@
         </div>
     </div>
         <div class="wizard-nav-row">
-            <button class="wizard-btn-next" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-1" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-2" data-step="2">
-        <div class="wizard-step-title"><span class="step-holes">9/18</span> Step 2: Round Length</div>
+        <div class="wizard-step-title"><span class="step-holes">9/18</span> Round Length · <span class="wiz-step-n" id="wiz-n-length">Step 2</span></div>
         <div class="wizard-step-sub">Full 18, front/back 9, or a custom 9-hole loop.</div>
     <div class="form-group">
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
@@ -539,16 +569,92 @@
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(2)">◀ Back</button>
-            <button class="wizard-btn-next" onclick="wizardNext(2)">Next: Format ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-2" onclick="wizardNext(2)">Next: Format ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">📝 Step 3: How We're Scoring</div>
+        <div class="wizard-step-title">📝 What Are We Playing? · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
         <div class="wizard-step-sub">Choose how scores are kept. Games and bets are added later.</div>
         <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Money games are added later, and you can skip this if everyone's just playing their own ball.</div>
     <div class="form-group">
-        <label>Scoring</label>
+        <label id="format-question-label">What are you playing today?</label>
+        <!-- FORMAT FIRST.
+             The <select> below is still the single source of truth - every reader in
+             this file, and every test, goes through game-format-select.value - but it
+             is no longer what a golfer touches. It is hidden; these cards write to it
+             and then call handleFormatChange() exactly as the dropdown's own onchange
+             did. Nothing about how a format is stored or scored changed.
+
+             A card can say what a format IS in one line. A <select> option cannot,
+             which is how "Ryder Cup" in a dropdown came to mean the legacy team money
+             game and walked the organizer into 1v1 betting controls. -->
+        <div class="fmt-grid" id="format-card-grid" role="radiogroup" aria-labelledby="format-question-label">
+
+            <div class="fmt-group-head">Everyone plays their own ball</div>
+            <button type="button" class="fmt-card" id="fmt-card-stroke" data-format="stroke"
+                role="radio" aria-checked="true" onclick="selectFormatCard('stroke')">
+                <span class="fmt-name">⛳ Individual (Stroke Play)</span>
+                <span class="fmt-desc">Total strokes for the round — low score wins.</span>
+            </button>
+            <button type="button" class="fmt-card" id="fmt-card-stableford" data-format="stableford"
+                role="radio" aria-checked="false" onclick="selectFormatCard('stableford')">
+                <span class="fmt-name">📈 Stableford</span>
+                <span class="fmt-desc">Points per hole instead of strokes — high score wins.</span>
+            </button>
+
+            <div class="fmt-group-head">Player vs player</div>
+            <button type="button" class="fmt-card" id="fmt-card-nassau-modern" data-format="nassau-modern"
+                role="radio" aria-checked="false" onclick="selectFormatCard('nassau-modern')">
+                <span class="fmt-name">🤝 Nassau</span>
+                <span class="fmt-desc">Front 9, back 9, and the whole round. Scored as an ordinary
+                    round; the three stakes are set under Games &amp; Money.</span>
+            </button>
+
+            <div class="fmt-group-head">Team formats</div>
+            <button type="button" class="fmt-card" id="fmt-card-bestball" data-format="bestball"
+                role="radio" aria-checked="false" onclick="selectFormatCard('bestball')">
+                <span class="fmt-name">👫 Best Ball</span>
+                <span class="fmt-desc">Partner up — the better of your team's two scores counts.</span>
+            </button>
+            <button type="button" class="fmt-card" id="fmt-card-scramble" data-format="scramble"
+                role="radio" aria-checked="false" onclick="selectFormatCard('scramble')">
+                <span class="fmt-name">🏌️ Scramble</span>
+                <span class="fmt-desc">Everyone tees off, play the best shot, go again — as a team.</span>
+            </button>
+            <button type="button" class="fmt-card" id="fmt-card-hilo" data-format="hilo"
+                role="radio" aria-checked="false" onclick="selectFormatCard('hilo')">
+                <span class="fmt-name">⚖️ Hi-Lo</span>
+                <span class="fmt-desc">Teams battle for the low score and the high score on every hole.</span>
+            </button>
+            <button type="button" class="fmt-card" id="fmt-card-wolf" data-format="wolf"
+                role="radio" aria-checked="false" onclick="selectFormatCard('wolf')">
+                <span class="fmt-name">🐺 Wolf</span>
+                <span class="fmt-desc">Pick a partner each hole, or go alone for bigger stakes. Four players.</span>
+            </button>
+            <!-- LEGACY. gameFormat:'ryder' is the old team-vs-team MONEY game and
+                 settles off matchStake exactly as match/bestball/scramble do. It is
+                 NOT the Ryder Cup competition. Renamed on the chooser only - no stored
+                 round is touched and no settlement label changed. -->
+            <button type="button" class="fmt-card" id="fmt-card-ryder" data-format="ryder"
+                role="radio" aria-checked="false" onclick="selectFormatCard('ryder')">
+                <span class="fmt-name">🛡️ Team Match</span>
+                <span class="fmt-desc">One side against the other for a set bet. This is the classic
+                    team money match, not the multi-session Cup below.</span>
+            </button>
+
+            <div class="fmt-group-head">Multi-session competition</div>
+            <!-- THE REAL RYDER CUP. Its own token, never the legacy 'ryder' value.
+                 Normalizes to 'stroke' on save: the round is scored normally and the
+                 Cup is built afterwards on the Matches page, where the roster is
+                 frozen and player ids are real. -->
+            <button type="button" class="fmt-card fmt-card-featured" id="fmt-card-ryder-cup" data-format="ryder-cup"
+                role="radio" aria-checked="false" onclick="selectFormatCard('ryder-cup')">
+                <span class="fmt-name">🏆 Ryder Cup<span class="fmt-badge">Cup</span></span>
+                <span class="fmt-desc">Two sides, points not money. Foursomes · Four-Ball · Singles.
+                    You'll pick the teams straight after the round is created.</span>
+            </button>
+        </div>
         <!-- STRUCTURAL CHOICES ONLY.
              Every option here changes how the scorecard is BUILT - individual play, or
              teams that have to be assigned as players are entered. The money formats
@@ -559,7 +665,7 @@
              The legacy options are NOT deleted - they are kept in a hidden group so that
              opening an old Nassau or Skins round for editing still finds and selects its
              own format. See revealLegacyFormatOption(). -->
-        <select id="game-format-select" onchange="handleFormatChange()">
+        <select id="game-format-select" onchange="handleFormatChange()" style="display:none;" aria-hidden="true" tabindex="-1">
             <optgroup label="Everyone plays their own ball">
                 <option value="stroke" selected>Individual (Stroke Play)</option>
                 <option value="stableford">Stableford</option>
@@ -577,9 +683,14 @@
             <optgroup label="Team formats">
                 <option value="bestball">Best Ball</option>
                 <option value="scramble">Scramble</option>
-                <option value="ryder">Ryder Cup</option>
+                <option value="ryder">Team Match</option>
                 <option value="hilo">Hi-Lo</option>
                 <option value="wolf">Wolf</option>
+            </optgroup>
+            <optgroup label="Multi-session competition">
+                <!-- Distinct from `ryder` above on purpose. Never stored: see
+                     normalizeGameFormatForSave(). -->
+                <option value="ryder-cup">Ryder Cup</option>
             </optgroup>
             
         </select>
@@ -615,12 +726,12 @@
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(3)">◀ Back</button>
-            <button class="wizard-btn-next" onclick="wizardNext(3)">Next: Format Settings ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-3" onclick="wizardNext(3)">Next: Format Settings ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-4" data-step="4">
-        <div class="wizard-step-title">⚙️ Step 4: Format Settings</div>
+        <div class="wizard-step-title">⚙️ Format Settings · <span class="wiz-step-n" id="wiz-n-settings">Step 4</span></div>
         <!-- Shown only when a genuinely old round is loaded. Every legacy field stays
              editable below it; this states what the screen is, nothing more. -->
         <div id="legacy-round-notice" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.78rem; color:var(--text-main); line-height:1.45;"></div>
@@ -820,12 +931,12 @@
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(4)">◀ Back</button>
-            <button class="wizard-btn-next" onclick="wizardNext(4)">Next: Players ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-4" onclick="wizardNext(4)">Next: Players ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-5" data-step="5">
-        <div class="wizard-step-title">👥 Step 5: Players</div>
+        <div class="wizard-step-title">👥 Players · <span class="wiz-step-n" id="wiz-n-players">Step 5</span></div>
         <div class="wizard-step-sub">Add everyone playing today and assign them to foursomes.</div>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
         ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Main Pool.
@@ -857,12 +968,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(5)">◀ Back</button>
-            <button class="wizard-btn-next" onclick="wizardNext(5)">Next: Side Games ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Side Games ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">💰 Step 6: Games &amp; Money</div>
+        <div class="wizard-step-title">💰 Games &amp; Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span></div>
         <div class="wizard-step-sub">Choose the games and bets you're playing. Everything here is optional.</div>
         <!-- Three sections, in the order a group actually decides: the main match
              first, then anything stacked on top, then field-wide pools. -->
@@ -1058,12 +1169,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" onclick="wizardBack(6)">◀ Back</button>
-            <button class="wizard-btn-next" onclick="wizardNext(6)">Next: Review ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-6" onclick="wizardNext(6)">Next: Review ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-7" data-step="7">
-        <div class="wizard-step-title">✅ Step 7: Review &amp; Save</div>
+        <div class="wizard-step-title">✅ Review &amp; Save · <span class="wiz-step-n" id="wiz-n-review">Step 7</span></div>
         <div class="wizard-step-sub">Quick check before you start the round — tap any step above to jump back and change something.</div>
         <div id="wizard-review-summary"></div>
         <div class="wizard-nav-row">
@@ -1158,21 +1269,182 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     })();
 
     // --- SETUP WIZARD ---
+    // ==================== SEMANTIC WIZARD WORKFLOW ====================
+    //
+    // Seven fixed steps for every format is what walked a Stroke Play round onto a
+    // completely blank "Format Settings" screen, and what handed the legacy team
+    // money game the generic 1v1 betting controls. Steps are now addressed by
+    // MEANING; which of them a round walks through, and what position each one
+    // occupies, is derived from the chosen format.
+    //
+    // NO MARKUP MOVED AND NO SCHEMA CHANGED. The DOM ids are still
+    // wizard-step-1..7, every settings panel is where it was, and the wizard has
+    // never persisted a step number - so nothing needs migrating and an existing
+    // round reopens exactly as before.
+    const WIZARD_STEP_OF = { course: 1, length: 2, format: 3, settings: 4, players: 5, action: 6, review: 7 };
+    const WIZARD_SEMANTIC_OF = { 1: 'course', 2: 'length', 3: 'format', 4: 'settings', 5: 'players', 6: 'action', 7: 'review' };
+    const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Format', settings: 'Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
+    const WIZARD_NEXT_LABELS = { length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
+    // DOM step ids only. NEVER the length of a workflow.
     const WIZARD_TOTAL_STEPS = 7;
-    const WIZARD_STEP_LABELS = { 1: 'Course', 2: 'Length', 3: 'Format', 4: 'Settings', 5: 'Players', 6: 'Side Games', 7: 'Review' };
+
+    // Formats that have a real Step 4 panel. Anything absent has none and skips the
+    // step outright instead of showing an empty screen. The legacy wager formats
+    // stay listed so an old round reopened for editing can still reach its editor.
+    const FORMATS_WITH_SETTINGS = ['stableford', 'bestball', 'scramble', 'ryder', 'wolf', 'match', 'skins', 'dots', 'nassau'];
+
+    // THE NEW RYDER CUP, and deliberately not the legacy 'ryder' value. That one is
+    // the old team-vs-team money game and must keep settling exactly as it always
+    // has. This token normalizes to 'stroke' on save; the Cup itself is built by
+    // the existing Phase 3B setup on the Matches page, which needs a frozen roster
+    // and real player ids - neither of which exists mid-wizard.
+    const RYDER_CUP_FORMAT = 'ryder-cup';
+    const FORMAT_CARD_VALUES = ['stroke', 'stableford', 'nassau-modern', 'bestball',
+        'scramble', 'hilo', 'wolf', 'ryder', 'ryder-cup'];
+
     let currentWizardStep = 1;
+
+    function currentPrimaryFormat() {
+        const sel = document.getElementById('game-format-select');
+        return (sel && sel.value) || 'stroke';
+    }
+
+    function isNewRyderCupChoice(fmt) {
+        return (fmt === undefined ? currentPrimaryFormat() : fmt) === RYDER_CUP_FORMAT;
+    }
+
+    // The single source of truth for the progress dots, for Back/Next, and for
+    // which steps exist at all.
+    function wizardWorkflow(fmt) {
+        const format = (fmt === undefined) ? currentPrimaryFormat() : fmt;
+        // A Cup carries no wizard money - no Format Settings, no Games & Money.
+        // Optional side action is added afterwards from Matches, exactly as it is
+        // for every other round.
+        if (format === RYDER_CUP_FORMAT) return ['course', 'length', 'format', 'players', 'review'];
+        const flow = ['course', 'length', 'format'];
+        if (FORMATS_WITH_SETTINGS.indexOf(format) !== -1) flow.push('settings');
+        flow.push('players', 'action', 'review');
+        return flow;
+    }
+
+    function wizardStepNumbers(fmt) {
+        return wizardWorkflow(fmt).map(function (s) { return WIZARD_STEP_OF[s]; });
+    }
+
+    function wizardStepNumber(semantic) { return WIZARD_STEP_OF[semantic]; }
+
+    // A step the current format does not have resolves forward to the next one it
+    // does, so a format switch can never strand the organizer on a hidden screen.
+    function wizardResolveStep(n) {
+        const steps = wizardStepNumbers();
+        if (steps.indexOf(n) !== -1) return n;
+        for (let i = 0; i < steps.length; i++) if (steps[i] >= n) return steps[i];
+        return steps[steps.length - 1];
+    }
+
+    function wizardNeighbourStep(fromStep, delta) {
+        const steps = wizardStepNumbers();
+        let idx = steps.indexOf(wizardResolveStep(fromStep)) + delta;
+        if (idx < 0) idx = 0;
+        if (idx >= steps.length) idx = steps.length - 1;
+        return steps[idx];
+    }
 
     function renderWizardProgress() {
         const container = document.getElementById('wizard-progress');
         if (!container) return;
+        const steps = wizardStepNumbers();
+        const here = steps.indexOf(currentWizardStep);
         let html = '';
-        for (let i = 1; i <= WIZARD_TOTAL_STEPS; i++) {
+        steps.forEach(function (stepNum, i) {
             let cls = 'wizard-dot';
-            if (i === currentWizardStep) cls += ' active';
-            else if (i < currentWizardStep) cls += ' done';
-            html += `<div class="${cls}" onclick="goToWizardStep(${i})" title="${WIZARD_STEP_LABELS[i]}">${i}</div>`;
-        }
+            if (stepNum === currentWizardStep) cls += ' active';
+            else if (here !== -1 && i < here) cls += ' done';
+            html += `<div class="${cls}" onclick="goToWizardStep(${stepNum})" title="${WIZARD_STEP_LABELS[WIZARD_SEMANTIC_OF[stepNum]]}">${i + 1}</div>`;
+        });
         container.innerHTML = html;
+    }
+
+    // The heading number follows the workflow, not the DOM id, so a Ryder Cup does
+    // not read "Step 5: Players" while the dots say 4.
+    function syncWizardStepTitles() {
+        wizardWorkflow().forEach(function (sem, i) {
+            const el = document.getElementById('wiz-n-' + sem);
+            if (el) el.textContent = 'Step ' + (i + 1);
+        });
+    }
+
+    // Next buttons name the step they actually lead to, not the one that used to
+    // follow them numerically.
+    function syncWizardNavLabels() {
+        const steps = wizardStepNumbers();
+        for (let n = 1; n <= WIZARD_TOTAL_STEPS; n++) {
+            const btn = document.getElementById('wizard-next-' + n);
+            if (!btn) continue;
+            const idx = steps.indexOf(n);
+            if (idx === -1 || idx === steps.length - 1) continue;
+            const target = WIZARD_SEMANTIC_OF[steps[idx + 1]];
+            btn.textContent = (target === 'review')
+                ? 'Review \u0026 Save \u25B6'
+                : 'Next: ' + WIZARD_NEXT_LABELS[target] + ' \u25B6';
+        }
+        const saveBtn = document.getElementById('main-save-btn');
+        if (saveBtn) {
+            saveBtn.textContent = isNewRyderCupChoice()
+                ? '\uD83C\uDFC6 Create Round \u0026 Set Up Cup'
+                : '\uD83D\uDCBE Save \u0026 Start Round';
+        }
+    }
+
+    function syncFormatCards() {
+        const fmt = currentPrimaryFormat();
+        FORMAT_CARD_VALUES.forEach(function (v) {
+            const card = document.getElementById('fmt-card-' + v);
+            if (!card) return;
+            const on = (v === fmt);
+            card.classList.toggle('selected', on);
+            card.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+    }
+
+    // The cards write to the hidden <select> and then call the SAME handler the
+    // dropdown's onchange always called. There is no second format model.
+    function selectFormatCard(fmt) {
+        const sel = document.getElementById('game-format-select');
+        if (!sel) return;
+        const prev = sel.value;
+        if (prev !== fmt) clearFormatCarryover(prev, fmt);
+        sel.value = fmt;
+        handleFormatChange();
+    }
+
+    // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
+    //
+    // A Ryder Cup skips both Format Settings and Games & Money, so a stake the
+    // organizer had set while looking at Best Ball would otherwise be saved without
+    // ever being shown again. Cleared at the moment of the switch, which is also
+    // what keeps the Review screen honest.
+    //
+    // Switching AWAY from a Cup needs no equivalent: the wizard holds no Cup draft
+    // to leak. That is the whole point of creating the Cup on the Matches page.
+    function clearFormatCarryover(prevFormat, nextFormat) {
+        if (nextFormat !== RYDER_CUP_FORMAT) return;
+        const holeBet = document.getElementById('enable-hole-bet');
+        if (holeBet) holeBet.checked = false;
+        const holeBetBox = document.getElementById('hole-bet-stake-container');
+        if (holeBetBox) holeBetBox.style.display = 'none';
+        const matchStakeEl = document.getElementById('match-stake');
+        if (matchStakeEl) matchStakeEl.value = 0;
+        const birdie = document.getElementById('enable-birdiegame');
+        if (birdie) birdie.checked = false;
+        const setupNassau = document.getElementById('setup-nassau-enabled');
+        if (setupNassau) setupNassau.checked = false;
+        const pool = document.getElementById('mp-enabled');
+        if (pool) pool.checked = false;
+        const poolPanel = document.getElementById('mp-panel');
+        if (poolPanel) poolPanel.style.display = 'none';
+        // Reuses the existing reset path rather than reaching into its state.
+        if (typeof loadAdditionalGames === 'function') loadAdditionalGames({});
     }
 
     // --- ROUND READY ---
@@ -1267,7 +1539,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function editRoundFromReady() {
         document.getElementById('round-ready-screen').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'block';
-        goToWizardStep(7);
+        goToWizardStep(wizardStepNumber('review'));
     }
 
     function goToSideBets() {
@@ -1301,12 +1573,17 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function goToWizardStep(n) {
         if (n < 1 || n > WIZARD_TOTAL_STEPS) return;
+        // A step the chosen format skips resolves to the nearest one it has.
+        n = wizardResolveStep(n);
         currentWizardStep = n;
         for (let i = 1; i <= WIZARD_TOTAL_STEPS; i++) {
             const el = document.getElementById('wizard-step-' + i);
             if (el) el.classList.toggle('active', i === n);
         }
         renderWizardProgress();
+        syncWizardStepTitles();
+        syncWizardNavLabels();
+        syncFormatCards();
         // THE PLAYER PICKER MUST FOLLOW THE ROSTER.
         //
         // Choosing Nassau in Step 3 pre-opens the Step 6 card and renders its picker
@@ -1317,11 +1594,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // null. That is why a fresh Nassau round reported "no bets this round".
         //
         // Re-rendering on arrival costs nothing and keeps the picker honest.
-        if (n === 6 && typeof renderSetupNassauPlayers === 'function') {
+        if (n === WIZARD_STEP_OF.action && typeof renderSetupNassauPlayers === 'function') {
             const box = document.getElementById('setup-nassau-enabled');
             if (box && box.checked) renderSetupNassauPlayers();
         }
-        if (n === 7) renderWizardReview();
+        if (n === WIZARD_STEP_OF.review) renderWizardReview();
         const progressEl = document.getElementById('wizard-progress');
         if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -1344,11 +1621,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const formatVal = document.getElementById('game-format-select').value;
             if (!formatVal) { alert('⚠️ Please select a game format before continuing.'); return; }
         }
-        goToWizardStep(fromStep + 1);
+        goToWizardStep(wizardNeighbourStep(fromStep, 1));
     }
 
     function wizardBack(fromStep) {
-        goToWizardStep(fromStep - 1);
+        goToWizardStep(wizardNeighbourStep(fromStep, -1));
     }
 
     function renderWizardReview() {
@@ -3505,7 +3782,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         dots: "Earn dots for birdies, KPs, and other in-round moments.",
         bestball: "Partner up — the better of your team's two scores counts.",
         scramble: "Everyone tees off, pick the best shot, play from there — as a team.",
-        ryder: "Team vs. team match play, one side against the other.",
+        ryder: "Team vs. team match play for a set bet \u2014 the classic team money match.",
+        'ryder-cup': "Two sides, points not money. Foursomes, Four-Ball and Singles. Teams are picked right after the round is created.",
         hilo: "Teams battle for both the low score and the high score on every hole."
     };
 
@@ -3574,6 +3852,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // for the token to escape through.
     function normalizeGameFormatForSave(fmt) {
         if (fmt === 'nassau-modern') return 'stroke';
+        // A Ryder Cup round is SCORED as an ordinary individual round - the Cup is a
+        // competition layered on top, held in data.ryderCup and computed by
+        // ryder-cup.js. It must never be written as the legacy 'ryder' money format,
+        // which would hand it matchStake settlement it was never set up for.
+        if (fmt === RYDER_CUP_FORMAT) return 'stroke';
         return fmt;
     }
 
@@ -3761,6 +4044,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // Keep the plain-English bet description in step with whichever format is showing,
         // including when a saved round is reopened rather than freshly configured.
         updateBetExplainers();
+
+        // THE WORKFLOW IS DERIVED, SO IT HAS TO BE RECOMPUTED HERE. Choosing a format
+        // with no Format Settings must drop that step from the dots, the headings and
+        // Back/Next in the same breath - and if the organizer is standing on a step the
+        // new format does not have, move them somewhere real.
+        syncFormatCards();
+        renderWizardProgress();
+        syncWizardStepTitles();
+        syncWizardNavLabels();
+        if (wizardStepNumbers().indexOf(currentWizardStep) === -1) goToWizardStep(currentWizardStep);
     }
 
     // WHAT THIS ROUND ALREADY DECIDED.
@@ -4383,7 +4676,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const baseEventName = roundDay; 
             const categoryIcon = getCategoryIcon(currentCategory);
 
-            const holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
+            let holeBetStake = document.getElementById("enable-hole-bet").checked ? (parseFloat(document.getElementById("hole-bet-stake").value) || 0) : 0;
 
             const birdieGameEnabled = document.getElementById("enable-birdiegame") ? document.getElementById("enable-birdiegame").checked : false;
             const birdieUnitVal = document.getElementById("birdie-unit-val-admin") ? (parseFloat(document.getElementById("birdie-unit-val-admin").value) || 0) : 1;
@@ -4394,6 +4687,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // builds the teams; the money is created explicitly from Action.
             let matchStake = document.getElementById("match-stake") ? (parseFloat(document.getElementById("match-stake").value) || 0) : 50;
             if (multiGroupMoneySuppressed()) matchStake = 0;
+            // A NEW RYDER CUP CARRIES NO WIZARD MONEY.
+            //
+            // The Cup workflow skips Format Settings and Games & Money entirely, so
+            // any stake left behind by a format the organizer looked at first would be
+            // saved without ever being shown again. clearFormatCarryover() already
+            // empties the controls on the switch; this is the belt to that pair of
+            // braces, at the one place the payload is actually built.
+            const creatingRyderCup = (document.getElementById("game-format-select").value === 'ryder-cup');
+            if (creatingRyderCup) { holeBetStake = 0; matchStake = 0; }
             const matchPressRule = document.getElementById("match-press-rule") ? document.getElementById("match-press-rule").value : "2down";
             const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
             const nassauScoring = document.getElementById("nassau-scoring") ? document.getElementById("nassau-scoring").value : "net";
@@ -4588,6 +4890,19 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }).then(() => {
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
+                if (creatingRyderCup) {
+                    // HANDOFF, NOT A SECOND SETUP.
+                    //
+                    // The Cup needs a frozen roster and real player ids, and neither
+                    // exists until the round is saved - wizard ids are positional
+                    // (idx + 101), so assigning sides before this point would silently
+                    // repoint memberships the moment a player was removed or reordered.
+                    // So the wizard creates the ROUND and takes the organizer straight
+                    // to the Phase 3B Cup setup that has always lived on Matches. No
+                    // setup logic is duplicated here.
+                    window.location.href = `sidematches.html?game=${currentMode}&setup=ryder`;
+                    return;
+                }
                 showRoundReadyScreen(currentMode);
             }).catch((err) => { 
                 saveBtn.innerText = originalText;
@@ -4628,17 +4943,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
     }
 
+    syncFormatCards();
     renderWizardProgress();
     goToWizardStep(1);
 
     // Step 3's sub-header reflects which entry card the organizer chose — Club Event nudges
-    // toward common club formats, Quick Round keeps it plain. Every format is still available
-    // in the dropdown either way; this only changes the framing text above it.
+    // toward common club formats, Quick Round keeps it plain. Every format card is still
+    // available either way; this only changes the framing text above them.
     const step3SubEl = document.getElementById('step3-sub');
     if (step3SubEl) {
         step3SubEl.textContent = currentEventType === 'club'
-            ? "Common club formats: Stroke Play, Skins, Stableford. Every other format below still works too."
-            : "How the round is scored. Money games get added in Step 6.";
+            ? "Common club formats: Stroke Play, Stableford, Best Ball. Every other format below still works too."
+            : "Pick the golf first. Bets and side games come later, under Games & Money.";
     }
     // On the lobby screen itself (no game code yet), show the framing for the default
     // Quick Round selection, matching whichever card starts active in the HTML.
@@ -4671,7 +4987,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 loadModeData(currentMode);
                 // loadModeData fetches its own data asynchronously, so give it a moment to actually
                 // populate the fields before building the review screen from them.
-                setTimeout(() => goToWizardStep(7), 600);
+                setTimeout(() => goToWizardStep(wizardStepNumber('review')), 600);
             }
         });
     }
