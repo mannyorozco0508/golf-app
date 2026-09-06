@@ -3215,6 +3215,61 @@ html {
             + String(p.message || p.type).replace(/[&<>]/g, '') + '</div>').join('');
     }
 
+    // NAMES ARE THE ONLY THING THAT CROSSES ROUNDS, so they have to mean something
+    // before a Cup is built on them.
+    //
+    // Player ids are per-round and positional; a Cup played over five rounds is
+    // stitched together by NAME. A golfer with no name, or one of two golfers with
+    // the same name, cannot be found on any other round - and the resolver will
+    // correctly refuse to load the Cup there, on Day 2, on a screen the organizer
+    // is not looking at and cannot fix from.
+    //
+    // HERE IS WHERE IT IS CHEAP. The roster is on screen, the names are typed on
+    // this round, and nobody has played a hole. Only golfers actually IN the Cup
+    // are checked: somebody on the round who is not on a side is not the Cup's
+    // business, and blocking on them would refuse a legitimate Cup.
+    function rcIdentityProblems() {
+        // NO LOCAL COPY OF THE RULE. action-model.js defines what a name is and
+        // what a placeholder is, and this page loads it; a fallback reimplementation
+        // here would be a second definition free to drift from the one the RESOLVER
+        // uses, so a Cup could pass this gate and still be refused on Day 2 - the
+        // exact failure this gate exists to prevent. If the helpers are missing,
+        // say so rather than saving a Cup that nothing checked.
+        if (typeof normalisePlayerName !== 'function'
+            || typeof isPlaceholderPlayerName !== 'function') {
+            return [{ type: 'identity-check-unavailable',
+                message: 'Could not check the golfers’ names — '
+                    + 'reload the page and try again.' }];
+        }
+        const norm = normalisePlayerName;
+        const isPlaceholder = isPlaceholderPlayerName;
+
+        const inCup = rcPlayers().filter(p => rcDraft.members[String(p.id)]);
+        const nameless = inCup.filter(p => !norm(p.name) || isPlaceholder(p.name));
+        const out = [];
+        if (nameless.length) {
+            // One message, however many there are. Four copies of the same sentence
+            // is noise, and the fix is the same for all of them.
+            out.push({ type: 'unnamed-in-cup',
+                message: 'Name every golfer in the Cup before saving. '
+                    + nameless.map(p => p.name || 'a blank name').join(', ')
+                    + ' cannot identify anyone on another round.' });
+        }
+        const seen = {}, reported = {};
+        inCup.forEach(p => {
+            const key = norm(p.name);
+            if (!key || isPlaceholder(p.name)) return;
+            if (seen[key] && !reported[key]) {
+                reported[key] = true;
+                out.push({ type: 'duplicate-in-cup',
+                    message: 'Two golfers in the Cup are called ' + p.name
+                        + '. Rename one so they can be told apart on another round.' });
+            }
+            seen[key] = true;
+        });
+        return out;
+    }
+
     // ONE AUTHORITY. The UI never decides legality; it asks the engine and prints
     // what comes back.
     function rcSave() {
@@ -3234,6 +3289,7 @@ html {
         // Refusing costs no work. Every rc* control mutates the draft in memory and
         // this is the only write, so the lineup, the sides and the names are all
         // still on screen for the organizer to save once they have answered.
+        rcIdentityProblems().forEach(p => problems.push(p));
         const needsSession = !!(next.sessions && Object.keys(next.sessions).length > 0);
         if (needsSession && !rcDraft.playsSession) {
             problems.push({ type: 'no-session',

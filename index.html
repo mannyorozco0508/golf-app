@@ -2803,6 +2803,61 @@ html {
             + '</div>';
     }
 
+    // WHY THERE IS NO CUP ON THIS ROUND.
+    //
+    // The card used to say "Cup unavailable" for every one of these, which is true
+    // and useless: a golfer on Day 2 got no Cup, no cause, and no idea that a name
+    // typed on a DIFFERENT round was the reason. The app knew exactly what was
+    // wrong. Saying it costs a sentence.
+    //
+    // Returns '' when there is nothing specific to say, so the caller keeps the
+    // generic line rather than inventing a cause it does not have.
+    function ryderUnavailableReason(res) {
+        if (!res) return '';
+        const host = res.host ? String(res.host) : '';
+        const where = host ? 'round ' + host : 'the round that holds it';
+        if (res.status === 'host-unavailable') {
+            return 'This Cup lives on ' + where + ', which would not load';
+        }
+        if (res.status === 'host-cup-missing') {
+            return 'The Cup on ' + where + ' has been removed';
+        }
+        if (res.status !== 'identity-unresolved') return '';
+
+        // THE SPELLING THE GOLFERS USE. The engine keys identity on a normalised
+        // name - trimmed and lowercased - and printing that back would show a
+        // golfer "mike dunne" and look like a different bug. Look the real name up
+        // on this round's own roster; fall back to the key if they are not here.
+        const norm = (typeof normalisePlayerName === 'function') ? normalisePlayerName
+            : (n => String(n == null ? '' : n).trim().toLowerCase());
+        const spell = key => {
+            const hit = (currentData.players || []).filter(p => norm(p.name) === norm(key))[0];
+            return hit ? hit.name : String(key || '');
+        };
+
+        const dupes = [];
+        let unnamed = false;
+        (res.identityProblems || []).forEach(p => {
+            if (p.type === 'duplicate-name') {
+                const n = spell(p.name);
+                if (n && dupes.indexOf(n) === -1) dupes.push(n);
+            } else if (p.type === 'unnamed') { unnamed = true; }
+        });
+
+        const bits = [];
+        if (dupes.length) {
+            bits.push('two golfers are called ' + dupes.map(n => '\u201C' + n + '\u201D').join(' and ')
+                + ', so this round cannot tell them apart');
+        }
+        if (unnamed) {
+            bits.push('some golfers in it have no name \u2014 \u201CPlayer 3\u201D is not a name that '
+                + 'means the same person on another round');
+        }
+        if (!bits.length) return '';
+        return 'Not showing because ' + bits.join(', and ')
+            + '. Fix the names on ' + where + ', then reopen this round';
+    }
+
     function renderRyderCupHtml() {
         if (typeof hasRyderCup !== 'function') return '';
         const res = ryderResolution();
@@ -2811,9 +2866,11 @@ html {
         // A pointer we cannot follow says so quietly and gets out of the way.
         // Scoring must never be blocked by a Cup that failed to load.
         if (!ryderResolutionUsable(res)) {
+            const why = ryderUnavailableReason(res);
             return '<div class="lw-card rc-card"><div class="lw-head">'
                 + '<span class="lw-title">\uD83C\uDFC6 RYDER CUP</span></div>'
-                + '<div class="rcs-hint">Cup unavailable \u2014 scoring is unaffected.</div></div>';
+                + '<div class="rcs-hint">' + (why ? esc0(why) : 'Cup unavailable')
+                + ' \u2014 scoring is unaffected.</div></div>';
         }
         const cup = res.cup;
         const cd = currentData.courseData || [];

@@ -82,6 +82,16 @@ const PROBE = `
                 usable: res ? ryderResolutionUsable(res) : null,
                 problems: res && res.identityProblems
                     ? res.identityProblems.map(p => p.type) : [] };
+
+  // WHAT THE GOLFER ACTUALLY SEES. A correct refusal that says nothing is the
+  // defect this whole thread started on, so the rendered card is read here rather
+  // than the resolution object - and it is read off the page, wherever the page
+  // decided to put it, not from a renderer called by name.
+  const cardEl = Array.from(document.querySelectorAll('.rc-card'))[0];
+  out.cardOnScreen = !!(cardEl && cardEl.getClientRects().length > 0
+      && cardEl.getBoundingClientRect().height > 0);
+  out.cardText = cardEl
+      ? (cardEl.textContent || '').replace(/\\s+/g, ' ').trim() : '';
   if (res && res.cup && ryderResolutionUsable(res)) {
     const cfg = ryderCupConfig(res.cup);
     const byId = {};
@@ -126,6 +136,16 @@ function bail(msg) {
                       + report.placeholders.status + ')');
     if (report.placeholders.usable)
         problems.push('a Cup built on "Player 1..4" was treated as usable');
+    // A REFUSAL THAT SAYS NOTHING IS THE DEFECT, not the fix.
+    if (!report.placeholders.cardOnScreen)
+        problems.push('the golfer is shown nothing at all where a Cup should be');
+    if (!/no name/i.test(report.placeholders.cardText))
+        problems.push('the card does not say the names are the problem: "'
+                      + report.placeholders.cardText + '"');
+    if (!/HOST/.test(report.placeholders.cardText))
+        problems.push('the card does not say which round to fix');
+    if (!/scoring is unaffected/i.test(report.placeholders.cardText))
+        problems.push('the golfer is not told they can still score');
 
     // 3. Two golfers with one name cannot be told apart.
     const dup = await arriveCold({ url: fileUrl('index.html', 'game=AWAY'),
@@ -137,6 +157,14 @@ function bail(msg) {
                       + report.duplicates.status + ')');
     if (report.duplicates.usable)
         problems.push('a Cup with two golfers called Mike was treated as usable');
+    if (!/tell them apart/i.test(report.duplicates.cardText))
+        problems.push('the card does not explain the duplicate: "'
+                      + report.duplicates.cardText + '"');
+    if (!/Mike/.test(report.duplicates.cardText))
+        problems.push('the card does not name the ambiguous golfer');
+    // The working case must NOT apologise for itself.
+    if (/no name|tell them apart|would not load/i.test(report.translated.cardText || ''))
+        problems.push('a Cup that resolved fine is showing a refusal message');
 
     report.problems = problems;
     report.verdict = problems.length ? 'FAIL' : 'PASS';

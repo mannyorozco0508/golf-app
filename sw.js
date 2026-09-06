@@ -269,7 +269,15 @@
 // after the round so it read as the subject, and the pointer to the Bets page.
 // An installed PWA on v65 keeps a home with two ways to start and a Cup screen
 // headed "Side Matches".
-const CACHE_VERSION = 'golfapp-v66-entry-cleanup';
+// Moved to v67: a Cup that refuses now says what is wrong and what to do. v63
+// taught the resolver to refuse rather than name the wrong golfers, and it
+// refused SILENTLY - "Cup unavailable", which is true and useless. A golfer on
+// Day 2 got no Cup, no cause, and no idea that a name typed on a different round
+// was the reason. All three unusable states now name themselves, and the Cup can
+// no longer be CREATED on golfers who are unnamed or share a name, which is where
+// the fix is cheap. Scoring is unblocked throughout. An installed PWA on v66
+// keeps a Cup that disappears without explaining itself.
+const CACHE_VERSION = 'golfapp-v67-identity-messaging';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
