@@ -189,7 +189,11 @@
 // Moved to v49: index.html gained Foursomes team score entry and sidematches.html
 // gained the scratch/handicap choice. An installed PWA on v48 would serve a
 // scorecard that cannot enter an alternate-shot score at all.
-const CACHE_VERSION = 'golfapp-v52-tile-gallery';
+// Moved to v53: index.html gained the D1 fix - the match-handicap line is cloned
+// into Hole View, so a golfer can finally see WHICH handicaps the dots are using
+// without switching views. An installed PWA on v52 would keep serving the card
+// where that line renders only inside the Full Card, which is the entire defect.
+const CACHE_VERSION = 'golfapp-v53-hole-view-match-hcp';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
