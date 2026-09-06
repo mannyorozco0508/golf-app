@@ -57,6 +57,17 @@ const PROBE = `
   // 4. The handoff sentence lives in the Cup card now.
   out.handoffCopyInCard = !!(cupMount && /Round created/.test(cupMount.innerHTML));
 
+  //    AND NEITHER PIECE OF SIDE-BETTING CHROME IS ON SCREEN. v62 removed the
+  //    side-matches CARD and left the page heading and the Bets pointer standing
+  //    above it, so an organizer sent here to build a Cup still landed under
+  //    "Side Matches (<round name>)" above a note about where Skins and KPs live.
+  //    Measured as geometry, not style: mini-dom has no layout and cannot tell
+  //    display:block from 0x0.
+  const onScreen = el => !!(el && el.getClientRects().length > 0
+      && el.getBoundingClientRect().height > 0);
+  out.pageHeadingVisible = onScreen(document.getElementById('main-title'));
+  out.betsPointerVisible = onScreen(document.getElementById('sm-bets-pointer'));
+
   // 5. The Cup is genuinely on screen, not merely present.
   out.cupVisible = !!(cupMount && cupMount.getClientRects().length > 0 && out.cupHeightPx > 0);
   out.cupAboveTheFold = out.cupTopPx !== null && out.cupTopPx < window.innerHeight;
@@ -74,6 +85,8 @@ const PROBE = `
   if (out.collapseMachineryPresent) problems.push('the v61 collapse block is still here');
   if (out.oldBannerPresent) problems.push('the old handoff banner is still in the markup');
   if (!out.handoffCopyInCard) problems.push('the handoff sentence was not folded into the card');
+  if (out.pageHeadingVisible) problems.push('the "Side Matches" page heading is on the Cup arrival');
+  if (out.betsPointerVisible) problems.push('the pointer to the Bets page is on the Cup arrival');
   if (!out.cupAboveTheFold) problems.push('the Cup is not on the first screen');
 
   out.problems = problems;
@@ -91,6 +104,10 @@ const PROBE_PLAIN = `
   out.cupRendered = !!(cupMount && cupMount.querySelector('.rcs-card'));
   out.handoffCopyInCard = !!(cupMount && /Round created/.test(cupMount.innerHTML));
   const y = el => el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null;
+  const onScreen2 = el => !!(el && el.getClientRects().length > 0
+      && el.getBoundingClientRect().height > 0);
+  out.pageHeadingVisible = onScreen2(document.getElementById('main-title'));
+  out.betsPointerVisible = onScreen2(document.getElementById('sm-bets-pointer'));
   out.cupAboveSideCard = y(cupMount) !== null
       && y(document.getElementById('sidematches-card')) !== null
       && y(cupMount) < y(document.getElementById('sidematches-card'));
@@ -99,6 +116,8 @@ const PROBE_PLAIN = `
   if (!out.cupRendered) problems.push('the Cup surface stopped rendering on an ordinary visit');
   if (!out.cupAboveSideCard) problems.push('the Cup renders below the side-betting card');
   if (out.handoffCopyInCard) problems.push('an ordinary visit claims the round was just created');
+  if (!out.pageHeadingVisible) problems.push('an ordinary visit lost its page heading');
+  if (!out.betsPointerVisible) problems.push('an ordinary visit lost the pointer to the Bets page');
   out.problems = problems;
   out.verdict = problems.length ? 'FAIL' : 'PASS';
   return JSON.stringify(out, null, 2);

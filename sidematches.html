@@ -341,7 +341,7 @@ html {
 
     <a class="back-btn" onclick="goBack()">← Back</a>
 
-    <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+    <div id="sm-bets-pointer" style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
         Looking for group-wide games like Skins, Birdie Game, or KPs? That's on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a> instead.
     </div>
 
@@ -771,6 +771,10 @@ html {
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `⚔️ Side Matches (${currentData.eventName || "Live Round"})`;
+            // Written before smApplyRyderArrival runs below, and rewritten on every
+            // snapshot after it - so setting the text is fine, but the element must
+            // not be re-shown. Hiding is applied by the arrival and nothing here
+            // touches display.
             renderSideMatches();
             // THE CUP SURFACE RENDERS ON DATA, like everything else on this page.
             //
@@ -2788,8 +2792,16 @@ html {
         if (window.__smRyderHandoff) return;
         if (!isOrganizerView() || !(currentData.players || []).length) return;
         window.__smRyderHandoff = true;
-        const card = document.getElementById('sidematches-card');
-        if (card) card.style.display = 'none';
+        // ALL THREE, not just the card. v62 removed the side-matches CARD and left
+        // the page chrome above it standing, so an organizer sent here to build a
+        // Cup still landed under "⚔️ Side Matches (Single Round)" - the heading is
+        // named after the round, so it reads as the subject - above a note about
+        // where Skins and KPs live. Neither is about a Ryder Cup. The Cup card draws
+        // its own heading, so nothing is left unlabelled.
+        ['sidematches-card', 'main-title', 'sm-bets-pointer'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
     }
 
     function rcRefresh() { if (!rcDraft || !rcDraft.__open) rcDraft = null; renderRyderCupSetup(); }

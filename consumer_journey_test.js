@@ -35,9 +35,16 @@ const BUILD = read('build-shell.js');
 
 // ---------------------------------------------------------------------------
 describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
+    // Still the primary action, reached differently. It used to be a button under
+    // the tiles; the tile IS the button now, so what this guards is that tapping
+    // Game Day starts a round - not that a particular control exists.
     test('Start a round', () => {
-        assert.match(ADMIN, /onclick="createRoom\(\)"/, 'the primary action');
-        assert.match(ADMIN, /Start New Game/);
+        assert.match(ADMIN, /onclick="selectHomeWidget\('quick'\)"/, 'the primary action');
+        const fn = ADMIN.slice(ADMIN.indexOf('function selectHomeWidget'),
+            ADMIN.indexOf('function generateRoomCode'));
+        assert.match(fn, /createRoom\(\);/, 'picking Game Day does not start anything');
+        assert.match(ADMIN, /function createRoom\(\)[\s\S]{0,300}window\.location\.href/,
+            'createRoom no longer goes anywhere');
     });
 
     test('Join a round, with a code field that fits current codes', () => {

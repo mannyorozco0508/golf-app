@@ -405,10 +405,11 @@ html {
         <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
     </div>
 
-    <button class="btn-primary" onclick="createRoom()">➕ Start New Game</button>
-
-    <div class="lobby-divider"><span>OR</span></div>
-    
+    <!-- PICKING A TILE IS THE DECISION. The page asks "What are you setting up?"
+         and offers two answers. The button that used to sit here was a second way
+         to give one of those answers, so the tile that looked like the answer did
+         nothing but tick itself and print a line of text. The "OR" went with it:
+         it separated that button from Join Game and has nothing left to separate. -->
     <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
     <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
 
@@ -2999,6 +3000,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const framingEl = document.getElementById('event-type-framing');
         framingEl.textContent = eventTypeFraming[type];
         framingEl.style.display = 'block';
+
+        // AND IT STARTS. Road Trip navigated on tap from the beginning; Game Day
+        // ticked itself and waited for a separate button, so the tile answered the
+        // page's question without acting on the answer. The framing above is still
+        // set: it is read on the round's own setup screen, and a deep link carrying
+        // ?eventType= relies on the same string.
+        createRoom();
     }
 
     function generateRoomCode() {

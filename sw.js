@@ -260,7 +260,16 @@
 // badge and never scored. The row is no longer rendered where a schedule exists,
 // and the handler refuses instead of pushing a blank. An installed PWA on v64
 // keeps two buttons that can only block its own Save.
-const CACHE_VERSION = 'golfapp-v65-add-match-guard';
+// Moved to v66: the entry screens stop framing the job as something else. The
+// home asked "What are you setting up?", offered two tiles, and then offered a
+// separate button underneath to actually begin - so the tile that looked like the
+// answer only ticked itself. Picking a tile starts the round now, and the button
+// and its orphaned "OR" are gone. And the Cup arrival loses the side-betting
+// chrome v62 left standing above the card it removed: the page heading, named
+// after the round so it read as the subject, and the pointer to the Bets page.
+// An installed PWA on v65 keeps a home with two ways to start and a Cup screen
+// headed "Side Matches".
+const CACHE_VERSION = 'golfapp-v66-entry-cleanup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
