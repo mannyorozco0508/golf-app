@@ -41,8 +41,9 @@ const REPO_ROOT = path.join(__dirname, '..');
 function makeStubSandbox() {
     const documentStub = createDocument();
     const elementRegistry = documentStub.__registry;
+    const captured = [];
     const dbStub = {
-        ref() {
+        ref(p) {
             // push() returns a FULL reference, as real Firebase does. It used to hand
             // back { key: 'TEST' } only, so any production path that pushed and then
             // set - logAuditEntry() does exactly that, and saveScore() calls it -
@@ -52,7 +53,14 @@ function makeStubSandbox() {
             // only read .key are unaffected.
             const ref = {
                 key: 'TEST',
-                on() {}, once() { return Promise.resolve({ val() { return null; }, exists() { return false; } }); },
+                // CAPTURED, NOT DISCARDED. Pages register their value handler at load;
+                // throwing it away meant a test could only approximate the arrival by
+                // hand-writing a listener, which is not the code production runs.
+                // sandbox.__dbHandlers lets a test fire the page's OWN callback.
+                on(ev, cb) {
+                    if (typeof cb === 'function') captured.push({ path: p, event: ev, cb: cb });
+                },
+                once() { return Promise.resolve({ val() { return null; }, exists() { return false; } }); },
                 set() { return Promise.resolve(); }, update() { return Promise.resolve(); },
                 remove() { return Promise.resolve(); },
                 push() { return ref; }
@@ -72,6 +80,20 @@ function makeStubSandbox() {
         setTimeout, clearTimeout, setInterval, clearInterval,
         location: { search: '', href: 'https://golf-app-5a5.pages.dev/index.html', pathname: '/index.html' },
         localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+        // A REAL one, unlike the localStorage stub above. sessionStorage is used to
+        // remember UI state that must survive a re-render or a reload, so a test
+        // that cannot read back what production wrote proves nothing about it.
+        // localStorage is deliberately left as-is: dozens of suites already run
+        // against its no-op behaviour and giving it memory could change them.
+        sessionStorage: (() => {
+            const mem = new Map();
+            return {
+                getItem: k => (mem.has(String(k)) ? mem.get(String(k)) : null),
+                setItem: (k, v) => { mem.set(String(k), String(v)); },
+                removeItem: k => { mem.delete(String(k)); },
+                clear: () => { mem.clear(); }
+            };
+        })(),
         firebase: { initializeApp() {}, database() { return dbStub; } },
         db: dbStub,
         alert() {}, confirm() { return true; }, prompt() { return null; },
@@ -80,6 +102,7 @@ function makeStubSandbox() {
         Math: Math, Date: Date, Array: Array, Object: Object, JSON: JSON,
         Set: Set, Map: Map,
         __elementRegistry: elementRegistry, // exposed so tests can inspect rendered output directly
+        __dbHandlers: captured,             // the value handlers the page registered
     };
     sandbox.window = sandbox;
     return sandbox;
@@ -210,6 +233,14 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     const inlineCode = matches.map(m => m[1]).join('\n');
 
     const sandbox = makeStubSandbox();
+    // THE PAGE'S OWN QUERY STRING. Pages read `const urlParams = new
+    // URLSearchParams(window.location.search)` at load, so a param-dependent path -
+    // ?setup=ryder, ?group=, ?add=1 - cannot be reached once the script has run.
+    // Setting it here lets a test ARRIVE the way a browser does, rather than
+    // reshaping production so a test can call into it.
+    if (options && options.search) {
+        sandbox.location.search = String(options.search);
+    }
     vm.createContext(sandbox);
 
     // Seed every <select id="..."> from the page's own markup, with its options.
@@ -221,6 +252,17 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     let sel;
     while ((sel = selectRe.exec(html)) !== null) {
         sandbox.document.__declare(sel[2], 'select', sel[3]);
+    }
+
+    // <details id="..."> carries its default state in the markup, and whether a
+    // block starts open or collapsed is exactly the kind of thing a test needs to
+    // read. Without this every details element answered `open: undefined`, so the
+    // markup default was invisible and a test could only see what JS had set.
+    const detailsRe = /<details\b([^>]*\bid="([^"]+)"[^>]*)>/gi;
+    let det;
+    while ((det = detailsRe.exec(html)) !== null) {
+        const el = sandbox.document.__declare(det[2], 'details');
+        el.open = /\bopen\b/.test(det[1]);
     }
 
     dependencies.forEach(depPath => {

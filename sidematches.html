@@ -136,6 +136,14 @@
 
         .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
+        /* The collapsed side-action block reads as the heading it replaces. */
+        #sm-block-summary { color: var(--brand-green); text-align: center; text-transform: uppercase;
+            font-size: 1rem; font-weight: bold; cursor: pointer; list-style: none;
+            padding: 2px 0; min-height: 44px; display: flex; align-items: center;
+            justify-content: center; gap: 6px; }
+        #sm-block-summary::-webkit-details-marker { display: none; }
+        #sm-block-summary::after { content: '\25BE'; font-size: 0.8rem; }
+        #sm-block:not([open]) #sm-block-summary::after { content: '\25B8'; }
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
         /* THREE STAKES NEED THE WHOLE ROW.
@@ -340,23 +348,29 @@ html {
 
     <h2 class="event-title" id="main-title">💰 Today's Action</h2>
 
+    <!-- THE CUP IS ITS OWN JOB, so it is its own surface. It used to be nested inside
+         the card headed "Side Matches (Cross-Group)", under a paragraph about $/hole
+         and presses: an organizer sent here by Game Day to create a Cup landed 511px
+         down a side-betting screen, with the Cup framed as one item of side action.
+         renderRyderCupSetup draws its own card, so this mount stays bare rather than
+         wrapping a card in a card. -->
+    <div id="ryder-cup-setup"></div>
+
     <div class="action-card" id="sidematches-card">
-        <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
-        <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
-        <!-- Shown only when Game Day setup has just created a Ryder Cup round and sent
-             the organizer here. The setup surface below is unchanged; this says why
-             they are looking at it. -->
-        <div id="ryder-handoff-banner" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:0.82rem; line-height:1.45;">
-            🏆 <strong>Round created.</strong> Next, set up your Cup below — name it, tap each golfer onto a side, then pick <strong>Classic</strong> (3 days, 5 sessions) or build your own.
-        </div>
-        <div id="ryder-cup-setup"></div>
-        <div id="sidematches-list"></div>
-        <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
-        <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
-        <!-- Was window.print(), which printed this page's own side-match maths as if it were
-             an authoritative payout. There is ONE settlement document, and this opens it. -->
-        <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+        <!-- COLLAPSIBLE, and only on arrival. Side action is what players add AFTER
+             teams exist, so on ?setup=ryder this starts shut and one tap opens it.
+             An ordinary visit to Matches renders it open exactly as before. -->
+        <details id="sm-block" open ontoggle="smRememberBlockState()">
+            <summary id="sm-block-summary">⚔️ Side Matches (Cross-Group)</summary>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px; margin-top:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
+            <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
+            <div id="sidematches-list"></div>
+            <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
+            <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
+            <!-- Was window.print(), which printed this page's own side-match maths as if it were
+                 an authoritative payout. There is ONE settlement document, and this opens it. -->
+            <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+        </details>
     </div>
 </div>
 
@@ -751,6 +765,18 @@ html {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `⚔️ Side Matches (${currentData.eventName || "Live Round"})`;
             renderSideMatches();
+            // THE CUP SURFACE RENDERS ON DATA, like everything else on this page.
+            //
+            // It did not. Every renderRyderCupSetup() call sat inside an rc* handler -
+            // rcOpen, rcOpenClassic, rcToggle, rcSave - and those are fired by buttons
+            // that only exist inside the markup renderRyderCupSetup produces. Page
+            // loads, mount stays empty, no buttons exist, nothing can trigger it. An
+            // organizer sent here by Game Day saw no Cup at all.
+            //
+            // rcRefresh() was written for exactly this and was never called. It drops
+            // an unopened draft and re-renders, so a snapshot landing mid-edit cannot
+            // wipe work the organizer has open.
+            rcRefresh();
             // Arrived from the scorecard's "+ ADD GROUP ACTION". Opened only once,
             // and only after the round data has landed - the scope chooser needs to
             // know how many groups exist before it can ask anything sensible.
@@ -770,7 +796,7 @@ html {
             // the button they can see, with the amount in front of them. Deep-linking
             // straight into a write would mean money moving from a URL.
             // ?setup=ryder — arriving from Game Day setup, which creates the ROUND and
-            // then sends the organizer here.
+            // then sends the organizer here. See smApplyRyderArrival.
             //
             // THIS PAGE HAS ALWAYS BEEN WHERE A CUP IS BUILT. The Phase 3B setup below
             // needs a frozen roster and real player ids, so it cannot run inside the
@@ -780,20 +806,7 @@ html {
             // IT CREATES NOTHING. Both entry buttons - "Set Up a Ryder Cup" and the
             // Classic 3-day preset - stay exactly as they are, because auto-opening the
             // blank builder would hide the preset most trips actually want.
-            if (urlParams.get('setup') === 'ryder' && !window.__smRyderHandoff
-                && isOrganizerView() && (currentData.players || []).length) {
-                window.__smRyderHandoff = true;
-                const rcBanner = document.getElementById('ryder-handoff-banner');
-                const alreadyHasCup = (typeof hasRyderCup === 'function') && hasRyderCup(currentData);
-                if (rcBanner && !alreadyHasCup) rcBanner.style.display = 'block';
-                setTimeout(() => {
-                    const mount = document.getElementById('ryder-cup-setup');
-                    if (!mount) return;
-                    mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    mount.classList.add('sm-card-focus');
-                    setTimeout(() => mount.classList.remove('sm-card-focus'), 2600);
-                }, 240);
-            }
+            smApplyRyderArrival();
 
             const pressTarget = urlParams.get('press');
             if (pressTarget && !window.__smPressFocused && (currentData.players || []).length) {
@@ -2741,6 +2754,63 @@ html {
     // Says plainly which link this is, so a scorekeeper who cannot see a Remove
     // button knows why rather than assuming the page is broken. Mirrors the badge
     // index.html already shows on the scorecard.
+    // WHAT AN ORGANIZER SENT HERE BY GAME DAY SHOULD LAND ON.
+    //
+    // The Cup is the job on this arrival; side action is what players add once
+    // teams exist. The Cup surface now sits above the side-matches card, and on
+    // ?setup=ryder that card starts collapsed behind its own heading.
+    //
+    // No scroll. The Cup was already above the fold before this change - the
+    // previous scrollIntoView was close to a no-op, because the problem was never
+    // where the scroll landed but what surrounded the thing it scrolled to.
+    function smBlockKey() { return 'sm-block-open:' + String(currentMode || ''); }
+
+    // NOT EVERY TOGGLE IS A CHOICE. Chrome fires `toggle` for a <details> that is
+    // open in the MARKUP, at parse time, before any of this runs - and the arrival
+    // below toggles the block itself. Neither is the organizer deciding anything.
+    // Persisting those wrote 'true' on load, which the arrival then read back as a
+    // remembered preference and dutifully left the block open. Only once the
+    // arrival has settled does a toggle mean somebody tapped it.
+    //
+    // Found by arriving cold in a real browser; mini-dom fires no toggle on parse,
+    // so every in-harness test of this passed while it was broken.
+    let smBlockReady = false;
+
+    function smWriteBlockState(open) {
+        try { sessionStorage.setItem(smBlockKey(), open ? 'true' : 'false'); }
+        catch (e) { /* private browsing - the default still applies */ }
+    }
+
+    function smSetBlockOpen(open) {
+        const d = document.getElementById('sm-block');
+        if (d) d.open = !!open;
+        smWriteBlockState(!!open);
+    }
+
+    // THE PARAM STAYS IN THE URL. Without remembering the choice, every reload
+    // would re-collapse a block the organizer had deliberately opened. Per round,
+    // and only for this tab - it is a view preference, not round data.
+    function smRememberBlockState() {
+        if (!smBlockReady) return;
+        const d = document.getElementById('sm-block');
+        if (d) smWriteBlockState(d.open);
+    }
+
+    function smApplyRyderArrival() {
+        if (urlParams.get('setup') !== 'ryder') return;
+        if (window.__smRyderHandoff) return;
+        if (!isOrganizerView() || !(currentData.players || []).length) return;
+        window.__smRyderHandoff = true;
+        const d = document.getElementById('sm-block');
+        if (!d) return;
+        let stored = null;
+        try { stored = sessionStorage.getItem(smBlockKey()); } catch (e) { stored = null; }
+        d.open = (stored === 'true');
+        smWriteBlockState(d.open);
+        // From here a toggle is a tap, so it is worth remembering.
+        smBlockReady = true;
+    }
+
     function rcRefresh() { if (!rcDraft || !rcDraft.__open) rcDraft = null; renderRyderCupSetup(); }
 
     function renderGroupLockBadge() {
@@ -2827,7 +2897,15 @@ html {
                 + ' onclick="rcOpen()">\uD83C\uDFC6 Set Up a Ryder Cup</button>'
                 + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
                 + ' onclick="rcOpenClassic()">\uD83D\uDCC5 Classic Ryder Cup \u2014 3 Days, 5 Sessions</button>'
-                + '<div class="rcs-hint">A team competition played on top of this round. '
+                + '<div class="rcs-hint">'
+                // The handoff banner used to say this in a separate box above the card.
+                // Three pieces of "this is the Cup" chrome on one screen was most of
+                // what pushed the Cup itself down the page.
+                + (urlParams.get('setup') === 'ryder'
+                    ? '<strong>Round created.</strong> Name it, tap each golfer onto a side, '
+                      + 'then pick Classic or build your own. '
+                    : '')
+                + 'A team competition played on top of this round. '
                 + 'Points, not money \u2014 your side games are unaffected.</div></div>';
             return;
         }

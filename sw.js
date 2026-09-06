@@ -227,7 +227,13 @@
 // it, so every round resolved with a null session and anything session-scoped
 // silently did nothing. An installed PWA on v59 would keep serving a Cup setup
 // with no way to answer the question.
-const CACHE_VERSION = 'golfapp-v60-session-pointer';
+// Moved to v61: arriving to set up a Cup lands on the Cup. The setup surface moved
+// out of the card headed "Side Matches (Cross-Group)", side action collapses on
+// ?setup=ryder, and rcRefresh() is finally called - without it the Cup surface
+// never rendered at all, because every render call sat inside a handler fired by
+// buttons that only exist inside the markup that render produces. An installed PWA
+// on v60 would keep serving a Matches page with no Cup on it.
+const CACHE_VERSION = 'golfapp-v61-cup-arrival';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

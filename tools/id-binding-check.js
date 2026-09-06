@@ -24,6 +24,10 @@
 // delete button on the middle row, and compares the NAME -> ID map of the
 // survivors against what it was before. That is the actual guarantee.
 //
+// IT CLICKS, IT DOES NOT INVOKE. Rows are added by clicking the real "Add New
+// Player" button and removed by clicking a row's real delete control, so this
+// check covers the wiring as well as the behaviour.
+//
 // DELIBERATELY OUTSIDE `npm test`. It needs Chrome, and this project keeps a
 // zero-extra-test-dependency rule. Run it by hand after any change to the player
 // list, the wizard's roster handling, or the id issuer in admin.html.
@@ -57,9 +61,20 @@ const SCRIPT = `
   const rows = () => Array.from(document.querySelectorAll('.player-row'));
   const NAMES = ['Ann', 'Bob', 'Cal', 'Dee'];
 
-  // Four golfers, added and named the way a user does: tap Add, type a name.
+  // Four golfers, added by CLICKING the real "Add New Player" button and typing
+  // into the real inputs. Calling addNewPlayerAndRefresh() directly would prove
+  // the handler works and say nothing about whether the button reaches it - the
+  // gap that hid four dead wires in the Ryder feature.
   document.getElementById('player-list').innerHTML = '';
-  NAMES.forEach(() => addNewPlayerAndRefresh());
+  const addBtn = Array.from(document.querySelectorAll('button'))
+      .filter(b => /Add New Player/i.test(b.textContent))[0];
+  if (!addBtn) {
+    out.verdict = 'ERROR';
+    out.error = 'no "Add New Player" button on the page';
+    return JSON.stringify(out, null, 2);
+  }
+  out.addedByClicking = true;
+  NAMES.forEach(() => addBtn.click());
   rows().forEach((r, i) => {
     r.querySelector('.p-name-input').value = NAMES[i];
     r.querySelector('.p-hcp-input').value = String(5 + i);

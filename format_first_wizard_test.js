@@ -334,20 +334,32 @@ describe('THE CUP HANDOFF — CREATE THE ROUND, THEN HAND OVER', () => {
         assert.ok(!/if \(creatingRyderCup\s*\|\|/.test(save));
     });
 
+    // RE-POINTED, NOT RELAXED. These pinned the old implementation: a separate
+    // #ryder-handoff-banner element, and isOrganizerView appearing within 400
+    // characters of the first `=== 'ryder'` in the file. The banner was folded
+    // into the Cup card and removed, and the arrival moved into its own function,
+    // so both anchors describe code that no longer exists. What they GUARD - the
+    // page keys on the param, and the handoff is organizer-only - is unchanged and
+    // is asserted against the arrival function itself.
     test('sidematches.html receives it', () => {
-        assert.match(SIDEMATCHES, /urlParams\.get\('setup'\) === 'ryder'/);
-        assert.match(SIDEMATCHES, /id="ryder-handoff-banner"/);
+        assert.match(SIDEMATCHES, /function smApplyRyderArrival\(\)/,
+            'nothing handles the ?setup=ryder arrival');
+        assert.match(SIDEMATCHES, /urlParams\.get\('setup'\) !== 'ryder'\) return;/,
+            'the arrival no longer keys on the param');
+        assert.match(SIDEMATCHES, /smApplyRyderArrival\(\);/,
+            'the arrival handler is never called');
     });
 
     test('the handoff is organizer-only', () => {
-        const hook = SIDEMATCHES.slice(SIDEMATCHES.indexOf("urlParams.get('setup') === 'ryder'"));
-        assert.match(hook.slice(0, 400), /isOrganizerView\(\)/);
+        const fn = SIDEMATCHES.slice(SIDEMATCHES.indexOf('function smApplyRyderArrival'));
+        assert.match(fn.slice(0, 700), /isOrganizerView\(\)/,
+            'a group scorekeeper would get the organizer arrival');
     });
 
     test('the handoff creates nothing — both entry buttons survive untouched', () => {
         assert.match(SIDEMATCHES, /onclick="rcOpen\(\)"/);
         assert.match(SIDEMATCHES, /onclick="rcOpenClassic\(\)"/);
-        const hook = SIDEMATCHES.slice(SIDEMATCHES.indexOf("urlParams.get('setup') === 'ryder'"));
+        const hook = SIDEMATCHES.slice(SIDEMATCHES.indexOf('function smApplyRyderArrival'));
         const block = hook.slice(0, 900);
         assert.ok(!/rcOpen\(\)/.test(block), 'must not auto-open and hide the Classic preset');
         assert.ok(!/\.set\(/.test(block), 'a handoff must never write');

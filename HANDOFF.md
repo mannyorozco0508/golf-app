@@ -95,6 +95,17 @@ A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and
 
 ## Checks that live outside `npm test`
 
+**DEVICE CHECKS MUST ARRIVE COLD.** Navigate to the URL a user lands on, replace
+only the data source, and touch nothing. A check that calls the function it is
+checking proves that function works *when invoked* — never that a user can reach
+it. That gap hid **five dead wires** in the Ryder feature alone: a render call, a
+session pointer, a match format, a Cup surface nothing ever rendered, and a
+`<details>` toggle that fired at parse time and poisoned its own stored state.
+Every one passed a green suite and a passing device check. `tools/lib/cold-arrival.js`
+is the shared harness: it blocks the Firebase bundles, injects a small stand-in
+before any page script, and lets the page run its own init, its own listener and
+its own render. If the page does not do something on its own, it does not happen.
+
 These exist because the node suite **structurally cannot** assert two things:
 **geometry** — `helpers/mini-dom.js` returns a hard-coded zero rect and implements
 no layout, so an element can be `display:block` and 0x0 at once — and **DOM
@@ -179,6 +190,24 @@ and the card moved above the score boxes.
 
 Run it by hand after any change to `renderHoleView`, the Foursomes entry functions, or the
 Ryder session/format wiring.
+
+### `tools/ryder-arrival-check.js` — proves an organizer lands on the Cup, not on side betting
+
+```
+node tools/ryder-arrival-check.js
+```
+
+Same exit codes. Arrives cold at `sidematches.html?setup=ryder` — the URL Game Day
+redirects to — and at an ordinary `?game=` visit, and compares the two.
+
+It asserts the Cup renders **without anyone invoking it** (the failure that made this
+tool necessary), that it is not inside and not below the side-betting card, that it has
+real geometry and is on the first screen, that side action collapses on arrival and the
+choice is remembered, that the old handoff banner is gone, and that an ordinary visit is
+completely unchanged.
+
+Run it after any change to the Matches page layout, the arrival handler, or the Cup
+setup surface.
 
 ## How I want you to work
 
