@@ -1396,6 +1396,12 @@ html {
         document.getElementById("sm-press-rule-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
         const apg = document.getElementById("sm-autopress-group");
         if (apg) apg.style.display = (isNassau && !fieldGame) ? "block" : "none";
+        // PRICED AS IT IS REVEALED. Choosing Nassau is what makes this control
+        // visible, and the stake boxes already hold values, so the amounts have to be
+        // in the option before the golfer looks at it. Wiring the label to oninput
+        // alone left it reading the bare "Same as Segment" fallback for anyone who
+        // accepted the stakes as they stood - which is most of them.
+        if (isNassau && !fieldGame) syncSmAutoPressLabel();
         // NASSAU IS MATCH PLAY. Front, back and overall are three match-play bets; a
         // "stroke play Nassau" is not a thing this app offers, and letting the selector
         // suggest otherwise is what made a real round look like stroke play.

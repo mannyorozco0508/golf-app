@@ -377,3 +377,111 @@ describe('THE MONEY CONTRACT DID NOT MOVE', () => {
         assert.match(src, /return blank\(ap\) \? baseStakeFor\(id\) : Number\(ap\);/);
     });
 });
+
+// ============================================================================
+// THE ENTRY POINT, NOT THE FUNCTION
+//
+// The label shipped correct and invisible. nassauAutoPressLabel() built the right
+// sentence, both pages rendered it faithfully, 37 tests passed - and a golfer who
+// opened the wizard saw "Same as Segment" with no amounts, because nothing called
+// the sync until a stake field was edited. The defaults are 10/10/20, which is
+// already what most groups want, so most golfers never fired an oninput and never
+// saw a price at all.
+//
+// Every test in the two describes above calls syncSetupNassauAutoPressLabel() or
+// syncSmAutoPressLabel() itself and then asserts the output. They proved the
+// builder and the rendering. Not one of them asked whether anything CALLS them.
+//
+// So these drive the path a user actually arrives through - navigate to the step,
+// tick the box, pick the format - and touch neither sync function by name.
+//
+// HARNESS LIMIT, and it matters here. mini-dom never parses value="10" out of
+// static markup, so the stake inputs read '' unless a test seeds them. A reveal
+// test that seeded nothing would see an unpriced label and could not tell a
+// missing call from an empty input. The stakes are therefore set BEFORE the
+// reveal - which is the state a real browser is already in when the panel opens -
+// and the browser's own default-attribute behaviour is verified in Chrome.
+// ============================================================================
+
+describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
+
+    // The wizard: navigate to the step and tick Nassau. No sync call, no typing.
+    function openWizard(front, back, overall) {
+        const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
+        vm.runInContext(`
+            alert=function(){};
+            collectWizardPlayers=function(){ return [{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}]; };
+            document.getElementById('setup-nassau-front').value='${front}';
+            document.getElementById('setup-nassau-back').value='${back}';
+            document.getElementById('setup-nassau-overall').value='${overall}';
+            goToWizardStep(5);
+            document.getElementById('setup-nassau-enabled').checked = true;
+            toggleSetupNassau();
+        `, sb);
+        return {
+            select: vm.runInContext(`document.getElementById('setup-nassau-autopress-mode').innerHTML`, sb),
+            hint: vm.runInContext(`document.getElementById('setup-nassau-autopress-hint').textContent`, sb),
+        };
+    }
+
+    test('opening the wizard to Nassau shows the amounts, untouched', () => {
+        const w = openWizard(10, 10, 20);
+        assert.match(w.select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/,
+            'the golfer opened the panel and got the unpriced fallback - the label ' +
+            'only ever appears for someone who edits a stake they did not need to edit');
+    });
+
+    test('the sub-line is there on open too, not just after an edit', () => {
+        assert.match(openWizard(10, 10, 20).hint, /Front 9 \$10 .* Back 9 \$10 .* Total \$20/);
+    });
+
+    test('it collapses correctly on open when the stakes agree', () => {
+        assert.match(openWizard(5, 5, 5).select, /Same as Segment \(\$5\)/);
+    });
+
+    // The side-match form: choose Nassau. That reveal is what makes the control
+    // visible at all, so it is the moment the label has to be right.
+    function openSideMatch(front, back, overall) {
+        const sb = loadHtmlInlineScript('sidematches.html', SM_DEPS);
+        vm.runInContext(`
+            alert=function(){};
+            currentData={players:[{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}],courseData:[],scores:{}};
+            document.getElementById('sm-front-stake').value='${front}';
+            document.getElementById('sm-back-stake').value='${back}';
+            document.getElementById('sm-overall-stake').value='${overall}';
+            document.getElementById('sm-format').value='nassau';
+            onSideMatchFormatChange();
+        `, sb);
+        return {
+            select: vm.runInContext(`document.getElementById('sm-autopress-mode').innerHTML`, sb),
+            hint: vm.runInContext(`document.getElementById('sm-autopress-hint').textContent`, sb),
+            groupShown: vm.runInContext(`document.getElementById('sm-autopress-group').style.display`, sb),
+        };
+    }
+
+    test('choosing Nassau reveals a control that is already priced', () => {
+        const f = openSideMatch(10, 10, 20);
+        assert.equal(f.groupShown, 'block', 'the control did not even appear');
+        assert.match(f.select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/,
+            'the control was revealed still carrying the static fallback');
+    });
+
+    test('and its sub-line is populated on reveal', () => {
+        assert.match(openSideMatch(0, 10, 20).hint, /Front 9 \$0/);
+    });
+
+    // Pinned at the source as well: a reveal that stops calling the sync is the
+    // exact regression this describe exists for, and the seeded-input harness
+    // cannot distinguish every way that could happen.
+    test('each reveal path calls the sync by name', () => {
+        const wiz = ADMIN.slice(ADMIN.indexOf('function toggleSetupNassau()'),
+                                ADMIN.indexOf('function toggleSetupNassauAutoAmount'));
+        assert.match(wiz, /syncSetupNassauAutoPressLabel\(\)/,
+            'toggleSetupNassau reveals the panel without pricing it');
+
+        const fmt = SM.slice(SM.indexOf('function onSideMatchFormatChange'),
+                             SM.indexOf('function onSideMatchFormatChange') + 4000);
+        assert.match(fmt, /syncSmAutoPressLabel\(\)/,
+            'onSideMatchFormatChange reveals the control without pricing it');
+    });
+});

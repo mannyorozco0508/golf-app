@@ -4004,7 +4004,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const on = document.getElementById('setup-nassau-enabled');
         const panel = document.getElementById('setup-nassau-panel');
         if (panel) panel.style.display = (on && on.checked) ? 'block' : 'none';
-        if (on && on.checked) renderSetupNassauPlayers();
+        if (on && on.checked) {
+            renderSetupNassauPlayers();
+            // PRICE THE AUTO-PRESS OPTION AS THE PANEL APPEARS.
+            //
+            // The stake boxes ship at 10/10/20, which is already what most groups
+            // want, so most golfers never type in one - and the label was wired only
+            // to oninput. That left the control showing the bare "Same as Segment"
+            // fallback for exactly the people who accepted the defaults. The reveal
+            // is the moment the amounts are first visible, so it is the moment they
+            // have to be right.
+            syncSetupNassauAutoPressLabel();
+        }
     }
 
     function toggleSetupNassauAutoAmount() {
