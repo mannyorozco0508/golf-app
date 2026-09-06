@@ -2782,10 +2782,14 @@ html {
     function rcLoadDraft() {
         const cfg = (typeof ryderCupConfig === 'function') ? ryderCupConfig(currentData) : null;
         if (!cfg) {
-            rcDraft = { name: '', nameA: 'Team A', nameB: 'Team B', members: {}, matches: [] };
+            rcDraft = { name: '', nameA: 'Team A', nameB: 'Team B', members: {},
+                        matches: [], playsSession: '' };
             return;
         }
         rcDraft = {
+            // WHICH SESSION THIS ROUND PLAYS. Rehydrated from the round's own
+            // pointer so reopening the Cup does not quietly forget it and re-ask.
+            playsSession: (currentData.ryderCupRef || {}).sessionId || '',
             name: ryderCupName(currentData) || '',
             nameA: cfg.sides.A ? cfg.sides.A.name : 'Team A',
             nameB: cfg.sides.B ? cfg.sides.B.name : 'Team B',
@@ -2902,6 +2906,21 @@ html {
     // once, so each is a collapsed row showing format, capacity and state; the
     // lineup opens only when tapped. A Foursomes row is visibly not playable
     // rather than silently broken.
+    // WHICH SESSION THIS ROUND IS. A Cup spans several rounds - the Classic
+    // schedule is five sessions over three days - and the engine's pointer
+    // architecture expects every participating round to carry
+    //
+    //     ryderCupRef = { host, sessionId }
+    //
+    // Nothing ever wrote it, so a round always resolved with sessionId null and
+    // anything session-scoped (alternate-shot entry above all) could not appear.
+    // The organizer picks it here, next to the schedule that names the sessions.
+    function rcSetPlaysSession(sessionId) {
+        if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        rcDraft.playsSession = sessionId || '';
+        renderRyderCupSetup();
+    }
+
     function rcSessionScheduleHtml() {
         if (!rcDraft || !rcDraft.sessions) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -2913,7 +2932,24 @@ html {
             .sort((a, b) => a.order - b.order)
             .forEach(s => { (byDay[s.day] = byDay[s.day] || []).push(s); });
 
-        let html = '<div class="rcs-sub">Schedule</div>';
+        // THE ROUND'S OWN IDENTITY, above the schedule it is chosen from. Blank is
+        // offered so the control never silently pre-answers a question the organizer
+        // has not been asked; rcSave refuses rather than guessing.
+        let html = '<div class="rcs-sub">This round</div>'
+            + '<label class="rcs-lab">Which session is this round?</label>'
+            + '<select class="rcs-in" id="rc-plays-session"'
+            + ' onchange="rcSetPlaysSession(this.value)">'
+            + '<option value=""' + (rcDraft.playsSession ? '' : ' selected')
+            + '>\u2014 choose \u2014</option>'
+            + Object.keys(rcDraft.sessions)
+                .map(k => rcDraft.sessions[k])
+                .sort((a, b) => a.order - b.order)
+                .map(s => '<option value="' + esc(s.id) + '"'
+                    + (rcDraft.playsSession === s.id ? ' selected' : '') + '>'
+                    + esc(s.label || s.id) + '</option>').join('')
+            + '</select>';
+
+        html += '<div class="rcs-sub">Schedule</div>';
         Object.keys(byDay).sort().forEach(day => {
             html += '<div class="rcs-day">Day ' + day + '</div>';
             byDay[day].forEach(s => {
@@ -3052,10 +3088,33 @@ html {
         if (rcDraft.__classic) next.preset = 'classic';
         const problems = validateRyderCupSave(currentData, currentData.courseData || [],
             currentData.scores || {}, next);
+        // A SCHEDULED CUP WHOSE ROUND HAS NO IDENTITY IS NOT SAVEABLE. With sessions
+        // present, a round that cannot say which one it plays resolves with a null
+        // session for the rest of its life, and everything session-scoped silently
+        // does nothing. Required only where there IS a schedule: a custom Cup has no
+        // sessions, so there is nothing to point at and nothing to demand.
+        //
+        // Refusing costs no work. Every rc* control mutates the draft in memory and
+        // this is the only write, so the lineup, the sides and the names are all
+        // still on screen for the organizer to save once they have answered.
+        const needsSession = !!(next.sessions && Object.keys(next.sessions).length > 0);
+        if (needsSession && !rcDraft.playsSession) {
+            problems.push({ type: 'no-session',
+                message: 'Choose which session this round plays before saving.' });
+        }
         if (problems.length > 0) { rcShowProblems(problems); return; }
         rcShowProblems([]);
         db.ref('events/' + currentMode + '/ryderCup').set(next)
-            .then(() => { rcDraft = null; renderRyderCupSetup(); })
+            .then(() => {
+                // THE POINTER, on the ROUND rather than inside the Cup. The Cup is one
+                // authoritative object; the pointer is per-round and must never be
+                // nested in it, or five rounds would each carry a different copy.
+                if (rcDraft && rcDraft.playsSession) {
+                    db.ref('events/' + currentMode + '/ryderCupRef')
+                        .set({ host: currentMode, sessionId: rcDraft.playsSession });
+                }
+                rcDraft = null; renderRyderCupSetup();
+            })
             .catch(e => rcShowProblems([{ message: 'Could not save: ' + e.message }]));
     }
 
@@ -3066,7 +3125,13 @@ html {
         if (!gate.ok) { rcShowProblems([{ message: gate.message || 'The Cup cannot be removed.' }]); return; }
         if (!confirm('Remove this Ryder Cup? No scores are affected.')) return;
         db.ref('events/' + currentMode + '/ryderCup').remove()
-            .then(() => { rcDraft = null; renderRyderCupSetup(); });
+            .then(() => {
+                // A POINTER TO A CUP THAT NO LONGER EXISTS IS WORSE THAN NONE. Left
+                // behind, the round resolves to 'host-unavailable' and reports a Cup
+                // it can never read, on every load, forever.
+                db.ref('events/' + currentMode + '/ryderCupRef').remove();
+                rcDraft = null; renderRyderCupSetup();
+            });
     }
 
     function renderSideMatches() {

@@ -99,9 +99,17 @@ function saveClassicCup(sb, sessionId) {
     run(sb, 'rcOpenClassic();');
     run(sb, 'rcToggle(101, "A"); rcToggle(102, "A"); rcToggle(103, "B"); rcToggle(104, "B");');
     run(sb, 'rcSeedSession(' + JSON.stringify(sessionId) + ');');
+    // A scheduled Cup will not save until the round says which session it is -
+    // see ryder_session_pointer_test.js. The organizer answers that too, so this
+    // driver does as well; the assertions below are unchanged.
+    run(sb, 'rcSetPlaysSession(' + JSON.stringify(sessionId) + ');');
     run(sb, 'rcSave();');
     const written = JSON.parse(run(sb, 'JSON.stringify(window.__written)'));
-    return written.length ? written[written.length - 1].value : null;
+    // Selected by PATH, not by position. Saving now performs two writes - the Cup
+    // and the round's session pointer - so "the last write" is the pointer, and a
+    // helper that assumed one write silently started returning the wrong object.
+    const cup = written.filter(w => String(w.path).endsWith('/ryderCup'))[0];
+    return cup ? cup.value : null;
 }
 
 const matchesOf = cup => Object.keys(cup.matches).map(k => cup.matches[k]);
@@ -182,6 +190,7 @@ describe('VALIDATION STILL GUARDS A FOURSOMES ROSTER', () => {
         run(sb, 'rcSeedSession("d1s1");');
         // Three a side in an alternate-shot pairing is not a thing.
         run(sb, 'rcDraft.matches[0].playersA = ["101","102","105"];');
+        run(sb, 'rcSetPlaysSession("d1s1");');   // so the refusal is about the ROSTER
         run(sb, 'rcSave();');
         const written = JSON.parse(run(sb, 'JSON.stringify(window.__written)'));
         assert.equal(written.length, 0,

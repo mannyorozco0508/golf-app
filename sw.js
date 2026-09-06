@@ -222,7 +222,12 @@
 // path, so a golfer in a Foursomes session had no way to enter a score while the
 // engine banked points for it. An installed PWA on v58 would keep serving the
 // scorecard that cannot score the format its own schedule asks for.
-const CACHE_VERSION = 'golfapp-v59-foursomes-entry-wired';
+// Moved to v60: a round can finally say which Cup session it is. Phase 4 designed
+// the pointer - data.ryderCupRef = { host, sessionId } - and nothing ever wrote
+// it, so every round resolved with a null session and anything session-scoped
+// silently did nothing. An installed PWA on v59 would keep serving a Cup setup
+// with no way to answer the question.
+const CACHE_VERSION = 'golfapp-v60-session-pointer';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -10,6 +10,13 @@
 // ryder_foursomes_entry_test.js now renders Hole View and proves the card
 // appears. Two guarantees are beyond it, and they are why this tool exists:
 //
+//   0. THE ROUND'S SESSION POINTER IS WRITTEN BY THE REAL SETUP UI.
+//      This tool used to hand the round a ryderCupRef itself - which is exactly
+//      how nobody noticed that NOTHING in production ever wrote one. It now
+//      drives sidematches.html's Cup setup, captures the writes that save
+//      actually performs, and applies only those. If rcSave stops writing the
+//      pointer, the round has none and this check fails.
+//
 //   1. THE CARD SITS BETWEEN THE PER-GOLFER BOXES AND PREV/NEXT.
 //      mini-dom stores innerHTML as a string, so the Full Card <tr> has no child
 //      nodes and renderHoleView emits no hv-player-row at all there. The node
@@ -39,10 +46,51 @@ const CHROME = process.env.CHROME_PATH
     || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = Number(process.env.CDP_PORT || 9371);
 const REPO_ROOT = path.join(__dirname, '..');
+const SETUP_PAGE = 'file://' + path.join(REPO_ROOT, 'sidematches.html') + '?game=FSCHECK';
 const PAGE = 'file://' + path.join(REPO_ROOT, 'index.html') + '?game=FSCHECK';
 const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'foursomes-'));
 
-const SCRIPT = `
+
+// STAGE ONE. The organizer's actual path: Classic preset, assign the sides, set
+// the Day 1 lineup, say which session this round is, Save. Every database write
+// is captured with its path; nothing is invented.
+const SETUP_SCRIPT = `
+(() => {
+  window.__written = [];
+  db.ref = function (p) { return {
+    set: function (v) { window.__written.push({ path: p, value: v });
+      return { then: function (f) { f && f(); return { catch: function () {} }; } }; },
+    remove: function () { return { then: function (f) { f && f();
+      return { catch: function () {} }; } }; },
+    on: function () {}, once: function () { return { then: function (f) {
+      f && f({ val: function () { return null; } });
+      return { catch: function () {} }; } }; },
+    push: function () { return { key: 'K1' }; }, update: function () {} }; };
+  currentMode = 'FSCHECK';
+  isOrganizerView = function () { return true; };
+  const CD = [];
+  for (let i = 1; i <= 18; i++) CD.push({ hole: i, par: 4, hcpIndex: i });
+  currentData = { players: [
+      { id: 101, name: 'Ann Adams', hcp: '0' }, { id: 102, name: 'Bob Brown', hcp: '0' },
+      { id: 103, name: 'Cal Clark', hcp: '0' }, { id: 104, name: 'Dee Dunn', hcp: '0' }],
+    courseData: CD, scores: {} };
+
+  rcOpenClassic();
+  rcToggle(101, 'A'); rcToggle(102, 'A'); rcToggle(103, 'B'); rcToggle(104, 'B');
+  rcSeedSession('d1s1');
+  rcSetPlaysSession('d1s1');
+  rcSave();
+
+  // A SUCCESSFUL SAVE CLEARS THE DRAFT AND RE-RENDERS, so #rc-problems is gone by
+  // now - reading it unguarded threw and the tool reported exit 2, which is
+  // correct behaviour (nothing proven) but a useless answer.
+  const probEl = document.getElementById('rc-problems');
+  return JSON.stringify({ writes: window.__written,
+                          problems: probEl ? probEl.innerHTML : '' });
+})()`;
+
+// STAGE TWO. Open the scorecard on a round built from EXACTLY those writes.
+const SCRIPT = (SETUP_WRITES) => `
 (() => {
   const out = {};
   const CD = [];
@@ -57,18 +105,18 @@ const SCRIPT = `
   }));
 
   currentMode = 'FSCHECK';
-  currentData = {
-    gameFormat: 'stroke', players: PLAYERS, courseData: CD, scores: scores,
-    ryderCupRef: { host: 'FSCHECK', sessionId: 's9' },
-    ryderCup: {
-      v: 1, name: 'Device Check Cup',
-      sides: { A: { id: 'A', name: 'Rattle' }, B: { id: 'B', name: 'Chaos' } },
-      members: { '101': 'A', '102': 'A', '103': 'B', '104': 'B' },
-      sessions: { s9: { id: 's9', day: 1, order: 1, format: 'foursomes', label: 'Day 1' } },
-      matches: { m1: { id: 'm1', sessionId: 's9', format: 'foursomes', scoring: 'scratch',
-        sideA: 'A', sideB: 'B', playersA: ['101','102'], playersB: ['103','104'] } }
-    }
-  };
+  currentData = { gameFormat: 'stroke', players: PLAYERS, courseData: CD, scores: scores };
+  // Whatever the setup UI wrote, and nothing else. A missing pointer stays missing.
+  ${SETUP_WRITES}.forEach(w => {
+    currentData[String(w.path).split('/').pop()] = w.value;
+  });
+  out.appliedKeys = ${SETUP_WRITES}.map(w => String(w.path).split('/').pop());
+  out.pointer = currentData.ryderCupRef || null;
+  if (!currentData.ryderCupRef) {
+    out.verdict = 'FAIL';
+    out.why = 'the setup UI wrote no ryderCupRef - the round has no session identity';
+    return JSON.stringify(out, null, 2);
+  }
   renderScorecard();
   setViewMode('hole');
 
@@ -141,7 +189,7 @@ function bail(msg) {
     if (!fs.existsSync(CHROME)) bail('Chrome not found at ' + CHROME + ' (set CHROME_PATH)');
     const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
         '--remote-debugging-port=' + PORT, '--user-data-dir=' + PROFILE,
-        '--window-size=390,844', '--allow-file-access-from-files', PAGE], { stdio: 'ignore' });
+        '--window-size=390,844', '--allow-file-access-from-files', SETUP_PAGE], { stdio: 'ignore' });
 
     let targets = null;
     for (let i = 0; i < 60; i++) {
@@ -159,7 +207,27 @@ function bail(msg) {
     await new Promise(r => ws.addEventListener('open', r, { once: true }));
     await new Promise(r => setTimeout(r, 2500));
 
-    const m = await rpc(ws, 1, 'Runtime.evaluate', { expression: SCRIPT, returnByValue: true });
+    // Stage one runs on the setup page, stage two on the scorecard.
+    const setup = await rpc(ws, 1, 'Runtime.evaluate',
+        { expression: SETUP_SCRIPT, returnByValue: true });
+    if (setup.result && setup.result.exceptionDetails) {
+        chrome.kill(); bail('setup page threw: ' + JSON.stringify(
+            setup.result.exceptionDetails.exception && setup.result.exceptionDetails.exception.description));
+    }
+    let captured;
+    try { captured = JSON.parse(setup.result.result.value); }
+    catch (e) { chrome.kill(); bail('setup returned no capture'); }
+    if (!captured.writes || !captured.writes.length) {
+        console.log(JSON.stringify({ verdict: 'FAIL',
+            why: 'the Cup setup UI performed no writes', problems: captured.problems }, null, 2));
+        ws.close(); chrome.kill(); process.exit(1);
+    }
+
+    await rpc(ws, 2, 'Page.navigate', { url: PAGE });
+    await new Promise(r => setTimeout(r, 3000));
+
+    const m = await rpc(ws, 3, 'Runtime.evaluate',
+        { expression: SCRIPT(JSON.stringify(captured.writes)), returnByValue: true });
     let code = 0;
     if (m.result && m.result.exceptionDetails) {
         const ex = m.result.exceptionDetails.exception;
