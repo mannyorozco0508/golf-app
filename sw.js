@@ -198,7 +198,12 @@
 // PWA on v53 would keep serving "Same as Segment" - the exact label nobody could
 // read - so the golfers most likely to have the app installed would be the only
 // ones who never saw the fix.
-const CACHE_VERSION = 'golfapp-v54-priced-auto-press';
+// Moved to v55: admin.html and sidematches.html now price the Auto Press option
+// as the control is REVEALED, not only when a stake is typed in. An installed PWA
+// on v54 would keep serving the version that shows the bare "Same as Segment"
+// fallback to anyone who accepts the default 10/10/20 stakes - which is most of
+// them, and is why v54 looked fine in a browser tab and broken on a phone.
+const CACHE_VERSION = 'golfapp-v55-autopress-on-reveal';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
