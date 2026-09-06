@@ -193,7 +193,12 @@
 // into Hole View, so a golfer can finally see WHICH handicaps the dots are using
 // without switching views. An installed PWA on v52 would keep serving the card
 // where that line renders only inside the Full Card, which is the entire defect.
-const CACHE_VERSION = 'golfapp-v53-hole-view-match-hcp';
+// Moved to v54: admin.html and sidematches.html gained the priced Auto Press
+// Amount option, and action-model.js the shared builder behind it. An installed
+// PWA on v53 would keep serving "Same as Segment" - the exact label nobody could
+// read - so the golfers most likely to have the app installed would be the only
+// ones who never saw the fix.
+const CACHE_VERSION = 'golfapp-v54-priced-auto-press';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
