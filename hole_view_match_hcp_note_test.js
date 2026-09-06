@@ -73,6 +73,7 @@ const cd18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpInd
 const ERIC = { id: 101, name: 'Eric Stone', hcp: '7' };
 const CHRIS = { id: 102, name: 'Chris Vale', hcp: '12' };
 const PAUL = { id: 103, name: 'Paul West', hcp: '9' };
+const DAN = { id: 104, name: 'Dan Ross', hcp: '15' };
 
 function scoresFor(players) {
     const s = {};
@@ -103,6 +104,22 @@ const symptom = () => (_symptom || (_symptom = buildRealm([ERIC, CHRIS], { w1: E
 let _overlap = null;
 const overlap = () => (_overlap || (_overlap =
     buildRealm([ERIC, CHRIS, PAUL], { w1: ERIC_V_CHRIS, w2: CHRIS_V_PAUL })));
+
+// The reported round: Net Stroke Play with a NASSAU side match. eligibleDotMatches
+// accepts 'match' and 'nassau' alike, so this is the same dot context by a different
+// wager shape - and it is the shape the defect was actually reported on.
+const ERIC_V_CHRIS_NASSAU = { format: 'nassau', scoring: 'net', teamAIds: ['101'],
+                              teamBIds: ['102'], stake: 20, startHole: 1, pressRule: 'none' };
+const PAUL_V_DAN = { format: 'match', scoring: 'net', teamAIds: ['103'], teamBIds: ['104'],
+                     stake: 10, startHole: 1, pressRule: 'none' };
+
+let _nassau = null;
+const nassau = () => (_nassau || (_nassau = buildRealm([ERIC, CHRIS], { w1: ERIC_V_CHRIS_NASSAU })));
+
+// Two wagers, no golfer in both - the case the merged DOTS BY MATCH line exists for.
+let _twoMatches = null;
+const twoMatches = () => (_twoMatches || (_twoMatches =
+    buildRealm([ERIC, CHRIS, PAUL, DAN], { w1: ERIC_V_CHRIS, w2: PAUL_V_DAN })));
 
 const holeViewHtml = call => call('document.getElementById("hole-view-card").innerHTML');
 const noteHtml = call => call('document.getElementById("match-hcp-note").innerHTML');
@@ -391,5 +408,175 @@ describe('D1 — THE CELLS DO NOT MOVE (Section 6.6)', () => {
             'the cell builder produced different bytes in the two views');
         assert.equal(inHole[0], ERIC_TD_SHA);
         assert.equal(inHole[1], CHRIS_TD_SHA);
+    });
+});
+
+// ============================================================================
+// D1a — AUTO IS THE DEFAULT, AND IT WAS WITHHOLDING THE HANDICAPS
+//
+// selectedDotMatchId starts at 'auto' (index.html:1504) so a reload lands on the
+// safest correct context without the golfer touching anything. That makes Auto the
+// state nearly every round is actually in - including the reported one: Net Stroke
+// Play with an Eric-vs-Chris Nassau.
+//
+// In Auto the note builder took its FIRST branch and stopped:
+//
+//     DOTS BY MATCH · Eric v Chris
+//
+// which names the pairing and carries no handicap numbers at all. The MATCH HCP
+// line - the only line that says who the baseline is and what each man plays off -
+// lives in the branch after it and was unreachable. So the D1 clone faithfully
+// carried the wrong sentence into Hole View, and a golfer looking for the handicaps
+// still could not find them.
+//
+// THE MERGED-MODE CAVEAT IS REAL, BUT ONLY FOR TWO OR MORE. Its comment is right
+// that two matches mean two baselines and naming one would be false. With exactly
+// ONE eligible wager there is exactly one baseline, and Auto and the explicit pick
+// produce a byte-identical dot plan - same rel numbers, same pips. The caveat was
+// being applied at N=1, where it costs the golfer the explanation and buys nothing.
+//
+// NO ARITHMETIC MOVES HERE EITHER. This changes which sentence is chosen, never a
+// handicap, a stroke allocation or a dot.
+// ============================================================================
+
+const MATCH_HCP_LINE = '<strong>MATCH HCP</strong> · Low: Eric (7) · Playing: Eric 0 · Chris 5';
+
+// Every test here drives the DEFAULT context explicitly rather than trusting the
+// realm's leftover state, so they do not depend on execution order - and so that
+// "auto" is genuinely what is under test.
+const asAuto = call => { call('selectedDotMatchId = "auto"'); call('renderScorecard()'); return call; };
+
+describe('D1a — AUTO WITH ONE MATCH SHOWS THE HANDICAPS', () => {
+
+    // AUTO BEING THE DEFAULT IS THE WHOLE REASON THIS BRANCH MATTERS: a golfer who
+    // never opens the selector is in it. Every test below forces the context so it
+    // stays order-independent, which means forcing it can no longer prove what the
+    // default IS - a control that changed the declared default sailed past all of
+    // them. The default is therefore pinned at its declaration instead.
+    test('Auto is the context a golfer lands in without touching anything', () => {
+        assert.match(SRC, /let selectedDotMatchId = 'auto';/,
+            'the default context is what puts a real round on this branch');
+    });
+
+    test('the symptom round offers exactly one eligible wager', () => {
+        const call = asAuto(symptom());
+        assert.equal(call('selectedDotMatchId'), 'auto');
+        assert.equal(call('eligibleDotMatches(currentData).length'), 1);
+    });
+
+    // THE DEFECT. Auto must not stop at the pairing list when there is one baseline.
+    test('Auto names the handicaps, not just the pairing', () => {
+        const call = asAuto(symptom());
+        assert.equal(noteHtml(call), MATCH_HCP_LINE);
+    });
+
+    test('the DOTS BY MATCH pairing line is NOT what a single match produces', () => {
+        const call = asAuto(symptom());
+        assert.ok(!noteHtml(call).includes('DOTS BY MATCH'),
+            'a single wager has one baseline - the pairing list withholds the numbers ' +
+            'the golfer came for');
+    });
+
+    test('Hole View carries that line, with the numbers in it', () => {
+        const call = asAuto(symptom());
+        call('setViewMode("hole")');
+        const note = holeViewNote(call);
+        assert.ok(note, 'no note rendered in Hole View');
+        assert.equal(note.inner, MATCH_HCP_LINE);
+        assert.match(note.inner, /Low: Eric \(7\)/);
+        assert.match(note.inner, /Chris 5/);
+    });
+
+    // Auto and the explicit pick describe the SAME allocation, so they must read
+    // identically. If they ever diverge, one of them is lying to the golfer.
+    test('Auto and an explicit pick produce the same sentence', () => {
+        const auto = asAuto(symptom());
+        const autoText = noteHtml(auto);
+        const call = symptom();
+        call('setDotContext("w1")');
+        assert.equal(autoText, noteHtml(call));
+    });
+
+    test('and the same dots — no allocation moved', () => {
+        const auto = asAuto(symptom());
+        const autoCells = symptomCells(auto).map(sha);
+        const call = symptom();
+        call('setDotContext("w1")');
+        assert.deepEqual(autoCells, symptomCells(call).map(sha));
+    });
+});
+
+describe('D1a — THE REPORTED SHAPE: NET STROKE PLAY + A NASSAU SIDE MATCH', () => {
+
+    test('a Nassau side match is an eligible dot context', () => {
+        const call = asAuto(nassau());
+        assert.equal(call('eligibleDotMatches(currentData).length'), 1);
+        assert.equal(call('selectedDotMatchId'), 'auto');
+    });
+
+    test('the selector offers Auto, exactly as reported on the device', () => {
+        const call = asAuto(nassau());
+        assert.match(call('document.getElementById("dot-context-select").innerHTML'),
+            /Auto \(each golfer's match\)/);
+        assert.equal(call('document.getElementById("dot-context-row").style.display'), 'flex');
+    });
+
+    // The exact gap between the wager box and Hole 1 that was reported empty.
+    test('Hole View shows the handicap line on the reported round', () => {
+        const call = asAuto(nassau());
+        call('setViewMode("hole")');
+        const note = holeViewNote(call);
+        assert.ok(note, 'Hole View rendered no note on the reported configuration');
+        assert.equal(note.inner, MATCH_HCP_LINE);
+    });
+});
+
+describe('D1a — TWO INDEPENDENT MATCHES STILL GET THE PAIRING LIST', () => {
+
+    // The merged branch keeps earning its keep. Two matches mean two baselines, so
+    // naming one Low WOULD be false - this is the case the comment was written for.
+    test('two independent wagers still produce DOTS BY MATCH', () => {
+        const call = asAuto(twoMatches());
+        assert.equal(call('selectedDotMatchId'), 'auto');
+        assert.match(noteHtml(call), /^<strong>DOTS BY MATCH<\/strong>/);
+    });
+
+    test('and it names BOTH pairings, so neither match is hidden', () => {
+        const call = asAuto(twoMatches());
+        assert.match(noteHtml(call), /Eric v Chris/);
+        assert.match(noteHtml(call), /Paul v Dan/);
+    });
+
+    test('it never claims a single Low across two baselines', () => {
+        const call = asAuto(twoMatches());
+        assert.ok(!noteHtml(call).includes('Low:'),
+            'two matches have two baselines - naming one would be false');
+    });
+
+    test('Hole View carries the pairing list too', () => {
+        const call = asAuto(twoMatches());
+        call('setViewMode("hole")');
+        assert.match(holeViewNote(call).inner, /DOTS BY MATCH/);
+    });
+});
+
+describe('D1a — THE SAFE STATES ARE UNCHANGED', () => {
+
+    test('Course is still silent under Auto rules', () => {
+        const call = symptom();
+        call('setDotContext("course")');
+        assert.equal(noteHtml(call), '');
+        call('setViewMode("hole")');
+        assert.ok(!holeViewHtml(call).includes('match-hcp-note'));
+    });
+
+    // Overlapping wagers retire Auto and drop to Course. That must still blank the
+    // note rather than fall through to a MATCH HCP line built from a merged plan.
+    test('overlapping wagers still fall back to Course and say nothing', () => {
+        const call = asAuto(overlap());
+        assert.equal(call('selectedDotMatchId'), 'course');
+        assert.equal(noteHtml(call), '');
+        call('setViewMode("hole")');
+        assert.ok(!holeViewHtml(call).includes('match-hcp-note'));
     });
 });

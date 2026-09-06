@@ -7111,10 +7111,21 @@ html {
         if (matchNoteEl) {
             const firstName = p => p.name.split(" ")[0];
             let noteHtml = "";
-            if (dotNoteMode === 'auto') {
+            if (dotNoteMode === 'auto' && dotNoteMatches.length > 1) {
                 // MERGED MODE HAS NO SINGLE "LOW". Two matches mean two baselines, so
                 // naming one would be false. What a golfer actually needs here is the
                 // pairing - which dots belong to which contest.
+                //
+                // ONLY WHEN THERE REALLY ARE TWO. Auto is the DEFAULT context, so a
+                // round carrying a single side match spent every hole on this branch
+                // reading "DOTS BY MATCH - Eric v Chris": a pairing already visible in
+                // the wager box, and not one handicap number. That is how the reported
+                // round looked after the line was made visible in Hole View - a note
+                // that answered a question nobody was asking.
+                //
+                // With one wager there is one baseline, and Auto's plan is identical
+                // to picking that wager by hand, so this falls through to the line
+                // below and says what the dots are actually built from.
                 noteHtml = `<strong>DOTS BY MATCH</strong> \u00B7 `
                     + dotNoteMatches.map(o => o.label.replace(/ vs /g, ' v ')).join(' \u00B7 ');
             } else if (dotPlanById) {
