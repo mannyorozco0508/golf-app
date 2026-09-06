@@ -56,9 +56,29 @@ each one has already hidden a real defect:
   resets it. A control that deleted the restore line passed the harness cleanly.
 
 When a behaviour depends on any of these, verify it in headless Chrome. Chrome is
-installed and can be driven over CDP from plain Node with no npm dependency — see the
-measurement scripts written for the Hole View and Auto Press work. Say plainly in the
-test file what the harness can and cannot prove.
+installed and can be driven over CDP from plain Node with no npm dependency. Say
+plainly in the test file what the harness can and cannot prove.
+
+## A device check may not call a function the page defines
+
+Replace the data source, navigate to the URL a user lands on, and touch nothing. If
+the page does not do it on its own, it does not happen.
+
+This is not a preference. A check that invokes what it checks proves that thing works
+**when invoked** — never that a user can reach it. That gap hid **five dead wires** in
+the Ryder Cup feature, every one of them under a green suite and a passing device
+check: a render call nothing made, a session pointer nothing wrote, a match format the
+writer discarded, an entry card no code path reached, and a `<details>` toggle that
+fired at parse time and poisoned its own stored state.
+
+The earlier version of this rule said "test the entry point a user arrives through".
+That was advice, and it was violated by every tool written after it — each one opened
+by calling the renderer it was about to measure. The rule above can be violated
+visibly: if a check contains a call to a page function, it is not a device check.
+
+`tools/lib/cold-arrival.js` is the shared harness — it blocks the Firebase bundles,
+injects a small stand-in before any page script, and lets the page run its own init,
+listener and render. `HANDOFF.md` documents the three checks built on it.
 
 `tools/id-binding-check.js` is the standing example, and the only check in the repo that
 can prove a player's id still belongs to the same golfer. `player_id_stability_test.js`
