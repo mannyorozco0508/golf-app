@@ -748,7 +748,37 @@ function nassauAutoPressLabel(input) {
     };
 }
 
+// ============================================================================
+// WHO IS THIS, ON A ROUND THAT DID NOT CREATE THEM
+//
+// Player ids are per-round and positional - 101 is "the first golfer on THIS
+// round's roster" - so an id means nothing on any other round. Trip Mode already
+// solved the general problem by keying cross-round identity on the NAME
+// (computeTripPointsRace), and this is that rule, shared rather than copied a
+// fourth time.
+//
+// There are three existing copies of trim().toLowerCase() in the app - trip.html
+// in four places, admin.html's custom-course key, and tournament.html's
+// duplicate check, which omits the trim. None is changed here: they are working
+// code with their own tests, and quietly re-pointing them is a separate decision.
+// New callers should use this one.
+function normalisePlayerName(name) {
+    return String(name == null ? '' : name).trim().toLowerCase();
+}
+
+// THE NAMES THE APP INVENTS FOR ITSELF ARE NOT IDENTITIES.
+//
+// A blank name field is SAVED as `Player ${idx + 1}`, so two rounds of unnamed
+// golfers carry the identical set of names - and matching on them would pair
+// people by position all over again, which is the exact bug names are here to
+// fix. A placeholder must never match anybody, on any round.
+function isPlaceholderPlayerName(name) {
+    return /^player\s*\d+$/.test(normalisePlayerName(name));
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
     module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
+    module.exports.normalisePlayerName = normalisePlayerName;
+    module.exports.isPlaceholderPlayerName = isPlaceholderPlayerName;
 }

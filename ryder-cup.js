@@ -314,13 +314,18 @@ function validateRyderCup(data) {
 // already uses (settlement-engine.js) - deliberately, so a Ryder Four-Ball and a
 // 2v2 side match over the same four golfers can never disagree about a hole.
 // ---------------------------------------------------------------------------
-function ryderFourBallState(data, courseData, savedScores, match) {
+function ryderFourBallState(data, courseData, savedScores, match, roundPlayers) {
     if (typeof calculateMatchEngine !== 'function') return null;
     var cfg = ryderCupConfig(data);
     if (!cfg || !match) return null;
 
+    // THE ROUND BEING PLAYED, not the round carrying the Cup. `data` here is
+    // whatever holds the Cup, which on a visiting round is the HOST's roster - so
+    // every id looked up here would miss, and the match would score nothing. It
+    // worked until now only because the Cup and the round were always the same
+    // round. roundPlayers is passed by the caller that knows which is which.
     var byId = {};
-    (data.players || []).forEach(function (p) { byId[String(p.id)] = p; });
+    (roundPlayers || data.players || []).forEach(function (p) { byId[String(p.id)] = p; });
 
     var roster = ryderMatchRoster(match);
     var idsA = roster.a;
@@ -445,7 +450,8 @@ function computeRyderMatchResult(data, courseData, savedScores, matchId, roundDa
         state.pointsA = ptsF.pointsA; state.pointsB = ptsF.pointsB;
         return state;
     }
-    state = ryderFourBallState(data, courseData, savedScores, match);
+    state = ryderFourBallState(data, courseData, savedScores, match,
+        (roundData && roundData.players) || data.players || []);
     if (!state) return null;
     var pts = ryderMatchPoints(state);
     state.pointsA = pts.pointsA;
@@ -927,6 +933,109 @@ function computeRyderCupTotals(cupData, scoresBySession) {
 }
 
 // ---------------------------------------------------------------------------
+// TRANSLATING A CUP ONTO THE ROUND THAT IS PLAYING IT
+//
+// The Cup lives on one host round and stores ids from THAT round. Every other
+// round has its own ids for the same people, so the Cup has to be re-expressed in
+// local ids before anything reads it. The bridge is the name, exactly as Trip
+// Mode bridges rounds.
+//
+// REFUSING IS PART OF THE JOB. A Cup that silently resolves onto the wrong
+// golfers is worse than one that does not resolve at all, so anything ambiguous
+// stops here and says what is wrong: placeholder names, which the app invents for
+// blank fields and which therefore repeat across rounds, and duplicate names,
+// which cannot be told apart. A golfer simply absent from this round is neither -
+// they sat the session out, and they resolve to nobody.
+//
+// The host round never reaches this: its ids are already local.
+function ryderTranslateCupToRound(hostCupData, roundData) {
+    var norm = (typeof normalisePlayerName === 'function')
+        ? normalisePlayerName
+        : function (n) { return String(n == null ? '' : n).trim().toLowerCase(); };
+    var isPlaceholder = (typeof isPlaceholderPlayerName === 'function')
+        ? isPlaceholderPlayerName
+        : function (n) { return /^player\s*\d+$/.test(norm(n)); };
+
+    var cfg = ryderCupConfig(hostCupData);
+    if (!cfg) return { problems: [{ type: 'no-cup', message: 'No Cup on the host round.' }] };
+
+    var hostPlayers = (hostCupData || {}).players || [];
+    var localPlayers = (roundData || {}).players || [];
+    var problems = [];
+
+    // hostId -> name, and name -> localId. Either side being ambiguous is fatal.
+    var nameOfHostId = {}, seenHost = {};
+    hostPlayers.forEach(function (p) {
+        var key = norm(p.name);
+        if (!key || isPlaceholder(p.name)) return;
+        if (seenHost[key]) seenHost[key] = 'dupe'; else seenHost[key] = 'one';
+        nameOfHostId[String(p.id)] = key;
+    });
+    var localIdOfName = {}, seenLocal = {};
+    localPlayers.forEach(function (p) {
+        var key = norm(p.name);
+        if (!key || isPlaceholder(p.name)) return;
+        if (seenLocal[key]) seenLocal[key] = 'dupe'; else seenLocal[key] = 'one';
+        localIdOfName[key] = String(p.id);
+    });
+
+    // Only golfers the CUP actually uses matter; a stranger on either roster is
+    // nobody's problem.
+    var used = {};
+    Object.keys(cfg.members).forEach(function (id) { used[String(id)] = true; });
+    Object.keys(cfg.matches).forEach(function (mid) {
+        var m = cfg.matches[mid];
+        (m.playersA || []).concat(m.playersB || [])
+            .concat(m.lockedA || []).concat(m.lockedB || [])
+            .forEach(function (id) { used[String(id)] = true; });
+    });
+
+    Object.keys(used).forEach(function (hostId) {
+        var key = nameOfHostId[hostId];
+        if (!key) {
+            problems.push({ type: 'unnamed', playerId: hostId,
+                message: 'A golfer in this Cup has no usable name on the host round. '
+                       + 'Names like "Player 3" cannot identify anyone across rounds.' });
+            return;
+        }
+        if (seenHost[key] === 'dupe') {
+            problems.push({ type: 'duplicate-name', name: key,
+                message: 'Two golfers on the host round are called "' + key + '". '
+                       + 'They cannot be told apart on another round.' });
+        }
+        if (seenLocal[key] === 'dupe') {
+            problems.push({ type: 'duplicate-name', name: key,
+                message: 'Two golfers on this round are called "' + key + '".' });
+        }
+    });
+    if (problems.length) return { problems: problems };
+
+    // A COPY. The authoritative Cup is never rewritten - five rounds translating
+    // the same object would each leave the next one reading somebody else's ids.
+    var out = JSON.parse(JSON.stringify(cfg));
+    var localOf = function (hostId) {
+        var key = nameOfHostId[String(hostId)];
+        // Absent from this round is legitimate. Keep an id that matches nobody
+        // rather than inventing one, so the golfer is simply not playing here.
+        return (key && localIdOfName[key]) ? localIdOfName[key] : ('absent:' + hostId);
+    };
+
+    var members = {};
+    Object.keys(out.members).forEach(function (hostId) {
+        members[localOf(hostId)] = out.members[hostId];
+    });
+    out.members = members;
+    Object.keys(out.matches).forEach(function (mid) {
+        var m = out.matches[mid];
+        ['playersA', 'playersB', 'lockedA', 'lockedB'].forEach(function (k) {
+            if (m[k]) m[k] = m[k].map(localOf);
+        });
+    });
+    return { cup: Object.assign({}, hostCupData, { ryderCup: out, players: localPlayers }),
+             problems: [] };
+}
+
+// ---------------------------------------------------------------------------
 // THE CANONICAL RESOLVER
 //
 // Every surface asks this one question and nothing scatters host/reference logic
@@ -966,7 +1075,14 @@ function resolveRyderCupForRound(roundData, hostCupData, roundCode) {
         return { status: 'session-missing', cup: hostCupData, sessionId: ref.sessionId,
                  host: String(ref.host) };
     }
-    return { status: 'referenced', cup: hostCupData, sessionId: ref.sessionId || null,
+    // The Cup is expressed in the HOST round's ids. Hand back one expressed in
+    // this round's, or refuse - never a Cup that names the wrong people.
+    var translated = ryderTranslateCupToRound(hostCupData, d);
+    if (translated.problems && translated.problems.length) {
+        return { status: 'identity-unresolved', cup: null, sessionId: ref.sessionId || null,
+                 host: String(ref.host), identityProblems: translated.problems };
+    }
+    return { status: 'referenced', cup: translated.cup, sessionId: ref.sessionId || null,
              host: String(ref.host) };
 }
 

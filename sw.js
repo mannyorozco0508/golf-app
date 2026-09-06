@@ -238,7 +238,14 @@
 // which still put side betting on the screen of somebody sent to build a Cup;
 // the collapse machinery went with it. An installed PWA on v61 would keep
 // serving the collapsed version and both pages would still have no way back.
-const CACHE_VERSION = 'golfapp-v62-setup-nav';
+// Moved to v63: a Cup can finally be played on a round that did not create it.
+// Player ids are per-round and positional, so the Cup's ids name different people
+// on every other round; ryder-cup.js now translates them by NAME, the same bridge
+// Trip Mode uses, and REFUSES when the names cannot identify anyone - placeholders
+// or duplicates. action-model.js carries the shared normaliser, so both files in
+// the shell list changed. An installed PWA on v62 would resolve a Cup onto whoever
+// happened to line up positionally, and silently swap the two sides.
+const CACHE_VERSION = 'golfapp-v63-cross-round-identity';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
