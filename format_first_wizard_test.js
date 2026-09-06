@@ -439,7 +439,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // is byte-for-byte unchanged, and nassau_autopress_label_test.js asserts its
         // behaviour rather than trusting this hash to notice.
         'action-model.js': '034b008b00fbcc16614b91d0982a6d1bd3a3b329cb3f46ce3d9590faadfa15b0',
-        'ryder-cup.js': '81cf2ea01752ec787792844ace37a802b562e9cdcb7174f4af3d4478c8f5328b',
+        'ryder-cup.js': 'bb6ecccfd92a60f30503ad5ddbf1a81d5b43beacc46305a3513d9971b81abd16',
         'bet-strip.js': '934c6a99291fc9848d107d2c877855aafd0758acfdcbb76842e44403006e290d',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',

@@ -241,7 +241,18 @@ function applyRyderPairingChange(data, courseData, savedScores, matchId, next) {
 // normal Rattle wagers simultaneously; that is a different layer with different
 // rules and this function must never be pointed at it.
 // ---------------------------------------------------------------------------
-var RYDER_ROSTER_SIZE = { fourball: 2, singles: 1 };
+// HOW MANY A SIDE EACH FORMAT SEATS. Foursomes is alternate shot - two golfers
+// playing one ball - so it seats two a side exactly as Four-Ball does.
+//
+// A FORMAT MISSING FROM THIS TABLE IS NOT VALIDATED AT ALL. validateRyderCup
+// reads `want` from here and guards on `if (want && ...)`, so an absent entry
+// does not fail loudly - it silently skips the roster check for every match of
+// that format. Add the format here in the same change that starts storing it.
+var RYDER_ROSTER_SIZE = { fourball: 2, foursomes: 2, singles: 1 };
+
+// The formats a match record may carry. buildRyderCupConfig normalises anything
+// else to fourball, so this list and the table above are added to together.
+var RYDER_MATCH_FORMATS = ['fourball', 'foursomes', 'singles'];
 
 function validateRyderCup(data) {
     var cfg = ryderCupConfig(data);
@@ -555,7 +566,20 @@ function buildRyderCupConfig(input) {
         matches[id] = {
             id: id,
             sessionId: m.sessionId || RYDER_DEFAULT_SESSION,
-            format: m.format === 'singles' ? 'singles' : 'fourball',
+            // THE FORMAT THE PAIRING WAS SEEDED WITH, not a guess between two.
+            //
+            // This collapsed everything that was not Singles into Four-Ball. That
+            // was right in Phase 3B, when those were the only two formats. Phase 5
+            // added real alternate shot - its own team-score namespace, its own
+            // allowance - and taught the `scoring` line below about it while leaving
+            // this one alone. The result was a Classic Cup whose schedule said
+            // Foursomes and whose match record said Four-Ball, so the entry screen
+            // (which reads the session) and the scorer (which reads the match)
+            // disagreed about which game was being played.
+            //
+            // Unrecognised values still fall back rather than being stored raw: a
+            // typo must not become a pairing nothing knows how to score.
+            format: RYDER_MATCH_FORMATS.indexOf(m.format) !== -1 ? m.format : 'fourball',
             // A Foursomes match carries scratch/handicap; every other format keeps
             // the existing net/gross meaning. Forcing 'net' here would silently
             // turn every scratch alternate-shot match into a handicap one.

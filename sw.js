@@ -212,7 +212,12 @@
 // longer renumber everyone below them. That id is the primary key for money -
 // scores live at p{id}_h{hole} - so an installed PWA on v56 would keep serving a
 // wizard that silently hands one golfer another's scorecard.
-const CACHE_VERSION = 'golfapp-v57-stable-player-ids';
+// Moved to v58: a Ryder match now stores the format it was seeded with.
+// buildRyderCupConfig flattened every non-singles format to fourball, so a
+// Classic Cup saved its Foursomes sessions as Four-Ball - the entry screen
+// offered alternate shot while the scorer read individual scores that alternate
+// shot never produces. An installed PWA on v57 would keep writing that record.
+const CACHE_VERSION = 'golfapp-v58-ryder-match-format';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

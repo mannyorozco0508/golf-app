@@ -104,6 +104,13 @@ const MODULE_PREREQS = {
     // getStrokes()/parseHcp() for individual net allocation, all as plain globals -
     // exactly as it does in the browser, where both tournament pages load them first.
     'tournament-engine.js': ['handicap.js', 'payouts.js'],
+    // ryder-cup.js calls parseHcp for the Foursomes allowance and
+    // calculateMatchEngine for Four-Ball, both as plain globals, exactly as the
+    // browser supplies them. Without them the Foursomes path throws
+    // ReferenceError and - far worse - ryderFourBallState bails at its first
+    // line and returns a SILENT null, so a Four-Ball test passes having computed
+    // nothing at all.
+    'ryder-cup.js': ['handicap.js', 'money-engine.js'],
 };
 
 // Loads a plain, standalone .js file (money-engine.js, tournament-engine.js,

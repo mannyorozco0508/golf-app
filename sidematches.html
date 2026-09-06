@@ -2795,6 +2795,15 @@ html {
         if (cfg.sessions) rcDraft.sessions = JSON.parse(JSON.stringify(cfg.sessions));
     }
 
+    // WHAT THE PAIRING IS CALLED. Derived from the stored format rather than
+    // guessed between two, which labelled every Foursomes pairing "Four-Ball" -
+    // a screen contradicting its own record.
+    const RC_FORMAT_LABELS = { singles: 'Singles', fourball: 'Four-Ball',
+                               foursomes: 'Foursomes' };
+    function rcFormatLabel(format) {
+        return RC_FORMAT_LABELS[format] || 'Four-Ball';
+    }
+
     function rcMatchLocked(m) {
         if (typeof ryderMatchLockState !== 'function') return false;
         return ryderMatchLockState(currentData, currentData.courseData || [],
@@ -2855,7 +2864,7 @@ html {
                 return p ? p.name : id;
             }).join(' + ');
             html += '<div class="rcs-match' + (locked ? ' locked' : '') + '">'
-                + '<div class="rcs-mtop">' + (m.format === 'singles' ? 'Singles' : 'Four-Ball')
+                + '<div class="rcs-mtop">' + rcFormatLabel(m.format)
                 + (locked ? ' <span class="rcs-lock">Match started \u2014 pairing locked</span>' : '')
                 + '</div>'
                 + '<div class="rcs-mrow">' + esc(nm(m.playersA) || '\u2014') + '</div>'
