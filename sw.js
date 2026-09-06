@@ -217,7 +217,12 @@
 // Classic Cup saved its Foursomes sessions as Four-Ball - the entry screen
 // offered alternate shot while the scorer read individual scores that alternate
 // shot never produces. An installed PWA on v57 would keep writing that record.
-const CACHE_VERSION = 'golfapp-v58-ryder-match-format';
+// Moved to v59: the Foursomes team-score card is finally wired into Hole View.
+// Phase 5 built the whole alternate-shot entry and never called it from any render
+// path, so a golfer in a Foursomes session had no way to enter a score while the
+// engine banked points for it. An installed PWA on v58 would keep serving the
+// scorecard that cannot score the format its own schedule asks for.
+const CACHE_VERSION = 'golfapp-v59-foursomes-entry-wired';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

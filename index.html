@@ -2212,6 +2212,25 @@ html {
             html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
         }
 
+        // ALTERNATE SHOT GETS ITS OWN BOX, and only in a Foursomes session.
+        //
+        // Two partners play one ball, so the PAIRING owns the number and no
+        // individual golfer does. renderFoursomesEntryHtml returns '' for every
+        // other round - Four-Ball, Singles, and every ordinary Rattle round are
+        // untouched - so this costs nothing anywhere else.
+        //
+        // WHY HERE. It is a score box, so it belongs with the score boxes rather
+        // than among the betting readouts below. Not above them: the dashboard
+        // comment further up records what happens when anything is inserted
+        // between the hole heading and the inputs. And above Prev/Next, because
+        // SCORE -> NEXT is the order this screen is built around - a card below
+        // the nav row is a card nobody scrolls to.
+        //
+        // ADDED, NOT SUBSTITUTED. The per-golfer boxes still render. Replacing
+        // them removes a way to score, which is a decision to make after a round
+        // has actually been played on this.
+        html += renderFoursomesEntryHtml(holeNum);
+
         // SCORE -> NEXT.
         //
         // Prev/Next used to sit below the Action Center and the press strip, so on a

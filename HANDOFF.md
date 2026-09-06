@@ -95,6 +95,16 @@ A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and
 
 ## Checks that live outside `npm test`
 
+These exist because the node suite **structurally cannot** assert two things:
+**geometry** — `helpers/mini-dom.js` returns a hard-coded zero rect and implements
+no layout, so an element can be `display:block` and 0x0 at once — and **DOM
+identity**, because it stores `innerHTML` as a string and never builds child nodes,
+so inputs inside rendered markup are not real elements. Anything **visual or
+binding-related needs one of these tools.** Two of them is a pattern now, not a
+one-off: when a change turns on what something looks like, or on which record a
+control is bound to, write the browser check rather than a test that asserts the
+assumption.
+
 ### `tools/id-binding-check.js` — the only check that can prove id-to-name binding
 
 ```
@@ -133,6 +143,42 @@ id issuer in `admin.html`. It is deliberately outside `npm test`: it needs Chrom
 this project keeps a zero-extra-test-dependency rule. It adds no npm package — it drives
 the installed Chrome over CDP using Node's built-in WebSocket. Set `CHROME_PATH` if
 Chrome is not at the standard macOS location.
+
+### `tools/foursomes-entry-check.js` — proves the alternate-shot card is reachable and additive
+
+```
+node tools/foursomes-entry-check.js
+```
+
+| exit | meaning |
+|------|---------|
+| 0 | PASS |
+| 1 | FAIL — the JSON lists which guarantee broke |
+| 2 | could not run (Chrome missing, page threw). **Nothing was proven — this is not a pass.** |
+
+Phase 5 built the entire Foursomes team-score entry — a box per side, WHS allowance,
+narrow-path writes, host-side locking — and never wired it into a render path. It was
+unreachable for the life of the feature while 590 lines of tests passed, because the two
+wiring tests asserted that a string appeared in `index.html`, and that string lived inside
+the dead function's own generated markup. The one test named for the feature being
+reachable was satisfied by the feature quoting itself.
+
+`ryder_foursomes_entry_test.js` now renders Hole View and proves the card appears. **Two
+guarantees are beyond it**, and they are why this tool exists:
+
+- **The card sits between the per-golfer boxes and Prev/Next.** mini-dom builds no
+  `hv-player-row` at all (the Full Card `<tr>` has no child nodes there), so the node suite
+  can only place the card between the hole heading and the nav row.
+- **Individual entry survives.** This wave *adds* the card rather than replacing the
+  per-golfer boxes. With no player rows in the harness, a control that deleted them was
+  invisible and passed the whole suite.
+
+It also asserts real geometry, so "present but 0x0" cannot pass. Verified to fail on all
+three regressions that matter: the call site unwired, the card replacing individual entry,
+and the card moved above the score boxes.
+
+Run it by hand after any change to `renderHoleView`, the Foursomes entry functions, or the
+Ryder session/format wiring.
 
 ## How I want you to work
 

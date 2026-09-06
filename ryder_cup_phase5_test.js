@@ -22,6 +22,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'money-engine.js']);
@@ -530,6 +531,42 @@ describe('PAGE WIRING AND MOBILE', () => {
     const IDX = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
     const SM = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
 
+    // Renders Hole View for a one-pairing session of the given format, so the two
+    // wiring tests below can read what a golfer sees rather than what the file says.
+    const IDX_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+        'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js',
+        'ryder-cup.js'];
+    function holeViewFor(format) {
+        const need = format === 'singles' ? 1 : 2;
+        const ps = players();
+        const cdSimple = CD;
+        const sc = {};
+        ps.forEach(p => cdSimple.forEach(h => { sc['p' + p.id + '_h' + h.hole] = 4; }));
+        const data = {
+            gameFormat: 'stroke', players: ps, courseData: cdSimple, scores: sc,
+            ryderCupRef: { host: 'PW1', sessionId: 'sX' },
+            ryderCup: {
+                v: 1, name: 'Wiring Cup',
+                sides: { A: { id: 'A', name: 'Rattle' }, B: { id: 'B', name: 'Chaos' } },
+                members: { '101':'A','102':'A','103':'A','104':'A',
+                           '105':'B','106':'B','107':'B','108':'B' },
+                sessions: { sX: { id: 'sX', day: 1, order: 1, format: format, label: 'S' } },
+                matches: { m1: { id: 'm1', sessionId: 'sX', format: format,
+                    scoring: format === 'foursomes' ? 'scratch' : 'net',
+                    sideA: 'A', sideB: 'B',
+                    playersA: ['101','102'].slice(0, need),
+                    playersB: ['105','106'].slice(0, need) } }
+            }
+        };
+        const sb = loadHtmlInlineScript('index.html', IDX_DEPS);
+        vm.runInContext('alert=function(){}; currentMode = "PW1";', sb);
+        vm.runInContext('currentData = ' + JSON.stringify(data) + ';', sb);
+        vm.runInContext('renderScorecard(); setViewMode("hole");', sb);
+        return vm.runInContext('document.getElementById("hole-view-card").innerHTML', sb);
+    }
+    const foursomesHoleView = () => holeViewFor('foursomes');
+    const fourballHoleView = () => holeViewFor('fourball');
+
     test('team entry writes a narrow child path, never the whole object', () => {
         const fn = IDX.slice(IDX.indexOf('function saveFoursomesScore'));
         assert.ok(/ryderTeamScorePath\(matchId, side, hole\)/.test(fn.slice(0, 900)));
@@ -548,13 +585,16 @@ describe('PAGE WIRING AND MOBILE', () => {
             'the Foursomes writer must not build an individual score key');
     });
 
-    test('the entry function is wired to its call site', () => {
-        // A negative control renamed saveFoursomesScore to ...RENAMED and escaped,
-        // because indexOf('function saveFoursomesScore') still prefix-matched.
-        // Pinning the onchange handler closes that.
-        assert.ok(/onchange="saveFoursomesScore\(/.test(IDX),
-            'the team score box must call saveFoursomesScore');
-        assert.ok(/function saveFoursomesScore\(matchId, side, hole, val\) \{/.test(IDX));
+    // REWRITTEN. This asserted that the string onchange="saveFoursomesScore( appeared
+    // somewhere in index.html - and that string lives inside renderFoursomesEntryHtml's
+    // OWN generated markup. So the one test named for the feature being reachable was
+    // satisfied by the feature quoting itself, and passed for the entire period the
+    // card was never rendered at all. Reachability is now asserted by rendering.
+    test('the entry card is reachable from Hole View', () => {
+        const html = foursomesHoleView();
+        assert.match(html, /fs-card/, 'the card never reaches the screen');
+        assert.match(html, /onchange="saveFoursomesScore\(/,
+            'the rendered box does not call saveFoursomesScore');
     });
 
     test('the first team score locks the match on the HOST', () => {
@@ -563,9 +603,12 @@ describe('PAGE WIRING AND MOBILE', () => {
             'the snapshot belongs on the authoritative host');
     });
 
+    // REWRITTEN for the same reason: this checked that a source line existed, which
+    // says nothing about what a golfer sees. Rendered both ways instead.
     test('team entry appears only for a foursomes session', () => {
-        const fn = IDX.slice(IDX.indexOf('function ryderFoursomesContext'));
-        assert.ok(/sess\.format !== 'foursomes'\) return null;/.test(fn.slice(0, 900)));
+        assert.match(foursomesHoleView(), /fs-card/);
+        assert.ok(!/fs-card/.test(fourballHoleView()),
+            'a Four-Ball session offered alternate-shot entry');
     });
 
     test('setup warns that individual side games are unavailable', () => {
