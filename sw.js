@@ -207,7 +207,12 @@
 // reads it - the priced option, the collapsed single-bet form, the sub-line and the
 // pre-script fallback in both pages all say "bet" now. An installed PWA on v55 would
 // keep serving the jargon this change exists to remove.
-const CACHE_VERSION = 'golfapp-v56-auto-press-says-bet';
+// Moved to v57: admin.html now issues STABLE player ids. A row is stamped with
+// data-player-id once and keeps it, so deleting or reordering a golfer can no
+// longer renumber everyone below them. That id is the primary key for money -
+// scores live at p{id}_h{hole} - so an installed PWA on v56 would keep serving a
+// wizard that silently hands one golfer another's scorecard.
+const CACHE_VERSION = 'golfapp-v57-stable-player-ids';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

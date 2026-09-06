@@ -93,6 +93,47 @@ A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and
 - **Still not tested on an actual course during an actual round.** That remains the real next step
 - No monetization built. Direction is freemium with a one-time or per-trip unlock, not a subscription. Real IAP needs native StoreKit work
 
+## Checks that live outside `npm test`
+
+### `tools/id-binding-check.js` — the only check that can prove id-to-name binding
+
+```
+node tools/id-binding-check.js
+```
+
+| exit | meaning |
+|------|---------|
+| 0 | PASS — every surviving golfer kept the id they had |
+| 1 | FAIL — a golfer was repointed; the JSON names who, and from what id to what |
+| 2 | the check could not run (Chrome missing, page threw). **Nothing was proven — this is not a pass.** |
+
+A player's id is the primary key for money. Scores live at `p{id}_h{hole}`, dots at
+`dots/h{hole}/{id}`, and side-match rosters and Ryder Cup membership are lists of ids.
+If a golfer's id changes, their scorecard changes hands, and nothing warns.
+
+**`player_id_stability_test.js` proves the id SEQUENCE is stable** — that deleting the
+second of four golfers leaves `[101,103,104]` rather than `[101,102,103]`. That is
+necessary, but it is strictly weaker than the guarantee that matters: a sequence can be
+perfectly correct while the wrong golfer holds each number.
+
+**The node suite cannot do better, and this is a hard limit, not an oversight.**
+`helpers/mini-dom.js` stores `innerHTML` as a string and never parses it into child
+nodes. The name and handicap inputs are written into the row's `innerHTML`, so in that
+harness they are not real elements — `row.querySelector('.p-name-input')` returns null,
+and every name `captureCurrentPlayerInputs()` reads back comes out empty. After any
+rebuild the harness has forgotten who is who. It can compare ids to ids and nothing more.
+
+A real browser has real inputs. The tool types four names, clicks the real delete button
+on the middle row, and compares the name-to-id map of the survivors against what it was
+before. Against the positional-id bug it reported `Cal: 103 -> 102`, `Dee: 104 -> 103`,
+and `Cal` inheriting the deleted golfer's id — the sentence the node suite could not say.
+
+Run it by hand after any change to the player list, the wizard's roster handling, or the
+id issuer in `admin.html`. It is deliberately outside `npm test`: it needs Chrome, and
+this project keeps a zero-extra-test-dependency rule. It adds no npm package — it drives
+the installed Chrome over CDP using Node's built-in WebSocket. Set `CHROME_PATH` if
+Chrome is not at the standard macOS location.
+
 ## How I want you to work
 
 - **Verify, don't assume.** Check that a change actually landed, from a fresh tarball

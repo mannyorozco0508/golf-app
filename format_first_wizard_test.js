@@ -376,10 +376,20 @@ describe('NO SECOND RYDER SETUP EXISTS IN THE WIZARD', () => {
         assert.ok(!/members\s*:/.test(ADMIN));
     });
 
-    test('positional wizard ids are never used for Cup membership', () => {
-        // They are still positional - that is a deferred fix, not a regression -
-        // so the guarantee is that they never meet a Cup at all.
-        assert.match(ADMIN, /id: idx \+ 101/);
+    test('wizard player ids are stable, and still never meet a Cup', () => {
+        // THIS PIN INVERTED. It used to assert ids WERE positional, guarding a
+        // deferred fix - a row could be deleted and every golfer below it silently
+        // renumbered. That fix has landed: an id is stamped on the row once and
+        // never recomputed, so the guarantee is now that positional ids cannot
+        // come back.
+        assert.ok(!/id:\s*idx\s*\+\s*101/.test(ADMIN),
+            'positional player ids have returned');
+        assert.match(ADMIN, /function playerIdOfRow\(row\)/,
+            'the single id issuer is gone');
+        assert.match(ADMIN, /setAttribute\("data-player-id"/,
+            'rows no longer carry their own id');
+
+        // Unchanged, and still true until the Teams step actually lands.
         assert.ok(!ADMIN.includes('/ryderCup'), 'the wizard never writes a Cup');
         assert.ok(!ADMIN.includes('rcDraft'), 'the wizard holds no Cup draft');
     });

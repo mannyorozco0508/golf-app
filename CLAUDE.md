@@ -60,6 +60,13 @@ installed and can be driven over CDP from plain Node with no npm dependency — 
 measurement scripts written for the Hole View and Auto Press work. Say plainly in the
 test file what the harness can and cannot prove.
 
+`tools/id-binding-check.js` is the standing example, and the only check in the repo that
+can prove a player's id still belongs to the same golfer. `player_id_stability_test.js`
+proves the id *sequence* is stable; only a real browser can prove the *binding*, because
+the name inputs are not real elements under mini-dom. `HANDOFF.md` documents how to run
+it and what its exit codes mean. Run it by hand after touching the player list, the
+wizard's roster handling, or the id issuer in `admin.html`.
+
 ## Prove every test is live before trusting it
 
 For each assertion, deliberately break the thing it guards and confirm the test fails.

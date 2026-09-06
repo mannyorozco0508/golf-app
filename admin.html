@@ -3550,6 +3550,50 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return result.ok ? result.data : null;
     }
 
+    // ================= STABLE PLAYER IDS =================
+    //
+    // A player's id is the PRIMARY KEY FOR MONEY: scores live at p{id}_h{hole},
+    // dots at dots/h{hole}/{id}, and side-match rosters and Cup membership are
+    // lists of ids. It used to be derived from DOM position - the row index plus a
+    // base of 101, recomputed on every capture - and because every mutation in this wizard
+    // rebuilds the whole list, deleting one golfer renumbered everyone below.
+    // That does not lose data, it RE-POINTS it: delete the second of four and the
+    // third inherits the second's id, and with it the second's scorecard.
+    //
+    // Now an id is issued once, stamped on the row, and never recomputed. A row
+    // loaded from a saved round keeps the id it was saved with, verbatim, so
+    // reopening a round in progress cannot orphan a single score.
+    //
+    // THE COUNTER CLEARS EVERY ID IT HAS SEEN, which is the second corruption
+    // path and easy to miss: a fresh counter starting at 101 would hand a NEW
+    // golfer an id an EXISTING golfer's scores are already filed under. Loading a
+    // roster of 101, 105, 110 must issue 111 - above the highest id present, not
+    // above the row count. Retired ids are never reissued within a session.
+    const PLAYER_ID_BASE = 101;
+    let playerIdHighWater = PLAYER_ID_BASE - 1;
+
+    function notePlayerId(id) {
+        const n = parseInt(id, 10);
+        if (!isNaN(n) && n > playerIdHighWater) playerIdHighWater = n;
+    }
+
+    function nextPlayerId() {
+        playerIdHighWater += 1;
+        return playerIdHighWater;
+    }
+
+    // THE ONE PLACE A ROW'S ID IS READ OR MINTED. Both the capture pipeline and
+    // the save path go through here, so there is no second expression that can
+    // drift from this one - which is exactly how the positional id survived in
+    // two independent copies.
+    function playerIdOfRow(row) {
+        const existing = row.getAttribute('data-player-id');
+        if (existing) { notePlayerId(existing); return parseInt(existing, 10); }
+        const minted = nextPlayerId();
+        row.setAttribute('data-player-id', String(minted));
+        return minted;
+    }
+
     function captureCurrentPlayerInputs() {
         const rows = document.querySelectorAll('.player-row');
         const list = [];
@@ -3563,7 +3607,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
             const moneyInput = row.querySelector('.p-money-input');
             const moneyVal = moneyInput ? moneyInput.checked : true;
-            list.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+            list.push({ id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
         });
         return list;
     }
@@ -3646,7 +3690,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true);
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id);
         });
         updateCount();
     }
@@ -3659,7 +3703,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         existingData.push({ name: '', hcp: '', team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
         updateCount();
     }
 
@@ -3741,7 +3785,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
         updateCount();
 
         document.getElementById('paste-players-textarea').value = '';
@@ -3756,7 +3800,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
         updateCount();
     }
 
@@ -4450,7 +4494,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -4532,6 +4576,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         const row = document.createElement("div");
         row.className = "player-row";
+        // Stamped at creation and never recomputed. An id passed in comes from a
+        // saved round or from the row this one is replacing during a rebuild; only a
+        // genuinely new row mints one.
+        if (playerId !== undefined && playerId !== null && playerId !== '') {
+            notePlayerId(playerId);
+            row.setAttribute("data-player-id", String(playerId));
+        } else {
+            row.setAttribute("data-player-id", String(nextPlayerId()));
+        }
         row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
@@ -4879,7 +4932,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     }
                 }
 
-                playersList.push({ id: idx + 101, name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+                playersList.push({ id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
             });
 
             try {
@@ -5015,10 +5068,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 if (creatingRyderCup) {
                     // HANDOFF, NOT A SECOND SETUP.
                     //
-                    // The Cup needs a frozen roster and real player ids, and neither
-                    // exists until the round is saved - wizard ids are positional
-                    // (idx + 101), so assigning sides before this point would silently
-                    // repoint memberships the moment a player was removed or reordered.
+                    // The Cup needs a frozen roster, which does not exist until the
+                    // round is saved. Wizard ids are no longer positional - a row keeps
+                    // the id it was issued, so a delete or a reorder cannot repoint a
+                    // membership - but the roster itself is still being edited here, and
+                    // sides picked against a roster still in flux are sides picked twice.
                     // So the wizard creates the ROUND and takes the organizer straight
                     // to the Phase 3B Cup setup that has always lived on Matches. No
                     // setup logic is duplicated here.

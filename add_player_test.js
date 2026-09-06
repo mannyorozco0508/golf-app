@@ -146,7 +146,7 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
     });
 
     test('addPlayerRow keeps its defaults so a bare call still works', () => {
-        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false\)/.test(ADM),
+        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined\)/.test(ADM),
             'a plain addPlayerRow() must still add one row with an immediate refresh');
     });
 
@@ -174,7 +174,7 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
 
     test('bulk paste still has its deferred path', () => {
         assert.ok(/deferRefresh/.test(ADM), 'the bulk optimisation must survive');
-        assert.ok(/addPlayerRow\(p\.name, p\.hcp, p\.team, p\.squad, false, p\.playingForMoney !== false, existingData\.length, true\)/.test(ADM),
-            'batch rebuilds still pass deferRefresh = true');
+        assert.ok(/addPlayerRow\(p\.name, p\.hcp, p\.team, p\.squad, false, p\.playingForMoney !== false, existingData\.length, true, p\.id\)/.test(ADM),
+            'batch rebuilds still pass deferRefresh = true, and now carry the row id');
     });
 });
