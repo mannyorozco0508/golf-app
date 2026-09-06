@@ -421,7 +421,14 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         'money-engine.js': '3c960947ed62ebf5c179050e3ac65f9e1ed88c106ab0a759763fdd7da8931a68',
         'settlement-engine.js': '4aa88420ecfc952673cb5509619af9fab3e535e5d9a039ad74023056bce63dc5',
         'pool-engine.js': '944957133f3bce762c704606f2aa43b26c9edfec16970c111445dd8d86cfc96b',
-        'action-model.js': '91aa99aa466d32d586627f5ec8ed417d0d4a54cfac79a06d32902bcccb639c37',
+        // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
+        // arithmetic; it was never meant to make these files permanently unwritable.
+        // action-model.js has since gained nassauAutoPressLabel() - a pure presentation
+        // helper that prices the auto-press dropdown - by explicit per-file approval.
+        // Additions only: buildNassauWagerPayload, the function that shapes the money,
+        // is byte-for-byte unchanged, and nassau_autopress_label_test.js asserts its
+        // behaviour rather than trusting this hash to notice.
+        'action-model.js': '5546899edf14caf7d3fb5b7ac516e78ec065007b8385a1a2c3034ececc572bd0',
         'ryder-cup.js': '81cf2ea01752ec787792844ace37a802b562e9cdcb7174f4af3d4478c8f5328b',
         'bet-strip.js': '934c6a99291fc9848d107d2c877855aafd0758acfdcbb76842e44403006e290d',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',

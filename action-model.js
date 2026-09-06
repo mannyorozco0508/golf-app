@@ -672,6 +672,70 @@ function buildNassauWagerPayload(input) {
     };
 }
 
+// ============================================================================
+// WHAT "SAME AS SEGMENT" ACTUALLY COSTS
+//
+// The Auto Press Amount dropdown said "Same as Segment", and nobody could tell
+// what that meant. "Segment" is undefined jargon, and it is SINGULAR while a
+// Nassau has three - so the honest answer is not one number.
+//
+// It is tempting to print "$10 (same as Front 9)". That would be wrong, and the
+// wizard's own defaults are the counter-example: Front $10, Back $10, Overall
+// $20. autoPressStakeFor() in money-engine.js resolves the amount PER SEGMENT at
+// press time, so a single auto press on hole 3 opens a $10 Front 9 press AND a
+// $20 Overall press in the same breath. Naming one number would understate every
+// Overall press by 2x, on money.
+//
+// So this reports every amount that can actually be charged, and collapses to a
+// single number only when the three genuinely agree:
+//
+//     Same as Segment ($10)                 all three equal
+//     Same as Segment ($10 / $10 / $20)     any differ
+//
+// `hint` maps those bare numbers back to their segments, because "$10 / $10 /
+// $20" on its own does not say which is which.
+//
+// PURE ON PURPOSE. Both the setup wizard and the side-match form render this
+// control, and a hand-written copy in each is exactly the duplication that once
+// let a per-press stake reach the engine but not the pages.
+function nassauAutoPressLabel(input) {
+    const i = input || {};
+    const BASE = 'Same as Segment';
+
+    // Blank means "not set". ZERO DOES NOT: a skipped $0 bet is a real answer to
+    // "what will a press cost me", and it must not fall through to the fallback.
+    const blank = v => v === undefined || v === null || v === '';
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? undefined : n; };
+
+    // Mirrors baseStakeFor() in money-engine.js: a blank segment falls back to the
+    // legacy single stake, and that fallback is what the golfer is really charged.
+    // A legacy round carries only `stake`, so all three resolve to it and the
+    // label collapses to the one number that round actually has.
+    const fallback = num(i.stake);
+    const seg = v => (blank(v) ? fallback : num(v));
+
+    const front = seg(i.front), back = seg(i.back), overall = seg(i.overall);
+
+    // Nothing to report is reported as nothing. Inventing a number here would be
+    // the same failure as naming Front 9's.
+    if (front === undefined || back === undefined || overall === undefined) {
+        return { option: BASE, hint: '', amounts: [] };
+    }
+
+    const cash = v => '$' + (Number.isInteger(v) ? String(v) : v.toFixed(2));
+    const allSame = front === back && back === overall;
+
+    return {
+        option: allSame
+            ? BASE + ' (' + cash(front) + ')'
+            : BASE + ' (' + cash(front) + ' / ' + cash(back) + ' / ' + cash(overall) + ')',
+        hint: 'Each press matches its own segment — Front 9 ' + cash(front)
+            + ' · Back 9 ' + cash(back) + ' · Total ' + cash(overall) + '.',
+        amounts: [front, back, overall],
+    };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
+    module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
 }

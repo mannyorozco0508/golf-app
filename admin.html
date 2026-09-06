@@ -1038,15 +1038,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 <div class="sm-nassau-stakes">
                     <div>
                         <label>Front 9</label>
-                        <input type="number" id="setup-nassau-front" value="10" min="0" inputmode="numeric">
+                        <input type="number" id="setup-nassau-front" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Back 9</label>
-                        <input type="number" id="setup-nassau-back" value="10" min="0" inputmode="numeric">
+                        <input type="number" id="setup-nassau-back" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Overall 18</label>
-                        <input type="number" id="setup-nassau-overall" value="20" min="0" inputmode="numeric">
+                        <input type="number" id="setup-nassau-overall" value="20" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -1069,10 +1069,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 </div>
                 <div style="margin-top:10px;">
                     <label style="font-size:0.75rem;">Auto Press Amount</label>
+                    <!-- The "same" option is PRICED AT RENDER TIME by
+                         nassauAutoPressLabel() in action-model.js - the same builder the
+                         side-match form uses. It ships unpriced so the markup carries no
+                         second copy of the sentence to drift. -->
                     <select id="setup-nassau-autopress-mode" onchange="toggleSetupNassauAutoAmount()">
                         <option value="same">Same as Segment</option>
                         <option value="custom">Custom Amount</option>
                     </select>
+                    <div id="setup-nassau-autopress-hint" style="display:none; font-size:0.68rem; color:var(--text-muted); margin-top:4px; line-height:1.35;"></div>
                     <input type="number" id="setup-nassau-autopress" value="" min="0" placeholder="$ per auto press" style="display:none; margin-top:6px;" inputmode="numeric">
                 </div>
                 <!-- WHO IS IN IT. Two players is unambiguous and defaults itself; more
@@ -4006,6 +4011,40 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const mode = document.getElementById('setup-nassau-autopress-mode');
         const amt = document.getElementById('setup-nassau-autopress');
         if (mode && amt) amt.style.display = mode.value === 'custom' ? 'block' : 'none';
+        syncSetupNassauAutoPressLabel();
+    }
+
+    // WHAT A PRESS WILL COST, IN THE OPTION ITSELF.
+    //
+    // "Same as Segment" told a golfer nothing, so the amounts are rendered into it.
+    // The sentence is built by nassauAutoPressLabel() in action-model.js and NOT
+    // composed here - the side-match form renders the same control, and two copies
+    // of this string would drift the moment one of them learned about a new stake.
+    //
+    // The <option> list is rewritten rather than patched: mirroring how the dot
+    // context selector is rebuilt, and the current choice is restored afterwards so
+    // re-pricing on every keystroke never moves the golfer's selection.
+    function syncSetupNassauAutoPressLabel() {
+        const sel = document.getElementById('setup-nassau-autopress-mode');
+        const hint = document.getElementById('setup-nassau-autopress-hint');
+        if (!sel || typeof nassauAutoPressLabel !== 'function') return;
+        const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+        const out = nassauAutoPressLabel({
+            front: v('setup-nassau-front'),
+            back: v('setup-nassau-back'),
+            overall: v('setup-nassau-overall'),
+        });
+        const keep = sel.value;
+        sel.innerHTML = '<option value="same">' + out.option + '</option>'
+            + '<option value="custom">Custom Amount</option>';
+        sel.value = keep || 'same';
+        // The sub-line explains the "same" amounts, so it has nothing to say once a
+        // custom amount is in force - that number is already in the input below.
+        if (hint) {
+            const show = sel.value !== 'custom' && !!out.hint;
+            hint.textContent = show ? out.hint : '';
+            hint.style.display = show ? 'block' : 'none';
+        }
     }
 
     // TWO PLAYERS IS OBVIOUS; MORE IS A CHOICE.

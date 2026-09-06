@@ -436,15 +436,15 @@ html {
                 <div class="sm-nassau-stakes">
                     <div>
                         <label>Front 9</label>
-                        <input type="number" id="sm-front-stake" value="20" min="0" inputmode="numeric">
+                        <input type="number" id="sm-front-stake" value="20" min="0" inputmode="numeric" oninput="syncSmAutoPressLabel()">
                     </div>
                     <div>
                         <label>Back 9</label>
-                        <input type="number" id="sm-back-stake" value="20" min="0" inputmode="numeric">
+                        <input type="number" id="sm-back-stake" value="20" min="0" inputmode="numeric" oninput="syncSmAutoPressLabel()">
                     </div>
                     <div>
                         <label>Overall 18</label>
-                        <input type="number" id="sm-overall-stake" value="20" min="0" inputmode="numeric">
+                        <input type="number" id="sm-overall-stake" value="20" min="0" inputmode="numeric" oninput="syncSmAutoPressLabel()">
                     </div>
                 </div>
             </div>
@@ -464,10 +464,14 @@ html {
                  automatic ones. -->
             <div id="sm-autopress-group" style="display:none; margin-top:8px;">
                 <label style="font-size:0.75rem;">Auto Press Amount</label>
+                <!-- The "same" option is PRICED AT RENDER TIME by nassauAutoPressLabel()
+                     in action-model.js - the same builder the setup wizard uses. It ships
+                     unpriced so the markup holds no second copy of the sentence. -->
                 <select id="sm-autopress-mode" onchange="toggleSmAutoPressAmount()">
                     <option value="same">Same as Segment</option>
                     <option value="custom">Custom Amount</option>
                 </select>
+                <div id="sm-autopress-hint" style="display:none; font-size:0.68rem; color:var(--text-muted); margin-top:4px; line-height:1.35;"></div>
                 <input type="number" id="sm-autopress-stake" value="" min="0" placeholder="$ per auto press" style="display:none; margin-top:6px;">
             </div>
         </div>
@@ -1321,6 +1325,10 @@ html {
         ['sm-front-stake','sm-back-stake','sm-overall-stake'].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = value;
         });
+        // A programmatic .value assignment fires no oninput, so the priced auto-press
+        // label has to be refreshed by hand or a preset would leave it showing the
+        // amounts the golfer just replaced.
+        syncSmAutoPressLabel();
         document.querySelectorAll('#sm-stake-presets .preset-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
     }
@@ -1344,6 +1352,35 @@ html {
         const mode = document.getElementById('sm-autopress-mode');
         const amt = document.getElementById('sm-autopress-stake');
         if (mode && amt) amt.style.display = mode.value === 'custom' ? 'block' : 'none';
+        syncSmAutoPressLabel();
+    }
+
+    // WHAT A PRESS WILL COST, IN THE OPTION ITSELF. The twin of
+    // syncSetupNassauAutoPressLabel() in admin.html: same control, same builder,
+    // and deliberately no second copy of the sentence - nassauAutoPressLabel() in
+    // action-model.js owns the wording for both entry points.
+    //
+    // The <option> list is rewritten rather than patched, and the current choice is
+    // restored, so re-pricing on every keystroke never moves the selection.
+    function syncSmAutoPressLabel() {
+        const sel = document.getElementById('sm-autopress-mode');
+        const hint = document.getElementById('sm-autopress-hint');
+        if (!sel || typeof nassauAutoPressLabel !== 'function') return;
+        const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+        const out = nassauAutoPressLabel({
+            front: v('sm-front-stake'),
+            back: v('sm-back-stake'),
+            overall: v('sm-overall-stake'),
+        });
+        const keep = sel.value;
+        sel.innerHTML = '<option value="same">' + out.option + '</option>'
+            + '<option value="custom">Custom Amount</option>';
+        sel.value = keep || 'same';
+        if (hint) {
+            const show = sel.value !== 'custom' && !!out.hint;
+            hint.textContent = show ? out.hint : '';
+            hint.style.display = show ? 'block' : 'none';
+        }
     }
 
     function onSideMatchFormatChange() {
