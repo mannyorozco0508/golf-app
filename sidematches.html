@@ -2980,6 +2980,32 @@ html {
         renderRyderCupSetup();
     }
 
+    // ONE BADGE, TWO QUESTIONS - and it used to answer both in the same shape.
+    //
+    //   "1 matches"  was the session's CAPACITY: how many it SEATS for the sides
+    //                as assigned. It says nothing about what you have created.
+    //   "1 set"      was a count of lineups that exist.
+    //
+    // On a four-golfer Cup every pairs session seats exactly one match, so the
+    // whole schedule read "1 matches" the moment the sides were picked - and that
+    // reads exactly like a count of matches that exist. Setting one lineup then
+    // looked like it had written pairings into every session. It never had:
+    // rcSeedSession filters on the session it was tapped for and touches nothing
+    // else. The screen was answering "how many does this seat" in the words of
+    // "how many have you made", and it was reported from a real device as a
+    // fan-out bug because that is the only honest way to read it.
+    //
+    // Capacity now says "seats". A lineup says "lineup set". Neither can be read
+    // as the other, and both count in English.
+    function rcSessionBadge(setCount, capacity) {
+        if (setCount > 0) {
+            return setCount + (setCount === 1 ? ' lineup set' : ' lineups set');
+        }
+        // A number is the wrong answer when there is nothing to count.
+        if (capacity <= 0) return 'seats no matches';
+        return 'seats ' + capacity + (capacity === 1 ? ' match' : ' matches');
+    }
+
     function rcSessionScheduleHtml() {
         if (!rcDraft || !rcDraft.sessions) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -3017,7 +3043,7 @@ html {
                 const set = (rcDraft.matches || []).filter(m => (m.sessionId || 's1') === s.id).length;
                 html += '<details class="rcs-sess' + (playable ? '' : ' off') + '">'
                     + '<summary>' + esc(RYDER_SESSION_FORMATS[s.format] || s.format)
-                    + ' <span class="rcs-cap">' + (set > 0 ? set + ' set' : n + ' matches')
+                    + ' <span class="rcs-cap">' + rcSessionBadge(set, n)
                     + '</span></summary>'
                     + (s.format === 'foursomes'
                         ? '<div class="rcs-hint">Alternate Shot \u2014 one ball per side. '

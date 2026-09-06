@@ -245,7 +245,14 @@
 // or duplicates. action-model.js carries the shared normaliser, so both files in
 // the shell list changed. An installed PWA on v62 would resolve a Cup onto whoever
 // happened to line up positionally, and silently swap the two sides.
-const CACHE_VERSION = 'golfapp-v63-cross-round-identity';
+// Moved to v64: the session badge on the Classic schedule stops answering two
+// questions in one shape. "1 matches" was CAPACITY - how many a session seats -
+// and read exactly like a count of lineups created, so on a four-golfer Cup every
+// session showed it and setting one lineup looked like it had written pairings
+// into all five. It never had. Capacity now says "seats 1 match"; a created
+// lineup says "1 lineup set". An installed PWA on v63 keeps the label that
+// caused a real organizer to report a fan-out bug that was not happening.
+const CACHE_VERSION = 'golfapp-v64-session-badge';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
