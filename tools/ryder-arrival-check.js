@@ -165,6 +165,18 @@ const PROBE_SCHEDULE = `
   out.seededSecond = click(byOnclick(/rcSeedSession\\(/)[1]);
   out.afterSecond = badges();
 
+  // 5. THE FREE-FORM ADDER, which produced "- vs -" on a real device. On a
+  //    scheduled Cup there must be no button to press at all: it filed matches
+  //    into 's1', a session the Classic schedule does not contain, so anything it
+  //    made was invisible in every badge and never scored. Counted here on the
+  //    rendered DOM rather than the source, because the question is what an
+  //    organizer can actually tap.
+  out.adderButtons = byOnclick(/rcAddMatch\\(/).length;
+  const rows = () => Array.from(mount.querySelectorAll('.rcs-mrow'))
+      .map(el => (el.textContent || '').trim());
+  out.matchRows = rows();
+  out.blankRows = out.matchRows.filter(t => t === '' || t === '\\u2014').length;
+
   const problems = [];
   if (!out.classicClicked) problems.push('no Classic preset button to press');
   if (out.chipsClicked !== 4) problems.push('only ' + out.chipsClicked + ' of 4 side chips responded');
@@ -195,6 +207,13 @@ const PROBE_SCHEDULE = `
       problems.push('the second lineup did not take - it reads "' + out.afterSecond[1] + '"');
   if (JSON.stringify(out.afterSecond.slice(2)) !== JSON.stringify(out.beforeSeeding.slice(2)))
       problems.push('two lineups disturbed the sessions nobody touched');
+
+  if (out.adderButtons > 0)
+      problems.push(out.adderButtons + ' free-form add-match buttons on a SCHEDULED Cup - '
+                  + 'they file into a session the schedule does not contain');
+  if (out.blankRows > 0)
+      problems.push(out.blankRows + ' empty pairings are on screen: '
+                  + JSON.stringify(out.matchRows));
 
   out.problems = problems;
   out.verdict = problems.length ? 'FAIL' : 'PASS';

@@ -252,7 +252,15 @@
 // into all five. It never had. Capacity now says "seats 1 match"; a created
 // lineup says "1 lineup set". An installed PWA on v63 keeps the label that
 // caused a real organizer to report a fan-out bug that was not happening.
-const CACHE_VERSION = 'golfapp-v64-session-badge';
+// Moved to v65: the free-form "+ Four-Ball" / "+ Singles" adder stops creating
+// matches nobody can use. It pushed a pairing whether or not it found anybody, so
+// once every assigned golfer was already playing it could only produce "- vs -";
+// and it filed into session 's1', which the Classic schedule does not contain, so
+// even a FILLED match added that way belonged to no session - invisible in every
+// badge and never scored. The row is no longer rendered where a schedule exists,
+// and the handler refuses instead of pushing a blank. An installed PWA on v64
+// keeps two buttons that can only block its own Save.
+const CACHE_VERSION = 'golfapp-v65-add-match-guard';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

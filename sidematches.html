@@ -2865,6 +2865,12 @@ html {
             currentData.scores || {}, m).locked;
     }
 
+    // Does this Cup have a schedule? The Classic preset writes one; a custom Cup
+    // has none, and everything it holds lives in the single default session.
+    function rcHasSchedule() {
+        return !!(rcDraft && rcDraft.sessions && Object.keys(rcDraft.sessions).length);
+    }
+
     function renderRyderCupSetup() {
         const mount = document.getElementById('ryder-cup-setup');
         if (!mount) return;
@@ -2937,11 +2943,20 @@ html {
                 + '</div>';
         });
 
-        html += '<div class="rcs-addrow">'
-            + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'fourball\')">+ Four-Ball</button>'
-            + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'singles\')">+ Singles</button>'
-            + '</div>'
-            + '<div id="rc-problems" class="rcs-problems"></div>'
+        // A SCHEDULED CUP MAKES ITS MATCHES PER SESSION, so this row is not
+        // offered there. rcAddMatch files into RYDER_DEFAULT_SESSION - 's1' - which
+        // the Classic schedule (d1s1, d1s2, d2s1, d2s2, d3s1) does not contain, so
+        // anything it created belonged to no session: absent from every session
+        // badge and never scored. Set Lineup on the session is the control that
+        // works. A custom Cup has no schedule, 's1' is the only session it has, and
+        // the row is the only way to make a match there - so it stays.
+        if (!rcHasSchedule()) {
+            html += '<div class="rcs-addrow">'
+                + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'fourball\')">+ Four-Ball</button>'
+                + '<button type="button" class="rcs-add" onclick="rcAddMatch(\'singles\')">+ Singles</button>'
+                + '</div>';
+        }
+        html += '<div id="rc-problems" class="rcs-problems"></div>'
             + '<button type="button" class="rcs-save" onclick="rcSave()">Save Ryder Cup</button>';
         if (exists) html += '<button type="button" class="rcs-remove" onclick="rcRemove()">Remove Cup</button>';
         html += '</div>';
@@ -3132,6 +3147,15 @@ html {
     // authority on whether the result is legal.
     function rcAddMatch(format) {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
+        // The row above is not rendered on a scheduled Cup, but this is a global on
+        // the page. Anything that still reaches it must not file into a session the
+        // schedule has never heard of.
+        if (rcHasSchedule()) {
+            rcShowProblems([{ type: 'scheduled-cup',
+                message: 'This Cup has a schedule \u2014 use Set Lineup on the '
+                    + 'session you want to pair.' }]);
+            return;
+        }
         const need = format === 'singles' ? 1 : 2;
         const used = {};
         rcDraft.matches.forEach(m => (m.playersA || []).concat(m.playersB || [])
@@ -3139,11 +3163,27 @@ html {
         const free = side => rcPlayers()
             .filter(p => rcDraft.members[String(p.id)] === side && !used[String(p.id)])
             .slice(0, need).map(p => String(p.id));
+        const a = free('A'), b = free('B');
+        // NEVER PUSH A BLANK. free() hands back whatever it found, which is nothing
+        // at all once everyone assigned is already playing - and this pushed the
+        // match regardless, rendering "\u2014 vs \u2014". Save then refused with a
+        // roster-size error, so no blank ever reached Firebase, but the organizer
+        // was left with a blocked Save and a dead entry, and nothing on screen
+        // connected it to the button that made it. Say what is short instead.
+        if (a.length < need || b.length < need) {
+            rcShowProblems([{ type: 'not-enough-free',
+                message: rcFormatLabel(format) + ' needs ' + need + ' free golfer'
+                    + (need === 1 ? '' : 's') + ' a side. Side A has ' + a.length
+                    + ', side B has ' + b.length
+                    + ' \u2014 everyone else is already in a match.' }]);
+            return;
+        }
+        rcShowProblems([]);
         rcDraft.matches.push({
             id: 'm' + (rcDraft.matches.length + 1),
             sessionId: (typeof RYDER_DEFAULT_SESSION === 'string') ? RYDER_DEFAULT_SESSION : 's1',
             format: format, scoring: 'net', sideA: 'A', sideB: 'B',
-            playersA: free('A'), playersB: free('B')
+            playersA: a, playersB: b
         });
         renderRyderCupSetup();
     }
