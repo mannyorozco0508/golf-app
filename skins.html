@@ -120,6 +120,11 @@
            closing is handled by a real listener in JS instead, which can actually close
            the menu rather than merely block it. */
 
+        /* Reached FROM somewhere - the scorecard, Game Day, a shared link - so it
+           needs a way back to it. The nav bar lists destinations, not a return. */
+        .back-btn { display: inline-block; margin-bottom: 10px; color: var(--brand-navy);
+            font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer;
+            min-height: 44px; display: inline-flex; align-items: center; }
         .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
         
@@ -205,6 +210,8 @@ html {
     <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
         Looking for a private bet between specific players (even across groups)? That's on <a href="sidematches.html" class="nav-link" style="color: var(--brand-navy); font-weight: bold;">⚔️ Matches</a> instead.
     </div>
+
+    <a class="back-btn" onclick="goBack()">← Back</a>
 
     <h2 class="event-title" id="main-title">💰 Skins Tracker</h2>
 
@@ -303,6 +310,19 @@ html {
             document.documentElement.classList.add('dark-mode');
         }
     })();
+
+
+    // Back to wherever this page was opened from. history.back() alone is a dead
+    // end on a cold link or a bookmark - there is nothing behind it, or what is
+    // behind it is outside the app - so the referrer decides, exactly as
+    // instructions.html has always done it.
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
+    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');

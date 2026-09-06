@@ -134,16 +134,13 @@
            closing is handled by a real listener in JS instead, which can actually close
            the menu rather than merely block it. */
 
+        /* Reached FROM somewhere - the scorecard, Game Day, a shared link - so it
+           needs a way back to it. The nav bar lists destinations, not a return. */
+        .back-btn { display: inline-block; margin-bottom: 10px; color: var(--brand-navy);
+            font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer;
+            min-height: 44px; display: inline-flex; align-items: center; }
         .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
-        /* The collapsed side-action block reads as the heading it replaces. */
-        #sm-block-summary { color: var(--brand-green); text-align: center; text-transform: uppercase;
-            font-size: 1rem; font-weight: bold; cursor: pointer; list-style: none;
-            padding: 2px 0; min-height: 44px; display: flex; align-items: center;
-            justify-content: center; gap: 6px; }
-        #sm-block-summary::-webkit-details-marker { display: none; }
-        #sm-block-summary::after { content: '\25BE'; font-size: 0.8rem; }
-        #sm-block:not([open]) #sm-block-summary::after { content: '\25B8'; }
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
         /* THREE STAKES NEED THE WHOLE ROW.
@@ -342,6 +339,8 @@ html {
     </details>
     </div>
 
+    <a class="back-btn" onclick="goBack()">← Back</a>
+
     <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
         Looking for group-wide games like Skins, Birdie Game, or KPs? That's on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a> instead.
     </div>
@@ -357,20 +356,15 @@ html {
     <div id="ryder-cup-setup"></div>
 
     <div class="action-card" id="sidematches-card">
-        <!-- COLLAPSIBLE, and only on arrival. Side action is what players add AFTER
-             teams exist, so on ?setup=ryder this starts shut and one tap opens it.
-             An ordinary visit to Matches renders it open exactly as before. -->
-        <details id="sm-block" open ontoggle="smRememberBlockState()">
-            <summary id="sm-block-summary">⚔️ Side Matches (Cross-Group)</summary>
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px; margin-top:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
-            <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
-            <div id="sidematches-list"></div>
-            <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
-            <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
+        <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
+        <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
+        <div id="sidematches-list"></div>
+        <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
+        <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
             <!-- Was window.print(), which printed this page's own side-match maths as if it were
                  an authoritative payout. There is ONE settlement document, and this opens it. -->
-            <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
-        </details>
+        <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
     </div>
 </div>
 
@@ -717,6 +711,19 @@ html {
             document.documentElement.classList.add('dark-mode');
         }
     })();
+
+
+    // Back to wherever this page was opened from. history.back() alone is a dead
+    // end on a cold link or a bookmark - there is nothing behind it, or what is
+    // behind it is outside the app - so the referrer decides, exactly as
+    // instructions.html has always done it.
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
+    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');
@@ -2763,52 +2770,26 @@ html {
     // No scroll. The Cup was already above the fold before this change - the
     // previous scrollIntoView was close to a no-op, because the problem was never
     // where the scroll landed but what surrounded the thing it scrolled to.
-    function smBlockKey() { return 'sm-block-open:' + String(currentMode || ''); }
-
-    // NOT EVERY TOGGLE IS A CHOICE. Chrome fires `toggle` for a <details> that is
-    // open in the MARKUP, at parse time, before any of this runs - and the arrival
-    // below toggles the block itself. Neither is the organizer deciding anything.
-    // Persisting those wrote 'true' on load, which the arrival then read back as a
-    // remembered preference and dutifully left the block open. Only once the
-    // arrival has settled does a toggle mean somebody tapped it.
+    // WHAT AN ORGANIZER SENT HERE BY GAME DAY SHOULD LAND ON.
     //
-    // Found by arriving cold in a real browser; mini-dom fires no toggle on parse,
-    // so every in-harness test of this passed while it was broken.
-    let smBlockReady = false;
-
-    function smWriteBlockState(open) {
-        try { sessionStorage.setItem(smBlockKey(), open ? 'true' : 'false'); }
-        catch (e) { /* private browsing - the default still applies */ }
-    }
-
-    function smSetBlockOpen(open) {
-        const d = document.getElementById('sm-block');
-        if (d) d.open = !!open;
-        smWriteBlockState(!!open);
-    }
-
-    // THE PARAM STAYS IN THE URL. Without remembering the choice, every reload
-    // would re-collapse a block the organizer had deliberately opened. Per round,
-    // and only for this tab - it is a view preference, not round data.
-    function smRememberBlockState() {
-        if (!smBlockReady) return;
-        const d = document.getElementById('sm-block');
-        if (d) smWriteBlockState(d.open);
-    }
-
+    // The Cup, and nothing else. Side action is what players add once teams exist,
+    // and it already lives in the More tab; on this arrival the side-matches card
+    // is not on the screen at all.
+    //
+    // v61 collapsed it behind a summary instead, which still left a heading, a
+    // chevron and a tap target for something nobody arriving to build a Cup wants -
+    // plus stored state, and a guard to stop a parse-time <details> toggle
+    // poisoning that state. All of it went with the collapse.
+    //
+    // No scroll either. The Cup renders above the card it replaces, so there has
+    // never been anything to scroll to.
     function smApplyRyderArrival() {
         if (urlParams.get('setup') !== 'ryder') return;
         if (window.__smRyderHandoff) return;
         if (!isOrganizerView() || !(currentData.players || []).length) return;
         window.__smRyderHandoff = true;
-        const d = document.getElementById('sm-block');
-        if (!d) return;
-        let stored = null;
-        try { stored = sessionStorage.getItem(smBlockKey()); } catch (e) { stored = null; }
-        d.open = (stored === 'true');
-        smWriteBlockState(d.open);
-        // From here a toggle is a tap, so it is worth remembering.
-        smBlockReady = true;
+        const card = document.getElementById('sidematches-card');
+        if (card) card.style.display = 'none';
     }
 
     function rcRefresh() { if (!rcDraft || !rcDraft.__open) rcDraft = null; renderRyderCupSetup(); }

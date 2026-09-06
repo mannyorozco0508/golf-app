@@ -34,7 +34,6 @@ const PROBE = `
   const out = {};
   const cupMount = document.getElementById('ryder-cup-setup');
   const card = document.getElementById('sidematches-card');
-  const block = document.getElementById('sm-block');
   const y = el => el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null;
 
   // 1. The Cup must render WITHOUT anyone invoking it.
@@ -48,10 +47,12 @@ const PROBE = `
   out.cupAboveSideCard = (out.cupTopPx !== null && out.sideCardTopPx !== null)
       && out.cupTopPx < out.sideCardTopPx;
 
-  // 3. Side action collapses on this arrival, and the old banner is gone.
-  out.sideBlockOpen = block ? block.open : null;
+  // 3. Side action is REMOVED from this arrival - not collapsed - and the old
+  //    banner is gone. A collapsed block still puts side betting on the screen.
+  out.sideCardVisible = !!(card && card.getClientRects().length > 0
+      && card.getBoundingClientRect().height > 0);
   out.oldBannerPresent = !!document.getElementById('ryder-handoff-banner');
-  out.storedBlockState = sessionStorage.getItem('sm-block-open:ARRIVE');
+  out.collapseMachineryPresent = !!document.getElementById('sm-block');
 
   // 4. The handoff sentence lives in the Cup card now.
   out.handoffCopyInCard = !!(cupMount && /Round created/.test(cupMount.innerHTML));
@@ -64,13 +65,16 @@ const PROBE = `
   if (!out.cupRendered) problems.push('the Cup did not render - nothing on the page invokes it');
   if (!out.cupVisible) problems.push('the Cup rendered but has no geometry');
   if (out.cupInsideSideCard) problems.push('the Cup is nested inside the side-betting card');
-  if (!out.cupAboveSideCard) problems.push('the Cup renders below the side-betting card');
-  if (out.sideBlockOpen !== false) problems.push('side action did not collapse on arrival');
+  // Only meaningful while the card is on screen. Hidden, its rect is all zeros,
+  // and "above it" compares against nothing - the guarantee on this arrival is
+  // that the card is not there at all, which is asserted separately.
+  if (out.sideCardVisible && !out.cupAboveSideCard)
+      problems.push('the Cup renders below the side-betting card');
+  if (out.sideCardVisible) problems.push('side betting is on the Cup arrival screen');
+  if (out.collapseMachineryPresent) problems.push('the v61 collapse block is still here');
   if (out.oldBannerPresent) problems.push('the old handoff banner is still in the markup');
   if (!out.handoffCopyInCard) problems.push('the handoff sentence was not folded into the card');
   if (!out.cupAboveTheFold) problems.push('the Cup is not on the first screen');
-  if (out.storedBlockState !== 'false')
-      problems.push('the collapsed state was not remembered (got ' + out.storedBlockState + ')');
 
   out.problems = problems;
   out.verdict = problems.length ? 'FAIL' : 'PASS';
@@ -81,16 +85,19 @@ const PROBE = `
 const PROBE_PLAIN = `
 (() => {
   const out = {};
-  const block = document.getElementById('sm-block');
   const cupMount = document.getElementById('ryder-cup-setup');
-  out.sideBlockOpen = block ? block.open : null;
+  out.sideCardVisible = !!(document.getElementById('sidematches-card')
+      && document.getElementById('sidematches-card').getClientRects().length > 0);
   out.cupRendered = !!(cupMount && cupMount.querySelector('.rcs-card'));
-  out.storedBlockState = sessionStorage.getItem('sm-block-open:ARRIVE');
   out.handoffCopyInCard = !!(cupMount && /Round created/.test(cupMount.innerHTML));
+  const y = el => el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null;
+  out.cupAboveSideCard = y(cupMount) !== null
+      && y(document.getElementById('sidematches-card')) !== null
+      && y(cupMount) < y(document.getElementById('sidematches-card'));
   const problems = [];
-  if (out.sideBlockOpen !== true) problems.push('an ordinary visit now hides the side action');
+  if (!out.sideCardVisible) problems.push('an ordinary visit now hides the side action');
   if (!out.cupRendered) problems.push('the Cup surface stopped rendering on an ordinary visit');
-  if (out.storedBlockState !== null) problems.push('an ordinary visit wrote view state');
+  if (!out.cupAboveSideCard) problems.push('the Cup renders below the side-betting card');
   if (out.handoffCopyInCard) problems.push('an ordinary visit claims the round was just created');
   out.problems = problems;
   out.verdict = problems.length ? 'FAIL' : 'PASS';

@@ -233,7 +233,12 @@
 // never rendered at all, because every render call sat inside a handler fired by
 // buttons that only exist inside the markup that render produces. An installed PWA
 // on v60 would keep serving a Matches page with no Cup on it.
-const CACHE_VERSION = 'golfapp-v61-cup-arrival';
+// Moved to v62: a back control on the two action-setup pages, and the side-matches
+// card is REMOVED from the Cup arrival rather than collapsed. v61 collapsed it,
+// which still put side betting on the screen of somebody sent to build a Cup;
+// the collapse machinery went with it. An installed PWA on v61 would keep
+// serving the collapsed version and both pages would still have no way back.
+const CACHE_VERSION = 'golfapp-v62-setup-nav';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

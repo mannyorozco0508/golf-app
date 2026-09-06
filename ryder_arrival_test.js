@@ -78,8 +78,13 @@ function arrive(opts) {
 
 const run = (sb, e) => vm.runInContext(e, sb);
 const cupHtml = sb => run(sb, 'document.getElementById("ryder-cup-setup").innerHTML');
-const blockOpen = sb => run(sb, '(function(){var d=document.getElementById("sm-block");'
-    + 'return d ? !!d.open : null;})()');
+// The side-matches card is REMOVED from this arrival, not collapsed. v61
+// collapsed it behind a summary; that still put side betting on the screen of
+// somebody sent here to build a Cup, so the block, its stored state and the
+// parse-time-toggle guard all went. setup_page_nav_test.js covers the removal of
+// that machinery; this file covers what the arrival looks like.
+const cardShown = sb => run(sb, '(function(){var c=document.getElementById("sidematches-card");'
+    + 'return c ? (c.style.display !== "none") : null;})()');
 
 describe('THE CUP IS NOT PART OF THE SIDE-MATCHES CARD', () => {
 
@@ -107,9 +112,9 @@ describe('THE CUP IS NOT PART OF THE SIDE-MATCHES CARD', () => {
 
 describe('ARRIVING WITH ?setup=ryder', () => {
 
-    test('the side-matches block collapses', () => {
-        assert.equal(blockOpen(arrive()), false,
-            'the organizer still lands on an open side-betting block');
+    test('the side-matches card is not on the screen at all', () => {
+        assert.equal(cardShown(arrive()), false,
+            'an organizer sent to build a Cup still lands on side betting');
     });
 
     test('the Cup setup is rendered and ready', () => {
@@ -117,44 +122,25 @@ describe('ARRIVING WITH ?setup=ryder', () => {
             'the Cup surface did not render on arrival');
     });
 
-    test('the collapse is remembered, so a reload does not undo the choice', () => {
-        const sb = arrive();
-        const stored = run(sb, 'sessionStorage.getItem("sm-block-open:ARRIVE")');
-        assert.equal(stored, 'false', 'nothing was remembered about the block');
-    });
-
-    test('opening the block is remembered too', () => {
-        const sb = arrive();
-        run(sb, 'smSetBlockOpen(true);');
-        assert.equal(blockOpen(sb), true);
-        assert.equal(run(sb, 'sessionStorage.getItem("sm-block-open:ARRIVE")'), 'true');
-    });
-
-    // The param stays in the URL. Without stored state, every reload would
-    // re-collapse a block the organizer had deliberately opened.
-    test('a remembered OPEN survives the next arrival', () => {
-        const sb = loadHtmlInlineScript('sidematches.html', DEPS,
-            { search: '?game=ARRIVE&setup=ryder' });
-        run(sb, 'sessionStorage.setItem("sm-block-open:ARRIVE", "true");');
-        run(sb, 'isOrganizerView = function(){ return true; };');
-        run(sb, 'currentData = ' + JSON.stringify({ players: P, courseData: CD, scores: {} }) + ';');
-        run(sb, 'smApplyRyderArrival();');
-        assert.equal(blockOpen(sb), true,
-            'a reload re-collapsed a block the organizer had opened');
-    });
+    // REMOVED WITH THE FEATURE. Three tests here guarded the remembered collapse
+    // state - that arriving stored 'false', that opening stored 'true', and that a
+    // stored 'true' survived the next arrival. The card is now simply absent on
+    // arrival and untouched otherwise, so there is no preference to remember and
+    // nothing for them to guard. setup_page_nav_test.js asserts that none of that
+    // machinery survived.
 });
 
 describe('WITHOUT THE PARAM NOTHING CHANGES', () => {
 
-    test('the side-matches block stays open', () => {
-        assert.equal(blockOpen(arrive({ setupParam: false })), true,
+    test('the side-matches card is shown as it always was', () => {
+        assert.equal(cardShown(arrive({ setupParam: false })), true,
             'an ordinary visit to Matches now hides the side action');
     });
 
-    test('nothing is written to sessionStorage', () => {
-        const sb = arrive({ setupParam: false });
-        assert.equal(run(sb, 'sessionStorage.getItem("sm-block-open:ARRIVE")'), null,
-            'an ordinary visit left state behind');
+    test('the Cup surface still renders on an ordinary visit', () => {
+        assert.match(run(arrive({ setupParam: false }),
+            'document.getElementById("ryder-cup-setup").innerHTML'), /Ryder Cup/,
+            'the Cup stopped rendering when the arrival stopped collapsing things');
     });
 
     // Read from the FILE, not from the harness: mini-dom never parses the page's
