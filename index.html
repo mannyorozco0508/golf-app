@@ -2136,6 +2136,34 @@ html {
         // comes first and the hole block stays whole: heading, players, boxes,
         // Prev/Next, uninterrupted.
         let html = '<div id="live-ticker-mount"></div>';
+
+        // THE MATCH-HANDICAP CONTEXT LINE, CLONED OUT OF THE FULL CARD.
+        //
+        // renderScorecard() builds this sentence into #match-hcp-note, which lives
+        // inside #full-card-container - display:none while Hole View is on screen.
+        // currentViewMode defaults to 'hole', so the one line that explains why
+        // Chris's cell reads a circled 3 AND a -1 was invisible in the only view
+        // golfers actually play from. The numbers were never wrong; the sentence
+        // that decodes them was in the other room.
+        //
+        // CLONED, NOT REBUILT, for the same reason the Bets row below is cloned:
+        // the sentence keeps ONE writer and one string, so a second copy cannot
+        // drift out of step with the dots it describes.
+        //
+        // THE GUARD IS EMPTINESS, not a mode name. The writer clears innerHTML and
+        // display together, so Course mode and the two-matches-share-a-golfer
+        // fallback both arrive here as "" - and neither leaves an empty
+        // teal-bordered bar or a reserved strip of height behind.
+        //
+        // WHERE IT SITS. Directly above the hole heading: next to the dots it
+        // explains, but still OUTSIDE the hole block. It is deliberately not placed
+        // between the heading and the score boxes, for the reason recorded below -
+        // anything inserted there stops "Hole 9" and a golfer's box from reading as
+        // one thing. It is appended after the ticker mount rather than before it so
+        // that mount stays exactly where it was.
+        const srcMatchNote = document.getElementById('match-hcp-note');
+        const matchNoteHtml = srcMatchNote ? srcMatchNote.innerHTML.trim() : '';
+        if (matchNoteHtml) html += `<div class="match-hcp-note hv-match-hcp-note">${matchNoteHtml}</div>`;
         html += `<div class="hole-view-header"><span class="hv-hole-num">Hole ${holeNum}</span><span class="hv-hole-meta">Par ${par} &bull; HCP ${hcp}</span></div>`;
 
         // DOTS / JUNK on the hole a golfer is actually standing on.
