@@ -428,7 +428,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // Additions only: buildNassauWagerPayload, the function that shapes the money,
         // is byte-for-byte unchanged, and nassau_autopress_label_test.js asserts its
         // behaviour rather than trusting this hash to notice.
-        'action-model.js': '5546899edf14caf7d3fb5b7ac516e78ec065007b8385a1a2c3034ececc572bd0',
+        'action-model.js': '034b008b00fbcc16614b91d0982a6d1bd3a3b329cb3f46ce3d9590faadfa15b0',
         'ryder-cup.js': '81cf2ea01752ec787792844ace37a802b562e9cdcb7174f4af3d4478c8f5328b',
         'bet-strip.js': '934c6a99291fc9848d107d2c877855aafd0758acfdcbb76842e44403006e290d',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',

@@ -689,8 +689,13 @@ function buildNassauWagerPayload(input) {
 // So this reports every amount that can actually be charged, and collapses to a
 // single number only when the three genuinely agree:
 //
-//     Same as Segment ($10)                 all three equal
-//     Same as Segment ($10 / $10 / $20)     any differ
+//     Same as each bet ($10)                three bets, one amount
+//     Same as each bet ($10 / $10 / $20)    three bets, different amounts
+//     Same as the bet ($10)                 a legacy round with a single bet
+//
+// "Segment" was jargon our golfers do not say. A Nassau is three bets, so "each"
+// is the accurate word at the tee; a legacy single-stake round has one, and there
+// "each" would be wrong.
 //
 // `hint` maps those bare numbers back to their segments, because "$10 / $10 /
 // $20" on its own does not say which is which.
@@ -700,7 +705,6 @@ function buildNassauWagerPayload(input) {
 // let a per-press stake reach the engine but not the pages.
 function nassauAutoPressLabel(input) {
     const i = input || {};
-    const BASE = 'Same as Segment';
 
     // Blank means "not set". ZERO DOES NOT: a skipped $0 bet is a real answer to
     // "what will a press cost me", and it must not fall through to the fallback.
@@ -716,6 +720,15 @@ function nassauAutoPressLabel(input) {
 
     const front = seg(i.front), back = seg(i.back), overall = seg(i.overall);
 
+    // THREE BETS, OR ONE. A Nassau is three separate wagers, so "each bet" is the
+    // accurate word even when the three amounts happen to agree - what decides the
+    // wording is the number of BETS, not the number of distinct numbers. A legacy
+    // round carries a single `stake` and no segments at all; there "each" would be
+    // plainly wrong.
+    const isNassau = !blank(i.front) || !blank(i.back) || !blank(i.overall);
+    const legacySingle = !isNassau && !blank(i.stake);
+    const BASE = legacySingle ? 'Same as the bet' : 'Same as each bet';
+
     // Nothing to report is reported as nothing. Inventing a number here would be
     // the same failure as naming Front 9's.
     if (front === undefined || back === undefined || overall === undefined) {
@@ -729,7 +742,7 @@ function nassauAutoPressLabel(input) {
         option: allSame
             ? BASE + ' (' + cash(front) + ')'
             : BASE + ' (' + cash(front) + ' / ' + cash(back) + ' / ' + cash(overall) + ')',
-        hint: 'Each press matches its own segment — Front 9 ' + cash(front)
+        hint: 'Each press matches its own bet — Front 9 ' + cash(front)
             + ' · Back 9 ' + cash(back) + ' · Total ' + cash(overall) + '.',
         amounts: [front, back, overall],
     };

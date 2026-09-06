@@ -203,7 +203,11 @@
 // on v54 would keep serving the version that shows the bare "Same as Segment"
 // fallback to anyone who accepts the default 10/10/20 stakes - which is most of
 // them, and is why v54 looked fine in a browser tab and broken on a phone.
-const CACHE_VERSION = 'golfapp-v55-autopress-on-reveal';
+// Moved to v56: the Auto Press option no longer says "Segment" anywhere a golfer
+// reads it - the priced option, the collapsed single-bet form, the sub-line and the
+// pre-script fallback in both pages all say "bet" now. An installed PWA on v55 would
+// keep serving the jargon this change exists to remove.
+const CACHE_VERSION = 'golfapp-v56-auto-press-says-bet';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

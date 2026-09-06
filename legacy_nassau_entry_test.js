@@ -264,7 +264,7 @@ describe('THE MODERN FORM — Action → Add Wager → Nassau', () => {
         assert.equal(f.shown('sm-autopress-group'), 'block');
         const src = read('sidematches.html');
         assert.match(src, /<option value="2down">Auto @ 2 Down<\/option>/);
-        assert.match(src, /<option value="same">Same as Segment<\/option>/);
+        assert.match(src, /<option value="same">Same as each bet<\/option>/);
         assert.match(src, /<option value="custom">Custom Amount<\/option>/);
     });
 

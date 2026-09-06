@@ -1,9 +1,9 @@
 // ============================================================================
-// "SAME AS SEGMENT" NOW SAYS WHAT IT COSTS
+// THE AUTO PRESS OPTION SAYS WHAT IT COSTS, IN WORDS GOLFERS USE
 //
-// The Auto Press Amount dropdown offered "Same as Segment", and nobody could tell
-// what that meant - "Segment" is undefined jargon, and it is SINGULAR while a
-// Nassau has three. The request was to show the money instead: "$10 (same as
+// The dropdown offered "Same as Segment", and nobody could tell what that meant.
+// "Segment" is undefined jargon our golfers do not say, and it is SINGULAR while
+// a Nassau has three. The request was to show the money instead: "$10 (same as
 // Front 9)".
 //
 // THAT EXACT WORDING WOULD BE WRONG, and the wizard's own defaults prove it.
@@ -18,11 +18,23 @@
 // So the label carries every amount it will actually use, and collapses to one
 // number only when the three genuinely agree.
 //
-//     all three equal   ->  Same as Segment ($10)
-//     any differ        ->  Same as Segment ($10 / $10 / $20)
+//     three bets, one amount     ->  Same as each bet ($10)
+//     three bets, different      ->  Same as each bet ($10 / $10 / $20)
+//     a legacy round, one bet    ->  Same as the bet ($10)
 //
-// with a sub-line that maps the bare numbers back to their segments, because
+// with a sub-line that maps the bare numbers back to their bets, because
 // "$10 / $10 / $20" alone does not say which is which.
+//
+// "EACH" TRACKS THE BET COUNT, NOT THE NUMBERS. A Nassau is three separate
+// wagers, so "each bet" stays right even when all three amounts agree. Only a
+// legacy round - a single `stake`, no segments at all - is one bet, and there
+// "each" would be wrong.
+//
+// THE WORD "SEGMENT" IS GONE from everything a golfer reads - the priced option,
+// the collapsed single-stake form, the sub-line, and the unpriced pre-script
+// fallback in both pages. It survives only in code: internal ids like sm-segment,
+// payload.segment, and the engine's own segments array, none of which reach a
+// screen.
 //
 // ONE BUILDER, TWO ENTRY POINTS - the rule this file exists to hold. The wizard
 // (admin.html) and the side-match form (sidematches.html) both render this
@@ -55,19 +67,19 @@ describe('THE SHARED BUILDER — what the label says', () => {
 
     test('three equal stakes collapse to one number', () => {
         assert.equal(label({ front: 10, back: 10, overall: 10 }).option,
-            'Same as Segment ($10)');
+            'Same as each bet ($10)');
     });
 
     // The wizard ships with exactly these numbers, so this is the DEFAULT state of
     // the control - the one a golfer sees before touching anything.
     test('the wizard defaults show all three, because they differ', () => {
         assert.equal(label({ front: 10, back: 10, overall: 20 }).option,
-            'Same as Segment ($10 / $10 / $20)');
+            'Same as each bet ($10 / $10 / $20)');
     });
 
     test('the order is Front, Back, Total — not sorted, not deduped', () => {
         assert.equal(label({ front: 5, back: 50, overall: 20 }).option,
-            'Same as Segment ($5 / $50 / $20)');
+            'Same as each bet ($5 / $50 / $20)');
     });
 
     test('the sub-line maps each number back to its segment', () => {
@@ -75,47 +87,47 @@ describe('THE SHARED BUILDER — what the label says', () => {
         assert.match(out.hint, /Front 9 \$10/);
         assert.match(out.hint, /Back 9 \$10/);
         assert.match(out.hint, /Total \$20/);
-        assert.match(out.hint, /each press matches its own segment/i);
+        assert.match(out.hint, /each press matches its own bet/i);
     });
 
     // A skipped bet is still a real answer to "what will a press cost me".
     test('a $0 segment is shown, never omitted', () => {
         const out = label({ front: 0, back: 10, overall: 20 });
-        assert.equal(out.option, 'Same as Segment ($0 / $10 / $20)');
+        assert.equal(out.option, 'Same as each bet ($0 / $10 / $20)');
         assert.match(out.hint, /Front 9 \$0/);
     });
 
     test('all-zero collapses like any other equal trio', () => {
         assert.equal(label({ front: 0, back: 0, overall: 0 }).option,
-            'Same as Segment ($0)');
+            'Same as each bet ($0)');
     });
 
     test('a $0 segment does not silently become the fallback', () => {
         // 0 is a real value, not "blank" - it must not fall through to `stake`.
         assert.equal(label({ front: 0, back: 0, overall: 0, stake: 25 }).option,
-            'Same as Segment ($0)');
+            'Same as each bet ($0)');
     });
 
     test('legacy single-stake rounds read as one number', () => {
-        assert.equal(label({ stake: 10 }).option, 'Same as Segment ($10)');
+        assert.equal(label({ stake: 10 }).option, 'Same as the bet ($10)');
     });
 
     // Mirrors baseStakeFor in money-engine.js: a blank segment falls back to the
     // legacy single stake, and that fallback is what the golfer is actually charged.
     test('a blank segment falls back to the legacy stake, as the engine does', () => {
         assert.equal(label({ front: 10, back: '', overall: 20, stake: 7 }).option,
-            'Same as Segment ($10 / $7 / $20)');
+            'Same as each bet ($10 / $7 / $20)');
     });
 
     test('with nothing to report it claims no number at all', () => {
         const out = label({});
-        assert.equal(out.option, 'Same as Segment');
+        assert.equal(out.option, 'Same as each bet');
         assert.equal(out.hint, '');
     });
 
     test('a half-dollar stake is not rounded away', () => {
         assert.equal(label({ front: 12.5, back: 12.5, overall: 12.5 }).option,
-            'Same as Segment ($12.50)');
+            'Same as each bet ($12.50)');
     });
 
     test('the builder is pure — no DOM, no database', () => {
@@ -170,7 +182,7 @@ describe('THE AMOUNTS ARE THE ONES THE ENGINE WILL CHARGE', () => {
         const cfg = { front: 5, back: 50, overall: 20 };
         const eng = enginePressStakes(cfg);
         assert.deepEqual(label(cfg).amounts, [eng.F9[0], eng.B9[0], eng['18'][0]]);
-        assert.equal(label(cfg).option, 'Same as Segment ($5 / $50 / $20)');
+        assert.equal(label(cfg).option, 'Same as each bet ($5 / $50 / $20)');
     });
 
     test('one press on one hole really can cost two different amounts', () => {
@@ -192,7 +204,7 @@ describe('ONE BUILDER, TWO ENTRY POINTS', () => {
         assert.equal(typeof AM.nassauAutoPressLabel, 'function');
     });
 
-    // The markup keeps an UNPRICED "Same as Segment" so the control is never an empty
+    // The markup keeps an UNPRICED "Same as each bet" so the control is never an empty
     // dropdown before the sync runs - progressive enhancement, not a second copy. What
     // must never appear in a page is a priced sentence, because THAT is the string that
     // drifts. Asserted directly below as well as here.
@@ -201,7 +213,7 @@ describe('ONE BUILDER, TWO ENTRY POINTS', () => {
             const src = read(f);
             const opt = /<option value="same">([^<]*)<\/option>/.exec(src);
             assert.ok(opt, f + ' lost its fallback option entirely');
-            assert.equal(opt[1], 'Same as Segment',
+            assert.equal(opt[1], 'Same as each bet',
                 f + ' hard-codes a priced label instead of letting the builder price it');
             assert.ok(!/\$/.test(opt[1]), f + ' bakes a dollar amount into static markup');
         });
@@ -216,7 +228,7 @@ describe('ONE BUILDER, TWO ENTRY POINTS', () => {
     test('neither page builds the sentence by hand', () => {
         ['admin.html', 'sidematches.html'].forEach(f => {
             const src = read(f);
-            assert.ok(!/Same as Segment \(\$/.test(src),
+            assert.ok(!/Same as each bet \(\$/.test(src),
                 f + ' composes the priced label itself - that is the copy that drifts');
         });
     });
@@ -243,12 +255,12 @@ describe('THE WIZARD — admin.html, driven for real', () => {
     }
 
     test('the option carries the wizard’s own default stakes', () => {
-        assert.match(wizard(10, 10, 20).select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/);
+        assert.match(wizard(10, 10, 20).select, /Same as each bet \(\$10 \/ \$10 \/ \$20\)/);
     });
 
     test('editing a stake re-prices the option', () => {
-        assert.match(wizard(5, 5, 5).select, /Same as Segment \(\$5\)/);
-        assert.match(wizard(1, 2, 3).select, /Same as Segment \(\$1 \/ \$2 \/ \$3\)/);
+        assert.match(wizard(5, 5, 5).select, /Same as each bet \(\$5\)/);
+        assert.match(wizard(1, 2, 3).select, /Same as each bet \(\$1 \/ \$2 \/ \$3\)/);
     });
 
     test('the Custom Amount option survives the rebuild', () => {
@@ -312,12 +324,12 @@ describe('THE SIDE-MATCH FORM — sidematches.html, driven for real', () => {
     }
 
     test('it prices the option from the form’s own stakes', () => {
-        assert.match(form(10, 10, 20).select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/);
-        assert.match(form(5, 5, 5).select, /Same as Segment \(\$5\)/);
+        assert.match(form(10, 10, 20).select, /Same as each bet \(\$10 \/ \$10 \/ \$20\)/);
+        assert.match(form(5, 5, 5).select, /Same as each bet \(\$5\)/);
     });
 
     test('a $0 segment is visible here too', () => {
-        assert.match(form(0, 10, 20).select, /Same as Segment \(\$0 \/ \$10 \/ \$20\)/);
+        assert.match(form(0, 10, 20).select, /Same as each bet \(\$0 \/ \$10 \/ \$20\)/);
     });
 
     test('the sub-line names the segments', () => {
@@ -383,7 +395,7 @@ describe('THE MONEY CONTRACT DID NOT MOVE', () => {
 //
 // The label shipped correct and invisible. nassauAutoPressLabel() built the right
 // sentence, both pages rendered it faithfully, 37 tests passed - and a golfer who
-// opened the wizard saw "Same as Segment" with no amounts, because nothing called
+// opened the wizard saw "Same as each bet" with no amounts, because nothing called
 // the sync until a stake field was edited. The defaults are 10/10/20, which is
 // already what most groups want, so most golfers never fired an oninput and never
 // saw a price at all.
@@ -426,7 +438,7 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
 
     test('opening the wizard to Nassau shows the amounts, untouched', () => {
         const w = openWizard(10, 10, 20);
-        assert.match(w.select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/,
+        assert.match(w.select, /Same as each bet \(\$10 \/ \$10 \/ \$20\)/,
             'the golfer opened the panel and got the unpriced fallback - the label ' +
             'only ever appears for someone who edits a stake they did not need to edit');
     });
@@ -436,7 +448,7 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
     });
 
     test('it collapses correctly on open when the stakes agree', () => {
-        assert.match(openWizard(5, 5, 5).select, /Same as Segment \(\$5\)/);
+        assert.match(openWizard(5, 5, 5).select, /Same as each bet \(\$5\)/);
     });
 
     // The side-match form: choose Nassau. That reveal is what makes the control
@@ -462,7 +474,7 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
     test('choosing Nassau reveals a control that is already priced', () => {
         const f = openSideMatch(10, 10, 20);
         assert.equal(f.groupShown, 'block', 'the control did not even appear');
-        assert.match(f.select, /Same as Segment \(\$10 \/ \$10 \/ \$20\)/,
+        assert.match(f.select, /Same as each bet \(\$10 \/ \$10 \/ \$20\)/,
             'the control was revealed still carrying the static fallback');
     });
 
@@ -483,5 +495,55 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
                              SM.indexOf('function onSideMatchFormatChange') + 4000);
         assert.match(fmt, /syncSmAutoPressLabel\(\)/,
             'onSideMatchFormatChange reveals the control without pricing it');
+    });
+});
+
+describe('THE WORD "SEGMENT" IS GONE FROM EVERYTHING A GOLFER READS', () => {
+
+    // "Segment" is jargon our golfers do not use. It may still appear in ids and
+    // engine internals - none of which reach a screen - but never in a string the
+    // control renders.
+    test('the priced option and its sub-line say "bet"', () => {
+        const out = label({ front: 10, back: 10, overall: 20 });
+        assert.ok(!/segment/i.test(out.option), 'priced option still says segment');
+        assert.ok(!/segment/i.test(out.hint), 'sub-line still says segment');
+        assert.match(out.option, /^Same as each bet /);
+        assert.match(out.hint, /Each press matches its own bet/);
+    });
+
+    test('the collapsed single-stake form says it too', () => {
+        assert.equal(label({ front: 10, back: 10, overall: 10 }).option, 'Same as each bet ($10)');
+        assert.equal(label({ stake: 10 }).option, 'Same as the bet ($10)');
+    });
+
+    test('and so does the unpriced fallback shipped in both pages', () => {
+        ['admin.html', 'sidematches.html'].forEach(f => {
+            const opt = /<option value="same">([^<]*)<\/option>/.exec(read(f));
+            assert.ok(opt, f + ' lost its fallback option');
+            assert.ok(!/segment/i.test(opt[1]),
+                f + ' still ships "segment" in the pre-script fallback');
+            assert.equal(opt[1], 'Same as each bet');
+        });
+    });
+
+    // The reveal path is what a golfer actually meets, so the wording is checked
+    // there too rather than only on the builder's return value.
+    test('what the wizard renders on open says "bet"', () => {
+        const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
+        vm.runInContext(`
+            alert=function(){};
+            collectWizardPlayers=function(){ return [{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}]; };
+            document.getElementById('setup-nassau-front').value='10';
+            document.getElementById('setup-nassau-back').value='10';
+            document.getElementById('setup-nassau-overall').value='20';
+            goToWizardStep(5);
+            document.getElementById('setup-nassau-enabled').checked = true;
+            toggleSetupNassau();
+        `, sb);
+        const sel = vm.runInContext(`document.getElementById('setup-nassau-autopress-mode').innerHTML`, sb);
+        const hint = vm.runInContext(`document.getElementById('setup-nassau-autopress-hint').textContent`, sb);
+        assert.ok(!/segment/i.test(sel), 'the wizard dropdown still says segment');
+        assert.ok(!/segment/i.test(hint), 'the wizard sub-line still says segment');
+        assert.match(sel, /Same as each bet \(\$10 \/ \$10 \/ \$20\)/);
     });
 });
