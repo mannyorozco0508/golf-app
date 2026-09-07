@@ -422,7 +422,34 @@
 // tools/code-entry-check.js, which types a code on a four-golfer round and on a
 // nine-golfer one and counts what each can actually edit.
 // An installed PWA on v76 has no way in from a code at all.
-const CACHE_VERSION = 'golfapp-v77-a-code-opens-the-round-not-the-wizard';
+// Moved to v78: the awards screen stops crediting the wrong man, and stops
+// printing escape sequences at people.
+//   FOUR LITERAL \uXXXX ESCAPES were rendering as text. Two were on the trip recap
+// - "Screenshot this \u2014 or use Share below" and a share button reading
+// "\uD83D\uDCE4 Share as Text" - which is the screen whose entire job is to be
+// screenshotted into a group chat. A fourth turned up on admin.html the moment a
+// cross-page scan existed. A \uXXXX sequence resolves inside a JS string and
+// prints literally in raw markup; this is the third time the class has shipped, so
+// it is now guarded every page at once, in source AND in rendered text.
+//   AWARDS CREDITED TWO GOLFERS AS ONE. Two Mikes on Day 1 produced "Most Birdies:
+// Mike Dunne - 5", which is 3 + 2: two men's birdies added together and published
+// to everyone who was there. The trip money already refused this through
+// tripIdentityProblems(); renderTripAwards() never called it. It refuses now, names
+// the golfer and the fix, and empties cachedAwards so the refusal reaches BOTH
+// recap surfaces rather than only the panel.
+//   A PAR WAS CROWNED THE BIGGEST BLOW-UP. blowUp began null and took the first
+// hole through `diff > blowUp.diff` with nothing requiring diff > 0, so a round
+// where nobody went over par named somebody's par. Two over or it is not a
+// blow-up, and when nobody blows up it says so instead of vanishing.
+//   AND THE FIFTH COPY OF A NAME RULE IS GONE. Awards keyed on raw p.name while the
+// leaderboard, the money and the placeholder warning all key through
+// normalisePlayerName(), so "Marty" and "marty " split here and merged everywhere
+// else. One rule now.
+//   Eagles gained their own line. Only diff === -1 was counted, so an eagle earned
+// nothing anywhere in the app; folding it into "Most Birdies" would make that label
+// untrue and counting it twice would make the number a count of nothing.
+// An installed PWA on v77 still merges two golfers' birdies onto one name.
+const CACHE_VERSION = 'golfapp-v78-awards-credit-the-right-man';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -163,7 +163,11 @@ describe('NO RAW NAME REACHES MARKUP, PAGE BY PAGE', () => {
     const TEXT_ONLY = {
         'admin.html': 1,        // addDiv.textContent
         'leaderboard.html': 2,  // share title + message
-        'trip.html': 9,         // recap text block, share title, textContent header
+        // 10, not 9, since the Eagle of the Trip line joined the recap TEXT block.
+        // Its sibling on the recap CARD is escaped - esc(a.mostEagles.name) - because
+        // that one is innerHTML; this one is a string handed to the clipboard, where
+        // escaping would paste "Mike &amp; Dave" into a group chat.
+        'trip.html': 10,        // recap text block, share title, textContent header
     };
 
     PAGES.forEach(p => {

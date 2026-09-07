@@ -425,11 +425,11 @@ html {
     <div class="recap-overlay" id="trip-recap-overlay" onclick="if (event.target === this) closeTripRecap();">
         <div class="recap-sheet">
             <div class="recap-bar">
-                <span class="recap-hint">Screenshot this \u2014 or use Share below</span>
+                <span class="recap-hint">Screenshot this — or use Share below</span>
                 <button class="recap-close" onclick="closeTripRecap()" aria-label="Close recap" title="Close">&times;</button>
             </div>
             <div id="trip-recap-card" class="recap-card"></div>
-            <button class="btn-primary recap-share" onclick="shareRecap()">\uD83D\uDCE4 Share as Text</button>
+            <button class="btn-primary recap-share" onclick="shareRecap()">📤 Share as Text</button>
         </div>
     </div>
 
@@ -1485,11 +1485,26 @@ html {
     //   Biggest Blow-Up — single worst score-vs-par on any one hole, trip-wide
     //   Best Comeback   — biggest front-9-to-back-9 gross improvement in a single round
     //   Sandbagger      — most net strokes under par, summed across the whole trip
+    // ONE NAME RULE, NOT A FIFTH COPY. These keyed on raw p.name while the
+    // cumulative leaderboard, the money settlement and the placeholder warning all
+    // key through normalisePlayerName() - so "Marty" and "marty " were two golfers
+    // here and one golfer everywhere else, and neither half won anything.
+    //
+    // The display name is carried alongside the key rather than reconstructed from
+    // it: an award should print the golfer's name as they typed it, not lowercased.
     function computeTripAwards(results) {
-        const birdieCounts = {};   // name -> count
-        const sandbaggerTotals = {}; // name -> net-to-par total (more negative = bigger sandbagger)
+        const nameKey = p => (typeof normalisePlayerName === 'function')
+            ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+        const birdieCounts = {};     // key -> { name, count }
+        const eagleCounts = {};      // key -> { name, count, hole, label }
+        const sandbaggerTotals = {}; // key -> { name, netToPar }
         let blowUp = null;   // { name, label, hole, par, score, diff }
         let comeback = null; // { name, label, frontGross, backGross, improvement }
+        const bump = (bag, k, p, field) => {
+            if (!bag[k]) bag[k] = { name: p.name, count: 0, netToPar: 0 };
+            bag[k][field] += 1;
+            return bag[k];
+        };
 
         results.forEach(({ label, data }) => {
             const courseData = data.courseData || [];
@@ -1498,6 +1513,8 @@ html {
 
             players.forEach(p => {
                 let frontGross = 0, backGross = 0, frontHoles = 0, backHoles = 0;
+                const key = nameKey(p);
+                if (!key) return;
 
                 courseData.forEach(h => {
                     const v = scores[`p${p.id}_h${h.hole}`];
@@ -1506,17 +1523,28 @@ html {
                     const par = parseInt(h.par, 10);
                     const diff = gross - par;
 
-                    if (diff === -1) {
-                        birdieCounts[p.name] = (birdieCounts[p.name] || 0) + 1;
+                    // AN EAGLE IS NOT A BIRDIE. Only diff === -1 was ever counted, so
+                    // an eagle earned nothing anywhere in the app. Folding it in here
+                    // would make "Most Birdies" untrue; it gets its own line instead.
+                    if (diff === -1) bump(birdieCounts, key, p, 'count');
+                    if (diff <= -2) {
+                        const e = bump(eagleCounts, key, p, 'count');
+                        if (e.count === 1) { e.hole = h.hole; e.label = label; }
                     }
 
                     if (h.hole <= 9) { frontGross += gross; frontHoles++; }
                     else { backGross += gross; backHoles++; }
 
                     const strokes = getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                    sandbaggerTotals[p.name] = (sandbaggerTotals[p.name] || 0) + ((gross - strokes) - par);
+                    if (!sandbaggerTotals[key]) sandbaggerTotals[key] = { name: p.name, netToPar: 0 };
+                    sandbaggerTotals[key].netToPar += ((gross - strokes) - par);
 
-                    if (!blowUp || diff > blowUp.diff) {
+                    // OVER PAR, OR IT IS NOT A BLOW-UP. This began at null and took the
+                    // first hole it saw through `diff > blowUp.diff`, with nothing
+                    // requiring diff > 0 - so a round where nobody went over par
+                    // crowned somebody's PAR as the biggest blow-up of the trip.
+                    // Two over, because a bogey is not a story.
+                    if (diff >= 2 && (!blowUp || diff > blowUp.diff)) {
                         blowUp = { name: p.name, label, hole: h.hole, par, score: gross, diff };
                     }
                 });
@@ -1530,21 +1558,21 @@ html {
             });
         });
 
-        let mostBirdies = null;
-        Object.keys(birdieCounts).forEach(name => {
-            if (birdieCounts[name] > 0 && (!mostBirdies || birdieCounts[name] > mostBirdies.count)) {
-                mostBirdies = { name, count: birdieCounts[name] };
-            }
-        });
+        const best = (bag, better) => {
+            let win = null;
+            Object.keys(bag).forEach(k => { if (better(bag[k], win)) win = bag[k]; });
+            return win;
+        };
+        const mostBirdies = best(birdieCounts, (e, w) => e.count > 0 && (!w || e.count > w.count));
+        const mostEagles = best(eagleCounts, (e, w) => e.count > 0 && (!w || e.count > w.count));
+        const sandbagger = best(sandbaggerTotals,
+            (e, w) => e.netToPar < 0 && (!w || e.netToPar < w.netToPar));
 
-        let sandbagger = null;
-        Object.keys(sandbaggerTotals).forEach(name => {
-            if (sandbaggerTotals[name] < 0 && (!sandbagger || sandbaggerTotals[name] < sandbagger.netToPar)) {
-                sandbagger = { name, netToPar: sandbaggerTotals[name] };
-            }
-        });
-
-        return { mostBirdies, blowUp, comeback, sandbagger };
+        // `scored` separates "nobody blew up" from "nobody has played yet". The first
+        // is worth saying out loud; the second is not an award screen at all.
+        const scored = Object.keys(birdieCounts).length > 0
+            || Object.keys(sandbaggerTotals).length > 0;
+        return { mostBirdies, mostEagles, blowUp, comeback, sandbagger, scored };
     }
 
     function renderTripAwards() {
@@ -1555,6 +1583,29 @@ html {
             return;
         }
 
+        // THE SAME REFUSAL THE MONEY MAKES, for the same reason. Awards are matched
+        // by name across rounds exactly as the trip total is, so two golfers called
+        // Mike Dunne became ONE winner - "Most Birdies: Mike Dunne 5" was 3 + 2, two
+        // men's birdies added together. This screen is screenshotted into a group
+        // chat, so a merged name is published to everyone who was there.
+        //
+        // cachedAwards is emptied, not just the panel: both recap surfaces read it,
+        // and a refusal that only covers the screen would still paste the merged
+        // award into the chat.
+        const idProblems = (typeof tripIdentityProblems === 'function')
+            ? tripIdentityProblems(cachedCountedResults) : [];
+        if (idProblems.length > 0) {
+            cachedAwards = {};
+            let warn = `<div style="background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; font-size:0.82rem; color:var(--warn-text);">`
+                + `<strong>\u26A0\uFE0F Awards Not Shown</strong>`
+                + `<div style="padding:6px 0 2px;">Two golfers cannot be told apart by name, and awards are matched by name across rounds \u2014 so birdies and blow-ups would be credited to the wrong man.</div>`;
+            idProblems.slice(0, 4).forEach(p => {
+                warn += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${p.message}</div>`;
+            });
+            container.innerHTML = warn + `</div>`;
+            return;
+        }
+
         const awards = computeTripAwards(cachedCountedResults);
         cachedAwards = awards;
 
@@ -1562,14 +1613,25 @@ html {
         if (awards.mostBirdies) {
             cards.push({ emoji: '🐦', title: 'Most Birdies', line: `${escapeHtml(awards.mostBirdies.name)} — ${awards.mostBirdies.count} birdie${awards.mostBirdies.count === 1 ? '' : 's'}` });
         }
+        if (awards.mostEagles) {
+            cards.push({ emoji: '\uD83E\uDD85', title: 'Eagle of the Trip',
+                line: awards.mostEagles.count === 1
+                    ? `${escapeHtml(awards.mostEagles.name)} — Hole ${awards.mostEagles.hole} on ${escapeHtml(String(awards.mostEagles.label))}`
+                    : `${escapeHtml(awards.mostEagles.name)} — ${awards.mostEagles.count} eagles` });
+        }
         if (awards.blowUp) {
             cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole', line: `${escapeHtml(awards.blowUp.name)} — Hole ${awards.blowUp.hole} (Par ${awards.blowUp.par}, shot ${awards.blowUp.score}) on ${awards.blowUp.label}` });
+        } else if (awards.scored) {
+            // Said out loud rather than omitted. An award that silently disappears
+            // reads as a bug; this reads as a fact about the golf.
+            cards.push({ emoji: '💥', title: 'Biggest Blow-Up Hole',
+                line: 'Nobody went over par by more than one — no blow-up to report.' });
         }
         if (awards.comeback) {
             cards.push({ emoji: '📈', title: 'Best Comeback', line: `${escapeHtml(awards.comeback.name)} — ${awards.comeback.frontGross} on the front, ${awards.comeback.backGross} on the back (${awards.comeback.label})` });
         }
         if (awards.sandbagger) {
-            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${escapeHtml(awards.sandbagger.name)} — ${Math.abs(awards.sandbagger.netToPar)} net strokes under par for the trip` });
+            cards.push({ emoji: '🎭', title: 'Sandbagger of the Week', line: `${escapeHtml(awards.sandbagger.name)} — ${Math.abs(awards.sandbagger.netToPar)} net stroke${Math.abs(awards.sandbagger.netToPar) === 1 ? '' : 's'} under par for the trip` });
         }
 
         if (cards.length === 0) {
@@ -1922,8 +1984,17 @@ html {
 
         // ---- AWARDS, only the ones that were actually earned ----
         const a = cachedAwards || {};
-        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+        if (a.mostBirdies || a.mostEagles || a.blowUp || a.comeback || a.sandbagger) {
             html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC5 AWARDS</div>';
+            if (a.mostEagles) {
+                html += '<div class="rc-award">\uD83E\uDD85<span><span class="rc-award-name">'
+                     + esc(a.mostEagles.name) + '</span> \u00B7 Eagle of the Trip'
+                     + (a.mostEagles.count === 1
+                        ? '<br><span class="rc-detail">Hole ' + a.mostEagles.hole
+                          + ' \u00B7 ' + esc(String(a.mostEagles.label)) + '</span>'
+                        : ' (' + a.mostEagles.count + ')')
+                     + '</span></div>';
+            }
             if (a.mostBirdies) {
                 html += '<div class="rc-award">\uD83D\uDC26<span><span class="rc-award-name">'
                      + esc(a.mostBirdies.name) + '</span> \u00B7 Most Birdies ('
@@ -1994,9 +2065,11 @@ html {
         }
 
         const a = cachedAwards || {};
-        if (a.mostBirdies || a.blowUp || a.comeback || a.sandbagger) {
+        if (a.mostBirdies || a.mostEagles || a.blowUp || a.comeback || a.sandbagger) {
             text += `\n🏅 AWARDS\n`;
             if (a.mostBirdies) text += `🐦 Most Birdies: ${a.mostBirdies.name} (${a.mostBirdies.count})\n`;
+            if (a.mostEagles) text += `🦅 Eagle of the Trip: ${a.mostEagles.name}${a.mostEagles.count === 1
+                ? `, Hole ${a.mostEagles.hole} on ${a.mostEagles.label}` : ` (${a.mostEagles.count})`}\n`;
             if (a.blowUp) text += `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
             if (a.comeback) text += `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
             if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name}\n`;
