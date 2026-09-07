@@ -53,17 +53,20 @@ function rpc(ws, id, method, params) {
 
 // The stand-in. Small on purpose: it implements only what the pages actually use,
 // so it cannot quietly diverge into a second Firebase.
-function firebaseStub(roundsJson) {
+function firebaseStub(dbJson) {
     return `
     (function () {
-      var ROUNDS = ${roundsJson};
+      var DB = ${dbJson};
       function refFor(pathStr) {
         var parts = String(pathStr).split('/').filter(Boolean);
         function resolve() {
-          // events/<CODE>[/child...]
-          if (parts[0] !== 'events') return null;
-          var node = ROUNDS[parts[1]];
-          for (var i = 2; i < parts.length && node != null; i++) node = node[parts[i]];
+          // ANY path, walked against the fixture. This resolved only events/<CODE>
+          // before, which was enough while every check was about a single round.
+          // A trip reads trips/<CODE>/rounds first and THEN the events it names, so
+          // a stub that answered null for trips/ made the page look broken for a
+          // reason that had nothing to do with the page.
+          var node = DB;
+          for (var i = 0; i < parts.length && node != null; i++) node = node[parts[i]];
           return node === undefined ? null : node;
         }
         var api = {
@@ -96,11 +99,18 @@ function firebaseStub(roundsJson) {
     })();`;
 }
 
-// Opens `url` cold with `rounds` as the database, waits for the page to settle,
-// then evaluates `expression` and returns its value. Nothing else is run.
+// Opens `url` cold with a database fixture, waits for the page to settle, then
+// evaluates `expression` and returns its value. Nothing else is run.
+//
+// `rounds` is the common case and stays: it is the events/ subtree, so
+// `rounds: { ABC: {...} }` serves events/ABC. `db` is the whole database when a
+// page reads more than one top-level node - a trip reads trips/<CODE>/rounds and
+// then the events it names, so it needs both. Passing `db` wins; passing `rounds`
+// is exactly `db: { events: rounds }`.
+//
 // `preScript` is injected before any page script too, for instrumenting a cold
 // load - a MutationObserver, a wrapped function - without touching the page.
-async function arriveCold({ url, rounds, expression, viewport, settleMs, preScript }) {
+async function arriveCold({ url, rounds, db, expression, viewport, settleMs, preScript }) {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     const port = 9400 + Math.floor(Math.random() * 400);
     if (!fs.existsSync(CHROME)) {
@@ -141,7 +151,7 @@ async function arriveCold({ url, rounds, expression, viewport, settleMs, preScri
         await rpc(ws, id++, 'Network.setBlockedURLs',
             { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js'] });
         await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
-            { source: firebaseStub(JSON.stringify(rounds || {})) });
+            { source: firebaseStub(JSON.stringify(db || { events: rounds || {} })) });
         if (preScript) {
             await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument', { source: preScript });
         }

@@ -1150,8 +1150,13 @@ html {
         const nameToRounds = {};
         results.forEach(({ label, data }) => {
             (data.players || []).forEach(p => {
-                const key = (p.name || '').trim().toLowerCase();
-                if (!/^player \d+$/.test(key)) return;
+                // THE SHARED RULE, not a fourth hand-rolled copy. The regex here
+                // demanded a space, so "Player3" slipped straight past it.
+                const key = (typeof normalisePlayerName === 'function')
+                    ? normalisePlayerName(p.name) : (p.name || '').trim().toLowerCase();
+                const placeholder = (typeof isPlaceholderPlayerName === 'function')
+                    ? isPlaceholderPlayerName(p.name) : false;
+                if (!placeholder) return;
                 if (!nameToRounds[key]) nameToRounds[key] = new Set();
                 nameToRounds[key].add(label);
             });
@@ -1235,6 +1240,75 @@ html {
     // Nets every linked round's main-format money result per player (via the shared
     // computeRoundMoneyByPlayer engine), sums across the whole trip matched by name,
     // then runs debt simplification into one minimal "who pays who" list.
+    // WHAT THE TRIP TOTAL ACTUALLY CONTAINS.
+    //
+    // The card used to end by claiming it counted the main format only, and that
+    // side games, side matches and one-off side bets were still to come. That was
+    // FALSE. The trip sums computeCombinedNetTotals, which counts every one of
+    // them: a $50 side match moves a golfer's trip total from +$10 to +$60.
+    //
+    // It was stale copy from an older implementation, and it is the more expensive
+    // of the two bugs on this card - a group reading it settles their side matches
+    // SEPARATELY, on top of a total that already contains them, and pays twice.
+    // Nothing looks broken while it happens.
+    //
+    // DECLARED AS A LIST, because a positive sentence goes stale in silence exactly
+    // the same way. trip_money_truth_test.js holds this against what the engine
+    // actually emits: every label computeCombinedNetTotals can add to a ledger must
+    // be covered by a category named here, so a new money source fails the suite
+    // until the copy catches up.
+    const TRIP_TOTAL_INCLUDES = [
+        'the main game', 'side games', 'side matches and presses',
+        'the Birdie Pool', 'KPs', 'the Main Pool'
+    ];
+
+    // NAMES ARE THE ONLY THING THAT CROSSES ROUNDS, and the trip total is built by
+    // matching on them. Two golfers called Mike Dunne therefore become ONE balance:
+    // four golfers go in, three come out, and "Lance Webb -> Mike Dunne $10" names a
+    // man who could be either of them. A placeholder is the same problem wearing a
+    // different hat - "Player 2" is not an identity.
+    //
+    // The Cup refuses this. Money should refuse it harder: the Cup's version costs
+    // points, this one sends real money to the wrong person for a week. A warning
+    // above an authoritative dollar figure is the worst of both worlds - nobody
+    // reads it, and the number decides who Venmos who.
+    //
+    // SCOPED TO THE TRIP-WIDE TOTAL. Scoring, the leaderboard and each round's own
+    // money are untouched. Only the number that spans rounds refuses, because only
+    // that number depends on matching names between them.
+    function tripIdentityProblems(counted) {
+        if (typeof normalisePlayerName !== 'function'
+            || typeof isPlaceholderPlayerName !== 'function') {
+            return [{ message: 'Could not check the golfers\u2019 names \u2014 reload the page and try again.' }];
+        }
+        const problems = [];
+        (counted || []).forEach(({ label, data }) => {
+            const seen = {}, reported = {};
+            ((data || {}).players || []).forEach(p => {
+                const key = normalisePlayerName(p.name);
+                if (!key || isPlaceholderPlayerName(p.name)) {
+                    problems.push({ round: label, name: p.name || '(no name)',
+                        message: '<strong>' + escapeHtml(p.name || 'A golfer with no name')
+                            + '</strong> in <strong>' + escapeHtml(label) + '</strong> is not a name. '
+                            + 'The trip total is matched by name across rounds, so a placeholder '
+                            + 'cannot be told from the same placeholder on another day. '
+                            + 'Open that round from Home and enter a real name.' });
+                    return;
+                }
+                if (seen[key] && !reported[key]) {
+                    reported[key] = true;
+                    problems.push({ round: label, name: p.name,
+                        message: 'Two golfers in <strong>' + escapeHtml(label) + '</strong> are both called '
+                            + '<strong>' + escapeHtml(p.name) + '</strong>. The trip total is matched by '
+                            + 'name, so their money would be merged into one balance and somebody would '
+                            + 'pay the other man\u2019s debts. Rename one of them in that round.' });
+                }
+                seen[key] = true;
+            });
+        });
+        return problems;
+    }
+
     function renderTripMoneySettlement() {
         const container = document.getElementById('trip-money-settlement');
         if (cachedRoundResults.length === 0) return;
@@ -1355,7 +1429,19 @@ html {
         // into transfers, but printing them tells Marty to pay Carp for a debt neither
         // of them has. Same predicate the Receipt uses, in action-model.js, so the two
         // surfaces cannot drift.
-        if (transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
+        // THE TRIP-WIDE NUMBER, OR AN EXPLANATION - never a number nobody can trust.
+        const idProblems = tripIdentityProblems(cachedCountedResults);
+        if (idProblems.length > 0) {
+            html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
+                <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Trip Total Not Shown</div>
+                <div style="font-size:0.8rem; padding:6px 0 2px;">Two golfers cannot be told apart by name, so a trip-wide total would send money to the wrong person. Each round\u2019s own money is unaffected and is shown below.</div>`;
+            idProblems.slice(0, 6).forEach(p => {
+                html += `<div style="font-size:0.8rem; padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${p.message}</div>`;
+            });
+            html += `</div>`;
+        }
+
+        if (idProblems.length === 0 && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
             html += `<div class="settle-card"><div class="settle-header">${tripSettled
                 ? '🏁 Final "Who Pays Who"'
                 : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
@@ -1365,7 +1451,7 @@ html {
             html += `</div>`;
         }
 
-        if (Object.keys(netByName).length > 0) {
+        if (idProblems.length === 0 && Object.keys(netByName).length > 0) {
             html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
             Object.values(netByName).sort((a, b) => b.net - a.net).forEach(v => {
                 html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span>${fmtMoney(v.net)}</span></div>`;
@@ -1388,7 +1474,7 @@ html {
         });
         html += `</div>`;
 
-        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Main-format bets only for now — Side Games, Side Matches, and one-off Side Bets aren't included yet.</div>`;
+        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Includes ${TRIP_TOTAL_INCLUDES.slice(0, -1).join(', ')} and ${TRIP_TOTAL_INCLUDES[TRIP_TOTAL_INCLUDES.length - 1]}.</div>`;
 
         container.innerHTML = html;
     }

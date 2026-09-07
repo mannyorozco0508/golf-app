@@ -301,7 +301,20 @@
 // copyFrom prefill is untouched), and the resume link gets the flex gap it needed
 // to stop rendering as "ResumeJLRL4H". An installed PWA on v68 keeps offering dead
 // rounds.
-const CACHE_VERSION = 'golfapp-v69-resume-means-real';
+// Moved to v70: the trip total tells the truth about itself, or shows no number.
+// The money card ended by claiming it counted the main format only and that side
+// games, side matches and one-off side bets were still to come. That was FALSE -
+// the trip sums computeCombinedNetTotals, which counts every one of them, and a
+// $50 side match moves a golfer's total from +$10 to +$60. A group reading that
+// line settles their side matches SEPARATELY, on top of a total that already
+// contains them, and pays twice - while nothing on screen looks broken. It now
+// states what IS included, from a list held against what the engine emits.
+// And the trip-wide total refuses when a name cannot identify a golfer: two men
+// called Mike Dunne were merged into one balance, four golfers in and three out,
+// with "Lance Webb -> Mike Dunne $10" naming either of them. Scoring, the
+// leaderboard and each round's own money are untouched. An installed PWA on v69
+// keeps a card that invites the group to double-pay every side match.
+const CACHE_VERSION = 'golfapp-v70-trip-total-truth';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
