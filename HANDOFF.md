@@ -54,7 +54,8 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 
 - Apple Developer account active, team `A2Z95T64UU` (Manuel Orozco, individual)
 - App Store Connect record exists: Rattle Golf, bundle `com.rattlegolf.app`, Apple ID 6808220335
-- **Build 2 is live on TestFlight.** Internal group "Beta Testers" with automatic distribution on
+- **Build 8 was archived on 2026-09-06.** `CURRENT_PROJECT_VERSION = 8` in the project. Internal group "Beta Testers" with automatic distribution on
+- **Build 8 carries web v71, not v72.** The native bundle is synced by hand, so it is a snapshot of whenever `node sync-mobile-web.js && npx cap sync ios` last ran — never automatically whatever `main` holds. v72 (the setup page's link copy, the quiet End control, the back button on admin) is on the web and NOT in that build. Check `ios/App/App/public/sw.js` for what a build actually contains; do not infer it from the repo
 - Signing works via automatic signing. The long-running failure was that my team had **zero registered devices**, so Apple would not issue a development profile. Plugging in my iPhone and enabling Developer Mode fixed it. Nothing in `project.pbxproj` was ever wrong — don't go looking there
 - Export compliance answer is "None of the algorithms mentioned above" (HTTPS via the OS only)
 - Privacy policy live at `golf-app-5a5.pages.dev/privacy.html`
