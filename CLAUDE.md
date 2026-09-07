@@ -36,6 +36,27 @@ freshly opened panel. Tests naturally drive explicit choices, because that is wh
 easy to write, so the default path is the one that goes uncovered. Ask of each feature:
 what does someone see who touches nothing? Then test exactly that.
 
+## A test that slices source needs at least one positive assertion
+
+A slice that truncates to nothing **satisfies every negative assertion in it,
+forever**. `assert.ok(!/<select/.test(fn))` is true of `''`, and so is every other
+"must not contain" in the same block.
+
+`ryder_cup_phase3b_test.js` sliced the setup renderer from
+`indexOf('function renderRyderCupSetup')` to `indexOf('function rcOpen')`. Adding
+`rcOpenJoin()` between them collapsed the slice to nothing. It was caught **only**
+because a positive assertion — `assert.ok(/rcs-chip/.test(fn))` — sat beside the
+negative one and failed loudly. A block made only of negatives would have gone
+green and stayed green, guarding an empty string.
+
+**The rule.** Any test that carves a region out of source must assert that
+something it expects **is** there, not only that forbidden things are not. The
+positive assertion is what proves the region exists at all.
+
+**And prefer an endpoint that cannot drift.** `indexOf('\n    function ', at + 30)`
+finds the end of the current function; a hand-written next-function name is a
+guess about file order that the next feature can silently invalidate.
+
 ## Do not let the harness prove the thing you are assuming
 
 `helpers/mini-dom.js` is a hand-rolled DOM, not a browser. It has real limits, and
