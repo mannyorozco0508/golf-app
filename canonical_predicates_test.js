@@ -41,7 +41,7 @@ const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
                'Marcus','Rocco','Matt H','Jeremy'];
 
 // EXACTLY what captureMoneyPool() in admin.html writes: Net Finish, KP, Net Skins,
-// ties void. Not invented - this is the production configuration.
+// carryOver: false. Not invented - this is the production configuration.
 const MONEY_POOL = {
     enabled: true, buyIn: 40,
     kp: { amount: 100, holes: [3,7,12,16] },

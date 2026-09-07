@@ -906,7 +906,11 @@ html {
     function buildSkinsReceiptSection(r, data, courseData, savedScores, $) {
         const scoring = r.skins.scoring === 'gross' ? 'gross' : 'net';
         const basisLabel = scoring === 'gross' ? 'Gross' : 'Net';
-        const carryLabel = r.skins.carryOver ? 'carries' : 'ties void';
+        // One vocabulary for the carry rule across every surface that names it. "Void"
+        // was app-only jargon - nobody at a course says it - and it appeared here, on
+        // the Skins page toggle and in the Money Pool select while eight other surfaces
+        // already said Carry Over / No Carry.
+        const carryLabel = r.skins.carryOver ? 'carries' : 'no carry';
 
         let html = `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} `
             + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;

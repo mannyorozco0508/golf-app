@@ -137,7 +137,7 @@ describe('SCORING BASIS', () => {
     });
 
     test('the header states the basis and the carry rule', () => {
-        assert.match(boot({ carry: false }).html(), /Net skins, ties void/);
+        assert.match(boot({ carry: false }).html(), /Net skins, no carry/);
         assert.match(boot({ carry: true }).html(), /Net skins, carries/);
     });
 
@@ -150,7 +150,7 @@ describe('SCORING BASIS', () => {
         b.run(`currentData.skinsPotFormat = 'net'; currentData.skinsCarryOver = true;`);
         b.run(`renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`);
         const h = b.html();
-        assert.match(h, /Gross skins, ties void/, 'the pool basis must win');
+        assert.match(h, /Gross skins, no carry/, 'the pool basis must win');
         assert.match(h, /H1 \u2014 Blake \u2014 Gross 3/, 'and the rows must follow it');
         assert.ok(!/Net \d+ \u2014 Skin/.test(h), 'no net rows on a gross pool bucket');
     });

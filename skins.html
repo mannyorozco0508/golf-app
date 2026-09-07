@@ -234,14 +234,14 @@ html {
         <div class="control-group" id="skins-config-carry" style="margin-top:10px;">
             <label>Carry Over Ties</label>
             <div class="toggle-row">
-                <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarryOver(false)">Void Tied Holes</span>
+                <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarryOver(false)">No Carry</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="skins-carry-switch" onchange="setSkinsCarryOver(this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
                 <span class="toggle-label-sm active" id="skins-carry-label-on" onclick="setSkinsCarryOver(true)">Carry Over</span>
             </div>
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Carry Over (traditional): a tied hole's value stacks onto the next hole until someone wins it outright. Void: a tied hole is just thrown out — simpler, but the group decides which one you actually play.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Carry Over (traditional): a tied hole's value stacks onto the next hole until someone wins it outright. No Carry: a tied hole is just thrown out — simpler, but the group decides which one you actually play.</p>
         </div>
 
         <div id="skins-content">
