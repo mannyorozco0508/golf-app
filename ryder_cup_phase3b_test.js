@@ -517,8 +517,11 @@ describe('MOBILE LAYOUT', () => {
     });
 
     test('player assignment uses chips, not a 24-golfer dropdown', () => {
-        const fn = SM.slice(SM.indexOf('function renderRyderCupSetup'),
-                            SM.indexOf('function rcOpen'));
+        // Sliced to the END of the renderer, not to the next name that happens to
+        // start with "rcOpen" - rcOpenJoin() now sits between them, and an earlier
+        // boundary silently truncated this to nothing.
+        const at = SM.indexOf('function renderRyderCupSetup');
+        const fn = SM.slice(at, SM.indexOf('\n    function ', at + 30));
         assert.ok(/rcs-chip/.test(fn));
         assert.ok(!/<select/.test(fn), 'a long select is the wrong picker on a phone');
     });

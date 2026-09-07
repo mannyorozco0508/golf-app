@@ -471,7 +471,21 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // its BEHAVIOUR - nassau_autopress_label_test.js, ryder_cross_round_identity_test.js
         // and round_duplicate_name_test.js - rather than trusting this hash to notice.
         'action-model.js': '5fd3455d899176f0ad10bb0ef35739718fa386c34d6b05bacf2f80948ed66ef2',
-        'ryder-cup.js': '26ecc804d9a36b5063c26a61df3b78c2eff391ed452985ba114c2b41eb9e039d',
+        // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
+        //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
+        //      already existed and already knew which roster was ambiguous; only the
+        //      field is new. index.html discarded the distinction and told everybody
+        //      to fix the HOST round, so an organizer whose duplicate was on the
+        //      joining round was sent to a round where nothing was wrong.
+        //   2. 'session-missing' left ryderResolutionUsable's allow-list. A round
+        //      whose ryderCupRef.sessionId pointed at a session that no longer exists
+        //      rendered the WHOLE Cup as though nothing were wrong. The resolver still
+        //      returns the status and its sessionId, so the screen names what is
+        //      missing; scoring is unaffected either way.
+        // No points math, no match resolution, no allocation touched.
+        // cup_join_by_code_test.js asserts the BEHAVIOUR of both rather than trusting
+        // this hash to notice.
+        'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
         'bet-strip.js': '60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',

@@ -998,13 +998,18 @@ function ryderTranslateCupToRound(hostCupData, roundData) {
                        + 'Names like "Player 3" cannot identify anyone across rounds.' });
             return;
         }
+        // `where` CARRIES WHAT THIS ALREADY KNEW. Both branches existed and said
+        // which roster was ambiguous in their own message, but the screen could only
+        // read type and name - so it appended "Fix the names on <host>" to both and
+        // sent organizers to a round where nothing was wrong. The distinction is a
+        // field now, not a sentence to parse.
         if (seenHost[key] === 'dupe') {
-            problems.push({ type: 'duplicate-name', name: key,
+            problems.push({ type: 'duplicate-name', name: key, where: 'host',
                 message: 'Two golfers on the host round are called "' + key + '". '
                        + 'They cannot be told apart on another round.' });
         }
         if (seenLocal[key] === 'dupe') {
-            problems.push({ type: 'duplicate-name', name: key,
+            problems.push({ type: 'duplicate-name', name: key, where: 'local',
                 message: 'Two golfers on this round are called "' + key + '".' });
         }
     });
@@ -1086,9 +1091,20 @@ function resolveRyderCupForRound(roundData, hostCupData, roundCode) {
              host: String(ref.host) };
 }
 
+// A DANGLING SESSION IS NOT USABLE.
+//
+// 'session-missing' was on this list, so a round whose ryderCupRef.sessionId aimed
+// at a session that no longer exists rendered the WHOLE Cup as though nothing were
+// wrong - standings, matches and all - while the thing that says which part of the
+// Cup this round is playing pointed at nothing. That is silent wrongness of exactly
+// the kind this app has been clearing out: the screen looked finished and was not.
+//
+// The resolver still RETURNS the status with its sessionId, so the caller can say
+// what is missing and where to fix it. Scoring is unaffected either way - a Cup
+// that will not load has never been a reason a golfer cannot post a score.
 function ryderResolutionUsable(res) {
     return !!(res && (res.status === 'local' || res.status === 'host'
-        || res.status === 'referenced' || res.status === 'session-missing') && res.cup);
+        || res.status === 'referenced') && res.cup);
 }
 
 // HOST DELETION GUARD, to the limit of what is cheap. Discovering every inbound

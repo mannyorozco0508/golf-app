@@ -2852,6 +2852,124 @@ html {
         });
     }
 
+    // ============================================================================
+    // JOIN A CUP THAT ALREADY EXISTS
+    //
+    // VALIDATE BEFORE WRITING, ALWAYS. A pointer aimed at a Cup that cannot load is
+    // a poisoned round: every load afterwards resolves to an error, and the golfer
+    // cannot clear it from the screen it appears on. Three questions, all answered
+    // before anything is written:
+    //
+    //     1. does the host round exist
+    //     2. does it have a Cup
+    //     3. does the session picked exist on that Cup
+    //
+    // The lookup does NOT write. It fetches the host, shows what was found, and
+    // offers its sessions; only Join writes, and only after re-checking the session
+    // against the Cup that was actually read.
+    //
+    // A ROUND CANNOT JOIN ITSELF. Pointing a round at its own code would make it the
+    // host of a Cup it does not have, which resolves to host-cup-missing forever.
+    let rcJoin = { open: false, code: '', host: null, hostCode: '', problem: '' };
+
+    function rcOpenJoin() {
+        rcJoin = { open: true, code: '', host: null, hostCode: '', problem: '' };
+        renderRyderCupSetup();
+    }
+    function rcCancelJoin() {
+        rcJoin = { open: false, code: '', host: null, hostCode: '', problem: '' };
+        renderRyderCupSetup();
+    }
+
+    function rcJoinPanelHtml() {
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        let html = '<div class="rcs-card" style="margin-top:10px;">'
+            + '<label class="rcs-lab">Game code of the round holding the Cup</label>'
+            + '<input class="rcs-in" id="rc-join-code" maxlength="12" placeholder="e.g. JLRL4H"'
+            + ' style="text-transform:uppercase;" value="' + esc(rcJoin.code) + '">'
+            + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
+            + ' onclick="rcJoinLookup()">\uD83D\uDD0D Find That Cup</button>';
+
+        if (rcJoin.host) {
+            const cfg = (typeof ryderCupConfig === 'function') ? ryderCupConfig(rcJoin.host) : null;
+            const sessions = (cfg && cfg.sessions) || {};
+            const ids = Object.keys(sessions);
+            html += '<div class="rcs-hint" style="margin-top:10px;">Found <strong>'
+                 + esc((cfg && cfg.name) || 'Ryder Cup') + '</strong> on round '
+                 + esc(rcJoin.hostCode) + '.</div>';
+            if (ids.length) {
+                html += '<label class="rcs-lab">Which session does this round play?</label>'
+                     + '<select class="rcs-in" id="rc-join-session">';
+                ids.forEach(id => { html += '<option value="' + esc(id) + '">'
+                     + esc(sessions[id].name || id) + '</option>'; });
+                html += '</select>';
+            } else {
+                html += '<div class="rcs-hint">This Cup has no sessions \u2014 this round '
+                     + 'will simply play it.</div>';
+            }
+            html += '<button type="button" class="rcs-start" style="margin-top:8px"'
+                 + ' onclick="rcJoinConfirm()">\uD83C\uDFC6 Join This Cup</button>';
+        }
+
+        html += '<div id="rc-join-problems" class="rcs-problems">'
+             + (rcJoin.problem ? esc(rcJoin.problem) : '') + '</div>'
+             + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
+             + ' onclick="rcCancelJoin()">Cancel</button></div>';
+        return html;
+    }
+
+    function rcJoinFail(msg) {
+        rcJoin.host = null; rcJoin.problem = msg; renderRyderCupSetup();
+    }
+
+    function rcJoinLookup() {
+        if (!isOrganizerView()) return refuseGroupWrite('join a Ryder Cup');
+        const el = document.getElementById('rc-join-code');
+        const code = String((el && el.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        rcJoin.code = code;
+        if (code.length < 2) return rcJoinFail('Enter the game code of the round that holds the Cup.');
+        if (code === String(currentMode).toUpperCase()) {
+            return rcJoinFail('That is this round\u2019s own code. Join a Cup that lives on a '
+                + 'different round, or set one up here.');
+        }
+        db.ref('events/' + code).once('value').then(snap => {
+            const host = snap && snap.val();
+            // 1. does the host round exist
+            if (!host || !host.players) {
+                return rcJoinFail('Could not find a round with the code ' + code
+                    + '. Check it with whoever set the Cup up.');
+            }
+            // 2. does it have a Cup
+            if (!(typeof hasRyderCup === 'function') || !hasRyderCup(host)) {
+                return rcJoinFail('Round ' + code + ' has no Ryder Cup on it. Nothing was '
+                    + 'changed here.');
+            }
+            rcJoin.host = host; rcJoin.hostCode = code; rcJoin.problem = '';
+            renderRyderCupSetup();
+        }).catch(e => rcJoinFail('Could not read round ' + code + ': ' + e.message));
+    }
+
+    function rcJoinConfirm() {
+        if (!isOrganizerView()) return refuseGroupWrite('join a Ryder Cup');
+        if (!rcJoin.host) return rcJoinFail('Find the Cup first.');
+        const cfg = (typeof ryderCupConfig === 'function') ? ryderCupConfig(rcJoin.host) : null;
+        if (!cfg) return rcJoinFail('Round ' + rcJoin.hostCode + ' has no Ryder Cup on it.');
+        const sel = document.getElementById('rc-join-session');
+        const sessionId = sel ? String(sel.value || '') : '';
+        const sessions = cfg.sessions || {};
+        // 3. does the session picked exist on that Cup - re-asked against the Cup
+        //    actually read, not against whatever the dropdown was built from.
+        if (Object.keys(sessions).length > 0 && (!sessionId || !sessions[sessionId])) {
+            return rcJoinFail('That session is not on this Cup any more. Pick one of its '
+                + 'sessions, or ask whoever set it up.');
+        }
+        const ref = { host: rcJoin.hostCode };
+        if (sessionId && sessions[sessionId]) ref.sessionId = sessionId;
+        db.ref('events/' + currentMode + '/ryderCupRef').set(ref)
+            .then(() => { rcCancelJoin(); })
+            .catch(e => rcJoinFail('Could not join: ' + e.message));
+    }
+
     function rcRefresh() { if (!rcDraft || !rcDraft.__open) rcDraft = null; renderRyderCupSetup(); }
 
     function renderGroupLockBadge() {
@@ -2944,6 +3062,13 @@ html {
                 + ' onclick="rcOpen()">\uD83C\uDFC6 Set Up a Ryder Cup</button>'
                 + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
                 + ' onclick="rcOpenClassic()">\uD83D\uDCC5 Classic Ryder Cup \u2014 3 Days, 5 Sessions</button>'
+                // THE THIRD CHOICE. A Cup lives on ONE round and every other day
+                // points at it, but nothing could ever write that pointer at somebody
+                // else's round - rcSave() only ever set host: currentMode. Days 2-5
+                // had no way in at all.
+                + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
+                + ' onclick="rcOpenJoin()">\uD83D\uDD17 Join a Cup That Already Exists</button>'
+                + (rcJoin.open ? rcJoinPanelHtml() : '')
                 + '<div class="rcs-hint">'
                 // The handoff banner used to say this in a separate box above the card.
                 // Three pieces of "this is the Cup" chrome on one screen was most of

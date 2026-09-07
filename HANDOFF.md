@@ -369,6 +369,30 @@ though it were fine.
 
 Run it after touching the wizard's step navigation, the Games step, or the Review.
 
+### `tools/cup-join-check.js` — joining a Cup by code, end to end
+
+```
+node tools/cup-join-check.js
+```
+
+Same exit codes. Types a host round's code into the real field and presses the real
+buttons; `rcJoinLookup`, `rcJoinConfirm` and `renderRyderCupSetup` are never named.
+
+It proves four things: Day 2 joins Day 1's Cup by code and the Cup then appears on
+Day 2's scorecard in Day 2's own player ids; a code that is not a round, and a round
+with no Cup, write **no pointer at all** (every write the page makes is recorded, so
+"nothing was written" is watched rather than inferred); a duplicate name on the
+JOINING round sends the organizer *here* while one on the host names the host; and a
+`ryderCupRef.sessionId` pointing at a session that no longer exists refuses instead
+of rendering the whole Cup.
+
+**Scoring is asserted unblocked in every failure case** — 76 of 76 inputs editable.
+A Cup that will not load has never been a reason a golfer cannot post a score, and
+that is the one thing here that must not change.
+
+Run it after touching the Cup card, the pointer, `resolveRyderCupForRound` or
+`ryderUnavailableReason`.
+
 ### The rest of them, one line each
 
 `cross-round-identity-check.js` (the same golfer across rounds) ·
@@ -379,6 +403,8 @@ Run it after touching the wizard's step navigation, the Games step, or the Revie
 quieter than Save, the page has a way back, and **nothing that shares a round has
 crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-check.js` ·
 `share-url-check.js` (every builder returns `https` from a non-web origin) ·
+`trip-awards-check.js` (awards refuse a merged name; no page renders a literal escape) ·
+`cup-join-check.js` ·
 `trip-money-check.js` · `wizard-wager-check.js`.
 
 ## How I want you to work

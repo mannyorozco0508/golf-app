@@ -2875,6 +2875,11 @@ html {
         if (res.status === 'host-cup-missing') {
             return 'The Cup on ' + where + ' has been removed';
         }
+        // A SESSION THAT IS NOT THERE. This used to render the whole Cup as though
+        // nothing were wrong, because 'session-missing' was on the usable list.
+        if (res.status === 'session-missing') {
+            return 'The session this round plays is no longer on the Cup on ' + where;
+        }
         if (res.status !== 'identity-unresolved') return '';
 
         // THE SPELLING THE GOLFERS USE. The engine keys identity on a normalised
@@ -2888,14 +2893,20 @@ html {
             return hit ? hit.name : String(key || '');
         };
 
-        const dupes = [];
+        // WHICH ROUND, kept apart. The engine reports where the duplicate is -
+        // `where: 'host' | 'local'` - and this used to discard it and tell everybody
+        // to fix the host. Being sent to a round where nothing is wrong is worse than
+        // being told nothing: you look, find nothing, and stop believing the message.
+        const dupesHere = [], dupesHost = [];
         let unnamed = false;
         (res.identityProblems || []).forEach(p => {
             if (p.type === 'duplicate-name') {
                 const n = spell(p.name);
-                if (n && dupes.indexOf(n) === -1) dupes.push(n);
+                const bag = p.where === 'local' ? dupesHere : dupesHost;
+                if (n && bag.indexOf(n) === -1) bag.push(n);
             } else if (p.type === 'unnamed') { unnamed = true; }
         });
+        const dupes = dupesHere.concat(dupesHost.filter(n => dupesHere.indexOf(n) === -1));
 
         const bits = [];
         if (dupes.length) {
@@ -2907,8 +2918,17 @@ html {
                 + 'means the same person on another round');
         }
         if (!bits.length) return '';
+        // Name the round the duplicate is actually ON. When both rounds have one,
+        // say both rather than picking.
+        const fixOn = [];
+        if (dupesHere.length) fixOn.push('this round');
+        if (dupesHost.length) fixOn.push(where);
+        if (!fixOn.length) fixOn.push(where);
+        // "Fix the names on this round, then reopen this round" says it twice.
+        const onlyHere = fixOn.length === 1 && fixOn[0] === 'this round';
         return 'Not showing because ' + bits.join(', and ')
-            + '. Fix the names on ' + where + ', then reopen this round';
+            + '. Fix the names on ' + fixOn.join(' and ')
+            + (onlyHere ? ', then reopen it' : ', then reopen this round');
     }
 
     function renderRyderCupHtml() {

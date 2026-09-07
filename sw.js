@@ -472,7 +472,30 @@
 // FINAL vs NOT FINAL was verified against a genuinely unresolved round rather than
 // assumed; it was already correct.
 // An installed PWA on v78 still pastes a merged settlement into the group chat.
-const CACHE_VERSION = 'golfapp-v79-one-gate-for-the-whole-trip';
+// Moved to v80: days 2-5 can finally join the Cup day 1 is holding.
+//   THE POINTER EXISTED SINCE v48 AND NOTHING COULD WRITE ONE. rcSave() set
+// host: currentMode - a round hosting its OWN Cup - so there was no way to aim a
+// round at somebody else's. The Cup card now offers a third choice beside Set Up
+// and the Classic preset: join a Cup that already exists, by the host round's code.
+//   VALIDATED BEFORE ANYTHING IS WRITTEN. Does the host round exist, does it have a
+// Cup, does the picked session exist on it - all three, and a round may not point
+// at itself. A pointer aimed at a Cup that cannot load is a poisoned round: every
+// load afterwards resolves to an error the golfer cannot clear from the screen it
+// appears on.
+//   THE REFUSAL NAMED THE WRONG ROUND. ryderTranslateCupToRound always
+// distinguished a duplicate on the HOST round from one on THIS round, and
+// ryderUnavailableReason discarded that and told everybody to fix the host. An
+// organizer whose duplicate was on the joining round - the normal case for days
+// 2-5 - was sent to a round where nothing was wrong, which is worse than saying
+// nothing: you look, find nothing, and stop believing the message. The engine
+// carries `where` now and the sentence names the round that is actually wrong.
+//   A DANGLING SESSION IS REFUSED. 'session-missing' was on
+// ryderResolutionUsable's allow-list, so a round whose session pointer aimed at
+// nothing rendered the WHOLE Cup as though everything were fine.
+//   SCORING IS NEVER BLOCKED by any of it - measured, 76 of 76 inputs editable in
+// every failure case.
+// An installed PWA on v79 has no way to join a Cup at all.
+const CACHE_VERSION = 'golfapp-v80-join-the-cup-day-one-is-holding';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
