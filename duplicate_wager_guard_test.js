@@ -132,7 +132,12 @@ describe('THE BUG THIS GUARD EXISTS FOR', () => {
     test('a modern Nassau round settles once', () => {
         const r = settle(round({ gameFormat: 'stroke', sideMatches: { n1: MODERN } }));
         assert.equal(r.receipts, 1);
-        assert.equal(r.marty, 40);
+        // RE-PINNED. $10 front + $10 back + $20 overall pays Marty $10 for the front
+        // and $20 for the overall; the back nine halves. That is $30. The old 40 was
+        // the collapsed stake - every segment priced at the OVERALL amount - which is
+        // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
+        // only what it costs is.
+        assert.equal(r.marty, 30);
         assert.equal(r.sum, 0);
     });
 
@@ -142,7 +147,10 @@ describe('THE BUG THIS GUARD EXISTS FOR', () => {
         // this assertion must keep describing reality.
         const r = settle(round(Object.assign({}, LEGACY, { sideMatches: { n1: MODERN } })));
         assert.equal(r.receipts, 2, 'two Nassaus between the same two golfers');
-        assert.equal(r.marty, 80, 'double-billed');
+        // 30 from the modern wager at its real per-segment prices, plus 40 from the
+        // legacy round which carries one $20 stake for all three segments. Still
+        // double-billed - that is what this test is about - just at honest prices.
+        assert.equal(r.marty, 70, 'double-billed');
         assert.equal(r.sum, 0, 'zero-sum, which is why no conservation check catches it');
     });
 

@@ -712,8 +712,21 @@
                 const virtual = teamA.map(p => Object.assign({}, p, { team: 'Team 1' }))
                     .concat(teamB.map(p => Object.assign({}, p, { team: 'Team 2' })));
                 const presses = sm.presses ? Object.values(sm.presses) : [];
+                // THE THREE STAKES, not one collapsed number. A Nassau is three
+                // independent wagers; this settled all of them - and every press off
+                // them - at `stake`, which buildNassauWagerPayload sets to the OVERALL
+                // amount. A wager typed as $10/$10/$20 charged $20/$20/$20, and because
+                // each auto-press inherits its segment's price the cascade multiplied
+                // it: $200 on a round whose face value was $40.
+                //
+                // calculateMatchEngine has always taken a stakeConfig and priced each
+                // segment from it; money-engine ships the builder. This call simply
+                // never passed it. Nothing about the arithmetic changes, and a wager
+                // with no per-segment stakes still yields undefined and settles exactly
+                // as it always has.
                 const calc = calculateMatchEngine(virtual, smCourse, savedScores,
-                    sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses);
+                    sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses,
+                    (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
                 if (!calc) return;
                 (calc.activeMatches || []).forEach(m => {
                     receipt.segments.push({
@@ -1003,7 +1016,9 @@
                 teamBPlayers.forEach(p => addAmount(p, bShare, smLabel));
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
+                // Same wager, same rule as above: each segment at its own stake.
+                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses,
+                    (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
                 if (!calc) return;
                 const t1Share = calc.t1TotalMoney / teamAPlayers.length;
                 const t2Share = -calc.t1TotalMoney / teamBPlayers.length;

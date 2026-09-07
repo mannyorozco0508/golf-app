@@ -441,7 +441,23 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
     // proof that none of them moved.
     const FROZEN = {
         'money-engine.js': '3c960947ed62ebf5c179050e3ac65f9e1ed88c106ab0a759763fdd7da8931a68',
-        'settlement-engine.js': '4aa88420ecfc952673cb5509619af9fab3e535e5d9a039ad74023056bce63dc5',
+        // RE-PINNED, with per-file approval, for one change each and no arithmetic.
+        // A Nassau is three independent wagers and both files settled all three - and
+        // every press off them - at the single collapsed `stake`, which is the OVERALL
+        // amount. A wager typed $10/$10/$20 charged $20/$20/$20, and because each
+        // auto-press inherits its segment's price the cascade multiplied it: $200 on a
+        // round whose face value was $40.
+        //
+        // calculateMatchEngine has always taken a stakeConfig and priced each segment
+        // from it; money-engine ships the builder. These call sites never passed it,
+        // and bet-strip's sideMatchRoundConfig dropped the fields before the live view
+        // ever saw them. Four call/shape changes, no formula touched.
+        //
+        // nassau_split_stake_test.js asserts the BEHAVIOUR rather than trusting these
+        // hashes to notice - including that a legacy single-stake wager and a uniform
+        // $20/$20/$20 wager settle byte-identically, so no round already paid in cash
+        // moves, and that the live strip and the receipt quote the same prices.
+        'settlement-engine.js': '1d7e7074d4c231e6412bfc663523cca8c38b3090d58d353414b55f9a33ae4c51',
         'pool-engine.js': '944957133f3bce762c704606f2aa43b26c9edfec16970c111445dd8d86cfc96b',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
@@ -456,7 +472,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // and round_duplicate_name_test.js - rather than trusting this hash to notice.
         'action-model.js': '5fd3455d899176f0ad10bb0ef35739718fa386c34d6b05bacf2f80948ed66ef2',
         'ryder-cup.js': '26ecc804d9a36b5063c26a61df3b78c2eff391ed452985ba114c2b41eb9e039d',
-        'bet-strip.js': '934c6a99291fc9848d107d2c877855aafd0758acfdcbb76842e44403006e290d',
+        'bet-strip.js': '60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',
         'database.rules.json': '3d7e4dce0f6e7c8bd566e33ba24148ba37bd39033eb61122d40aa2ed671fd979',

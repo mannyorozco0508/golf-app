@@ -123,7 +123,7 @@ function engines() {
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
-function settle(gameFormat, wager) {
+function settle(gameFormat, wager, legacyStakes) {
     const E = engines();
     const players = TWO.map((p,i) => Object.assign({}, p, { team: i ? 'Team 2':'Team 1' }));
     const scores = {};
@@ -133,6 +133,10 @@ function settle(gameFormat, wager) {
     if (wager) d.sideMatches = { n1: wager };
     if (gameFormat === 'nassau') {
         d.nassauStake = 20; d.nassauScoring = 'net'; d.nassauPressRule = 'none';
+        // Optional per-segment stakes, so a comparison against a modern wager is made
+        // on genuinely equal terms rather than relying on both sides collapsing to
+        // the overall amount - which is exactly what used to make them agree.
+        if (legacyStakes) Object.assign(d, legacyStakes);
     }
     const receipts = E.buildSideMatchReceipts(d, cd18, scores);
     const vals = Object.values(E.computeCombinedNetTotals(d, cd18, scores).netByName);
@@ -284,7 +288,12 @@ describe('THE MODERN SHORTCUT IS UNAFFECTED', () => {
         const r = settle('stroke', modern().wager);
         assert.equal(r.receipts, 1);
         assert.equal(r.legacyMain, 0);
-        assert.equal(r.marty, 40);
+        // RE-PINNED. $10 front + $10 back + $20 overall pays Marty $10 for the front
+        // and $20 for the overall; the back nine halves. That is $30. The old 40 was
+        // the collapsed stake - every segment priced at the OVERALL amount - which is
+        // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
+        // only what it costs is.
+        assert.equal(r.marty, 30);
         assert.equal(r.sum, 0);
     });
 });
@@ -315,7 +324,14 @@ describe('MONEY IS UNCHANGED BY ANY OF THIS', () => {
             window.__w = collectSetupNassauWager();
         `, sb);
         const w = JSON.parse(JSON.stringify(vm.runInContext('window.__w', sb)));
-        assert.equal(settle('stroke', w).marty, settle('nassau', null).marty);
+        // The legacy round is given the SAME three stakes. Without that this compared
+        // a $10/$10/$20 wager against a flat $20 one and called it equal terms - true
+        // only while the modern side collapsed to the overall amount.
+        assert.equal(settle('stroke', w).marty, settle('nassau', null, {
+            nassauFrontStake: w.frontStake,
+            nassauBackStake: w.backStake,
+            nassauOverallStake: w.overallStake
+        }).marty);
     });
 
     test('no engine or settlement file was touched', () => {

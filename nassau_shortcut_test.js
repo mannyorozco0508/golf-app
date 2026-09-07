@@ -107,7 +107,7 @@ function wizard(selectValue, { players = TWO, stakes = null, picks = null, tick 
     };
 }
 
-function settle(gameFormat, wager) {
+function settle(gameFormat, wager, legacyStakes) {
     const E = engines();
     const scores = {};
     TWO.forEach(p => cd18.forEach(h => { scores['p'+p.id+'_h'+h.hole] = 4; }));
@@ -122,6 +122,10 @@ function settle(gameFormat, wager) {
         d.nassauStake = 20;
         d.nassauScoring = 'net';
         d.nassauPressRule = 'none';
+        // Optional per-segment stakes, so a comparison against a modern wager is made
+        // on genuinely equal terms rather than relying on both sides collapsing to
+        // the overall amount - which is exactly what used to make them agree.
+        if (legacyStakes) Object.assign(d, legacyStakes);
     }
     const receipts = E.buildSideMatchReceipts(d, cd18, scores);
     const vals = Object.values(E.computeCombinedNetTotals(d, cd18, scores).netByName);
@@ -300,7 +304,12 @@ describe('SETTLEMENT: ONE RECEIPT, NO SYNTHETIC DUPLICATE', () => {
         const r = settle('stroke', w);
         assert.equal(r.receipts, 1);
         assert.equal(r.legacyMain, 0, 'stroke carries no synthetic main wager');
-        assert.equal(r.marty, 40);
+        // RE-PINNED. $10 front + $10 back + $20 overall pays Marty $10 for the front
+        // and $20 for the overall; the back nine halves. That is $30. The old 40 was
+        // the collapsed stake - every segment priced at the OVERALL amount - which is
+        // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
+        // only what it costs is.
+        assert.equal(r.marty, 30);
         assert.equal(r.sum, 0);
     });
 
@@ -309,11 +318,18 @@ describe('SETTLEMENT: ONE RECEIPT, NO SYNTHETIC DUPLICATE', () => {
         // panel's. The first version of this test compared a no-press modern wager
         // against a 2-down legacy round and would have blamed the shortcut for a
         // difference that was really my fixture.
+        // EQUAL TERMS NOW MEANS EQUAL STAKES TOO. This compared a modern wager set
+        // to $10/$10/$20 against a legacy round carrying a single $20, and passed
+        // only because the modern one used to collapse to the overall amount. The
+        // shapes really do agree - but they have to be given the same wager first.
         const modern = wizard('nassau-modern').wager;
         const paid = settle('stroke', modern).marty;
-        assert.equal(paid, 40, 'Marty won two holes on the front');
-        assert.equal(settle('nassau', null).marty, paid,
-            'the golfer gets the same money either way');
+        assert.equal(paid, 30, 'Marty won two holes on the front');
+        assert.equal(settle('nassau', null, {
+            nassauFrontStake: modern.frontStake,
+            nassauBackStake: modern.backStake,
+            nassauOverallStake: modern.overallStake
+        }).marty, paid, 'the golfer gets the same money either way');
     });
 
     test('the double-billing shape is still unreachable from this path', () => {

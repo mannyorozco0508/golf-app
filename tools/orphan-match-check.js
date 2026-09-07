@@ -61,6 +61,48 @@ function getJson(path) {
     });
 }
 
+// SPLIT-STAKE NASSAU EXPOSURE.
+//
+// settlement-engine.js settles a Nassau side match with the single collapsed
+// `stake` field and never passes calculateMatchEngine its stakeConfig, so every
+// segment - and every press off it - is priced at the overall stake. A wager saved
+// as $10 front / $10 back / $20 overall settles as $20 / $20 / $20.
+//
+// Fixing that changes what old rounds say when reopened, because settlement
+// recomputes from stored scores every time. This reports which rounds hold such a
+// wager so the exposure can be seen BEFORE the fix, not discovered after.
+//
+// It reports the SHAPE, not a dollar delta. The delta depends on how many presses
+// fired, which depends on the scores, which is the engine's job to work out - and
+// this tool does not carry a second copy of the money math to guess with. What it
+// can say without guessing is: this round holds a wager whose segments are not all
+// the same price, so its receipt will change.
+function findStakeExposure(code, event) {
+    const out = [];
+    const sms = (event || {}).sideMatches;
+    if (!sms || typeof sms !== 'object') return out;
+    Object.keys(sms).forEach(id => {
+        const m = sms[id] || {};
+        if (m.format !== 'nassau') return;
+        const num = v => (v === undefined || v === null || v === '') ? null : Number(v);
+        const f = num(m.frontStake), b = num(m.backStake), o = num(m.overallStake);
+        const stake = num(m.stake);
+        // All three absent is a genuinely legacy single-stake wager: nassauStakeConfig
+        // returns undefined for it and the fix leaves it byte-identical.
+        if (f === null && b === null && o === null && num(m.autoPressStake) === null) return;
+        const priced = [f, b, o].filter(v => v !== null);
+        const uniform = priced.every(v => v === stake);
+        if (uniform && num(m.autoPressStake) === null) return;   // same price everywhere: no change
+        out.push({ round: code, wager: id, kind: 'split-stake-nassau',
+            front: f, back: b, overall: o, settlesEverySegmentAt: stake,
+            customAutoPress: num(m.autoPressStake),
+            detail: 'this Nassau will re-settle at different amounts once the '
+                  + 'per-segment stakes are honoured; today every segment and every '
+                  + 'press is priced at ' + stake });
+    });
+    return out;
+}
+
 // THE DETECTOR. Pure, so the self-test can drive it without a network.
 function findProblems(code, cup) {
     const out = [];
@@ -123,8 +165,28 @@ const FIXTURES = [
     { name: 'a round with no Cup on it', bad: false, cup: null }
 ];
 
+const STAKE_FIXTURES = [
+    { name: 'a split-stake Nassau ($10/$10/$20)', bad: true, event: { sideMatches: {
+        K1: { format: 'nassau', frontStake: 10, backStake: 10, overallStake: 20, stake: 20 } } } },
+    { name: 'a custom auto-press amount', bad: true, event: { sideMatches: {
+        K1: { format: 'nassau', frontStake: 20, backStake: 20, overallStake: 20, stake: 20,
+              autoPressStake: 5 } } } },
+    { name: 'a uniform $20/$20/$20 Nassau, which does not move', bad: false, event: { sideMatches: {
+        K1: { format: 'nassau', frontStake: 20, backStake: 20, overallStake: 20, stake: 20 } } } },
+    { name: 'a legacy single-stake Nassau, which does not move', bad: false, event: { sideMatches: {
+        K1: { format: 'nassau', stake: 20 } } } },
+    { name: 'a match side bet, which has no segments', bad: false, event: { sideMatches: {
+        K1: { format: 'match', stake: 20 } } } },
+    { name: 'a round with no side matches', bad: false, event: { players: [] } }
+];
+
 function selfTest(verbose) {
     const failures = [];
+    STAKE_FIXTURES.forEach(f => {
+        const found = findStakeExposure('FIXTURE', f.event).length > 0;
+        if (found !== f.bad) failures.push((f.bad ? 'MISSED: ' : 'FALSE ALARM: ') + f.name);
+        if (verbose) console.log('  ' + (found === f.bad ? 'ok  ' : 'FAIL') + '  ' + f.name);
+    });
     FIXTURES.forEach(f => {
         const found = findProblems('FIXTURE', f.cup).length > 0;
         if (found !== f.bad) {
@@ -192,6 +254,15 @@ function selfTest(verbose) {
             sessions: sessions ? sessions.length : 0, matches: matches,
             pointsAt: ref ? (ref.host + '/' + ref.sessionId) : null });
         findProblems(code, cup).forEach(p => report.problems.push(p));
+
+        // Read separately from the Cup, because this lives on the round itself.
+        let ev;
+        try { ev = await getJson('/events/' + encodeURIComponent(code) + '.json'); }
+        catch (e) { bail(e.message); }
+        findStakeExposure(code, ev).forEach(x => {
+            report.stakeExposure = report.stakeExposure || [];
+            report.stakeExposure.push(x);
+        });
     }
 
     // A code that is not there proves NOTHING about it, so this is exit 2 rather
@@ -203,7 +274,13 @@ function selfTest(verbose) {
             + (missing.length === 1 ? 'that code.' : 'those codes.'));
     }
 
+    // Exposure is REPORTED, not failed on. It is not a defect in the stored data -
+    // the wager was saved exactly as typed - it is a list of rounds whose displayed
+    // money will move when the settlement bug is fixed.
+    const exposed = (report.stakeExposure || []).length;
     report.verdict = report.problems.length ? 'FOUND' : 'CLEAN';
+    if (exposed) report.stakeExposureNote = exposed + ' Nassau wager(s) will re-settle '
+        + 'at a different amount once per-segment stakes are honoured';
     console.log(JSON.stringify(report, null, 2));
     if (!report.problems.length) {
         console.log('\nNo stranded or empty matches in the rounds scanned. '

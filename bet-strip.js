@@ -198,7 +198,11 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
     }
 
     const manualPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
-    const calc = calculateMatchEngine(teamPlayers, holes, scores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses);
+    // The live view prices each Nassau segment from the same config settlement uses.
+    // money-engine.js already passes this when it settles a round-format Nassau; the
+    // strip did not, so the two disagreed about a split-stake round all afternoon.
+    const calc = calculateMatchEngine(teamPlayers, holes, scores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses,
+        (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(data) : undefined));
     if (!calc || !calc.activeMatches || calc.activeMatches.length === 0) {
         return Object.assign({}, empty, { reason: 'Waiting for scores.' });
     }
@@ -886,6 +890,17 @@ function sideMatchRoundConfig(sm, matchPlayers) {
         nassauScoring: sm.scoring || 'gross',
         matchStake: sm.stake || 0,
         nassauStake: sm.stake || 0,
+        // CARRIED, NOT DROPPED. This flattens a side-match wager into a round-shaped
+        // object for the live engine, and it used to keep only the collapsed `stake` -
+        // so the strip priced every segment at the overall amount while the receipt
+        // priced each one properly. A golfer would watch one number all afternoon and
+        // be handed a different one at the bar, which is worse than both being wrong.
+        // Undefined stays undefined: a legacy single-stake wager still produces no
+        // stakeConfig and behaves exactly as before.
+        nassauFrontStake: sm.frontStake,
+        nassauBackStake: sm.backStake,
+        nassauOverallStake: sm.overallStake,
+        nassauAutoPressStake: sm.autoPressStake,
         matchPressRule: sm.pressRule || 'none',
         nassauPressRule: sm.pressRule || 'none',
         matchPresses: sm.presses ? Object.values(sm.presses) : [],

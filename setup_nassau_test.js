@@ -304,7 +304,12 @@ describe('IT REACHES THE LIVE SURFACES AND SETTLES ONCE', () => {
         const d = roundWith(setupWager(), 18);
         const c = E.computeCombinedNetTotals(d, cd18, d.scores);
         const vals = Object.values(c.netByName);
-        assert.equal(vals.find(v => v.name === 'Marty').net, 40);
+        // RE-PINNED. $10 front + $10 back + $20 overall pays Marty $10 for the front
+        // and $20 for the overall; the back nine halves. That is $30. The old 40 was
+        // the collapsed stake - every segment priced at the OVERALL amount - which is
+        // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
+        // only what it costs is.
+        assert.equal(vals.find(v => v.name === 'Marty').net, 30);
         assert.equal(vals.reduce((a, v) => a + v.net, 0), 0);
     });
 });

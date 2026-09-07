@@ -332,7 +332,18 @@
 // on nearly every round this group plays. It nearly got the card deleted, which
 // would have left a four-ball with no way to share a round at all. An installed PWA
 // on v71 keeps a page that mislabels its own link and shouts about deletion.
-const CACHE_VERSION = 'golfapp-v72-setup-page-truth';
+// Moved to v73: a Nassau settles at the stakes it was set up with. A wager typed
+// as $10 front / $10 back / $20 overall saved correctly and then settled every
+// segment at $20 - and because each auto-press inherits its segment's price, the
+// cascade multiplied it: $200 on a round whose face value was $40. The delta was a
+// MULTIPLE, not a fixed overcharge, and it scaled with how hard the presses ran.
+// calculateMatchEngine always took a stakeConfig and priced each segment from it;
+// three call sites never passed it, and bet-strip's flattening dropped the fields
+// before the live view saw them. Four call/shape changes, no arithmetic. Legacy
+// single-stake and uniform wagers settle byte-identically, so nothing already paid
+// in cash moves. An installed PWA on v72 keeps overcharging every split-stake
+// Nassau it settles.
+const CACHE_VERSION = 'golfapp-v73-nassau-segment-stakes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
