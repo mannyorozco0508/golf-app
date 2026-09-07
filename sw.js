@@ -378,7 +378,32 @@
 // promise a bet that will not be written or stay silent about one that will.
 // An installed PWA on v74 can still create a foursome's round with nothing to send
 // anybody, and still lose a $40 Nassau to the Back button without a word.
-const CACHE_VERSION = 'golfapp-v75-share-after-save-and-keep-the-bet';
+// Moved to v76: the FULL leaderboard is the full field, and its footer can finally
+// say when it is not.
+//   Tapping "Full Leaderboard" on the scorecard called liveStandings() with no
+// argument, which scopes to the group being scored - so a Group 1 scorekeeper on a
+// twelve-golfer round opened the full board and was shown four people. Three
+// separate comments said whole field: the overlay markup, renderLiveBoard() and the
+// footer, whose stated job is to confirm nobody is missing.
+//   THE FOOTER COULD NEVER HAVE SAID SO. It was built as
+// 'Showing ' + shown + ' of ' + shown - the same variable twice - so it read
+// "Showing 4 of 4" on a field of twelve. The test guarding it was named "the footer
+// confirms the whole field is present" and set no group lock, exercising the one
+// state where the two numbers legitimately agree. It now drives a real ?group=1
+// link and fails without this fix.
+//   The expanded board now defaults to the whole field with a By Group / All
+// Players toggle - the same two choices the Leaderboard page offers, under the same
+// names, built from a button and a class rather than a <details>, and not persisted.
+// The second number in the footer is the round's real player count, so narrowing
+// reads "Showing 4 of 12".
+//   THE COMPACT CARD IS UNCHANGED and still scoped to the foursome being scored.
+// group_scope_test.js holds that rule and a new suite asserts it again, so widening
+// the overlay cannot quietly widen the working view with it.
+//   Also carries the Skins carry-rule copy from the previous commit: "void" was
+// app-only jargon and left three surfaces for Carry Over / No Carry.
+// An installed PWA on v75 still shows a group scorekeeper four golfers under a
+// heading that says Full Leaderboard, and a footer that agrees with itself.
+const CACHE_VERSION = 'golfapp-v76-the-full-leaderboard-is-the-full-field';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

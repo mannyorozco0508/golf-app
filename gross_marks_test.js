@@ -322,7 +322,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v75-share-after-save-and-keep-the-bet';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v76-the-full-leaderboard-is-the-full-field';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

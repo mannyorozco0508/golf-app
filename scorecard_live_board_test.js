@@ -493,8 +493,33 @@ describe('THE MODAL READS LIKE A FINISHED SCREEN', () => {
         assert.match(read('index.html'), /id="live-board-overlay"[^>]*onclick="[^"]*closeLiveBoard\(\)/);
     });
 
+    // THIS TEST USED TO SET NO GROUP LOCK, so it exercised the one state where the
+    // two numbers legitimately agree - and the footer it guards was built as
+    // 'Showing ' + shown + ' of ' + shown, the same variable twice. It could not
+    // have failed on the defect it is named after. A real ?group=1 link now drives
+    // it: twelve golfers, four of them this scorekeeper's.
+    const lockedScorecard = (lockedGroup) => {
+        const sb = loadHtmlInlineScript('index.html', IDX_DEPS);
+        const { d, gm } = fixture();
+        vm.runInContext(`
+            currentMode = 'ABCD';
+            hasGroupLock = true; lockedGroup = ${lockedGroup};
+            currentData = ${JSON.stringify(d)};
+            window.__scPlayerGroupMap = ${JSON.stringify(gm)};
+            window.__scFilteredPlayers = currentData.players.filter(function (p) {
+                return ${JSON.stringify(gm)}[String(p.id)] === ${lockedGroup}; });
+            renderLiveBoard();
+        `, sb);
+        return sb.document.getElementById('live-board-body').innerHTML;
+    };
+
     test('the footer confirms the whole field is present', () => {
         assert.match(strip(scorecard().board()), /Showing 12 of 12 players/);
+    });
+
+    test('and it says so from a GROUP LINK too, which is where it matters', () => {
+        assert.match(strip(lockedScorecard(1)), /Showing 12 of 12 players/,
+            'a group scorekeeper opening the FULL leaderboard is shown a short field');
     });
 
     test('the header stays put while the body scrolls', () => {

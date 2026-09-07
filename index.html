@@ -1095,6 +1095,12 @@
            360px phone gets a horizontal scrollbar. */
         .rc-card, .rc-card * { min-width:0; overflow-wrap:anywhere; }
         .lw-foot { font-size: 0.6rem; color: var(--text-muted); margin-top: 5px; }
+        .lb-scope-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .lb-scope-btn { flex: 1; min-height: 44px; border-radius: 8px; cursor: pointer;
+            font-size: 0.8rem; font-weight: bold; border: 1px solid var(--border-mid);
+            background: transparent; color: var(--text-muted); }
+        .lb-scope-btn.active { border-color: var(--brand-green);
+            background: var(--brand-green); color: #fff; }
         .lb-foot { font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 8px 0 2px 0; }
 
         /* FULL FIELD OVERLAY */
@@ -1347,7 +1353,9 @@ html {
 </div>
 
 <!-- FULL FIELD, WITHOUT LEAVING SCORE ENTRY. Navigating to leaderboard.html mid-hole
-     loses whatever is half-typed; an overlay keeps the scorecard mounted underneath. -->
+     loses whatever is half-typed; an overlay keeps the scorecard mounted underneath.
+     This claimed the full field while renderLiveBoard() asked for the scoped set; it
+     is now true, and a By Group / All Players toggle narrows it on a group link. -->
 <div class="modal-overlay" id="live-board-overlay" onclick="if (event.target === this) closeLiveBoard();">
     <div class="modal-box lb-overlay-box">
         <!-- REAL CHARACTERS, NOT ESCAPES. \uXXXX sequences only resolve inside a JS
@@ -2360,7 +2368,11 @@ html {
     // ALWAYS NET HERE. The Leaderboard has a ranking toggle; the scorecard ticker
     // does not, because "who is leading" during a money round means net. The
     // toggle over there must not change what this line means.
-    function liveStandings() {
+    // scope: 'field' for the whole round, anything else (including omitted) for
+    // the group this link is responsible for. The DEFAULT IS UNCHANGED - every
+    // existing caller passes nothing and keeps the scoped behaviour the product
+    // rule requires; only the expanded board asks for the field.
+    function liveStandings(scope) {
         if (typeof computeNetToParStandings !== 'function') return [];
         // THE SCORECARD IS A WORKING VIEW FOR ONE FOURSOME.
         //
@@ -2378,9 +2390,12 @@ html {
         // A cross-group wager still appears in LIVE MATCHES & PRESSES and names the
         // opponent there - but it does not add that golfer to these standings, which
         // represent the group being scored.
-        const players = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-            ? window.__scFilteredPlayers
-            : ((currentData && currentData.players) || []);
+        const whole = (currentData && currentData.players) || [];
+        const players = (scope === 'field')
+            ? whole
+            : ((window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
+                ? window.__scFilteredPlayers
+                : whole);
         const courseData = (currentData && currentData.courseData) || [];
         const savedScores = (currentData && currentData.scores) || {};
         if (players.length === 0 || courseData.length === 0) return [];
@@ -3053,6 +3068,24 @@ html {
             || String(a.name).localeCompare(String(b.name)));
     }
 
+    // WHICH FIELD THE EXPANDED BOARD IS SHOWING.
+    //
+    // 'field' by default, because the button that opens it says "Full Leaderboard"
+    // and the overlay is the surface where the whole round belongs - the compact
+    // card above stays scoped to the foursome being scored, which is the working
+    // view and is asserted separately.
+    //
+    // NOT PERSISTED, deliberately. A stored toggle is state that outlives the
+    // reason it was set, and the one <details> in this app that remembered itself
+    // poisoned its own value at parse time. This resets to the whole field every
+    // time the page loads, which is also what the button promises.
+    let liveBoardScope = 'field';
+
+    function setLiveBoardScope(mode) {
+        liveBoardScope = (mode === 'group') ? 'group' : 'field';
+        renderLiveBoard();
+    }
+
     function openLiveBoard() {
         renderLiveBoard();
         const el = document.getElementById('live-board-overlay');
@@ -3065,13 +3098,39 @@ html {
 
     // The whole field, plus who has actually won a skin. Reads canonical results
     // and formats them; it resolves nothing.
+    //
+    // IT SAID THAT AND DID NOT DO IT. This called liveStandings() with no argument,
+    // which scopes to the group, so a Group 1 scorekeeper on a twelve-golfer round
+    // tapped "Full Leaderboard" and was shown four people - while this comment, the
+    // overlay's own markup comment and the footer all said whole field.
     function renderLiveBoard() {
         const body = document.getElementById('live-board-body');
         if (!body) return;
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        const rows = liveStandings();
+        const rows = liveStandings(liveBoardScope);
+        // THE REAL FIELD, which is what "of N" has to mean for the footer to be
+        // capable of reporting anything.
+        const fieldSize = ((currentData && currentData.players) || []).length;
 
-        let html = '<div class="lb-row lb-head"><span class="lb-c-pos">POS</span>'
+        // Offered only where there is something to scope to: a group link on a
+        // round with more than one group. An organizer has no "my group".
+        const scoped = (window.__scFilteredPlayers || []);
+        const canScope = scoped.length > 0 && scoped.length < fieldSize;
+        let html = '';
+        if (canScope) {
+            // A BUTTON AND A CLASS. The same two choices the Leaderboard page
+            // offers, under the same names, so a golfer moving between the two
+            // surfaces is not asked to learn a second vocabulary.
+            const btn = (mode, label) => '<button type="button" class="lb-scope-btn'
+                + (liveBoardScope === mode ? ' active' : '') + '"'
+                + ' onclick="setLiveBoardScope(\'' + mode + '\')">' + label + '</button>';
+            html += '<div class="lb-scope-row">'
+                + btn('group', '\uD83C\uDFCC\uFE0F By Group')
+                + btn('field', '\uD83D\uDCCB All Players')
+                + '</div>';
+        }
+
+        html += '<div class="lb-row lb-head"><span class="lb-c-pos">POS</span>'
             + '<span class="lb-c-name">PLAYER</span><span class="lb-c-score">SCORE</span>'
             + '<span class="lb-c-par">NET TO PAR</span><span class="lb-c-thru">THRU</span></div>';
 
@@ -3090,10 +3149,15 @@ html {
                  + '</div>';
         });
 
-        // Confirms at a glance that nobody is missing from the list.
+        // CONFIRMS AT A GLANCE THAT NOBODY IS MISSING - which the previous version
+        // could not do, because it was 'Showing ' + shown + ' of ' + shown: the same
+        // variable twice, reading "Showing 4 of 4" on a field of twelve. The second
+        // number is now the round's actual player count, so narrowing to a group
+        // reads "Showing 4 of 12" and the gap is on screen.
         const shown = rows.length;
-        html += '<div class="lb-foot">Showing ' + shown + ' of ' + shown
-             + ' player' + (shown === 1 ? '' : 's') + '</div>';
+        const total = Math.max(fieldSize, shown);
+        html += '<div class="lb-foot">Showing ' + shown + ' of ' + total
+             + ' player' + (total === 1 ? '' : 's') + '</div>';
         html += renderSkinsWonHtml();
         body.innerHTML = html;
     }
