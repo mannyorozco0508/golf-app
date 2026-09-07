@@ -125,10 +125,20 @@
            both themes. A circle also reads as a brand lockup where a rounded square
            would read as a second app icon floating on the page. Sized to sit in the
            same footprint the 3.5rem emoji occupied, not larger. */
-        .lobby-mark { width: 72px; height: 72px; margin: 0 auto 6px auto; border-radius: 50%;
+        .lobby-mark { width: 132px; height: 132px; margin: 0 auto 8px auto; border-radius: 50%;
             background: var(--brand-cream); display: flex; align-items: center; justify-content: center; }
-        .lobby-mark img { width: 56px; height: 56px; display: block; }
-        .lobby-title { font-size: 2rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; }
+        .lobby-mark img { width: 104px; height: 104px; display: block; }
+        /* THE MARK LEADS, and the wordmark supports it - it used to be the other way
+           round, with the name set larger than the symbol above it. The wordmark
+           STAYS: a symbol on its own does not tell a first-time golfer what this is. */
+        .lobby-title { font-size: 1.35rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; letter-spacing: 0.5px; }
+        /* A CONVENIENCE FOR ONE PERSON ON ONE DEVICE, not a third headline choice.
+           It was a full-width primary button competing with the two tiles that are
+           the actual question this screen asks. Still a 44px touch target: small is
+           not the same as unreachable on a phone. */
+        .resume-link { display: inline-flex; align-items: center; justify-content: center;
+            min-height: 44px; padding: 0 10px; font-size: 0.85rem; font-weight: bold;
+            color: var(--brand-navy); text-decoration: underline; cursor: pointer; }
         .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
         .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid var(--border-mid) !important; border-radius: 10px !important; padding: 14px !important; background: var(--nav-bg) !important; color: var(--text-main) !important; }
@@ -344,7 +354,7 @@ html {
 
 <div class="container" id="lobby-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-    <div class="lobby-logo lobby-mark" onclick="handleSecretTap()"><img src="logo-mark.png" alt="Rattle Golf" width="56" height="56"></div>
+    <div class="lobby-logo lobby-mark" onclick="handleSecretTap()"><img src="logo-mark.png" alt="Rattle Golf" width="104" height="104"></div>
     <div class="lobby-title">Rattle Golf</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
 
@@ -400,21 +410,23 @@ html {
     </div>
 
     <!-- RESUME GAME BOX -->
-    <div id="resume-container" style="display: none; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid var(--border-light);">
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">Recent Game Found</span>
-        <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="resumeGame()">▶️ Resume Game (<span id="resume-room-badge"></span>)</button>
+    <div id="resume-container" style="display: none; margin-bottom: 14px;">
+        <a class="resume-link" onclick="resumeGame()">▶️ Resume <span id="resume-room-badge"></span></a>
     </div>
 
     <!-- PICKING A TILE IS THE DECISION. The page asks "What are you setting up?"
-         and offers two answers. The button that used to sit here was a second way
-         to give one of those answers, so the tile that looked like the answer did
-         nothing but tick itself and print a line of text. The "OR" went with it:
-         it separated that button from Join Game and has nothing left to separate. -->
-    <input type="text" id="join-room-input" class="join-input" placeholder="ENTER GAME CODE" maxlength="6">
-    <button class="btn-outline" onclick="joinRoom()">📥 Join Game</button>
-
-    <div class="lobby-divider"><span>OR</span></div>
-
+         and offers two answers. A button used to sit here saying the same thing a
+         tile says, so the tile that looked like the answer did nothing but tick
+         itself and print a line of text. -->
+    <!-- NO CODE ENTRY. A golfer arrives on a LINK the organizer sends, and the
+         link carries ?game=CODE which this page reads on load. Nobody has ever
+         typed a code here, so the field asked every arriving golfer to answer a
+         question that was never theirs. Nothing depended on it: the round link,
+         a group's scorekeeper link, the read-only follow link and a deep link
+         carrying ?eventType= all read the URL and never went near joinRoom.
+         Legacy 4-character codes still open, because the link path applies no
+         length rule at all. Duplicate keeps its own field below - it asks a
+         different question, of an organizer who has the code in front of them. -->
     <p style="font-size:0.75rem; color:var(--text-muted); margin: 0 0 8px 0;">Playing 36 today, or running the same setup again? Copy an existing round's course/format/side games as a starting point — you can still edit players before saving.</p>
     <input type="text" id="duplicate-room-input" class="join-input" placeholder="GAME CODE TO COPY" maxlength="6">
     <button class="btn-outline" onclick="duplicateRoom()">📑 Duplicate This Round's Setup</button>
@@ -3033,17 +3045,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function createRoom() {
         const newCode = generateRoomCode();
         let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
-        if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
-        window.location.href = dest;
-    }
-
-    function joinRoom() {
-        const inputCode = document.getElementById("join-room-input").value.trim().toUpperCase();
-        if (inputCode.length < 2) {
-            alert("⚠️ Please enter a valid game code.");
-            return;
-        }
-        let dest = `admin.html?game=${inputCode}`;
         if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
         window.location.href = dest;
     }

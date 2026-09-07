@@ -134,33 +134,42 @@ describe('THE SAFE ALPHABET IS UNCHANGED', () => {
 
 describe('EXISTING FOUR-CHARACTER CODES STILL WORK', () => {
 
-    test('joining rejects only codes shorter than two characters', () => {
-        // The one length rule in the app. A 4-character code from an old round
-        // passes it exactly as it always did.
-        const src = read('admin.html');
-        const at = src.indexOf('function joinRoom');
-        const fn = src.slice(at, at + 500);
-        assert.match(fn, /inputCode\.length < 2/, 'the only length check');
-        assert.ok(!/length !== \d|length === \d|length < [3-9]/.test(fn),
-            'nothing may require a specific or longer length');
+    // THE TYPED-CODE PATH IS GONE. joinRoom and its field were removed once it was
+    // confirmed that nobody has ever typed a code - a golfer arrives on a link the
+    // organizer sends. So the length rule this used to guard no longer exists, and
+    // the guarantee moved to the path that DOES: the link.
+    //
+    // The link path applies no length rule at all, which is why a legacy round
+    // still opens. That is asserted directly below by opening one, rather than by
+    // reading a validator that is no longer there.
+    test('the link path applies no length rule to a code', () => {
+        ['admin.html', 'index.html'].forEach(f => {
+            const src = read(f);
+            assert.match(src, /urlParams\.get\('game'\)/, f + ' stopped reading the link');
+            const at = src.indexOf("urlParams.get('game')");
+            const near = src.slice(Math.max(0, at - 300), at + 300);
+            assert.ok(!/length\s*[<>!=]==?\s*\d/.test(near),
+                f + ' gates the link on a code length: ' + near.slice(250, 350));
+        });
     });
 
     ['ABCD', 'WXYZ', 'QRST'].forEach(code => {
-        test(`a legacy 4-character code "${code}" is still accepted`, () => {
-            const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
-            vm.runInContext(`
-                window.__dest = null;
-                alert = function(m){ window.__alert = m; };
-                document.getElementById('join-room-input').value = '${code}';
-                window.location.href = '';
-                joinRoom();
-                window.__dest = window.location.href;
-            `, sb);
-            const dest = String(vm.runInContext('window.__dest', sb) || '');
-            assert.ok(dest.includes('game=' + code),
-                'a 4-character code must still route to its round, got: ' + dest);
-            assert.equal(vm.runInContext('window.__alert', sb), undefined,
-                'and must not be rejected');
+        test(`a legacy 4-character link "${code}" still opens its round`, () => {
+            // The real path, and a stronger check than the old one: this opens the
+            // page the way a golfer does and reads what round it decided it is on,
+            // rather than asking a validator whether it would have allowed it.
+            const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+                { search: '?game=' + code });
+            assert.equal(vm.runInContext('currentMode', sb), code,
+                'a 4-character link must still open its round');
+        });
+
+        test(`and the scorecard opens on "${code}" too`, () => {
+            const sb = loadHtmlInlineScript('index.html',
+                ['score-marks.js', 'money-engine.js', 'action-model.js',
+                 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js',
+                 'hole-events.js', 'ryder-cup.js'], { search: '?game=' + code });
+            assert.equal(vm.runInContext('currentMode', sb), code);
         });
     });
 
@@ -187,28 +196,29 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
 
     test('every code input accepts at least six characters', () => {
         const inputs = inputMaxLengths();
-        assert.ok(inputs.length >= 3, 'expected join, duplicate and trip inputs');
+        // Two now, not three: the round's join field is gone. Duplicate (admin) and
+        // trip-join (trip) are the only places a code is still typed, both by
+        // someone who has the code in front of them.
+        assert.ok(inputs.length >= 2, 'expected the duplicate and trip inputs');
+        assert.ok(!inputs.some(i => i.id === 'join-room-input'),
+            'the round join field is back');
         inputs.forEach(i => assert.ok(i.max === null || i.max >= CODE_LENGTH,
             i.file + ' #' + i.id + ' has maxlength=' + i.max +
             ' and would truncate a ' + CODE_LENGTH + '-character code'));
     });
 
-    test('a generated round code passes join unchanged', () => {
-        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
-        vm.runInContext(`
-            alert = function(m){ window.__alert = m; };
-            var code = generateRoomCode();
-            window.__code = code;
-            document.getElementById('join-room-input').value = code;
-            window.location.href = '';
-            joinRoom();
-            window.__dest = window.location.href;
-        `, sb);
-        const code = String(vm.runInContext('window.__code', sb));
-        const dest = String(vm.runInContext('window.__dest', sb) || '');
+    test('a generated round code survives the round trip through a link', () => {
+        // Generate a code the way createRoom does, put it in a link the way the
+        // organizer shares it, and open that link. A truncation anywhere in that
+        // chain opens the wrong round, or none.
+        const gen = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
+        vm.runInContext('window.__code = generateRoomCode();', gen);
+        const code = String(vm.runInContext('window.__code', gen));
         assert.equal(code.length, CODE_LENGTH);
-        assert.ok(dest.includes('game=' + code),
-            'the whole code must reach the URL, got: ' + dest);
+        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+            { search: '?game=' + code + '&eventType=quick' });
+        assert.equal(vm.runInContext('currentMode', sb), code,
+            'the whole code did not survive the link');
     });
 
     test('a generated code passes duplicate-round unchanged', () => {

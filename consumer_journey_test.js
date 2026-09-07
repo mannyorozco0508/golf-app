@@ -27,7 +27,8 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { REPO_ROOT } = require('./helpers/load-script.js');
+const vm = require('vm');
+const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADMIN = read('admin.html');
@@ -47,10 +48,19 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
             'createRoom no longer goes anywhere');
     });
 
-    test('Join a round, with a code field that fits current codes', () => {
-        assert.match(ADMIN, /id="join-room-input"/);
-        assert.match(ADMIN, /onclick="joinRoom\(\)"/);
-        assert.match(ADMIN, /maxlength="6"/, 'six-character codes must be typeable');
+    // JOINING IS A LINK, NOT A CODE. The typed-code field is gone: a golfer
+    // arrives on a link the organizer sends, and nobody has ever typed a code.
+    // What must survive is the path that is actually used, so that is what this
+    // now guards - including a legacy 4-character code, because the link path
+    // applies no length rule at all.
+    test('Join a round, by opening the link the organizer sent', () => {
+        assert.ok(!/id="join-room-input"/.test(ADMIN),
+            'the home still asks for a code nobody types');
+        assert.match(ADMIN, /urlParams\.get\('game'\)/, 'the link parameter must be read');
+        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js'],
+            { search: '?game=ABCD' });
+        assert.equal(vm.runInContext('currentMode', sb), 'ABCD',
+            'a link no longer opens the round it names');
     });
 
     test('Trips', () => {

@@ -63,6 +63,74 @@ const run = (sb, e) => vm.runInContext(e, sb);
 const cardShown = sb => run(sb, '(function(){var c=document.getElementById("sidematches-card");'
     + 'return c ? (c.style.display !== "none") : null;})()');
 
+// EXTENDED AFTER THE WAVE ABOVE. Matches and Bets got a back control; the other
+// pages a golfer is SENT to during a round had none at all - Final Results is
+// reached from a button on Matches, Stats and the Leaderboard from the nav bar,
+// and a Trip from the Home tile. Every one of them was a dead end: the nav bar
+// lists destinations, not a return.
+//
+// The round-setup WIZARD was already covered and is not touched here. All seven
+// steps carry a Back, and the first step's is hidden rather than dead, because
+// any step can be first now and the button follows the workflow.
+const PAGES_WITH_BACK = [
+    { file: 'sidematches.html', backs: 1 },
+    { file: 'skins.html', backs: 1 },
+    { file: 'settlement.html', backs: 1 },
+    { file: 'stats.html', backs: 1 },
+    { file: 'leaderboard.html', backs: 1 },
+    // Two screens, two dead ends. Giving only the first a way back is the
+    // "just some" problem this wave exists to fix.
+    { file: 'trip.html', backs: 2 }
+];
+
+describe('A WAY BACK OUT — EVERY PAGE THAT IS SENT TO', () => {
+
+    PAGES_WITH_BACK.forEach(p => {
+        const src = read(p.file);
+
+        test(p.file + ' offers a back control on every screen it has', () => {
+            assert.equal((src.match(/class="back-btn"/g) || []).length, p.backs,
+                p.file + ' has the wrong number of back controls');
+        });
+
+        test(p.file + ' defines goBack exactly once', () => {
+            assert.equal((src.match(/function goBack\(\)/g) || []).length, 1);
+            assert.match(src, /onclick="goBack\(\)"/);
+        });
+
+        test(p.file + ' back falls back to a real destination', () => {
+            const fn = src.slice(src.indexOf('function goBack()'),
+                                 src.indexOf('function goBack()') + 400);
+            assert.match(fn, /document\.referrer/, 'it does not check where it came from');
+            assert.match(fn, /history\.back\(\)/);
+            assert.match(fn, /admin\.html/, 'a cold arrival would have nowhere to go');
+        });
+
+        // Small text on a phone is still something a thumb has to hit.
+        test(p.file + ' back control is a usable touch target', () => {
+            const at = src.indexOf('.back-btn {');
+            assert.ok(at > -1, p.file + ' has no .back-btn rule');
+            const m = /min-height:\s*(\d+)px/.exec(src.slice(at, src.indexOf('}', at)));
+            assert.ok(m && Number(m[1]) >= 40,
+                p.file + ' back control is below a usable touch target');
+        });
+    });
+
+    test('the setup wizard already had one on every step but the first', () => {
+        const admin = read('admin.html');
+        const steps = [...admin.matchAll(/class="wizard-step" id="wizard-step-(\d+)"/g)]
+            .map(m => ({ n: m[1], at: m.index }));
+        assert.ok(steps.length >= 5, 'the wizard lost its steps');
+        steps.forEach((s, i) => {
+            const seg = admin.slice(s.at, i + 1 < steps.length ? steps[i + 1].at : admin.length);
+            assert.match(seg, /wizard-btn-back/, 'wizard step ' + s.n + ' has no Back');
+        });
+        // Hidden, not absent: any step can be first, so it follows the workflow.
+        assert.match(admin, /back\.style\.display = \(steps\.indexOf\(n\) === 0\) \? 'none' : ''/,
+            'the first step would show a Back that goes nowhere');
+    });
+});
+
 describe('A WAY BACK OUT', () => {
 
     ['sidematches.html', 'skins.html'].forEach(page => {

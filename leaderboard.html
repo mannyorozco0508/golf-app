@@ -85,6 +85,11 @@
             --leader-bg: #3a3320;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        /* Reached FROM somewhere - the scorecard, the nav bar, a shared link - so it
+           needs a way back to it. The nav bar lists destinations, not a return. */
+        .back-btn { display: inline-flex; align-items: center; margin-bottom: 10px;
+            color: var(--brand-navy); font-weight: bold; font-size: 0.85rem;
+            text-decoration: none; cursor: pointer; min-height: 44px; }
         .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
         .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
 
@@ -258,6 +263,8 @@ html {
     </details>
     </div>
 
+    <a class="back-btn" onclick="goBack()">← Back</a>
+
     <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
     
     <div class="toggle-row" id="format-toggle">
@@ -328,6 +335,19 @@ html {
             document.documentElement.classList.add('dark-mode');
         }
     })();
+
+
+    // Back to wherever this page was opened from. history.back() alone is a dead
+    // end on a cold link or a bookmark - there is nothing behind it, or what is
+    // behind it is outside the app - so the referrer decides, exactly as
+    // instructions.html has always done it.
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
+    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');

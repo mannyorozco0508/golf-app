@@ -27,7 +27,8 @@
 // refuses to pass unless it catches every bad one. Run it before believing a
 // clean result - the real scan runs it first automatically and bails if it fails.
 //
-//   exit 0   nothing wrong found (and the detector proved itself first)
+//   exit 0   nothing wrong found (and the detector proved itself first, and every
+//            round asked about actually exists)
 //   exit 1   something found - the JSON says which round, match and session
 //   exit 2   could not run. NOTHING WAS PROVEN - this is not a pass.
 // ============================================================================
@@ -172,9 +173,16 @@ function selfTest(verbose) {
         + 'so the codes have to come from you.');
 
     const report = { scanned: [], problems: [] };
+    const missing = [];
     for (const code of codes) {
-        let cup, ref;
+        let cup, ref, top;
         try {
+            // DOES THE ROUND EXIST AT ALL? Without this, a mistyped or long-deleted
+            // code reads null for everything and reports CLEAN - a false all-clear,
+            // which is the one thing this tool must never produce. Shallow, so it
+            // costs one key list rather than the whole round.
+            top = await getJson('/events/' + encodeURIComponent(code) + '.json?shallow=true');
+            if (!top) { missing.push(code); continue; }
             cup = await getJson('/events/' + encodeURIComponent(code) + '/ryderCup.json');
             ref = await getJson('/events/' + encodeURIComponent(code) + '/ryderCupRef.json');
         } catch (e) { bail(e.message); }
@@ -184,6 +192,15 @@ function selfTest(verbose) {
             sessions: sessions ? sessions.length : 0, matches: matches,
             pointsAt: ref ? (ref.host + '/' + ref.sessionId) : null });
         findProblems(code, cup).forEach(p => report.problems.push(p));
+    }
+
+    // A code that is not there proves NOTHING about it, so this is exit 2 rather
+    // than a clean bill of health for a round that was never read.
+    if (missing.length) {
+        console.log(JSON.stringify(report, null, 2));
+        bail('no round exists at ' + missing.join(', ')
+            + ' - mistyped, or the round was deleted. Nothing was checked for '
+            + (missing.length === 1 ? 'that code.' : 'those codes.'));
     }
 
     report.verdict = report.problems.length ? 'FOUND' : 'CLEAN';

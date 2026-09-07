@@ -204,7 +204,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v67-identity-messaging';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v68-home-and-nav';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -452,10 +452,22 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'the disc must use the brand variable, not a hardcoded colour');
     });
 
-    test('the mark is proportional to the header, not oversized', () => {
-        const [, size] = /\.lobby-mark \{ width: (\d+)px/.exec(ADMIN);
-        assert.ok(Number(size) <= 96,
-            `the disc is ${size}px; it should sit in roughly the footprint the 3.5rem emoji had`);
+    // REVERSED DELIBERATELY. This asserted the disc stayed within roughly the
+    // footprint of the 3.5rem emoji it replaced - the mark was supporting cast.
+    // The decision changed: the mark leads the home screen and the wordmark
+    // supports it. A ceiling is the wrong guard for that, because it would pass
+    // just as happily with the wordmark set larger again. What matters is the
+    // RELATIONSHIP, so that is what is asserted now.
+    test('the mark leads, and the wordmark supports it', () => {
+        const [, disc] = /\.lobby-mark \{ width: (\d+)px/.exec(ADMIN);
+        const [, sym] = /\.lobby-mark img \{ width: (\d+)px/.exec(ADMIN);
+        const [, word] = /\.lobby-title \{ font-size: ([\d.]+)rem/.exec(ADMIN);
+        assert.ok(Number(sym) < Number(disc), 'the symbol does not fit inside its disc');
+        // 1rem is 16px at the root, so the wordmark's cap height is nowhere near
+        // the disc. Compared as rendered box against rendered box.
+        assert.ok(Number(disc) > Number(word) * 16 * 2,
+            `a ${disc}px disc does not lead a ${word}rem wordmark`);
+        assert.ok(Number(disc) >= 120, `the disc is ${disc}px and does not dominate`);
     });
 });
 
@@ -468,7 +480,12 @@ describe('THE BRAND MARK ASSET', () => {
         assert.equal(buf.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
         const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
         assert.equal(w, h);
-        assert.equal(w, 256, 'sized for retina at the 56px display size');
+        // Retina, expressed as the rule rather than a number: the asset must carry
+        // at least 2x the size it is DISPLAYED at, so growing the mark on screen
+        // cannot quietly leave a soft logo behind.
+        const [, sym] = /\.lobby-mark img \{ width: (\d+)px/.exec(read('admin.html'));
+        assert.ok(w >= Number(sym) * 2,
+            `the asset is ${w}px but is displayed at ${sym}px, below 2x for retina`);
     });
 
     test('the mark is transparent — it sits on the disc, it does not carry a field', () => {
@@ -492,7 +509,7 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v67-identity-messaging';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v68-home-and-nav';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
         assert.match(BUILD, /cacheName: 'tournament-v32-consumer-ready'/,
             'Tournament assets did not change, so its cache must not move');

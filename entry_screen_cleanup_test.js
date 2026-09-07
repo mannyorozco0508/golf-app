@@ -105,19 +105,19 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
         assert.match(vm.runInContext('location.href', sb), /eventType=club/);
     });
 
-    test('the other three ways in are untouched', () => {
-        assert.match(ADMIN, /onclick="joinRoom\(\)"/, 'Join Game');
-        assert.match(ADMIN, /id="join-room-input"/);
+    // Was three. The typed-code join was removed in the wave after this one, once
+    // it was confirmed nobody has ever used it; see home_screen_shape_test.js.
+    test('the other ways in are untouched', () => {
         assert.match(ADMIN, /onclick="duplicateRoom\(\)"/, 'Duplicate');
         assert.match(ADMIN, /onclick="resumeGame\(\)"/, 'Resume');
-        assert.match(ADMIN, /id="resume-container"[^>]*display: none/, 'Resume stays hidden');
+        assert.match(ADMIN, /id="resume-container"[^>]*display: ?none/, 'Resume stays hidden');
     });
 
     // "OR" with nothing before it is not a choice.
-    test('no divider is left stranded above Join Game', () => {
+    test('no divider is left stranded above the first way in', () => {
         const lobby = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'),
                                   ADMIN.indexOf('id="admin-screen"'));
-        const before = lobby.slice(0, lobby.indexOf('id="join-room-input"'));
+        const before = lobby.slice(0, lobby.indexOf('id="duplicate-room-input"'));
         assert.equal((before.match(/lobby-divider/g) || []).length, 0,
             'an "OR" divider survives with nothing on the other side of it');
     });

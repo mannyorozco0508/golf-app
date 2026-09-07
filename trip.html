@@ -90,6 +90,11 @@
             --warn-text: #f0b84f;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        /* Reached FROM somewhere - the scorecard, the nav bar, a shared link - so it
+           needs a way back to it. The nav bar lists destinations, not a return. */
+        .back-btn { display: inline-flex; align-items: center; margin-bottom: 10px;
+            color: var(--brand-navy); font-weight: bold; font-size: 0.85rem;
+            text-decoration: none; cursor: pointer; min-height: 44px; }
         .container { max-width: 720px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
         h2, h3 { color: var(--brand-green); margin-top: 0; }
         .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
@@ -242,6 +247,8 @@ html {
 <body>
 
 <div class="container" id="setup-screen">
+    <a class="back-btn" onclick="goBack()">← Back</a>
+
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🚐</div>
     <div class="lobby-title">Road Trip</div>
@@ -292,6 +299,8 @@ html {
 </div>
 
 <div class="container" id="manage-screen" style="display:none;">
+    <a class="back-btn" onclick="goBack()">← Back</a>
+
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div style="text-align:center;">
         <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Trip Code</span><br>
@@ -450,6 +459,19 @@ html {
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+
+    // Back to wherever this page was opened from. history.back() alone is a dead
+    // end on a cold link or a bookmark - there is nothing behind it, or what is
+    // behind it is outside the app - so the referrer decides, exactly as
+    // instructions.html has always done it.
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
+    }
 
     function toggleTheme() {
         const isDark = document.documentElement.classList.toggle('dark-mode');

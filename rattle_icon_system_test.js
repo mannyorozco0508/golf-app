@@ -241,7 +241,11 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
     });
 
     test('📥 now means join, and only join', () => {
-        assert.match(ADMIN, /joinRoom\(\)">\u{1F4E5} Join Game<\/button>/u);
+        // The round's typed-code field is gone - a golfer arrives on a link - so the
+        // only inbox left is the trip one. The rule it guards is unchanged: this
+        // glyph means joining something, and nothing else.
+        assert.ok(!/joinRoom\(\)/.test(ADMIN), 'the round join control is gone');
+        assert.match(read('trip.html'), /joinTrip\(\)">\u{1F4E5} Open Trip<\/button>/u);
         (ADMIN + IDX + TRIP).match(/\u{1F4E5}[^<\n]{0,24}/gu).forEach(m =>
             assert.match(m, /Join|Open/, 'inbox used for something that is not joining: ' + m));
     });

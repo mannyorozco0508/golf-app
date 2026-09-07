@@ -277,7 +277,18 @@
 // no longer be CREATED on golfers who are unnamed or share a name, which is where
 // the fix is cheap. Scoring is unblocked throughout. An installed PWA on v66
 // keeps a Cup that disappears without explaining itself.
-const CACHE_VERSION = 'golfapp-v67-identity-messaging';
+// Moved to v68: the home shows what is actually used, and every page can get
+// back. "ENTER GAME CODE" and "Join Game" are gone - confirmed that nobody has
+// ever typed a code, because a golfer arrives on a link the organizer sends, and
+// every real way in (the round link, a group's scorekeeper link, the read-only
+// follow link, a deep link carrying eventType) reads the URL and never went near
+// joinRoom. Legacy 4-character codes still open: the link path applies no length
+// rule at all. Resume shrinks from a full-width primary button to a small link,
+// the brand mark grows to lead the screen and the wordmark shrinks to support it,
+// and settlement, stats, leaderboard and both trip screens gain the back control
+// Matches and Bets already had. An installed PWA on v67 keeps a home asking for a
+// code that goes nowhere, and four pages with no way out.
+const CACHE_VERSION = 'golfapp-v68-home-and-nav';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
