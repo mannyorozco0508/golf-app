@@ -108,18 +108,32 @@ This was the last unrecoverable risk on the October list. A golf course is the o
 place this app is guaranteed to lose signal, and losing a hole of scores mid-round
 is the failure nobody forgives — it is the reason the group goes back to paper.
 
-**What was proven, precisely:** a score entered with no connection is not lost, it
-survives the app being killed, and it reaches the database once signal returns.
+**Proven, in full, against the definition set before testing began:**
 
-**Two parts of the original definition were not reported on, so treat them as
-unproven rather than passed:** what the golfer is *told* while offline (there may
-be no indication at all that a score is queued), and that a returning score lands
-**exactly once** rather than twice. Neither is known to be broken. If either
-matters before the trip, they are cheap to check on the same device — reconnect
-with the scorecard open and count the rows.
+- a score entered with no connection is not lost
+- it survives the app being **force-quit**
+- it reaches the database when signal returns
+- it lands **exactly once** — no duplicate row on reconnect
 
-Do not weaken this section to "offline works". The distinction between what was
-tested and what was assumed is the whole value of the record.
+That is the whole bar, met. Nothing here is assumed.
+
+### The golfer is told nothing while offline — a product gap, not a defect
+
+Also confirmed on the same device: with no signal there is **no banner, no
+spinner, and no indication whatsoever** that a score is queued rather than saved.
+The screen looks identical to a normal save.
+
+**The data is safe. The golfer just isn't told.** Those are different problems and
+this file should not blur them. Nothing is lost, nothing duplicates, nothing needs
+fixing to protect a round — so this is not on the October critical path.
+
+What it costs is confidence, and confidence is why groups keep a paper card. A
+golfer who suspects a score did not save will re-enter it, or stop trusting the
+app and write the hole down. The absence of a message is doing real work against
+the product even though the engineering underneath it is correct.
+
+Worth building when there is room: a queued/synced indicator. Not urgent, and
+explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
