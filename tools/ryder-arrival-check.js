@@ -68,7 +68,21 @@ const PROBE = `
   out.pageHeadingVisible = onScreen(document.getElementById('main-title'));
   out.betsPointerVisible = onScreen(document.getElementById('sm-bets-pointer'));
 
-  // 5. The Cup is genuinely on screen, not merely present.
+  // 5. A CUP ROUND SKIPS ROUND READY ENTIRELY - saveSettings sends it straight
+  //    here - so without a links panel on this arrival the Cup organizer is the one
+  //    person who creates a round and is never offered a link to it. Measured on
+  //    screen, from the copy button's own onclick, because a suite can only grep
+  //    the source and a panel nothing renders greps identically to one that works.
+  const linksBox = document.getElementById('rc-group-links');
+  out.linksVisible = !!(linksBox && linksBox.getClientRects().length > 0
+      && linksBox.getBoundingClientRect().height > 0);
+  out.linkUrls = Array.from(document.querySelectorAll('#rc-group-links .group-link-row button'))
+      .map(b => ((b.getAttribute('onclick') || '').match(/'([^']+)'/) || [])[1])
+      .filter(Boolean);
+  const linkNote = document.getElementById('rc-links-note');
+  out.linkNote = linkNote ? (linkNote.innerText || '').replace(/\\s+/g, ' ').trim() : null;
+
+  // 6. The Cup is genuinely on screen, not merely present.
   out.cupVisible = !!(cupMount && cupMount.getClientRects().length > 0 && out.cupHeightPx > 0);
   out.cupAboveTheFold = out.cupTopPx !== null && out.cupTopPx < window.innerHeight;
 
@@ -88,6 +102,21 @@ const PROBE = `
   if (out.pageHeadingVisible) problems.push('the "Side Matches" page heading is on the Cup arrival');
   if (out.betsPointerVisible) problems.push('the pointer to the Bets page is on the Cup arrival');
   if (!out.cupAboveTheFold) problems.push('the Cup is not on the first screen');
+  if (!out.linksVisible)
+      problems.push('a Cup organizer lands here with no way to share the round - this '
+          + 'arrival skips the Round Ready screen, so this panel is the only one');
+  if (out.linkUrls.length !== 1)
+      problems.push('four golfers is one group and should get exactly one link; found '
+          + out.linkUrls.length);
+  out.linkUrls.forEach(u => {
+      if (!/^https:\\/\\//.test(u))
+          problems.push('a Cup link nobody can open: ' + u);
+      if (!/[?&]group=/.test(u))
+          problems.push('a Cup link is not scoped to a group: ' + u);
+  });
+  if (!out.linkNote || !/scorekeeper/i.test(out.linkNote))
+      problems.push('the Cup links are handed over without saying what they permit: '
+          + JSON.stringify(out.linkNote));
 
   out.problems = problems;
   out.verdict = problems.length ? 'FAIL' : 'PASS';
@@ -116,6 +145,11 @@ const PROBE_PLAIN = `
   if (!out.cupRendered) problems.push('the Cup surface stopped rendering on an ordinary visit');
   if (!out.cupAboveSideCard) problems.push('the Cup renders below the side-betting card');
   if (out.handoffCopyInCard) problems.push('an ordinary visit claims the round was just created');
+  // The links panel belongs to the handoff. An ordinary visit is somebody managing
+  // action mid-round; the scorecard already has its own Group Links panel.
+  const ordinaryLinks = document.getElementById('rc-group-links');
+  if (ordinaryLinks && ordinaryLinks.getClientRects().length > 0)
+      problems.push('the Cup handoff links panel is on an ordinary visit too');
   if (!out.pageHeadingVisible) problems.push('an ordinary visit lost its page heading');
   if (!out.betsPointerVisible) problems.push('an ordinary visit lost the pointer to the Bets page');
   out.problems = problems;

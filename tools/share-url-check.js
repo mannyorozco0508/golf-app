@@ -8,7 +8,9 @@
 // which is useless the moment it leaves the phone. On the native build that broke
 // the invite link, the QR, every group scorekeeper link, the private organizer
 // link, the read-only follow link and the trip link - all of them, because they
-// all derived from the page's own location.
+// all derived from the page's own location. (The invite link and the QR have since
+// left the app entirely; sharing moved to the Round Ready screen. The rule they
+// broke is what this file guards, and it still holds every other surface.)
 //
 // THIS REPRODUCES IT WITHOUT AN IPHONE. The cold harness serves over file://,
 // which is a non-web origin exactly as capacitor:// is. If a builder reads
@@ -38,21 +40,20 @@ const DB = { events: { SHARE: ROUND },
              trips: { TRIP1: { name: 'Myrtle', createdAt: 1, rounds: { SHARE: { label: 'Day 1' } } } } };
 
 const SURFACES = [
+    // THE BUILDER, not the surface. admin.html's share surface is now the Round
+    // Ready screen, which only exists after Save - tools/round-share-check.js
+    // presses Save and measures the links it renders, including that every one of
+    // them is https. This asks the narrower question the file is named for: does
+    // the builder those links come from return a web URL when the page itself is
+    // not on the web? file:// stands in for capacitor://.
     { page: 'admin.html', query: 'game=SHARE', name: 'setup page', probe: `
         (() => {
           const out = {};
           if (typeof scorecardUrlFor === 'function') {
-            out['invite link'] = scorecardUrlFor('SHARE');
+            out['spectator link'] = scorecardUrlFor('SHARE');
             out['group scorekeeper link'] = scorecardUrlFor('SHARE', 2);
           }
-          // The QR encodes whatever the invite link is, so it is covered by the
-          // line above; recorded here so a reader can see it was considered.
-          out['QR encodes'] = out['invite link'] || null;
           if (typeof shareBaseUrl === 'function') out['shareBaseUrl()'] = shareBaseUrl();
-          const rendered = Array.from(document.querySelectorAll('#group-links-list button'))
-              .map(b => (b.getAttribute('onclick') || '').match(/'(\\S+?:\\/\\/[^']*)'/))
-              .filter(Boolean).map(m => m[1]);
-          if (rendered.length) out['rendered group link'] = rendered[0];
           return JSON.stringify(out); })()` },
     // NO &group= here on purpose: isOrganizerView() is "not group-locked", so a
     // scorekeeper link cannot see the Group Links panel at all. This is the

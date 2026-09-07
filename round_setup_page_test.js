@@ -1,24 +1,25 @@
 // ============================================================================
 // THE ROUND SETUP PAGE SAYS WHAT ITS LINK DOES, AND STOPS SHOUTING ABOUT DELETION
 //
-// 1. THE SHARE CARD LIED ABOUT ITS OWN LINK.
+// 1. THE SHARE CARD IS GONE FROM THIS SCREEN - and this is where that is recorded,
+//    because it was this file that stopped it being deleted for the wrong reason.
 //
-//    It read "Spectator link — anyone can watch, but scores are read-only." That
-//    is TRUE above four players and FALSE at or below four, where the bare
+//    It once read "Spectator link - anyone can watch, but scores are read-only."
+//    That is TRUE above four players and FALSE at or below four, where the bare
 //    ?game=CODE link is fully writable. Measured, not inferred: arriving cold on a
-//    four-player round gives 76 score inputs, 76 of them editable; the same
-//    arrival on eight players gives 152 inputs and 0 editable.
+//    four-player round gave 76 score inputs, 76 of them editable; the same arrival
+//    on eight gave 152 and 0. Most of this group's golf is a foursome, so the
+//    sentence was wrong on almost every round they play - and it nearly got the
+//    card deleted as "the wrong link", which would have left a four-ball with no
+//    way to share a round at all.
 //
-//    Most of this group's golf is a foursome, so the sentence was wrong on almost
-//    every round they play - and it nearly got the card deleted as "the wrong
-//    link". Removing it would have left a four-ball with NO way to share a round
-//    at all: both group-link surfaces hide themselves when there is one group.
-//
-//    THE COPY IS NOW BOUND TO THE BEHAVIOUR, not to a group count that merely
-//    correlates with it. index.html decides editability on players.length > 4;
-//    this card must describe THAT. tools/round-setup-check.js measures what the
-//    link actually permits and fails if the sentence disagrees - so if the gate
-//    ever moves, the sentence goes red instead of quietly starting to lie again.
+//    THE CARD HAS NOW LEFT, for the opposite reason: it sat at step one, offering a
+//    link to a round that did not exist yet. Sharing moved to the Round Ready
+//    screen, where the round is real and the groups are known, and a four-ball gets
+//    a labelled copyable link like everybody else. round_ready_share_test.js and
+//    tools/round-share-check.js own that surface and its measured copy now. What
+//    stays here is the proof that this screen no longer offers a link at all - so
+//    the two surfaces cannot both start describing one.
 //
 // 2. END CURRENT GAME WAS THE LOUDEST THING ON THE PAGE.
 //
@@ -43,79 +44,38 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
-const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
+const { REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADM = read('admin.html');
 
-// The page with a roster of `rowCount` golfers, then its own roster-change
-// handler run - the same call the Add Player button makes.
-function withRoster(rowCount) {
-    const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js'],
-        { search: '?game=RSETUP' });
-    vm.runInContext(`
-        alert = function () {}; confirm = function () { return true; };
-        var __rows = ${rowCount};
-        document.querySelectorAll = function (sel) {
-            if (sel === '.player-row' || sel === '#player-list .player-row') return new Array(__rows);
-            return { forEach: function () {}, length: 0 };
-        };
-        currentMode = 'RSETUP';
-        regenerateGroupLinks();
-    `, sb);
-    return sb;
-}
-const note = sb => vm.runInContext(
-    '(function(){var e=document.getElementById("share-link-note");'
-    + 'return e ? (e.textContent || e.innerHTML || "") : null;})()', sb);
-
-describe('THE SHARE CARD DESCRIBES ITS OWN LINK', () => {
+describe('THE SETUP SCREEN NO LONGER OFFERS A LINK', () => {
 
     test('the old blanket claim is gone', () => {
         assert.ok(!/Spectator link — anyone can watch, but scores are read-only/.test(ADM),
             'the card still calls a writable link read-only');
     });
 
-    test('the note is an element the page can update, not fixed markup', () => {
-        assert.match(ADM, /id="share-link-note"/,
-            'the sentence cannot change with the roster');
+    test('the card, its note and its QR all left together', () => {
+        assert.ok(!/id="share-link-note"/.test(ADM), 'the note element survives the card');
+        assert.ok(!/id="qrcode"/.test(ADM), 'the QR mount survives the card');
+        assert.ok(!/onclick="copyAppUrl\(\)"/.test(ADM), 'the invite button survives the card');
+        assert.ok(!/id="group-links-box"/.test(ADM),
+            'the setup screen still lists links for a round that may not be saved');
     });
 
-    [1, 2, 3, 4].forEach(n => {
-        test(n + ' golfer(s): it is called a scorekeeper link', () => {
-            const t = note(withRoster(n));
-            assert.match(t, /scorekeeper/i, 'reads: ' + JSON.stringify(t));
-            assert.ok(!/read-only/i.test(t),
-                'a writable link is still described as read-only: ' + JSON.stringify(t));
-        });
+    test('and nothing is left calling into them', () => {
+        assert.ok(!/function syncShareLinkNote/.test(ADM),
+            'the updater for a deleted element is still here');
+        assert.ok(!/regenerateGroupLinks/.test(ADM),
+            'a builder with no markup to build into is still wired to the roster');
     });
 
-    [5, 8, 12].forEach(n => {
-        test(n + ' golfers: it is called read-only and points below', () => {
-            const t = note(withRoster(n));
-            assert.match(t, /read-only/i, 'reads: ' + JSON.stringify(t));
-            assert.match(t, /own link|below|each group/i,
-                'it does not send them to the group links: ' + JSON.stringify(t));
-        });
-    });
-
-    // The exact boundary index.html uses. Five is the first multi-group round.
-    test('the switch happens at the same count index.html uses', () => {
-        assert.match(note(withRoster(4)), /scorekeeper/i);
-        assert.match(note(withRoster(5)), /read-only/i);
-        assert.match(read('index.html'), /const isMultiGroupRound = players\.length > 4;/,
-            'index.html moved the gate; this card now describes the wrong rule');
-    });
-
-    test('the QR and the copy button still exist', () => {
-        assert.match(ADM, /id="qrcode"/, 'the only link a foursome has was removed');
-        assert.match(ADM, /onclick="copyAppUrl\(\)"/);
-    });
-
-    test('and the group scorekeeper box is untouched', () => {
-        assert.match(ADM, /id="group-links-box"/);
-        assert.match(ADM, /Group Scorekeeper Links/);
+    test('the measured sentence moved rather than disappearing', () => {
+        assert.match(read('grouping.js'), /function groupLinkNoteText/,
+            'the one measured piece of copy in the app went with the card');
+        assert.match(ADM, /groupLinkNoteText\(/,
+            'admin.html no longer shows the note anywhere');
     });
 });
 

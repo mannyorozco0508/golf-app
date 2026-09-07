@@ -130,6 +130,24 @@ fails the suite until the copy names it.
 
 Copy that describes behaviour is behaviour. Test it like behaviour.
 
+### And a measured sentence does not survive a move by being re-typed
+
+When the share card left the setup screen, the instruction was to keep the
+scorekeeper/read-only note bound to editability exactly as it had been measured.
+Carrying the words across would have obeyed the letter of that and broken it
+completely, because **what the sentence described was no longer the thing being
+handed out.** The old measurement was of the bare `?game=CODE` link: writable at or
+below four golfers, and 0 of 152 inputs editable at eight. Every link the app now
+sends carries `?group=N`, and re-measuring those gave a different answer entirely —
+76 of 76 editable at eight golfers, 19 of 19 for a group of one. A group link is
+*always* writable. What changes above four golfers is not what it permits but who
+it covers; the other groups are not locked on that card, they are not on it.
+
+So "read-only link" would have been a fresh, unmeasured lie sitting under a comment
+claiming it was measured — the worst of both. **Re-measure at the new site.** The
+rule moves; the words are re-derived. `tools/round-share-check.js` opens all
+thirteen links the app can hand out and checks they cover the field exactly once.
+
 ## A cold check reads `innerText`, never `textContent`
 
 `document.body.textContent` **includes the source of every inline `<script>` in the

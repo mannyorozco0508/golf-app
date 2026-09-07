@@ -1,25 +1,17 @@
 #!/usr/bin/env node
 // ============================================================================
-// DOES THE SETUP PAGE TELL THE TRUTH ABOUT ITS OWN LINK?
+// IS THE SETUP PAGE STILL SHAPED THE WAY IT SHOULD BE?
 //
-// This is the check the wave exists for, and it is deliberately not a check that
-// the sentence matches a group count. A group count is a PROXY. The claim the
-// card makes is about what the link PERMITS, so this measures that directly:
+// THE LINK HALF OF THIS CHECK HAS MOVED. It used to arrive cold on admin.html,
+// read the share card's sentence, then open the very link that sentence described
+// and count the editable score inputs - failing if the two disagreed. That card is
+// gone: sharing happens after Save now, on the Round Ready screen, where the round
+// is real. tools/round-share-check.js does the same measurement there, against all
+// thirteen links the app hands out.
 //
-//   1. arrive cold on admin.html with a roster of N and read the sentence
-//   2. arrive cold on index.html?game=CODE - the very link the card is describing,
-//      no &group= - and COUNT THE EDITABLE SCORE INPUTS
-//   3. fail if they disagree
-//
-// So if index.html's gate ever moves off players.length > 4, this goes red and the
-// copy has to catch up. The old sentence claimed "read-only" unconditionally and
-// was false on every foursome - which is most of this group's golf - and nearly
-// got the card deleted as the wrong link. Deleting it would have left a four-ball
-// with no way to share a round at all.
-//
-// It also measures the two things mini-dom cannot see about the page's shape: that
-// the destructive control is quieter than the primary one, and that the page has a
-// way back.
+// WHAT STAYS is what only a browser can see about this page's shape: that the
+// control which WIPES A ROUND is quieter than the primary one, and that the page
+// has a way back. Both are geometry, and mini-dom returns an all-zero rect.
 //
 //   node tools/round-setup-check.js
 //
@@ -37,24 +29,14 @@ const roster = n => Array.from({ length: n }, (_, i) =>
 const roundOf = n => ({ eventName: 'Setup Check', gameFormat: 'stroke',
     players: roster(n), courseData: CD, scores: {} });
 
-// What the setup page SAYS. Read as rendered text, never textContent - the page
-// keeps its whole application in an inline <script>, and textContent would match
-// this very copy in the source and report it rendered when nothing had.
-const SAYS = `
+// The shape of the page, measured. innerText and real rects, never textContent -
+// this page keeps its whole application in an inline <script>.
+const SHAPE = `
 (() => {
-  const el = document.getElementById('share-link-note');
-  const out = { note: el ? (el.innerText || '').replace(/\\s+/g, ' ').trim() : null };
-  out.noteOnScreen = !!(el && el.getClientRects().length > 0);
-  out.qrPresent = !!document.querySelector('#qrcode img, #qrcode canvas');
-  out.groupBoxShown = (() => {
-    const b = document.getElementById('group-links-box');
-    return !!(b && b.getClientRects().length > 0);
-  })();
-
-  // Shape: the destructive control must be quieter than the primary one.
-  const px = el2 => el2 ? parseFloat(getComputedStyle(el2).fontSize) : 0;
-  const area = el2 => { if (!el2) return 0; const r = el2.getBoundingClientRect();
-                        return Math.round(r.width * r.height); };
+  const out = {};
+  const px = el => el ? parseFloat(getComputedStyle(el).fontSize) : 0;
+  const area = el => { if (!el) return 0; const r = el.getBoundingClientRect();
+                       return Math.round(r.width * r.height); };
   const endBtn = Array.from(document.querySelectorAll('button'))
       .filter(b => /endAndClearRound\\(/.test(b.getAttribute('onclick') || ''))[0];
   const saveBtn = document.getElementById('main-save-btn');
@@ -67,17 +49,13 @@ const SAYS = `
   const back = document.querySelector('.back-btn');
   out.backPresent = !!back;
   out.backHeightPx = back ? Math.round(back.getBoundingClientRect().height) : 0;
-  return JSON.stringify(out);
-})()`;
 
-// What the link the card describes ACTUALLY PERMITS.
-const PERMITS = `
-(() => {
-  const inputs = Array.from(document.querySelectorAll('input.score-input, input[type="number"], input[inputmode="numeric"]'));
-  return JSON.stringify({
-    scoreInputs: inputs.length,
-    editable: inputs.filter(i => !i.disabled && !i.readOnly).length
-  });
+  // AND NOTHING THAT SHARES A ROUND MAY BE BACK ON THIS SCREEN. A link offered
+  // before the round exists is the defect this page was cleaned of; if one
+  // reappears here, two surfaces start describing the same thing again.
+  out.strays = ['qrcode', 'share-link-note', 'group-links-box', 'group-links-list']
+      .filter(id => !!document.getElementById(id));
+  return JSON.stringify(out);
 })()`;
 
 function bail(msg) {
@@ -86,80 +64,37 @@ function bail(msg) {
     process.exit(2);
 }
 
-const SIZES = [2, 4, 5, 8];
-
 (async () => {
     const problems = [];
-    const report = { sizes: {} };
 
-    for (const n of SIZES) {
-        const db = { events: { SETUP: roundOf(n) } };
-        const said = await arriveCold({ url: fileUrl('admin.html', 'game=SETUP'),
-            db: db, expression: SAYS, settleMs: 3500 });
-        if (!said.ok) bail('admin.html at ' + n + ': ' + said.reason);
-        const permits = await arriveCold({ url: fileUrl('index.html', 'game=SETUP'),
-            db: db, expression: PERMITS, settleMs: 3500 });
-        if (!permits.ok) bail('index.html at ' + n + ': ' + permits.reason);
+    const db = { events: { SETUP: roundOf(4) } };
+    const r = await arriveCold({ url: fileUrl('admin.html', 'game=SETUP'),
+        db: db, expression: SHAPE, settleMs: 3500 });
+    if (!r.ok) bail('admin.html: ' + r.reason);
+    const s = JSON.parse(r.value);
+    const report = { shape: s };
 
-        const s = JSON.parse(said.value), p = JSON.parse(permits.value);
-        report.sizes[n] = { says: s.note, editable: p.editable, of: p.scoreInputs,
-                            groupBoxShown: s.groupBoxShown };
+    // A RUN THAT MEASURED NO GEOMETRY PROVES NOTHING. An all-zero rect is exactly
+    // what a page that never rendered returns.
+    if (!s.endPresent) bail('the End control is not on the page at all - nothing was measured');
+    if (!s.saveFontPx) bail('the Save button reported no font size - the page did not render');
+    if (!s.saveAreaPx) bail('the Save button reported no area - the page did not render');
 
-        if (!s.note) { problems.push(n + ' golfers: the card says nothing at all'); continue; }
-        if (!s.noteOnScreen) problems.push(n + ' golfers: the sentence is not on screen');
-        if (p.scoreInputs === 0) {
-            problems.push(n + ' golfers: the scorecard rendered no score inputs, so '
-                + 'nothing was measured - this proves nothing either way');
-            continue;
-        }
-
-        // THE ASSERTION THIS TOOL EXISTS FOR.
-        const writable = p.editable > 0;
-        const claimsWritable = /scorekeeper/i.test(s.note);
-        const claimsReadOnly = /read-only/i.test(s.note);
-        if (writable && !claimsWritable) {
-            problems.push(n + ' golfers: the link is WRITABLE (' + p.editable + '/'
-                + p.scoreInputs + ' inputs editable) but the card says '
-                + JSON.stringify(s.note));
-        }
-        if (!writable && !claimsReadOnly) {
-            problems.push(n + ' golfers: the link is READ-ONLY (0/' + p.scoreInputs
-                + ' editable) but the card says ' + JSON.stringify(s.note));
-        }
-        if (writable && claimsReadOnly) {
-            problems.push(n + ' golfers: the card calls a writable link read-only');
-        }
-        // A read-only link must send them somewhere useful.
-        if (!writable && !s.groupBoxShown) {
-            problems.push(n + ' golfers: the link is read-only and the group links '
-                + 'box is not on screen - the organizer is told to use a link that '
-                + 'does not exist');
-        }
-        // And the only link a small round has must still be there.
-        if (writable && !s.qrPresent) {
-            problems.push(n + ' golfers: the QR is gone, and this is the only link '
-                + 'a round this size has');
-        }
-
-        if (n === SIZES[0]) {
-            report.shape = { endFontPx: s.endFontPx, saveFontPx: s.saveFontPx,
-                endAreaPx: s.endAreaPx, saveAreaPx: s.saveAreaPx,
-                endHeightPx: s.endHeightPx, backHeightPx: s.backHeightPx };
-            if (!s.endPresent) problems.push('the End control is gone entirely');
-            if (!(s.endFontPx < s.saveFontPx))
-                problems.push('End (' + s.endFontPx + 'px) is not quieter than Save ('
-                    + s.saveFontPx + 'px)');
-            if (!(s.endAreaPx < s.saveAreaPx))
-                problems.push('End occupies ' + s.endAreaPx + 'px2 against Save\'s '
-                    + s.saveAreaPx + 'px2 - the destructive control is still the bigger one');
-            if (s.endHeightPx < 40)
-                problems.push('the End control is ' + s.endHeightPx + 'px tall, below a '
-                    + 'usable touch target - quiet is not the same as unhittable');
-            if (!s.backPresent) problems.push('the page has no way back');
-            if (s.backHeightPx < 40)
-                problems.push('the back control is ' + s.backHeightPx + 'px tall');
-        }
-    }
+    if (!(s.endFontPx < s.saveFontPx))
+        problems.push('End (' + s.endFontPx + 'px) is not quieter than Save ('
+            + s.saveFontPx + 'px)');
+    if (!(s.endAreaPx < s.saveAreaPx))
+        problems.push('End occupies ' + s.endAreaPx + 'px2 against Save\'s '
+            + s.saveAreaPx + 'px2 - the destructive control is still the bigger one');
+    if (s.endHeightPx < 40)
+        problems.push('the End control is ' + s.endHeightPx + 'px tall, below a usable '
+            + 'touch target - quiet is not the same as unhittable');
+    if (!s.backPresent) problems.push('the page has no way back');
+    if (s.backHeightPx < 40)
+        problems.push('the back control is ' + s.backHeightPx + 'px tall');
+    if (s.strays.length)
+        problems.push('a share surface is back on the setup screen: ' + s.strays.join(', ')
+            + ' - sharing belongs after Save, see tools/round-share-check.js');
 
     report.problems = problems;
     report.verdict = problems.length ? 'FAIL' : 'PASS';

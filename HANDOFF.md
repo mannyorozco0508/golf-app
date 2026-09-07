@@ -39,7 +39,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 ## Current state
 
 ```
-1125 suites · 5721 tests · 5720 passing · 0 failing · 1 todo
+1151 suites · 5858 tests · 5857 passing · 0 failing · 1 todo
 ```
 
 15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
@@ -56,7 +56,8 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 - App Store Connect record exists: Rattle Golf, bundle `com.rattlegolf.app`, Apple ID 6808220335
 - **Build 8 was archived on 2026-09-06** carrying web v71. `CURRENT_PROJECT_VERSION = 8` in the project. Internal group "Beta Testers" with automatic distribution on
 - **DO NOT USE BUILD 9 — it cannot share a round.** Inside the iOS wrapper the page is served from `capacitor://localhost`, so every share URL built from the page's own location came out as `capacitor://localhost/index.html?game=CODE`, which nobody who receives it can open. That broke the invite link, the QR, every group scorekeeper link, the private organizer link, the follow link and the trip link at once. Fixed in v74; build 10 carries it
-- **The bundle is now synced to v74** and ready for build 10. It was previously synced to v73. v73 is the one that matters: before it, a Nassau set up as $10 front / $10 back / $20 overall settled every segment at $20, and because each auto-press inherits its segment's price the cascade multiplied it — $200 on a wager whose face value was $40. Any build before 9 overcharges every split-stake Nassau it settles
+- **The bundle is synced to v74 and the web is now on v75** — re-run `node sync-mobile-web.js && npx cap sync ios` before build 10 or it ships without the share fix. v75 is the one that matters for sharing: on v74 and earlier, a foursome could create, save and start a round with **nothing to send anybody** — the only share surface was a card on the setup screen that offered a link before the round existed, and the Round Ready panel behind it rendered a sentence telling the organizer to read the round code aloud. v75 also stops the wizard silently deleting a configured Nassau when you tap Back.
+- **The v74 bundle** was ready for build 10 before that. It was previously synced to v73. v73 is the one that matters: before it, a Nassau set up as $10 front / $10 back / $20 overall settled every segment at $20, and because each auto-press inherits its segment's price the cascade multiplied it — $200 on a wager whose face value was $40. Any build before 9 overcharges every split-stake Nassau it settles
 - **Build 8 carried web v71, not v72.** The native bundle is synced by hand, so it is a snapshot of whenever `node sync-mobile-web.js && npx cap sync ios` last ran — never automatically whatever `main` holds. v72 (the setup page's link copy, the quiet End control, the back button on admin) is on the web and NOT in that build. Check `ios/App/App/public/sw.js` for what a build actually contains; do not infer it from the repo
 - Signing works via automatic signing. The long-running failure was that my team had **zero registered devices**, so Apple would not issue a development profile. Plugging in my iPhone and enabling Developer Mode fixed it. Nothing in `project.pbxproj` was ever wrong — don't go looking there
 - Export compliance answer is "None of the algorithms mentioned above" (HTTPS via the OS only)
@@ -305,6 +306,64 @@ completely unchanged.
 
 Run it after any change to the Matches page layout, the arrival handler, or the Cup
 setup surface.
+
+### `tools/round-share-check.js` — no saved round may exist with no link to send
+
+```
+node tools/round-share-check.js
+```
+
+Same exit codes. Takes a couple of minutes: it opens 27 pages.
+
+For each roster size — 1, 2, 4, 5, 8, 9, 12 — it arrives cold on `admin.html?game=`,
+**presses the Save button** from a timer installed before any page script (a thumb,
+scheduled: `saveSettings` is never named), and then reads the Round Ready screen the
+page renders for itself. It fails if any size ends up with no copyable `https` link,
+a link not scoped to a group, a link with no copy control on screen, or two groups
+sharing one.
+
+Then it **measures the copy instead of asserting it.** It opens the bare round link
+and every group link and counts the score inputs each shows and how many are
+editable. Every group link must be fully writable for the card it shows; the group
+links together must cover the field *exactly once* — fewer and a golfer has nobody
+able to enter their score, more and two scorekeepers can write the same card; at or
+below four golfers the one link must cover everybody; above four each must cover
+less. That last pair is the whole content of the sentence beside the links, and
+measuring it is what caught the first draft of that sentence.
+
+Run it after touching the Round Ready screen, `groupLinkNoteText`, the grouping
+rules, or `index.html`'s `isMultiGroupRound` gate.
+
+### `tools/wizard-wager-check.js` — a bet you set up is still there when you save
+
+```
+node tools/wizard-wager-check.js
+```
+
+Same exit codes. Ticks Nassau in the Games step, types the stakes, chooses the two
+golfers, taps **◀ Back** and walks forward again — four times — and then walks to
+the Review. Every line is a gesture on a control; no function `admin.html` defines
+is named in it.
+
+It exists because `helpers/mini-dom.js` **keeps** a `<select>`'s value when
+`innerHTML` is rewritten and a real browser resets it, so the defect it guards is
+structurally invisible to the node suite. It also runs the same drive with the two
+golfers left unpicked, and fails if a Nassau that will *not* be written reviews as
+though it were fine.
+
+Run it after touching the wizard's step navigation, the Games step, or the Review.
+
+### The rest of them, one line each
+
+`cross-round-identity-check.js` (the same golfer across rounds) ·
+`foursomes-entry-check.js` · `home-screen-check.js` · `id-binding-check.js` ·
+`nassau-stake-check.js` (a split-stake Nassau prices every segment) ·
+`orphan-match-check.js` (READ-ONLY, against live data) ·
+`receipt-identity-check.js` · `round-setup-check.js` (the destructive control is
+quieter than Save, the page has a way back, and **nothing that shares a round has
+crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-check.js` ·
+`share-url-check.js` (every builder returns `https` from a non-web origin) ·
+`trip-money-check.js` · `wizard-wager-check.js`.
 
 ## How I want you to work
 

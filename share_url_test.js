@@ -143,23 +143,26 @@ describe('EVERY BUILDER USES IT', () => {
     });
 });
 
-describe('THE COPY SAYS WHAT THE CARD SAYS', () => {
+describe('THE COPY SAYS WHAT THE LINK DOES', () => {
 
-    // The alert said "Copied friend spectator/scorecard link!" - two names at once,
-    // unconditionally - while the card's note is conditional and measured: at or
-    // below four golfers that link is genuinely writable, so it IS the scorekeeper
-    // link. One rule, or they drift apart again.
+    // The setup screen's alert said "Copied friend spectator/scorecard link!" - two
+    // names at once, unconditionally - while the note above it was conditional and
+    // measured. Both are gone with the card: sharing moved to the Round Ready screen
+    // and the Cup handoff. What had to survive the move is the RULE, in one place,
+    // so two surfaces cannot start describing different things.
     test('the two-names-at-once alert is gone', () => {
         assert.ok(!/friend spectator\/scorecard link/.test(read('admin.html')),
             'the alert still gives the link two names in one sentence');
     });
 
-    test('the alert is built from the same note the card shows', () => {
-        const src = read('admin.html').replace(/\/\/.*$/gm, '');
-        const at = src.indexOf('function copyAppUrl');
-        assert.ok(at > -1, 'copyAppUrl is gone');
-        const body = src.slice(at, at + 500);
-        assert.match(body, /shareLinkNoteText\(/,
-            'the alert does not use the same rule the card does, so it can drift again');
+    test('the rule has one definition and both surfaces call it', () => {
+        assert.equal((read('grouping.js').match(/function groupLinkNoteText/g) || []).length, 1);
+        ['admin.html', 'sidematches.html'].forEach(f => {
+            const src = read(f).replace(/\/\/.*$/gm, '');
+            assert.match(src, /groupLinkNoteText\(/,
+                f + ' hands out group links without saying what they permit');
+            assert.ok(!/function groupLinkNoteText/.test(src),
+                f + ' carries its own copy of the rule, so the two can drift apart');
+        });
     });
 });

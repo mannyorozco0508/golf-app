@@ -43,6 +43,7 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <script src="product-links.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -140,6 +141,9 @@
             font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer;
             min-height: 44px; display: inline-flex; align-items: center; }
         .action-card { background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
+        .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
         .action-card h3 { color: var(--brand-green); margin-top: 0; margin-bottom: 12px; text-align: center; text-transform: uppercase; font-size: 1rem;}
         
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
@@ -354,6 +358,12 @@ html {
          renderRyderCupSetup draws its own card, so this mount stays bare rather than
          wrapping a card in a card. -->
     <div id="ryder-cup-setup"></div>
+
+    <!-- THE SAME SURFACE THE READY SCREEN HAS. A Ryder Cup round skips Round Ready
+         entirely - saveSettings sends it straight here - so without this a Cup
+         organizer is the one person who creates a round and is never offered a link
+         to it. Rendered by smApplyRyderArrival, on that arrival only. -->
+    <div id="rc-group-links" class="action-card" style="display:none;"></div>
 
     <div class="action-card" id="sidematches-card">
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
@@ -2801,6 +2811,44 @@ html {
         ['sidematches-card', 'main-title', 'sm-bets-pointer'].forEach(function (id) {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
+        });
+        rcRenderGroupLinks();
+    }
+
+    // One link per group, from the shared rule. The Cup organizer needs exactly what
+    // the Round Ready screen gives everybody else, and for the same reason: the round
+    // exists now, the groups are known, and nobody can score until somebody is sent a
+    // link. groupLinkNoteText lives in grouping.js so this and admin.html cannot end
+    // up describing different rules.
+    function rcRenderGroupLinks() {
+        const box = document.getElementById('rc-group-links');
+        if (!box) return;
+        const players = currentData.players || [];
+        if (!players.length) return;
+        const boundaries = computeGroupBoundaries(players.length,
+            currentData.groupSizeOverrides || {});
+        let html = '<h3 style="margin-bottom:2px;">🔗 Scorekeeper Links</h3>'
+            + '<div id="rc-links-note" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">'
+            + escapeHtml(groupLinkNoteText(players.length)) + '</div>';
+        boundaries.forEach(function (b) {
+            const url = shareBaseUrl() + 'index.html?game=' + currentMode + '&group=' + b.group;
+            const names = players.slice(b.startIdx, b.startIdx + b.size)
+                .map(function (p) { return String(p.name || '').trim().split(' ')[0]; }).join(', ');
+            html += '<div class="group-link-row">'
+                + '<span>🏌️ Group ' + b.group + '<br>'
+                + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
+                + escapeHtml(names) + '</span></span>'
+                + '<button class="btn-outline" onclick="rcCopyGroupLink(\'' + url + '\', '
+                + b.group + ')">🔗 Copy Link</button>'
+                + '</div>';
+        });
+        box.innerHTML = html;
+        box.style.display = 'block';
+    }
+
+    function rcCopyGroupLink(url, groupNum) {
+        navigator.clipboard.writeText(url).then(function () {
+            alert('Copied Group ' + groupNum + '\u2019s scorekeeper link. Send this ONLY to that group.');
         });
     }
 

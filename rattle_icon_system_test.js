@@ -269,7 +269,12 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
         assert.match(ADMIN, /\u{1F4D1} <strong>Copied settings from your other round/u);
         assert.ok(!/duplicateRoom/.test(ADMIN),
             'the removed home-screen control is back');
-        assert.match(ADMIN, /\u29C9 Copy Invite L/u);
+        // ⧉ LEFT admin.html WITH THE SHARE CARD. The one invite button that used it
+        // sat on the setup screen, offering a link to a round that did not exist yet;
+        // sharing is now per group, on Round Ready, and every one of those buttons is
+        // 🔗. The glyph itself is unretired - sidematches.html still copies a single
+        // wager link with it, asserted below.
+        assert.ok(!/\u29C9/u.test(ADMIN), 'admin.html has a copy glyph again — say what it copies');
         assert.match(ADMIN, /">\u{1F517} Copy Link</u);
         assert.match(IDX, /toggleGroupLinksPanel\(\)">\u{1F517} Group Li/u);
         assert.match(read('sidematches.html'), /\u29C9 Copy</u);

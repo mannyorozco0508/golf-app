@@ -73,3 +73,32 @@ function computeGroupBoundaries(playerCount, overrides) {
     });
     return boundaries;
 }
+
+// WHAT A ?group=N LINK PERMITS, in the one sentence an organizer sees before
+// sending it to somebody.
+//
+// MEASURED, NOT INFERRED. tools/round-share-check.js opens every link the app hands
+// out, at every roster size, and counts the score inputs its holder can edit:
+//
+//   4 golfers, ?group=1    76 inputs, 76 editable - the whole field
+//   8 golfers, ?group=1    76 inputs, 76 editable - Golfers 1-4 and nobody else
+//   8 golfers, ?group=2    76 inputs, 76 editable - Golfers 5-8 and nobody else
+//   9 golfers, ?group=3    19 inputs, 19 editable - the one golfer in that group
+//
+// So a group link is ALWAYS a scorekeeper link, and never a read-only one: what
+// changes above four golfers is not what it permits but WHO IT COVERS. The other
+// groups are not locked on that card - they are not on it. A sentence promising
+// "read-only" would describe a screen nobody is looking at. (The bare ?game=CODE
+// link IS read-only above four golfers, and the setup card that used to hand it out
+// said so; that card and that link are both gone from the app's share surfaces.)
+//
+// ONE DEFINITION because two surfaces show it: admin.html's Round Ready screen and
+// sidematches.html's Ryder Cup handoff. If index.html's gate ever moves off
+// players.length > 4, the check goes red and this has to catch up.
+function groupLinkNoteText(playerCount) {
+    const MULTI_GROUP_ABOVE = 4;   // index.html: const isMultiGroupRound = players.length > 4
+    return (Number(playerCount) > MULTI_GROUP_ABOVE)
+        ? 'Send each group only their own link \u2014 it opens that group\u2019s card '
+          + 'and nobody else\u2019s.'
+        : 'Scorekeeper link \u2014 send this to whoever is keeping the card.';
+}

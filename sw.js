@@ -355,7 +355,30 @@
 // http/https so preview deploys and local dev share links to themselves, and the
 // canonical web origin anywhere else. index.html and leaderboard.html load it now.
 // An installed PWA on v73 keeps handing out links nobody can open.
-const CACHE_VERSION = 'golfapp-v74-share-links-are-web-links';
+// Moved to v75: you share a round after it exists, and a bet you set up is still
+// there when you save.
+//   The share card sat on the SETUP screen at step one, offering a link to a round
+// with no format, no course and no players yet - and the group-links panel beside
+// it hid itself whenever there was one group, which is most of this group's golf.
+// Sharing moved to the Round Ready screen, where the round is real and the groups
+// are known: one labelled copyable link per group, rendered on arrival rather than
+// behind a "Group Links" button nobody pressed. A single group used to get a
+// SENTENCE there telling the organizer to read the round code aloud; it now gets a
+// real link like everybody else. The Ryder Cup handoff, which skips Round Ready
+// entirely, gained the same panel. The QR and its runtime CDN script went with the
+// card - a per-group link cannot be one QR, and a third-party fetch on the
+// most-used screen fails offline inside the native bundle.
+//   And the wizard silently deleted a configured Nassau. Arriving at the Games step
+// rewrites the two golfer dropdowns with innerHTML, which resets a <select> in a
+// real browser, so one tap of "◀ Back" emptied the pairing while leaving the
+// checkbox ticked and the stakes typed - and the round then saved with NO BET and
+// said nothing. The pairing is remembered outside the markup now. The Review step,
+// which had never mentioned side matches at all, shows the wager bound to
+// collectSetupNassauWager() - the same function the save calls - so it cannot
+// promise a bet that will not be written or stay silent about one that will.
+// An installed PWA on v74 can still create a foursome's round with nothing to send
+// anybody, and still lose a $40 Nassau to the Back button without a word.
+const CACHE_VERSION = 'golfapp-v75-share-after-save-and-keep-the-bet';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

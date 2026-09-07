@@ -7,7 +7,6 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f4c3a">
     <script src="pwa-boot.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
@@ -285,7 +284,6 @@
         .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
         .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
-        .share-box { background: var(--nassau-box-bg); border: 2px dashed var(--brand-green); border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 20px; }
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
         .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
         .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
@@ -295,8 +293,6 @@
             min-height: 44px; padding: 0 10px; background: none; border: none;
             color: var(--text-muted); font-size: 0.78rem; text-decoration: underline;
             cursor: pointer; }
-        #qrcode { display: flex; justify-content: center; margin: 12px 0; }
-        #qrcode img { border: 4px solid white; border-radius: 8px; }
         
         .player-row { display: grid; gap: 6px; align-items: center; margin-bottom: 10px; }
         .grid-stroke { grid-template-columns: 2fr 1fr 38px; }
@@ -470,18 +466,18 @@ html {
         📑 <strong>Copied settings from your other round</strong> — course, format, and side games are pre-filled. Double-check <strong>Step 5: Players</strong> since who's playing today may be different.
     </div>
 
-    <div class="share-box">
-        <h3>📲 Share Link with Group</h3>
-        <span id="share-link-note" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;"></span>
-        <div id="qrcode"></div>
-        <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">⧉ Copy Invite Link</button>
-    </div>
+    <!-- SHARING MOVED TO THE READY SCREEN.
+         Both of these cards sat here, visible at step one, before a format or a
+         course or a single player existed - offering a link to a round that had not
+         been built, and a group-links panel that hid itself on every foursome.
+         Sharing belongs after Save, where the round is real and the groups are
+         known, so a link can be addressed to whoever is keeping that group's card.
 
-    <div class="share-box" id="group-links-box" style="display:none; border-color:var(--accent-red);">
-        <h3>🔒 Group Scorekeeper Links</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 10px;">Send EACH group ONLY their own link below. They can enter scores for their group only — every other group shows up read-only.</span>
-        <div id="group-links-list"></div>
-    </div>
+         THE QR WENT WITH IT. Post-save the links are per group, so one QR would
+         have to encode the wrong one; it was also a third-party script fetched from
+         a CDN at runtime, on the most-used screen, inside a native bundle where
+         that fails offline. tournament.html keeps its own - a tournament pins one
+         code for the whole field, which is the case a QR actually suits. -->
 
     <div class="wizard-progress" id="wizard-progress"></div>
 
@@ -1307,8 +1303,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
-    <button class="btn-outline" onclick="showRoundReadyLinks()">🔒 Group Links</button>
-    <div id="rr-links-box" style="display:none; margin-top:12px;"></div>
+    <div id="rr-links-box" style="margin-top:12px;"></div>
 </div>
 
 <script>
@@ -1565,6 +1560,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function renderRoundReady(data) {
         document.getElementById('rr-course-sub').textContent = `${data.eventName || 'Round'} — ${data.courseName || 'Course TBD'}`;
+        // On arrival, from the data already fetched. Not behind a tap.
+        renderRoundReadyLinks(data);
 
         const players = data.players || [];
         document.getElementById('rr-players-list').innerHTML = players.length > 0
@@ -1646,29 +1643,46 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         window.location.href = `sidematches.html?game=${currentMode}`;
     }
 
-    function showRoundReadyLinks() {
+    // ONE LINK PER GROUP, ALWAYS AT LEAST ONE.
+    //
+    // This used to render, for a single group, a sentence and nothing else: the
+    // round code, it said, worked as the scorecard link for everyone. A four-ball
+    // organizer was told to read a code aloud. That sentence was the bug, not a
+    // fallback - a foursome needs to send its scorekeeper a link exactly as a
+    // shotgun does, it just needs one of them.
+    //
+    // AND IT WAS BEHIND A BUTTON, so an organizer who never pressed "Group Links"
+    // never sent anybody anything.
+    //
+    // The note comes from groupLinkNoteText() in grouping.js - one definition,
+    // shared with the Cup handoff, bound to what a ?group= link actually permits.
+    function renderRoundReadyLinks(data) {
         const box = document.getElementById('rr-links-box');
-        db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
-            const data = snapshot.val() || {};
-            const players = data.players || [];
-            const boundaries = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
-            if (boundaries.length <= 1) {
-                box.style.display = 'block';
-                box.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.85rem;">One group — the round code itself works as the scorecard link for everyone.</div>`;
-                return;
-            }
-
-            let html = '';
-            boundaries.forEach(b => {
-                const groupUrl = scorecardUrlFor(currentMode, b.group);
-                html += `<div class="group-link-row">
-                    <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
-                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">🔗 Copy Link</button>
-                </div>`;
-            });
-            box.style.display = 'block';
-            box.innerHTML = html;
+        if (!box) return;
+        const players = (data && data.players) || [];
+        if (players.length === 0) {
+            box.innerHTML = '<div style="font-size:0.82rem; color:var(--text-muted);">'
+                + 'Add players to this round to get a scorekeeper link.</div>';
+            return;
+        }
+        const boundaries = computeGroupBoundaries(players.length,
+            (data && data.groupSizeOverrides) || {});
+        let html = '<div class="wr-label" style="margin-bottom:4px;">Scorekeeper Links</div>'
+            + '<div id="rr-links-note" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">'
+            + escapeHtml(groupLinkNoteText(players.length)) + '</div>';
+        boundaries.forEach(b => {
+            const url = scorecardUrlFor(currentMode, b.group);
+            const names = players.slice(b.startIdx, b.startIdx + b.size)
+                .map(p => String(p.name || '').trim().split(' ')[0]).join(', ');
+            html += '<div class="group-link-row">'
+                + '<span>🏌️ Group ' + b.group + '<br>'
+                + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
+                + escapeHtml(names) + '</span></span>'
+                + '<button class="btn-outline" onclick="copyGroupLink(\'' + url + '\', '
+                + b.group + ')">🔗 Copy Link</button>'
+                + '</div>';
         });
+        box.innerHTML = html;
     }
 
     function goToWizardStep(n) {
@@ -1726,6 +1740,32 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function wizardBack(fromStep) {
         goToWizardStep(wizardNeighbourStep(fromStep, -1));
+    }
+
+    // WHAT THE SIDE MATCH WILL ACTUALLY BE, or that it will not be saved.
+    //
+    // The review covered the main format, the stacked games and the extras, and said
+    // nothing whatever about side matches - so a fully configured Nassau and a
+    // half-finished one reviewed identically. That is why a pairing lost to the Back
+    // button was invisible right up to the receipt.
+    //
+    // BOUND TO collectSetupNassauWager(), the same function saveSettings calls, so
+    // this cannot promise a bet that will not be written or stay silent about one
+    // that will.
+    function wizardSideMatchLine() {
+        const on = document.getElementById('setup-nassau-enabled');
+        if (!on || !on.checked) return '';
+        const w = (typeof collectSetupNassauWager === 'function')
+            ? collectSetupNassauWager() : null;
+        if (!w) return '\u26A0\uFE0F Nassau \u2014 will NOT be saved: pick the two golfers';
+        const nameOf = id => {
+            const p = collectWizardPlayers().filter(x => String(x.id) === String(id))[0];
+            return p ? String(p.name).trim().split(' ')[0] : ('#' + id);
+        };
+        const who = (w.teamAIds || []).map(nameOf).join('/') + ' vs '
+                  + (w.teamBIds || []).map(nameOf).join('/');
+        return 'Nassau $' + (w.frontStake || 0) + ' / $' + (w.backStake || 0)
+             + ' / $' + (w.overallStake || 0) + ' \u2014 ' + who;
     }
 
     function renderWizardReview() {
@@ -1809,8 +1849,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         });
         rows.push(['Players', `${playerCount} added`, 5, SEC_PLAYERS]);
         rows.push(['Extras', sideGamesText, 6, SEC_ACTION]);
-        // Side Matches ($ bets like "Manny vs John") are set up on the Matches tab after the
-        // round is created — this screen can't summarize them yet since none exist at this point.
+        // A side match set up in the Games step is written by this same Save, so it
+        // belongs on the last screen before playing. Read from what will be written -
+        // see wizardSideMatchLine above - never from the form.
+        const sideMatchLine = wizardSideMatchLine();
+        if (sideMatchLine) rows.push(['Side Match', sideMatchLine, 6, SEC_ACTION]);
 
         // Grouped so SCORING, PLAYERS and GAMES & MONEY read as separate answers.
         const ORDER = [SEC_SCORING, SEC_PLAYERS, SEC_ACTION];
@@ -4130,9 +4173,32 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // A heads-up round has exactly one possible Nassau, so it fills itself in. With
     // more players the app must not invent the pairing - guessing who is playing whom
     // for money is how a wrong bet gets settled.
+    // WHO WAS PICKED, remembered outside the markup.
+    //
+    // Arriving at this step rebuilds the two dropdowns with innerHTML, which in a
+    // real browser destroys them and creates new ones with nothing chosen. One tap
+    // of "◀ Back" and forward again therefore emptied the pairing while leaving
+    // the checkbox ticked and the stakes typed - and collectSetupNassauWager returns
+    // null without a pairing, so the round saved with NO BET and said nothing.
+    //
+    // A value that decides who is in a money game cannot live only in markup that
+    // gets rewritten.
+    let setupNassauPicks = { p1: '', p2: '' };
+
+    function rememberSetupNassauPicks() {
+        const a = document.getElementById('setup-nassau-p1');
+        const b = document.getElementById('setup-nassau-p2');
+        if (a) setupNassauPicks.p1 = a.value || '';
+        if (b) setupNassauPicks.p2 = b.value || '';
+    }
+
     function renderSetupNassauPlayers() {
         const box = document.getElementById('setup-nassau-players');
         if (!box) return;
+        // BEFORE THE REWRITE, because the rewrite is what destroys them. onchange
+        // covers a golfer picking from the list; this covers everything else, and
+        // needs no event to have fired.
+        rememberSetupNassauPicks();
         const players = collectWizardPlayers().filter(p => p.name && p.name.trim());
         if (players.length < 2) {
             box.innerHTML = '<div style="font-size:0.74rem; color:var(--text-muted);">Add at least two players in Step 5 first.</div>';
@@ -4141,26 +4207,30 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const opts = (sel) => players.map((p, i) =>
             '<option value="' + p.id + '"' + (String(p.id) === String(sel) ? ' selected' : '') + '>'
             + String(p.name).replace(/[<>&"]/g, '') + '</option>').join('');
-        // Default only in the unambiguous case.
-        const defA = players.length === 2 ? players[0].id : '';
-        const defB = players.length === 2 ? players[1].id : '';
+        // A remembered choice wins; a two-player round still defaults to the only
+        // pairing there is; a golfer since removed from the roster is dropped rather
+        // than left in the bet.
+        const stillPlaying = id => id !== '' && players.some(p => String(p.id) === String(id));
+        const keptA = stillPlaying(setupNassauPicks.p1) ? setupNassauPicks.p1 : '';
+        const keptB = stillPlaying(setupNassauPicks.p2) ? setupNassauPicks.p2 : '';
+        const defA = keptA || (players.length === 2 ? players[0].id : '');
+        const defB = keptB || (players.length === 2 ? players[1].id : '');
         box.innerHTML =
             '<div style="display:grid; grid-template-columns:1fr auto 1fr; gap:6px; align-items:center;">'
-            + '<select id="setup-nassau-p1">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defA) + '</select>'
+            + '<select id="setup-nassau-p1" onchange="rememberSetupNassauPicks()">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defA) + '</select>'
             + '<span style="font-size:0.72rem; color:var(--text-muted);">vs</span>'
-            + '<select id="setup-nassau-p2">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defB) + '</select>'
+            + '<select id="setup-nassau-p2" onchange="rememberSetupNassauPicks()">' + (players.length === 2 ? '' : '<option value="">Pick\u2026</option>') + opts(defB) + '</select>'
             + '</div>'
             + (players.length > 2 ? '<div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">More action can be added from Action once the round starts.</div>' : '');
 
         // Set the selection explicitly rather than trusting the `selected` attribute to
         // survive innerHTML. Browsers honour it; relying on markup parsing for a value
         // that decides who is in a money game is a needless dependency.
-        if (defA && defB) {
-            const a = document.getElementById('setup-nassau-p1');
-            const b = document.getElementById('setup-nassau-p2');
-            if (a) a.value = String(defA);
-            if (b) b.value = String(defB);
-        }
+        const a = document.getElementById('setup-nassau-p1');
+        const b = document.getElementById('setup-nassau-p2');
+        if (a) a.value = defA ? String(defA) : '';
+        if (b) b.value = defB ? String(defB) : '';
+        rememberSetupNassauPicks();
     }
 
     // Builds the wager from the Step 6 fields using the SHARED builder in
@@ -4426,7 +4496,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             } else {
                 addPlayerRow(); 
             }
-            regenerateGroupLinks();
         });
     }
 
@@ -4626,7 +4695,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
-        regenerateGroupLinks();
     }
 
     // --- CUSTOM GROUP SIZING ---
@@ -4717,7 +4785,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         groupSizeOverrides[groupIdx] = newSize;
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
-        regenerateGroupLinks();
     }
 
     // WHAT THIS LINK ACTUALLY DOES, which is not one fixed thing.
@@ -4736,49 +4803,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // describes that, and tools/round-setup-check.js measures what the link really
     // permits and fails if this sentence disagrees. If the gate moves, the copy goes
     // red rather than quietly starting to lie again.
-    const MULTI_GROUP_ABOVE = 4;   // index.html: const isMultiGroupRound = players.length > 4
-    function shareLinkNoteText(playerCount) {
-        return (playerCount > MULTI_GROUP_ABOVE)
-            ? 'Read-only link. Each group needs its own link below.'
-            : 'Scorekeeper link \u2014 send this to whoever is keeping the card.';
-    }
-
-    function syncShareLinkNote() {
-        const el = document.getElementById('share-link-note');
-        if (!el) return;
-        el.textContent = shareLinkNoteText(document.querySelectorAll('.player-row').length);
-    }
-
-    function regenerateGroupLinks() {
-        // The roster just changed, which is the only thing either of these depends on.
-        syncShareLinkNote();
-        const box = document.getElementById('group-links-box');
-        const list = document.getElementById('group-links-list');
-        if (!box || !list) return;
-
-        const playerCount = document.querySelectorAll('.player-row').length;
-        const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
-
-        if (!currentMode || boundaries.length <= 1) {
-            box.style.display = 'none';
-            list.innerHTML = '';
-            return;
-        }
-
-        box.style.display = 'block';
-
-        let html = '';
-        boundaries.forEach(b => {
-            const groupUrl = scorecardUrlFor(currentMode, b.group);
-            html += `
-                <div class="group-link-row">
-                    <span>🏌️ Group ${b.group} (${b.size} player${b.size === 1 ? '' : 's'})</span>
-                    <button class="btn-outline" onclick="copyGroupLink('${groupUrl}', ${b.group})">🔗 Copy Link</button>
-                </div>
-            `;
-        });
-        list.innerHTML = html;
-    }
 
     // ---- Player-facing URL builder -----------------------------------------
     // ROOT CAUSE OF THE ADMIN-LINK BUG.
@@ -5163,24 +5187,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
     }
 
-    function generateQRCode() {
-        const currentUrl = scorecardUrlFor(currentMode);
-        document.getElementById("qrcode").innerHTML = "";
-        new QRCode(document.getElementById("qrcode"), {
-            text: currentUrl, width: 140, height: 140,
-            colorDark : "#0f4c3a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
-        });
-    }
-
-    function copyAppUrl() {
-        const currentUrl = scorecardUrlFor(currentMode);
-        // THE SAME SENTENCE THE CARD SHOWS, from the same rule. This used to give
-        // the link two different names in one breath, unconditionally, while the
-        // note above it is conditional and correct: at or below four golfers the
-        // link is genuinely writable, so it IS the scorekeeper link.
-        const note = shareLinkNoteText(document.querySelectorAll('.player-row').length);
-        navigator.clipboard.writeText(currentUrl).then(() => alert('Copied. ' + note));
-    }
 
     syncFormatCards();
     renderWizardProgress();
@@ -5207,7 +5213,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     if (currentMode) {
-        generateQRCode();
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
@@ -5220,7 +5225,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     if (banner) banner.style.display = 'block';
                 } else {
                     addPlayerRow();
-                    regenerateGroupLinks();
                 }
                 // Fresh round, nothing saved yet - starting at Step 1 (already done above) is right.
             } else {
