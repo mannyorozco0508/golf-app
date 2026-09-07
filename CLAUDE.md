@@ -98,6 +98,32 @@ twice because the view switch it relied on never rebuilt anything.
 A control that mutates something genuinely harmless *should* be inert. Say so, rather
 than inventing an assertion to make it look caught.
 
+## A cold check reads `innerText`, never `textContent`
+
+`document.body.textContent` **includes the source of every inline `<script>` in the
+body.** Every page in this repo keeps its whole application in one, so
+`body.textContent` is mostly JavaScript.
+
+That is not a style preference, it is a trap that produces confident false results
+in **both** directions. A check written to confirm a refusal message got rendered
+matched that message in the page's own source and passed on a page that rendered
+nothing; the same regex then matched on the *clean* control and reported that a
+good round had been refused. Both arms of `tools/receipt-identity-check.js` were
+wrong at once, and the JSON looked entirely plausible.
+
+`innerText` is the **rendered** text. It excludes script and style content, and it
+excludes hidden elements — which matters just as much, because a modal that never
+opened has plenty of `textContent` and no `innerText` at all.
+
+**The rule.** Read `innerText`, scoped to the element whose content is the claim —
+`#fr-final-money`, not the body. If the assertion is about something being absent,
+scoping is the difference between "not on screen" and "not anywhere in the file".
+
+**And prove the positive control shows something.** A refusal check is worthless
+if the clean case renders nothing either: "no merged balance" is trivially true on
+a blank page. Assert the good round actually displayed money before believing the
+bad one was refused.
+
 ## Two entry points means one builder
 
 `admin.html` and `sidematches.html` both render the Nassau controls. Anything they
