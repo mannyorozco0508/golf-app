@@ -1411,6 +1411,31 @@ html {
             return;
         }
 
+        // A NAME THE MONEY CANNOT TELL APART STOPS THE RECEIPT.
+        //
+        // Every total below is added up by name, so two golfers sharing one become a
+        // single balance and somebody pays the other man's debts. This is the receipt
+        // cash actually changes hands on, so it refuses rather than printing a number
+        // nobody can check. Scores are untouched and still on every other screen.
+        const dupNames = (typeof duplicatePlayerNames === 'function')
+            ? duplicatePlayerNames(players) : [];
+        if (dupNames.length > 0) {
+            const esc = t => String(t).replace(/[&<>"]/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            container.innerHTML = '<div class="settle-card" style="background:var(--warn-bg); '
+                + 'border:2px solid var(--warn-border);">'
+                + '<div class="settle-header" style="color:var(--warn-text);">'
+                + '\u26A0\uFE0F Money Not Totalled</div>'
+                + dupNames.map(d => '<div style="font-size:0.82rem; padding:6px 0;">'
+                    + (d.count > 2 ? d.count + ' golfers are all called' : 'Two golfers are both called')
+                    + ' <strong>' + esc(d.name) + '</strong>. Every total on this '
+                    + 'page is added up by name, so their money would be merged into one '
+                    + 'balance and somebody would pay the other\u2019s debts. Rename one of '
+                    + 'them in Setup, then come back.</div>').join('')
+                + '</div>';
+            return;
+        }
+
         // `contributions` is the canonical per-golfer breakdown added in the Wave 2B
         // foundation. Destructured here so the ledger below reads engine output rather
         // than recomputing anything.

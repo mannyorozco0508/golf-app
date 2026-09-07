@@ -5059,6 +5059,24 @@ html {
                 ? '<div class="fr-verified-badge">\u2713 Scores verified before settlement</div>' : '';
         }
 
+        // THE SAME REFUSAL AS THE RECEIPT, from the same detector. This panel and
+        // settlement.html show the same money; if only one of them refused, a golfer
+        // could read a merged total on the screen the other page declined to print.
+        const dupNames = (typeof duplicatePlayerNames === 'function')
+            ? duplicatePlayerNames(currentData.players || []) : [];
+        if (dupNames.length > 0) {
+            const escD = t => String(t).replace(/[&<>"]/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            moneyEl.innerHTML = '<div class="fr-empty">'
+                + dupNames.map(d => (d.count > 2 ? d.count + ' golfers are all called' : 'Two golfers are both called')
+                    + ' <strong>' + escD(d.name) + '</strong>. The money is added up '
+                    + 'by name, so it cannot be totalled until one of them is renamed in Setup.')
+                    .join(' ')
+                + '</div>';
+            payEl.innerHTML = '';
+            return;
+        }
+
         let result;
         try {
             result = computeCombinedNetTotals(currentData, courseData, savedScores);

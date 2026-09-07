@@ -445,12 +445,16 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         'pool-engine.js': '944957133f3bce762c704606f2aa43b26c9edfec16970c111445dd8d86cfc96b',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
-        // action-model.js has since gained nassauAutoPressLabel() - a pure presentation
-        // helper that prices the auto-press dropdown - by explicit per-file approval.
-        // Additions only: buildNassauWagerPayload, the function that shapes the money,
-        // is byte-for-byte unchanged, and nassau_autopress_label_test.js asserts its
-        // behaviour rather than trusting this hash to notice.
-        'action-model.js': 'aa22c0fa11ad87e1d0a852292aa95506b0b7c26eb9f996e9f6177ae08dd61530',
+        // action-model.js has since gained, by explicit per-file approval each time:
+        // nassauAutoPressLabel() which prices the auto-press dropdown;
+        // normalisePlayerName() and isPlaceholderPlayerName(), the one definition of
+        // what a golfer's name is across rounds; and duplicatePlayerNames(), which
+        // reports two golfers a receipt cannot tell apart.
+        // ADDITIONS ONLY. buildNassauWagerPayload, the function that shapes the money,
+        // is byte-for-byte unchanged. Each addition is guarded by a suite that asserts
+        // its BEHAVIOUR - nassau_autopress_label_test.js, ryder_cross_round_identity_test.js
+        // and round_duplicate_name_test.js - rather than trusting this hash to notice.
+        'action-model.js': '5fd3455d899176f0ad10bb0ef35739718fa386c34d6b05bacf2f80948ed66ef2',
         'ryder-cup.js': '26ecc804d9a36b5063c26a61df3b78c2eff391ed452985ba114c2b41eb9e039d',
         'bet-strip.js': '934c6a99291fc9848d107d2c877855aafd0758acfdcbb76842e44403006e290d',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',

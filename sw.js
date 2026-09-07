@@ -314,7 +314,17 @@
 // with "Lance Webb -> Mike Dunne $10" naming either of them. Scoring, the
 // leaderboard and each round's own money are untouched. An installed PWA on v69
 // keeps a card that invites the group to double-pay every side match.
-const CACHE_VERSION = 'golfapp-v70-trip-total-truth';
+// Moved to v71: a round's own receipt refuses two golfers it cannot tell apart.
+// Every settlement total is keyed on the NAME, so two men called Mike Dunne were
+// ONE balance - four golfers in, three out - and "Lance Webb -> Mike Dunne $10"
+// named a man who could be either of them. v70 made the TRIP total refuse this;
+// this is the same bug one level down, on the receipt cash actually changes hands
+// on. Both surfaces that show a round's money refuse from one shared detector in
+// action-model.js, so they cannot disagree about whether a receipt is safe to pay
+// from. Placeholders are deliberately NOT refused here: inside a single round
+// Player 1..4 are distinct and nothing merges. An installed PWA on v70 keeps
+// printing a merged balance that looks finished.
+const CACHE_VERSION = 'golfapp-v71-receipt-identity';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

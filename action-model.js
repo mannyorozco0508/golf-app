@@ -776,9 +776,45 @@ function isPlaceholderPlayerName(name) {
     return /^player\s*\d+$/.test(normalisePlayerName(name));
 }
 
+// TWO GOLFERS THE MONEY CANNOT TELL APART.
+//
+// Every settlement total is keyed on the golfer's NAME - computeCombinedNetTotals
+// does `netByName[name.trim().toLowerCase()].net += amount`. So two men called
+// Mike Dunne in one round are ONE balance: four golfers go in, three come out, and
+// "Lance Webb -> Mike Dunne $10" names a man who could be either of them. The
+// arithmetic is right and the receipt looks finished, which is what makes it
+// dangerous - nothing on screen suggests a question was ever asked.
+//
+// MATCHED EXACTLY AS THE ENGINE MATCHES. Trimmed and lowercased, through the same
+// normaliser, because a detector that is stricter than the engine would pass a
+// receipt the engine goes on to merge.
+//
+// A BLANK NAME IS NOT A DUPLICATE OF ANOTHER BLANK. It is a different problem -
+// nobody can be paid by it either way - and reporting it here would send an
+// organizer looking for two golfers with the same name when there are none.
+//
+// PLACEHOLDERS ARE NOT REPORTED EITHER. "Player 1" through "Player 4" cannot
+// identify anyone ACROSS rounds, which is why a trip refuses them, but inside a
+// single round they are distinct and nothing merges. Refusing that round would
+// block money that is not in doubt.
+function duplicatePlayerNames(players) {
+    const seen = {};
+    (players || []).forEach(function (p) {
+        if (!p) return;
+        const key = normalisePlayerName(p.name);
+        if (!key) return;
+        if (!seen[key]) seen[key] = { key: key, name: String(p.name).trim(), count: 0, ids: [] };
+        seen[key].count += 1;
+        seen[key].ids.push(String(p.id));
+    });
+    return Object.keys(seen).map(function (k) { return seen[k]; })
+        .filter(function (e) { return e.count > 1; });
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
     module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
     module.exports.normalisePlayerName = normalisePlayerName;
     module.exports.isPlaceholderPlayerName = isPlaceholderPlayerName;
+    module.exports.duplicatePlayerNames = duplicatePlayerNames;
 }
