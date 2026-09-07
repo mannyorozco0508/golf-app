@@ -86,16 +86,33 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
             'an "OR" survives with nothing on one side of it');
     });
 
-    test('DUPLICATE keeps its own field, which is a different question', () => {
-        assert.match(ADMIN, /id="duplicate-room-input"/,
-            'the duplicate field was removed with the join field');
-        assert.match(ADMIN, /onclick="duplicateRoom\(\)"/);
-        assert.match(ADMIN, /maxlength="6"/, 'and it still holds a whole code');
+    // The duplicate field went in the wave after this one, for the same reason:
+    // never used. Its PREFILL is untouched - see below.
+    test('the duplicate field is gone too', () => {
+        assert.ok(!/id="duplicate-room-input"/.test(ADMIN));
+        assert.ok(!/duplicateRoom/.test(ADMIN));
+        assert.ok(!/GAME CODE TO COPY/.test(ADMIN));
     });
 
-    test('the shared input styling survives for it', () => {
-        assert.match(ADMIN, /\.join-input \{/,
-            'the CSS went with the join field and took duplicate down with it');
+    test('and the styling that existed only for those two fields went with them', () => {
+        assert.ok(!/\.join-input/.test(ADMIN),
+            'a rule is left behind for controls that no longer exist');
+    });
+
+    // Cutting the button must not cut the capability. A link is still a way in.
+    test('the copyFrom prefill still works — only the control was removed', () => {
+        assert.match(ADMIN, /urlParams\.get\('copyFrom'\)/,
+            'admin.html?game=NEW&copyFrom=OLD stopped pre-filling');
+        assert.match(ADMIN, /loadModeData\(copyFromCode\)/);
+    });
+
+    test('nothing is left below the two tiles', () => {
+        const l = lobby();
+        const afterWidgets = l.slice(l.indexOf('home-widgets'));
+        assert.ok(!/<input/.test(afterWidgets),
+            'the home screen still asks for something to be typed');
+        assert.ok(!/lobby-divider/.test(afterWidgets),
+            'a divider survives with nothing to divide');
     });
 });
 

@@ -63,6 +63,20 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 
 To ship a new build: `node sync-mobile-web.js && npx cap sync ios`, bump **Build** in Xcode (Version stays 1.0.0), Archive, Distribute → App Store Connect.
 
+## Things in the live database that look alarming and are not
+
+**`app_settings/beta_expiration` is dead data.** It currently reads
+`2026-08-31T00:00:00` — a date in the past — sitting in the production database
+where anyone poking around will find it and assume the app is about to stop
+working, or already has.
+
+**Nothing reads it.** Grepping the whole repo, the only other appearances are in
+`security-rules.tests-data.json`, which is fixture data for the rules suite. No
+page, engine or service worker consumes it. No beta expires, and moving the date
+would change nothing. It was checked in full on 2026-09-06 rather than guessed at.
+
+Leave it. It is recorded here so the next person spends no time on it.
+
 ## Firebase security rules — DEPLOYED
 
 `database.rules.json` is live on `golfapp-9fb21-default-rtdb`. Deploy with:
@@ -115,6 +129,50 @@ binding-related needs one of these tools.** Two of them is a pattern now, not a
 one-off: when a change turns on what something looks like, or on which record a
 control is bound to, write the browser check rather than a test that asserts the
 assumption.
+
+### `tools/home-screen-check.js` — the only check that can see a layout gap
+
+```
+node tools/home-screen-check.js
+```
+
+Arrives cold at `admin.html` with a resume pointer already in `localStorage`, the
+way a returning golfer's phone does, and measures the rendered home screen.
+
+It exists because of a bug **mini-dom structurally cannot see**. The resume control
+rendered as `ResumeJLRL4H` with no space, while the markup was already correct:
+
+```html
+<a class="resume-link">▶️ Resume <span id="resume-room-badge"></span></a>
+```
+
+`.resume-link` is `display:inline-flex`, so the label and the badge are flex items
+and **flex layout drops the anonymous whitespace between them**. With no layout
+engine there is no way to tell `Resume ABC` from `ResumeABC`. The check measures
+the real gap with a `Range` around the label's own text node, and also measures
+that the brand mark leads the wordmark and that the lobby asks for nothing typed.
+
+### `tools/orphan-match-check.js` — READ-ONLY scan of the live database
+
+```
+node tools/orphan-match-check.js ROUND1 ROUND2 ...
+node tools/orphan-match-check.js --trip MYR1
+node tools/orphan-match-check.js --self-test
+```
+
+Looks for Cup matches stranded under session `s1` by the pre-v65 adder. Two things
+about it are deliberate and worth keeping:
+
+- **It proves its own detector first**, against known-bad and known-good fixtures,
+  and bails rather than reporting clean. A clean report from a detector that cannot
+  detect is a false all-clear, which is worse than no report.
+- **It checks the round exists before scanning it.** It once reported `CLEAN` for a
+  code that is not in the database at all — every read returned `null`, so it gave a
+  clean bill of health for a round it had never read. That is now exit 2.
+
+The rules give `.read` on `events/$eventCode` but nothing on `/events`, so a single
+round reads and a listing is denied. **The codes have to come from you**; the tool
+cannot discover rounds, and that is the rule working as intended.
 
 ### `tools/id-binding-check.js` — the only check that can prove id-to-name binding
 

@@ -107,8 +107,10 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
 
     // Was three. The typed-code join was removed in the wave after this one, once
     // it was confirmed nobody has ever used it; see home_screen_shape_test.js.
-    test('the other ways in are untouched', () => {
-        assert.match(ADMIN, /onclick="duplicateRoom\(\)"/, 'Duplicate');
+    // Was three, then two. Duplicate went the wave after the typed-code join, for
+    // the same reason - never used. Resume is what remains, and it changed meaning:
+    // it now points only at a round that was actually saved.
+    test('the other way in is untouched', () => {
         assert.match(ADMIN, /onclick="resumeGame\(\)"/, 'Resume');
         assert.match(ADMIN, /id="resume-container"[^>]*display: ?none/, 'Resume stays hidden');
     });
@@ -117,8 +119,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
     test('no divider is left stranded above the first way in', () => {
         const lobby = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'),
                                   ADMIN.indexOf('id="admin-screen"'));
-        const before = lobby.slice(0, lobby.indexOf('id="duplicate-room-input"'));
-        assert.equal((before.match(/lobby-divider/g) || []).length, 0,
+        assert.equal((lobby.match(/lobby-divider/g) || []).length, 0,
             'an "OR" divider survives with nothing on the other side of it');
     });
 });

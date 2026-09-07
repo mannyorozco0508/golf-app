@@ -196,12 +196,14 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
 
     test('every code input accepts at least six characters', () => {
         const inputs = inputMaxLengths();
-        // Two now, not three: the round's join field is gone. Duplicate (admin) and
-        // trip-join (trip) are the only places a code is still typed, both by
-        // someone who has the code in front of them.
-        assert.ok(inputs.length >= 2, 'expected the duplicate and trip inputs');
+        // ONE now. The round join field went, then the duplicate field went - both
+        // for the same reason, that nobody ever typed a code. Joining a TRIP is the
+        // only code still typed anywhere, by someone who has it in front of them.
+        assert.ok(inputs.length >= 1, 'expected the trip input');
         assert.ok(!inputs.some(i => i.id === 'join-room-input'),
             'the round join field is back');
+        assert.ok(!inputs.some(i => i.id === 'duplicate-room-input'),
+            'the duplicate field is back');
         inputs.forEach(i => assert.ok(i.max === null || i.max >= CODE_LENGTH,
             i.file + ' #' + i.id + ' has maxlength=' + i.max +
             ' and would truncate a ' + CODE_LENGTH + '-character code'));
@@ -221,19 +223,21 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
             'the whole code did not survive the link');
     });
 
-    test('a generated code passes duplicate-round unchanged', () => {
-        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
-        vm.runInContext(`
-            alert = function(m){ window.__alert = m; };
-            var code = generateRoomCode();
-            window.__code = code;
-            var el = document.getElementById('duplicate-room-input');
-            if (el) el.value = code;
-        `, sb);
-        const code = String(vm.runInContext('window.__code', sb));
+    // The duplicate BUTTON is gone; the prefill it drove is not. A code still has
+    // to survive the copyFrom link intact, or a new round is built from the wrong
+    // old one - so the guarantee moved to the link, exactly as the join one did.
+    test('a generated code survives the copyFrom link unchanged', () => {
+        const gen = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
+        vm.runInContext('window.__code = generateRoomCode();', gen);
+        const code = String(vm.runInContext('window.__code', gen));
         assert.equal(code.length, CODE_LENGTH);
-        const dupMax = inputMaxLengths().find(i => i.id === 'duplicate-room-input');
-        assert.ok(dupMax && dupMax.max >= CODE_LENGTH, 'the duplicate field must hold it');
+        // Open the link a duplicate produces and read what the page decided the
+        // SOURCE round is. A truncation here builds the new round from a different
+        // old one, or from nothing.
+        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+            { search: '?game=NEWRND&copyFrom=' + code });
+        assert.equal(vm.runInContext('copyFromCode', sb), code,
+            'the source code did not survive the copyFrom link');
     });
 
     test('a generated trip code fits the trip join field', () => {

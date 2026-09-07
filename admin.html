@@ -136,13 +136,14 @@
            It was a full-width primary button competing with the two tiles that are
            the actual question this screen asks. Still a 44px touch target: small is
            not the same as unreachable on a phone. */
+        /* gap, NOT the space in the markup. These are flex items, and flex layout
+           drops the anonymous whitespace between them - which is why this rendered
+           as "ResumeJLRL4H" with the markup already correct. */
         .resume-link { display: inline-flex; align-items: center; justify-content: center;
-            min-height: 44px; padding: 0 10px; font-size: 0.85rem; font-weight: bold;
+            gap: 6px; min-height: 44px; padding: 0 10px; font-size: 0.85rem; font-weight: bold;
             color: var(--brand-navy); text-decoration: underline; cursor: pointer; }
         .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
-        .join-input { text-align: center; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2rem !important; margin-bottom: 12px; border: 2px solid var(--border-mid) !important; border-radius: 10px !important; padding: 14px !important; background: var(--nav-bg) !important; color: var(--text-main) !important; }
-        .join-input:focus { border-color: var(--brand-green) !important; outline: none; background: var(--bg-card) !important; }
 
         /* Admin Styles */
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
@@ -414,22 +415,15 @@ html {
         <a class="resume-link" onclick="resumeGame()">▶️ Resume <span id="resume-room-badge"></span></a>
     </div>
 
-    <!-- PICKING A TILE IS THE DECISION. The page asks "What are you setting up?"
-         and offers two answers. A button used to sit here saying the same thing a
-         tile says, so the tile that looked like the answer did nothing but tick
-         itself and print a line of text. -->
-    <!-- NO CODE ENTRY. A golfer arrives on a LINK the organizer sends, and the
-         link carries ?game=CODE which this page reads on load. Nobody has ever
-         typed a code here, so the field asked every arriving golfer to answer a
-         question that was never theirs. Nothing depended on it: the round link,
-         a group's scorekeeper link, the read-only follow link and a deep link
-         carrying ?eventType= all read the URL and never went near joinRoom.
-         Legacy 4-character codes still open, because the link path applies no
-         length rule at all. Duplicate keeps its own field below - it asks a
-         different question, of an organizer who has the code in front of them. -->
-    <p style="font-size:0.75rem; color:var(--text-muted); margin: 0 0 8px 0;">Playing 36 today, or running the same setup again? Copy an existing round's course/format/side games as a starting point — you can still edit players before saving.</p>
-    <input type="text" id="duplicate-room-input" class="join-input" placeholder="GAME CODE TO COPY" maxlength="6">
-    <button class="btn-outline" onclick="duplicateRoom()">📑 Duplicate This Round's Setup</button>
+    <!-- NOTHING BELOW THE TILES. The page asks "What are you setting up?" and the
+         two tiles are the whole answer.
+         A typed-code field and a Join button used to sit here; nobody has ever
+         typed a code, because a golfer arrives on a LINK carrying ?game=CODE,
+         which this page reads on load. A second field for copying an old round's
+         setup into a new one sat here too, and was never used either.
+         The PREFILL those buttons drove is untouched: admin.html?game=NEW&copyFrom=OLD
+         still fills a new round from an old one's setup. Only the home-screen
+         control is gone, so a link that carries copyFrom keeps working. -->
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -2017,7 +2011,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         document.getElementById("lobby-screen").style.display = "none";
         document.getElementById("admin-screen").style.display = "block";
         document.getElementById("display-room-code").textContent = currentMode;
-        localStorage.setItem('lastRoomCode', currentMode);
+        // THE RESUME POINTER IS NOT WRITTEN HERE ANY MORE.
+        //
+        // It used to be, on this line, the instant the URL carried ?game=CODE - and
+        // the round is not written to Firebase until Save & Start Round, with the
+        // entire setup wizard in between. Open the wizard, back out, and the phone
+        // offered to resume a round that had never been created; tapping it landed
+        // on "Waiting for Admin to save settings", blaming an absent person for a
+        // round nobody had made. Picking a tile mints a code immediately now, so a
+        // stray tap also OVERWROTE a good pointer with a phantom.
+        //
+        // It is written in saveSettings' .then() instead, where the round provably
+        // exists. Resume then means what it says.
 
         if (tripLinkCode) {
             document.getElementById("trip-context-banner-wizard").style.display = "block";
@@ -3052,24 +3057,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // Generates a brand-new round but pre-fills its setup from an existing round (course,
     // format, stakes, side games, starting roster) — built for 36-hole days and repeat
     // weekly games where re-typing the same setup from scratch wastes time.
-    function duplicateRoom() {
-        const sourceCode = document.getElementById("duplicate-room-input").value.trim().toUpperCase();
-        if (sourceCode.length < 2) {
-            alert("⚠️ Enter the game code of the round you want to copy.");
-            return;
-        }
-        db.ref(`events/${sourceCode}`).once('value').then(snap => {
-            if (!snap.exists()) {
-                alert(`⚠️ No round found with code ${sourceCode}. Double-check the code and try again.`);
-                return;
-            }
-            const newCode = generateRoomCode();
-            let dest = `admin.html?game=${newCode}&copyFrom=${sourceCode}`;
-            if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
-            window.location.href = dest;
-        }).catch(err => alert(`Error looking up that round: ${err.message}`));
-    }
-
 
     const courseSearchInput = document.getElementById('course-search-input');
     const courseDropdown = document.getElementById('course-dropdown');
@@ -5065,6 +5052,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             if (loadedExistingRound) delete payload.settlementMode;
 
             db.ref(`events/${currentMode}`).update(payload).then(() => {
+                // THE ROUND NOW EXISTS. Only here is it true that there is
+                // something to resume, so only here is the pointer written.
+                localStorage.setItem('lastRoomCode', currentMode);
                 if (tripLinkCode) {
                     return db.ref(`trips/${tripLinkCode}/rounds/${currentMode}`).set({
                         label: selectedCourseName,

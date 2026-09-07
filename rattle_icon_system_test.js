@@ -251,7 +251,13 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
     });
 
     test('duplicate is 📑, copy is ⧉, group links are 🔗', () => {
-        assert.match(ADMIN, /\u{1F4D1} Duplicate This Round's Setup/u);
+        // The duplicate BUTTON was removed from the home screen - never used - but
+        // the prefill it drove is untouched, and 📑 still marks it: the banner shown
+        // on a round opened with ?copyFrom=. Same glyph, same meaning, at the point
+        // where a golfer actually sees a duplicated setup.
+        assert.match(ADMIN, /\u{1F4D1} <strong>Copied settings from your other round/u);
+        assert.ok(!/duplicateRoom/.test(ADMIN),
+            'the removed home-screen control is back');
         assert.match(ADMIN, /\u29C9 Copy Invite L/u);
         assert.match(ADMIN, /">\u{1F517} Copy Link</u);
         assert.match(IDX, /toggleGroupLinksPanel\(\)">\u{1F517} Group Li/u);

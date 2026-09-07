@@ -288,7 +288,20 @@
 // and settlement, stats, leaderboard and both trip screens gain the back control
 // Matches and Bets already had. An installed PWA on v67 keeps a home asking for a
 // code that goes nowhere, and four pages with no way out.
-const CACHE_VERSION = 'golfapp-v68-home-and-nav';
+// Moved to v69: "Resume" means a round that exists. The pointer was written on
+// page load, the instant the URL carried ?game=CODE, and the round is not written
+// to Firebase until Save & Start Round - the whole setup wizard in between. Open
+// the wizard, back out, and the phone offered to resume a round that was never
+// created; tapping it said "Waiting for Admin to save settings", blaming an absent
+// person for a round nobody had made. v68 made it easier to hit, because picking a
+// tile mints a code immediately. The pointer is now written on save, and a round
+// that comes back empty AND matches this device's own pointer clears it and says
+// so - while a player who is merely early still sees the wait, which is true for
+// them. Also: the never-used duplicate control leaves the home screen (its
+// copyFrom prefill is untouched), and the resume link gets the flex gap it needed
+// to stop rendering as "ResumeJLRL4H". An installed PWA on v68 keeps offering dead
+// rounds.
+const CACHE_VERSION = 'golfapp-v69-resume-means-real';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

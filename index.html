@@ -2077,13 +2077,50 @@ html {
     // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
     // same render pass) and re-lays it out as a card. This means Hole View can never show a different
     // number than the Full Card view - it's the exact same DOM, just displayed differently.
+    // WHY THERE IS NOTHING HERE - and two different people are asking.
+    //
+    // A player who opens a group link before the organizer has saved is simply
+    // early, and "waiting for the organizer" is true for them.
+    //
+    // But a device holding a RESUME POINTER to this very round is the device that
+    // saved it: index.html never writes lastRoomCode, so a match can only have come
+    // from admin.html's save. If the round is empty now it is gone, and telling its
+    // own creator to wait for an absent admin is nonsense.
+    //
+    // CLEARED ONCE, AND THE VERDICT CACHED. Both views call this in the same render
+    // pass; without the cache the second would find the pointer already removed and
+    // quietly disagree with the first about what happened.
+    let __deadRoundVerdict = null;
+    function emptyRoundMessage() {
+        if (__deadRoundVerdict === null) {
+            let own = false;
+            try {
+                if (localStorage.getItem('lastRoomCode') === currentMode) {
+                    localStorage.removeItem('lastRoomCode');
+                    own = true;
+                }
+            } catch (e) { /* private mode: the message below is still correct */ }
+            __deadRoundVerdict = own;
+        }
+        return __deadRoundVerdict
+            ? 'This round no longer exists \u2014 it was never saved, or it has been cleared. Start a new round from the home screen.'
+            : 'No data found for this room. Waiting for Admin to save settings...';
+    }
+
     function renderHoleView() {
         const container = document.getElementById('hole-view-card');
         if (!container) return;
 
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         if (courseData.length === 0) {
-            container.innerHTML = '<div style="padding:30px 10px; text-align:center; color:var(--text-muted);">No data found for this room. Waiting for Admin to save settings...</div>';
+            // NOT emptyRoundMessage(). This fires on a DIFFERENT condition: a round
+            // that exists, with players, whose course carries no hole data yet -
+            // renderScorecard returns above before Hole View is ever reached when the
+            // round itself is absent. Using the dead-round message here would tell a
+            // golfer on a LIVE round that it no longer exists, and clear a pointer
+            // that is doing its job. Setup is genuinely incomplete here, so the wait
+            // is real.
+            container.innerHTML = '<div style="padding:30px 10px; text-align:center; color:var(--text-muted);">No course data for this round yet. Waiting for the organizer to finish setup...</div>';
             return;
         }
         const holeNumbers = courseData.map(h => h.hole);
@@ -6934,7 +6971,7 @@ html {
         }
 
         if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) {
-            document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: var(--text-muted);">No data found for this room. Waiting for Admin to save settings...</td></tr>`;
+            document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: var(--text-muted);">${emptyRoundMessage()}</td></tr>`;
             return;
         }
 

@@ -241,6 +241,25 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     if (options && options.search) {
         sandbox.location.search = String(options.search);
     }
+    // A REAL localStorage, OPT-IN. The stub above is a deliberate no-op and must
+    // stay one: dozens of suites already run against its forgetfulness, and giving
+    // every page memory could change them. But a test about WHEN something is
+    // remembered cannot be written against a store that forgets everything - it
+    // would pass whether the write happened or not. Opted into per test, and
+    // installed BEFORE the page script runs, so a write on load is visible.
+    if (options && options.localStorage) {
+        const mem = new Map();
+        sandbox.localStorage = {
+            getItem: k => (mem.has(String(k)) ? mem.get(String(k)) : null),
+            setItem: (k, v) => { mem.set(String(k), String(v)); },
+            removeItem: k => { mem.delete(String(k)); },
+            clear: () => { mem.clear(); }
+        };
+        if (options.seedStorage) {
+            Object.keys(options.seedStorage).forEach(k =>
+                mem.set(String(k), String(options.seedStorage[k])));
+        }
+    }
     vm.createContext(sandbox);
 
     // Seed every <select id="..."> from the page's own markup, with its options.
