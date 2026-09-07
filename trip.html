@@ -1127,6 +1127,9 @@ html {
                 cachedRoundResults = results;
                 cachedCountedResults = results.filter(r => r.countsTowardTrip);
                 renderPlaceholderNameWarning(results);
+                // ONCE, BEFORE ANYTHING RENDERS. Every surface below reads the answer
+                // rather than asking the question again.
+                recomputeTripGate();
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
                 renderTripAwards();
@@ -1179,6 +1182,13 @@ html {
     function renderCumulativeLeaderboard() {
         const container = document.getElementById('trip-leaderboard');
         if (cachedRoundResults.length === 0) return;
+        if (tripAttributionBlocked()) {
+            container.innerHTML = tripBlockedNotice('Standings',
+                'Scores are added up by name across rounds, so a shared name puts two '
+                + 'golfers on one line \u2014 which is how somebody came to look like they '
+                + 'played more rounds than the trip has.');
+            return;
+        }
         if (cachedCountedResults.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
             return;
@@ -1307,6 +1317,92 @@ html {
             });
         });
         return problems;
+    }
+
+    // A ROUND COUNT THAT CANNOT EXIST.
+    //
+    // The cumulative board rendered "Mike Dunne \u00B7 4 rounds played" on a
+    // TWO-ROUND trip: two men's rounds added together under one name. Nothing looked
+    // at it, and an impossible number sat on screen being read as a fact.
+    //
+    // INDEPENDENT OF THE NAME RULE ON PURPOSE. This does not ask whether two golfers
+    // share a name; it asks whether the arithmetic is possible. A merge that the name
+    // check somehow misses still cannot hide from it, and it costs one pass.
+    function tripRoundCountProblems(counted) {
+        const rounds = (counted || []).length;
+        const seen = {};
+        (counted || []).forEach(({ data }) => {
+            ((data || {}).players || []).forEach(p => {
+                const key = (typeof normalisePlayerName === 'function')
+                    ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+                if (!key) return;
+                if (!seen[key]) seen[key] = { name: p.name, key: key, count: 0 };
+                seen[key].count += 1;
+            });
+        });
+        return Object.keys(seen).filter(k => seen[k].count > rounds).map(k => ({
+            kind: 'impossible-rounds', round: '', name: seen[k].name,
+            message: '<strong>' + escapeHtml(seen[k].name) + '</strong> appears in '
+                + seen[k].count + ' rounds on a trip with ' + rounds + '. That number '
+                + 'cannot be right, so more than one golfer is being counted under that '
+                + 'name. Rename them so each golfer is their own.'
+        }));
+    }
+
+    // THE GATE, ASKED ONCE FOR THE WHOLE TRIP.
+    //
+    // Every panel used to ask this for itself, and the recap asked nobody - so the
+    // money panel refused to show a total while the SHARED TEXT printed
+    // "Zach Hill owes Mike Dunne $1" onto the clipboard, into a group chat, where it
+    // gets used to settle up. The one surface that leaves the app was the one still
+    // publishing the merge.
+    //
+    // A refusal is a property of the TRIP. If it cannot tell two golfers apart, then
+    // nothing that attributes anything to a golfer publishes: not money, not awards,
+    // not standings, not the points race, not the card, not the text.
+    let cachedIdentityProblems = [];
+    let gateComputedFrom = null;   // the exact results array the answer was derived from
+
+    function recomputeTripGate() {
+        cachedIdentityProblems = ((typeof tripIdentityProblems === 'function')
+            ? tripIdentityProblems(cachedCountedResults) : [])
+            .concat(tripRoundCountProblems(cachedCountedResults));
+        gateComputedFrom = cachedCountedResults;
+        return cachedIdentityProblems;
+    }
+
+    // CHECKED ONCE PER LOAD, AND IMPOSSIBLE TO FORGET. The gate is computed on the
+    // load path, but a renderer reached from anywhere else must not be able to
+    // publish just because nobody ran it first - that is the same shape as the bug
+    // this exists to stop. So the answer is recomputed if it was derived from a
+    // different set of rounds than the one being rendered, which is free in the
+    // normal case and self-healing in every other.
+    function tripAttributionBlocked() {
+        if (gateComputedFrom !== cachedCountedResults) recomputeTripGate();
+        return cachedIdentityProblems.length > 0;
+    }
+
+    // The sentence a surface shows. The RULE is single; only the consequence is
+    // written per surface, because "your money is merged" on an awards panel makes a
+    // golfer think his money is broken too.
+    function tripBlockedNotice(kindOfThing, extra) {
+        let html = `<div style="background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; font-size:0.82rem; color:var(--warn-text);">`
+            + `<strong>\u26A0\uFE0F ${kindOfThing} Not Shown</strong>`
+            + `<div style="padding:6px 0 2px;">${extra}</div>`;
+        cachedIdentityProblems.slice(0, 4).forEach(p => {
+            html += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${awardsIdentityMessage(p)}</div>`;
+        });
+        return html + `</div>`;
+    }
+
+    // Plain text, for the clipboard. Same facts, no markup.
+    function tripBlockedPlainReason() {
+        const names = [...new Set(cachedIdentityProblems.map(p => p.name).filter(Boolean))];
+        return 'Two golfers on this trip cannot be told apart by name'
+            + (names.length ? ' (' + names.join(', ') + ')' : '')
+            + '. Everything here is matched by name across rounds, so standings, money, '
+            + 'points and awards would all be credited to the wrong man. Rename them in '
+            + 'the round where they clash and share this again.';
     }
 
     // ONE DETECTOR, ONE SENTENCE PER SURFACE.
@@ -1457,8 +1553,11 @@ html {
         // of them has. Same predicate the Receipt uses, in action-model.js, so the two
         // surfaces cannot drift.
         // THE TRIP-WIDE NUMBER, OR AN EXPLANATION - never a number nobody can trust.
-        const idProblems = tripIdentityProblems(cachedCountedResults);
-        if (idProblems.length > 0) {
+        // ASK FIRST, THEN READ. tripAttributionBlocked() may recompute the gate and
+        // assigns a NEW array, so a reference taken before the call is the stale one.
+        const blocked = tripAttributionBlocked();
+        const idProblems = cachedIdentityProblems;
+        if (blocked) {
             html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
                 <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Trip Total Not Shown</div>
                 <div style="font-size:0.8rem; padding:6px 0 2px;">Two golfers cannot be told apart by name, so a trip-wide total would send money to the wrong person. Each round\u2019s own money is unaffected and is shown below.</div>`;
@@ -1468,7 +1567,7 @@ html {
             html += `</div>`;
         }
 
-        if (idProblems.length === 0 && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
+        if (!blocked && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
             html += `<div class="settle-card"><div class="settle-header">${tripSettled
                 ? '🏁 Final "Who Pays Who"'
                 : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
@@ -1619,9 +1718,11 @@ html {
         // cachedAwards is emptied, not just the panel: both recap surfaces read it,
         // and a refusal that only covers the screen would still paste the merged
         // award into the chat.
-        const idProblems = (typeof tripIdentityProblems === 'function')
-            ? tripIdentityProblems(cachedCountedResults) : [];
-        if (idProblems.length > 0) {
+        if (tripAttributionBlocked()) {
+            // READ AFTER ASKING. tripAttributionBlocked() may recompute the gate, and
+            // it assigns a NEW array - so a reference taken before the call is the
+            // stale empty one, and the refusal renders with no golfer named.
+            const idProblems = cachedIdentityProblems;
             cachedAwards = {};
             let warn = `<div style="background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; font-size:0.82rem; color:var(--warn-text);">`
                 + `<strong>\u26A0\uFE0F Awards Not Shown</strong>`
@@ -1745,6 +1846,14 @@ html {
     function renderPointsRace() {
         const container = document.getElementById('trip-points-race');
         if (cachedRoundResults.length === 0) return;
+        if (tripAttributionBlocked()) {
+            cachedPointsStandings = [];
+            container.innerHTML = tripBlockedNotice('Points Race',
+                'Points are awarded per round and totalled by name, so two golfers '
+                + 'sharing one would collect a single score between them.');
+            renderPrizePayouts();
+            return;
+        }
         if (cachedCountedResults.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
             cachedPointsStandings = [];
@@ -1956,6 +2065,18 @@ html {
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
         const counted = cachedCountedResults.length;
+
+        // THE SCREENSHOTTED HALF OBEYS THE SAME GATE. A card is posted to the chat
+        // exactly as the text is; refusing on screen and publishing here would just
+        // move the merge one tap away.
+        if (tripAttributionBlocked()) {
+            mount.innerHTML = '<div class="rc-title">\uD83E\uDDF3 ' + esc(tripData.name || 'Trip') + '</div>'
+                + '<div class="rc-block"><div class="rc-head">\u26A0\uFE0F RECAP NOT SHOWN</div>'
+                + '<div style="font-size:0.82rem; line-height:1.5;">'
+                + esc(tripBlockedPlainReason()) + '</div></div>';
+            return;
+        }
+
         let html = '<div class="rc-title">\uD83E\uDDF3 ' + esc(tripData.name || 'Trip') + '</div>'
                  + '<div class="rc-sub">' + counted + ' round' + (counted === 1 ? '' : 's')
                  + (cachedTripSettled ? '' : ' \u00B7 still in progress') + '</div>';
@@ -2063,6 +2184,30 @@ html {
     function buildShareRecapText() {
         let text = `🚐 ${tripData.name} — Trip Recap\n\n`;
 
+        // THE WORST PLACE THIS COULD LEAK, AND WHERE IT DID. This string goes on the
+        // clipboard and into a group chat, where people settle up from it. It used to
+        // print "FINAL SETTLEMENT / Zach Hill owes Mike Dunne $1" while the money panel
+        // on screen was refusing to show a total for exactly that reason.
+        //
+        // It returns the REASON rather than an empty message: a recap that arrives with
+        // no standings and no explanation reads as a broken app, and somebody shares
+        // the merged one from yesterday instead.
+        if (tripAttributionBlocked()) {
+            text += `\u26A0\uFE0F RECAP NOT SHOWN\n${tripBlockedPlainReason()}\n`;
+            if (currentTripCode) text += `\n\uD83D\uDD17 Trip: ${tripShareUrl()}\n`;
+            return text;
+        }
+
+        // HOW MUCH GOLF THIS DESCRIBES. A recap lands in a chat with no surrounding
+        // context; the card has always said this and the text never did.
+        const countedN = cachedCountedResults.length;
+        const excluded = cachedRoundResults.length - countedN;
+        text += `${countedN} round${countedN === 1 ? '' : 's'}`
+             + (excluded > 0
+                ? ` \u00B7 ${excluded} linked round${excluded === 1 ? '' : 's'} excluded from totals`
+                : '')
+             + `\n\n`;
+
         text += `🏆 STANDINGS (Net)\n`;
         const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
         if (netRows.length === 0) {
@@ -2099,7 +2244,7 @@ html {
                 ? `, Hole ${a.mostEagles.hole} on ${a.mostEagles.label}` : ` (${a.mostEagles.count})`}\n`;
             if (a.blowUp) text += `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
             if (a.comeback) text += `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
-            if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name}\n`;
+            if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name} (${Math.abs(a.sandbagger.netToPar)} net stroke${Math.abs(a.sandbagger.netToPar) === 1 ? '' : 's'} under par)\n`;
         }
 
         // Unlike the card, pasted text carries a tappable link - so it does.

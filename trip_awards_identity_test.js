@@ -185,10 +185,14 @@ describe('2. AWARDS REFUSE TWO GOLFERS THEY CANNOT TELL APART', () => {
     test('both sentences come from ONE detector, not two copies of the rule', () => {
         const src = read('trip.html').replace(/\/\/.*$/gm, '');
         assert.equal((src.match(/function tripIdentityProblems/g) || []).length, 1);
-        // The awards panel must ASK the detector rather than re-deriving duplicates.
+        // The awards panel must ASK, not re-derive. Since the one-gate wave it asks
+        // the TRIP - tripAttributionBlocked() - rather than running the detector for
+        // itself, which is the same requirement one level up.
         const at = src.indexOf('function renderTripAwards');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
-        assert.match(fn, /tripIdentityProblems\(/, 'awards re-derive the rule');
+        assert.match(fn, /tripAttributionBlocked\(\)/, 'awards re-derive the rule');
+        assert.ok(!/tripIdentityProblems\(/.test(fn),
+            'the awards panel runs the detector itself instead of reading the gate');
         assert.ok(!/normalisePlayerName\(/.test(fn),
             'the awards panel detects duplicates itself instead of asking');
     });

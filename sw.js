@@ -449,7 +449,30 @@
 // nothing anywhere in the app; folding it into "Most Birdies" would make that label
 // untrue and counting it twice would make the number a count of nothing.
 // An installed PWA on v77 still merges two golfers' birdies onto one name.
-const CACHE_VERSION = 'golfapp-v78-awards-credit-the-right-man';
+// Moved to v79: a refusal is a property of the TRIP, and the recap obeys it.
+//   THE WORST INSTANCE OF THIS BUG FOUND SO FAR. The trip money panel refused to
+// show a total when two golfers could not be told apart - "would send money to the
+// wrong person" - and the SHARED RECAP TEXT printed "FINAL SETTLEMENT / Zach Hill
+// owes Mike Dunne $1" onto the clipboard anyway. That string goes into a group chat
+// and gets used to settle up, so the one surface that LEAVES THE APP was the one
+// still publishing the merge.
+//   It happened because each panel asked the question for itself and the recap
+// asked nobody. The gate is now computed once for the trip and everything that
+// attributes anything to a golfer obeys it: money, awards, the cumulative board,
+// the points race, the recap card and the recap text. It is also self-healing - a
+// renderer reached from anywhere else recomputes rather than publishing because
+// nobody ran the gate first, which is the same shape as the bug it prevents.
+//   THE STANDINGS AND POINTS RACE WERE MERGING TOO, and had been all along. The
+// board rendered "Mike Dunne - 4 rounds played" on a TWO-ROUND trip: two men's
+// rounds added together into a number that cannot exist, with nothing looking at
+// it. tripRoundCountProblems() now asserts the invariant independently of the name
+// rule - a golfer's round count can never exceed the rounds that count.
+//   The recap text also carries its own context now: how many rounds it covers, a
+// caveat when a linked round is excluded from totals, and the sandbagger's number.
+// FINAL vs NOT FINAL was verified against a genuinely unresolved round rather than
+// assumed; it was already correct.
+// An installed PWA on v78 still pastes a merged settlement into the group chat.
+const CACHE_VERSION = 'golfapp-v79-one-gate-for-the-whole-trip';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

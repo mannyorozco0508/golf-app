@@ -57,6 +57,20 @@ const db = (r1, r2) => ({
 
 const FOUR = ['Marty Sharp', 'Carp Dean', 'Lance Webb', 'Zach Hill'];
 
+// navigator.share and the clipboard are replaced so the recap can be captured
+// without anything leaving the machine. Neither is a page function.
+const STUB_SHARE = `
+(function () {
+  window.__shared = null;
+  navigator.share = function (o) { window.__shared = o; return Promise.resolve(); };
+  try {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: function (t) { window.__shared = { text: t }; return Promise.resolve(); } } });
+  } catch (e) {}
+  window.__alerts = [];
+  window.alert = function (m) { window.__alerts.push(String(m)); };
+})();`;
+
 // Everything on screen, plus the recap opened the way a golfer opens it.
 const PROBE = `
 (() => {
@@ -85,6 +99,16 @@ const PROBE = `
   // textContent would match \\uXXXX in that source on any page at all.
   out.rendered = (document.body.innerText || '').replace(/\\s+/g, ' ').trim();
   out.renderedChars = out.rendered.length;
+
+  // THE CLIPBOARD STRING, by pressing the button a golfer presses. This is the one
+  // surface that leaves the app: it used to print money the screen was refusing.
+  const sb = Array.from(document.querySelectorAll('button'))
+      .filter(b => /shareRecap/.test(b.getAttribute('onclick') || ''))[0];
+  out.shareButton = !!sb;
+  if (sb) sb.click();
+  out.clipboard = (window.__shared || {}).text || null;
+  out.board = t(document.getElementById('trip-leaderboard'));
+  out.points = t(document.getElementById('trip-points-race'));
   return JSON.stringify(out);
 })()`;
 
@@ -131,11 +155,12 @@ const CASES = [
 
     for (const c of CASES) {
         const r = await arriveCold({ url: fileUrl('trip.html', 'trip=TRIP1'), db: c.db,
-            expression: PROBE, settleMs: 5200 });
+            preScript: STUB_SHARE, expression: PROBE, settleMs: 5200 });
         if (!r.ok) bail(c.name + ': ' + r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail(c.name + ': unreadable output'); }
         report.cases[c.name] = { awards: g.awards, recapChrome: g.recapChrome,
-                                 recapOnScreen: g.recapOnScreen, chars: g.renderedChars };
+                                 recapOnScreen: g.recapOnScreen, chars: g.renderedChars,
+                                 clipboard: g.clipboard };
 
         // A RUN THAT RENDERED NOTHING MEASURED NOTHING.
         if (!g.awardsOnScreen || !g.awards) {
@@ -174,9 +199,54 @@ const CASES = [
                 problems.push(c.name + ': the RECAP CARD still carries awards built on a '
                     + 'merged name - that is the thing people paste into the chat');
             }
+            // THE ONE THAT LEAVES THE APP.
+            if (!g.shareButton) {
+                problems.push(c.name + ': no share control, so the clipboard was never '
+                    + 'measured - the assertions below prove nothing');
+            } else if (!g.clipboard) {
+                problems.push(c.name + ': pressing share produced no text at all');
+            } else {
+                const cb = g.clipboard;
+                if (/owes/i.test(cb) || /\u{1F4B5}/u.test(cb)) {
+                    problems.push(c.name + ': THE CLIPBOARD CARRIES MONEY the screen '
+                        + 'refused to show: ' + cb);
+                }
+                if (/\u{1F3C6} STANDINGS/u.test(cb)) {
+                    problems.push(c.name + ': the clipboard carries merged standings');
+                }
+                if (/POINTS RACE/.test(cb)) {
+                    problems.push(c.name + ': the clipboard carries a merged points race');
+                }
+                if (/\u{1F3C5} AWARDS/u.test(cb)) {
+                    problems.push(c.name + ': the clipboard carries awards');
+                }
+                if (!/Mike Dunne/.test(cb) || !/told apart|same name/i.test(cb)
+                    || !/rename/i.test(cb)) {
+                    problems.push(c.name + ': the clipboard does not say WHY it is empty - '
+                        + 'a recap with no reason reads as a broken app: ' + cb);
+                }
+            }
+            if (/Mike Dunne/.test(g.board || '') && /rounds played/i.test(g.board || '')) {
+                problems.push(c.name + ': the cumulative board still merges two golfers');
+            }
+            if (/Pos\s+Player\s+Points/i.test(g.points || '')) {
+                problems.push(c.name + ': the points race still ranks a merged name');
+            }
         } else {
             if (!/Most Birdies/i.test(g.awards)) {
                 problems.push(c.name + ': a clean trip was refused its awards: ' + g.awards);
+            }
+            // THE OTHER HALF: a gate that fires on a clean trip is a broken app.
+            const cb = g.clipboard || '';
+            ['\u{1F3C6} STANDINGS', 'SETTLEMENT', 'POINTS RACE', '\u{1F3C5} AWARDS']
+                .forEach(block => {
+                    if (!new RegExp(block, 'u').test(cb)) {
+                        problems.push(c.name + ': a clean trip\'s recap is missing '
+                            + block + ': ' + cb);
+                    }
+                });
+            if (!/\d+ rounds?/.test(cb)) {
+                problems.push(c.name + ': the recap does not say how much golf it covers');
             }
         }
 
