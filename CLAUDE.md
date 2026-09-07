@@ -174,6 +174,34 @@ if the clean case renders nothing either: "no merged balance" is trivially true 
 a blank page. Assert the good round actually displayed money before believing the
 bad one was refused.
 
+## A rendered sweep and a source scan are both required
+
+A `\uXXXX` escape resolves inside a JS string and prints **literally** in raw HTML
+markup. It has now shipped four times, in three files, and the two guards that
+catch it cannot substitute for each other:
+
+- **The rendered sweep** (`tools/trip-awards-check.js`) reads `innerText` on every
+  page. `innerText` excludes hidden elements, so it walks straight past anything
+  behind a tap or a `display:none` — the two on the trip recap were inside an
+  overlay, and are only caught because the sweep presses the button that opens it
+  first. The one on `admin.html` sits in `#multigroup-action-note`, hidden on
+  arrival, and the sweep **cannot** see it. That is correct, not a gap.
+- **The source scan** (`trip_awards_identity_test.js`) reads every `.html` file
+  with `<script>` blocks, comments and `on*` handlers stripped — `\uXXXX` is
+  legitimate JavaScript in all three. It sees hidden markup, and it is what found
+  the `admin.html` instance. But it **cannot** see a string a template builds at
+  runtime, because that string does not exist until the page runs.
+
+Neither half is optional. A defect in hidden static markup is invisible to the
+first; a defect assembled at runtime is invisible to the second. When you add a
+guard for a class of defect, ask which half of that pair you have written.
+
+**And escaping is not always the fix.** The recap's eagle line is escaped on the
+card, which is `innerHTML`, and deliberately raw in the share text, which goes to
+the clipboard — escaping there would paste `Mike &amp; Dave` into a group chat.
+`safe_text_test.js` pins the count of raw interpolations per page so a new one has
+to be justified rather than assumed.
+
 ## Two entry points means one builder
 
 `admin.html` and `sidematches.html` both render the Nassau controls. Anything they

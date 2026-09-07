@@ -1287,7 +1287,7 @@ html {
             ((data || {}).players || []).forEach(p => {
                 const key = normalisePlayerName(p.name);
                 if (!key || isPlaceholderPlayerName(p.name)) {
-                    problems.push({ round: label, name: p.name || '(no name)',
+                    problems.push({ kind: 'placeholder', round: label, name: p.name || '(no name)',
                         message: '<strong>' + escapeHtml(p.name || 'A golfer with no name')
                             + '</strong> in <strong>' + escapeHtml(label) + '</strong> is not a name. '
                             + 'The trip total is matched by name across rounds, so a placeholder '
@@ -1297,7 +1297,7 @@ html {
                 }
                 if (seen[key] && !reported[key]) {
                     reported[key] = true;
-                    problems.push({ round: label, name: p.name,
+                    problems.push({ kind: 'duplicate', round: label, name: p.name,
                         message: 'Two golfers in <strong>' + escapeHtml(label) + '</strong> are both called '
                             + '<strong>' + escapeHtml(p.name) + '</strong>. The trip total is matched by '
                             + 'name, so their money would be merged into one balance and somebody would '
@@ -1307,6 +1307,33 @@ html {
             });
         });
         return problems;
+    }
+
+    // ONE DETECTOR, ONE SENTENCE PER SURFACE.
+    //
+    // The awards panel used to print tripIdentityProblems()'s own message, which is
+    // written about MONEY - "their money would be merged into one balance and
+    // somebody would pay the other man's debts". True, and also true of the awards,
+    // but a golfer reading it under "Awards Not Shown" concludes his money is broken
+    // as well. The rule that FINDS the problem stays single; only the sentence
+    // describing the consequence belongs to the surface showing it.
+    function awardsIdentityMessage(p) {
+        const who = '<strong>' + escapeHtml(p.name || 'A golfer with no name') + '</strong>';
+        const round = '<strong>' + escapeHtml(p.round || 'a round') + '</strong>';
+        if (p.kind === 'duplicate') {
+            return 'Two golfers in ' + round + ' are both called ' + who + '. Awards are '
+                + 'matched by name across rounds, so their birdies, eagles and blow-ups '
+                + 'would be added together and credited to one of them. Rename one of '
+                + 'them in that round.';
+        }
+        if (p.kind === 'placeholder') {
+            return who + ' in ' + round + ' is not a name. Awards are matched by name '
+                + 'across rounds, so a placeholder cannot be told from the same '
+                + 'placeholder on another day. Open that round from Home and enter a '
+                + 'real name.';
+        }
+        // The detector could not run at all. Its own words are right for that.
+        return escapeHtml(String(p.message || 'The golfers\u2019 names could not be checked.'));
     }
 
     function renderTripMoneySettlement() {
@@ -1600,7 +1627,7 @@ html {
                 + `<strong>\u26A0\uFE0F Awards Not Shown</strong>`
                 + `<div style="padding:6px 0 2px;">Two golfers cannot be told apart by name, and awards are matched by name across rounds \u2014 so birdies and blow-ups would be credited to the wrong man.</div>`;
             idProblems.slice(0, 4).forEach(p => {
-                warn += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${p.message}</div>`;
+                warn += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${awardsIdentityMessage(p)}</div>`;
             });
             container.innerHTML = warn + `</div>`;
             return;

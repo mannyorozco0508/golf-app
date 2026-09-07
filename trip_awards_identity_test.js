@@ -161,6 +161,38 @@ describe('2. AWARDS REFUSE TWO GOLFERS THEY CANNOT TELL APART', () => {
             '"Player 1" on two days was treated as one golfer: ' + t.awards());
     });
 
+    // ONE DETECTOR, TWO SENTENCES. The refusal reused the MONEY wording - "their
+    // money would be merged into one balance and somebody would pay the other
+    // man's debts" - under an "Awards Not Shown" header. Both statements are true,
+    // but a golfer reading that on the awards panel concludes his money is broken
+    // too. The rule stays single; the copy is per surface.
+    test('the awards refusal talks about awards, not about money', () => {
+        const a = twoMikes().awards();
+        assert.ok(!/money|balance|debts|pay/i.test(a),
+            'the awards refusal tells a golfer his money is broken: ' + a);
+        assert.match(a, /birdie|award/i, 'it does not say what is actually affected');
+        assert.match(a, /rename/i, 'it still has to say what to do');
+    });
+
+    test('and the money refusal still talks about money', () => {
+        const t = twoMikes();
+        t.run('renderTripMoneySettlement();');
+        const m = strip(t.sb.document.getElementById('trip-money-settlement').innerHTML);
+        assert.match(m, /money|balance|debts|pay/i,
+            'the money refusal lost the reason it exists: ' + m.slice(0, 200));
+    });
+
+    test('both sentences come from ONE detector, not two copies of the rule', () => {
+        const src = read('trip.html').replace(/\/\/.*$/gm, '');
+        assert.equal((src.match(/function tripIdentityProblems/g) || []).length, 1);
+        // The awards panel must ASK the detector rather than re-deriving duplicates.
+        const at = src.indexOf('function renderTripAwards');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
+        assert.match(fn, /tripIdentityProblems\(/, 'awards re-derive the rule');
+        assert.ok(!/normalisePlayerName\(/.test(fn),
+            'the awards panel detects duplicates itself instead of asking');
+    });
+
     // THE OTHER HALF. A refusal that fires on a clean trip is just a broken feature.
     test('a clean trip still gets its awards', () => {
         const t = trip([roundOf('Day 1', FOUR, (pl, s) => {
