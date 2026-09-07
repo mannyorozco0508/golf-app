@@ -39,7 +39,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 ## Current state
 
 ```
-920 suites · 4783 tests · 4782 passing · 0 failing · 1 todo
+1125 suites · 5721 tests · 5720 passing · 0 failing · 1 todo
 ```
 
 15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
@@ -99,12 +99,34 @@ What they don't: `events/$eventCode` is still `.read: true, .write: true`, so an
 
 A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. Free tier is 50 requests/day and each course costs two.
 
+## Offline — VERIFIED ON REAL HARDWARE, 2026-09-06
+
+Scores typed in **airplane mode** survived a **force-quit** and synced when signal
+came back. Verified by Manny on a real device, not in a harness.
+
+This was the last unrecoverable risk on the October list. A golf course is the one
+place this app is guaranteed to lose signal, and losing a hole of scores mid-round
+is the failure nobody forgives — it is the reason the group goes back to paper.
+
+**What was proven, precisely:** a score entered with no connection is not lost, it
+survives the app being killed, and it reaches the database once signal returns.
+
+**Two parts of the original definition were not reported on, so treat them as
+unproven rather than passed:** what the golfer is *told* while offline (there may
+be no indication at all that a score is queued), and that a returning score lands
+**exactly once** rather than twice. Neither is known to be broken. If either
+matters before the trip, they are cheap to check on the same device — reconnect
+with the scorecard open and count the rows.
+
+Do not weaken this section to "offline works". The distinction between what was
+tested and what was assumed is the whole value of the record.
+
 ## Known open items
 
 - `skins.html` (Action tab) doesn't know about participant-scoped Skins games — still shows only the legacy round-wide view. Money is unaffected; the page is misleading
 - Four separate "Save as PDF" buttons exist; only the Round Receipt is canonical
 - The Tesseract OCR scorecard scanner loads from a CDN at runtime, so it fails offline — exactly where it's most needed
-- **Still not tested on an actual course during an actual round.** That remains the real next step
+- **Still not tested on an actual course during an actual round.** That remains the real next step. (Offline behaviour specifically *has* now been verified on hardware — see the section above.)
 - No monetization built. Direction is freemium with a one-time or per-trip unlock, not a subscription. Real IAP needs native StoreKit work
 
 ## Checks that live outside `npm test`
