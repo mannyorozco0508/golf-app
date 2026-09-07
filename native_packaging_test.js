@@ -187,13 +187,33 @@ describe('CROSS-PRODUCT NAVIGATION STAYS OUTBOUND', () => {
         assert.match(read('product-links.js'), /GOLF_PRODUCT_ORIGINS/);
     });
 
-    test('NEGATIVE CONTROL — no production origin is hardcoded anywhere', () => {
-        ['admin.html', 'trip.html', 'index.html', 'product-links.js'].forEach(f => {
+    // NARROWED, DELIBERATELY, AND STILL A REAL GUARD.
+    //
+    // This banned every pages.dev origin because the CROSS-PRODUCT domains were
+    // unknown and a guessed absolute URL fails in production while a relative one
+    // keeps working. That reasoning is intact and still enforced below.
+    //
+    // What it also banned, unintentionally, was the one origin the app cannot work
+    // without: inside the iOS wrapper location.origin is capacitor://localhost, so
+    // a share link built from it is unopenable by anyone it is sent to. There is no
+    // relative answer to "where does this app live on the web" - it has to be
+    // written down once. It now lives in exactly one place and is pinned there.
+    test('NEGATIVE CONTROL — no PAGE hardcodes a deployment origin', () => {
+        ['admin.html', 'trip.html', 'index.html', 'leaderboard.html'].forEach(f => {
             const code = read(f).split('\n').filter(l => !l.trim().startsWith('//')
                 && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n');
             assert.ok(!/https:\/\/[a-z0-9-]+\.pages\.dev/i.test(code),
-                f + ' hardcodes a deployment origin');
+                f + ' hardcodes a deployment origin instead of asking product-links.js');
         });
+    });
+
+    test('the canonical origin is declared once, in the file that owns origins', () => {
+        const code = read('product-links.js').split('\n')
+            .filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*')).join('\n');
+        const hits = code.match(/https:\/\/[a-z0-9-]+\.pages\.dev/gi) || [];
+        assert.equal(hits.length, 1,
+            'the canonical web origin must appear exactly once, not ' + hits.length + ' times');
+        assert.match(code, /GOLF_WEB_ORIGIN\s*=/, 'it is not the declared constant');
     });
 
     test('the origins config ships empty, meaning same-origin', () => {

@@ -120,9 +120,14 @@ describe('THE SHARE LINK', () => {
     test('it uses the same base pattern as the scorecard group links', () => {
         const trip_ = read('trip.html');
         const idx = read('index.html');
-        assert.match(trip_, /window\.location\.href\.split\('\?'\)\[0\]/);
-        assert.match(idx, /window\.location\.href\.split\('\?'\)\[0\]/,
-            'one pattern, so the two cannot drift');
+        // They shared an IDIOM before - window.location.href.split('?')[0] - copied
+        // into each file. They share a FUNCTION now, which is what "cannot drift"
+        // actually requires: a copied idiom drifts the moment one copy is edited,
+        // and both copies were wrong inside the iOS wrapper.
+        assert.match(trip_, /shareBaseUrl\(\)/);
+        assert.match(idx, /shareBaseUrl\(\)/, 'one builder, so the two cannot drift');
+        assert.ok(!/window\.location\.href\.split\('\?'\)\[0\]/.test(trip_ + idx),
+            'the copied idiom is back');
     });
 
     test('the iOS clipboard fallback is present', () => {

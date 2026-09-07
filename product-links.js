@@ -57,6 +57,51 @@ function consumerUrl(relativePath) {
     return productUrl(cfg.consumer, relativePath);
 }
 
+// ============================================================================
+// WHERE THIS APP LIVES ON THE WEB, for links that leave the device.
+//
+// Inside the iOS wrapper the page is served from capacitor://localhost, so every
+// URL built from the page's own location came out as
+//     capacitor://localhost/index.html?game=L6Y38G
+// - meaningless the moment it is pasted into a text. That broke the invite link,
+// the QR, every group scorekeeper link, the private organizer link, the follow
+// link, the trip link and the tournament team link AT ONCE, because all of them
+// read location.origin. Sharing a round from the app was simply impossible.
+//
+// THE RULE, and why it is not just "always use the canonical origin":
+//   http/https -> THIS page's origin. A Cloudflare preview deploy must hand out
+//                 links to itself, not to production, or testing a deploy silently
+//                 sends everyone to the live site.
+//   anything else -> the canonical origin. capacitor:// and file:// are not
+//                 addresses another phone can reach.
+//
+// The directory is kept, not just the origin, so a subdirectory deployment works -
+// and it is derived by dropping the last path segment rather than replacing
+// "admin.html", because Cloudflare serves clean URLs and this page is often
+// "/admin" with no filename to replace.
+const GOLF_WEB_ORIGIN = 'https://golf-app-5a5.pages.dev';
+
+function shareBaseUrl() {
+    const loc = (typeof window !== 'undefined' && window.location) ? window.location
+        : (typeof location !== 'undefined' ? location : null);
+    // DECIDED FROM THE ORIGIN, not from location.protocol. The question is whether
+    // this page's address is one another phone could reach, and the origin answers
+    // it directly - "https://..." yes, "capacitor://localhost" no. Reading protocol
+    // alone also fails wherever that field is not populated, which sends a
+    // perfectly good web page to the canonical origin and quietly breaks
+    // subdirectory and preview deployments.
+    const raw = String((loc && loc.origin) || '') || String((loc && loc.href) || '');
+    // The ORIGIN only. Falling back to href when origin is absent pulled the path
+    // in with it, and appending the directory then produced
+    // ".../trip.html/trip.html?trip=CODE" - a doubled path that looks like a typo
+    // and is really a share link nobody can open.
+    const m = /^(https?:\/\/[^\/?#]+)(\/[^?#]*)?/i.exec(raw);
+    if (!m) return GOLF_WEB_ORIGIN + '/';
+    const pathname = String((loc && loc.pathname) || m[2] || '/');
+    const dir = pathname.replace(/\/[^\/]*$/, '/');
+    return m[1] + (dir.charAt(0) === '/' ? dir : '/' + dir);
+}
+
 // A link INTO the Tournament product - the organizer page, or a specific event.
 // Called from Consumer pages that offer or list tournaments.
 function tournamentUrl(relativePath) {

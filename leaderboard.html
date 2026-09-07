@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Live Leaderboard</title>
-    <script src="./firebase-app-compat.js"></script>
+    <script src="product-links.js"></script>
+<script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Live Skins consumes computeSkinsHoleLedger() from settlement-engine.js - the
          same canonical resolver the scorecard uses. money-engine.js and action-model.js
@@ -471,9 +472,7 @@ html {
     }
 
     function shareResults() {
-        const rawUrl = window.location.href.split('?')[0];
-        const dirUrl = rawUrl.substring(0, rawUrl.lastIndexOf('/'));
-        const sharedUrl = dirUrl + `/shared.html?game=${currentMode}`;
+        const sharedUrl = shareBaseUrl() + `shared.html?game=${currentMode}`;
         
         const courseName = currentBoardData.courseName || "Live Round";
         const dateObj = new Date();

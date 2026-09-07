@@ -2082,7 +2082,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // ?fresh=1 forces a clean landing screen for whoever opens this link, regardless of
         // what's cached in that device's localStorage — a friend testing this for the first
         // time shouldn't see "Resume Game" pointing at a round that isn't theirs.
-        const baseUrl = window.location.href.split('?')[0] + '?fresh=1';
+        const baseUrl = shareBaseUrl() + 'admin.html?fresh=1';
         const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
@@ -4795,10 +4795,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // Built from the directory now, so it works whether the page is served as
     // /admin, /admin.html, or from a subdirectory.
     function playerPageUrl(page) {
-        const loc = window.location;
-        // Drop the final path segment if it is this page; keep the directory.
-        const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
-        return loc.origin + dir + page;
+        // shareBaseUrl() keeps this page's origin on the web and swaps in the
+        // canonical one inside the app, where location.origin is capacitor://
+        // localhost and useless to whoever is sent the link.
+        return shareBaseUrl() + page;
     }
 
     function scorecardUrlFor(gameCode, groupNum) {
@@ -5174,7 +5174,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function copyAppUrl() {
         const currentUrl = scorecardUrlFor(currentMode);
-        navigator.clipboard.writeText(currentUrl).then(() => alert("Copied friend spectator/scorecard link!"));
+        // THE SAME SENTENCE THE CARD SHOWS, from the same rule. This used to give
+        // the link two different names in one breath, unconditionally, while the
+        // note above it is conditional and correct: at or below four golfers the
+        // link is genuinely writable, so it IS the scorekeeper link.
+        const note = shareLinkNoteText(document.querySelectorAll('.player-row').length);
+        navigator.clipboard.writeText(currentUrl).then(() => alert('Copied. ' + note));
     }
 
     syncFormatCards();

@@ -406,7 +406,13 @@ describe('TRIP \u2194 TOURNAMENT — one relationship, two pointers', () => {
         // These are internal links, not cross-product ones. Routing them through
         // product-links.js would send a scoring golfer to the Consumer origin.
         const t = codeOf('tournament.html');
-        assert.match(t, /function scorecardBaseUrl\(\)[\s\S]{0,220}replace\('tournament\.html', 'tournament-scorecard\.html'\)/);
+        // The .replace() pattern this pinned could not survive a non-web origin -
+        // inside a wrapper it produced capacitor://localhost/tournament-scorecard.html.
+        // It builds from shareBaseUrl() now, which returns THIS page's own origin on
+        // the web, so a scoring link stays same-origin exactly as before. The
+        // guarantee that matters - never routed through the cross-product seam - is
+        // unchanged and asserted below.
+        assert.match(t, /function scorecardBaseUrl\(\)[\s\S]{0,220}shareBaseUrl\(\)/);
         const linkFn = t.slice(t.indexOf('function renderTeamLinks'), t.indexOf('function renderTeamLinks') + 1400);
         assert.match(linkFn, /\$\{scorecardBaseUrl\(\)\}\?tourney=\$\{currentCode\}&team=\$\{t\.num\}/);
         assert.ok(!/consumerUrl\(`?tournament-scorecard|tournamentUrl\(`?tournament-scorecard/.test(t),

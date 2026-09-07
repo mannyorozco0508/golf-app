@@ -343,7 +343,19 @@
 // single-stake and uniform wagers settle byte-identically, so nothing already paid
 // in cash moves. An installed PWA on v72 keeps overcharging every split-stake
 // Nassau it settles.
-const CACHE_VERSION = 'golfapp-v73-nassau-segment-stakes';
+// Moved to v74: share links are links somebody else can open. Inside the iOS
+// wrapper the page is served from capacitor://localhost, so every URL built from
+// the page's own location came out as capacitor://localhost/index.html?game=CODE -
+// useless the moment it was pasted into a text. That broke the invite link, the
+// QR, every group scorekeeper link, the private organizer link, the follow link,
+// the trip link and the tournament team link AT ONCE, because all of them read
+// location.origin. Sharing a round from the native app was impossible.
+// product-links.js - already "the one place that knows the two products may not
+// live at the same origin" - now owns the rule: this page's own origin on
+// http/https so preview deploys and local dev share links to themselves, and the
+// canonical web origin anywhere else. index.html and leaderboard.html load it now.
+// An installed PWA on v73 keeps handing out links nobody can open.
+const CACHE_VERSION = 'golfapp-v74-share-links-are-web-links';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

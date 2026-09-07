@@ -873,7 +873,7 @@ html {
     // ONE LINK, NO TYPING. Same shape the scorecard's group links use:
     // window.location.href minus any existing query, plus ?trip=CODE.
     function tripShareUrl() {
-        const base = window.location.href.split('?')[0];
+        const base = shareBaseUrl() + 'trip.html';
         return base + '?trip=' + encodeURIComponent(currentTripCode || '');
     }
 

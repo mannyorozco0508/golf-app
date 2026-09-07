@@ -24,6 +24,7 @@
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
     <script src="text-safe.js"></script>
+    <script src="product-links.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
@@ -4548,7 +4549,9 @@ html {
 
         // This page IS the scorecard, so its own URL is the right base. Deliberately not
         // a filename replace - that pattern is what broke the admin links on clean URLs.
-        const base = window.location.href.split('?')[0];
+        // Not this page's URL: inside the app that is capacitor://localhost and
+        // nobody sent one of these links could open it.
+        const base = shareBaseUrl() + 'index.html';
         // ORGANIZER LINK. Shown where someone already goes looking for links, but set
         // apart and worded so it is obvious this one is not for the group chat.
         //

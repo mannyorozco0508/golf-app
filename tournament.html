@@ -875,7 +875,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let currentData = {};
 
     function scorecardBaseUrl() {
-        return window.location.href.split('?')[0].replace('tournament.html', 'tournament-scorecard.html');
+        return shareBaseUrl() + 'tournament-scorecard.html';
     }
 
     function renderTeamLinks() {
