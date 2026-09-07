@@ -98,6 +98,27 @@ twice because the view switch it relied on never rebuilt anything.
 A control that mutates something genuinely harmless *should* be inert. Say so, rather
 than inventing an assertion to make it look caught.
 
+## Defence in depth has to be provable with the other rules switched off
+
+A second guard that never fires on real data is indistinguishable from a second
+guard that does not work. Both are green, forever.
+
+The trip's round-count invariant — a golfer cannot play more rounds than the trip
+counts — was added as an independent catch for a merge the name rule might miss.
+Deleting it from the gate **caught nothing**, because on every fixture the name
+rule already fired first. It was decoration with a comment claiming otherwise, and
+only a negative control revealed that.
+
+**The rule.** If a check exists to back up another check, prove it in isolation:
+stub the primary rule silent and assert the backup still blocks — *and* assert a
+clean case still passes, so the isolation test cannot be satisfied by a guard that
+simply refuses everything. `trip_one_gate_test.js` does both.
+
+This is the same failure as an inert assertion, one level up: the test passes, the
+mechanism is real, and nothing depends on it. Ask of every belt-and-braces guard:
+what would have to break for this one, specifically, to be the thing that saved us —
+then build that case.
+
 ## When a screen looks wrong, find out whether the behaviour or the sentence is wrong
 
 Twice in one day a screen was reported as broken, and both times the code was
