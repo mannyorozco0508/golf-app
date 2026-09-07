@@ -251,11 +251,19 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
         assert.match(fn, /confirm\(/, 'the confirmation prompt must survive');
     });
 
-    test('📥 now means join, and only join', () => {
-        // The round's typed-code field is gone - a golfer arrives on a link - so the
-        // only inbox left is the trip one. The rule it guards is unchanged: this
-        // glyph means joining something, and nothing else.
-        assert.ok(!/joinRoom\(\)/.test(ADMIN), 'the round join control is gone');
+    test('📥 means join, and only join', () => {
+        // The round's code field is BACK, so there are two inboxes again - a trip
+        // code and a game code. The rule is unchanged: this glyph means opening
+        // something you already have, and nothing else.
+        //
+        // joinRoom() is still gone, and deliberately: it sent a typed code to
+        // admin.html, which lands on the organizer's Review holding "Save & Start
+        // Round". openRoundByCode() opens the scorecard. Same glyph, same meaning,
+        // a destination that is not the wizard.
+        assert.ok(!/function joinRoom/.test(ADMIN),
+            'the control that opened the organizer wizard from a code is back');
+        assert.match(ADMIN, /openRoundByCode\(\)">\u{1F4E5} Open</u,
+            'the game-code control lost its inbox glyph');
         assert.match(read('trip.html'), /joinTrip\(\)">\u{1F4E5} Open Trip<\/button>/u);
         (ADMIN + IDX + TRIP).match(/\u{1F4E5}[^<\n]{0,24}/gu).forEach(m =>
             assert.match(m, /Join|Open/, 'inbox used for something that is not joining: ' + m));

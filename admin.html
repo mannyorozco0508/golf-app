@@ -141,6 +141,24 @@
         .resume-link { display: inline-flex; align-items: center; justify-content: center;
             gap: 6px; min-height: 44px; padding: 0 10px; font-size: 0.85rem; font-weight: bold;
             color: var(--brand-navy); text-decoration: underline; cursor: pointer; }
+        /* ONE ROW, NOT TWO FULL-WIDTH BLOCKS. The pair this replaces was a
+           full-width field above a full-width button, which read as the primary
+           thing to do on a screen whose primary thing is the two tiles. Quiet, but
+           both halves stay a 44px target - small is not the same as unhittable. */
+        /* ID-SCOPED ON PURPOSE, and this is not decoration. Two later rules outrank a
+           bare class here: input[type="text"] sets width:100% (specificity 0,1,1) and
+           .btn-outline is a later 0,1,0. With plain .join-code-* the button took the
+           whole row and the field was squeezed to 22px wide on a 390px phone - the
+           button's label wrapped to two lines, which is what gave it away. Nothing in
+           the node suite can see that: mini-dom has no layout. Measured, and now
+           guarded in both directions, by tools/home-screen-check.js. */
+        #join-code-row .join-code-input { flex: 0 1 200px; width: 200px; max-width: 58%; min-height: 44px;
+            padding: 0 12px; border: 1px solid var(--border-mid); border-radius: 8px;
+            background: var(--bg-card); color: var(--text-main);
+            font-size: 0.9rem; font-weight: bold; letter-spacing: 1px;
+            text-align: center; text-transform: uppercase; box-sizing: border-box; }
+        #join-code-row .join-code-btn { flex: 0 0 auto; width: auto; min-height: 44px;
+            margin: 0; padding: 0 14px; font-size: 0.85rem; white-space: nowrap; }
         .lobby-divider { margin: 30px 0; border-top: 1px solid var(--border-light); position: relative; }
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
 
@@ -422,15 +440,31 @@ html {
         <a class="resume-link" onclick="resumeGame()">▶️ Resume <span id="resume-room-badge"></span></a>
     </div>
 
-    <!-- NOTHING BELOW THE TILES. The page asks "What are you setting up?" and the
-         two tiles are the whole answer.
-         A typed-code field and a Join button used to sit here; nobody has ever
-         typed a code, because a golfer arrives on a LINK carrying ?game=CODE,
-         which this page reads on load. A second field for copying an old round's
-         setup into a new one sat here too, and was never used either.
-         The PREFILL those buttons drove is untouched: admin.html?game=NEW&copyFrom=OLD
-         still fills a new round from an old one's setup. Only the home-screen
-         control is gone, so a link that carries copyFrom keeps working. -->
+    <!-- OPENING A ROUND YOU ALREADY HAVE, which is a different question from the
+         one the tiles answer. It sits under Resume because the two are the same
+         kind of action - get me back to something that exists - and Resume is the
+         commoner of them.
+         SMALLER THAN WHAT IT REPLACES: one row, not a full-width field above a
+         full-width button competing with the tiles.
+         AND IT GOES SOMEWHERE ELSE. joinRoom() sent a typed code to
+         admin.html?game=CODE, which lands on the organizer's Review step holding
+         "Save & Start Round" - measured at four golfers and at nine. This opens the
+         SCORECARD. See openRoundByCode().
+         The copy-an-old-round field that also sat here is still gone and still not
+         missed; the PREFILL it drove is untouched, so
+         admin.html?game=NEW&copyFrom=OLD keeps working from a link. -->
+    <div id="join-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
+        <input type="text" id="join-code-input" class="join-code-input" maxlength="48"
+               placeholder="GAME CODE" aria-label="Game code or the link your organizer sent">
+        <button class="btn-outline join-code-btn" onclick="openRoundByCode()">📥 Open</button>
+    </div>
+    <!-- MEASURED, not guessed: index.html gates scoring on players.length > 4, so a
+         bare ?game=CODE is 76 of 76 inputs editable on a foursome and 0 of 171 on a
+         nine-golfer shotgun. tools/code-entry-check.js types a code on both and
+         counts, so this sentence goes red if the gate ever moves. -->
+    <p id="join-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
+        Above four golfers a typed code is read-only — paste the link your organizer sent if you are keeping score.
+    </p>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -3122,6 +3156,35 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const newCode = generateRoomCode();
         let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
         if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+        window.location.href = dest;
+    }
+
+    // OPENS THE ROUND. NOT THE WIZARD.
+    //
+    // joinRoom() went to admin.html?game=CODE. Measured at four golfers and at nine,
+    // that lands on wizard step 7 - the organizer's Review - with "Save & Start
+    // Round" on screen. A golfer who typed the code somebody read out arrived
+    // holding the control that rewrites the round. This goes to the scorecard.
+    //
+    // IT ALSO TAKES A PASTED LINK, because a link is what an organizer actually
+    // sends and people paste what they were sent. A group is carried across ONLY
+    // when the pasted text carried one: a bare code has no group in it, and adding
+    // one would hand scorekeeper rights over another foursome to anybody who knows
+    // the code. Read-only above four golfers is the honest outcome, and the note
+    // beside the field says so.
+    function openRoundByCode() {
+        const el = document.getElementById('join-code-input');
+        const text = String((el && el.value) || '').trim();
+        const fromUrl = /[?&]game=([A-Za-z0-9]+)/.exec(text);
+        const code = String(fromUrl ? fromUrl[1] : text).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (code.length < 2) {
+            alert('\u26A0\uFE0F Enter the game code your organizer sent.');
+            return;
+        }
+        // Only from a pasted link, never manufactured for a typed code.
+        const group = fromUrl ? (/[?&]group=(\d+)/.exec(text) || [])[1] : null;
+        let dest = playerPageUrl('index.html') + '?game=' + code;
+        if (group) dest += '&group=' + group;
         window.location.href = dest;
     }
 

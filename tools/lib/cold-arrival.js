@@ -110,7 +110,13 @@ function firebaseStub(dbJson) {
 //
 // `preScript` is injected before any page script too, for instrumenting a cold
 // load - a MutationObserver, a wrapped function - without touching the page.
-async function arriveCold({ url, rounds, db, expression, viewport, settleMs, preScript }) {
+// `blockUrls` adds patterns to the block list. A check that measures WHERE a
+// control sends the browser must block the real destination: otherwise Chrome
+// follows it onto the network and document.URL reports where the SERVER put you.
+// Cloudflare serves clean URLs, so /index.html?game=X 308s to /?game=X - and the
+// check then reads a redirect target as though the page had built it. Blocked, the
+// navigation fails and document.URL is exactly the URL the app asked for.
+async function arriveCold({ url, rounds, db, expression, viewport, settleMs, preScript, blockUrls }) {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     const port = 9400 + Math.floor(Math.random() * 400);
     if (!fs.existsSync(CHROME)) {
@@ -134,9 +140,26 @@ async function arriveCold({ url, rounds, db, expression, viewport, settleMs, pre
         if (!targets || !targets.length) return { ok: false, reason: 'Chrome exposed no page target' };
 
         ws = new WebSocket(targets[0].webSocketDebuggerUrl);
+        // EVERY URL THE PAGE ASKS FOR, in order, and the FIRST one is the URL the
+        // app built. A check that measures WHERE a control sends the browser cannot
+        // read document.URL afterwards: the navigation completes, so Cloudflare's
+        // clean-URL redirect rewrites /index.html?game=X to /?game=X and the check
+        // grades the redirect. Blocking is not the answer either - Chrome's URL
+        // patterns do not match a main-frame navigation at all here (only '*' does,
+        // and that stops the request before this event fires, leaving nothing to
+        // read). So a check using this makes one real outbound GET; what it asserts
+        // on is the request the PAGE issued, which no server can rewrite.
+        const requests = [];
         await new Promise((res, rej) => {
             ws.addEventListener('open', res, { once: true });
             ws.addEventListener('error', () => rej(new Error('CDP socket error')), { once: true });
+        });
+
+        ws.addEventListener('message', ev => {
+            let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+            if (m.method === 'Network.requestWillBeSent' && m.params && m.params.request) {
+                requests.push(m.params.request.url);
+            }
         });
 
         let id = 1;
@@ -149,7 +172,8 @@ async function arriveCold({ url, rounds, db, expression, viewport, settleMs, pre
 
         // The real bundles must not load, or they would replace the stand-in.
         await rpc(ws, id++, 'Network.setBlockedURLs',
-            { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js'] });
+            { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js']
+                .concat(blockUrls || []) });
         await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
             { source: firebaseStub(JSON.stringify(db || { events: rounds || {} })) });
         if (preScript) {
@@ -166,6 +190,7 @@ async function arriveCold({ url, rounds, db, expression, viewport, settleMs, pre
             return { ok: false, reason: 'page threw: ' + (ex && ex.description) };
         }
         return { ok: true, value: m.result.result.value,
+                 requests: requests.slice(),
                  finalUrl: (await rpc(ws, id++, 'Runtime.evaluate',
                      { expression: 'document.URL', returnByValue: true })).result.result.value };
     } catch (e) {

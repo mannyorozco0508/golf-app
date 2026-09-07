@@ -403,7 +403,26 @@
 // app-only jargon and left three surfaces for Carry Over / No Carry.
 // An installed PWA on v75 still shows a group scorekeeper four golfers under a
 // heading that says Full Leaderboard, and a footer that agrees with itself.
-const CACHE_VERSION = 'golfapp-v76-the-full-leaderboard-is-the-full-field';
+// Moved to v77: a game code opens the round again - and opens the ROUND, not the
+// organizer's wizard.
+//   v68 removed the home screen's code field on the evidence that golfers arrive on
+// a link. That evidence still holds, so what comes back is one compact row under
+// Resume rather than a full-width field above a full-width button competing with
+// the two tiles. Both halves stay a 44px target.
+//   WHAT DOES NOT COME BACK IS THE DESTINATION. joinRoom() sent a typed code to
+// admin.html?game=CODE, which lands on wizard step 7 - the organizer's Review -
+// with "Save & Start Round" on screen, measured at four golfers and at nine. A
+// golfer who typed the code somebody read out arrived holding the control that
+// rewrites the round. openRoundByCode() opens the scorecard instead.
+//   It also accepts a PASTED LINK and keeps the group that link carried, because a
+// link is what an organizer actually sends. A bare code never acquires a group:
+// inventing one would hand scorekeeper rights over another foursome to anybody who
+// knows the code. Above four golfers a typed code is therefore read-only, and the
+// note beside the field says so - measured, not asserted, by
+// tools/code-entry-check.js, which types a code on a four-golfer round and on a
+// nine-golfer one and counts what each can actually edit.
+// An installed PWA on v76 has no way in from a code at all.
+const CACHE_VERSION = 'golfapp-v77-a-code-opens-the-round-not-the-wizard';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

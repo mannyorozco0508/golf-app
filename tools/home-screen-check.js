@@ -71,15 +71,36 @@ const PROBE = `
   out.wordmarkPx = h(word);
   out.wordmarkText = word ? (word.textContent || '').trim() : null;
 
-  // Nothing on THIS screen asks for a typed code. Scoped to the lobby: the setup
-  // wizard lives in the same document behind display:none and has plenty of legal
-  // inputs (course search, new course name, KP holes). Counting those said the home
-  // screen was asking for a code when it was not - the probe was wrong, not the page.
+  // EXACTLY ONE THING IS ASKED FOR, and it is the game code. Scoped to the lobby:
+  // the setup wizard lives in the same document behind display:none and has plenty
+  // of legal inputs (course search, new course name, KP holes). Counting those said
+  // the home screen was asking for a code when it was not - the probe was wrong, not
+  // the page.
+  //
+  // v68 removed the code field entirely and this asserted zero. v77 brought it back
+  // in a smaller shape, so the assertion is now about the SHAPE: one field, on one
+  // row with its button, both a real touch target, and not the full-width pair that
+  // competed with the two tiles.
   const lobby = document.getElementById('lobby-screen');
   out.textInputs = lobby
       ? Array.from(lobby.querySelectorAll('input[type="text"]'))
           .map(i => i.id || i.placeholder || '(unnamed)')
       : ['(no lobby screen at all)'];
+  const codeInput = document.getElementById('join-code-input');
+  const codeRow = document.getElementById('join-code-row');
+  const codeBtn = codeRow ? codeRow.querySelector('button') : null;
+  const r = el => el ? el.getBoundingClientRect() : null;
+  const ri = r(codeInput), rb = r(codeBtn);
+  out.code = {
+      onScreen: !!(codeRow && codeRow.getClientRects().length > 0),
+      inputH: ri ? Math.round(ri.height) : 0,
+      btnH: rb ? Math.round(rb.height) : 0,
+      sameRow: !!(ri && rb && Math.abs(ri.top - rb.top) < 12),
+      inputW: ri ? Math.round(ri.width) : 0,
+      pageW: Math.round(document.documentElement.clientWidth),
+      noteOnScreen: !!(document.getElementById('join-code-note')
+          && document.getElementById('join-code-note').getClientRects().length > 0)
+  };
   out.tiles = Array.from(document.querySelectorAll('.home-widget'))
       .map(b => (b.querySelector('.hw-name') || {}).textContent || '?');
 
@@ -100,9 +121,27 @@ const PROBE = `
       problems.push('the symbol does not sit inside its disc');
   if (!out.wordmarkText) problems.push('the wordmark is gone - a symbol alone names nothing');
 
-  if (out.textInputs.length > 0)
-      problems.push('the home screen asks for something to be typed: '
-          + JSON.stringify(out.textInputs));
+  if (out.textInputs.length !== 1 || out.textInputs[0] !== 'join-code-input')
+      problems.push('the lobby asks for ' + out.textInputs.length + ' typed things: '
+          + JSON.stringify(out.textInputs) + ' - it should ask for the game code and '
+          + 'nothing else');
+  if (!out.code.onScreen) problems.push('the game-code row is not on screen');
+  if (out.code.inputH < 44) problems.push('the code field is ' + out.code.inputH
+      + 'px tall, below a usable touch target');
+  if (out.code.btnH < 44) problems.push('the code button is ' + out.code.btnH + 'px tall');
+  if (!out.code.sameRow) problems.push('the code field and its button are stacked, '
+      + 'not on one row - that is the full-width pair v68 removed');
+  if (out.code.inputW >= out.code.pageW - 40)
+      problems.push('the code field is full width again (' + out.code.inputW + 'px of '
+          + out.code.pageW + ')');
+  // THE OTHER DIRECTION, which the first draft of this could not see. A flex basis
+  // of auto sized the field to its CONTENT, and an empty field has none: it rendered
+  // 22px wide. "Not full width" was satisfied by a box nobody could type in.
+  if (out.code.inputW < 120)
+      problems.push('the code field is ' + out.code.inputW + 'px wide - too narrow to '
+          + 'type a game code into');
+  if (!out.code.noteOnScreen)
+      problems.push('nothing on screen says what a typed code actually gives you');
   if (out.tiles.length !== 2)
       problems.push('expected two tiles, found ' + JSON.stringify(out.tiles));
 

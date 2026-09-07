@@ -95,7 +95,7 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
     });
 
     test('and the styling that existed only for those two fields went with them', () => {
-        assert.ok(!/\.join-input/.test(ADMIN),
+        assert.ok(!/\.join-input\b/.test(ADMIN),
             'a rule is left behind for controls that no longer exist');
     });
 
@@ -106,13 +106,31 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
         assert.match(ADMIN, /loadModeData\(copyFromCode\)/);
     });
 
-    test('nothing is left below the two tiles', () => {
-        const l = lobby();
+    // WHAT IS BELOW THE TILES, now that the code row is back. The v68 finding still
+    // holds for the COPY-AN-OLD-ROUND field, which nobody used and which is still
+    // gone; and the shape finding holds too - what came back is one compact row, not
+    // the full-width field above a full-width button that competed with the tiles.
+    test('below the tiles there is Resume and exactly one input', () => {
+        // COMMENTS STRIPPED. The note explaining what stayed removed names
+        // copyFrom=OLD, and an earlier version of this assertion matched that
+        // sentence rather than any control - grading prose as though it were markup.
+        const l = lobby().replace(/<!--[\s\S]*?-->/g, '');
         const afterWidgets = l.slice(l.indexOf('home-widgets'));
-        assert.ok(!/<input/.test(afterWidgets),
-            'the home screen still asks for something to be typed');
+        const inputs = afterWidgets.match(/<input/g) || [];
+        assert.equal(inputs.length, 1,
+            'the home screen asks for ' + inputs.length + ' things to be typed');
+        assert.match(afterWidgets, /id="join-code-input"/, 'and it is the game code');
+        assert.ok(!/copyFrom["'\s]*[:=]/.test(afterWidgets),
+            'the copy-an-old-round field is back, and it was never used');
         assert.ok(!/lobby-divider/.test(afterWidgets),
             'a divider survives with nothing to divide');
+    });
+
+    test('the code row is not a full-width block competing with the tiles', () => {
+        const at = ADMIN.indexOf('id="join-code-row"');
+        assert.ok(at > -1);
+        assert.match(ADMIN.slice(at, at + 200), /display:\s*flex/,
+            'the field and its button are stacked again');
     });
 });
 

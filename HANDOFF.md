@@ -67,6 +67,22 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 
 To ship a new build: `node sync-mobile-web.js && npx cap sync ios`, bump **Build** in Xcode (Version stays 1.0.0), Archive, Distribute → App Store Connect.
 
+## A removed control is not always safe to restore as it was
+
+**The home screen's game-code field went to the wrong screen for its whole life.**
+`joinRoom()` navigated to `admin.html?game=CODE`. Measured cold at four golfers and
+at nine, that lands on **wizard Step 7 — the organizer's Review — with "Save & Start
+Round" on screen.** Anyone who ever typed a code got the organizer's setup screen,
+holding the control that rewrites the round.
+
+Nobody reported it, because almost nobody typed a code: golfers arrive on a link.
+That is also why v68 could delete the field on good evidence without the defect ever
+surfacing. Restoring the control **as it was** would have restored the bug with it.
+
+v77 brings the field back under a new name, `openRoundByCode()`, pointing at
+`index.html` — the scorecard. The rule this leaves behind: when a removed control
+comes back, re-derive where it should go. The old destination is not evidence.
+
 ## Things in the live database that look alarming and are not
 
 **`app_settings/beta_expiration` is dead data.** It currently reads
