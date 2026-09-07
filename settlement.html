@@ -501,10 +501,21 @@ html {
         // The PDF is read out of THESE TWO NODES - the settlement document and the
         // scorecard beneath it, exactly as rendered. Nothing is recalculated, so the
         // exported money is the displayed money by construction.
-        const roots = [
-            document.getElementById('settle-content'),
-            document.getElementById('receipt-scorecard')
-        ].filter(Boolean);
+        // EVERY SECTION THAT CARRIES MONEY, not just the one named "settle-content".
+        //
+        // THE EXPORT SHIPPED A RECEIPT WITH NO MONEY IN IT. These two ids are
+        // SIBLINGS of the money sections, not their parents - on a Main Pool round
+        // #settle-content holds only "No money bets were set up for this round", so
+        // the PDF was that sentence plus a scorecard while $480 of pool money sat on
+        // screen in #money-pool-section and #combined-settlement-summary. No error,
+        // no empty file: a plausible-looking document missing the entire point.
+        //
+        // Listed in reading order, and empties are dropped so a round without a pool
+        // does not export a blank heading.
+        const roots = ['receipt-export-head', 'settle-content', 'money-pool-section',
+                       'combined-settlement-summary', 'receipt-scorecard']
+            .map(id => document.getElementById(id))
+            .filter(el => el && (el.innerText || '').trim().length > 0);
 
         return window.RattleExport.exportOrPrint({ title: title, roots: roots });
     }
@@ -571,10 +582,16 @@ html {
         const scoring = (currentData && (currentData.nassauScoring || currentData.matchScoring)) || '';
         const sub = (fmtName[gameFormat] || gameFormat) + (scoring ? ' \u00B7 ' + (scoring === 'net' ? 'Net' : 'Gross') : '');
 
-        return `<div class="receipt-head">
+        // WHO IT IS FOR. A receipt that leaves the app names the course and the day
+        // but not the group, so a golfer with two rounds on one weekend cannot tell
+        // two PDFs apart. The roster count and the round's own name close that.
+        const who = (currentData && currentData.players || []).length;
+        const label = (currentData && (currentData.eventName || currentData.roundDay)) || '';
+        return `<div class="receipt-head" id="receipt-export-head">
             <div class="receipt-head-course">${course}</div>
             <div class="receipt-head-date">${date}</div>
-            <div class="receipt-head-format">${sub}</div>
+            <div class="receipt-head-format">${sub}${who ? ' \u00B7 ' + who + ' golfer' + (who === 1 ? '' : 's') : ''}</div>
+            ${label ? `<div class="receipt-head-group">${escapeHtml(label)}</div>` : ''}
         </div>`;
     }
 
@@ -915,6 +932,21 @@ html {
         let html = `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} `
             + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;
 
+        // A ROUND THAT NEVER SAID SAYS SO. An absent carry setting used to mean
+        // "carry"; it now means "no carry", which is what a group that never
+        // discussed it assumes. That flip RESTATES a legacy round's money, so it is
+        // declared rather than applied quietly - a receipt whose numbers changed
+        // between two openings with nothing explaining why is exactly the silent
+        // wrongness this app keeps removing.
+        const carryRecorded = (typeof skinsCarryRuleRecorded === 'function')
+            ? skinsCarryRuleRecorded((((data || {}).moneyPool || {}).skins || {}).carryOver)
+            : true;
+        if (!carryRecorded) {
+            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);">`
+                 + `<span>This round did not record a carry rule \u2014 settled as `
+                 + `<strong>No Carry</strong>, one skin per hole won outright.</span><span></span></div>`;
+        }
+
         if (typeof computeSkinsHoleLedger !== 'function') {
             // The engine is the only source. Rather than quietly falling back to a
             // second implementation - the duplication this project keeps removing -
@@ -976,7 +1008,12 @@ html {
         L.holes.forEach(row => {
             if (row.state !== 'skin' || !row.winner) return;
             const k = String(row.winner.id);
-            countByPlayer[k] = (countByPlayer[k] || 0) + 1;
+            // UNITS, NOT HOLES. This counted holes won while the hole line above
+            // printed units - so a golfer who won one hole carrying two skins read
+            // as "1 skin $35" beside two men on "1 skin $17", which looks like one
+            // man being paid double for the same thing. The money divides by units,
+            // so the label counts units.
+            countByPlayer[k] = (countByPlayer[k] || 0) + (row.unitsWon || 1);
         });
 
         const winners = Object.keys(countByPlayer).map(id => {
@@ -1476,7 +1513,10 @@ html {
         // window.print(), so the system print/share sheet handles Save PDF, AirDrop
         // and the rest; building a second PDF renderer would mean a second source of
         // truth for the money. Hidden in print by the .btn-primary rule above.
-        html += `<button class="btn-primary" style="margin-bottom:12px;" onclick="printReceipt()">\uD83D\uDDA8\uFE0F Print / Save PDF</button>`;
+        // ONE EXPORT, ONE LABEL. Two buttons with different names on the same
+        // screen - "Print / Save PDF" and "Print / Save Receipt" - read as two
+        // different documents. There is only one, and this is it.
+        html += `<button class="btn-primary" style="margin-bottom:12px;" onclick="printReceipt()">\uD83D\uDCC4 Print / Save Receipt</button>`;
 
         html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
             <div class="settle-header">${(function () {

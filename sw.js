@@ -495,7 +495,32 @@
 //   SCORING IS NEVER BLOCKED by any of it - measured, 76 of 76 inputs editable in
 // every failure case.
 // An installed PWA on v79 has no way to join a Cup at all.
-const CACHE_VERSION = 'golfapp-v80-join-the-cup-day-one-is-holding';
+// Moved to v81: skins do not carry unless somebody said so, and the exported
+// receipt contains the money.
+//   AN ABSENT CARRY RULE MEANT CARRY. Every reader was `!== false`, and three files
+// each held their own copy of that decision, so a round that never recorded a rule
+// carried anyway. Nobody's mental model of skins is "carries unless stated". Only
+// an explicit true carries now, the default lives once in action-model's
+// skinsCarriesOver(), and the other two engines ask it instead of repeating it.
+//   THIS RESTATES A LEGACY ROUND with skins money and no recorded rule - measured
+// at $241 of a $480 pot moving from a twelve-way refund to three winners - so the
+// Receipt SAYS which rule it applied when the round never said. Every current
+// writer records the field, so no app-created round is affected.
+//   THE SKINS SUMMARY COUNTED HOLES WHILE THE HOLE LINE COUNTED SKINS. A golfer who
+// won one hole carrying two skins read as "1 skin $35" beside two men on
+// "1 skin $17" - one man apparently paid double for the same thing. Both count
+// skins now, which is what the money divides by.
+//   AND THE EXPORTED RECEIPT HAD NO MONEY IN IT. printReceipt() took
+// #settle-content and #receipt-scorecard, which are SIBLINGS of the money sections
+// - so on a Main Pool round the PDF was a scorecard plus the sentence "No money
+// bets were set up for this round" while $480 sat on screen beside it. No error, no
+// empty file, just a plausible document missing the point. The export now takes
+// every section that carries money, there is one button instead of two competing
+// labels, and the header names the course, the date and the group.
+//   trip.html hides the recap overlay when printing; it used to print over the page.
+// An installed PWA on v80 carries skins nobody asked to carry and exports a receipt
+// with no money on it.
+const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

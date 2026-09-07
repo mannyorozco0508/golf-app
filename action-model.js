@@ -811,7 +811,33 @@ function duplicatePlayerNames(players) {
         .filter(function (e) { return e.count > 1; });
 }
 
+// WHAT AN ABSENT CARRY SETTING MEANS.
+//
+// Every reader used `!== false`, so a round that never recorded a rule CARRIED -
+// and three separate files each held their own copy of that decision. Nobody's
+// mental model of skins is "carries unless stated": a group that never discussed it
+// expects each hole to stand alone, and a silent carry is the likeliest shape of a
+// Monday game going wrong with nobody having chosen anything.
+//
+// ONLY AN EXPLICIT TRUE CARRIES. The three settings this is asked about are
+// genuinely different games that can coexist in one round with different rules -
+// data.skinsCarryOver for the round's own skins, each instance's own flag, and
+// moneyPool.skins.carryOver for the Main Pool bucket - so they cannot collapse into
+// one setting. What they share is this: one place that decides what silence means.
+function skinsCarriesOver(setting) {
+    return setting === true;
+}
+
+// Whether the round said ANYTHING. Flipping the default restates a legacy round's
+// money, so a receipt has to be able to say which rule it applied rather than
+// quietly picking one.
+function skinsCarryRuleRecorded(setting) {
+    return setting === true || setting === false;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
+    module.exports.skinsCarriesOver = skinsCarriesOver;
+    module.exports.skinsCarryRuleRecorded = skinsCarryRuleRecorded;
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
     module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
     module.exports.normalisePlayerName = normalisePlayerName;

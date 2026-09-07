@@ -411,7 +411,14 @@ describe('THE ANCHOR — one definition of who won a skin', () => {
         const wrapper = bounded('computeSkinsHoleLedger');
         assert.match(wrapper, /fieldParticipants\(data\)/, 'Field must come from the canonical participant resolver.');
         assert.match(wrapper, /resolveSkinsMode\(data\)/, 'Mode must come from the canonical resolver.');
-        assert.match(wrapper, /data\.skinsCarryOver !== false/, 'Carry must be read the same way settlement reads it.');
+        // STRONGER THAN THE OLD PIN. This asserted the literal `!== false`, which is
+        // the expression three files each held a copy of - and which made an absent
+        // setting CARRY. The default now lives once, in action-model's
+        // skinsCarriesOver(), and what matters is that every reader asks it.
+        assert.match(wrapper, /skinsCarriesOver\(/,
+            'Carry must be read through the one shared rule, not a local copy.');
+        assert.doesNotMatch(wrapper, /skinsCarryOver !== false/,
+            'the old carries-unless-stated default is back');
     });
 
     test('the existing settlement resolvers were not modified', () => {

@@ -204,7 +204,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v80-join-the-cup-day-one-is-holding';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -509,7 +509,7 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v80-join-the-cup-day-one-is-holding';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
         assert.match(BUILD, /cacheName: 'tournament-v32-consumer-ready'/,
             'Tournament assets did not change, so its cache must not move');

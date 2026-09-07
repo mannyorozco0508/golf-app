@@ -170,7 +170,9 @@ describe('PRINT / SAVE PDF IS FINDABLE', () => {
                                createdAt:1, teamAIds:['101'], teamBIds:['103'] } } })};
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
         const html = sb.document.getElementById('combined-settlement-summary').innerHTML;
-        const btn = html.indexOf('Print / Save PDF');
+        // The top action is the same single export as the one at the bottom; both
+        // read "Print / Save Receipt" since the two competing labels were merged.
+        const btn = html.indexOf('Print / Save Receipt');
         const results = html.indexOf('Final Results');
         assert.notEqual(btn, -1, 'the action must render');
         assert.ok(btn < results, 'it must come before the document, not after it');

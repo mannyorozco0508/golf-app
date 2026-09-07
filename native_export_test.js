@@ -284,8 +284,20 @@ describe('the export reads the screen; it does not recompute money', () => {
 
     test('both pages hand it rendered nodes, not round data', () => {
         const s = read('settlement.html');
-        assert.match(s, /document\.getElementById\('settle-content'\)/);
-        assert.match(s, /document\.getElementById\('receipt-scorecard'\)/);
+        // The roots are now a LIST of ids mapped to nodes rather than two literal
+        // getElementById calls, because the two it named are SIBLINGS of the money
+        // sections - the export shipped a Main Pool receipt with no money in it.
+        // What this test protects is unchanged: rendered NODES go to the exporter,
+        // never round data for it to recompute.
+        const at = s.indexOf('const roots = [');
+        assert.ok(at > -1, 'the export roots are gone');
+        const roots = s.slice(at, s.indexOf('];', at));
+        assert.match(roots, /'settle-content'/);
+        assert.match(roots, /'receipt-scorecard'/);
+        assert.match(roots, /'money-pool-section'/, 'the pool money is not exported');
+        assert.match(roots, /'combined-settlement-summary'/, 'the settlement is not exported');
+        assert.match(s, /\.map\(id => document\.getElementById\(id\)\)/,
+            'the exporter is handed ids rather than nodes');
         assert.match(s, /window\.RattleExport\.exportOrPrint\(/);
         const t = read('trip.html');
         assert.match(t, /trip-itinerary-print-view/);

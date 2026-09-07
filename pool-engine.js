@@ -539,7 +539,9 @@ function computeMoneyPool(data, courseData, savedScores) {
                 - (result.kp ? result.kp.amountCents : 0)
                 - (result.net ? result.net.amountCents : 0);
         const scoring = skCfg.scoring === 'gross' ? 'gross' : 'net';
-        const carry = skCfg.carryOver !== false;
+        // One rule, in action-model.js. See skinsCarriesOver().
+        const carry = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(skCfg.carryOver) : skCfg.carryOver === true;
 
         // THE CANONICAL SKINS ENGINE decides the winners and the units - the same
         // functions every skins wager in the app settles through. This bucket only

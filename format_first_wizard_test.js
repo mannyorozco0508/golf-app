@@ -440,6 +440,23 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
     // out of scope for a navigation project, and this is the cheapest possible
     // proof that none of them moved.
     const FROZEN = {
+        // RE-PINNED, with per-file approval, for ONE change and no arithmetic.
+        // AN ABSENT SKINS CARRY SETTING USED TO MEAN "CARRY". Every reader was
+        // `!== false`, and three files each held their own copy of that decision, so
+        // a round that never recorded a rule carried anyway - the likeliest shape of
+        // a Monday game going wrong with nobody having chosen it. Nobody's mental
+        // model of skins is "carries unless stated".
+        // The default now lives ONCE, in action-model's skinsCarriesOver(), and only
+        // an explicit true carries. pool-engine and settlement-engine ask it instead
+        // of repeating it. No formula, no allocation and no unit arithmetic moved:
+        // the same engines run, on the other side of the same boolean.
+        // THIS RESTATES A LEGACY ROUND that has skins money and no recorded rule -
+        // measured at $241 of a $480 pot moving from a twelve-way refund to three
+        // winners - so the Receipt now SAYS which rule it applied when the round
+        // never said. Every current writer records the field, so no app-created
+        // round is affected.
+        // skins_carry_and_labels_test.js asserts the BEHAVIOUR of all of it rather
+        // than trusting these hashes to notice.
         'money-engine.js': '3c960947ed62ebf5c179050e3ac65f9e1ed88c106ab0a759763fdd7da8931a68',
         // RE-PINNED, with per-file approval, for one change each and no arithmetic.
         // A Nassau is three independent wagers and both files settled all three - and
@@ -457,8 +474,8 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // hashes to notice - including that a legacy single-stake wager and a uniform
         // $20/$20/$20 wager settle byte-identically, so no round already paid in cash
         // moves, and that the live strip and the receipt quote the same prices.
-        'settlement-engine.js': '1d7e7074d4c231e6412bfc663523cca8c38b3090d58d353414b55f9a33ae4c51',
-        'pool-engine.js': '944957133f3bce762c704606f2aa43b26c9edfec16970c111445dd8d86cfc96b',
+        'settlement-engine.js': 'dec9585ed6f5f236b9dce26cb823d50b5684b56ab27a67268119fb7de2d10fbc',
+        'pool-engine.js': 'c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:
@@ -470,7 +487,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // is byte-for-byte unchanged. Each addition is guarded by a suite that asserts
         // its BEHAVIOUR - nassau_autopress_label_test.js, ryder_cross_round_identity_test.js
         // and round_duplicate_name_test.js - rather than trusting this hash to notice.
-        'action-model.js': '5fd3455d899176f0ad10bb0ef35739718fa386c34d6b05bacf2f80948ed66ef2',
+        'action-model.js': 'c652eca54e017a9db4518c1d65d31a35fbbfc67b0d8e0570b89103dd81c58dd5',
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the

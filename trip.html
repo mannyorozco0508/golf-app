@@ -221,6 +221,9 @@
         html.is-native [onclick*="printItinerary"] { display: none !important; }
 
         @media print {
+            /* The recap overlay is the thing people screenshot, and it sits ON TOP of
+               the page. Printed with it open it covers the itinerary underneath. */
+            .recap-overlay, #trip-recap-overlay { display: none !important; }
             body.printing-itinerary > *:not(#manage-screen) { display: none !important; }
             body.printing-itinerary #manage-screen > *:not(#trip-itinerary-print-view) { display: none !important; }
             body.printing-itinerary #trip-itinerary-print-view { display: block !important; }

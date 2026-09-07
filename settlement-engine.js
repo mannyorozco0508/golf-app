@@ -81,7 +81,8 @@
             ? resolveSkinsMode(data)
             : (data.skinsPotFormat || 'split');
         const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
-        const carryOver = data.skinsCarryOver !== false;
+        const carryOver = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
         const totalHoles = (courseData || []).length;
         const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
 
@@ -1401,7 +1402,8 @@
             ? resolveSkinsMode(data)
             : (data.skinsPotFormat || 'split');
 
-        const carryOver = data.skinsCarryOver !== false;
+        const carryOver = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
 
         return {
             mode,

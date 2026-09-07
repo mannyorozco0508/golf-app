@@ -283,8 +283,12 @@ describe('FINAL MODE KEEPS THE RECEIPT', () => {
         assert.match(results(FINAL).text(), /KP/);
     });
 
-    test('Print / Save PDF returns', () => {
-        assert.match(results(FINAL).text(), /Print \/ Save PDF/);
+    // RENAMED, NOT REMOVED. The Receipt carried two export buttons with different
+    // names - "Print / Save PDF" at the top and "Print / Save Receipt" at the
+    // bottom - which read as two different documents when there is only one. Both
+    // now say Print / Save Receipt.
+    test('the export returns', () => {
+        assert.match(results(FINAL).text(), /Print \/ Save Receipt/);
     });
 
     test('POOL-ONLY still suppresses Who Pays Who', () => {
