@@ -227,9 +227,20 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
     test('★ End & Wipe is a bin, and never the Join icon', () => {
         // The important one. A destructive, irreversible action shared 📥 with "Join
         // Game" - the single most dangerous icon collision the audit found.
-        [ADMIN, IDX].forEach(src =>
-            assert.match(src, /endAndClearRound\(\)">\u{1F5D1}\ufe0f End & Wipe Round<\/button>/u));
-        assert.ok(!/\u{1F4E5} End & Wipe/u.test(ADMIN + IDX), '📥 must never mean destroy');
+        // Asserted as the RULE, not as one exact label. admin.html's control was made
+        // small and quiet - it is destructive and should be the least prominent thing
+        // on the page - and its wording changed with it. What must never change is
+        // which glyph it carries: the bin, and never the inbox that means Join.
+        [['admin.html', ADMIN], ['index.html', IDX]].forEach(([name, src]) => {
+            const at = src.indexOf('onclick="endAndClearRound()"');
+            assert.ok(at > -1, name + ' has no End & Wipe control');
+            const label = src.slice(at, src.indexOf('</button>', at));
+            assert.match(label, /\u{1F5D1}\ufe0f/u, name + ': the destructive control lost its bin');
+            assert.ok(!/\u{1F4E5}/u.test(label), name + ': 📥 must never mean destroy');
+            assert.match(label, /wipe/i, name + ': it no longer says what it does');
+        });
+        assert.ok(!/\u{1F4E5}[^<\n]{0,12}(End|Wipe)/u.test(ADMIN + IDX),
+            '📥 must never mean destroy');
     });
 
     test('the destructive confirmation was not weakened', () => {

@@ -98,6 +98,38 @@ twice because the view switch it relied on never rebuilt anything.
 A control that mutates something genuinely harmless *should* be inert. Say so, rather
 than inventing an assertion to make it look caught.
 
+## When a screen looks wrong, find out whether the behaviour or the sentence is wrong
+
+Twice in one day a screen was reported as broken, and both times the code was
+correct and the **copy describing it** was the thing that lied.
+
+- The trip money card said it counted the main format only and that side matches
+  were still to come. It counted them: a $50 side match moved a golfer's total from
+  +$10 to +$60. A group reading that line settles side matches **again**, on top of
+  a total that already contains them, and pays twice.
+- The setup page called its QR "a spectator link, read-only". On four golfers that
+  link is fully writable — 76 of 76 score inputs editable, measured in Chrome. It
+  is the scorekeeper link. Deleting the card as "the wrong link" would have left a
+  four-ball with **no way to share a round at all**.
+
+Both looked exactly like the app working correctly. Nothing was broken on screen,
+the arithmetic was right, the numbers were real. Only the words were false — which
+is worse than a visible bug, because a visible bug gets fixed and a confident wrong
+sentence gets believed and acted on.
+
+**The rule. Measure before believing either the screen or the report.** Ask which
+of these is actually true: the behaviour is wrong, or the description is. They need
+opposite fixes, and guessing wrong deletes working code.
+
+**Then bind the copy to the behaviour, not to a proxy for it.** The share note is
+not asserted against a group count that merely correlates with editability; a check
+opens the link it describes and counts editable inputs. Move the gate in
+`index.html` and the sentence goes red. A positive list — `TRIP_TOTAL_INCLUDES` —
+is held against every label the engine can actually emit, so a new money source
+fails the suite until the copy names it.
+
+Copy that describes behaviour is behaviour. Test it like behaviour.
+
 ## A cold check reads `innerText`, never `textContent`
 
 `document.body.textContent` **includes the source of every inline `<script>` in the

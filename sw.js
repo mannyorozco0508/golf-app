@@ -324,7 +324,15 @@
 // from. Placeholders are deliberately NOT refused here: inside a single round
 // Player 1..4 are distinct and nothing merges. An installed PWA on v70 keeps
 // printing a merged balance that looks finished.
-const CACHE_VERSION = 'golfapp-v71-receipt-identity';
+// Moved to v72: the setup page describes its own link instead of guessing at it,
+// the destructive control stops being the loudest thing on the page, and the page
+// finally has a way back. The share card claimed unconditionally that its QR was a
+// read-only spectator link; on four golfers that link is fully writable - 76 of 76
+// score inputs editable - so it IS the scorekeeper link, and the sentence was wrong
+// on nearly every round this group plays. It nearly got the card deleted, which
+// would have left a four-ball with no way to share a round at all. An installed PWA
+// on v71 keeps a page that mislabels its own link and shouts about deletion.
+const CACHE_VERSION = 'golfapp-v72-setup-page-truth';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

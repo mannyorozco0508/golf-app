@@ -146,6 +146,12 @@
         .lobby-divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 0 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: bold; }
 
         /* Admin Styles */
+        /* Reached FROM somewhere - the home tiles, a link, the nav bar - so it needs
+           a way back to it. The wizard's step Back moves between steps; it never
+           leaves the wizard. */
+        .back-btn { display: inline-flex; align-items: center; margin-bottom: 10px;
+            color: var(--brand-navy); font-weight: bold; font-size: 0.85rem;
+            text-decoration: none; cursor: pointer; min-height: 44px; }
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 20px; }
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
@@ -283,7 +289,12 @@
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
         .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
         .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
-        .end-box { background: var(--danger-box-bg); border: 2px dashed var(--accent-red); border-radius: 10px; padding: 16px; text-align: center; margin-top: 30px; margin-bottom: 20px; }
+        /* Quiet, but still a thumb-sized target. Small is not the same as
+           unhittable, and this is a real control somebody occasionally needs. */
+        .end-round-btn { display: inline-flex; align-items: center; justify-content: center;
+            min-height: 44px; padding: 0 10px; background: none; border: none;
+            color: var(--text-muted); font-size: 0.78rem; text-decoration: underline;
+            cursor: pointer; }
         #qrcode { display: flex; justify-content: center; margin: 12px 0; }
         #qrcode img { border: 4px solid white; border-radius: 8px; }
         
@@ -428,6 +439,7 @@ html {
 
 <div class="container" id="admin-screen" style="display: none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <a class="back-btn" onclick="goBack()">← Back</a>
     <!-- Top Navigation Bar -->
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
@@ -460,7 +472,7 @@ html {
 
     <div class="share-box">
         <h3>📲 Share Link with Group</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Spectator link — anyone can watch, but scores are read-only. Use this if there's only one group.</span>
+        <span id="share-link-note" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;"></span>
         <div id="qrcode"></div>
         <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="copyAppUrl()">⧉ Copy Invite Link</button>
     </div>
@@ -1233,10 +1245,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
     </div>
 
-    <div class="end-box">
-        <h3 style="color: var(--accent-red); margin-top: 0;">🏁 End Current Game</h3>
-        <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
-        <button class="btn-danger" onclick="endAndClearRound()">🗑️ End & Wipe Round</button>
+    <!-- PROMINENCE TRACKS HOW OFTEN A CONTROL IS WANTED, not how much damage it
+         does. This was a full-width red button inside a 2px dashed red panel - the
+         loudest thing on a page whose actual job is starting a round - and it wipes
+         the round permanently. It is now the quietest control here.
+         The confirm() in front of it is untouched: that is the safeguard, and a
+         small button is not a substitute for asking. -->
+    <div style="text-align:center; margin-top:28px;">
+        <button type="button" class="end-round-btn" onclick="endAndClearRound()">🗑️ End &amp; wipe this round</button>
     </div>
 
     <!-- THE TOURNAMENT EXIT CARD WAS REMOVED AT THE PRODUCT SEPARATION.
@@ -1809,6 +1825,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             </div>
         `).join('');
         }).join('');
+    }
+
+    // Back to wherever this page was opened from. history.back() alone is a dead
+    // end on a cold link or a bookmark - there is nothing behind it, or what is
+    // behind it is outside the app - so the referrer decides, exactly as
+    // instructions.html has always done it.
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) {
+            history.back();
+        } else {
+            window.location.href = 'admin.html';
+        }
     }
 
     function toggleTheme() {
@@ -4692,7 +4720,38 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         regenerateGroupLinks();
     }
 
+    // WHAT THIS LINK ACTUALLY DOES, which is not one fixed thing.
+    //
+    // The card used to claim, always, that this was a read-only spectator link.
+    // That is true above four golfers and FALSE at or below four, where the bare
+    // ?game=CODE link is fully writable - measured in a browser: four players gives
+    // 76 editable score inputs, eight gives none. Most rounds here are a foursome,
+    // so the sentence was wrong on nearly every round played, and it nearly got the
+    // card deleted as "the wrong link". Deleting it would have left a four-ball with
+    // no way to share a round at all: both group-link surfaces hide themselves when
+    // there is only one group.
+    //
+    // TIED TO THE RULE THAT DECIDES EDITABILITY, not to a group count that merely
+    // correlates with it. index.html gates scoring on `players.length > 4`; this
+    // describes that, and tools/round-setup-check.js measures what the link really
+    // permits and fails if this sentence disagrees. If the gate moves, the copy goes
+    // red rather than quietly starting to lie again.
+    const MULTI_GROUP_ABOVE = 4;   // index.html: const isMultiGroupRound = players.length > 4
+    function shareLinkNoteText(playerCount) {
+        return (playerCount > MULTI_GROUP_ABOVE)
+            ? 'Read-only link. Each group needs its own link below.'
+            : 'Scorekeeper link \u2014 send this to whoever is keeping the card.';
+    }
+
+    function syncShareLinkNote() {
+        const el = document.getElementById('share-link-note');
+        if (!el) return;
+        el.textContent = shareLinkNoteText(document.querySelectorAll('.player-row').length);
+    }
+
     function regenerateGroupLinks() {
+        // The roster just changed, which is the only thing either of these depends on.
+        syncShareLinkNote();
         const box = document.getElementById('group-links-box');
         const list = document.getElementById('group-links-list');
         if (!box || !list) return;
