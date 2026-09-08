@@ -37,13 +37,21 @@ function render(d) {
         ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     vm.runInContext(`
         currentData = ${J(d)};
+        // THE MAIN POOL CARD IS RENDERED HERE BECAUSE THE PAGE RENDERS IT - it is
+        // the first of the four calls settlement.html makes on every snapshot. The
+        // harness drew the other three and skipped this one, so #money-pool-section
+        // was always empty in here whatever the fixture said, and a test could not
+        // tell "there is no pool" from "the pool was never drawn". That is the
+        // difference the denial turns on.
+        renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderSettlement(currentData);
         renderReceiptScorecard();
         window.__a = document.getElementById('combined-settlement-summary').innerHTML;
         window.__b = document.getElementById('settle-content').innerHTML;
-        window.__c = document.getElementById('receipt-scorecard').innerHTML;`, sb);
-    return { top: sb.window.__a, mid: sb.window.__b, card: sb.window.__c };
+        window.__c = document.getElementById('receipt-scorecard').innerHTML;
+        window.__d = document.getElementById('money-pool-section').innerHTML;`, sb);
+    return { top: sb.window.__a, mid: sb.window.__b, card: sb.window.__c, pool: sb.window.__d };
 }
 const ledger = d => call(`
     var o = computeCombinedNetTotals(${J(d)}, ${J(CD)}, ${J(d.scores)});
@@ -221,7 +229,42 @@ describe('NOTHING IS INVENTED', () => {
         assert.ok(!/Marty vs Manny/.test(r.mid), 'how a round is scored is not a bet');
         assert.ok(!/MATCH NET/.test(r.mid));
         assert.ok(!/Final Payout Settlement/.test(r.top + r.mid));
-        assert.match(r.mid, /No money bets were set up/);
+    });
+
+    // ---- THE DENIAL IS A RULE, NOT A STRING IN ONE FIXTURE ------------------
+    //
+    // This used to be one line inside the test above - `assert.match(r.mid, /No
+    // money bets were set up/)` - on a fixture with no moneyPool. It was true, and
+    // it was silent on the case that was wrong: the denial fired on "no side games"
+    // and never looked at the Main Pool, so a pool round printed "No money bets
+    // were set up for this round" as the first line of a receipt that then listed
+    // $480 of its own pool money. The old assertion passed throughout.
+    //
+    // Both halves are pinned now. Deleting either one leaves a rule that only ever
+    // says yes, or only ever says no.
+    const DENIAL = /No money bets were set up/;
+
+    test('a round with NO money of any kind says so', () => {
+        const r = render({ gameFormat: 'stroke', players: F.P, courseData: CD, scores: F.S });
+        assert.match(r.mid, DENIAL, 'a genuinely no-bet round must still say so plainly');
+        assert.equal(r.pool, '', 'and there is no Main Pool card to contradict it');
+    });
+
+    test('a round WITH a Main Pool is NOT told it has no money', () => {
+        const withPool = {
+            gameFormat: 'stroke', players: F.P, courseData: CD, scores: F.S,
+            settlementMode: 'whole-dollar',
+            moneyPool: { enabled: true, buyIn: 40,
+                net: { amount: 70, places: [100] },
+                skins: { mode: 'remainder', scoring: 'net', carryOver: false } },
+        };
+        const r = render(withPool);
+        assert.ok(!DENIAL.test(r.mid),
+            'the Receipt denied the bets it was about to print');
+        // POSITIVE HALF. Without this the test is satisfied by a Receipt that
+        // renders nothing at all, which is the other way to make a denial vanish.
+        assert.match(r.pool, /Main Pool/i, 'the Main Pool card must actually render');
+        assert.match(r.pool, /\$/, 'and it must carry money');
     });
 
     test('a $0 main stake shows no wager block', () => {

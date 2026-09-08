@@ -1760,6 +1760,25 @@ html {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
             if (sideHtml) {
                 container.innerHTML = sideHtml + `<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>`;
+            } else if (typeof computeMoneyPool === 'function' && computeMoneyPool(data, courseData, savedScores)) {
+                // THE DENIAL BELOW ASKED THE WRONG QUESTION. It fired on "no side
+                // games" and never looked at the Main Pool, so the ordinary pool
+                // round - a pot, no side matches - printed "No money bets were set
+                // up for this round" as the FIRST line under the header and then
+                // $480 of pool money four words below it. On screen and in the
+                // exported receipt both. Measured, not supposed.
+                //
+                // THE SAME QUESTION THE POOL CARD ASKS, so the two cannot disagree:
+                // renderMoneyPoolSection shows the Main Pool when computeMoneyPool
+                // returns a result and hides it when it does not. The denial now
+                // appears if and only if that card does not.
+                //
+                // Emptied rather than given a heading of its own: the Main Pool card
+                // immediately below IS this round's ledger, and printReceipt drops
+                // roots that render empty, so the export starts at the header and
+                // goes straight to the money instead of carrying a bare "Final
+                // Ledger" title with nothing under it.
+                container.innerHTML = '';
             } else {
                 container.innerHTML = `
                     <div class="settle-card">
