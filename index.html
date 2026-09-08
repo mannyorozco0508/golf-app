@@ -662,6 +662,10 @@
         .fr-hole-par { color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
         .fr-hole-val { font-weight: bold; font-size: 1rem; min-width: 44px; text-align: right; }
         .fr-hole-input { width: 56px; height: 40px; text-align: center; font-size: 1rem; font-weight: bold; border: 1px solid var(--border-mid); border-radius: 8px; }
+        /* A STAGED HOLE LOOKS DIFFERENT FROM A SAVED ONE. The digits are identical
+           either way; without this the only thing separating "typed" from "saved"
+           is a sentence further down the screen. */
+        .fr-hole-input.fr-hole-staged { border: 2px solid var(--accent-amber, #b8860b); background: rgba(184,134,11,0.08); }
         .fr-hole-missing { color: var(--warn-text); font-style: italic; font-size: 0.8rem; }
         .fr-sub-row { display: flex; justify-content: space-between; padding: 6px 4px; font-size: 0.85rem; font-weight: bold; background: var(--bg-soft); }
         .fr-impact { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--warn-bg); font-size: 0.82rem; }
@@ -3709,12 +3713,27 @@ html {
     // MONEY POOL on the scorecard: the pot at a glance, and KP entry right where
     // the golfer is standing. Read-only view of computeMoneyPool(); the ONLY write
     // is the KP winner, to the storage shape settlement already reads.
+    // WHAT THE NUMBER ACTUALLY IS. Cents when there are cents, none when there are
+    // not - the same rule settlement.html:1054 has always used on the Receipt.
+    //
+    // The three formatters this replaces all rounded: two `(c/100).toFixed(0)`
+    // here and Math.round in frMoney. On a whole-dollar round that is a no-op,
+    // because every figure is a multiple of 100. On a LEGACY round - one created
+    // before settlementMode existed, which settles in cents by design - a $9.98
+    // skin read "$10" and a $1.67 Net Finish share read "$2". Nothing was
+    // miscalculated; the screen simply did not say what the number was, and a
+    // rounded figure looks exactly like an exact one.
+    //
+    // Two copies of this rule now exist in the app, here and on the Receipt,
+    // where there were four formatters and only one of them honest.
+    const centsToMoney = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+
     function buildMoneyPoolBanner() {
         if (!currentData.moneyPool || currentData.moneyPool.enabled === false) return '';
         if (typeof computeMoneyPool !== 'function') return '';
         const r = computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {});
         if (!r) return '';
-        const $ = c => '$' + (c / 100).toFixed(0);
+        const $ = centsToMoney;
         let html = '<div class="action-section-label">\uD83C\uDFC6 Main Pool \u00B7 ' + $(r.totalPoolCents) + '</div>';
         if (!r.valid) return html + '<div class="section-summary" style="color:var(--accent-red);">\u26A0\uFE0F ' + r.errors[0] + '</div>';
         const bits = [];
@@ -3747,7 +3766,7 @@ html {
     // read it and act on it.
     function buildLiveNetFinish(r) {
         if (!r.net || !r.net.lines || r.net.lines.length === 0) return '';
-        const $ = c => '$' + (c / 100).toFixed(0);
+        const $ = centsToMoney;
 
         // Complete means every pool participant has posted every hole. Anything less
         // and the standings can still move.
@@ -3791,7 +3810,7 @@ html {
     // is what the pool engine allocated, so it is what gets shown.
     function buildLiveKpStatus(r) {
         if (!r.kp || !r.kp.lines || r.kp.lines.length === 0) return '';
-        const $ = c => '$' + (c / 100).toFixed(0);
+        const $ = centsToMoney;
         let html = '<div class="lnf-head">\uD83D\uDCCD KP \u00B7 ' + $(r.kp.amountCents) + '</div>';
         r.kp.lines.forEach(l => {
             html += '<div class="lnf-row"><span>H' + l.hole + ' \u00B7 '
@@ -5122,7 +5141,7 @@ html {
                 if (rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
                     rows.push(kpOpen
                         ? '<div class="fr-gate-warn">\u26A0\uFE0F KP winners not confirmed \u2014 $'
-                          + ((rk.kpUnresolvedCents || 0) / 100).toFixed(0) + ' still allocated to KP</div>'
+                          + centsToMoney(rk.kpUnresolvedCents || 0).slice(1) + ' still allocated to KP</div>'
                         : '<div class="fr-gate-ok">\u2713 KP winners confirmed</div>');
                 }
                 if (missing.length > 0) {
@@ -5350,17 +5369,20 @@ html {
     }
 
     // A canonical settlement snapshot. READS ONLY.
-    function frSnapshot() {
-        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        const savedScores = currentData.scores || {};
-        const snap = { net: {}, skins: {}, place: {}, totals: {} };
+    // TAKEN OF A ROUND, not of the page. Passing the record in is what lets the
+    // same function snapshot the round as it stands AND the round as the staged
+    // corrections would leave it, without either one touching currentData.
+    function frSnapshotOf(data) {
+        const courseData = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const savedScores = data.scores || {};
+        const snap = { net: {}, skins: {}, place: {}, totals: {}, presses: {} };
         try {
-            const c = computeCombinedNetTotals(currentData, courseData, savedScores);
+            const c = computeCombinedNetTotals(data, courseData, savedScores);
             Object.values(c.netByName).forEach(v => { snap.net[v.name] = v.net; });
         } catch (e) { /* a snapshot that cannot be taken simply reports no change */ }
         try {
             if (typeof computeMoneyPool === 'function') {
-                const pool = computeMoneyPool(currentData, courseData, savedScores);
+                const pool = computeMoneyPool(data, courseData, savedScores);
                 if (pool && pool.valid) {
                     (pool.skins ? pool.skins.lines : []).forEach(l => {
                         snap.skins[String(l.hole)] = { name: l.winnerName, cents: l.cents };
@@ -5371,30 +5393,95 @@ html {
                 }
             }
         } catch (e) { /* as above */ }
-        (currentData.players || []).forEach(p => {
+        // PRESSES, BY NAME. Without these a correction that changes what a press
+        // pays moved the Final money line with nothing saying which wager did it -
+        // the organizer saw a number change and had to guess why.
+        //
+        // buildSideMatchReceipts is the canonical describer settlement.html already
+        // prints from; nothing is recomputed here. A press is a STORED AGREEMENT and
+        // this only reads what it is worth - whether it fired is not a question a
+        // score correction is allowed to reopen.
+        try {
+            if (typeof buildSideMatchReceipts === 'function') {
+                buildSideMatchReceipts(data, courseData, savedScores).forEach(rc => {
+                    (rc.segments || []).forEach(seg => {
+                        if (!/press/i.test(seg.label || '')) return;
+                        snap.presses[rc.matchId + '|' + seg.label] = {
+                            label: seg.label, nameA: rc.nameA, nameB: rc.nameB,
+                            startHole: seg.startHole, money: seg.money,
+                            toSideA: seg.toSideA, result: seg.result,
+                        };
+                    });
+                });
+            }
+        } catch (e) { /* as above */ }
+        (data.players || []).forEach(p => {
             if (typeof computePlayerRoundTotals !== 'function') return;
             const t = computePlayerRoundTotals(p, courseData, savedScores);
             snap.totals[p.name] = { gross: t.gross, net: t.net, complete: t.complete };
         });
         return snap;
     }
+    function frSnapshot() { return frSnapshotOf(currentData); }
 
-    const frMoney = c => (c < 0 ? '-$' : '+$') + Math.abs(Math.round(c / 100));
+    // ---- STAGED CORRECTIONS -------------------------------------------------
+    //
+    // WHY THESE ARE HELD RATHER THAN WRITTEN. frCorrectScore used to call
+    // saveScore on every keystroke that changed a digit, so the impact panel
+    // described a change that had ALREADY happened - there was nothing to accept,
+    // because nothing was pending, and nothing to discard, because the round had
+    // already moved. undoAuditEntry could put one value back and logged the undo
+    // as a further entry: a trail of second thoughts rather than a decision.
+    //
+    // Staging is a UI-layer concern and stays one. saveScore is untouched and is
+    // still the only thing that writes a score - commit calls it once per staged
+    // hole, so the permission gate, the pending-write tracking and the audit entry
+    // all happen exactly as they always have. THE ORDINARY SCORECARD IS UNCHANGED:
+    // a scorekeeper still retypes a hole and it still lands immediately.
+    let frStaged = {};
+    const frStagedKey = (playerId, hole) => 'p' + playerId + '_h' + hole;
+    function frStagedCount() { return Object.keys(frStaged).length; }
+    // The round as the staged corrections would leave it. currentData is never
+    // mutated: the page's model stays exactly what Firebase last sent until the
+    // organizer commits.
+    function frStagedData() {
+        const merged = Object.assign({}, currentData.scores || {});
+        Object.keys(frStaged).forEach(k => {
+            if (frStaged[k] === null) delete merged[k]; else merged[k] = frStaged[k];
+        });
+        return Object.assign({}, currentData, { scores: merged });
+    }
+
+    // The sign is carried outside the dollar sign, as everywhere else in the app;
+    // the magnitude goes through the one rule so a legacy round's $9.98 skin says
+    // $9.98 rather than $10.
+    const frMoney = c => (c < 0 ? '-' : '+') + centsToMoney(Math.abs(c));
 
     // Diffs two canonical snapshots. Reports what MOVED; says so plainly when
     // nothing did, because "no change" is the answer an organizer most wants.
-    function frRenderImpact(before, after, playerName, hole, oldVal, newVal) {
+    // DIFFS THE WHOLE ROUND, not the hole that changed. The recon measured why:
+    // correcting hole 7 re-priced hole 1, because the skins pot divides by the
+    // total number of skins won and removing one anywhere re-prices them all.
+    // A panel that reported only the corrected hole would have been quietly wrong.
+    function frRenderImpact(before, after, corrections) {
         const el = document.getElementById('fr-detail-impact');
         if (!el) return;
         const lines = [];
 
-        const tb = before.totals[playerName] || {}, ta = after.totals[playerName] || {};
-        if (tb.gross !== ta.gross) {
-            lines.push('Gross: ' + (tb.gross === null ? '\u2014' : tb.gross) + ' \u2192 ' + (ta.gross === null ? '\u2014' : ta.gross));
-        }
-        if (tb.net !== ta.net) {
-            lines.push('Net: ' + (tb.net === null ? '\u2014' : tb.net) + ' \u2192 ' + (ta.net === null ? '\u2014' : ta.net));
-        }
+        // EVERY GOLFER WHOSE CARD MOVED, not one. The old signature took a single
+        // playerName because a correction was a single write; with several staged
+        // across several golfers, naming one of them would have been arbitrary.
+        [...new Set([...Object.keys(before.totals), ...Object.keys(after.totals)])].forEach(nm => {
+            const tb = before.totals[nm] || {}, ta = after.totals[nm] || {};
+            if (tb.gross !== ta.gross) {
+                lines.push(nm + ' gross: ' + (tb.gross === null || tb.gross === undefined ? '\u2014' : tb.gross)
+                    + ' \u2192 ' + (ta.gross === null || ta.gross === undefined ? '\u2014' : ta.gross));
+            }
+            if (tb.net !== ta.net) {
+                lines.push(nm + ' net: ' + (tb.net === null || tb.net === undefined ? '\u2014' : tb.net)
+                    + ' \u2192 ' + (ta.net === null || ta.net === undefined ? '\u2014' : ta.net));
+            }
+        });
 
         // Skins, hole by hole, from the canonical pool result.
         const holes = [...new Set([...Object.keys(before.skins), ...Object.keys(after.skins)])]
@@ -5433,15 +5520,98 @@ html {
                                      + ' \u2192 ' + (a >= 0 ? '+$' + a : '-$' + Math.abs(a)));
         });
 
-        el.innerHTML = '<div class="fr-impact"><div class="fr-impact-head">\u2713 Score corrected</div>'
-            + '<div class="fr-impact-line">' + playerName + ' \u00B7 Hole ' + hole + ': '
-            + (oldVal === null ? '\u2014' : oldVal) + ' \u2192 ' + (newVal === null ? '\u2014' : newVal) + '</div>'
+        // Presses, named. Reported only when a press exists and its money moved, so
+        // a round without one produces no press line at all.
+        [...new Set([...Object.keys(before.presses || {}), ...Object.keys(after.presses || {})])].forEach(k => {
+            const b = (before.presses || {})[k], a = (after.presses || {})[k];
+            const ref = a || b;
+            if (!ref) return;
+            const val = seg => !seg ? '$0'
+                : '$' + Math.round(seg.money) + ' to ' + (seg.toSideA ? seg.nameA : seg.nameB);
+            if (b && a && b.money === a.money && b.toSideA === a.toSideA) return;
+            lines.push(ref.nameA + ' v ' + ref.nameB + ' \u00B7 ' + ref.label
+                + ' (from hole ' + ref.startHole + '): ' + val(b) + ' \u2192 ' + val(a));
+        });
+
+        const list = (corrections || []).map(c => '<div class="fr-impact-line">'
+            + c.playerName + ' \u00B7 Hole ' + c.hole + ': '
+            + (c.oldVal === null || c.oldVal === undefined ? '\u2014' : c.oldVal) + ' \u2192 '
+            + (c.newVal === null ? '\u2014' : c.newVal) + '</div>').join('');
+        const n = (corrections || []).length;
+        const head = n === 0 ? 'No corrections staged'
+            : (n === 1 ? '1 correction staged \u2014 not saved yet'
+                       : n + ' corrections staged \u2014 not saved yet');
+
+        el.innerHTML = '<div class="fr-impact"><div class="fr-impact-head">' + head + '</div>'
+            + list
             + '<div style="margin-top:6px;">' + lines.map(l => '<div class="fr-impact-line">' + l + '</div>').join('') + '</div>'
             + (moved.length
                 ? '<div class="fr-impact-head" style="margin-top:8px;">Final money</div>'
                   + moved.map(m => '<div class="fr-impact-line fr-impact-money">' + m + '</div>').join('')
                 : '<div class="fr-impact-line" style="margin-top:8px;">Final money: no change</div>')
+            + (n > 0
+                ? '<div class="fr-impact-actions" style="margin-top:10px; display:flex; gap:8px;">'
+                  + '<button class="btn-primary" style="flex:1;" onclick="frCommitCorrections()">Save '
+                  + n + ' correction' + (n === 1 ? '' : 's') + '</button>'
+                  + '<button class="btn-outline" style="flex:1;" onclick="frDiscardCorrections()">Discard</button>'
+                  + '</div>'
+                : '')
             + '</div>';
+    }
+
+    // The panel, rebuilt from whatever is staged right now. Called after every
+    // correction and after commit and discard, so what is on screen is always the
+    // diff of the CURRENT staging set against the round as it actually stands.
+    function frRenderStagedImpact() {
+        const el = document.getElementById('fr-detail-impact');
+        if (!el) return;
+        if (frStagedCount() === 0) { el.innerHTML = ''; return; }
+        const players = currentData.players || [];
+        const corrections = Object.keys(frStaged).map(k => {
+            const m = /^p(\d+)_h(\d+)$/.exec(k);
+            if (!m) return null;
+            const p = players.find(x => String(x.id) === m[1]);
+            const cur = (currentData.scores || {})[k];
+            return { playerId: m[1], playerName: p ? p.name : 'Player', hole: Number(m[2]),
+                     oldVal: cur === undefined ? null : cur, newVal: frStaged[k] };
+        }).filter(Boolean).sort((a, b) => a.playerName.localeCompare(b.playerName) || a.hole - b.hole);
+        frRenderImpact(frSnapshotOf(currentData), frSnapshotOf(frStagedData()), corrections);
+    }
+
+    // ONE WRITE PER STAGED HOLE, THROUGH THE ONE CANONICAL PATH. saveScore still
+    // carries the permission gate, the pending-write tracking and the audit entry;
+    // nothing is duplicated here and nothing new writes a score.
+    function frCommitCorrections() {
+        const entries = Object.keys(frStaged);
+        if (entries.length === 0) return;
+        entries.forEach(k => {
+            const m = /^p(\d+)_h(\d+)$/.exec(k);
+            if (!m) return;
+            const val = frStaged[k];
+            try {
+                frOrganizerEditContext = true;
+                saveScore(m[1], Number(m[2]), val === null ? '' : String(val));
+            } finally { frOrganizerEditContext = false; }
+            // saveScore leaves the local model alone and waits for the listener.
+            // Applied optimistically here for the same reason the single-correction
+            // path always did: the panel below must describe the round the write
+            // just produced, not the one before it. Firebase stays authoritative.
+            if (!currentData.scores) currentData.scores = {};
+            if (val === null) delete currentData.scores[k]; else currentData.scores[k] = val;
+        });
+        frStaged = {};
+        renderFinishRoundDetail();
+        frRenderStagedImpact();
+        renderFinishRoundMoney();
+    }
+
+    // NOTHING TO UNDO, BECAUSE NOTHING HAPPENED. Discard drops the staging set;
+    // no write was ever issued, so the round is exactly what it was before the
+    // review opened and the audit log has nothing to say about it.
+    function frDiscardCorrections() {
+        frStaged = {};
+        renderFinishRoundDetail();
+        frRenderStagedImpact();
     }
 
     // ---- KP REVIEW & CONFIRMATION -------------------------------------------
@@ -5480,12 +5650,12 @@ html {
             const orig = r.kpCancelled.originalCents;
             mount.innerHTML = '<div class="fr-money-title">KP Results</div>'
                 + '<div class="fr-review-note">KPs cancelled for this round \u00B7 '
-                + '$' + (orig / 100).toFixed(0) + ' moved into the skins pool.</div>';
+                + centsToMoney(orig) + ' moved into the skins pool.</div>';
             return;
         }
         if (!r.kp || r.kp.amountCents <= 0) { mount.innerHTML = ''; return; }
 
-        const $ = c => '$' + (c / 100).toFixed(0);
+        const $ = centsToMoney;
         const leaders = currentData.kpLeaders || {};
         const noWin = currentData.kpNoWinner || {};
         const isOrg = hasOrganizerAuthority();
@@ -5613,7 +5783,7 @@ html {
             return;
         }
 
-        const amt = '$' + (r.kp.amountCents / 100).toFixed(0);
+        const amt = centsToMoney(r.kp.amountCents);
         if (!confirm('Cancel all KPs for this round?\n\nThe ' + amt + ' KP allocation moves into the '
             + 'skins pool.\n\nExisting KP leaders will no longer receive KP money.')) return;
         if (!requireOnlineForMoney('KPs NOT CANCELLED', 'Reconnect before cancelling the KPs.')) return;
@@ -5651,7 +5821,9 @@ html {
         const p = (currentData.players || []).find(x => String(x.id) === String(frDetailPlayerId));
         if (!p) { mount.innerHTML = ''; return; }
 
-        const t = computePlayerRoundTotals(p, courseData, savedScores);
+        // Totals follow the STAGED card. Reading them off the stored scores would
+        // print a GROSS that contradicts the digits immediately above it.
+        const t = computePlayerRoundTotals(p, courseData, frStagedData().scores);
         document.getElementById('fr-detail-name').textContent = p.name;
 
         // AUTHORITY IS NOT WIDENED HERE. Review is whole-field; correcting is not.
@@ -5672,21 +5844,30 @@ html {
 
         let html = '';
         courseData.forEach(h => {
-            const v = savedScores['p' + p.id + '_h' + h.hole];
+            // THE STAGED VALUE, not the stored one. An organizer who types 4 and
+            // looks away must see 4 when they look back, even though nothing has
+            // been written - and the row says so rather than looking saved.
+            const key = frStagedKey(p.id, h.hole);
+            const staged = Object.prototype.hasOwnProperty.call(frStaged, key);
+            const v = staged ? frStaged[key] : savedScores[key];
             const has = v && v > 0;
             const right = mayEdit
-                ? '<input class="fr-hole-input" type="tel" inputmode="numeric" pattern="[0-9]*" value="'
+                ? '<input class="fr-hole-input' + (staged ? ' fr-hole-staged' : '')
+                  + '" type="tel" inputmode="numeric" pattern="[0-9]*" value="'
                   + (has ? v : '') + '" onchange="frCorrectScore(' + p.id + ',' + h.hole + ',this.value)">'
                 : (has ? '<span class="fr-hole-val">' + v + '</span>'
                        : '<span class="fr-hole-missing">no score</span>');
             html += '<div class="fr-hole-row"><span class="fr-hole-label">Hole ' + h.hole
-                 + '<span class="fr-hole-par">par ' + h.par + '</span></span>' + right + '</div>';
+                 + '<span class="fr-hole-par">par ' + h.par + '</span>'
+                 + (staged ? '<span class="fr-hole-par">not saved</span>' : '')
+                 + '</span>' + right + '</div>';
         });
 
         // Totals come from the canonical helper, never recomputed here.
         const front = courseData.filter(h => h.hole <= 9), back = courseData.filter(h => h.hole > 9);
+        const stagedScores = frStagedData().scores;
         const sumOf = list => list.reduce((a, h) => {
-            const v = savedScores['p' + p.id + '_h' + h.hole];
+            const v = stagedScores['p' + p.id + '_h' + h.hole];
             return a + (v && v > 0 ? parseInt(v, 10) : 0);
         }, 0);
         html += '<div class="fr-sub-row"><span>OUT</span><span>' + sumOf(front) + '</span></div>';
@@ -5699,53 +5880,38 @@ html {
         mount.innerHTML = html;
     }
 
-    // THE CORRECTION PATH. saveScore() is the app's one score-writing function; it
-    // carries the permission gate, the Firebase write, the pending-write tracking
-    // and the audit entry. Nothing is duplicated here.
+    // THE CORRECTION PATH. It STAGES; it does not write. saveScore() is still the
+    // app's one score-writing function and frCommitCorrections() is the only thing
+    // in this flow that calls it.
     function frCorrectScore(playerId, hole, raw) {
         const p = (currentData.players || []).find(x => String(x.id) === String(playerId));
         if (!p) return;
-        const key = 'p' + playerId + '_h' + hole;
-        const oldVal = (currentData.scores && currentData.scores[key] !== undefined) ? currentData.scores[key] : null;
+        const key = frStagedKey(playerId, hole);
+        const stored = (currentData.scores && currentData.scores[key] !== undefined) ? currentData.scores[key] : null;
         const parsed = parseInt(raw, 10);
         const newVal = (isNaN(parsed) || parsed <= 0) ? null : parsed;
-        if (oldVal === newVal) return;
 
         // PERMISSION IS ASKED FIRST, and it is the SAME gate saveScore applies -
         // not a copy of the rule, the function itself. A refused correction must
         // change nothing and must report nothing, or the impact panel would describe
-        // money moving on the back of a write that never happened.
-        // The exception is opened for the duration of this one correction and closed
-        // in the finally, so an exception thrown mid-write cannot leave the app in a
+        // money moving that no write would ever have been allowed to make.
+        // The exception is opened for the duration of this one question and closed
+        // in the finally, so an exception thrown mid-check cannot leave the app in a
         // globally-writable state.
         let allowed;
         try { frOrganizerEditContext = true; allowed = canWritePlayer(playerId); }
         finally { frOrganizerEditContext = false; }
         if (!allowed) { renderFinishRoundDetail(); return; }
 
-        const before = frSnapshot();
-        try {
-            frOrganizerEditContext = true;
-            saveScore(playerId, hole, raw);      // the one canonical write path
-        } finally { frOrganizerEditContext = false; }
+        // TYPING A VALUE BACK TO WHAT IT ALREADY IS UNSTAGES IT. Otherwise a golfer
+        // who corrected a hole and then thought better of it would leave a staged
+        // entry that writes the value it already holds - a real write, a real audit
+        // line, and nothing changed.
+        if (stored === newVal) delete frStaged[key];
+        else frStaged[key] = newVal;
 
-        // saveScore writes to Firebase and lets the .on('value') listener update
-        // currentData - it deliberately does not touch the local model itself. So
-        // currentData.scores still holds the OLD value on the very next line, and
-        // reading it here would snapshot the round as though nothing had changed.
-        //
-        // The local value is therefore applied optimistically, exactly as the
-        // listener is about to. Firebase remains authoritative: when the round-trip
-        // completes the listener overwrites this with whatever actually landed, and
-        // if the write failed the value reverts. This is the same brief divergence
-        // the scorecard's own inputs already live with.
-        if (!currentData.scores) currentData.scores = {};
-        if (newVal === null) delete currentData.scores[key];
-        else currentData.scores[key] = newVal;
-
-        const after = frSnapshot();
         renderFinishRoundDetail();
-        frRenderImpact(before, after, p.name, hole, oldVal, newVal);
+        frRenderStagedImpact();
     }
 
     function jumpToMissingHole(hole) {
@@ -5764,6 +5930,10 @@ html {
     }
 
     function openFinishRoundModal() {
+        // A REVIEW STARTS EMPTY. Staged corrections belong to one sitting; carrying
+        // them into the next one would offer to save something the organizer typed
+        // an hour ago and walked away from.
+        frStaged = {};
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const savedScores = currentData.scores || {};
         const players = currentData.players || [];

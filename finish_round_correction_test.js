@@ -104,6 +104,12 @@ function boot({ group = 1, drop = null, pool = true } = {}) {
         open:   n => vm.runInContext('frOpenPlayer(' + idOf(n) + ');', sb),
         correct: (n, hole, val) => vm.runInContext(
             'frCorrectScore(' + idOf(n) + ',' + hole + ',"' + val + '");', sb),
+        // CORRECTIONS STAGE NOW. frCorrectScore holds them in the page and
+        // frCommitCorrections is the only thing in this flow that writes, so a
+        // test about what the ROUND looks like afterwards has to press the button
+        // the organizer presses.
+        commit: () => vm.runInContext('frCommitCorrections();', sb),
+        staged: () => vm.runInContext('frStagedCount()', sb),
     };
 }
 
@@ -195,31 +201,73 @@ describe('EIGHTEEN HOLES, WRITTEN OUT', () => {
 
 describe('CORRECTIONS GO THROUGH THE CANONICAL PATH', () => {
 
-    test('frCorrectScore calls saveScore and nothing else', () => {
+    // THE CONTRACT CHANGED, AND IT GOT STRICTER. frCorrectScore used to call
+    // saveScore on the spot, so the impact panel described a change that had
+    // already happened - nothing to accept, nothing to discard. It now STAGES, and
+    // frCommitCorrections is the one thing in the flow that writes. Both halves
+    // are pinned: the correction must write nothing at all, and the commit must
+    // still go through the single canonical path rather than growing its own.
+    test('frCorrectScore stages and writes NOTHING', () => {
         const src = read(PAGE);
         const at = src.indexOf('function frCorrectScore');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /saveScore\(playerId, hole, raw\)/);
+        assert.match(fn, /frStaged\[key\] = newVal/, 'the correction must stage');
+        assert.ok(!/saveScore\(/.test(fn), 'a correction must not write; commit writes');
         ['db.ref', '.set(', '.remove(', '.update('].forEach(t =>
             assert.ok(!fn.includes(t), `corrections must not write directly; found ${t}`));
     });
 
-    test('a correction updates gross and net immediately', () => {
+    test('frCommitCorrections is the only writer, and still the canonical one', () => {
+        const src = read(PAGE);
+        const at = src.indexOf('function frCommitCorrections');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        assert.match(fn, /saveScore\(m\[1\], Number\(m\[2\]\)/,
+            'commit must write through saveScore, not a second path');
+        ['db.ref', '.set(', '.remove(', '.update('].forEach(t =>
+            assert.ok(!fn.includes(t), `commit must not write directly; found ${t}`));
+        assert.match(fn, /finally \{ frOrganizerEditContext = false; \}/,
+            'a throw mid-write must not leave the app globally writable');
+    });
+
+    test('staging moves NOTHING in the round until commit', () => {
+        // The load-bearing assertion of the whole change.
+        const b = boot(); b.open('Marty');
+        const key = 'p101_h1';
+        const before = b.run(`currentData.scores['${key}']`);
+        b.correct('Marty', 1, 7);
+        assert.equal(b.staged(), 1, 'the correction must be staged');
+        assert.equal(b.run(`currentData.scores['${key}']`), before,
+            'the round moved while the correction was only staged');
+        b.commit();
+        assert.equal(b.run(`currentData.scores['${key}']`), 7);
+        assert.equal(b.staged(), 0, 'staging must be empty after a commit');
+    });
+
+    test('a staged correction updates the GROSS on screen at once, and the round on commit', () => {
+        // The digits and the total under them must agree the moment they are typed,
+        // or the screen contradicts itself; the ROUND still waits for the button.
         const b = boot(); b.open('Marty');
         const before = b.run(`computePlayerRoundTotals(currentData.players[0], currentData.courseData, currentData.scores)`);
         b.correct('Marty', 1, 7);       // was 5
+        assert.match(strip(b.detail()), new RegExp('GROSS ' + (before.gross + 2)),
+            'the staged card must show the corrected total immediately');
+        const stillStored = b.run(`computePlayerRoundTotals(currentData.players[0], currentData.courseData, currentData.scores)`);
+        assert.equal(stillStored.gross, before.gross, 'the stored round must not have moved yet');
+        b.commit();
         const after = b.run(`computePlayerRoundTotals(currentData.players[0], currentData.courseData, currentData.scores)`);
         assert.equal(after.gross, before.gross + 2);
         assert.equal(after.net, before.net + 2);
-        assert.match(strip(b.detail()), new RegExp('GROSS ' + after.gross));
     });
 
-    test('the impact panel names the hole and the change', () => {
+    test('the impact panel names the hole, the change, and that it is not saved', () => {
         const b = boot(); b.open('Marty');
         b.correct('Marty', 1, 7);
         const t = strip(b.impact());
-        assert.match(t, /Score corrected/);
+        assert.match(t, /1 correction staged \u2014 not saved yet/,
+            'the panel must say the round has not moved');
         assert.match(t, /Marty \u00B7 Hole 1: 5 \u2192 7/);
+        assert.match(t, /Save 1 correction/);
+        assert.match(t, /Discard/);
     });
 
     test('a correction that changes nothing says so', () => {
@@ -247,6 +295,10 @@ describe('A CORRECTION THAT MOVES REAL MONEY', () => {
 
         b.open('Marcus');
         b.correct('Marcus', 14, 7);      // was 4
+        // The STAGED panel names it before anything is written...
+        assert.match(strip(b.impact()), /Hole 14 skin/,
+            'the staged diff must already show the skin moving');
+        b.commit();                      // ...and the round moves when told to
 
         const skinsAfter = b.run(`(function(){
             var p = computeMoneyPool(currentData, currentData.courseData, currentData.scores);
@@ -254,7 +306,11 @@ describe('A CORRECTION THAT MOVES REAL MONEY', () => {
         })()`);
         assert.ok(!plain(skinsAfter).includes('14:Marcus'),
             'STALE: Marcus still holds the hole 14 skin after losing it');
-        assert.match(strip(b.impact()), /Hole 14 skin/);
+        // AND THE PANEL IS EMPTY AGAIN. It describes what is STAGED; once the
+        // corrections are saved there is nothing pending to describe, and leaving
+        // the old diff on screen would offer a Save button for work already done.
+        assert.equal(strip(b.impact()).trim(), '', 'a committed review has nothing staged left');
+        assert.equal(b.staged(), 0);
     });
 
     test('the money panel re-renders from the corrected scores', () => {
@@ -286,13 +342,16 @@ describe('A CORRECTION THAT MOVES REAL MONEY', () => {
 
         b.open('Marcus');
         b.correct('Marcus', 2, 12);      // blow him well down the field
+        assert.match(strip(b.impact()), /Net Finish/,
+            'the staged diff must already show the place moving');
+        b.commit();
         const placeAfter = b.run(`(function(){
             var p = computeMoneyPool(currentData, currentData.courseData, currentData.scores);
             return p.net.lines.map(function(l){ return l.place + ':' + l.names.join('/'); });
         })()`);
         assert.ok(!plain(placeAfter).some(x => /1:Marcus/.test(x)),
             'STALE: Marcus is still 1st after a six-shot correction');
-        assert.match(strip(b.impact()), /Net Finish/);
+        assert.equal(strip(b.impact()).trim(), '', 'a committed review has nothing staged left');
     });
 
     test('Who Pays Who re-renders and still reconstructs every balance', () => {

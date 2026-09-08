@@ -97,6 +97,8 @@ function boot({ link = 'group', group = 1, token = TOKEN, legacy = false, online
         can: n => vm.runInContext('canWritePlayer(' + idOf(n) + ')', sb),
         open: n => vm.runInContext('frOpenPlayer(' + idOf(n) + ');', sb),
         correct: (n,h,v) => vm.runInContext('frCorrectScore(' + idOf(n) + ',' + h + ',"' + v + '");', sb),
+        // Corrections stage; commit is what writes. See finish_round_correction_test.js.
+        commit: () => vm.runInContext('frCommitCorrections();', sb),
         detail: () => sb.document.getElementById('fr-detail-holes').innerHTML,
         badge: () => sb.document.getElementById('fr-verified-badge').innerHTML,
     };
@@ -237,21 +239,30 @@ describe('THE ORGANIZER TOKEN', () => {
 
 describe('ORGANIZER CORRECTION IS STILL CANONICAL', () => {
 
+    // A CORRECTION NO LONGER WRITES - it stages, and frCommitCorrections writes.
+    // The canonical-path rule is unchanged and is now pinned where the write is.
     test('it goes through saveScore, not a second write path', () => {
         const src = read(PAGE);
-        const at = src.indexOf('function frCorrectScore');
+        const at = src.indexOf('function frCommitCorrections');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /saveScore\(playerId, hole, raw\)/);
+        assert.match(fn, /saveScore\(m\[1\], Number\(m\[2\]\)/);
         ['db.ref', '.set(', '.remove(', '.update('].forEach(t =>
-            assert.ok(!fn.includes(t), `corrections must not write directly; found ${t}`));
+            assert.ok(!fn.includes(t), `commit must not write directly; found ${t}`));
+        const corr = src.slice(src.indexOf('function frCorrectScore'),
+            src.indexOf('\n    function ', src.indexOf('function frCorrectScore') + 10));
+        assert.ok(!/saveScore\(/.test(corr), 'the correction itself must write nothing');
     });
 
     test('the exception is closed in a finally block', () => {
+        // Both places the organizer exception is opened: the permission question in
+        // frCorrectScore, and the write in frCommitCorrections.
         const src = read(PAGE);
-        const at = src.indexOf('function frCorrectScore');
-        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /finally \{ frOrganizerEditContext = false; \}/,
-            'a throw mid-write must not leave the app globally writable');
+        ['function frCorrectScore', 'function frCommitCorrections'].forEach(name => {
+            const at = src.indexOf(name);
+            const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+            assert.match(fn, /finally \{ frOrganizerEditContext = false; \}/,
+                name + ': a throw must not leave the app globally writable');
+        });
     });
 
     test('a CROSS-GROUP organizer correction reruns skins, Net Finish and the money', () => {
@@ -267,6 +278,7 @@ describe('ORGANIZER CORRECTION IS STILL CANONICAL', () => {
 
         b.open('Marcus');                    // Group 3, organizer holds no group link
         b.correct('Marcus', 14, 7);
+        b.commit();                          // staged, then saved
 
         const after = b.run(`(function(){
             var p = computeMoneyPool(currentData, currentData.courseData, currentData.scores);
@@ -361,13 +373,21 @@ describe('ANY SCORE CHANGE CLEARS VERIFICATION', () => {
         assert.equal(b.run('isScoresVerified()'), false, 'STALE verification after a score edit');
     });
 
-    test('an ORGANIZER review correction clears it', async () => {
+    test('an ORGANIZER review correction clears it — on commit, not on staging', async () => {
+        // VERIFICATION DESCRIBES THE SAVED ROUND. A staged correction has not
+        // changed the saved round, so the badge is still telling the truth while
+        // it is pending - and the panel beside it says "not saved yet" in as many
+        // words. It clears the moment the correction actually lands, through
+        // saveScore, exactly as any other score edit does.
         const b = boot({ link: 'organizer' });
         b.run('frShowResults(true);');
         await tick();
         assert.equal(b.run('isScoresVerified()'), true);
         b.open('Rocco');
         b.correct('Rocco', 18, 6);
+        assert.equal(b.run('isScoresVerified()'), true,
+            'staging must not clear a verification of a round that has not changed');
+        b.commit();
         assert.equal(b.run('isScoresVerified()'), false);
     });
 
