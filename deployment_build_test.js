@@ -204,6 +204,37 @@ describe('PWA — two independent installable apps', () => {
     const swOf = (p) => fs.readFileSync(path.join(outDir(p), 'sw.js'), 'utf8');
     const manifestOf = (p) => JSON.parse(fs.readFileSync(path.join(outDir(p), 'manifest.json'), 'utf8'));
 
+    test('the committed Tournament manifest is EXACTLY what the build generates', () => {
+        // THE ONE COMMITTED PER-PRODUCT FILE, and the reason it is safe.
+        //
+        // tournament.html and tournament-scorecard.html link tournament-manifest.json
+        // rather than manifest.json, because the live deployment is still the
+        // combined repo root where manifest.json is the Consumer identity - a
+        // tournament page linking that name would offer the wrong app to install.
+        //
+        // A hand-maintained second manifest is exactly the duplication this repo
+        // refuses everywhere else, so it is not hand-maintained: it must be byte
+        // for byte what manifestFor('tournament') produces. Change the product's
+        // name, colours or icons in build-shell.js and this fails until the
+        // committed copy is regenerated from the build output.
+        const committed = fs.readFileSync(path.join(REPO_ROOT, 'tournament-manifest.json'), 'utf8');
+        const generated = fs.readFileSync(path.join(outDir('tournament'), 'manifest.json'), 'utf8');
+        assert.equal(committed, generated,
+            'tournament-manifest.json has drifted from build-shell.js - copy dist/tournament/manifest.json over it');
+    });
+
+    test('the committed Tournament manifest is NOT the Consumer one', () => {
+        // The failure this whole wave exists to prevent, asserted by content.
+        const t = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'tournament-manifest.json'), 'utf8'));
+        const c = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'manifest.json'), 'utf8'));
+        assert.notEqual(t.name, c.name, 'the two products must not share an install name');
+        assert.notEqual(t.start_url, c.start_url);
+        const icons = t.icons.map(i => i.src);
+        assert.ok(icons.every(s => /^tournament-icon-/.test(s)), 'got ' + icons.join(', '));
+        assert.ok(t.icons.every(i => i.purpose === 'any'),
+            'a maskable crop cuts TOURNAMENTS down to URNAMEN');
+    });
+
     test('each output has its own generated worker and manifest', () => {
         ['consumer', 'tournament'].forEach(p => GENERATED.forEach(f =>
             assert.ok(fs.existsSync(path.join(outDir(p), f)), 'dist/' + p + ' is missing ' + f)));
@@ -213,12 +244,15 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        // The two versions are ALLOWED to diverge, and here they do: only Consumer
-        // assets changed in the Rattle Golf identity batch, so only Consumer bumped.
+        // The two versions are ALLOWED to diverge, and here they do: waves 19 and
+        // 20 gave Tournament its own icon and its own manifest, so only Tournament
+        // bumped. Consumer's artwork and manifest are byte-identical and its worker
+        // must NOT move - a bump would re-download the Consumer shell for a change
+        // that is not in it.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
         assert.match(c, /^consumer-v45-no-native-print$/);
-        assert.match(t, /^tournament-v34-pending-handicaps-and-payer-link$/);
+        assert.match(t, /^tournament-v36-its-own-manifest$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {

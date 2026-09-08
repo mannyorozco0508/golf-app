@@ -65,12 +65,22 @@ const PRODUCTS = {
         startUrl: './admin.html',
         themeColor: '#0E2B1F',
         backgroundColor: '#F6F4EC',
+        // MASKABLE IS CORRECT HERE and is not a copy of what Tournament does.
+        // Android keeps only the inner 80% circle of a maskable icon; the brush
+        // R spans 74.7% of the canvas and sits centred, so the crop takes
+        // background and nothing else. Measured, not assumed.
+        icons: [
+            { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        ],
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
-        // Moved to v34. Everything v33 carried, plus the waves since. All three
-        // are precached, so an installed device keeps serving the old ones until
-        // this string changes:
+        // Moved to v36. The icons changed in v35 and the manifest both tournament
+        // pages link is new in v36 - a precached page whose manifest is not in the
+        // same cache generation cannot be installed offline, and an installed
+        // device would keep serving the head of the page without the link at all.
+        // Everything v34 carried is still here:
         //   tournament-scorecard.html  the hole you are typing is never rebuilt;
         //                              stroke dots on the golfer's own card; the
         //                              roster no longer prints "(0)" for a
@@ -87,13 +97,30 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v34-pending-handicaps-and-payer-link',
+        cacheName: 'tournament-v36-its-own-manifest',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
+        // ITS OWN MARK, AND "any" ONLY - NOT "any maskable".
+        //
+        // The other product keeps maskable because its icon is a centred mark
+        // that survives the crop. This one carries the word TOURNAMENTS in a
+        // banner across the bottom, and a maskable crop destroys it. Measured on
+        // the 1024 master: the safe circle at the glyph mid-line is 485px wide
+        // and the word spans 801px, so 38.8% of the letter pixels fall outside
+        // it - T, O, T and S go entirely and a home screen reads "URNAMEN".
+        //
+        // Declaring "any" does not make the icon worse anywhere. It tells Android
+        // to letterbox the artwork inside its mask instead of cropping to it,
+        // which is exactly what a word-bearing icon needs. iOS is unaffected
+        // either way: its own corner mask clips ZERO pixels of this artwork.
+        icons: [
+            { src: 'tournament-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: 'tournament-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        ],
         themeColor: '#1d3557',
         backgroundColor: '#f4f6f8',
     },
@@ -215,10 +242,12 @@ function manifestFor(product) {
         background_color: p.backgroundColor,
         theme_color: p.themeColor,
         orientation: 'portrait-primary',
-        icons: [
-            { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-            { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-        ],
+        // READ FROM THE PRODUCT, not written here. One hard-coded list served both
+        // manifests, which is why the organizer PWA installed wearing the other
+        // product's mark - and why "maskable" was inherited by an icon that cannot
+        // survive being cropped to a circle. Each product declares its own above,
+        // beside its own name and colours, where the choice is visible.
+        icons: p.icons,
     }, null, 2) + '\n';
 }
 

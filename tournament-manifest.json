@@ -1,0 +1,25 @@
+{
+  "name": "GolfApp Tournaments",
+  "short_name": "Tournaments",
+  "description": "Tournament scoring and live leaderboard",
+  "start_url": "./tournament.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#1d3557",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "tournament-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "tournament-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

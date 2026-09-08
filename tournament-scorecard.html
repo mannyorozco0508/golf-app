@@ -4,6 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tournament Scorecard</title>
+    <!-- THE HOME-SCREEN ICON WHEN A GOLFER ADDS THIS TO THEIR HOME SCREEN.
+         iOS does not read the web manifest for the icon; without this tag it
+         takes a SCREENSHOT OF THE PAGE and uses that. Every page in this repo
+         was in that state until wave 19. 180x180 is the size iOS asks for at
+         @3x, and the file is the one the manifest icons are derived from, so
+         the home screen and the installed PWA cannot show two different marks. -->
+    <link rel="apple-touch-icon" href="tournament-icon-180.png">
+    <!-- THE INSTALL IDENTITY OF THIS PRODUCT, and deliberately NOT manifest.json.
+         The live deployment is still the combined repo root, where manifest.json
+         is the OTHER product - a different name and a start_url pointing at its
+         home screen, measured on the deployed site. Linking that name here would
+         offer the wrong app to anyone who installed from a tournament page. This
+         file resolves to the Tournament identity in BOTH the combined root and
+         dist/tournament.
+         The other product is not named in this comment on purpose:
+         rattle_identity_test.js asserts these pages carry none of its branding,
+         and that guard is worth more absolute than a comment is worth precise. -->
+    <link rel="manifest" href="tournament-manifest.json">
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->

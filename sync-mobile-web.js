@@ -47,15 +47,29 @@ const SHARED_SHELL = [
     'grouping.js', 'handicap.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // One HTML escaper for every page that renders a user-supplied name.
     'text-safe.js',
-    // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, the
-    // worker and manifest themselves, and the icons.
+    // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, and
+    // the worker and manifest themselves.
     // product-links.js is the only place that knows the two products may live at
     // different origins. Shared because both sides link across the boundary.
     'product-links.js',
     'native-export.js',
     'firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
-    'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
+    'sw.js', 'manifest.json',
 ];
+
+// THE ICONS LEFT SHARED IN WAVE 19, and that is the whole point of the wave.
+//
+// icon-192.png and icon-512.png sat here, so the Tournament bundle inherited
+// them and the Tournament PWA installed wearing the Consumer mark - two apps,
+// one picture, on the same home screen. Nothing was broken; the icons were
+// simply classified as runtime plumbing when they are in fact IDENTITY, and
+// identity is the one thing two products must not share.
+//
+// The rule for SHARED is "divergence would be a correctness or infrastructure
+// problem". Divergence here is the REQUIREMENT, not the hazard. So each product
+// declares its own below, and Consumer's set is unchanged byte for byte: it
+// still ships icon-192.png and icon-512.png, still from SHARED_SHELL.concat(
+// CONSUMER_SHELL), still declared "any maskable" in its manifest.
 
 // The golfer-facing product: quick rounds, boys trips, side matches, presses,
 // settlement, history. money-engine.js, settlement-engine.js and pool-engine.js
@@ -65,6 +79,10 @@ const CONSUMER_SHELL = [
     'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
     'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
     'instructions.html', 'shared.html', 'logo-mark.png',
+    // The home-screen mark, moved here from SHARED_SHELL in wave 19. Consumer
+    // ships exactly what it always shipped; what changed is that Tournament no
+    // longer gets it for free.
+    'icon-192.png', 'icon-512.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
     // The Ryder Cup competition layer, loaded by the scorecard. Without it here
@@ -79,6 +97,34 @@ const CONSUMER_SHELL = [
 // small. Moving it would hand Consumer a screen it has no reason to own.
 const TOURNAMENT_SHELL = [
     'tournament.html', 'tournament-scorecard.html', 'tournament-engine.js',
+    // The organizer product has its own mark now: the R and flag over a dark
+    // green TOURNAMENTS banner. Three sizes ship - 512 and 192 for the manifest,
+    // 180 for the apple-touch-icon both tournament pages now declare.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. build-shell.js and three tests read these
+    // lists by matching every single-quoted run between the brackets, so a
+    // contraction in a comment is parsed as a shell file. One did, and the list
+    // came back with the comment text in it.
+    //
+    // tournament-icon-1024.png is DELIBERATELY ABSENT. It is 695KB of Xcode and
+    // App Store Connect asset and would otherwise be precached onto every device
+    // for a shell whose whole purpose is working on a course with no signal -
+    // the same rule icon-1024.png has always followed.
+    'tournament-icon-512.png', 'tournament-icon-192.png', 'tournament-icon-180.png',
+    // THE MANIFEST BOTH TOURNAMENT PAGES LINK, and the one committed per-product
+    // file in the repo. Every other per-product manifest is GENERATED into dist/,
+    // and that is still true - build-shell.js writes dist/tournament/manifest.json
+    // exactly as before and nothing reads this file to produce it.
+    //
+    // It exists because the LIVE deployment is still the combined repo root, where
+    // manifest.json is the Consumer one. Measured on golf-app-5a5.pages.dev:
+    // /manifest.json is name "Rattle Golf", start_url ./admin.html, icon-192/512
+    // maskable. A tournament page linking manifest.json would therefore offer the
+    // OTHER product for installation - worse than the no-link state it replaced.
+    //
+    // deployment_build_test.js asserts this file is byte-identical to what
+    // build-shell.js generates for the tournament output, so the two cannot drift.
+    'tournament-manifest.json',
 ];
 
 // Exactly the production runtime files the app needs - no tests, no fallback/archive

@@ -298,11 +298,24 @@ describe('APP ICON ASSET SEAM', () => {
     });
 
     test('the 700KB master is NOT precached and NOT in the native bundle', () => {
-        assert.ok(!read('sw.js').includes(MASTER),
+        // MEMBERSHIP, NOT SUBSTRING. This read `includes('icon-1024.png')` against
+        // the raw text of sync-mobile-web.js, and wave 19 broke it without adding
+        // the file to anything: 'tournament-icon-1024.png' CONTAINS 'icon-1024.png',
+        // so the second product's master - named in a comment saying it is
+        // deliberately absent - was reported as a declared shell file. The lists are
+        // now parsed the way build-shell.js parses them, and the two greps that
+        // remain are anchored to the quoted form so neither can collide either.
+        assert.ok(!read('sw.js').includes("'./" + MASTER + "'"),
             'the master would add 700KB to every offline install');
-        assert.ok(!read('sync-mobile-web.js').includes(MASTER),
-            'the master is an Xcode asset, not a web shell file');
-        assert.ok(!BUILD.includes(MASTER),
+        const sync = read('sync-mobile-web.js');
+        ['SHARED_SHELL', 'CONSUMER_SHELL', 'TOURNAMENT_SHELL'].forEach(name => {
+            const m = new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];').exec(sync);
+            assert.ok(m, name + ' must be declared in sync-mobile-web.js');
+            const files = [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+            assert.ok(!files.includes(MASTER),
+                'the master is an Xcode asset, not a web shell file (' + name + ')');
+        });
+        assert.ok(!BUILD.includes("'" + MASTER + "'"),
             'the master must not be declared in the built manifest');
     });
 
@@ -511,7 +524,7 @@ describe('THE BRAND MARK ASSET', () => {
     test('the cache moved — the header changed and installed devices must see it', () => {
         assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v34-pending-handicaps-and-payer-link'/,
-            'Tournament assets did not change, so its cache must not move');
+        assert.match(BUILD, /cacheName: 'tournament-v36-its-own-manifest'/,
+            'Tournament got its own manifest in wave 20 and its cache moved with it');
     });
 });

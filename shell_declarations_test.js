@@ -112,8 +112,37 @@ describe('OWNERSHIP — named, so a file cannot quietly change sides', () => {
 
     test('SHARED holds the runtime neither product can boot without', () => {
         ['firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
-         'sw.js', 'manifest.json', 'icon-192.png', 'icon-512.png']
+         'sw.js', 'manifest.json']
             .forEach(f => assert.ok(SHARED.includes(f), f + ' must be SHARED'));
+    });
+
+    test('the ICONS are not shared — an icon is identity, not runtime', () => {
+        // THE CONTRACT CHANGED IN WAVE 19, and it got stronger rather than weaker.
+        // icon-192/512 used to be asserted SHARED as "runtime plumbing". They are
+        // not plumbing: they are what a golfer taps on a home screen, and while
+        // they were shared the organizer PWA installed wearing the Consumer mark -
+        // two apps, one picture, and nothing failed anywhere.
+        //
+        // The SHARED rule is "divergence would be a correctness or infrastructure
+        // problem". For identity, divergence is the REQUIREMENT. So each product
+        // owns its own, and this asserts both halves: Consumer still ships exactly
+        // what it always shipped, and Tournament can no longer inherit it.
+        ['icon-192.png', 'icon-512.png'].forEach(f => {
+            assert.ok(!SHARED.includes(f), f + ' is identity and must not be SHARED');
+            assert.ok(CONSUMER.includes(f), f + ' must still ship to Consumer');
+            assert.ok(!TOURNAMENT.includes(f), f + ' must not be declared Tournament');
+        });
+        ['tournament-icon-512.png', 'tournament-icon-192.png', 'tournament-icon-180.png']
+            .forEach(f => {
+                assert.ok(TOURNAMENT.includes(f), f + ' must be TOURNAMENT');
+                assert.ok(!SHARED.includes(f), f + ' must not be SHARED');
+                assert.ok(!CONSUMER.includes(f), f + ' must not be Consumer');
+            });
+        // The App Store master ships to nobody - 695KB precached for a shell whose
+        // whole point is working with no signal.
+        [SHARED, CONSUMER, TOURNAMENT].forEach(list =>
+            assert.ok(!list.some(f => /icon-1024\.png$/.test(f)),
+                'a 1024 master must not be declared in any shell list'));
     });
 
     test('the money engines are CONSUMER, not shared', () => {
@@ -185,10 +214,33 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
         // A service worker does not precache itself - the browser fetches it, and
         // caching it would pin the worker that is meant to replace itself. sw.js is
         // declared SHARED because it still SHIPS to the native bundle.
-        const NOT_PRECACHED = ['sw.js'];
+        //
+        // THE TOURNAMENT ICONS ARE THE SECOND EXCEPTION, and it is a different
+        // reason. sw.js here is the SOURCE-TREE worker: it is the combined
+        // deployment's shell and its CACHE_VERSION is the Consumer key. The
+        // Tournament icons are precached by the worker build-shell.js GENERATES
+        // into dist/tournament, from that product's own file list - putting them
+        // in this one would force a Consumer cache bump for a Consumer asset that
+        // did not change, re-downloading the whole Consumer shell for an icon that
+        // is not in it.
+        const NOT_PRECACHED = ['sw.js',
+            'tournament-icon-512.png', 'tournament-icon-192.png', 'tournament-icon-180.png',
+            // Same reason as the icons: precached by the worker build-shell.js
+            // generates for the Tournament output, not by this Consumer-keyed one.
+            'tournament-manifest.json'];
         UNION.filter(f => !SHELL_FILES.includes(f)).forEach(f =>
             assert.ok(NOT_PRECACHED.includes(f),
                 f + ' is declared but not precached - if that is deliberate, list it here'));
+        // The exception cannot quietly grow into a gap: everything excused beyond
+        // sw.js has to be a file only the Tournament product declares, and must be
+        // precached by the output that owns it. dist/ is build output and not read
+        // here; tools/tournament-icon-wiring-check.js opens the generated worker
+        // and asserts all three are in it.
+        NOT_PRECACHED.filter(f => f !== 'sw.js').forEach(f => {
+            assert.ok(TOURNAMENT.includes(f), f + ' is excused but is not a Tournament file');
+            assert.ok(!SHARED.includes(f) && !CONSUMER.includes(f),
+                f + ' is excused from the Consumer shell but is declared for it');
+        });
     });
 
     test('there is still ONE service worker and ONE manifest', () => {
@@ -202,6 +254,27 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
          'manifest-tournament.json'].forEach(f =>
             assert.ok(!fs.existsSync(path.join(REPO_ROOT, f)),
                 f + ' exists in source - the per-product files are generated, not committed'));
+        // WAVE 20 MADE ONE EXCEPTION, and it is named rather than smuggled in
+        // under a filename this list happens not to contain.
+        //
+        // tournament-manifest.json IS committed. Both tournament pages link it,
+        // and they cannot link manifest.json: the live deployment is still the
+        // combined repo root, where that name is the Consumer identity - measured
+        // on golf-app-5a5.pages.dev as name "Rattle Golf", start_url ./admin.html.
+        // A link to it would offer the wrong app to anyone installing from a
+        // tournament page.
+        //
+        // It is not a second source of truth. build-shell.js still GENERATES
+        // dist/tournament/manifest.json from PRODUCTS.tournament and reads nothing
+        // from this file; deployment_build_test.js asserts the committed copy is
+        // byte-identical to that output, so the pair cannot drift.
+        assert.ok(fs.existsSync(path.join(REPO_ROOT, 'tournament-manifest.json')),
+            'both tournament pages link it - without it they link nothing');
+        assert.ok(TOURNAMENT.includes('tournament-manifest.json'),
+            'the manifest both tournament pages link must ship with them');
+        assert.ok(!SHARED.includes('tournament-manifest.json')
+            && !CONSUMER.includes('tournament-manifest.json'),
+            'the Tournament manifest is not Consumer\'s and is not shared');
     });
 
     test('dist/ is GENERATED output, never source', () => {
