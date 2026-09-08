@@ -203,8 +203,16 @@ describe('FLIGHT MODEL — stable ids, organizer names', () => {
         assert.match(del, /const counts = flightTeamCounts\(currentData\)/,
             'the guard must count real assignments, not trust the UI');
         assert.match(del, /if \(inUse > 0\)/);
-        assert.match(del, /still has \$\{inUse\} team/,
-            'the organizer must be told how many teams are in the way');
+        // RE-PINNED, wave 5. The refusal used to hardcode "team", which read
+        // "0 teams" on an individual event whose flight was full of golfers -
+        // and the count that produced it unlocked the delete button. The
+        // organizer must still be told how many are in the way; the noun now
+        // follows the model instead of being asserted as a fixed word.
+        assert.match(del, /still has \$\{inUse\}/,
+            'the organizer must be told how many are in the way');
+        assert.match(del, /competitorNoun\(currentData, inUse\)/,
+            'and must name them by the model - golfers on an individual event, '
+            + 'teams on a team one - not by a hardcoded noun');
         assert.match(del, /flights\/\$\{fid\}`\)\.remove\(\)/);
         // The refusal must come BEFORE the remove, or it is not a guard.
         assert.ok(del.indexOf('if (inUse > 0)') < del.indexOf('.remove()'),
@@ -471,14 +479,18 @@ describe('PAYOUTS — canonical, and deliberately still overall-only', () => {
         // single-round board, the round board and the combined board alike. Paying
         // places from a filtered view would silently mean "3rd in the B flight takes
         // third prize", which is a prize policy nobody has specified.
-        assert.match(fn, /cachedLeaderboardRows = computeTournamentLeaderboard\(currentData\);/,
-            'the single-round payout cache must be the unfiltered field');
-        assert.match(fn, /cachedLeaderboardRows = computeRoundLeaderboard\(currentData, viewing\);/,
-            'a round board caches its round unfiltered');
-        assert.match(fn, /cachedLeaderboardRows = computeEventStandings\(currentData\)\.rows/,
-            'the combined board caches the whole field');
-        assert.ok(!/cachedLeaderboardRows = rows;/.test(fn),
-            'no board may cache the flight-filtered rows');
+        // RE-PINNED, wave 10. The three boards used to resolve themselves inline,
+        // one assignment each; they now share resolveLeaderboardView, which the
+        // printed sheet and the golfer's card also use. The RULE is unchanged and
+        // is what is asserted: the cache is taken WITHOUT a flight, so it is the
+        // whole field whichever view is on screen.
+        const cacheLine = /cachedLeaderboardRows = resolveLeaderboardView\(([^)]*)\)\.rows;/.exec(fn);
+        assert.ok(cacheLine, 'the payout cache must come from the shared resolution');
+        assert.ok(!/lbFlightId/.test(cacheLine[1]),
+            'the payout cache must be taken WITHOUT a flight - a filtered cache would '
+            + 'quietly mean "3rd in the B flight takes third prize"');
+        assert.ok(!/cachedLeaderboardRows = rows;|cachedLeaderboardRows = view\.rows;/.test(fn),
+            'no board may cache the flight-filtered rows it is displaying');
     });
 
     test('and the payout answer does not move when a flight is being viewed', () => {

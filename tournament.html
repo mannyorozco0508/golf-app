@@ -163,7 +163,13 @@
         .flight-count { font-size:0.75rem; color:var(--text-muted); white-space:nowrap; }
         .flight-del { background:none; border:none; color:var(--accent-red); font-size:0.85rem; cursor:pointer; padding:4px; }
         .flight-del[disabled] { color:var(--text-muted); cursor:not-allowed; }
-        .fa-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-faint); }
+        .fa-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-faint); }
+        /* The payer sits on its own line inside the row it belongs to, so it
+           moves with that entry and never lines up against the wrong golfer. */
+        .fa-payer { flex-basis:100%; display:flex; align-items:center; gap:6px; padding-top:4px; }
+        .fa-payer-label { font-size:0.72rem; color:var(--text-muted); white-space:nowrap; }
+        .fa-payer input { font-size:0.8rem; padding:4px 6px; min-width:0; flex:1; }
+        .fa-payer-tag { font-size:0.72rem; color:var(--text-muted); white-space:nowrap; }
         .fa-team { flex:1; font-size:0.88rem; min-width:0; }
         .fa-row select { font-size:0.85rem; padding:5px 6px; max-width:52%; }
         .lb-flight-btn { display:inline-block; font-size:0.8rem; padding:6px 12px; margin:3px; border:1px solid var(--brand-green); border-radius:14px; color:var(--brand-green); background:transparent; cursor:pointer; }
@@ -238,10 +244,59 @@
         <input type="hidden" id="shamble-count-best" value="1">
     </div>
 
+    <!-- MOVED HERE FROM #manage-screen, wave 6.
+         This block holds the ONLY Gross/Net control in the product, and it used
+         to live inside #manage-screen - which is display:none while this form is
+         up. selectFormat() set it to block and it stayed invisible inside a
+         hidden ancestor, so setIndividualMode() was never called, individualMode
+         never left 'gross', and no organizer could create a Net event. The
+         scoring for it was written, correct and unreachable the whole time.
+         It sits beside the format picker now because that is the control it
+         responds to, and selectFormat already toggles it - no second mechanism.
+
+         THE WORDING IS RE-DERIVED, NOT CARRIED. It used to say "Add your player
+         field below", which was true of the manage screen it was written for and
+         false here: below this is the name list, and handicaps are set after the
+         save. Moving the sentence unchanged would have been a fresh lie under a
+         comment saying it had been reviewed. -->
+    <div id="individual-setup-note" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:16px; font-size:0.82rem;">
+        <strong>Individual Stroke Play.</strong> Type your golfers' names in the list below — teams are not used. After you save you'll set each golfer's handicap, build scoring groups (who plays together) and send every group its own link.
+        <div style="margin-top:8px;">
+            <label style="font-size:0.8rem;"><input type="radio" name="ind-mode" value="gross" checked onchange="setIndividualMode('gross')"> Gross</label>
+            <label style="font-size:0.8rem; margin-left:14px;"><input type="radio" name="ind-mode" value="net" onchange="setIndividualMode('net')"> Net</label>
+        </div>
+        <div id="ind-net-warning" style="display:none; margin-top:6px; color:var(--warn-text); font-size:0.78rem;"></div>
+    </div>
+
     <div class="form-group">
-        <label>Entry Fee per Team ($, optional)</label>
+        <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
         <input type="number" id="t-entry-fee" value="0" min="0" placeholder="0">
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Pool and payouts are calculated for you once teams are in — this is just the calculator, settle up for real however your event normally does.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">Pool and payouts are calculated for you once teams are in — this is just the calculator, settle up for real however your event normally does.</p>
+    </div>
+
+    <!-- MOVED HERE FROM #manage-screen, wave 9. Same fault as
+         #individual-setup-note in wave 6, and the same fix.
+
+         isMultiRoundSetup is read by saveTournament and set by nothing else.
+         This checkbox was the only thing that sets it, and it lived on the
+         screen that REPLACES this form once a tournament exists - so it could
+         only ever be ticked after the function that reads it could no longer
+         run. eventModel and rounds were therefore written by no code path at
+         all, and the entire rounds subsystem - createRound, setRoundStatus, the
+         handicap snapshot, combined standings - had never executed.
+
+         THE WORDING IS RE-DERIVED. It described what a round owns, which was
+         true anywhere; what it did not say is what happens to the setup you are
+         filling in right now. Round 1 IS this form - saveTournament turns it
+         into the first round - and an organizer who is not told that will
+         reasonably expect to have to enter it twice. -->
+    <div class="form-group" style="border:1px dashed var(--border-faint); border-radius:10px; padding:10px 12px; margin-bottom:14px;">
+        <label style="font-size:0.86rem; font-weight:bold;">
+            <input type="checkbox" id="multi-round-toggle" onchange="setMultiRound(this.checked)"> This event has more than one round
+        </label>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
+            A club championship over two days, or a member-guest weekend. What you have set above becomes Round 1 — you won't type it again. Each later round gets its own course, format and scores; the field, flights and handicaps belong to the event.
+        </div>
     </div>
 
     <hr class="section-divider">
@@ -312,23 +367,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="shotgun-assignments-list"></div>
         </div>
 
-        <div class="form-group" style="border:1px dashed var(--border-faint); border-radius:10px; padding:10px 12px; margin-bottom:14px;">
-            <label style="font-size:0.86rem; font-weight:bold;">
-                <input type="checkbox" id="multi-round-toggle" onchange="setMultiRound(this.checked)"> This event has more than one round
-            </label>
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
-                A club championship over two days, or a member-guest weekend. Each round gets its own course, format and scores; the field, flights and handicaps belong to the event.
-            </div>
-        </div>
-
-        <div id="individual-setup-note" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:16px; font-size:0.82rem;">
-            <strong>Individual Stroke Play.</strong> Add your player field below — teams are not used. After you save you'll build scoring groups (who plays together) and send each group its own link.
-            <div style="margin-top:8px;">
-                <label style="font-size:0.8rem;"><input type="radio" name="ind-mode" value="gross" checked onchange="setIndividualMode('gross')"> Gross</label>
-                <label style="font-size:0.8rem; margin-left:14px;"><input type="radio" name="ind-mode" value="net" onchange="setIndividualMode('net')"> Net</label>
-            </div>
-            <div id="ind-net-warning" style="display:none; margin-top:6px; color:var(--warn-text); font-size:0.78rem;"></div>
-        </div>
 
         <hr class="section-divider">
         <h3>🚩 Flights / Divisions</h3>
@@ -359,6 +397,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <button class="btn-outline" style="white-space:nowrap;" onclick="addPlayerToField()">+ Add</button>
             </div>
             <button class="btn-outline" onclick="openPastePlayersModal()" style="margin-bottom:10px;">📋 Paste Player List</button>
+            <!-- An entry somebody has PAID for and not yet named. Deliberately a
+                 separate action from typing a name: a blank box on the setup form
+                 is still dropped, because tabbing past a field is not a purchase. -->
+            <button class="btn-outline" onclick="addUnnamedEntry()" style="margin-bottom:10px;">➕ Add unnamed entry (paid, name to come)</button>
             <div id="player-field-list"></div>
         </div>
 
@@ -513,7 +555,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function pickCourse(key, name) {
         selectedCourseKey = key;
         selectedCourseName = name;
-        selectedCourseData = resolveTournamentCourseData(key);
+        const card = resolveCourseCard(key);
+        selectedCourseData = card.data;
+        selectedCourseIsSynthetic = card.synthetic;
         document.getElementById('course-search-input').value = selectedCourseName;
         document.getElementById('course-key').value = key;
         document.getElementById('course-dropdown').style.display = 'none';
@@ -522,13 +566,37 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Firebase's global_courses is the live source of truth for real hole data — falls back
     // to the local seed set in course-data.js, then a flat placeholder if neither has it yet
     // (matches the same fallback order used by the trip planner).
-    function resolveTournamentCourseData(key) {
-        if (globalCourses[key] && globalCourses[key].data) return globalCourses[key].data;
-        if (coursePresets[key]) return coursePresets[key].data;
+    // A FABRICATED CARD CANNOT BE RECOGNISED BY LOOKING AT IT.
+    //
+    // The fallback below is eighteen par-4s with stroke indexes 1..18 in hole
+    // order - which is structurally a PERFECTLY VALID allocation. It is the
+    // shape hasUsableStrokeIndex() checks for, so asking that function whether
+    // this card is real returns TRUE, courseIndexSynthetic was stored as false,
+    // and net was then allocated on an invented index. That is the exact outcome
+    // the whole guard exists to prevent, and it was invisible only because
+    // nobody could reach the Net radio to trigger it.
+    //
+    // So the fact is RECORDED WHERE IT HAPPENS rather than inferred later. This
+    // function is the only place that knows it fell through, and it now says so.
+    function resolveCourseCard(key) {
+        if (globalCourses[key] && globalCourses[key].data) {
+            return { data: globalCourses[key].data, synthetic: false };
+        }
+        if (coursePresets[key]) return { data: coursePresets[key].data, synthetic: false };
         let fallback = [];
         for (let h = 1; h <= 18; h++) fallback.push({ hole: h, par: 4, hcpIndex: h });
-        return fallback;
+        return { data: fallback, synthetic: true };
     }
+
+    function resolveTournamentCourseData(key) {
+        return resolveCourseCard(key).data;
+    }
+
+    // TRUE when the selected card came from the fallback. Belt and braces with
+    // the structural check at every read site: this flag is what catches a
+    // fabricated card, and hasUsableStrokeIndex still catches a REAL course
+    // whose stored index is malformed. Neither one covers the other's case.
+    let selectedCourseIsSynthetic = false;
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.custom-select-wrapper')) {
@@ -551,6 +619,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         document.querySelectorAll('#main-format-picker .format-card').forEach(c => c.classList.remove('active'));
         document.getElementById('fmt-' + fmt).classList.add('active');
         document.getElementById('shamble-count-group').style.display = (fmt === 'shamble') ? 'block' : 'none';
+        syncEntryFeeWording(fmt);
+    }
+
+    // THE FEE IS PER TEAM ON A TEAM EVENT AND PER GOLFER ON AN INDIVIDUAL ONE.
+    // The helper text promised "once teams are in" on an event that can never
+    // have any - a sentence describing something that cannot happen. The words
+    // follow the format card the organizer just pressed.
+    function syncEntryFeeWording(fmt) {
+        const per = (fmt === 'individual') ? 'Golfer' : 'Team';
+        const noun = (fmt === 'individual') ? 'golfers' : 'teams';
+        const label = document.getElementById('t-entry-fee-label');
+        const help = document.getElementById('t-entry-fee-help');
+        if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
+        if (help) {
+            help.textContent = `Pool and payouts are calculated for you once ${noun} are in`
+                + ' — this is just the calculator, settle up for real however your event'
+                + ' normally does.';
+        }
     }
 
     function setShambleCount(n) {
@@ -798,7 +884,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // 1..18 placeholder was used, which is what stops net from being allocated on
         // an invented card. Written for every event so the flag means the same thing
         // whenever it is read.
-        const syntheticIndex = !hasUsableStrokeIndex({ courseData: selectedCourseData });
+        const syntheticIndex = selectedCourseIsSynthetic
+            || !hasUsableStrokeIndex({ courseData: selectedCourseData });
         let pendingFirstRound = null;
 
         const payload = {
@@ -1032,21 +1119,47 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (tab === 'leaderboard') renderLeaderboard();
     }
 
-    function formatLabel(fmt) {
-        if (fmt === 'shamble') return 'Shamble';
-        if (fmt === 'bestball') return '2-Man Best Ball';
-        return 'Scramble';
-    }
-
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
     // computeTournamentPayouts now live in tournament-engine.js so this page and
     // tournament-scorecard.html always agree on the math — including tie handling,
     // which used to just silently rank tied teams apart instead of grouping them.
 
+    // THE FEE IS PER COMPETITOR, and on an individual event a competitor is a
+    // golfer. Counting teams made a $300 fee on a three-golfer field a $0 pool,
+    // every payout $0.00, and the organizer was told "No entry fee set".
+    //
+    // THIS IS A STAND-IN FOR "WHAT WAS COLLECTED", NOT A RECORD OF IT.
+    //
+    // fee x competitor count is only the truth while every entrant pays exactly
+    // once and nobody is comped. Three ordinary cases break it, in both
+    // directions:
+    //
+    //   COMPED ENTRIES - the veterans' foursome, the pro, the club captain's
+    //     guest. They are competitors and they paid nothing, so this OVERSTATES
+    //     the pot and the calculator offers prize money that does not exist.
+    //   SPONSORS AND EXTRAS - a sponsor buying a team's entry plus four
+    //     mulligans, or a hole sponsorship folded into the entry. Money came in
+    //     that no competitor count can see, so this UNDERSTATES the pot.
+    //   ONE PAYER, MANY ENTRIES - a captain paying for four. The arithmetic
+    //     happens to come out right, and it is right by luck: the moment one of
+    //     the four drops out, who is owed the refund is a question this
+    //     function has no way to answer.
+    //
+    // A WITHDRAWN GOLFER STILL COUNTS HERE. That is deliberate, decided by
+    // Manny, and consistent with the above: their fee was collected, so the pot
+    // does not shrink when they walk in. The same choice is why a flight
+    // holding only withdrawn golfers is still undeletable - see
+    // flightTeamCounts in tournament-engine.js, which shares this assumption.
+    //
+    // WHEN PAYMENTS EXIST, THIS SHOULD READ THEM. The moment the product knows
+    // who actually paid - a registration record, a payment status per entrant -
+    // the pool must be the sum of what was taken, and this multiplication
+    // becomes a fallback for events that never recorded any of it. Until then
+    // it is an estimate the organizer is expected to sanity-check, which is
+    // exactly what the mismatch banner beneath the payout table is for.
     function poolTotal() {
-        const teams = currentData.teams || {};
         const fee = currentData.entryFee || 0;
-        return fee * Object.keys(teams).length;
+        return fee * competitorCount(currentData);
     }
 
     function renderLeaderboard() {
@@ -1054,42 +1167,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const note = document.getElementById('lb-combined-note');
         if (note) { note.style.display = 'none'; note.textContent = ''; }
 
-        if (recordIsMultiRound()) {
-            // THREE SOURCES, ONE RENDERER. A round board, a flight-filtered round
-            // board and the combined standings are the same rows in the same shape -
-            // only where they come from differs, and none of them re-ranks anything.
-            const viewing = lbRoundId || 'event';
-            if (viewing === 'event') {
-                const result = computeEventStandings(currentData, lbFlightId);
-                cachedLeaderboardRows = computeEventStandings(currentData).rows || [];
-                if (!result.available) {
-                    // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
-                    // every round leaderboard still works beside it.
-                    note.style.display = 'block';
-                    note.textContent = result.reason;
-                    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
-                    return;
-                }
-                renderLeaderboardRows(container, result.rows, 'event');
-                return;
-            }
-            const rows = computeRoundLeaderboard(currentData, viewing, lbFlightId);
-            cachedLeaderboardRows = computeRoundLeaderboard(currentData, viewing);
-            renderLeaderboardRows(container, rows, 'round');
+        // ONE RESOLUTION, shared with the printed sheet and the golfer's card.
+        const view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+
+        // PAYOUTS STAY ON THE OVERALL FIELD. The prize calculator below reads
+        // this cache, and paying places out of a filtered board would quietly
+        // mean "3rd in the B flight takes third prize" - a policy nobody has
+        // specified. Per-flight prize money needs its own pot per flight, which
+        // is a decision, not a filter.
+        cachedLeaderboardRows = resolveLeaderboardView(currentData, lbRoundId).rows;
+
+        if (!view.available) {
+            // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
+            // every round leaderboard still works beside it.
+            note.style.display = 'block';
+            note.textContent = view.reason;
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
             return;
         }
-
-        // lbFlightId is null for Overall, which is what every historical tournament
-        // and every tournament without flights produces - the same call, unchanged.
-        const rows = computeTournamentLeaderboard(currentData, lbFlightId);
-
-        // PAYOUTS STAY ON THE OVERALL FIELD. The prize calculator below reads this
-        // cache, and paying places out of a filtered board would quietly mean "3rd in
-        // the B flight takes third prize" - a policy nobody has specified. Per-flight
-        // prize money needs its own pot per flight, which is a decision, not a filter.
-        cachedLeaderboardRows = computeTournamentLeaderboard(currentData);
-
-        renderLeaderboardRows(container, rows, 'round');
+        renderLeaderboardRows(container, view.rows, view.kind);
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
@@ -1106,7 +1202,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         const thruHead = kind === 'event' ? 'Rds' : 'Thru';
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${kind === 'event' ? 'Golfer' : 'Team'}</span><span class="lb-thru">${thruHead}</span><span class="lb-score">To Par</span>
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">${thruHead}</span><span class="lb-score">To Par</span>
         </div>`;
         const rankCounts = {};
         rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
@@ -1118,12 +1214,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // is behind, and the board should say why.
             const partial = (kind === 'event' && r.hasScores && !r.completedAll)
                 ? '<span class="tie-tag" style="color:var(--text-muted);">(incomplete)</span>' : '';
+            // UNRANKED WITH A REASON. A bare dash beside a golfer who has posted
+            // eighteen holes reads as a bug; this says it is waiting on a number.
+            const pendingTag = r.netPending
+                ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
             const thru = kind === 'event'
                 ? (r.hasScores ? `${r.roundsComplete}/${r.countableRounds}` : '-')
                 : (r.hasScores ? r.thru : '-');
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${r.teamName}${tieTag}${partial}</span>
+                <span class="lb-team">${r.teamName}${tieTag}${partial}${pendingTag}</span>
                 <span class="lb-thru">${thru}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
@@ -1144,7 +1244,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${Object.keys(currentData.teams || {}).length} teams). Set how many spots pay — ties split whatever their tied spots add up to.`
+            ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
             : `No entry fee set for this tournament — set spot amounts manually if you're running a separate pool.`;
 
         let existing = [];
@@ -1314,9 +1414,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     let editingRoundId = null;
+    // THE GROUPS PANEL IS PART OF WHAT EDIT CHANGES.
+    //
+    // This used to re-render the rounds list only, so the panel below kept
+    // telling the organizer to press Edit - the button they had just pressed -
+    // until some unrelated write happened to refresh the page. Nothing was
+    // broken; the render simply had no caller.
     function editRound(rid) {
         editingRoundId = (editingRoundId === rid) ? null : rid;
         renderRounds();
+        renderScoringGroups();
     }
 
     function renderRounds() {
@@ -1347,7 +1454,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', 1)" ${i === ids.length - 1 ? 'disabled' : ''}>▼</button>
                 <button class="flight-del" onclick="deleteRound('${rid}')" ${scored ? 'disabled title="This round has scores"' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
-                    ${r.courseName || 'No course set'} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + ((r.scoringMode === 'net') ? 'Net' : 'Gross') : ''} • ${holes} holes
+                    ${r.courseName || 'No course set'} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + (netIsInPlay(r) ? 'Net' : (netWasRefused(r) ? 'Gross — net unavailable on this course' : 'Gross')) : ''} • ${holes} holes
                 </div>
                 <div style="flex-basis:100%; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
                     <button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="editRound('${rid}')">${editingRoundId === rid ? 'Done' : 'Edit'}</button>
@@ -1359,11 +1466,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).join('');
 
         renderRoundEditor();
-    }
-
-    function formatLabelFor(fmt) {
-        return { scramble: 'Scramble', shamble: 'Shamble', bestball: '2-Man Best Ball',
-                 individual: 'Individual Stroke Play' }[fmt] || fmt || '—';
     }
 
     // A ROUND'S SETTINGS ARE LOCKED ONCE IT OPENS. Changing the course or the format
@@ -1407,7 +1509,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     <option value="gross" ${r.scoringMode !== 'net' ? 'selected' : ''}>Gross</option>
                     <option value="net" ${r.scoringMode === 'net' ? 'selected' : ''}>Net</option>
                 </select>
-                ${(r.scoringMode === 'net' && !hasUsableStrokeIndex(r)) ? `<div style="color:var(--warn-text); font-size:0.76rem; margin-top:4px;">⚠️ This course has no real stroke index, so net strokes can't be allocated. The round will score Gross.</div>` : ''}
+                ${netWasRefused(r) ? `<div style="color:var(--warn-text); font-size:0.76rem; margin-top:4px;">⚠️ This course has no real stroke index, so net strokes can't be allocated. The round will score Gross.</div>` : ''}
             </div>` : ''}
         </div>`;
     }
@@ -1421,13 +1523,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function setRoundCourse(rid, key) {
         if (!key) return;
-        const data = resolveTournamentCourseData(key);
+        const card = resolveCourseCard(key);
         const name = (allCourses()[key] || {}).name || key;
         db.ref(`tournaments/${currentCode}/rounds/${rid}`).update({
             activeCourseKey: key,
             courseName: name,
-            courseData: data,
-            courseIndexSynthetic: !hasUsableStrokeIndex({ courseData: data }),
+            courseData: card.data,
+            // Same pair as the event: the flag catches a fabricated card, the
+            // structural check catches a real one with a broken index.
+            courseIndexSynthetic: card.synthetic
+                || !hasUsableStrokeIndex({ courseData: card.data }),
         }).catch(err => alert(`Error: ${err.message}`));
     }
 
@@ -1477,7 +1582,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // allocation so the round can still be played gross; ranking net money on an
         // invented index would be worse than refusing, so the organizer is told here
         // rather than discovering it in the standings.
-        const synthetic = selectedCourseData && !hasUsableStrokeIndex({ courseData: selectedCourseData });
+        const synthetic = selectedCourseIsSynthetic
+            || (selectedCourseData && !hasUsableStrokeIndex({ courseData: selectedCourseData }));
         if (individualMode === 'net' && synthetic) {
             warn.style.display = 'block';
             warn.textContent = "⚠️ This course has no real stroke index saved, so net strokes can't be allocated honestly. The event will score Gross until the course card is added.";
@@ -1496,10 +1602,37 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pid = newPlayerId();
         // DUPLICATE NAMES ARE NOT MERGED. Two golfers called Dave Smith are two
         // people; silently collapsing them would give one of them the other's score.
+        // addedAt, BECAUSE THE OTHER TWO WRITERS WRITE IT. saveTournament and
+        // commitPastePlayers both stamp it; this one did not, and
+        // renderPlayerField sorts on `addedAt || 0` - so every golfer added with
+        // this button sorted to the TOP of the field, above the roster that was
+        // there first.
         db.ref(`tournaments/${currentCode}/players/${pid}`)
-            .set({ id: pid, name: name, handicap: hcpEl.value.trim() || '0' })
+            .set({ id: pid, name: name, handicap: hcpEl.value.trim() || '0',
+                   addedAt: Date.now() })
             .then(() => { nameEl.value = ''; hcpEl.value = ''; })
             .catch(err => alert(`Error adding player: ${err.message}`));
+    }
+
+    // A PAID ENTRY WITH NO NAME YET. The captain's other three.
+    //
+    // Same record shape every other writer produces - id, name, handicap,
+    // addedAt - plus the declared marker. The name is written as an EMPTY
+    // STRING rather than left out, so the field is present on every player
+    // record and a reader never has to tell "no name yet" from "field missing".
+    //
+    // NO HANDICAP AT ALL, and a marker that says so. Writing '0' - which is what
+    // the other three writers store - entered an unknown person as a SCRATCH
+    // golfer on a net board, which is the one number nobody would have chosen
+    // for them and the hardest to spot, because scratch is an ordinary thing to
+    // be. The value is omitted and handicapPending declares the absence, because
+    // an organizer can legitimately type 0.
+    function addUnnamedEntry() {
+        const pid = newPlayerId();
+        db.ref(`tournaments/${currentCode}/players/${pid}`)
+            .set({ id: pid, name: '', addedAt: Date.now(),
+                   unnamed: true, handicapPending: true })
+            .catch(err => alert(`Error adding entry: ${err.message}`));
     }
 
     function updatePlayerName(pid, name) {
@@ -1507,13 +1640,57 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!trimmed) { renderPlayerField(); return; }
         // A rename touches the name field only. Scores are keyed by id, so correcting
         // a spelling cannot move a single stroke.
-        db.ref(`tournaments/${currentCode}/players/${pid}/name`).set(trimmed)
+        //
+        // NAMING AN UNNAMED ENTRY IS THE SAME ACTION. One update clears the
+        // marker alongside the name, so the record becomes an ordinary named
+        // competitor - same id, same scores, nothing re-minted. Written as one
+        // update rather than two so a record can never be briefly named and
+        // still marked unnamed.
+        const patch = { name: trimmed };
+        if (isUnnamed((currentData.players || {})[pid])) patch.unnamed = null;
+        db.ref(`tournaments/${currentCode}/players/${pid}`).update(patch)
             .catch(err => alert(`Error: ${err.message}`));
     }
 
+    // NUMBERING IS NOT NAMING. This clears the pending marker and nothing else -
+    // an entry can be numbered before it is named, and named before it is
+    // numbered, and neither implies the other.
     function updatePlayerHandicap(pid, hcp) {
-        db.ref(`tournaments/${currentCode}/players/${pid}/handicap`).set((hcp || '').trim() || '0')
+        const patch = { handicap: (hcp || '').trim() || '0' };
+        if (handicapIsPending((currentData.players || {})[pid])) patch.handicapPending = null;
+        db.ref(`tournaments/${currentCode}/players/${pid}`).update(patch)
             .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // WHO BOUGHT THIS ENTRY - recorded, not charged.
+    //
+    // This is the LINK to a payment, not a payment. A captain hands over money
+    // for four, three slots have no name yet, and nothing on the record said
+    // where the money came from. `name` and `contact` are what an organizer
+    // types today; `ref` is where a Stripe object id goes when there is one, and
+    // an organizer editing the name or contact must never drop it, so it is
+    // carried across every write here.
+    //
+    // ITS OWN OBJECT ON THE PLAYER RECORD, never the name field. A payer smuggled
+    // into `name` would be parsed back out by every reader, would show up on the
+    // leaderboard as the competitor, and would be wiped the moment the entry was
+    // named - which is exactly the thing this has to survive.
+    //
+    // OPTIONAL. Clearing both boxes removes the node rather than leaving an empty
+    // one, so an entry with no payer is byte-identical to every entry created
+    // before this existed.
+    function updatePlayerPayer(pid, field, value) {
+        const raw = ((currentData.players || {})[pid] || {}).paidBy || {};
+        const str = v => String(v === undefined || v === null ? '' : v).trim();
+        const next = { name: str(raw.name), contact: str(raw.contact) };
+        next[field] = str(value);
+        const ref = db.ref(`tournaments/${currentCode}/players/${pid}/paidBy`);
+        if (!next.name && !next.contact) {
+            ref.remove().catch(err => alert(`Error: ${err.message}`));
+            return;
+        }
+        if (str(raw.ref)) next.ref = str(raw.ref);
+        ref.set(next).catch(err => alert(`Error: ${err.message}`));
     }
 
     function assignPlayerToFlight(pid, fid) {
@@ -1535,6 +1712,28 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch(err => alert(`Error: ${err.message}`));
     }
 
+    // NOTHING SCORED, IT NEVER HAPPENED. SOMETHING SCORED, IT IS A RESULT.
+    //
+    // removePlayerFromField stays exactly as it is for a golfer with no scores.
+    // Once there are strokes against their name the control becomes Withdraw,
+    // which sets a status and removes nothing - so the record, the scores and
+    // above all the ID survive. The id is the point: addPlayerToField mints a
+    // fresh one, so a deleted golfer cannot be re-created, only replaced by a
+    // stranger with the same name and an empty card.
+    function withdrawPlayer(pid) {
+        db.ref(`tournaments/${currentCode}/players/${pid}/status`)
+            .set(COMPETITOR_WITHDRAWN)
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // Reinstating REMOVES the field rather than writing 'active', so a
+    // reinstated golfer's record is identical to one that was never withdrawn -
+    // there is no second way of being in the competition.
+    function reinstatePlayer(pid) {
+        db.ref(`tournaments/${currentCode}/players/${pid}/status`).remove()
+            .catch(err => alert(`Error: ${err.message}`));
+    }
+
     function renderPlayerField() {
         const section = document.getElementById('player-field-section');
         if (!recordIsIndividual()) { section.style.display = 'none'; return; }
@@ -1553,17 +1752,74 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const flightOptions = (sel) => `<option value="">— No flight —</option>` + fids.map(fid =>
             `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
 
-        list.innerHTML = `<p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 6px 0;">${pids.length} golfer${pids.length === 1 ? '' : 's'}</p>`
+        const withdrawnCount = pids.filter(pid => isWithdrawn(players[pid])).length;
+        const unnamedCount = pids.filter(pid => isUnnamed(players[pid])).length;
+        list.innerHTML = `<p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 6px 0;">${pids.length} golfer${pids.length === 1 ? '' : 's'}${unnamedCount ? ` \u2014 ${unnamedCount} unnamed` : ''}${withdrawnCount ? ` \u2014 ${withdrawnCount} withdrawn` : ''}</p>`
             + pids.map(pid => {
             const p = players[pid];
             const sel = flights[p.flightId] ? p.flightId : '';
             return `<div class="fa-row">
-                <input class="fa-team" type="text" value="${p.name || ''}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;">
-                <input type="text" value="${p.handicap !== undefined ? p.handicap : '0'}" onchange="updatePlayerHandicap('${pid}', this.value)" style="width:52px;">
+                <input class="fa-team" type="text" value="${p.name || ''}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;"
+                    placeholder="${isUnnamed(p) ? 'Paid entry \u2014 name to come' : ''}">
+                <input type="text" value="${handicapIsPending(p) ? '' : (p.handicap !== undefined ? p.handicap : '0')}" onchange="updatePlayerHandicap('${pid}', this.value)" style="width:52px;"
+                    placeholder="${handicapIsPending(p) ? 'hcp' : ''}">
                 ${fids.length ? `<select onchange="assignPlayerToFlight('${pid}', this.value)">${flightOptions(sel)}</select>` : ''}
-                <button class="flight-del" onclick="removePlayerFromField('${pid}')">✕</button>
+                ${playerRowControl(pid, p)}
+                ${payerRow(pid, p, players)}
             </div>`;
         }).join('');
+    }
+
+    // WHOSE ENTRY IS THIS - shown on the row that can answer it.
+    //
+    // Offered on a slot with no name yet, which is the case that needs it, and on
+    // any entry that already has a payer, so naming the golfer does not make the
+    // record's payer invisible. A golfer who walked up and paid for themselves
+    // gets the row they have always had.
+    //
+    // THE TAG IS WHAT MAKES THREE IDENTICAL SLOTS DISTINGUISHABLE. "Captain
+    // Smith" three times is no better than "Unnamed entry" three times; the
+    // position within that payer's entries is the part that separates them, and
+    // payerEntryTag in the engine decides it so the ordering rule exists once.
+    //
+    // The values are attribute-escaped because a payer name is free text an
+    // organizer types. (The name and handicap boxes above are raw, which is this
+    // page's long-standing convention and not something this row changes.)
+    function payerRow(pid, p, players) {
+        if (!isUnnamed(p) && !hasPayer(p)) return '';
+        const attr = v => String(v === undefined || v === null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const raw = p.paidBy || {};
+        const tag = payerEntryTag(players, pid);
+        return `<div class="fa-payer">
+            <span class="fa-payer-label">Paid by</span>
+            <input type="text" value="${attr(raw.name)}" placeholder="Who bought it"
+                onchange="updatePlayerPayer('${pid}', 'name', this.value)">
+            <input type="text" value="${attr(raw.contact)}" placeholder="Email or phone"
+                onchange="updatePlayerPayer('${pid}', 'contact', this.value)">
+            ${tag ? `<span class="fa-payer-tag">${attr(tag)}</span>` : ''}
+        </div>`;
+    }
+
+    // WHICH CONTROL THIS GOLFER GETS - decided once, here.
+    //
+    // Withdrawn  -> Reinstate, and nothing else. Deleting a withdrawn golfer
+    //               would orphan the scores that are the reason they were
+    //               withdrawn rather than removed.
+    // Scored     -> Withdraw. The strokes are a result and a result is not
+    //               deleted by a mis-tap.
+    // Unscored   -> the ✕ it has always had.
+    function playerRowControl(pid, p) {
+        if (isWithdrawn(p)) {
+            return `<button class="flight-del" style="color:var(--brand-green);"
+                onclick="reinstatePlayer('${pid}')" title="Put them back in the field">Reinstate</button>`;
+        }
+        if (competitorScoreCount(currentData, pid) > 0) {
+            return `<button class="flight-del" style="color:var(--accent-red);"
+                onclick="withdrawPlayer('${pid}')" title="They have scores - the record is kept">Withdraw</button>`;
+        }
+        return `<button class="flight-del" onclick="removePlayerFromField('${pid}')">\u2715</button>`;
     }
 
     // --- PLAYER IMPORT ---
@@ -1798,7 +2054,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const inUse = counts[fid] || 0;
         if (inUse > 0) {
             const flight = (currentData.flights || {})[fid] || {};
-            alert(`⚠️ "${flight.name || 'That flight'}" still has ${inUse} team${inUse === 1 ? '' : 's'} in it. Move them to another flight (or to Unassigned) first.`);
+            alert(`⚠️ "${flight.name || 'That flight'}" still has ${inUse} ${competitorNoun(currentData, inUse)} in it. Move them to another flight (or to Unassigned) first.`);
             return;
         }
         db.ref(`tournaments/${currentCode}/flights/${fid}`).remove()
@@ -1828,7 +2084,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 return `<div class="flight-row">
                     <input class="flight-name-input" type="text" value="${flights[fid].name || ''}"
                         onchange="renameFlight('${fid}', this.value)">
-                    <span class="flight-count">${n} team${n === 1 ? '' : 's'}</span>
+                    <span class="flight-count">${n} ${competitorNoun(currentData, n)}</span>
                     <button class="flight-del" onclick="deleteFlight('${fid}')" ${n > 0 ? 'disabled title="Move its teams out first"' : ''}>✕</button>
                 </div>`;
             }).join('');
@@ -1958,18 +2214,26 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // --- PRINT RESULTS (same browser-print-to-PDF pattern used across the rest of the app) ---
     function buildResultsPrintView() {
         const container = document.getElementById('tournament-print-view');
-        const rows = computeTournamentLeaderboard(currentData);
+        // THE SHEET IS WHAT THE SCREEN IS SHOWING. It used to read the event
+        // root, which on a multi-round record holds no scores, so it printed a
+        // full field of blanks beside a correct board.
+        const view = resolveLeaderboardView(currentData, lbRoundId);
+        const rows = view.rows;
         const pool = poolTotal();
+        // A SHEET WITH NO SCORING MODE ON IT IS A NET RESULT AND A GROSS RESULT
+        // AS THE SAME PIECE OF PAPER. The engine decides the words; this only
+        // decides where they go.
+        const scoringLine = scoringModeLine(currentData);
 
         let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${currentData.name}</h1>
-            <p style="color:#666; margin-top:0;">${currentData.courseName} • ${formatLabel(currentData.format)}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
+            <p style="color:#666; margin-top:0;">${currentData.courseName} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${view.title}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
             <table style="width:100%; border-collapse:collapse; margin-top:14px;">
                 <tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
-                    <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">Team</th><th style="padding:8px 4px;">Thru</th><th style="padding:8px 4px; text-align:right;">To Par</th>
+                    <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">${entryColumnLabel(currentData)}</th><th style="padding:8px 4px;">${view.kind === 'event' ? 'Rds' : 'Thru'}</th><th style="padding:8px 4px; text-align:right;">To Par</th>
                 </tr>`;
         rows.forEach(r => {
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${r.teamName}</td><td style="padding:8px 4px;">${r.hasScores ? r.thru : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
+            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${r.teamName}</td><td style="padding:8px 4px;">${r.hasScores ? (view.kind === 'event' ? `${r.roundsComplete}/${r.countableRounds}` : r.thru) : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
         });
         html += `</table>`;
         container.innerHTML = html;
@@ -1994,11 +2258,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+            document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
             const pool = poolTotal();
             document.getElementById('manage-t-pool').textContent = pool > 0 ? `💰 Pool: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+            document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
 
             // A tournament created before this feature existed has no startType field at all —
             // treated as 'normal' automatically, no migration needed.

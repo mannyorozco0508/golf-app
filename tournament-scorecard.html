@@ -74,6 +74,10 @@
         .hole-num { font-weight: bold; font-size: 1.1rem; }
         .hole-par { font-size: 0.75rem; color: var(--text-muted); }
         .hole-score-input { width: 64px; height: 48px; text-align: center; font-size: 1.3rem; font-weight: bold; border: 2px solid var(--border-mid); border-radius: 8px; background: var(--bg-card); color: var(--text-main); }
+        /* Reserved width, never conditional: an empty slot keeps the score boxes
+           in a row lined up whether or not that golfer strokes on the hole. */
+        .stroke-dots { color: var(--accent-teal); font-weight: bold; font-size: 1rem;
+            letter-spacing: 1px; min-width: 14px; line-height: 1; }
         .hole-score-input:focus { border-color: var(--brand-green); outline: none; }
 
         .hole-row-multi { padding: 12px 4px; border-bottom: 1px solid var(--border-faint); }
@@ -182,12 +186,6 @@
         if (tab === 'leaderboard') renderLeaderboard();
     }
 
-    function formatLabel(fmt) {
-        if (fmt === 'shamble') return 'Shamble';
-        if (fmt === 'bestball') return '2-Man Best Ball';
-        return 'Scramble';
-    }
-
     // ONE SCORING SURFACE, TWO SCOPES.
     //
     // ?team=N   a legacy team event. Untouched, forever - organizers have already
@@ -266,13 +264,22 @@
 
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
-        const rows = computeTournamentLeaderboard(currentData);
+        // THE ROUND THIS LINK IS FOR. Reading the event root showed this golfer
+        // a full field with every score blank - including the fifty-four they
+        // had just entered on the card one tab away. Same resolution the
+        // organizer's board and printed sheet use.
+        const view = resolveLeaderboardView(currentData, myRoundId);
+        const rows = view.rows;
+        if (!view.available) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">${view.reason}</div>`;
+            return;
+        }
 
         const rankCounts = {};
         rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
 
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">Team</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
         </div>`;
         rows.forEach(r => {
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
@@ -357,6 +364,100 @@
         trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
 
+    // THE HOLE YOU ARE TYPING IS NEVER TOUCHED.
+    //
+    // One listener sits on tournaments/<CODE>, so every score any group posts
+    // re-fires this page's callback. Rebuilding #holes-list from a string on
+    // every one of those threw away the digit under the golfer's thumb - it is
+    // not saved until onchange fires on blur - dropped focus, and closed the
+    // keyboard. Measured: 72 of 72 inputs replaced by one unrelated write, 360
+    // times a minute at 25 groups. tools/tournament-focus-check.js is that
+    // measurement and Test 8 is what holds this in place.
+    //
+    // A SCORE CHANGE IS NOT A SHAPE CHANGE. Almost every snapshot differs from
+    // the last one only in numbers, and numbers can be written into the inputs
+    // that are already on screen. The card is rebuilt only when the card is
+    // genuinely different - a golfer joined the group, the round opened or
+    // closed, the format or the course changed - which is the list in the
+    // audit's R3.
+    //
+    // THE SHAPE IS DERIVED FROM THE HTML THE RENDERER JUST BUILT, not from a
+    // hand-kept list of fields to watch. A field nobody remembered to add to
+    // such a list is a card that silently stops updating; here, anything that
+    // changes the markup changes the key. Only the two genuinely volatile
+    // parts are stripped out of it, and the same two are what the in-place
+    // path writes - one definition, so they cannot drift apart.
+    //
+    // shapeSalt carries what affects the inputs WITHOUT appearing in the html.
+    // roundLocked is the only one: it is applied by the caller as a disabled
+    // sweep after this returns, so a round reopening has to force a rebuild or
+    // the inputs would stay disabled for good.
+    const HOLE_VALUE_ATTR = /value="[^"]*"/g;
+    const HOLE_TEAM_RESULT = /(<span class="team-hole-result">)[^<]*(<\/span>)/g;
+    let lastHolesShape = null;
+
+    function holesShapeKey(html, shapeSalt) {
+        return String(shapeSalt || '') + '|'
+            + html.replace(HOLE_VALUE_ATTR, 'value=""')
+                  .replace(HOLE_TEAM_RESULT, '$1$2');
+    }
+
+    function setHolesListPreservingFocus(html, shapeSalt) {
+        const list = document.getElementById('holes-list');
+        if (!list) return;
+        const keyOf = el => el.getAttribute('onchange') || '';
+        const shape = holesShapeKey(html, shapeSalt);
+
+        // The browser's own parser on the same string, so the new values are
+        // read exactly as they would have rendered - no regex over markup.
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        const freshInputs = tpl.content.querySelectorAll('input');
+        const liveInputs = list.querySelectorAll('input');
+
+        if (shape === lastHolesShape && liveInputs.length === freshInputs.length) {
+            const values = new Map();
+            freshInputs.forEach(el => values.set(keyOf(el), el.getAttribute('value') || ''));
+            const results = new Map();
+            tpl.content.querySelectorAll('[id^="hole-row-"]').forEach(row => {
+                const r = row.querySelector('.team-hole-result');
+                if (r) results.set(row.id, r.textContent);
+            });
+            const active = document.activeElement;
+            liveInputs.forEach(el => {
+                // THE ONE THE GOLFER IS IN IS LEFT ALONE. Their half-typed
+                // stroke outranks a stored number they are in the middle of
+                // replacing.
+                if (el === active) return;
+                const v = values.get(keyOf(el));
+                if (v !== undefined && el.value !== v) el.value = v;
+            });
+            results.forEach((text, rowId) => {
+                const r = list.querySelector('#' + rowId + ' .team-hole-result');
+                if (r && r.textContent !== text) r.textContent = text;
+            });
+            return;
+        }
+
+        // THE CARD IS GENUINELY DIFFERENT. Rebuild it - and still put the
+        // golfer's own node back, because a roster change three groups away
+        // should not cost them the hole they are writing down.
+        const active = document.activeElement;
+        const keep = (active && active.tagName === 'INPUT' && list.contains(active))
+            ? active : null;
+        const keepKey = keep ? keyOf(keep) : null;
+
+        list.innerHTML = html;
+        lastHolesShape = shape;
+
+        if (!keep || !keepKey) return;
+        const fresh = Array.from(list.querySelectorAll('input'))
+            .find(el => keyOf(el) === keepKey);
+        if (!fresh || !fresh.parentNode) return;   // that cell is gone - leave it
+        fresh.parentNode.replaceChild(keep, fresh);
+        keep.focus();
+    }
+
     function renderGroup(group) {
         // THE ROUND VIEW, NOT THE EVENT. Shadowing the outer currentData here is
         // deliberate: everything below reads course, format, scoring mode, groups and
@@ -368,7 +469,13 @@
         const ids = (group.playerIds || []).filter(pid => players[pid]);
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const scores = currentData.scores || {};
-        const netMode = currentData.scoringMode === 'net';
+        // THE SAME QUESTION THE SCORING ASKS. Reading scoringMode alone made
+        // this card say "Net" over a gross board on a course whose stroke index
+        // is fabricated - the engine refuses net there and is right to.
+        // netIsInPlay/netWasRefused live in tournament-engine.js beside the
+        // refusal itself, so the word and the arithmetic cannot disagree.
+        const netMode = netIsInPlay(currentData);
+        const netRefused = netWasRefused(currentData);
 
         document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
         document.getElementById('event-sub').textContent =
@@ -377,8 +484,19 @@
             `You're scoring for <strong>${group.name || 'your group'}</strong>`;
         // Handicaps are shown because net is derived from them - a golfer needs to see
         // WHY their net differs from their gross without the page explaining allocation.
+        //
+        // `handicap || 0` PRINTED "(0)" FOR A SLOT NOBODY HAS NUMBERED. Wave 17
+        // took that lie off the organizer's board and left it here, on the one
+        // surface a golfer actually holds during the round. handicapDisplay is
+        // the same rule the board uses and says the same words - the phrase is a
+        // constant in the engine, not a sentence re-typed on this page - and a
+        // genuine scratch golfer still reads "(0)".
+        //
+        // competitorDisplayName for the same reason the board uses it: an
+        // unnamed slot's name is an empty string, and printing it left a bare
+        // "(handicap pending)" floating in the roster with nobody attached to it.
         document.getElementById('team-roster').innerHTML = ids.map(pid =>
-            `${players[pid].name}${netMode ? ` <span style="font-weight:normal; color:var(--text-muted);">(${players[pid].handicap || 0})</span>` : ''}`
+            `${competitorDisplayName(players[pid])}${netMode ? ` <span style="font-weight:normal; color:var(--text-muted);">(${handicapDisplay(players[pid])})</span>` : ''}`
         ).join(' &nbsp;•&nbsp; ') || 'No golfers assigned yet';
 
         if (group.startingHole) {
@@ -400,14 +518,32 @@
                     const v = scores[`${pid}_h${h.hole}`];
                     if (v && v > 0) thruCount[pid] = (thruCount[pid] || 0) + 1;
                     const first = (players[pid].name || '').split(' ')[0];
+                    // WHERE THIS GOLFER GETS A SHOT. The card showed a handicap in
+                    // the roster and never said which holes it fell on, which is
+                    // the one thing a number like 18 does not tell you.
+                    //
+                    // The allocation is NOT recomputed here: playerStrokesOnHole
+                    // is the accessor the scoring itself uses, so the dots and the
+                    // net total cannot disagree. And netMode is netIsInPlay(),
+                    // already resolved above - so a gross round draws nothing, and
+                    // so does a net round on a fabricated stroke index, where the
+                    // engine refuses net and this card already says Gross.
+                    //
+                    // The span is emitted EVEN WHEN EMPTY. A slot that appears
+                    // only for golfers who stroke would move every other score box
+                    // in the row the moment somebody's handicap changed.
+                    const strokes = netMode ? playerStrokesOnHole(players[pid], h) : 0;
+                    const dots = strokes > 0 ? '\u2022'.repeat(strokes)
+                        : (strokes < 0 ? '+' : '');
                     return `<label style="display:flex; align-items:center; gap:4px; font-size:0.8rem;">
                         <span style="color:var(--text-muted);">${first}</span>
+                        <span class="stroke-dots" aria-hidden="true">${dots}</span>
                         <input type="number" class="hole-score-input" inputmode="numeric" min="1" style="width:52px;"
                             value="${v || ''}" onchange="saveIndividualScore('${pid}', ${h.hole}, this.value)">
                     </label>`;
                 }).join('') + `</div></div>`;
         });
-        document.getElementById('holes-list').innerHTML = html;
+        setHolesListPreservingFocus(html, 'locked:' + roundLocked);
 
         const played = Math.max(0, ...ids.map(pid => thruCount[pid] || 0));
         document.getElementById('status-main').textContent = `Thru ${played}`;
@@ -415,7 +551,13 @@
             ? (currentData.roundStatus === 'closed'
                 ? 'This round is closed — scores are final'
                 : 'This round is not open for scoring yet')
-            : (netMode ? 'Enter gross scores — net is worked out for you' : 'Enter gross scores');
+            : (netMode ? 'Enter gross scores — net is worked out for you'
+                : netRefused
+                    // The same sentence the organizer's round editor shows, so a
+                    // golfer asking why their net vanished gets the same answer.
+                    ? 'Enter gross scores — this course has no real stroke index, so net '
+                      + "can't be allocated and this round is scored Gross"
+                    : 'Enter gross scores');
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
@@ -433,7 +575,7 @@
         const shambleCountBest = currentData.shambleCountBest || 1;
 
         document.getElementById('event-title').textContent = `🏆 ${currentData.name}`;
-        document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabel(currentData.format)}`;
+        document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
         const teamName = team.name || `Team ${team.num}`;
         document.getElementById('scoring-for').innerHTML =
             `You're scoring for <strong>${teamName}</strong>`;
@@ -487,7 +629,7 @@
             });
         }
 
-        document.getElementById('holes-list').innerHTML = html;
+        setHolesListPreservingFocus(html);
 
         // Starting hole is purely a display/navigation aid — the scored hole is always the
         // real golf hole (hole 8 is still hole 8, stored the same way regardless of when it

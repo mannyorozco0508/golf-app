@@ -511,7 +511,7 @@ describe('THE BRAND MARK ASSET', () => {
     test('the cache moved — the header changed and installed devices must see it', () => {
         assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v32-consumer-ready'/,
+        assert.match(BUILD, /cacheName: 'tournament-v34-pending-handicaps-and-payer-link'/,
             'Tournament assets did not change, so its cache must not move');
     });
 });

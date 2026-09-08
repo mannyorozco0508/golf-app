@@ -172,7 +172,7 @@ describe('THE CLUB/TOURNAMENT IMPLEMENTATION SURVIVED — DO NOT DELETE THIS COD
     test('the Tournament build target is untouched', () => {
         const build = read('build-shell.js');
         assert.match(build, /appName: 'GolfApp Tournaments'/, 'Tournament identity unchanged');
-        assert.match(build, /cacheName: 'tournament-v32-consumer-ready'/,
+        assert.match(build, /cacheName: 'tournament-v34-pending-handicaps-and-payer-link'/,
             'no Tournament asset changed in this batch, so its cache must not move');
         assert.ok(!/Rattle/.test(build.slice(build.indexOf('tournament: {'))),
             'Tournament must never be renamed Rattle Golf');

@@ -31,6 +31,7 @@
 // ============================================================================
 
 const { spawn } = require('child_process');
+const registry = require('./browser-registry.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -116,18 +117,58 @@ function firebaseStub(dbJson) {
 // Cloudflare serves clean URLs, so /index.html?game=X 308s to /?game=X - and the
 // check then reads a redirect target as though the page had built it. Blocked, the
 // navigation fails and document.URL is exactly the URL the app asked for.
+
+// THE PORT IS CHOSEN BY CHROME, NOT GUESSED.
+//
+// Both harnesses used to pick a random port out of a fixed range - 9800..9979
+// here, 9400..9799 in cold-arrival - which is fine one session at a time and
+// collides when tools run back to back. Wave 10 saw exactly that: one exit 1 and
+// one exit 2 in a batch run, neither reproducible alone. A suite that is only
+// green when run slowly is worse than a red one, because the failure looks like
+// the app.
+//
+// --remote-debugging-port=0 makes Chrome bind an ephemeral port and write it to
+// DevToolsActivePort inside the profile directory. Each session already gets its
+// own mkdtemp profile, so the port is unique BY CONSTRUCTION - no range, no
+// retry, and no chance of attaching to another session's browser, which a retry
+// loop on a fixed range cannot rule out.
+function readDevToolsPort(profileDir, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 20000);
+    const file = path.join(profileDir, 'DevToolsActivePort');
+    return new Promise((resolve, reject) => {
+        (function poll() {
+            try {
+                const raw = fs.readFileSync(file, 'utf8').split('\n')[0].trim();
+                if (raw && /^[0-9]+$/.test(raw)) return resolve(Number(raw));
+            } catch (e) { /* not written yet */ }
+            if (Date.now() > deadline) {
+                return reject(new Error('Chrome never wrote DevToolsActivePort in '
+                    + profileDir + ' - it may have failed to start'));
+            }
+            setTimeout(poll, 100);
+        })();
+    });
+}
+
 async function arriveCold({ url, rounds, db, expression, viewport, settleMs, preScript, blockUrls }) {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
-    const port = 9400 + Math.floor(Math.random() * 400);
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
     }
     const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
-        '--remote-debugging-port=' + port, '--user-data-dir=' + profile,
+        '--remote-debugging-port=0', '--user-data-dir=' + profile,
         '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+    // TRACKED BEFORE ANYTHING THAT CAN THROW OR BAIL. A caller that gives up
+    // between here and the finally below exits through process.exit, which does
+    // not run finally - the registry is what closes the browser then.
+    const tracked = registry.track(chrome, profile);
 
     let ws = null;
     try {
+        let port;
+        try { port = await readDevToolsPort(profile, 20000); }
+        catch (e) { return { ok: false, reason: String(e.message || e) }; }
+
         let targets = null;
         for (let i = 0; i < 60; i++) {
             await new Promise(r => setTimeout(r, 250));
@@ -197,6 +238,7 @@ async function arriveCold({ url, rounds, db, expression, viewport, settleMs, pre
         return { ok: false, reason: String(e && e.message || e) };
     } finally {
         try { if (ws) ws.close(); } catch (e) {}
+        registry.release(tracked);
         chrome.kill();
         try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
     }

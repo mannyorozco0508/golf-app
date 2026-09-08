@@ -68,7 +68,26 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
-        cacheName: 'tournament-v32-consumer-ready',
+        // Moved to v34. Everything v33 carried, plus the waves since. All three
+        // are precached, so an installed device keeps serving the old ones until
+        // this string changes:
+        //   tournament-scorecard.html  the hole you are typing is never rebuilt;
+        //                              stroke dots on the golfer's own card; the
+        //                              roster no longer prints "(0)" for a
+        //                              handicap nobody has supplied
+        //   tournament-engine.js       netIsInPlay/netWasRefused, one format
+        //                              label, one competitor count, withdrawal,
+        //                              unnamed entries, pending handicaps, and
+        //                              who bought an entry
+        //   tournament.html            Net/Gross and format wording derived from
+        //                              the engine, pool counts golfers on an
+        //                              individual event, the flight guard holds,
+        //                              multi-round events reachable, a paid slot
+        //                              with no name yet, and the payer on it
+        // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
+        // would re-download the Consumer shell for changes that are not in it and
+        // still leave Tournament devices on the old files.
+        cacheName: 'tournament-v34-pending-handicaps-and-payer-link',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

@@ -116,6 +116,286 @@ function hasUsableStrokeIndex(data) {
     return true;
 }
 
+// IS NET ACTUALLY BEING APPLIED? THE ONE PLACE THAT DECIDES.
+//
+// Asking for net and getting net are different things: on a course the app has
+// never mapped, resolveTournamentCourseData() fabricates a 1..18 index,
+// courseIndexSynthetic records that it did, and hasUsableStrokeIndex() refuses
+// to allocate on it. The round is then scored GROSS, correctly.
+//
+// The label on the golfer's card used to ask a different question - scoringMode
+// alone - so the card read "Net" over a gross board and told the golfer net was
+// being worked out for them. Nothing was broken on screen; the sentence was
+// simply false, which is worse, because a wrong number gets queried and a
+// confident wrong sentence gets believed.
+//
+// So the arithmetic and every word describing it now ask the SAME function. If
+// the rule ever changes, it changes here, once, and the labels follow. Three
+// names because callers genuinely ask three different questions - what was
+// asked for, what is happening, and whether those differ:
+//
+//   netWasRequested   the stored setting, nothing more
+//   netIsInPlay       the setting AND a course that can carry it - this is the
+//                     one the scoring uses
+//   netWasRefused     asked for and not happening. The case that needs a
+//                     sentence on screen.
+function netWasRequested(data) {
+    return !!data && data.scoringMode === 'net';
+}
+
+function netIsInPlay(data) {
+    return netWasRequested(data) && hasUsableStrokeIndex(data);
+}
+
+function netWasRefused(data) {
+    return netWasRequested(data) && !netIsInPlay(data);
+}
+
+// WHAT THIS FORMAT IS CALLED. ONE DEFINITION.
+//
+// There were three: a formatLabel() in each of the two pages, byte-identical
+// and both wrong - they handled shamble and bestball and returned 'Scramble'
+// for everything else, so an Individual Stroke Play event announced itself as a
+// Scramble on the organizer header, the leaderboard header and the printed
+// sheet - and a formatLabelFor() sitting in the same file as one of them,
+// correct, used only by the rounds list. Two copies of a rule, one of which
+// already had the answer the other got wrong, is exactly the duplication that
+// ships the same defect twice.
+//
+// An unknown format falls back to its own stored value rather than to a guess,
+// because naming a format something it is not is how this started.
+function formatLabelFor(fmt) {
+    return { scramble: 'Scramble', shamble: 'Shamble', bestball: '2-Man Best Ball',
+             individual: 'Individual Stroke Play' }[fmt] || fmt || '\u2014';
+}
+
+// WITHDRAWN: A RESULT THAT IS NO LONGER IN THE COMPETITION.
+//
+// Deleting a golfer who has scored removes the record and ORPHANS their score
+// keys - nothing reaches them again, because addPlayerToField mints a fresh id,
+// so re-adding the same person creates a different competitor with an empty
+// card. Wave 5 measured exactly that: one tap, no confirmation, eighteen holes
+// unreachable.
+//
+// So a scored competitor is withdrawn instead. The record stays, the scores
+// stay, the id stays - and every board asks THIS function rather than testing
+// the field itself, so "withdrawn" cannot come to mean two different things in
+// two places. Declared, never inferred: no marker means active, which is what
+// every record written before today is.
+var COMPETITOR_WITHDRAWN = 'withdrawn';
+
+function isWithdrawn(entry) {
+    return !!entry && entry.status === COMPETITOR_WITHDRAWN;
+}
+
+// HOW MANY HOLES THIS COMPETITOR HAS ACTUALLY POSTED, wherever the scores live.
+// A single-round record keeps them at the root; a multi-round event keeps them
+// per round, and a golfer who played Saturday has a result even if Sunday's
+// round is empty. Counting only the root would offer Delete on a scored golfer
+// the moment an event grew a second round.
+function competitorScoreCount(data, id) {
+    if (!data || !id) return 0;
+    const prefix = String(id) + '_h';
+    let n = 0;
+    const tally = scores => Object.keys(scores || {})
+        .forEach(k => { if (k.indexOf(prefix) === 0) n++; });
+    tally(data.scores);
+    Object.keys(data.rounds || {}).forEach(rid => tally((data.rounds[rid] || {}).scores));
+    return n;
+}
+
+// A PAID ENTRY THAT IS NOT YET A PERSON.
+//
+// A captain pays for four and names one. The setup form drops the other three
+// before the write - filter(v => v.length > 0) - so the money exists and the
+// competitors do not. An unnamed entry is the slot itself: a real place in the
+// field, assignable to a group, scoreable, named whenever the captain gets
+// round to it.
+//
+// DECLARED, NOT INFERRED FROM AN EMPTY NAME. An organizer who tabs past a text
+// box has not bought an entry, and a record whose name happens to be blank is
+// indistinguishable from a mistake. The marker is written deliberately when the
+// slot is created and REMOVED the moment a name arrives, so - exactly like
+// withdrawal - absence of the marker is the ordinary state and there is only
+// one way of being a named competitor.
+//
+// NOT the same field as status. A withdrawn golfer has left the competition; an
+// unnamed one has not arrived in it. Overloading one field would make two very
+// different sentences share a value.
+function isUnnamed(entry) {
+    return !!entry && entry.unnamed === true;
+}
+
+// AN ABSENT HANDICAP IS NOT A HANDICAP OF ZERO.
+//
+// A slot nobody has numbered was written handicap '0' and, on a NET event, was
+// ranked as a scratch golfer - the one handicap nobody would have chosen for an
+// unknown person, and the hardest to notice because scratch is a perfectly
+// ordinary thing for a real golfer to be.
+//
+// DECLARED, NEVER INFERRED FROM THE VALUE. An organizer can legitimately enter
+// 0: a scratch golfer exists. So "missing" cannot be read off the number, off
+// an empty string, or off the field being absent. It is a marker, written when
+// the slot is created and cleared the moment a number arrives.
+//
+// GROSS EVENTS ARE UNTOUCHED. There is no handicap to be missing when none is
+// being applied, so a pending entry plays and ranks exactly like anybody else.
+function handicapIsPending(entry) {
+    return !!entry && entry.handicapPending === true;
+}
+
+// WHAT TO CALL SOMEBODY WHO HAS NO NAME YET, in the one place that decides it.
+// `p.name || 'Player'` was the old fallback and it lied twice over: it read the
+// same for a slot nobody has named and for a record whose name failed to save.
+function competitorDisplayName(entry) {
+    if (isUnnamed(entry)) return 'Unnamed entry';
+    return (entry && entry.name) || 'Player';
+}
+
+// THE PENDING WORDS, TYPED ONCE.
+//
+// The board and the golfer's own card both have to say that a handicap has not
+// arrived yet. Wave 17 wrote the sentence on the board and the card kept
+// printing `handicap || 0`, so the surface actually carried around the course
+// was the one still claiming an unknown person plays off scratch. Two
+// hand-written sentences for one fact is how formatLabel and the pool defect
+// both happened, so neither page types these words: the phrase is a constant
+// and the display rule is a function.
+var HANDICAP_PENDING_TEXT = 'handicap pending';
+
+// What to show where a handicap number goes. A REAL ZERO IS A REAL ZERO - a
+// scratch golfer still reads "0" here, which is the whole reason absence is a
+// marker rather than something read off the value.
+function handicapDisplay(entry) {
+    if (handicapIsPending(entry)) return HANDICAP_PENDING_TEXT;
+    // Unchanged from what every surface did before this function existed: an
+    // absent value on a record with no pending marker is a legacy zero.
+    const h = entry ? entry.handicap : undefined;
+    return (h === undefined || h === null || h === '') ? '0' : String(h);
+}
+
+// WHO BOUGHT THIS ENTRY.
+//
+// NOT A PAYMENT. A captain pays for a foursome, three of the slots have no name
+// yet, and until wave 18 nothing recorded whose they were - the organizer had
+// the money and no way to say where it came from, and three slots that read
+// identically on the field list. This is the link a payment will later attach
+// to: `name` and `contact` are what an organizer types today, `ref` is where a
+// Stripe object id goes when there is one. Nothing here charges anybody.
+//
+// STRUCTURED, NOT PARSED. The payer is its own object on the player record,
+// never smuggled into the name field, so reading it is a property access and
+// naming the entry cannot disturb it.
+//
+// OPTIONAL, and absence is the ordinary state - an entry with no payer is
+// exactly the entry every organizer has been creating all along.
+function entryPayer(entry) {
+    const p = entry && entry.paidBy;
+    if (!p || typeof p !== 'object') return null;
+    const str = v => String(v === undefined || v === null ? '' : v).trim();
+    const name = str(p.name);
+    if (!name) return null;
+    return { name: name, contact: str(p.contact), ref: str(p.ref) };
+}
+
+// The predicate, beside isUnnamed and isWithdrawn, for a consumer that only
+// needs to ask whether anybody is recorded.
+function hasPayer(entry) {
+    return entryPayer(entry) !== null;
+}
+
+// TELLING ONE CAPTAIN'S THREE SLOTS APART.
+//
+// A payer's name alone does not distinguish them - that was the point of
+// recording it and it is not enough on its own, because three rows reading
+// "Captain Smith" are as interchangeable as three rows reading "Unnamed entry".
+// The position within that payer's entries is what separates them, ordered by
+// when they were added so the numbering is stable across renders and does not
+// shift when an unrelated entry is created.
+//
+// Grouped by the payment reference when there is one, and otherwise by name and
+// contact together - two different Smiths with different emails are two payers.
+function payerEntryTag(players, pid) {
+    const all = players || {};
+    const mine = entryPayer(all[pid]);
+    if (!mine) return '';
+    const keyOf = e => { const p = entryPayer(e); return p ? (p.ref || (p.name + '|' + p.contact).toLowerCase()) : null; };
+    const key = keyOf(all[pid]);
+    const siblings = Object.keys(all)
+        .filter(id => keyOf(all[id]) === key)
+        .sort((a, b) => ((all[a].addedAt || 0) - (all[b].addedAt || 0)) || (a < b ? -1 : a > b ? 1 : 0));
+    if (siblings.length < 2) return mine.name;
+    return `${mine.name} · ${siblings.indexOf(pid) + 1} of ${siblings.length}`;
+}
+
+// HOW MANY COMPETITORS ARE THERE, AND WHAT IS ONE CALLED. ONE BRANCH.
+//
+// An individual event keeps its field in players/ and nothing in teams/, so
+// anything that counted teams to mean competitors read ZERO on it. That was not
+// one bug: a $300 entry fee produced a $0 pool, AND the "a flight in use is not
+// deleted" guard reported no occupants and let an organizer delete a flight
+// three golfers were assigned to - the precise thing its own comment says it
+// exists to prevent.
+//
+// The branch on the declared model is written HERE, once, and returns both the
+// records and the word for them together. Two functions each branching on the
+// same marker is how the pool and the flight guard drifted apart in the first
+// place; one that hands back a pair cannot.
+//
+// NEVER from key shape, always from the marker: a legacy record has no
+// scoringModel and is a team event forever, which is what keeps every stored
+// tournament reading the way it always has.
+function competitorModel(data) {
+    return isPlayerModel(data)
+        ? { entries: (data && data.players) || {}, word: 'golfer' }
+        : { entries: (data && data.teams) || {}, word: 'team' };
+}
+
+function competitorEntries(data) {
+    return competitorModel(data).entries;
+}
+
+function competitorCount(data) {
+    return Object.keys(competitorEntries(data)).length;
+}
+
+// "3 golfers" / "1 team". The count is passed in rather than recomputed so a
+// caller that already has a filtered number - a flight's occupants, say - can
+// name it without the noun and the number disagreeing.
+function competitorNoun(data, n) {
+    const word = competitorModel(data).word;
+    return Number(n) === 1 ? word : word + 's';
+}
+
+// WHAT THE ENTRIES ON A LEADERBOARD ARE. Derived from the record's declared
+// model, not from which view happens to be on screen: the same field is the
+// same competitors whether you are looking at one round, another round or the
+// combined standings. The event view already said "Golfer" and the round views
+// said "Team" over the same golfers, which is what one label per view buys you.
+function entryColumnLabel(data) {
+    const word = competitorModel(data).word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+// NET OR GROSS, IN A SENTENCE, FOR A DOCUMENT THAT LEAVES THE BUILDING.
+//
+// A printed sheet with no scoring mode on it is a net result and a gross result
+// as the same piece of paper. It asks the two predicates above rather than
+// restating either condition, so the sheet cannot disagree with the board it
+// was printed from.
+//
+// Null for team formats: a scramble has no net/gross choice to state, and
+// printing one would be inventing a distinction the event does not have.
+function scoringModeLine(data) {
+    if (!isPlayerModel(data)) return null;
+    if (netIsInPlay(data)) return 'Net';
+    if (netWasRefused(data)) {
+        return "Gross \u2014 this course has no real stroke index, so net strokes "
+             + "can't be allocated";
+    }
+    return 'Gross';
+}
+
 // Strokes a player receives on one hole, from the SHARED handicap module. This is
 // competition stroke play, not wagering: getStrokes() by course stroke index, with
 // no relative-to-opponent adjustment anywhere. allocateMatchStrokes() and
@@ -159,11 +439,19 @@ function normalizePlayerEntries(data) {
     const players = data.players || {};
     const scores = data.scores || {};
     const holes = data.courseData || [];
-    const useNet = data.scoringMode === 'net' && hasUsableStrokeIndex(data);
+    const useNet = netIsInPlay(data);
     let idx = 0;
 
-    return Object.keys(players).map(pid => {
+    // A WITHDRAWN GOLFER IS OFF THE BOARD AND STILL IN THE RECORD. Filtered
+    // before the map so the remaining ranks close up rather than leaving a gap
+    // where somebody used to be.
+    return Object.keys(players).filter(pid => !isWithdrawn(players[pid])).map(pid => {
         const p = players[pid];
+        // CANNOT BE NETTED. Decided here, once, so no surface has to work it out
+        // for itself: a net event plus a handicap nobody has supplied means
+        // there is no net score to rank, only a gross one that would be a
+        // different competition.
+        const pending = useNet && handicapIsPending(p);
         let strokes = 0, thru = 0, parPlayed = 0, received = 0;
         holes.forEach(h => {
             const v = scores[`${pid}_h${h.hole}`];
@@ -176,14 +464,21 @@ function normalizePlayerEntries(data) {
         });
         idx++;
         const net = strokes - received;   // received is 0 in gross mode
+        const shown = competitorDisplayName(p);
         return {
             entryType: 'player', entryKey: pid, num: idx,
-            teamName: p.name || 'Player',
-            playerId: pid, playerName: p.name || 'Player',
+            teamName: shown,
+            playerId: pid, playerName: shown,
             strokes: strokes, thru: thru, parPlayed: parPlayed,
-            strokesReceived: received, net: thru > 0 ? net : null,
-            toPar: thru > 0 ? net - parPlayed : null,
-            hasScores: thru > 0,
+            strokesReceived: received, net: (thru > 0 && !pending) ? net : null,
+            toPar: (thru > 0 && !pending) ? net - parPlayed : null,
+            // hasScores is what ranking, payouts and the event total all key
+            // off, so a pending entry is unranked and unpaid everywhere by the
+            // one decision above rather than by four separate ones. netPending
+            // is what lets a screen say WHY instead of leaving a bare dash.
+            hasScores: thru > 0 && !pending,
+            netPending: pending,
+            holesPosted: thru,
             flightId: p.flightId || null,
         };
     });
@@ -464,22 +759,60 @@ function computeEventStandings(data, flightId) {
     return { available: true, reason: null, rows: rows };
 }
 
+// WHICH LEADERBOARD IS IN VIEW. ASKED ONCE.
+//
+// Three surfaces need this answer: the organizer's board, the sheet that board
+// prints, and the golfer's own Leaderboard tab on a round-scoped link. Two of
+// them used to answer it for themselves by calling
+// computeTournamentLeaderboard(data) on the EVENT ROOT - which on a multi-round
+// record holds no scores at all - so both rendered a full field with every
+// score blank, directly beneath a board that was correct.
+//
+// That is the same failure as the two formatLabel copies and the team-counting
+// pool: a question answered independently in more than one place drifts, and
+// the copy that drifts is always the one nobody is looking at.
+//
+// selection is null or 'event' for the combined standings, or a round id.
+// A single-round record ignores it entirely and returns what it always did.
+function resolveLeaderboardView(data, selection, flightId) {
+    if (!isMultiRound(data)) {
+        return { kind: 'round', scope: 'single', available: true, reason: null,
+                 rows: computeTournamentLeaderboard(data, flightId), title: null };
+    }
+    const viewing = selection || 'event';
+    if (viewing === 'event') {
+        const r = computeEventStandings(data, flightId);
+        return { kind: 'event', scope: 'event', available: r.available,
+                 reason: r.reason, rows: r.rows || [], title: 'Event total' };
+    }
+    const round = (data.rounds || {})[viewing];
+    if (!round) {
+        return { kind: 'round', scope: 'round', available: false, rows: [],
+                 reason: 'That round is no longer part of this event.', title: null };
+    }
+    return { kind: 'round', scope: 'round', available: true, reason: null,
+             rows: computeRoundLeaderboard(data, viewing, flightId),
+             title: round.name || 'Round' };
+}
+
 // FLIGHTS FILTER THE FIELD; THEY DO NOT RANK IT DIFFERENTLY.
 //
-// A flight is a subset of the same teams, standing in the same competition, judged
-// by the same rule - so there is exactly one ranking implementation and the flight
-// view reaches it by narrowing the input, never by copying the sort. A second
-// ranking path would be a second definition of "tied", and the whole point of a
-// flight is that the B flight is scored the same way the Championship flight is.
+// A flight is a subset of the same competitors, standing in the same
+// competition, judged by the same rule - so there is exactly one ranking
+// implementation and the flight view reaches it by narrowing the input, never
+// by copying the sort. A second ranking path would be a second definition of
+// "tied", and the whole point of a flight is that the B flight is scored the
+// same way the Championship flight is.
 //
-// flightId omitted or null means OVERALL, which is every team including those with
-// no flight at all. That default is what keeps historical tournaments - which have
-// no flights node and no flightId on any team - behaving exactly as before.
-function teamsInFlight(teams, flightId) {
-    const ids = Object.keys(teams);
-    if (!flightId) return ids;
-    return ids.filter(tid => (teams[tid] || {}).flightId === flightId);
-}
+// flightId omitted or null means OVERALL, which is every competitor including
+// those in no flight at all. That default is what keeps historical tournaments -
+// which have no flights node and no flightId on anybody - behaving exactly as
+// before.
+//
+// teamsInFlight() USED TO LIVE HERE AND HAD NO CALLERS. The leaderboard filters
+// normalized rows by flightId directly, in computeTournamentLeaderboard. It was
+// deleted rather than kept: it looked exactly like the flight rule, so it was a
+// decoy somebody would eventually "fix" to no effect.
 
 // Teams that belong to no flight the tournament actually has.
 //
@@ -488,11 +821,11 @@ function teamsInFlight(teams, flightId) {
 // team appears in NO count at all and disappears from the organizer's view of the
 // field. The dropdown already falls back to Unassigned for a dangling id; this
 // makes the counts agree with it rather than quietly losing a team.
-function unassignedTeamIds(teams, flights) {
-    const all = teams || {};
+function unassignedTeamIds(competitors, flights) {
+    const all = competitors || {};
     const known = flights || {};
-    return Object.keys(all).filter(tid => {
-        const fid = (all[tid] || {}).flightId;
+    return Object.keys(all).filter(id => {
+        const fid = (all[id] || {}).flightId;
         return !fid || !known[fid];
     });
 }
@@ -500,17 +833,29 @@ function unassignedTeamIds(teams, flights) {
 // How many teams sit in each flight, plus the unassigned count. Derived, never
 // stored - a cached count is a count that goes stale the first time a team moves.
 function flightTeamCounts(data) {
-    const teams = data.teams || {};
-    const flights = data.flights || {};
+    // SHARES poolTotal's ASSUMPTION, deliberately: this counts everyone in the
+    // field, including a WITHDRAWN competitor. So a flight holding only
+    // withdrawn golfers reports occupants and stays undeletable - which is the
+    // conservative answer, because deleting it would strand a flightId on
+    // records that still hold real scores. See the note at poolTotal in
+    // tournament.html for the entry-fee side of the same choice.
+    //
+    // COMPETITORS, NOT TEAMS. On an individual event the flightId lives on the
+    // player, so counting teams reported zero occupants for a flight full of
+    // golfers and unlocked the delete button that guards them. The name is kept
+    // because two page call sites and a test pin it; what it counts is now the
+    // field, whichever model holds it.
+    const competitors = competitorEntries(data);
+    const flights = (data && data.flights) || {};
     const counts = {};
     Object.keys(flights).forEach(fid => { counts[fid] = 0; });
-    Object.keys(teams).forEach(tid => {
-        const fid = teams[tid].flightId;
-        // A team pointing at a deleted flight is counted as unassigned below rather
-        // than resurrecting the missing flight as a phantom row.
+    Object.keys(competitors).forEach(id => {
+        const fid = competitors[id].flightId;
+        // Anyone pointing at a deleted flight is counted as unassigned below
+        // rather than resurrecting the missing flight as a phantom row.
         if (fid && counts[fid] !== undefined) counts[fid]++;
     });
-    counts.__unassigned = unassignedTeamIds(teams, flights).length;
+    counts.__unassigned = unassignedTeamIds(competitors, flights).length;
     return counts;
 }
 

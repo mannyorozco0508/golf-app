@@ -112,6 +112,154 @@ This node is the relationship the Club/Tournament app will use to find its trip 
 
 ---
 
+## Tournament scoring surface — what the next person needs before touching it
+
+`tournament-scorecard.html` is where a golfer actually enters strokes, and it
+carries decisions that look like style until you change one.
+
+### The card is not rebuilt for a score change
+
+Both tournament pages hold exactly one listener, on `tournaments/<CODE>`. Every
+write in the product lands under that path, so every device's callback re-runs on
+every score anyone posts — measured at 25 groups, that is roughly 360 re-fires a
+minute on each phone. The card used to answer each one by rewriting its hole list
+from a string, which replaced all 72 inputs, dropped focus, and threw away any
+digit typed but not yet blurred. `onchange` fires on blur, so that digit was never
+saved anywhere else.
+
+So the renderer now writes new numbers into the inputs already on screen, and only
+rebuilds when the card is genuinely a different card. The one the golfer is
+currently in is skipped entirely: a half-typed stroke outranks a stored number
+they are in the middle of replacing.
+
+### The shape key is DERIVED from the markup. Do not replace it with a field list.
+
+The decision "is this the same card" is made by taking the HTML the renderer just
+built, blanking the two parts that legitimately change on every score — the input
+`value` attributes and the per-hole team result text — and comparing what is left
+with the previous render. Anything that changes the markup changes the key.
+
+**The obvious refactor here is the bug.** Replacing that with an explicit list of
+fields to watch — roster, status, format, course — moves correctness from "the
+markup decides" to "somebody remembered". The failure mode is silent and awful: a
+field nobody adds to the list is a card that stops updating and gives no sign,
+which is the same class of defect as a guard that cannot fire. If the derivation
+ever needs to change, it should get harder to fool, not more explicit.
+
+### `roundLocked` is the one thing not in the markup
+
+A round's open/closed state does not appear in the HTML at all. It is applied
+afterwards, by the caller, as a sweep that disables every input. That sweep only
+ever sets `disabled` — it never clears it — so without help, closing a round and
+reopening it would leave the card dead permanently: the in-place path would reuse
+the disabled inputs and nothing would put them back.
+
+It is therefore passed to the renderer separately as a salt on the shape key, so a
+lock change always forces a full rebuild and the inputs come back enabled.
+`tools/tournament-focus-check.js` proves this on a hand-written multi-round record,
+in both Chrome and WebKit, and its control removes the salt and confirms the inputs
+stay stuck disabled — so the salt is demonstrably what does the work rather than
+something that merely sits alongside it.
+
+### Fields that must force a rebuild
+
+This list is **documentation of what the derived key already covers**, not an input
+to it. Nothing reads it. It exists so a reviewer can check the key is still doing
+its job, and so anyone adding a field knows what class it belongs to.
+
+Rebuilds the hole inputs: round status; round format; the course data, name or
+key; scoring mode; the round's handicap snapshot; the round being removed; a
+scoring group's player list; the group being removed; a player added or removed;
+a player's name; a player's handicap; a team's name, player list or starting hole;
+and the single-round equivalents of format, scoring mode, course data and course
+name.
+
+Rebuilds something other than the inputs: the group's name, the group's or team's
+starting hole, the round's name, the event name — and flights, which change only
+the leaderboard tab.
+
+Affects this page not at all: entry fee, start type, trip code, sort order,
+closed-at and created-at timestamps.
+
+**And the trap.** The Leaderboard tab on this same page is built from every score
+in the event. Anything that suppresses re-rendering has to be scoped to the hole
+inputs, never to the snapshot, or that tab freezes.
+
+### Which score keys belong to a card
+
+Four key shapes exist, and the branch between them is chosen from the record's
+declared model marker — never guessed from the key itself:
+
+- Individual events (`scoringModel: 'player-v1'`) key scores by opaque player id.
+  Membership is decided by **testing the key against the ids the group actually
+  holds**, not by taking the key apart. The ids are minted and opaque, and a parser
+  for them would be a second definition of player identity.
+- Legacy team events key by team number — one score per team per hole for Scramble,
+  one per player index for Shamble and Best Ball. Those last two are byte-identical
+  in storage and differ only in how they are read, so the key can never tell you
+  which format produced it.
+
+Seven ways a naive version of that predicate goes wrong, all of them cheap to
+avoid and expensive to discover:
+
+1. `team1` is a prefix of `team11`. The team number must be matched with its
+   delimiter, not with a string prefix.
+2. In a multi-round event the scores live under the round and membership must be
+   read from **that round's** groups. Comparing against the event's own
+   `scoringGroups` — empty on such a record — makes every key look foreign and
+   nothing ever updates.
+3. A cleared score arrives as an **absent** key, not a changed one. Walking only
+   the new record's keys cannot see a deletion; the union of old and new is needed.
+4. A golfer moved **into** the group must be read from the arriving snapshot. Held
+   against a cached member list, their key reads as foreign, no rebuild happens,
+   and their inputs never appear.
+5. A golfer moved **out** correctly reads as foreign — but the group's membership
+   changed, which is a rebuild trigger for a different reason, so the card must
+   still redraw.
+6. Shamble and Best Ball share one key shape. Format is a record field; inferring
+   it from keys silently changes the arithmetic.
+7. Player ids happen to contain no underscore today, which makes `{id}_h{n}` look
+   safely splittable. That is a property of the id minter, not of the format.
+   Membership testing does not depend on it. Parsing would.
+
+### There are TWO cache versions, and `CLAUDE.md` names only one
+
+`CLAUDE.md` says to bump `CACHE_VERSION` in `sw.js` when a cached shell file
+changes. That instruction is written for Consumer, and `sw.js`'s `CACHE_VERSION` is
+the **Consumer** cache.
+
+The Tournament bundle has its own key, set in `build-shell.js`. A change to
+`tournament.html`, `tournament-scorecard.html` or `tournament-engine.js` needs
+**that** one moved. Bumping `sw.js` instead re-downloads the Consumer shell on
+every installed phone for a change that is not in Consumer, and still leaves
+Tournament devices serving the old file — the worst of both. Check which product
+the changed file belongs to before bumping anything.
+
+### The `#multi-round-toggle` trapdoor
+
+The organizer page carries a checkbox reading "This event has more than one
+round". It writes nothing. The flag it sets is read only by the save that creates
+a tournament, and the checkbox lives on the screen that replaces the setup form —
+so it can only be ticked after the only function that reads it can no longer run.
+Multi-round events are therefore not creatable from the UI, and everything built
+for them is correct and unreachable.
+
+**Wiring that checkbox is a two-line change that ships three bugs.** Before doing
+it, fix these, because each one is invisible today only because nothing can reach
+it:
+
+1. **Print / Send Results reads the event root.** A multi-round event has no
+   scores there, so the printed sheet lists every golfer with no score at all,
+   while the leaderboard above it — which reads the round — is correct.
+2. **The golfer's own Leaderboard tab reads the event root** for the same reason
+   and is likewise blank on a multi-round event.
+3. **No control produces a round-scoped team link.** Team links are built without
+   a round, and the scorecard correctly refuses them with a message telling the
+   golfer to ask the organizer for today's link — a link the organizer has no way
+   to generate. A multi-round team event would be unscoreable.
+
+The refusal in (3) is right. The way out of it does not exist yet.
+
 ## Do not
 
 - Delete `tournament*` files, or the `tournaments` node, or the retained helpers

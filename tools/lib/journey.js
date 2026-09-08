@@ -29,6 +29,7 @@
 // ============================================================================
 
 const { spawn } = require('child_process');
+const registry = require('./browser-registry.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -177,14 +178,54 @@ function statefulStub(dbJson) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+
+// THE PORT IS CHOSEN BY CHROME, NOT GUESSED.
+//
+// Both harnesses used to pick a random port out of a fixed range - 9800..9979
+// here, 9400..9799 in cold-arrival - which is fine one session at a time and
+// collides when tools run back to back. Wave 10 saw exactly that: one exit 1 and
+// one exit 2 in a batch run, neither reproducible alone. A suite that is only
+// green when run slowly is worse than a red one, because the failure looks like
+// the app.
+//
+// --remote-debugging-port=0 makes Chrome bind an ephemeral port and write it to
+// DevToolsActivePort inside the profile directory. Each session already gets its
+// own mkdtemp profile, so the port is unique BY CONSTRUCTION - no range, no
+// retry, and no chance of attaching to another session's browser, which a retry
+// loop on a fixed range cannot rule out.
+function readDevToolsPort(profileDir, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 20000);
+    const file = path.join(profileDir, 'DevToolsActivePort');
+    return new Promise((resolve, reject) => {
+        (function poll() {
+            try {
+                const raw = fs.readFileSync(file, 'utf8').split('\n')[0].trim();
+                if (raw && /^[0-9]+$/.test(raw)) return resolve(Number(raw));
+            } catch (e) { /* not written yet */ }
+            if (Date.now() > deadline) {
+                return reject(new Error('Chrome never wrote DevToolsActivePort in '
+                    + profileDir + ' - it may have failed to start'));
+            }
+            setTimeout(poll, 100);
+        })();
+    });
+}
+
 async function openJourney(opts) {
     const o = opts || {};
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'journey-'));
-    const port = 9800 + Math.floor(Math.random() * 180);
     if (!fs.existsSync(CHROME)) throw new Error('Chrome not found at ' + CHROME);
     const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
-        '--remote-debugging-port=' + port, '--user-data-dir=' + profile,
+        '--remote-debugging-port=0', '--user-data-dir=' + profile,
         '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+    // TRACKED BEFORE ANYTHING THAT CAN THROW OR BAIL - openJourney throws in
+    // three places below, and a tool that bail()s while a session is open exits
+    // through process.exit, which does not run any finally the caller wrote.
+    const tracked = registry.track(chrome, profile);
+
+    let port;
+    try { port = await readDevToolsPort(profile, 20000); }
+    catch (e) { registry.release(tracked); chrome.kill(); throw e; }
 
     let targets = null;
     for (let i = 0; i < 80; i++) {
@@ -195,7 +236,10 @@ async function openJourney(opts) {
             if (targets.length) break;
         } catch (e) { /* not up yet */ }
     }
-    if (!targets || !targets.length) { chrome.kill(); throw new Error('Chrome exposed no page target'); }
+    if (!targets || !targets.length) {
+        registry.release(tracked); chrome.kill();
+        throw new Error('Chrome exposed no page target');
+    }
 
     const ws = new WebSocket(targets[0].webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -325,6 +369,7 @@ async function openJourney(opts) {
         async close() {
             await harvest();
             try { ws.close(); } catch (e) {}
+            registry.release(tracked);
             chrome.kill();
             try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
             return db;

@@ -788,9 +788,11 @@ describe('EVENT VIEW — one renderer, three sources', () => {
     });
 
     test('a refusal shows its reason and leaves the round boards working', () => {
+        // RE-PINNED, wave 10: the refusal now arrives on the shared view object
+        // instead of a local `result`. Same rule, same sentence.
         const fn = fnBody(src(), 'renderLeaderboard');
-        assert.match(fn, /if \(!result\.available\)/);
-        assert.match(fn, /note\.textContent = result\.reason;/);
+        assert.match(fn, /if \(!view\.available\)/);
+        assert.match(fn, /note\.textContent = view\.reason;/);
         assert.match(fn, /Pick a round above to see its leaderboard/);
     });
 
@@ -803,9 +805,14 @@ describe('EVENT VIEW — one renderer, three sources', () => {
     });
 
     test('every board caches the UNFILTERED field for the prize calculator', () => {
+        // RE-PINNED, wave 10. One shared resolution replaced the three inline
+        // ones; what matters is unchanged and is asserted directly - the cache is
+        // taken without a flight, so every view caches the whole field.
         const fn = fnBody(src(), 'renderLeaderboard');
-        assert.match(fn, /cachedLeaderboardRows = computeEventStandings\(currentData\)\.rows/);
-        assert.match(fn, /cachedLeaderboardRows = computeRoundLeaderboard\(currentData, viewing\);/);
-        assert.ok(!/cachedLeaderboardRows = rows;/.test(fn));
+        const cacheLine = /cachedLeaderboardRows = resolveLeaderboardView\(([^)]*)\)\.rows;/.exec(fn);
+        assert.ok(cacheLine, 'the payout cache must come from the shared resolution');
+        assert.ok(!/lbFlightId/.test(cacheLine[1]),
+            'the cache must be the UNFILTERED field on every view');
+        assert.ok(!/cachedLeaderboardRows = rows;|cachedLeaderboardRows = view\.rows;/.test(fn));
     });
 });
