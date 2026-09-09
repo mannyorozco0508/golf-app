@@ -56,16 +56,47 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 - App Store Connect record exists: Rattle Golf, bundle `com.rattlegolf.app`, Apple ID 6808220335
 - **Build 8 was archived on 2026-09-06** carrying web v71. `CURRENT_PROJECT_VERSION = 8` in the project. Internal group "Beta Testers" with automatic distribution on
 - **DO NOT USE BUILD 9 — it cannot share a round.** Inside the iOS wrapper the page is served from `capacitor://localhost`, so every share URL built from the page's own location came out as `capacitor://localhost/index.html?game=CODE`, which nobody who receives it can open. That broke the invite link, the QR, every group scorekeeper link, the private organizer link, the follow link and the trip link at once. Fixed in v74; build 10 carries it
-- **The bundle is synced to v82. `CURRENT_PROJECT_VERSION` is 17, WHICH IS ALREADY USED — bump it to 18 before archiving.** The bundle state is verified by `native_bundle_freshness_test.js`, which hashes every shipped file against its repo twin — not by reading this sentence, which is the point. **Builds 14, 15, 16 and 17 shipped the BUILD 13 BUNDLE**: the sync was last run on 2026-09-07, and the four builds after it were archived from those same web assets. Build 17 was still running the three-copy save-button restore, so over-allocating the Main Pool alerted once and left Save & Start Round dead — the round had to be wiped and started over. Do not trust builds 14–17 for anything below. Build 13 is the one Marty's Monday game is played on: skins that do not carry unless somebody said so, and a receipt PDF that contains the money. Build 12 was the first that could join a Cup from day 2, share a round from a code, and refuse a trip recap it cannot attribute. v75 is the one that matters for sharing: on v74 and earlier a foursome could create, save and start a round with **nothing to send anybody** — the only share surface was a card on the setup screen offering a link before the round existed, and the Round Ready panel behind it rendered a sentence telling the organizer to read the round code aloud. v75 also stops the wizard silently deleting a configured Nassau when you tap Back, and makes the Review say what will actually be saved.
+- **The bundle is synced to v82. `CURRENT_PROJECT_VERSION` is 20, and builds 18, 19 and 20 have been cut — bump to 21 before the next archive.** The bundle state is verified by `native_bundle_freshness_test.js`, which hashes every shipped file against its repo twin — not by reading this sentence, which is the point. **Builds 14, 15, 16 and 17 shipped the BUILD 13 BUNDLE**: the sync was last run on 2026-09-07, and the four builds after it were archived from those same web assets. Build 17 was still running the three-copy save-button restore, so over-allocating the Main Pool alerted once and left Save & Start Round dead — the round had to be wiped and started over. Do not trust builds 14–17 for anything below. Build 13 is the one Marty's Monday game is played on: skins that do not carry unless somebody said so, and a receipt PDF that contains the money. Build 12 was the first that could join a Cup from day 2, share a round from a code, and refuse a trip recap it cannot attribute. v75 is the one that matters for sharing: on v74 and earlier a foursome could create, save and start a round with **nothing to send anybody** — the only share surface was a card on the setup screen offering a link before the round existed, and the Round Ready panel behind it rendered a sentence telling the organizer to read the round code aloud. v75 also stops the wizard silently deleting a configured Nassau when you tap Back, and makes the Review say what will actually be saved.
 - **v75 went into build 11, v74 into build 10.** It was previously synced to v73. v73 is the one that matters: before it, a Nassau set up as $10 front / $10 back / $20 overall settled every segment at $20, and because each auto-press inherits its segment's price the cascade multiplied it — $200 on a wager whose face value was $40. Any build before 9 overcharges every split-stake Nassau it settles
 - **Build 8 carried web v71, not v72 — and it happened again, for four builds running.** The native bundle is synced by hand, so it is a snapshot of whenever `node sync-mobile-web.js && npx cap sync ios` last ran — never automatically whatever `main` holds. This paragraph was written after the first time and did not prevent the second, because the failure is an omitted command and prose does not fail. `native_bundle_freshness_test.js` now does: it runs in `npm test`, hashes every declared file in `ios/App/App/public/` against the repo root, and says which of the two hops was skipped. A tree that has never been synced at all SKIPS with the reason printed — a missing bundle cannot ship, a stale one can. v72 (the setup page's link copy, the quiet End control, the back button on admin) is on the web and NOT in that build. Check `ios/App/App/public/sw.js` for what a build actually contains; do not infer it from the repo
 - Signing works via automatic signing. The long-running failure was that my team had **zero registered devices**, so Apple would not issue a development profile. Plugging in my iPhone and enabling Developer Mode fixed it. Nothing in `project.pbxproj` was ever wrong — don't go looking there
 - Export compliance answer is "None of the algorithms mentioned above" (HTTPS via the OS only)
-- Privacy policy live at `golf-app-5a5.pages.dev/privacy.html`
+- **The support address is `support@rattlegolf.com`, live and verified.** Cloudflare Email Routing on `rattlegolf.com`, forwarding to Manny's Gmail, catch-all on. It went live 2026-09-09 and replaced the old `rattlegolf.app` address in `support.html`, `terms.html` and `privacy.html`
+- **Manny owns `rattlegolf.com`. He does NOT own `rattlegolf.app`.** Mail to the old address bounced or reached a stranger. (This file deliberately does not spell that address out in full: `HANDOFF.md` is scanned by the same repo-wide rule, and writing it here would re-create the failure the rule exists to catch.) `support_contact_test.js` refuses any email at `rattlegolf.app` repo-wide, and refuses the string in any form at all on the three golfer-facing pages
+- **`com.rattlegolf.app` is the permanent iOS bundle id and is NOT a domain reference.** A reverse-DNS bundle id requires no ownership, and it cannot change once the App Store Connect record exists. It appears in **8 files**: `capacitor.config.ts`, `ios/App/App.xcodeproj/project.pbxproj`, `native_packaging_test.js`, `rattle_identity_test.js`, `support_contact_test.js`, `native-ios-release-check.md`, `product-separation.md`, `HANDOFF.md`. Changing it would not rename the app — it would create a different one and orphan Apple ID 6808220335, the TestFlight builds and the reviews
+- Privacy policy live at `golf-app-5a5.pages.dev/privacy.html`, support at `/support.html`, terms at `/terms.html`. **Cloudflare serves clean URLs**: `/privacy.html` answers 308 and redirects to `/privacy`, which is 200. Both forms work; use whichever App Store Connect accepts. Verified served 2026-09-09, byte-identical to commit `1eb5c90`
 
 **Not done yet:** external TestFlight testers, the EU trader declaration (required or the app is pulled from the EU store), and the Paid Apps Agreement (required for any in-app purchase; needs banking and tax info).
 
 To ship a new build: `node sync-mobile-web.js && npx cap sync ios`, **then `npm test` — `native_bundle_freshness_test.js` is what proves the sync actually landed**, bump **Build** in Xcode (Version stays 1.0.0), Archive, Distribute → App Store Connect. Running the test after the archive proves nothing about the archive; run it before.
+
+## A test that reads `git ls-files` cannot see itself until it is committed
+
+`support_contact_test.js` forbids any email address at `rattlegolf.app`. To explain
+the defect it has to **write that address down**, and to name its own control it
+writes a second invented address at the same domain. It scans `git ls-files`, which
+lists **tracked** files — and while it was being written it was untracked, so it never
+scanned itself. (Neither address is spelled out in this file, for the same reason:
+`HANDOFF.md` is scanned by that rule too, and it caught two attempts to write them
+into this very paragraph.)
+
+It reported green on every run. Manny ran `npm test` green. Claude Code ran the full
+suite green. **Both runs were honest and both were blind to the same thing**, because
+the input set was defined by something neither of them changed until the commit. The
+moment `git add` tracked the file, `main` went red on the test's own documentation.
+
+**The rule.** When a check derives its input from repository state — `git ls-files`,
+a glob, a directory walk, a declared list — ask what that input set looks like *after*
+the commit, not just now. A test that is not yet in the set it scans has not been run.
+The cheapest way to find out is `git add -N` before the final run, so the file is
+listed without being staged for content.
+
+**And the second half: a green suite is not proof the suite saw the change.** This was
+caught by a tarball check *after* the push — refetching the branch and grepping the
+extracted files, which has no notion of tracked or untracked and simply reads what is
+there. That is why the deploy verification exists and why it is not redundant with
+`npm test`: they take different inputs, and the difference between them is exactly
+where this class of defect lives.
 
 ## A removed control is not always safe to restore as it was
 
