@@ -1835,6 +1835,37 @@ html {
         return String(n);
     }
 
+    // NO TWO GOLFERS MAY SHARE A VISIBLE LABEL.
+    //
+    // The Full Card header showed p.name.split(" ")[0] and nothing else. On live
+    // round Y5VGXM the record held "Player 1" through "Player 8" - DISTINCT names,
+    // which is exactly why settlement does not refuse that round - and the header
+    // deleted the only character that told them apart. Eight columns read "Player".
+    //
+    // First names are still the right default: "Marty" fits a 360px phone and
+    // "Marty Sharp" does not, and a group knows each other by first name. So this
+    // shortens by default and STOPS SHORTENING WHERE IT WOULD LIE. If two golfers
+    // in the set being rendered reduce to the same first word, both of them keep
+    // their full name; everybody else is unaffected.
+    //
+    // SCOPED TO THE SET BEING RENDERED, which on a group scorekeeper link is that
+    // foursome. Two "Marty"s in different groups never appear side by side, so
+    // widening both columns for a collision nobody can see would be a cost paid for
+    // nothing.
+    //
+    // WHAT IT CANNOT FIX. If two golfers carry the identical FULL name there is no
+    // string that separates them, and this returns that name twice - deliberately,
+    // because inventing "Marty (2)" would put a label on the card that is not the
+    // golfer's name. That round is already refused by duplicatePlayerNames() before
+    // any money is totalled, on both the Receipt and the Finish Round panel.
+    function shortPlayerLabels(list) {
+        const full = (list || []).map(p => String((p && p.name) || '').trim());
+        const first = full.map((n, i) => n.split(/\s+/)[0] || full[i]);
+        const seen = {};
+        first.forEach(f => { seen[f] = (seen[f] || 0) + 1; });
+        return first.map((f, i) => (seen[f] > 1 ? (full[i] || f) : f));
+    }
+
     // Attribute-safe. Player names are user-entered and land in a data- attribute.
     function escapeAttr(v) {
         return String(v === undefined || v === null ? '' : v)
@@ -3166,7 +3197,14 @@ html {
                 : '<span class="lb-net">\u2014</span>';
             html += '<div class="lb-row">'
                  + '<span class="lb-c-pos">' + r.positionLabel + '</span>'
-                 + '<span class="lb-c-name">' + esc(r.name) + '<span class="lb-hcp">HCP ' + esc(r.hcp) + '</span></span>'
+                 // THROUGH THE SAME FORMATTER THE CARD USES, not a second one. This
+                 // interpolated r.hcp raw, so a stored "" printed the bare label "HCP "
+                 // and the gross in the next span read as the handicap:
+                 // "Player 1 HCP 90 Net 90". formatHcpDisplay is what the Full Card
+                 // header and Hole View have always used for the same value, and a
+                 // plus handicap depends on it too - a scratch golfer reads "HCP 0"
+                 // and a plus-2 reads "HCP +2", never the internal "-2".
+                 + '<span class="lb-c-name">' + esc(r.name) + '<span class="lb-hcp">HCP ' + esc(formatHcpDisplay(r.hcp)) + '</span></span>'
                  + '<span class="lb-c-score">' + score + '</span>'
                  + '<span class="lb-c-par">' + (r.started ? formatToPar(r.toPar) : '\u2014') + '</span>'
                  + '<span class="lb-c-thru">' + r.thru + '</span>'
@@ -7483,10 +7521,16 @@ html {
         // data-player-name carries the bare name because Hole View re-reads these
         // header cells to label its rows; without it the added HCP line would be
         // concatenated straight into the name and every row would read "LeeHCP 5".
-        filteredPlayers.forEach(p => {
-            const first = p.name.split(" ")[0];
-            headRow.innerHTML += `<th data-player-name="${escapeAttr(first)}">`
-                + `<span class="fc-name">${first}</span>`
+        // ONE BUILDER FOR THE WHOLE HEADER. Hole View re-reads data-player-name from
+        // these cells, so the label and the attribute must be the same string - and
+        // computing the set once is what lets a collision be seen at all. A per-player
+        // shortener cannot know that the golfer three columns over reduces to the
+        // same word.
+        const fcLabels = shortPlayerLabels(filteredPlayers);
+        filteredPlayers.forEach((p, i) => {
+            const label = fcLabels[i];
+            headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}">`
+                + `<span class="fc-name">${label}</span>`
                 + `<span class="fc-hcp">HCP ${formatHcpDisplay(p.hcp)}</span></th>`;
         });
 

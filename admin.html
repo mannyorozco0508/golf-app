@@ -5212,6 +5212,46 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // belongs.
             if (loadedExistingRound) delete payload.settlementMode;
 
+            // UNNAMED GOLFERS ARE A CHOICE. THIS IS WHERE IT GETS MADE.
+            //
+            // A blank name box is saved as `Player ${idx + 1}` a few lines above.
+            // Inside one round those names are distinct and the money is correct -
+            // duplicatePlayerNames() deliberately does not refuse them. The cost is
+            // ACROSS rounds: isPlaceholderPlayerName() makes every one of them
+            // unmatchable, so the round can never join a trip or a Ryder Cup. Live
+            // round Y5VGXM was created exactly this way - eight golfers, every name
+            // a placeholder, a $40 buy-in pool - and nothing on screen said a word.
+            //
+            // WARN, DO NOT BLOCK. Starting a round with nobody named is a legitimate
+            // thing to do; a group that never intends to run a trip loses nothing by
+            // it, and being stopped at the first tee to type four names is worse than
+            // the thing being prevented. So this is the LAST thing before the write:
+            // every gate that genuinely refuses has already had its say, so nobody is
+            // asked to confirm a round that is about to be turned down anyway.
+            //
+            // THE SAME PREDICATE THE TRIP USES. isPlaceholderPlayerName lives in
+            // action-model.js and is what cross-round identity actually applies. A
+            // second regex here could drift, and then the warning would name a
+            // consequence that does not happen or miss one that does.
+            //
+            // Guarded on typeof for the same reason every other consumer of that file
+            // is: if the script did not load, the round still saves.
+            const placeholderNames = (typeof isPlaceholderPlayerName === 'function')
+                ? playersList.filter(p => isPlaceholderPlayerName(p.name)).map(p => p.name)
+                : [];
+            if (placeholderNames.length > 0) {
+                const n = placeholderNames.length;
+                const proceed = confirm(
+                    '\u26A0\uFE0F ' + n + (n === 1 ? ' golfer has' : ' golfers have') + ' no name.\n\n'
+                    + 'They will be saved as ' + placeholderNames.slice(0, 2).join(', ')
+                    + (n > 2 ? ' and so on' : '') + '.\n\n'
+                    + 'This round and its money work normally. But a placeholder cannot be '
+                    + 'matched to the same golfer in another round, so this round will not be '
+                    + 'able to join a trip or a Ryder Cup later.\n\n'
+                    + 'OK to start the round anyway, or Cancel to go back and name them.');
+                if (!proceed) return;
+            }
+
             // FROM HERE THE WRITE OWNS THE BUTTON. The finally must not put it back
             // while a save is genuinely in flight - "Saving..." is true at that point.
             handedOff = true;

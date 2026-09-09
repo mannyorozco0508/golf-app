@@ -520,7 +520,31 @@
 //   trip.html hides the recap overlay when printing; it used to print over the page.
 // An installed PWA on v80 carries skins nobody asked to carry and exports a receipt
 // with no money on it.
-const CACHE_VERSION = 'golfapp-v81-skins-do-not-carry-unless-you-said-so';
+// Moved to v82: every golfer gets a label of their own, and HCP says a handicap.
+//   THREE FAULTS OFF ONE LIVE ROUND, Y5VGXM - eight golfers, a $40 buy-in pool, and
+// every name a placeholder.
+//   THE WIZARD SAID NOTHING. admin.html saves a blank name box as `Player N`, and no
+// gate ever mentioned it. Inside one round those names are distinct and the money is
+// correct, so duplicatePlayerNames() rightly does not refuse them - but
+// isPlaceholderPlayerName() makes every one of them unmatchable across rounds, so the
+// round can never join a trip or a Ryder Cup. That decision was being made silently at
+// the moment of the save. It now WARNS AND YIELDS: the count, the consequence, and OK
+// still starts the round. It is the last thing before the write, so nobody confirms a
+// round that is about to be refused anyway.
+//   TWO GOLFERS THE CARD COULD NOT TELL APART. The Full Card header showed
+// name.split(" ")[0], which deleted the only character distinguishing "Player 1" from
+// "Player 4" - eight columns all reading "Player" over a record holding eight distinct
+// names. First names are still the default; shortening now STOPS where two golfers in
+// the rendered set would collide, and both keep their full name. Hole View re-reads
+// those same cells, so it inherits the fix rather than needing its own.
+//   AND THE LEADERBOARD PRINTED THE GROSS AS A HANDICAP. renderLiveBoard interpolated
+// r.hcp raw, so a stored "" gave the bare label "HCP " and the score in the next span
+// landed where the number belongs: "Player 1 HCP 90 Net 90". It goes through
+// formatHcpDisplay now, the same formatter the card header and Hole View already use,
+// so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
+// An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
+// golfers who all read "Player".
+const CACHE_VERSION = 'golfapp-v82-a-label-of-their-own';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

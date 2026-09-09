@@ -88,8 +88,21 @@ const dottedSIs = (calc, p) => cd18
 describe('CHANGE 1 — THE GOLFER\u2019S HANDICAP IN THE HEADER', () => {
 
     test('the header cell carries name AND handicap', () => {
-        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{first\}<\/span>/,
+        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{label\}<\/span>/,
             'the name must stay its own element');
+        // RE-PINNED, NOT WEAKENED. `first` became `label` when the header stopped
+        // being able to show two golfers the same word: p.name.split(" ")[0] deleted
+        // the digit that told "Player 1" from "Player 4", so a live round rendered
+        // eight columns all reading "Player" over eight distinct stored names. The
+        // assertion below is STRONGER than the one it replaces - it pins where the
+        // string comes from, so reverting to a per-player shortener fails here and
+        // not only in tools/name-label-check.js. A per-player expression cannot know
+        // that the golfer three columns over reduces to the same word; only a builder
+        // handed the whole set can.
+        assert.match(renderScorecardSrc, /const fcLabels = shortPlayerLabels\(filteredPlayers\)/,
+            'the labels must be computed across the whole rendered set, not per player');
+        assert.ok(!/const first = p\.name\.split\(" "\)\[0\]/.test(renderScorecardSrc),
+            'the per-player first-word shortener must be gone from the header');
         assert.match(renderScorecardSrc, /<span class="fc-hcp">HCP \$\{formatHcpDisplay\(p\.hcp\)\}<\/span>/,
             'the handicap must render through the golfer-facing formatter');
         assert.ok(!/headRow\.innerHTML \+= `<th>\$\{p\.name\.split\(" "\)\[0\]\}<\/th>`/.test(renderScorecardSrc),
@@ -152,8 +165,15 @@ describe('CHANGE 1 — THE GOLFER\u2019S HANDICAP IN THE HEADER', () => {
     test('a four-player phone layout still emits exactly four header cells', () => {
         const ps = twoVtwo([5, 12, 8, 17]);
         // One <th> per player, each self-contained - the loop body is a single cell.
-        const loop = renderScorecardSrc.slice(renderScorecardSrc.indexOf('filteredPlayers.forEach(p => {'),
-            renderScorecardSrc.indexOf('const matchNoteEl'));
+        const loopAt = renderScorecardSrc.indexOf('filteredPlayers.forEach((p, i) => {');
+        const loop = renderScorecardSrc.slice(loopAt, renderScorecardSrc.indexOf('const matchNoteEl'));
+        // A SLICE THAT TRUNCATES TO NOTHING SATISFIES EVERY COUNT OF ZERO IN IT. The
+        // start marker moved when the loop gained its index (it needs one to read the
+        // labels computed across the set), and indexOf returned -1, so the slice ran
+        // from the end of the string backwards and was empty. Assert the region exists
+        // before counting anything inside it.
+        assert.ok(loopAt > 0, 'the header loop was not found - the rest of this test would guard an empty string');
+        assert.match(loop, /data-player-name=/, 'the slice really is the header loop');
         assert.equal((loop.match(/<th /g) || []).length, 1, 'one cell per golfer, no extra columns');
         assert.equal((loop.match(/<\/th>/g) || []).length, 1);
         assert.equal(ps.length, 4);
@@ -179,7 +199,11 @@ describe('HOLE VIEW STILL READS CLEAN NAMES', () => {
     });
 
     test('there is a data-attribute fallback if querySelector is unavailable', () => {
-        assert.match(renderScorecardSrc, /data-player-name="\$\{escapeAttr\(first\)\}"/);
+        assert.match(renderScorecardSrc, /data-player-name="\$\{escapeAttr\(label\)\}"/);
+        // THE ATTRIBUTE AND THE VISIBLE SPAN MUST BE THE SAME STRING. Hole View reads
+        // .fc-name first and falls back to this attribute, so letting them drift gives
+        // the two views two different answers depending only on which branch ran.
+        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{label\}<\/span>/);
         assert.match(renderHoleViewSrc, /dataset\.playerName/);
     });
 
