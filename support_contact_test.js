@@ -41,6 +41,7 @@ const BUNDLE_ID = 'com.rattlegolf.app';
 
 // An address-shaped token. The local part is deliberately permissive - the point is
 // to catch anything a human might type, not to validate RFC 5322.
+const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const BINARY = /\.(png|jpg|jpeg|gif|ico|pdf|zip|woff2?|ttf|icns|mp4|mov)$/i;
 
@@ -49,13 +50,37 @@ function trackedTextFiles() {
     return out.split('\n').filter(f => f && !BINARY.test(f));
 }
 
+// AN ADDRESS IN A COMMENT IS DOCUMENTATION, NOT SOMETHING THE APP HANDS OUT.
+//
+// THIS FILE IS WHY. It has to WRITE the forbidden address down to explain the defect
+// and to name its own controls, so the first version of this test flagged its own
+// header. It did not do so while it was being written, because git ls-files lists
+// TRACKED files and the test was untracked until the commit landed - so it went green
+// on a suite that had never scanned it, and turned main red the moment it did.
+//
+// Comment content is blanked before addresses are extracted, NEWLINES PRESERVED, so
+// reported line numbers still point at the real line. `//` is only a comment when it
+// is not preceded by a colon, or every https:// URL in the repo would be eaten.
+//
+// THE LIMIT THIS CREATES, and the second rule that closes it: an address hidden in a
+// comment on a page a golfer reads would slip past. So the three CONTACT PAGES are
+// additionally held to a stricter rule below - the string may not appear there at
+// all, commented or not.
+function stripComments(src) {
+    const blank = m => m.replace(/[^\n]/g, ' ');
+    return src
+        .replace(/<!--[\s\S]*?-->/g, blank)
+        .replace(/\/\*[\s\S]*?\*\//g, blank)
+        .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + blank(m.slice(p1.length)));
+}
+
 // Every address in the repo, with the file and line it sits on.
 function allEmails() {
     const found = [];
     trackedTextFiles().forEach(rel => {
         let src;
         try { src = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8'); } catch (e) { return; }
-        src.split('\n').forEach((line, i) => {
+        stripComments(src).split('\n').forEach((line, i) => {
             const m = line.match(EMAIL);
             if (!m) return;
             // de-duplicated per line: a mailto: link repeats the address as its text,
@@ -107,6 +132,23 @@ describe('THE SUPPORT ADDRESS IS AT A DOMAIN WE OWN', () => {
         });
         assert.deepEqual(missing, [],
             'these pages carry no address at ' + GOOD_DOMAIN + ': ' + missing.join(', '));
+    });
+
+    // THE PAGES A GOLFER READS ARE HELD STRICTER THAN THE REST OF THE REPO.
+    //
+    // Comment-blanking above is right for source and test files, and it opens exactly
+    // one hole: a bad address commented out on a contact page would pass. There is no
+    // legitimate reason for the string to appear on those three pages in any form, so
+    // they are checked raw - markup, comments and all.
+    test('the contact pages do not mention the wrong domain at all, even in a comment', () => {
+        const CONTACT_PAGES = ['support.html', 'terms.html', 'privacy.html'];
+        const offenders = CONTACT_PAGES.filter(p =>
+            read(p).toLowerCase().includes(BAD_DOMAIN));
+        assert.deepEqual(offenders, [],
+            'these golfer-facing pages mention ' + BAD_DOMAIN + ' somewhere: '
+            + offenders.join(', ') + '\n  On these three files the rule is raw text, not '
+            + 'just live markup - a commented-out address is one uncomment away from '
+            + 'being handed to somebody.');
     });
 
     // ---- THE BUNDLE ID IS NOT AN EMAIL, AND MUST SURVIVE ------------------
