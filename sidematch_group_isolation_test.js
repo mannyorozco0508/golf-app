@@ -302,10 +302,9 @@ describe('IDENTITY IS NOT AUTHORIZATION', () => {
 // ---------------------------------------------------------------------------
 describe('CREATION — a group link cannot build a wager out of other groups', () => {
     function pick(b, aIds, bIds) {
-        const state = {};
-        aIds.forEach(id => { state[String(id)] = 'a'; });
-        bIds.forEach(id => { state[String(id)] = 'b'; });
-        b.run(`sidematchPickState = ${JSON.stringify(state)};`);
+        // TAP ORDER, NOT A SIDE MAP - one side tapped first, then the other.
+        const state = aIds.map(String).concat(bIds.map(String));
+        b.run(`sidematchPickOrder = ${JSON.stringify(state)};`);
         b.sb.__setElement('sm-format', 'match');
         b.sb.__setElement('sm-scoring', 'net');
         b.sb.__setElement('sm-stake', '50');
@@ -349,8 +348,13 @@ describe('CREATION — a group link cannot build a wager out of other groups', (
         b.run(`saveSideMatch();`);
         const w = b.writes();
         assert.equal(w.length, 1, 'organizer cross-group creation must not regress');
-        assert.deepEqual(w[0].value.teamAIds, [String(b.g1[0].id)]);
-        assert.deepEqual(w[0].value.teamBIds, [String(b.g2[0].id)]);
+        // NORMALISED ACROSS THE REALM BOUNDARY. sidematchSides() builds these arrays
+        // inside the vm context, and deepStrictEqual compares prototypes - a same-
+        // contents array from another realm fails it. The values are compared
+        // identically; only the wrapper differs.
+        const plain = v => JSON.parse(JSON.stringify(v));
+        assert.deepEqual(plain(w[0].value.teamAIds), [String(b.g1[0].id)]);
+        assert.deepEqual(plain(w[0].value.teamBIds), [String(b.g2[0].id)]);
     });
 
     test('the creation guard sits before the write', () => {

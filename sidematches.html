@@ -259,7 +259,9 @@
         .player-pick-badge.pick-a { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .player-pick-badge.pick-b { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy); }
         .player-pick-badge.on-other-side { opacity: 0.45; }
-        .sm-side-zone-label { font-size: 0.72rem; font-weight: bold; text-transform: uppercase; color: var(--text-muted); margin: 10px 0 4px 0; }
+        /* The tap position, shown on the badge, because the order is now the only
+           thing that decides which side a golfer is on. */
+        .sm-pick-order { display: inline-block; min-width: 14px; margin-right: 5px; text-align: center; border-radius: 7px; background: rgba(255,255,255,0.28); font-size: 0.65rem; line-height: 14px; }
 
         /* MAGIC PDF HIDING CSS */
         @media print {
@@ -548,11 +550,12 @@ html {
         </div>
 
         <div id="sm-picker-box">
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Build 1v1 or 2v2 sides — every format supports both. Tap a golfer under the side you want them on. Tap again to remove them, or tap them under the other side to move them there.</div>
-        <div class="sm-side-zone-label">Side 1 (green)</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap two golfers for a 1v1, or four for a 2v2. The first half of your taps is one side, the rest are the other. Tap a name again to take it back out.</div>
+        <!-- ONE ROSTER, LISTED ONCE. This was the whole field TWICE - once under
+             "Side 1 (green)" and again under "Side 2 (navy)" - so a twelve-golfer
+             round offered twenty-four tappable names to set up a bet between two of
+             them, and the organizer had to decide a colour before tapping. -->
         <div id="sm-player-picker-a" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-        <div class="sm-side-zone-label">Side 2 (navy)</div>
-        <div id="sm-player-picker-b" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
         <div id="sm-team-size-indicator" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin-top:10px; margin-bottom:8px;"></div>
         <div id="sm-preview" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.85rem;"></div>
         </div>
@@ -1159,7 +1162,40 @@ html {
     }
 
     // --- SIDE MATCHES (Cross-Group 1v1 / 2v2) ---
-    let sidematchPickState = {}; // { playerId: 'a'|'b' }
+    // TAP ORDER IS THE MODEL. This was { playerId: 'a'|'b' }, which cannot express
+    // order at all - and Object.keys returns INTEGER-LIKE KEYS IN ASCENDING NUMERIC
+    // ORDER regardless of insertion, so even reading it back could not recover who
+    // was tapped first.
+    let sidematchPickOrder = []; // [playerId, ...] in the order they were tapped
+
+    // THE SIDES, DERIVED IN ONE PLACE.
+    //
+    // First half of the taps is one side, the second half the other:
+    //     Dan, Rich              -> Dan vs Rich
+    //     Dan, Steve, Rich, Jim  -> Dan & Steve vs Rich & Jim
+    // An odd number of taps is an INCOMPLETE selection, not a lopsided match, so it
+    // returns uneven sides and every existing guard refuses it exactly as before.
+    //
+    // SORTED ASCENDING WITHIN EACH SIDE, deliberately. The old screen derived each
+    // side with Object.keys(...).filter(...), which is ascending numeric, so its
+    // teamAIds were always ascending. Tap order is the input now; without this sort
+    // the same 2v2 would write ["105","103"] where the old screen wrote
+    // ["103","105"] - the same set, different bytes. Nothing reads order within a
+    // side (a 2v2 side is scored best ball), so this is faithfulness to the stored
+    // shape rather than a behaviour anyone depends on.
+    //
+    // THREE CALL SITES USED TO DERIVE THIS BY HAND, identically. One builder now, for
+    // the same reason action-model.js owns the Nassau label: a hand-written copy in
+    // each place is how this project has already shipped a divergence.
+    function sidematchSides() {
+        const ids = sidematchPickOrder.slice();
+        const half = Math.floor(ids.length / 2);
+        const asc = list => list.slice().sort((a, b) => Number(a) - Number(b));
+        // An odd count splits so the FIRST side holds the extra - "Dan & Steve vs
+        // Rich" - which is what the pairing line shows while a 2v2 is half built.
+        const cut = ids.length % 2 === 0 ? half : half + 1;
+        return { teamAIds: asc(ids.slice(0, cut)), teamBIds: asc(ids.slice(cut)) };
+    }
 
     // ---- ACTION SCOPE -------------------------------------------------------
     // Every new wager is created as one of two things, and the golfer says which:
@@ -1192,7 +1228,7 @@ html {
     }
 
     function openSideMatchModal() {
-        sidematchPickState = {};
+        sidematchPickOrder = [];
         fieldActionPick = {};
         actionScope = null;
         actionOwnerGroup = null;
@@ -1571,7 +1607,11 @@ html {
         const groupMap = buildPlayerGroupMap();
         const distinctGroups = new Set(Object.values(groupMap)).size;
 
-        function renderZone(containerId, side) {
+        // ONE ROSTER. Every golfer appears exactly once, still grouped by foursome so
+        // a name is easy to find, and a tapped golfer carries the position they were
+        // tapped in - which is the only thing that decides sides now, so it is the
+        // thing the badge has to show.
+        function renderRoster(containerId) {
             const wrapper = document.getElementById(containerId);
             if (!wrapper) return;
             let html = "";
@@ -1579,28 +1619,31 @@ html {
             // foursome - otherwise "Avery vs Indigo" is just two names.
             const showHeads = actionScope === 'cross' && distinctGroups > 1;
             let lastGroup = null;
+            const sides = sidematchSides();
             players.forEach(p => {
                 const grp = groupMap[String(p.id)];
                 if (showHeads && grp !== lastGroup) {
                     html += `<div class="sm-pick-group-head">Group ${grp || '?'}</div>`;
                     lastGroup = grp;
                 }
-                const currentSide = sidematchPickState[p.id];
-                const isOnThisSide = currentSide === side;
-                const isOnOtherSide = currentSide && currentSide !== side;
-                const cls = isOnThisSide ? (side === 'a' ? 'pick-a' : 'pick-b') : (isOnOtherSide ? 'on-other-side' : '');
+                const pos = sidematchPickOrder.indexOf(String(p.id));
+                // The colour still says WHICH SIDE, but it is derived from the tap
+                // position rather than chosen - the organizer never picks a colour.
+                const cls = pos < 0 ? ''
+                    : (sides.teamAIds.includes(String(p.id)) ? 'pick-a' : 'pick-b');
+                const order = pos < 0 ? ''
+                    : `<span class="sm-pick-order">${pos + 1}</span>`;
                 const cnt = existingCount[p.id] || 0;
                 const tag = cnt > 0 ? ` <span style="opacity:0.75;">(in ${cnt})</span>` : '';
                 // Inside a group game every name is in the same group, so the tag is noise.
                 const groupTag = (!showHeads && distinctGroups > 1 && actionScope !== 'group')
                     ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${grp || '?'}</span>` : '';
-                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}', '${side}')">${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
+                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}')">${order}${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
             });
             wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
         }
 
-        renderZone('sm-player-picker-a', 'a');
-        renderZone('sm-player-picker-b', 'b');
+        renderRoster('sm-player-picker-a');
         updateSideMatchPickerFeedback();
     }
 
@@ -1610,37 +1653,40 @@ html {
     // ball in all three. Stroke Play used to be capped at one golfer per side here,
     // which was stale rather than protective: settlement-engine.js has scored a full
     // stroke side since the 2v2 regression fix, and the cap never guarded the write
-    // anyway - sidematchPickState survives a format change, so picking 2v2 under Match
+    // anyway - the selection survives a format change, so picking 2v2 under Match
     // Play and switching to Stroke Play walked straight past it. The supported shape is
     // now stated once, here and again at the save boundary, and the formats agree.
     const MAX_PER_SIDE = 2;
 
-    // Fully deterministic — no auto-balancing, ever. Tapping a golfer under a side always does
-    // exactly one of three predictable things:
-    //   - not currently on either side -> assigned to the tapped side (unless that side is
-    //     already full, in which case nothing happens and a clear message explains why)
-    //   - already on the OTHER side -> moves to the tapped side (a deliberate one-tap move,
-    //     never a silent one — the organizer tapped that specific zone on purpose)
-    //   - already on THIS side -> removed (toggle off)
+    // Fully deterministic - no auto-balancing, ever. A tap does exactly one of three
+    // predictable things:
+    //   - not selected -> appended to the end of the order (unless four are already
+    //     picked, in which case nothing changes and a clear message explains why)
+    //   - already selected -> REMOVED, and everyone after them shifts up one place,
+    //     which is what a numbered list has to do to stay honest. Tapping Steve out of
+    //     "Dan, Steve, Rich" leaves "Dan, Rich" - a finished 1v1 - not a gap.
+    //   - a fifth tap -> refused with the reason on screen
     //
-    // A golfer is a KEY in sidematchPickState, so being on both sides at once is not a
-    // state this can produce - a tap on the other side moves them, it does not add them.
-    function pickPlayerForSide(playerId, side) {
-        const current = sidematchPickState[playerId];
-        const maxPerSide = MAX_PER_SIDE;
+    // A golfer appears ONCE in the order, so being on both sides at once is not a state
+    // this can produce.
+    //
+    // THE SECOND ARGUMENT IS GONE. It named the zone that was tapped, and there are no
+    // zones any more. The function keeps its name because it is what the roster's own
+    // onclick calls and what several tests drive; an extra argument from an old caller
+    // is simply ignored.
+    function pickPlayerForSide(playerId) {
+        const id = String(playerId);
+        const at = sidematchPickOrder.indexOf(id);
 
-        if (current === side) {
-            delete sidematchPickState[playerId];
+        if (at >= 0) {
+            sidematchPickOrder.splice(at, 1);
         } else {
-            const sideCount = Object.values(sidematchPickState).filter(s => s === side).length;
-            if (sideCount >= maxPerSide) {
-                const label = side === 'a' ? 'Side 1' : 'Side 2';
-                const limitReason = `${label} already has ${maxPerSide}`;
-                document.getElementById('sm-team-size-indicator').innerHTML = `<span style="color:var(--accent-red);">⚠️ ${limitReason} — remove someone from ${label} first.</span>`;
+            if (sidematchPickOrder.length >= MAX_PER_SIDE * 2) {
+                document.getElementById('sm-team-size-indicator').innerHTML = `<span style="color:var(--accent-red);">⚠️ That is four golfers already — tap one of them to take it back out.</span>`;
                 document.getElementById('sm-preview').style.display = 'none';
-                return; // no silent reassignment — nothing changes until the organizer frees up a spot
+                return; // no silent reassignment — nothing changes until a spot is freed
             }
-            sidematchPickState[playerId] = side;
+            sidematchPickOrder.push(id);
         }
         renderSideMatchPicker();
         // The safe default depends on WHO is in the match - a cross-group bet starts
@@ -1657,17 +1703,36 @@ html {
         if (!indicator || !preview) return;
 
         const players = currentData.players || [];
-        const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
-        const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
+        const { teamAIds, teamBIds } = sidematchSides();
         const format = document.getElementById('sm-format') ? document.getElementById('sm-format').value : 'match';
 
-        if (teamAIds.length === 0 && teamBIds.length === 0) {
-            indicator.textContent = 'Tap players above to build each side.';
+        // THE PAIRING IN PLAIN WORDS, and it is the ONLY feedback now - it replaced the
+        // "Side 1 (green)" / "Side 2 (navy)" headings outright. Built from the same
+        // sidematchSides() the write uses, so what the organizer reads and what gets
+        // stored cannot disagree.
+        const firstName = id => {
+            const p = players.find(x => String(x.id) === String(id));
+            return p ? p.name.split(' ')[0] : id;
+        };
+        const nameList = ids => ids.map(firstName).join(' & ');
+
+        if (sidematchPickOrder.length === 0) {
+            indicator.textContent = 'Tap two golfers for a 1v1, or four for a 2v2.';
+            preview.style.display = 'none';
+            return;
+        }
+        // ONE TAP IS NOT A PAIRING, and must not be shown as one. Naming the golfer
+        // picked so far confirms the tap landed; "vs" would claim a match that has
+        // nobody on the other side.
+        if (sidematchPickOrder.length === 1) {
+            indicator.innerHTML = `<span style="color:var(--text-muted);">${nameList([sidematchPickOrder[0]])} — tap the golfer they are playing.</span>`;
             preview.style.display = 'none';
             return;
         }
         if (teamAIds.length !== teamBIds.length) {
-            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Uneven sides — pick the same number on each side.</span>`;
+            // Three taps: show the pairing as it stands AND what is missing, rather
+            // than a bare refusal that makes the organizer count.
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ ${nameList(teamAIds)} vs ${nameList(teamBIds)} — tap one more to make it 2v2.</span>`;
             preview.style.display = 'none';
             return;
         }
@@ -1689,8 +1754,11 @@ html {
             return;
         }
 
-        const sizeLabel = teamAIds.length === 1 ? '1v1' : `${teamAIds.length}v${teamBIds.length}`;
-        indicator.innerHTML = `<span style="color:var(--brand-green);">✅ ${sizeLabel}</span>`;
+        // THE PAIRING, IN PLAIN WORDS. This said "1v1" / "2v2" while the names sat in a
+        // separate preview box below - two places to look, and the size is the part a
+        // golfer can already see. It reads "Dan vs Rich" and "Dan & Steve vs Rich & Jim"
+        // now, which is the line that replaced the Side 1 / Side 2 headings.
+        indicator.innerHTML = `<span style="color:var(--brand-green);">✅ ${nameList(teamAIds)} vs ${nameList(teamBIds)}</span>`;
 
         const teamAPlayers = players.filter(p => teamAIds.includes(String(p.id)));
         const teamBPlayers = players.filter(p => teamBIds.includes(String(p.id)));
@@ -1997,8 +2065,7 @@ html {
         const sel = document.getElementById('sm-start-hole');
         if (!sel) return;
         const holes = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
-        const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
+        const { teamAIds, teamBIds } = sidematchSides();
         const parts = (currentData.players || [])
             .filter(p => teamAIds.includes(String(p.id)) || teamBIds.includes(String(p.id)));
         const auto = (typeof sideMatchStartHole === 'function')
@@ -2126,23 +2193,27 @@ html {
         const chosenFormat = document.getElementById("sm-format").value;
         if (isFieldAction(chosenFormat)) { saveFieldAction(chosenFormat); return; }
 
-        const teamAIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'a');
-        const teamBIds = Object.keys(sidematchPickState).filter(id => sidematchPickState[id] === 'b');
+        const { teamAIds, teamBIds } = sidematchSides();
         const format = document.getElementById("sm-format").value;
 
         // THE CONTRACT, ENFORCED WHERE IT COUNTS.
         //
         // The picker limits what can be built; this limits what can be SAVED, and the
         // two are deliberately separate. A picker-only rule is not a rule: the old
-        // Stroke Play cap lived solely in pickPlayerForSide(), sidematchPickState is
+        // Stroke Play cap lived solely in pickPlayerForSide(), the selection is
         // cleared only by openSideMatchModal(), and nothing here re-checked it - so a
         // format switch carried an unsupported selection through to storage. Every
         // format now has the same supported shape and it is checked again on the way
         // out, so the old loophole leads somewhere valid instead of somewhere wrong.
         //
         // 1 vs 1 or 2 vs 2. Equal sides, at least one golfer each, never more than two.
+        // AN INCOMPLETE SELECTION SAYS WHY. One tap or three is not a match, and this
+        // is the surface where a silent return has already cost a round: the pool gate
+        // used to alert once and leave Save & Start Round dead. It names the count so
+        // the organizer does not have to go back and tally the roster.
         if (teamAIds.length < 1 || teamBIds.length < 1 || teamAIds.length !== teamBIds.length) {
-            alert("⚠️ Pick an equal number of players per side — 1 vs 1 or 2 vs 2.");
+            const n = teamAIds.length + teamBIds.length;
+            alert(`\u26A0\uFE0F Tap two golfers for a 1v1, or four for a 2v2 — you have picked ${n}.`);
             return;
         }
         if (teamAIds.length > MAX_PER_SIDE || teamBIds.length > MAX_PER_SIDE) {
@@ -2152,7 +2223,7 @@ html {
 
         // ONE GOLFER, ONE SIDE, BY CONSTRUCTION.
         //
-        // There is deliberately no overlap check here. sidematchPickState maps a golfer
+        // There is deliberately no overlap check here. The tap order holds a golfer
         // to ONE side - they are keys, and both arrays above are Object.keys() of that
         // same map partitioned by value - so a golfer on both sides is not a state this
         // page can hold. pickPlayerForSide() enforces it where it is real: tapping the

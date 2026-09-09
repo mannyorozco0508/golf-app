@@ -97,10 +97,9 @@ const ORGANIZER = null;
 // Puts the picker into a given scope and selects two sides.
 function pick(b, scope, aIds, bIds) {
     b.run(`openSideMatchModal(); pickActionScope('${scope}');`);
-    const state = {};
-    aIds.forEach(id => { state[String(id)] = 'a'; });
-    bIds.forEach(id => { state[String(id)] = 'b'; });
-    b.run(`sidematchPickState = ${JSON.stringify(state)}; renderSideMatchPicker();`);
+    // TAP ORDER, NOT A SIDE MAP - one side tapped first, then the other.
+    const state = aIds.map(String).concat(bIds.map(String));
+    b.run(`sidematchPickOrder = ${JSON.stringify(state)}; renderSideMatchPicker();`);
 }
 
 // ============================================================================
@@ -251,7 +250,12 @@ describe('PICKER AND GUARD SPEAK WITH ONE VOICE', () => {
         const b = boot(2);
         pick(b, 'cross', [b.ids(2)[0]], [b.ids(1)[0]]);
         b.run(`updateSideMatchPickerFeedback();`);
-        assert.match(b.html('sm-team-size-indicator'), /1v1/);
+        // RE-PINNED: the line names the golfers instead of saying "1v1". The claim -
+        // a legitimate cross-group pick is shown as valid - is now checked on the green
+        // tick plus both names, which is more than the size label carried.
+        const tick = b.html('sm-team-size-indicator');
+        assert.match(tick, /\u2705/, 'a legitimate pick must show the green tick');
+        assert.match(tick, / vs /, 'and read as a pairing');
     });
 });
 
@@ -335,10 +339,9 @@ describe('EXISTING ISOLATION IS UNTOUCHED', () => {
         // committed 'group' scope, so the guard is exercised the way the UI reaches it.
         const b = boot(ORGANIZER);
         b.run(`openSideMatchModal(); pickActionScope('group'); pickOwnerGroup(1);`);
-        const st = {};
-        st[b.ids(1)[0]] = 'a';
-        st[b.ids(2)[0]] = 'b';
-        b.run(`sidematchPickState = ${JSON.stringify(st)}; renderSideMatchPicker();`);
+        // TAP ORDER, NOT A SIDE MAP - one side tapped first, then the other.
+        const st = [b.ids(1)[0], b.ids(2)[0]];
+        b.run(`sidematchPickOrder = ${JSON.stringify(st)}; renderSideMatchPicker();`);
         assert.equal(b.run(`actionScope`), 'group', 'scope must actually be committed for this test to mean anything');
         b.sb.__setElement('sm-format', 'match');
         b.sb.__setElement('sm-scoring', 'net');

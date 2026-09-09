@@ -32,7 +32,7 @@
 // out while the Matches tab that created the match showed ALL SQUARE and $0.
 //
 // Batch 1 proved that is reachable today: pickPlayerForSide() caps a stroke match
-// at one golfer per side, but the cap lives in the PICKER only, sidematchPickState
+// at one golfer per side, but the cap lives in the PICKER only, sidematchPickOrder
 // is cleared solely by openSideMatchModal(), and saveSideMatch() never re-applies
 // the stroke-specific limit at the write boundary. Pick 2v2 under Match Play,
 // switch the format, save.
@@ -556,7 +556,7 @@ describe('FIXED IN BATCH 3 — stats.html now agrees with canonical on 2v2', () 
 //
 // BATCH 1 wrote this section to prove a 2v2 stroke match was reachable BY ACCIDENT:
 // pickPlayerForSide() capped a stroke side at one golfer, but the cap lived in the
-// picker only, sidematchPickState survives a format change, and saveSideMatch()
+// picker only, sidematchPickOrder survives a format change, and saveSideMatch()
 // never re-checked it. Pick 2v2 under Match Play, switch format, save.
 //
 // BATCH 2b removed the accident by making the behaviour intentional. Stroke Play
@@ -591,7 +591,7 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
             return ref;
         };
 
-        // Round state. currentData / currentMode / sidematchPickState are top-level
+        // Round state. currentData / currentMode / sidematchPickOrder are top-level
         // `let` bindings inside the page's inline script, so they live in the
         // context's lexical scope rather than on the sandbox object - they are set
         // by running a statement in the SAME context, which is how the page itself
@@ -600,12 +600,12 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
             'currentMode = "TESTCD";' +
             'currentData = { players: ' + JSON.stringify(roster || FOURSOME) + ', courseData: [], scores: {} };' +
             'lockedGroup = null; hasGroupLock = false;' +
-            'sidematchPickState = {}; actionScope = null; actionOwnerGroup = null;',
+            'sidematchPickOrder = []; actionScope = null; actionOwnerGroup = null;',
             sb
         );
 
         const setField = (id, value) => { sb.document.getElementById(id).value = value; };
-        const pickState = () => plain(vm.runInContext('sidematchPickState', sb));
+        const pickState = () => plain(vm.runInContext('sidematchPickOrder', sb));
         const alerts = [];
         sb.alert = (msg) => alerts.push(String(msg));
         return { sb, writes, setField, pickState, alerts };
@@ -636,7 +636,10 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         return ctx.writes;
     }
 
-    const pick = (ctx, player, side) => ctx.sb.pickPlayerForSide(String(player.id), side);
+    // THE SIDE ARGUMENT IS GONE. Sides are derived from tap order now, so the call
+    // sites below still read "a, a, b, b" and still mean it - the first two taps are
+    // one side and the last two the other, which is exactly what they always asserted.
+    const pick = (ctx, player) => ctx.sb.pickPlayerForSide(String(player.id));
 
     // ---- 1. Stroke selected FIRST allows two per side -----------------------
 
@@ -647,31 +650,35 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
 
-        pick(ctx, ALPHA_1, 'a');
-        pick(ctx, ALPHA_2, 'a');
-        pick(ctx, BRAVO_1, 'b');
-        pick(ctx, BRAVO_2, 'b');
+        pick(ctx, ALPHA_1);
+        pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1);
+        pick(ctx, BRAVO_2);
 
-        assert.deepEqual(ctx.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' });
+        assert.deepEqual(ctx.pickState(), ['1', '2', '3', '4']);
     });
 
     // ---- 2. A third golfer on one side is still refused ---------------------
 
-    test('a THIRD golfer on a side is refused, and nothing silently moves', () => {
+    test('a FIFTH golfer is refused, and nothing silently moves', () => {
         const roster = FOURSOME.concat([{ id: 5, name: 'Cal Charlie', hcp: '0' }]);
         const ctx = pageWithCapture(roster);
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
 
-        pick(ctx, ALPHA_1, 'a');
-        pick(ctx, ALPHA_2, 'a');
+        pick(ctx, ALPHA_1); pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1); pick(ctx, BRAVO_2);
         const before = ctx.pickState();
-        ctx.sb.pickPlayerForSide('5', 'a');
+        ctx.sb.pickPlayerForSide('5');
 
+        // THE CAP MOVED WITH THE MODEL AND GOT STRONGER. It was two PER SIDE, checked
+        // when a zone was tapped. It is four IN TOTAL now, so three a side cannot be
+        // BUILT at all rather than being refused one zone at a time. Same supported
+        // shape, refused at the same moment, nothing silently reassigned.
         assert.deepEqual(ctx.pickState(), before,
-            'a full side must reject the tap outright - no reassignment, no swap');
+            'a full selection must reject the tap outright - no reassignment, no swap');
         assert.match(ctx.sb.document.getElementById('sm-team-size-indicator').innerHTML,
-            /already has 2/, 'and the golfer must be told why');
+            /four golfers already/, 'and the golfer must be told why');
     });
 
     // ---- 3 & 4. Both supported shapes actually save -------------------------
@@ -680,14 +687,14 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         const ctx = pageWithCapture();
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
-        pick(ctx, ALPHA_1, 'a');
-        pick(ctx, BRAVO_1, 'b');
+        pick(ctx, ALPHA_1);
+        pick(ctx, BRAVO_1);
 
         const writes = saveAs(ctx, 'stroke');
         assert.equal(writes.length, 1);
         assert.equal(writes[0].value.format, 'stroke');
-        assert.deepEqual(writes[0].value.teamAIds, ['1']);
-        assert.deepEqual(writes[0].value.teamBIds, ['3']);
+        assert.deepEqual(plain(writes[0].value.teamAIds), ['1']);
+        assert.deepEqual(plain(writes[0].value.teamBIds), ['3']);
     });
 
     test('2v2 Stroke Play is intentionally selectable and saveable', () => {
@@ -698,10 +705,10 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         const ctx = pageWithCapture();
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
-        pick(ctx, ALPHA_1, 'a');
-        pick(ctx, ALPHA_2, 'a');
-        pick(ctx, BRAVO_1, 'b');
-        pick(ctx, BRAVO_2, 'b');
+        pick(ctx, ALPHA_1);
+        pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1);
+        pick(ctx, BRAVO_2);
 
         const writes = saveAs(ctx, 'stroke');
         assert.equal(writes.length, 1, 'the match should have been written');
@@ -711,8 +718,8 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         // fabricating a payload: the path is the one saveSideMatch() builds.
         assert.equal(w.path, 'events/TESTCD/sideMatches/PUSHKEY');
         assert.equal(w.value.format, 'stroke');
-        assert.deepEqual(w.value.teamAIds, ['1', '2']);
-        assert.deepEqual(w.value.teamBIds, ['3', '4']);
+        assert.deepEqual(plain(w.value.teamAIds), ['1', '2']);
+        assert.deepEqual(plain(w.value.teamBIds), ['3', '4']);
         assert.equal(w.value.overallStake, OVERALL_STAKE);
     });
 
@@ -723,17 +730,22 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         // produce this - which is exactly why the SAVE boundary has to check. A
         // picker-only rule was the whole Batch 1 finding.
         const ctx = pageWithCapture();
-        vm.runInContext("sidematchPickState = { '1': 'a', '2': 'a', '3': 'b' };", ctx.sb);
+        // THREE TAPS IS AN INCOMPLETE 2v2 under the ordered picker, and it must still
+        // be refused - the same rule, reached the way an organizer now reaches it.
+        vm.runInContext("sidematchPickOrder = ['1','2','3'];", ctx.sb);
 
         const writes = saveAs(ctx, 'stroke');
         assert.equal(writes.length, 0, '2 vs 1 must be refused');
-        assert.ok(ctx.alerts.some(a => /equal number/.test(a)), 'and the golfer must be told why');
+        assert.ok(ctx.alerts.some(a => /1v1|2v2/.test(a)), 'and the golfer must be told why');
     });
 
     test('three per side does not save', () => {
         const ctx = pageWithCapture(FOURSOME.concat([
             { id: 5, name: 'Cal Charlie', hcp: '0' }, { id: 6, name: 'Dan Delta', hcp: '0' }]));
-        vm.runInContext("sidematchPickState = { '1': 'a', '2': 'a', '5': 'a', '3': 'b', '4': 'b', '6': 'b' };", ctx.sb);
+        // SIX TAPS. The picker caps at four, but the write guard is what actually
+        // refuses three per side, and that is what this asserts - so it is set
+        // directly, past the cap, exactly as the old test set six per the old shape.
+        vm.runInContext("sidematchPickOrder = ['1','2','5','3','4','6'];", ctx.sb);
 
         const writes = saveAs(ctx, 'stroke');
         assert.equal(writes.length, 0, '3 vs 3 must be refused - two per side is the supported maximum');
@@ -742,7 +754,7 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
 
     test('a golfer cannot occupy both sides', () => {
         // Prevention lives in the picker, and it is structural rather than a check:
-        // sidematchPickState maps a golfer to ONE side, so tapping the other side
+        // sidematchPickOrder maps a golfer to ONE side, so tapping the other side
         // MOVES them. Both id lists in saveSideMatch() are Object.keys() of that same
         // map partitioned by value, which makes overlap unrepresentable rather than
         // merely rejected.
@@ -750,18 +762,21 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
 
-        pick(ctx, ALPHA_1, 'a');
-        assert.deepEqual(ctx.pickState(), { '1': 'a' });
+        pick(ctx, ALPHA_1);
+        assert.deepEqual(ctx.pickState(), ['1']);
 
-        pick(ctx, ALPHA_1, 'b');
-        assert.deepEqual(ctx.pickState(), { '1': 'b' },
-            'tapping the other side must MOVE a golfer, never duplicate them');
+        pick(ctx, ALPHA_1);
+        // A SECOND TAP REMOVES. There are no sides to move between any more, so the
+        // property that mattered - a golfer can never be on both sides - is now
+        // structural: a golfer holds ONE position in the order or none.
+        assert.deepEqual(ctx.pickState(), [],
+            'a second tap must remove, never duplicate');
 
         // And what actually gets saved is disjoint, checked on the real write rather
         // than on the intermediate state.
-        pick(ctx, BRAVO_1, 'a');
+        pick(ctx, ALPHA_1); pick(ctx, BRAVO_1);
         const w = saveAs(ctx, 'stroke')[0].value;
-        const overlap = w.teamAIds.filter(id => w.teamBIds.includes(id));
+        const overlap = plain(w.teamAIds).filter(id => plain(w.teamBIds).includes(id));
         assert.deepEqual(overlap, [], 'no golfer may appear on both sides of a saved match');
     });
 
@@ -771,34 +786,34 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         const ctx = pageWithCapture();
         ctx.setField('sm-format', 'match');
         ctx.sb.onSideMatchFormatChange();
-        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
-        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+        pick(ctx, ALPHA_1); pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1); pick(ctx, BRAVO_2);
 
         const writes = saveAs(ctx, 'match');
         assert.equal(writes.length, 1);
         assert.equal(writes[0].value.format, 'match');
-        assert.deepEqual(writes[0].value.teamAIds, ['1', '2']);
-        assert.deepEqual(writes[0].value.teamBIds, ['3', '4']);
+        assert.deepEqual(plain(writes[0].value.teamAIds), ['1', '2']);
+        assert.deepEqual(plain(writes[0].value.teamBIds), ['3', '4']);
     });
 
     test('Nassau 2v2 still works', () => {
         const ctx = pageWithCapture();
         ctx.setField('sm-format', 'nassau');
         ctx.sb.onSideMatchFormatChange();
-        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
-        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+        pick(ctx, ALPHA_1); pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1); pick(ctx, BRAVO_2);
 
         const writes = saveAs(ctx, 'nassau');
         assert.equal(writes.length, 1);
         assert.equal(writes[0].value.format, 'nassau');
-        assert.deepEqual(writes[0].value.teamAIds, ['1', '2']);
-        assert.deepEqual(writes[0].value.teamBIds, ['3', '4']);
+        assert.deepEqual(plain(writes[0].value.teamAIds), ['1', '2']);
+        assert.deepEqual(plain(writes[0].value.teamBIds), ['3', '4']);
     });
 
     // ---- 9. Format switching in both directions ----------------------------
 
     test('switching format preserves a valid 2v2 selection, both ways', () => {
-        // sidematchPickState is cleared only by openSideMatchModal(), so a selection
+        // sidematchPickOrder is cleared only by openSideMatchModal(), so a selection
         // survives a format change. That used to be the bypass; now every format
         // accepts the same shape, so surviving is correct rather than dangerous.
         const toStroke = pageWithCapture();
@@ -808,7 +823,7 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         pick(toStroke, BRAVO_1, 'b'); pick(toStroke, BRAVO_2, 'b');
         toStroke.setField('sm-format', 'stroke');
         toStroke.sb.onSideMatchFormatChange();
-        assert.deepEqual(toStroke.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' },
+        assert.deepEqual(toStroke.pickState(), ['1', '2', '3', '4'],
             'Match Play -> Stroke Play must not drop a golfer');
         assert.equal(saveAs(toStroke, 'stroke')[0].value.format, 'stroke');
 
@@ -819,7 +834,7 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         pick(toMatch, BRAVO_1, 'b'); pick(toMatch, BRAVO_2, 'b');
         toMatch.setField('sm-format', 'match');
         toMatch.sb.onSideMatchFormatChange();
-        assert.deepEqual(toMatch.pickState(), { '1': 'a', '2': 'a', '3': 'b', '4': 'b' },
+        assert.deepEqual(toMatch.pickState(), ['1', '2', '3', '4'],
             'Stroke Play -> Match Play must not drop a golfer either');
         assert.equal(saveAs(toMatch, 'match')[0].value.format, 'match');
     });
@@ -830,8 +845,8 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         const ctx = pageWithCapture();
         ctx.setField('sm-format', 'stroke');
         ctx.sb.onSideMatchFormatChange();
-        pick(ctx, ALPHA_1, 'a'); pick(ctx, ALPHA_2, 'a');
-        pick(ctx, BRAVO_1, 'b'); pick(ctx, BRAVO_2, 'b');
+        pick(ctx, ALPHA_1); pick(ctx, ALPHA_2);
+        pick(ctx, BRAVO_1); pick(ctx, BRAVO_2);
         const saved = saveAs(ctx, 'stroke')[0].value;
 
         const scores = lopsided2v2Scores();
@@ -856,7 +871,9 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
             'the modal must not tell golfers 2v2 is unavailable to Stroke Play');
         assert.ok(!/Match Play and Nassau only/.test(src),
             'nor any rewording of the same claim');
-        assert.match(src, /Build 1v1 or 2v2 sides/,
+        // RE-PINNED: the instruction was rewritten for the single roster. It still has
+        // to say both shapes are available, which is the claim this guards.
+        assert.match(src, /Tap two golfers for a 1v1, or four for a 2v2/,
             'and it should say plainly that both shapes are available');
     });
 });

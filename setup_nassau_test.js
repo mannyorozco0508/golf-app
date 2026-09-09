@@ -86,7 +86,7 @@ function actionWager({ front = 10, back = 10, overall = 20, press = '2down',
             remove:function(){},on:function(){},
             once:function(){return {then:function(f){f&&f({val:function(){return null;}}); return {catch:function(){}};}};}};};
         currentMode='ABCD'; isOrganizerView=function(){return true;};
-        sidematchPickState={'101':'a','102':'b'};
+        sidematchPickOrder=['101','102'];
         currentData={players:${JSON.stringify(P2)},courseData:${JSON.stringify(cd18)},scores:{}};
         document.getElementById('sm-format').value='nassau'; onSideMatchFormatChange();
         document.getElementById('sm-front-stake').value='${front}';

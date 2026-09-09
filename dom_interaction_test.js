@@ -248,41 +248,52 @@ describe('SIDE MATCH PLAYER PICKER — a second real interaction', () => {
                 scores: {}, sideMatches: {}
             };
             document.__mount(document.getElementById('sm-player-picker-a'));
-            document.__mount(document.getElementById('sm-player-picker-b'));
         `, sb);
         return sb;
     }
 
-    test('opening the modal renders both side pickers', () => {
+    test('opening the modal renders ONE roster, with each golfer on it once', () => {
+        // WAS "renders both side pickers". The field was listed twice - once per side
+        // zone - so this asserted the same name appeared in each. There is one list
+        // now, and the property worth guarding is the opposite one: exactly one badge
+        // per golfer.
         const sb = actionPage();
         assert.doesNotThrow(() => vm.runInContext(`renderSideMatchPicker();`, sb));
         vm.runInContext(`
             window.__a = document.getElementById('sm-player-picker-a').innerHTML;
-            window.__b = document.getElementById('sm-player-picker-b').innerHTML;`, sb);
-        assert.ok(/Marty/.test(sb.window.__a), 'side 1 lists the field');
-        assert.ok(/Marty/.test(sb.window.__b), 'side 2 lists the field');
+            var b = document.getElementById('sm-player-picker-b');
+            window.__b = b ? (b.innerHTML || '') : '';`, sb);
+        assert.ok(/Marty/.test(sb.window.__a), 'the roster lists the field');
+        assert.equal((sb.window.__a.match(/Marty/g) || []).length, 1,
+            'a golfer must appear exactly once, not once per side');
+        // mini-dom hands back a stub for an unknown id rather than null, so the second
+        // zone is checked by what it CONTAINS - nothing - which is the claim either way.
+        assert.equal(sb.window.__b, '', 'the second side zone must hold no golfers');
     });
 
     test('picking players updates the live state and the feedback line', () => {
         const sb = actionPage();
         vm.runInContext(`
             renderSideMatchPicker();
-            pickPlayerForSide('1', 'a');
-            pickPlayerForSide('2', 'b');
-            window.__state = JSON.stringify(sidematchPickState);
+            pickPlayerForSide('1');
+            pickPlayerForSide('2');
+            window.__state = JSON.stringify(sidematchPickOrder);
             window.__size = document.getElementById('sm-team-size-indicator').innerHTML;`, sb);
-        assert.equal(sb.window.__state, '{"1":"a","2":"b"}');
-        assert.match(sb.window.__size, /1v1/, 'the modal should say what is being built');
+        assert.equal(sb.window.__state, '["1","2"]');
+        // The line names the golfers now instead of saying "1v1" - which is more, not
+        // less: it is the feedback that replaced the Side 1 / Side 2 headings.
+        assert.match(sb.window.__size, /Marty.*vs.*Manny|Manny.*vs.*Marty/,
+            'the modal should say who is playing whom');
     });
 
     test('tapping a chosen golfer again removes them', () => {
         const sb = actionPage();
         vm.runInContext(`
             renderSideMatchPicker();
-            pickPlayerForSide('1', 'a');
-            pickPlayerForSide('1', 'a');
-            window.__state = JSON.stringify(sidematchPickState);`, sb);
-        assert.equal(sb.window.__state, '{}');
+            pickPlayerForSide('1');
+            pickPlayerForSide('1');
+            window.__state = JSON.stringify(sidematchPickOrder);`, sb);
+        assert.equal(sb.window.__state, '[]');
     });
 
     test('switching formats does not throw and hides the two-sided picker for Skins', () => {

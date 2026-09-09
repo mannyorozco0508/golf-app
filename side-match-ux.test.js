@@ -4,35 +4,49 @@ const vm = require('vm');
 const { loadHtmlInlineScript, loadJsFile } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
+// pickState is an ORDERED ARRAY of ids now: the first half of the taps is one side,
+// the second half the other. It replaced { id: 'a' | 'b' }, which cannot express order
+// at all - and Object.keys returns integer-like keys ascending regardless of insertion,
+// so the old shape could not even be read back in tap order.
 function setStateAndRender(sandbox, data, pickState, formatVal) {
     sandbox.__data = data;
     sandbox.__pickState = pickState;
     if (formatVal) sandbox.__setElement('sm-format', formatVal);
-    vm.runInContext('currentData = __data; sidematchPickState = __pickState; renderSideMatchPicker();', sandbox);
+    vm.runInContext('currentData = __data; sidematchPickOrder = __pickState; renderSideMatchPicker();', sandbox);
 }
 
 describe('sidematches.html — live team-size feedback (Part 4/2)', () => {
     test('a balanced 1v1 pick shows a clear green confirmation', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['Manny', 'John'], [-2, 5]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, { [players[0].id]: 'a', [players[1].id]: 'b' });
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, [String(players[0].id), String(players[1].id)]);
         const indicator = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
-        assert.ok(indicator.includes('1v1') && indicator.includes('var(--brand-green)'));
+        // RE-PINNED TO THE PAIRING LINE. The indicator said "1v1" with the names in a
+        // separate preview box; it reads "Manny vs John" now, which is the line that
+        // replaced the Side 1 / Side 2 headings. Naming both golfers is strictly more
+        // than "1v1" said.
+        assert.ok(indicator.includes('Manny') && indicator.includes('John')
+            && indicator.includes('vs') && indicator.includes('var(--brand-green)'));
     });
 
     test('a balanced 2v2 pick is correctly detected', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, { [players[0].id]: 'a', [players[1].id]: 'a', [players[2].id]: 'b', [players[3].id]: 'b' });
-        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('2v2'));
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, [String(players[0].id), String(players[1].id), String(players[2].id), String(players[3].id)]);
+        const line2 = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
+        assert.ok(['A', 'B', 'C', 'D'].every(n => line2.includes(n)) && line2.includes('vs'),
+            'a 2v2 must read as both pairs, not as the string "2v2"');
     });
 
     test('REGRESSION: uneven sides are clearly flagged before save, not left to fail silently at save time', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C'], [0, 0, 0]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, { [players[0].id]: 'a', [players[1].id]: 'a', [players[2].id]: 'b' });
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, [String(players[0].id), String(players[1].id), String(players[2].id)]);
         const indicator = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
-        assert.ok(indicator.includes('Uneven') && indicator.includes('accent-red'));
+        // The wording moved with the model: three taps is an INCOMPLETE 2v2, and the
+        // line shows the pairing so far plus what is missing rather than the bare word
+        // "Uneven". Still red, still refuses, still hides the preview.
+        assert.ok(indicator.includes('tap one more') && indicator.includes('accent-red'));
         assert.equal(sandbox.document.getElementById('sm-preview').style.display, 'none');
     });
 
@@ -44,17 +58,21 @@ describe('sidematches.html — live team-size feedback (Part 4/2)', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
         setStateAndRender(sandbox, { players, courseData: makeCourseData(18) },
-            { [players[0].id]: 'a', [players[1].id]: 'a', [players[2].id]: 'b', [players[3].id]: 'b' }, 'stroke');
+            [String(players[0].id), String(players[1].id),
+             String(players[2].id), String(players[3].id)], 'stroke');
         sandbox.updateSideMatchPickerFeedback();
         const indicator = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
         assert.ok(!indicator.includes('1v1 only'), 'the restriction should be gone');
-        assert.ok(indicator.includes('2v2'), `expected a 2v2 preview, got: ${indicator}`);
+        // RE-PINNED: the line names both pairs instead of saying "2v2". Asserting the
+        // four names is strictly more than the size label was.
+        assert.ok(['A', 'B', 'C', 'D'].every(n => indicator.includes(n)) && indicator.includes('vs'),
+            `expected a 2v2 pairing line, got: ${indicator}`);
     });
 
     test('a genuine handicap difference in a 1v1 shows the correct stroke count in the preview', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['Manny', 'John'], [-2, 5]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, { [players[0].id]: 'a', [players[1].id]: 'b' });
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, [String(players[0].id), String(players[1].id)]);
         const preview = sandbox.document.getElementById('sm-preview').innerHTML;
         assert.ok(preview.includes('John receives 7 strokes'), 'a -2 vs +5 handicap gap should be exactly 7 strokes over 18 holes');
     });
@@ -62,7 +80,7 @@ describe('sidematches.html — live team-size feedback (Part 4/2)', () => {
     test('equal handicaps show no stroke note at all', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B'], [8, 8]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, { [players[0].id]: 'a', [players[1].id]: 'b' });
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, [String(players[0].id), String(players[1].id)]);
         const preview = sandbox.document.getElementById('sm-preview').innerHTML;
         assert.ok(!preview.includes('receives'), 'equal handicaps should not claim anyone receives strokes');
     });
@@ -72,18 +90,22 @@ describe('sidematches.html — cross-group labeling (Part 11)', () => {
     test('group labels appear when the round genuinely has multiple groups', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], [0, 0, 0, 0, 0, 0, 0, 0]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, {});
-        const zoneA = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
-        const zoneB = sandbox.document.getElementById('sm-player-picker-b').innerHTML;
-        assert.ok(zoneA.includes('Group') && zoneB.includes('Group'), 'both side zones should show group labels once there are multiple groups');
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, []);
+        // ONE ROSTER NOW. This read both side zones; there is one list, so the label has
+        // to be on it - and each golfer appears exactly once, which is the point of the
+        // change and is asserted here rather than assumed.
+        const roster = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
+        assert.ok(roster.includes('Group'), 'the single roster must show group labels once there are multiple groups');
+        assert.equal((roster.match(/player-pick-badge/g) || []).length, players.length,
+            'every golfer appears exactly once - the roster is not listed twice');
     });
 
     test('group labels stay hidden for a single foursome — nothing to distinguish', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
-        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, {});
-        const zoneA = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
-        assert.ok(!zoneA.includes('Group'));
+        setStateAndRender(sandbox, { players, courseData: makeCourseData(18) }, []);
+        const roster = sandbox.document.getElementById('sm-player-picker-a').innerHTML;
+        assert.ok(!roster.includes('Group'));
     });
 });
 
@@ -160,57 +182,75 @@ describe('CROSS-GROUP SIDE MATCHES — 1v1 and 2v2 spanning two groups (Part 11/
 });
 
 describe('FIXED THIS BATCH — the picker is now fully deterministic, no auto-balancing surprises', () => {
-    test('REGRESSION (was a bug, now fixed): two players can be placed on the SAME side directly, in exactly one tap each', () => {
-        // Previously: tapping two different unpicked players always auto-balanced them onto
-        // OPPOSITE sides, with no direct way to put them on the same side without a detour.
-        // This test proves that's no longer true — pickPlayerForSide is fully explicit about
-        // which side a tap targets, so "John + Mike" on the same side just works.
+    test('two taps build a 1v1 in tap order, first tapped against second', () => {
+        // REWRITTEN FOR THE ORDERED PICKER, not weakened. The old assertion was that a
+        // tap is explicit about WHICH SIDE it targets, because the picker before it
+        // auto-balanced. There are no sides to target now: the order is the model, and
+        // what has to be deterministic is that two taps produce first-vs-second and
+        // nothing else. Same property - no surprise placement - stated in the new terms.
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['John', 'Mike'], [0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[1].id), 'a');
-        const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[1].id]: 'a' }),
-            'both players should land on side "a" — exactly what was tapped, exactly two taps, no detour');
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id));
+        sandbox.pickPlayerForSide(String(players[1].id));
+        const state = vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox);
+        assert.equal(state, JSON.stringify([String(players[0].id), String(players[1].id)]),
+            'the order is exactly what was tapped, in the order it was tapped');
+        const sides = vm.runInContext('JSON.stringify(sidematchSides())', sandbox);
+        assert.equal(sides, JSON.stringify({ teamAIds: [String(players[0].id)],
+                                             teamBIds: [String(players[1].id)] }),
+            'first tap is one side, second is the other');
     });
 
-    test('tapping a player already on a side, under that same side, removes them (toggle off)', () => {
+    test('tapping a chosen golfer again removes them', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['A'], [0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), '{}');
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id));
+        sandbox.pickPlayerForSide(String(players[0].id));
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox), '[]');
     });
 
-    test('tapping a player already on side A, under side B, moves them there in one deliberate tap', () => {
-        const sandbox = loadHtmlInlineScript('sidematches.html');
-        const players = require('./helpers/fixtures.js').makePlayers(['A'], [0]);
-        sandbox.__data = { players, courseData: makeCourseData(18) };
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[0].id), 'b');
-        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), JSON.stringify({ [players[0].id]: 'b' }));
-    });
-
-    test('REGRESSION: attempting to overfill a side (3rd player, max is 2) changes nothing — no silent reassignment', () => {
+    test('a removed golfer leaves no gap — everyone after them shifts up', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C'], [0, 0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[1].id), 'a');
-        const beforeOverflow = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        sandbox.pickPlayerForSide(String(players[2].id), 'a'); // side a already has 2 — should be rejected
-        const afterOverflow = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(beforeOverflow, afterOverflow, 'state must be completely unchanged when a side is already full');
-        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('already has 2'));
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        // REPLACES "moves them to the other side in one tap". There are no sides to
+        // move between; a second tap removes. What has to hold instead is that removing
+        // somebody from the MIDDLE closes the gap, or the numbers on the badges would
+        // stop matching the sides they produce.
+        sandbox.pickPlayerForSide(String(players[0].id));
+        sandbox.pickPlayerForSide(String(players[1].id));
+        sandbox.pickPlayerForSide(String(players[2].id));
+        sandbox.pickPlayerForSide(String(players[1].id)); // take the middle one back out
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox),
+            JSON.stringify([String(players[0].id), String(players[2].id)]),
+            'the third tap moves up into second place');
+    });
+
+    test('REGRESSION: a fifth tap changes nothing — no silent reassignment', () => {
+        const sandbox = loadHtmlInlineScript('sidematches.html');
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C', 'D', 'E'], [0, 0, 0, 0, 0]);
+        sandbox.__data = { players, courseData: makeCourseData(18) };
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        // THE CAP MOVED WITH THE MODEL. It was two PER SIDE, checked when a zone was
+        // tapped; it is four IN TOTAL now, because the sides are derived from the order.
+        // Same supported shape - 1v1 or 2v2, never three a side - refused at the same
+        // moment, with the reason still on screen and nothing silently reassigned.
+        [0, 1, 2, 3].forEach(i => sandbox.pickPlayerForSide(String(players[i].id)));
+        const beforeOverflow = vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox);
+        sandbox.pickPlayerForSide(String(players[4].id)); // a fifth — must be rejected
+        const afterOverflow = vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox);
+        assert.equal(beforeOverflow, afterOverflow, 'the order must be completely unchanged when four are already picked');
+        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('four golfers already'));
     });
 
     test('Stroke Play now takes 2 per side, the same as every other match format', () => {
+        // Four taps, first two against last two - which is the 2v2 the engine scores
+        // best ball. The old version tapped twice into one zone; there is no zone now.
         // REVERSED DELIBERATELY. This used to assert a max of one golfer per side for
         // Stroke Play, described as "the engine's real 1v1-only constraint". That
         // stopped being true when settlement-engine.js learned to score a whole stroke
@@ -218,45 +258,54 @@ describe('FIXED THIS BATCH — the picker is now fully deterministic, no auto-ba
         // only, so a format switch walked past it. Stroke Play is 1v1 or 2v2 now, and
         // the picker says so.
         const sandbox = loadHtmlInlineScript('sidematches.html');
-        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B'], [0, 0]);
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
         sandbox.__setElement('sm-format', 'stroke');
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[1].id), 'a');
-        const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[1].id]: 'a' }),
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        [0, 1, 2, 3].forEach(i => sandbox.pickPlayerForSide(String(players[i].id)));
+        const sides = vm.runInContext('JSON.stringify(sidematchSides())', sandbox);
+        assert.equal(sides, JSON.stringify({
+            teamAIds: [String(players[0].id), String(players[1].id)],
+            teamBIds: [String(players[2].id), String(players[3].id)] }),
             'a second golfer must be accepted on a Stroke Play side');
     });
 
-    test('Stroke Play still refuses a THIRD golfer on a side', () => {
-        // The cap moved, it did not disappear. Two per side is the supported shape for
-        // every format; three has never settled and still must not be buildable.
+    test('Stroke Play still refuses a fifth golfer', () => {
+        // The cap moved, it did not disappear. 1v1 or 2v2 is the supported shape for
+        // every format; three a side has never settled and still must not be buildable.
         const sandbox = loadHtmlInlineScript('sidematches.html');
-        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C'], [0, 0, 0]);
+        const players = require('./helpers/fixtures.js').makePlayers(['A', 'B', 'C', 'D', 'E'], [0, 0, 0, 0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
         sandbox.__setElement('sm-format', 'stroke');
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a');
-        sandbox.pickPlayerForSide(String(players[1].id), 'a');
-        const before = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        sandbox.pickPlayerForSide(String(players[2].id), 'a');
-        assert.equal(vm.runInContext('JSON.stringify(sidematchPickState)', sandbox), before,
-            'state must be completely unchanged when a Stroke side is already full');
-        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('already has 2'));
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        [0, 1, 2, 3].forEach(i => sandbox.pickPlayerForSide(String(players[i].id)));
+        const before = vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox);
+        sandbox.pickPlayerForSide(String(players[4].id));
+        assert.equal(vm.runInContext('JSON.stringify(sidematchPickOrder)', sandbox), before,
+            'the order must be unchanged once four are picked, on Stroke Play too');
+        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('four golfers already'));
     });
 
     test('ACCEPTANCE SCENARIO C: Manny+Mike vs John+Steve, created directly, no tricks, exactly 4 taps', () => {
         const sandbox = loadHtmlInlineScript('sidematches.html');
         const players = require('./helpers/fixtures.js').makePlayers(['Manny', 'John', 'Mike', 'Steve'], [0, 0, 0, 0]);
         sandbox.__data = { players, courseData: makeCourseData(18) };
-        vm.runInContext('currentData = __data; sidematchPickState = {};', sandbox);
-        sandbox.pickPlayerForSide(String(players[0].id), 'a'); // Manny
-        sandbox.pickPlayerForSide(String(players[2].id), 'a'); // Mike
-        sandbox.pickPlayerForSide(String(players[1].id), 'b'); // John
-        sandbox.pickPlayerForSide(String(players[3].id), 'b'); // Steve
-        const state = vm.runInContext('JSON.stringify(sidematchPickState)', sandbox);
-        assert.equal(state, JSON.stringify({ [players[0].id]: 'a', [players[2].id]: 'a', [players[1].id]: 'b', [players[3].id]: 'b' }));
-        assert.ok(sandbox.document.getElementById('sm-team-size-indicator').innerHTML.includes('2v2'));
+        vm.runInContext('currentData = __data; sidematchPickOrder = [];', sandbox);
+        sandbox.pickPlayerForSide(String(players[0].id)); // Manny
+        sandbox.pickPlayerForSide(String(players[2].id)); // Mike
+        sandbox.pickPlayerForSide(String(players[1].id)); // John
+        sandbox.pickPlayerForSide(String(players[3].id)); // Steve
+        const state = vm.runInContext('JSON.stringify(sidematchSides())', sandbox);
+        // Manny + Mike tapped first, John + Steve second - the same four taps, and the
+        // same two sides, without ever choosing a colour. Ids are ascending within a
+        // side because that is the byte order the old screen wrote.
+        const asc = (x, y) => Number(x) - Number(y);
+        assert.equal(state, JSON.stringify({
+            teamAIds: [String(players[0].id), String(players[2].id)].sort(asc),
+            teamBIds: [String(players[1].id), String(players[3].id)].sort(asc) }));
+        // And the line a golfer actually reads says the same thing in words.
+        const line = sandbox.document.getElementById('sm-team-size-indicator').innerHTML;
+        assert.ok(['Manny', 'Mike', 'John', 'Steve'].every(n => line.includes(n))
+            && line.includes('vs'), `expected the pairing in words, got: ${line}`);
     });
 });

@@ -76,10 +76,11 @@ const ORGANIZER = null;
 
 // Drives the real two-sided picker and the real save.
 function makeMatch(b, aIds, bIds, opts) {
-    const st = {};
-    aIds.forEach(id => { st[String(id)] = 'a'; });
-    bIds.forEach(id => { st[String(id)] = 'b'; });
-    b.run(`sidematchPickState = ${JSON.stringify(st)};`);
+    // TAP ORDER, NOT A SIDE MAP. One side is tapped first, then the other - the
+    // ordered picker derives the sides from that, so aIds then bIds says exactly what
+    // { id: 'a' | 'b' } used to say.
+    const st = aIds.map(String).concat(bIds.map(String));
+    b.run(`sidematchPickOrder = ${JSON.stringify(st)};`);
     b.sb.__setElement('sm-format', (opts && opts.format) || 'match');
     b.sb.__setElement('sm-scoring', 'net');
     b.sb.__setElement('sm-stake', '50');
