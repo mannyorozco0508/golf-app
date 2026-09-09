@@ -4919,11 +4919,29 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function saveSettings() {
 
+        // THE BUTTON IS GIVEN BACK IN ONE PLACE, and that place is the finally at
+        // the bottom of this function.
+        //
+        // saveSettings disables the control the moment it starts so a golfer cannot
+        // fire two writes with two taps. It then has several ways to refuse, and
+        // each one used to carry its own copy of the two lines that put the button
+        // back. Three copies existed; the fourth refusal - the Main Pool gate - was
+        // added without one. It alerted once and returned with the control still
+        // disabled, so the first press spoke and EVERY PRESS AFTER IT WAS SILENT.
+        // goToWizardStep resets the LABEL on every step change and never touches
+        // `disabled`, so the button read "Save & Start Round", looked enabled, and
+        // did nothing at all.
+        //
+        // A fifth refusal cannot repeat that now: there is nothing to remember to
+        // add. The only path that deliberately LEAVES the button disabled is the
+        // one where a write is genuinely in flight, and that is what handedOff
+        // marks - from there the .then and the .catch own it.
+        const saveBtn = document.getElementById("main-save-btn");
+        const originalText = saveBtn ? saveBtn.innerText : "\uD83D\uDCBE Save & Start Round";
+        let handedOff = false;
+
         try {
-            const saveBtn = document.getElementById("main-save-btn");
-            const originalText = saveBtn.innerText;
-            saveBtn.innerText = "⏳ Saving...";
-            saveBtn.disabled = true;
+            if (saveBtn) { saveBtn.innerText = "\u23F3 Saving..."; saveBtn.disabled = true; }
 
             let courseKey = courseHiddenSelect.value;
             let selectedCourseName = courseSearchInput.value.trim();
@@ -4945,7 +4963,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             if (!courseKey && !selectedCourseName) { 
                 alert("⚠️ Please select or type a Golf Course name before saving!"); 
-                saveBtn.innerText = originalText; saveBtn.disabled = false;
                 return; 
             }
             
@@ -4962,7 +4979,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             if (gameFormat === 'wolf' && rows.length > 0 && rows.length !== 4) {
                 alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
-                saveBtn.innerText = originalText; saveBtn.disabled = false;
                 return;
             }
 
@@ -4972,7 +4988,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const preview = previewCourseData(courseKey);
             if (!preview.ok) {
                 alert('\u26A0\uFE0F Course card problem: ' + preview.reason);
-                saveBtn.innerText = originalText; saveBtn.disabled = false;
                 return;
             }
             let finalCourseData = preview.data;
@@ -5197,6 +5212,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // belongs.
             if (loadedExistingRound) delete payload.settlementMode;
 
+            // FROM HERE THE WRITE OWNS THE BUTTON. The finally must not put it back
+            // while a save is genuinely in flight - "Saving..." is true at that point.
+            handedOff = true;
             db.ref(`events/${currentMode}`).update(payload).then(() => {
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
@@ -5233,8 +5251,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         } catch (e) {
             alert(`JavaScript Error: ${e.message}`);
-            const saveBtn = document.getElementById("main-save-btn");
-            if(saveBtn) { saveBtn.innerText = "💾 Save & Start Round"; saveBtn.disabled = false; }
+        } finally {
+            // Every refusal, and every throw, lands here. Only a write in flight
+            // does not.
+            if (saveBtn && !handedOff) {
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+            }
         }
     }
 
