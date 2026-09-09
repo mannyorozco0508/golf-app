@@ -70,8 +70,12 @@ describe('STAGE A — a round can be created without a betting decision', () => 
     });
 
     test('Round Ready is the bridge to Action', () => {
+        // THE ID DID NOT MOVE, THE LABEL DID. Both pinned on purpose: this wave changed
+        // display text only, so the id staying put is as much the contract as the new
+        // words are.
         assert.ok(/id="rr-add-action-btn"/.test(adm));
-        assert.ok(/ADD ACTION/.test(adm));
+        assert.ok(/SIDE BETS/.test(adm));
+        assert.ok(!/ADD ACTION/.test(adm), 'the old label must be gone from Round Ready');
         assert.ok(/MANAGE ACTION \\u00B7 \$\{actionLines\.length\} active/.test(adm)
             || /MANAGE ACTION/.test(adm), 'the button should reflect existing action');
     });
@@ -133,7 +137,7 @@ describe('STAGE B — Action is the single money hub', () => {
 
     test('the page is Action, not Side Matches', () => {
         assert.ok(/Today's Action/.test(sm));
-        assert.ok(/ADD ACTION/.test(sm));
+        assert.ok(/SIDE BETS/.test(sm));
         assert.ok(/<title>Action<\/title>/.test(sm));
     });
 

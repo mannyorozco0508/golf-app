@@ -178,7 +178,7 @@ describe('THE CUP ARRIVAL HAS NO SIDE BETTING ON IT', () => {
     test('and its content is untouched', () => {
         const sb = arrive(false);
         assert.ok(run(sb, 'document.getElementById("sidematches-list") !== null'));
-        ['ADD ACTION', 'Auto-Pair Whole Field', 'Final Results'].forEach(t =>
+        ['SIDE BETS', 'Auto-Pair Whole Field', 'Final Results'].forEach(t =>
             assert.ok(SM_SRC.includes(t), t + ' was lost'));
     });
 });

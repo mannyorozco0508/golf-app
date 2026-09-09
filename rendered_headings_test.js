@@ -179,7 +179,7 @@ describe('THE FIX DID NOT DISTURB THE PANEL', () => {
 
     test('+ ADD GROUP ACTION still renders with its group and link', () => {
         const html = renderActionCenter(8, 1, { additionalGameInstances: GROUP_DOTS, dots: DOTS_EVENTS });
-        assert.ok(html.includes('+ ADD GROUP 1 ACTION'));
+        assert.ok(html.includes('+ GROUP 1 SIDE BETS'));
         assert.ok(/sidematches\.html\?game=ABCD&group=1&add=1/.test(html));
     });
 

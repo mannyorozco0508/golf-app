@@ -149,7 +149,7 @@ describe('WITHOUT THE PARAM NOTHING CHANGES', () => {
     test('the side-matches content is all still there', () => {
         const card = SM_SRC.slice(SM_SRC.indexOf('id="sidematches-card"'));
         const block = card.slice(0, card.indexOf('</details>'));
-        assert.match(block, /ADD ACTION/);
+        assert.match(block, /SIDE BETS/);
         assert.match(block, /Auto-Pair Whole Field/);
         assert.match(block, /Final Results/);
         assert.match(block, /id="sidematches-list"/);

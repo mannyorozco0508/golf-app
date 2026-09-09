@@ -136,8 +136,20 @@ describe('ORGANIZER AND SCOREKEEPER SHARE ONE SCORECARD', () => {
     });
 
     test('PERMISSIONS differ, not the design', () => {
-        assert.ok(/ADD ACTION/.test(org.action), 'organizer should get Add Action');
-        assert.ok(!/ADD ACTION/.test(sk.action), 'a scorekeeper should not');
+        // RE-PINNED TO THE NEW LABEL. "Add Action" reads "Side Bets" now.
+        //
+        // THE NEGATIVE IS THE ONE THAT MATTERS, and it needs care: on a MULTI-GROUP
+        // round a scorekeeper does get a control - the link labelled
+        // "+ GROUP N SIDE BETS" - so a bare !/SIDE BETS/ would be asserting something
+        // this test never meant and would go red for the right reason on the wrong
+        // fixture. What a scorekeeper must not get is the ORGANIZER'S BUTTON, so that
+        // is what is asserted: the openAddAction() control, by the handler that opens
+        // the sheet, which no group link may reach.
+        assert.ok(/SIDE BETS/.test(org.action), 'organizer should get the Side Bets control');
+        assert.ok(/openAddAction\(\)/.test(org.action), 'and it is the organizer button, not a link');
+        assert.ok(!/openAddAction\(\)/.test(sk.action), 'a scorekeeper must not get the organizer button');
+        assert.ok(!/ADD ACTION/.test(org.action) && !/ADD ACTION/.test(sk.action),
+            'the old label must be gone from both views');
         assert.ok(/All Players/.test(org.filters), 'organizer keeps the group selector');
         assert.equal(sk.filters, '', 'a locked scorekeeper gets no selector');
     });

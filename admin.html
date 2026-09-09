@@ -1333,7 +1333,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
          Action" is the single entrance to every money game - there is no longer a
          separate betting setup buried in the wizard. -->
     <button class="btn-primary" onclick="startScoring()" style="font-size:1.1rem; padding:16px;">▶️ START SCORING</button>
-    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;" id="rr-add-action-btn">💰 ADD ACTION</button>
+    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;" id="rr-add-action-btn">💰 SIDE BETS</button>
 
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
@@ -1655,7 +1655,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (addBtn) {
             addBtn.innerHTML = actionLines.length > 0
                 ? `\uD83D\uDCB0 MANAGE ACTION \u00B7 ${actionLines.length} active`
-                : '\uD83D\uDCB0 ADD ACTION';
+                : '\uD83D\uDCB0 SIDE BETS';
         }
         document.getElementById('rr-action-text').innerHTML = actionLines.map(l => `<div>${l}</div>`).join('');
     }

@@ -164,9 +164,12 @@ describe('+ ADD GROUP ACTION — a link, not a second form', () => {
     });
 
     test('the button names the group so it is obvious whose action it starts', () => {
-        assert.equal(boot(8, 1).sb.addGroupActionLabel(), '+ ADD GROUP 1 ACTION');
-        assert.equal(boot(8, 3).sb.addGroupActionLabel(), '+ ADD GROUP 3 ACTION');
-        assert.equal(boot(8, ORGANIZER).sb.addGroupActionLabel(), '+ ADD ACTION');
+        // RE-PINNED TO THE NEW WORDS, NOT WEAKENED. "Add Action" became "Side Bets";
+        // the FUNCTION is still addGroupActionLabel, which is what this test calls by
+        // name, so a rename would fail here before the string ever mattered.
+        assert.equal(boot(8, 1).sb.addGroupActionLabel(), '+ GROUP 1 SIDE BETS');
+        assert.equal(boot(8, 3).sb.addGroupActionLabel(), '+ GROUP 3 SIDE BETS');
+        assert.equal(boot(8, ORGANIZER).sb.addGroupActionLabel(), '+ SIDE BETS');
     });
 
     test('index.html contains no copy of the wager form', () => {

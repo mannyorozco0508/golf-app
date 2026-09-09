@@ -475,7 +475,7 @@ describe('WAVE 2 / WAVE 3 BEHAVIOUR IS PRESERVED', () => {
 
     test('Add Action and its organizer gate survive', () => {
         const idx = read('index.html');
-        assert.ok(/\+ ADD ACTION/.test(idx));
+        assert.ok(/\+ SIDE BETS/.test(idx));
         const fn = idx.slice(idx.indexOf('function canAddAction'), idx.indexOf('function addActionStartHole'));
         assert.ok(/isOrganizerView\(\)/.test(fn));
     });

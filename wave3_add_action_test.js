@@ -489,7 +489,7 @@ describe('SCORECARD — the Add Action flow renders correctly', () => {
     }
 
     test('the + ADD ACTION button appears for the organizer', () => {
-        assert.match(render(''), /\+ ADD ACTION/);
+        assert.match(render(''), /\+ SIDE BETS/);
     });
 
     test('tapping it lists the games that can still be added', () => {

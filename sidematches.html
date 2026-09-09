@@ -352,7 +352,7 @@ html {
     <h2 class="event-title" id="main-title">💰 Today's Action</h2>
 
     <!-- THE CUP IS ITS OWN JOB, so it is its own surface. It used to be nested inside
-         the card headed "Side Matches (Cross-Group)", under a paragraph about $/hole
+         the card headed "Side Matches (Any Group)", under a paragraph about $/hole
          and presses: an organizer sent here by Game Day to create a Cup landed 511px
          down a side-betting screen, with the Cup framed as one item of side action.
          renderRyderCupSetup draws its own card, so this mount stays bare rather than
@@ -366,11 +366,11 @@ html {
     <div id="rc-group-links" class="action-card" style="display:none;"></div>
 
     <div class="action-card" id="sidematches-card">
-        <h3 style="margin-bottom:2px;">⚔️ Side Matches (Cross-Group)</h3>
+        <h3 style="margin-bottom:2px;">⚔️ Side Matches (Any Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
         <div id="sidematches-list"></div>
-        <button class="btn-primary" onclick="openSideMatchModal()">➕ ADD ACTION</button>
+        <button class="btn-primary" onclick="openSideMatchModal()">➕ SIDE BETS</button>
         <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
             <!-- Was window.print(), which printed this page's own side-match maths as if it were
                  an authoritative payout. There is ONE settlement document, and this opens it. -->
@@ -1236,7 +1236,7 @@ html {
         if (owner) owner.style.display = step === 'owner' ? 'block' : 'none';
         if (form) form.style.display = step === 'form' ? 'block' : 'none';
         const title = document.getElementById('sm-modal-title');
-        if (title) title.textContent = step === 'form' ? '\u2694\uFE0F New Action' : '\u2694\uFE0F Add Action';
+        if (title) title.textContent = step === 'form' ? '\u2694\uFE0F New Action' : '\u2694\uFE0F Side Bets';
     }
 
     function pickActionScope(scope) {
@@ -1918,7 +1918,7 @@ html {
         const ids = (selectedIds || []).map(String);
         if (ids.length === 0) return '';
         if (crossGroupWagerIsAnchored(ids)) return '';
-        return 'This is Group ' + lockedGroup + '\u2019s link, so a cross-group wager needs at least one Group '
+        return 'This is Group ' + lockedGroup + '\u2019s link, so an Any Group wager needs at least one Group '
             + lockedGroup + ' golfer in it.';
     }
 
@@ -2167,7 +2167,7 @@ html {
         if (!canCreateWagerWith(teamAIds.concat(teamBIds))) {
             console.warn('Blocked: wager not anchored to Group ' + lockedGroup + '.');
             alert(actionScope === 'cross'
-                ? '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a cross-group match needs '
+                ? '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so an Any Group match needs '
                     + 'at least one Group ' + lockedGroup + ' golfer in it. Ask the organizer to set up a match '
                     + 'between two other foursomes.'
                 : '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s action, so everyone in it must be a Group '
@@ -2342,7 +2342,7 @@ html {
     function buildAutoPairMatchups() {
         const players = currentData.players || [];
         const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
-        if (boundaries.length < 2) return { matchups: [], note: 'Need at least 2 groups set up to auto-pair cross-group matches.', unmatchedCount: 0 };
+        if (boundaries.length < 2) return { matchups: [], note: 'Need at least 2 groups set up to auto-pair Any Group matches.', unmatchedCount: 0 };
 
         const groups = boundaries.map(b => players.slice(b.startIdx, b.startIdx + b.size));
         const half = Math.ceil(groups.length / 2);
@@ -2391,7 +2391,7 @@ html {
     }
 
     function openAutoPairModal() {
-        if (!isOrganizerView()) return refuseGroupWrite('set up the cross-group matchups');
+        if (!isOrganizerView()) return refuseGroupWrite('set up the Any Group matchups');
         const result = buildAutoPairMatchups();
         autoPairPreview = result.matchups;
         renderAutoPairPreview(result.note);
@@ -2425,7 +2425,7 @@ html {
         // organizer-only by definition. There is no scoped version of it to offer a
         // group link, and one group should not be able to commit every other group
         // to a set of matches in a single tap.
-        if (!isOrganizerView()) return refuseGroupWrite('set up the cross-group matchups');
+        if (!isOrganizerView()) return refuseGroupWrite('set up the Any Group matchups');
         if (autoPairPreview.length === 0) {
             alert("⚠️ No matchups to create.");
             return;
@@ -2455,7 +2455,7 @@ html {
         db.ref(`events/${currentMode}`).update(updates)
             .then(() => {
                 closeAutoPairModal();
-                alert(`✅ Created ${autoPairPreview.length} cross-group matchup${autoPairPreview.length === 1 ? '' : 's'}. Each player can find their match under Side Matches.`);
+                alert(`✅ Created ${autoPairPreview.length} Any Group matchup${autoPairPreview.length === 1 ? '' : 's'}. Each player can find their match under Side Matches.`);
             })
             .catch(err => alert(`Failed to create matchups: ${err.message}`));
     }

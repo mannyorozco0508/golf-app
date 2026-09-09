@@ -549,7 +549,7 @@ describe('EARLIER WAVES PRESERVED', () => {
     });
 
     test('Wave 2/3 Today\'s Action and Add Action survive', () => {
-        ['Group Games', 'Group Games', '+ ADD ACTION'].forEach(t => assert.ok(idx.includes(t)));
+        ['Group Games', 'Group Games', '+ SIDE BETS'].forEach(t => assert.ok(idx.includes(t)));
     });
 
     test('Dollar Game stayed retired', () => {

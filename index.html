@@ -3448,7 +3448,11 @@ html {
     }
 
     function addGroupActionLabel() {
-        return hasGroupLock ? '+ ADD GROUP ' + lockedGroup + ' ACTION' : '+ ADD ACTION';
+        // DISPLAY TEXT ONLY. The function is still addGroupActionLabel(), the class is
+        // still .add-action-btn, and the href it labels is unchanged - only the words
+        // a golfer reads moved. The group-locked variant splits the label around the
+        // group number, so it is two strings, not one.
+        return hasGroupLock ? '+ GROUP ' + lockedGroup + ' SIDE BETS' : '+ SIDE BETS';
     }
 
     function addActionStartHole() {
@@ -3486,7 +3490,7 @@ html {
                     '<small>' + spec.blurb + '</small></button>';
             }).join('');
             return '<div class="add-action-panel">' +
-                '<div class="aa-title">Add Action</div>' + choices +
+                '<div class="aa-title">Side Bets</div>' + choices +
                 '<button type="button" class="aa-cancel" onclick="closeAddAction()">Cancel</button>' +
                 '</div>';
         }
@@ -4449,7 +4453,7 @@ html {
         body += '<div class="action-foot">Nothing here is settled yet.</div>';
 
         if (addActionOpen) body += buildAddActionPanelHtml();
-        else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ ADD ACTION</button>';
+        else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ SIDE BETS</button>';
         // A multi-group round needs the scope-aware flow, which lives on the Action
         // page. This is a LINK to it, never a second copy of the wager form.
         else if (canAddGroupAction()) body += '<a class="add-action-btn" href="' + addGroupActionHref() + '">' + addGroupActionLabel() + '</a>';
