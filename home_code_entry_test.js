@@ -38,17 +38,63 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADM = read('admin.html');
 
+// THE TWO ORIGINS THIS PAGE IS ACTUALLY SERVED FROM.
+//
+// THIS FIXTURE IS WHY A REAL DEFECT WENT UNCAUGHT. It hardcoded the https origin -
+// the one origin where the bug cannot happen - so every assertion below passed while
+// the app shipped a version that threw the golfer into Safari. openRoundByCode()
+// builds its destination through shareBaseUrl(), whose whole job is to return the
+// CANONICAL web origin when the page is not itself on http(s). On https it returns
+// this page's own origin and the destination is same-origin. On capacitor://localhost
+// it returns https://golf-app-5a5.pages.dev/ - a different origin, which Capacitor
+// cancels and hands to the system browser.
+//
+// Every journey below now runs under BOTH, so the failing branch is reachable.
+const ORIGINS = [
+    { name: 'the web', href: 'https://golf-app-5a5.pages.dev/admin.html' },
+    { name: 'the iOS app', href: 'capacitor://localhost/admin.html' },
+];
+
 // The lobby, with nothing typed - the state a golfer arrives in.
-function lobby() {
+//
+// EVERY FIELD shareBaseUrl() READS IS SET, not just href. The sandbox's location is
+// a stub: assigning .href leaves .origin undefined and .pathname at its default, and
+// shareBaseUrl reads origin first and pathname second. A fixture that sets only href
+// silently tests the stub's defaults instead of the origin it named.
+function lobby(href) {
+    const at = href || ORIGINS[0].href;
+    const isWeb = /^https?:/i.test(at);
+    const u = isWeb ? new URL(at) : null;
+    const loc = {
+        href: at,
+        origin: isWeb ? u.origin : 'capacitor://localhost',
+        pathname: isWeb ? u.pathname : '/admin.html',
+    };
     const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
     vm.runInContext("alert = function (m) { window.__said = m; };"
-        + " location.href = 'https://golf-app-5a5.pages.dev/admin.html';", sb);
+        + ' location = ' + JSON.stringify(loc) + '; window.location = location;', sb);
     return {
         sb,
         type: v => vm.runInContext(
             `document.getElementById('join-code-input').value = ${JSON.stringify(v)};`, sb),
         go: () => vm.runInContext('openRoundByCode();', sb),
-        href: () => String(vm.runInContext('location.href', sb)),
+        // RESOLVED, THE WAY A BROWSER RESOLVES IT.
+        //
+        // window.location.href = 'index.html?game=X' does not leave the golfer on a
+        // relative string - the browser resolves it against the page's own URL and
+        // navigates to the absolute result. The vm's location is a stub and does no
+        // such thing, so asserting on the raw assigned value would test the stub.
+        //
+        // This models the browser: whatever openRoundByCode assigns is resolved
+        // against the origin the page was served from, and the assertions are about
+        // WHERE THE GOLFER LANDS. An absolute destination resolves to itself, so this
+        // changes nothing about what the current code produces - it is still the
+        // off-origin https URL, and the app assertions still fail on it.
+        href: () => {
+            const raw = String(vm.runInContext('location.href', sb));
+            try { return new URL(raw, at).href; }
+            catch (e) { return raw; }
+        },
         said: () => vm.runInContext('window.__said || null', sb),
     };
 }
@@ -94,18 +140,18 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
     });
 });
 
-describe('IT OPENS THE ROUND, NOT THE WIZARD', () => {
+ORIGINS.forEach(O => describe('IT OPENS THE ROUND, NOT THE WIZARD — on ' + O.name, () => {
 
     // THE DEFECT THAT IS NOT BEING RESTORED.
     test('a typed code goes to the scorecard', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('AB12CD'); l.go();
         assert.match(l.href(), /index\.html\?game=AB12CD/,
             'a golfer who types a code lands somewhere else: ' + l.href());
     });
 
     test('and never to admin.html, which opens the organizer’s Review', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('AB12CD'); l.go();
         assert.ok(!/admin\.html\?game=/.test(l.href()),
             'this is where joinRoom() used to go, holding Save & Start Round');
@@ -117,29 +163,47 @@ describe('IT OPENS THE ROUND, NOT THE WIZARD', () => {
     });
 
     test('a lower-case code still opens', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('ab12cd'); l.go();
         assert.match(l.href(), /game=AB12CD/, 'codes are shown upper-case everywhere');
     });
 
     test('stray spaces do not stop it', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('  ab12cd  '); l.go();
         assert.match(l.href(), /game=AB12CD/);
     });
 
     // Legacy 4-character codes still exist on saved rounds.
     test('a legacy four-character code still opens', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('R4HH'); l.go();
         assert.match(l.href(), /game=R4HH/);
     });
-});
 
-describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS', () => {
+    // THE ASSERTION THIS FILE WAS MISSING. A destination that leaves the app's own
+    // origin is cancelled by Capacitor and opened in Safari - so on the wrapper this
+    // is not a cosmetic difference, it is the golfer being ejected from the app on
+    // the commonest way into a round.
+    test('the destination never leaves the origin the page is served from', () => {
+        const l = lobby(O.href);
+        l.type('AB12CD'); l.go();
+        const dest = l.href();
+        if (/^https?:/i.test(O.href)) {
+            assert.ok(dest.startsWith(new URL(O.href).origin),
+                'a web deploy sent the golfer to another origin: ' + dest);
+        } else {
+            assert.ok(!/^https?:\/\//i.test(dest),
+                '\ninside the app the destination left capacitor://localhost:\n    '
+                + dest + '\n  Capacitor cancels that and hands it to Safari.');
+        }
+    });
+}));
+
+ORIGINS.forEach(O => describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS — on ' + O.name, () => {
 
     test('a pasted group link keeps its group', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
         l.go();
         assert.match(l.href(), /game=JLRL4H/);
@@ -148,7 +212,7 @@ describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS', () => {
     });
 
     test('a pasted link with no group does not gain one', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H');
         l.go();
         assert.ok(!/group=/.test(l.href()),
@@ -157,12 +221,27 @@ describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS', () => {
 
     // THE PERMISSION LINE. A code carries no group, so none may be added to it.
     test('a bare code never acquires a group', () => {
-        const l = lobby();
+        const l = lobby(O.href);
         l.type('JLRL4H'); l.go();
         assert.ok(!/group=/.test(l.href()),
             'typing a code granted scorekeeper rights over a foursome');
     });
-});
+
+    // The pasted link is the case the note under the field actually recommends, so
+    // it gets the same origin assertion as the typed code.
+    test('a pasted link does not leave the origin either', () => {
+        const l = lobby(O.href);
+        l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
+        l.go();
+        const dest = l.href();
+        if (/^https?:/i.test(O.href)) {
+            assert.ok(dest.startsWith(new URL(O.href).origin), dest);
+        } else {
+            assert.ok(!/^https?:\/\//i.test(dest),
+                'pasting the organizer link inside the app ejected the golfer: ' + dest);
+        }
+    });
+}));
 
 describe('IT REFUSES WHAT IT CANNOT OPEN', () => {
 

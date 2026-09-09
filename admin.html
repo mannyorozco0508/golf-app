@@ -3183,7 +3183,38 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
         // Only from a pasted link, never manufactured for a typed code.
         const group = fromUrl ? (/[?&]group=(\d+)/.exec(text) || [])[1] : null;
-        let dest = playerPageUrl('index.html') + '?game=' + code;
+        // RELATIVE, LIKE EVERY OTHER NAVIGATION ON THIS PAGE.
+        //
+        // This used to build the destination with playerPageUrl(), which is
+        // shareBaseUrl() + page. shareBaseUrl exists for links that LEAVE THE
+        // DEVICE, and its rule is right for that: on a non-http(s) origin it returns
+        // the canonical web origin, because capacitor://localhost/index.html?game=X
+        // is meaningless the moment it is pasted into a text.
+        //
+        // Inside the iOS wrapper the page IS served from capacitor://localhost, so
+        // this produced https://golf-app-5a5.pages.dev/index.html?game=CODE - a
+        // different origin from the app's own. Capacitor's WebViewDelegationHandler
+        // cancels an off-origin top-level navigation and hands it to
+        // UIApplication.shared.open, so typing a code THREW THE GOLFER INTO SAFARI.
+        // Observed on an iPad Pro 13-inch: a new Safari tab, and the status bar
+        // reading "< Rattle Golf". That is the way three golfers in every foursome
+        // enter a round - the organizer sets it up, everybody else types the code or
+        // pastes the link.
+        //
+        // A bare relative path is resolved by the browser against THIS page's own
+        // URL, which is correct everywhere at once and needs no origin logic:
+        //     capacitor://localhost/admin.html -> capacitor://localhost/index.html?...
+        //     https://preview-7.pages.dev/admin -> https://preview-7.pages.dev/index.html?...
+        //     https://example.com/golf/admin   -> https://example.com/golf/index.html?...
+        // It is exactly what resumeGame() a few hundred lines up already does, and
+        // what the other thirty-five navigations in this bundle do.
+        //
+        // shareBaseUrl AND playerPageUrl ARE UNCHANGED. Every share surface - the QR,
+        // the invite text, all thirteen group scorekeeper links - still hands out an
+        // absolute https URL another phone can open. The fix is at this call site
+        // because the mistake was at this call site: a builder for links you SEND was
+        // used for a link you NAVIGATE TO.
+        let dest = 'index.html?game=' + code;
         if (group) dest += '&group=' + group;
         window.location.href = dest;
     }
