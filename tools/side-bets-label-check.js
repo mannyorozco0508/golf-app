@@ -184,7 +184,13 @@ const SM_PROBE = `
   const badges = Array.from(document.querySelectorAll('#sidematch-modal .player-pick-badge'));
   out.badgeCount = badges.length;
   const tap = (id, side) => {
-    const h = "pickPlayerForSide('" + id + "', '" + side + "')";
+    // ONE ARGUMENT NOW. The picker lists the roster ONCE and derives the sides from
+    // tap order, so the zone letter the badge used to carry is gone. This matched
+    // "pickPlayerForSide('105', 'a')", found nothing, selected nobody, and reported
+    // that the app renders no anchor warning - a harness break wearing an app defect's
+    // clothes, for the second time in this file. The side letter is kept in the
+    // signature so the call sites still read a/b and still mean "this side first".
+    const h = "pickPlayerForSide('" + id + "')";
     const b = badges.find(x => (x.getAttribute('onclick') || '').indexOf(h) >= 0);
     if (b) b.click();
     return !!b;
@@ -357,7 +363,13 @@ const MUST_STILL_EXIST = {
             // The page's own roster tiles, tapped the way a golfer taps them.
             const badges = Array.from(document.querySelectorAll('#sidematch-modal .player-pick-badge'));
             const tap = (id, side) => {
-                const h = "pickPlayerForSide('" + id + "', '" + side + "')";
+                // ONE ARGUMENT NOW. The picker lists the roster ONCE and derives the sides from
+    // tap order, so the zone letter the badge used to carry is gone. This matched
+    // "pickPlayerForSide('105', 'a')", found nothing, selected nobody, and reported
+    // that the app renders no anchor warning - a harness break wearing an app defect's
+    // clothes, for the second time in this file. The side letter is kept in the
+    // signature so the call sites still read a/b and still mean "this side first".
+    const h = "pickPlayerForSide('" + id + "')";
                 const b = badges.find(x => (x.getAttribute('onclick') || '').indexOf(h) >= 0);
                 if (b) b.click();
                 return !!b;
