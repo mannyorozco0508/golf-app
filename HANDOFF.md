@@ -259,9 +259,23 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 ## Known open items
 
 - **The trips rule is NOT "trips are protected now". Read this before assuming it.**
-`trips/$tripCode` now carries `".write": "newData.exists() || !data.hasChild('rounds')"`
+**DEPLOYED 2026-09-10** and proven against the live database, not only against targaryen.
+`trips/$tripCode` carries `".write": "newData.exists() || !data.hasChild('rounds')"`
 — the events idiom with one word changed — so a trip that has rounds cannot be deleted
-in one write. `trip_delete_rules_test.js` pins all sixteen scenarios including the gaps.
+in one write. `trip_delete_rules_test.js` pins all seventeen scenarios including the gaps.
+  - **Live proof, both halves, on a scratch trip `ZZTRIP`.** Forbidden: `DELETE
+    /trips/ZZTRIP.json` on a trip holding a round pointer returned **HTTP 401
+    `{"error":"Permission denied"}`** and the trip survived it — refused by the server,
+    not by the simulator. Permitted: creating the trip and writing
+    `trips/ZZTRIP/rounds/ZZR1` both returned HTTP 200. Cleaned up via the documented
+    two-write route (delete `rounds`, then delete the trip) and verified: every path
+    under `trips/ZZTRIP` reads `null`.
+  - **The escape route was proven BEFORE anything risky was created**, because
+    `global_courses` left `zz_scratch_probe` behind by checking deletability after the
+    write. A scratch trip was created with only `name`+`createdAt`, deleted, and confirmed
+    gone — and only then was a version with rounds created. **A trip whose only child is
+    `rounds` cannot be deleted by any client at all** (both clauses fail; that is X5), so
+    a scratch node in that shape would have been permanent.
 Three things about it a future reader must not inherit wrongly:
   - **It guards a whole-trip delete that NO CLIENT PERFORMS.** Every trips write path
     the app can emit was enumerated from source — `trip.html`, `admin.html:5415` and
