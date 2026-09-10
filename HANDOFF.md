@@ -258,6 +258,26 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
+- **`setControlPending` is duplicated in `admin.html` and `trip.html`, knowingly.** Both
+copies disable a control, show `⏳ …ing...`, and return a `restore()` the failure path
+calls so a refused issue cannot leave a dead button. **They are the same shape, NOT the
+same bytes** — 859 chars against 628, and the difference is real: admin's writes into the
+tile's `.hw-desc` child so the icon and title survive (the tile reads "Game Day /
+⏳ Starting..."), while trip's link has no child to write into and replaces its own text
+outright. A shared version therefore has to take that target as an argument, which is
+the one piece of design work the move needs. This entry first said "byte-identical";
+that was wrong, no test asserted it, and it was caught by diffing the two before
+committing a sentence that claimed it.
+**It belongs in `code-issuer.js`, which both pages already load** — the same wave that
+gave both controls a database round trip is the wave that made a pending state
+necessary, so the helper and the cause are already in the same place. It was not moved
+because `code-issuer.js` was not in that wave's approval, and moving a shared file to
+carry a UI helper is not a change worth making on its own. **Move it the next time
+`code-issuer.js` is open for another reason**, and delete both copies in the same edit —
+this project has already paid for a hand-written copy in each of two pages, when a
+per-press Nassau stake reached the engine but not the pages. `tools/tile-double-tap-check.js`
+covers both surfaces, so a move that breaks one goes red.
+
 - `skins.html` (Action tab) doesn't know about participant-scoped Skins games — still shows only the legacy round-wide view. Money is unaffected; the page is misleading
 - Four separate "Save as PDF" buttons exist; only the Round Receipt is canonical
 - The Tesseract OCR scorecard scanner loads from a CDN at runtime, so it fails offline — exactly where it's most needed

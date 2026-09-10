@@ -50,8 +50,20 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
         // silently invalidates.
         const fnStart = ADMIN.indexOf('function selectHomeWidget');
         const fn = ADMIN.slice(fnStart, ADMIN.indexOf('\n    function ', fnStart + 30));
-        assert.match(fn, /createRoom\(\);/, 'picking Game Day does not start anything');
-        assert.match(ADMIN, /function createRoom\(\)[\s\S]{0,300}window\.location\.href/,
+        // RE-PINNED, AND STRICTER THAN IT WAS. The call is no longer bare: the tile
+        // that was pressed is handed over so it can show that it is working, because
+        // issuing a code is now a database round trip and a tile that looks idle gets
+        // tapped twice. Asserting the ARGUMENT as well as the call keeps the original
+        // point - picking Game Day starts a round - and adds the new one.
+        assert.match(fn, /createRoom\(document\.getElementById\('hw-' \+ type\)\);/,
+            'picking Game Day does not start anything');
+        // The bound moved 300 -> 1000 because the function legitimately grew: measured,
+        // the signature now sits 860 characters from the navigation, with the
+        // re-entrancy guard, setControlPending and the awaited issueUniqueCode between
+        // them. 1000 is the measurement plus headroom, not a number picked to pass -
+        // the point is still "createRoom goes somewhere", and a createRoom that stopped
+        // navigating would still fail.
+        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1000}window\.location\.href/,
             'createRoom no longer goes anywhere');
     });
 

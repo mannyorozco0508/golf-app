@@ -287,7 +287,7 @@ html {
         <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">➕ Build Trip &amp; All Rounds</button>
 
         <div style="text-align:center; margin-top:12px;">
-            <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline;" onclick="createTripBlank()">Skip planning — just create an empty trip</span>
+            <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline;" onclick="createTripBlank(this)">Skip planning — just create an empty trip</span>
         </div>
     </div>
 
@@ -855,13 +855,52 @@ html {
 
     // Fallback for anyone who just wants an empty trip container with no upfront planning —
     // the original one-field flow, still available for whenever that's genuinely what's wanted.
-    function createTripBlank() {
+    // THE SAME SHAPE AS THE BUILD TRIP BUTTON ABOVE - an hourglass, a present
+    // participle, and the control made non-interactive - because two different
+    // pending states in one app reads as unfinished. This is a <span> acting as
+    // a link, so `disabled` does nothing on it and pointer-events carries the
+    // weight instead.
+    //
+    // Measured cold before this existed: two taps on this link issued TWO codes
+    // and created TWO TRIPS. admin.html carries the matching copy for its Game
+    // Day tile. SAME SHAPE, NOT THE SAME BYTES: that one writes into the tile's
+    // .hw-desc child so the icon and title survive, while this link has no child
+    // to write into and replaces its own text outright. A shared version has to
+    // take that target as an argument. It belongs in code-issuer.js, which both
+    // pages already load, the next time that file is open for another reason.
+    function setControlPending(el, pendingText) {
+        if (!el) return function () {};
+        const wasHtml = el.innerHTML;
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.6';
+        el.textContent = pendingText;
+        // RESTORE: a refused issue must not leave a dead control.
+        return function restore() {
+            el.disabled = false;
+            el.removeAttribute('aria-disabled');
+            el.style.pointerEvents = '';
+            el.style.opacity = '';
+            el.innerHTML = wasHtml;
+        };
+    }
+
+    function createTripBlank(pressedEl) {
+        // AND CHECKED AGAIN IN THE HANDLER, not only on the element. pointer-events
+        // stops a thumb; it does not stop the handler being invoked, and `disabled`
+        // means nothing on a <span>. This is the same belt-and-braces the group
+        // filter and the round delete already use: removing the visual state in
+        // devtools, or reaching the handler another way, must achieve nothing.
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { alert('⚠️ Give your trip a name first.'); return; }
+        const restore = setControlPending(pressedEl, '\u23F3 Creating...');
         issueUniqueCode({ db, root: 'trips' }).then(code =>
             db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} })
                 .then(() => { window.location.href = `trip.html?trip=${code}`; })
         ).catch(err => {
+            restore();
             const m = String((err && err.message) || err || '');
             alert(/could not issue a free/i.test(m)
                 ? 'Could not start a new trip just now.\n\nEvery code we tried was already '

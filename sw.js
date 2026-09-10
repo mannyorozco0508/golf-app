@@ -524,6 +524,22 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v88: a control that is issuing a code says so, and cannot be pressed twice.
+//
+// v87 gave the Game Day tile and trip.html's "Skip planning" link a database round
+// trip - the existence check that stops two organizers being handed one code. Issuing
+// a code used to be free, so both used to act instantly and neither had any pending
+// state. Measured cold on v87: two taps issued TWO codes on BOTH surfaces, the second
+// navigated, and the first code was abandoned with its round never created.
+//
+// Both now match the shape trip.html's Build Trip button already used - an hourglass,
+// a present participle, and the control made non-interactive - and both restore it if
+// the issue is refused, so a failure cannot leave a dead control. Both also re-check
+// in the handler, because pointer-events stops a thumb but not an invocation, and
+// `disabled` means nothing on a <span>.
+//
+// An installed PWA on v87 shows a tile that looks identical while it waits.
+
 // Moved to v87: one code generator, with an existence check beside it.
 //
 // admin.html, trip.html and tournament.html each carried a byte-identical
@@ -636,7 +652,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v87-one-generator-with-a-check-beside-it';
+const CACHE_VERSION = 'golfapp-v88-a-tile-that-says-it-is-working';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

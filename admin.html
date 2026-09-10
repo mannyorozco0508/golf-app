@@ -3172,7 +3172,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // page's question without acting on the answer. The framing above is still
         // set: it is read on the round's own setup screen, and a deep link carrying
         // ?eventType= relies on the same string.
-        createRoom();
+        // The tile that was pressed, so it is the one that shows it is working.
+        createRoom(document.getElementById('hw-' + type));
     }
 
         // The generator moved to code-issuer.js, with an existence check beside it.
@@ -3184,13 +3185,61 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // navigates BEFORE anything is written; the round does not exist until Save &
     // Start Round, by which time the organizer has typed a roster. A collision
     // found at save time would be found after the work.
-    async function createRoom() {
+    // THE SHAPE, AND IT IS THE ONE trip.html's Build Trip BUTTON ALREADY USES:
+    // an hourglass, a present participle, and the control made non-interactive
+    // until the answer arrives. Rather than invent a third pending style this
+    // matches it - two different pending states in one app reads as unfinished.
+    //
+    // WHY THIS EXISTS AT ALL. Issuing a code used to be free, so the tile
+    // navigated instantly. It now asks the database whether the code it drew is
+    // already in use, and that is a round trip. Measured cold: two taps issued
+    // TWO codes, the second navigated, and the first round was never created.
+    //
+    // A <button> takes `disabled`. A <span> acting as a link cannot, so this also
+    // sets pointer-events and opacity - the same shape whatever the element is.
+    // trip.html carries a matching copy for its own "Skip planning" link. SAME
+    // SHAPE, NOT THE SAME BYTES, and the difference is real: this one writes into
+    // the tile's .hw-desc child so the icon and title survive - the tile reads
+    // "Game Day / \u23F3 Starting..." - while trip.html's link has no child to
+    // write into and replaces its own text outright. A shared version has to take
+    // that target as an argument. It belongs in code-issuer.js, which both pages
+    // already load, the next time that file is open for another reason.
+    function setControlPending(el, pendingText) {
+        if (!el) return function () {};
+        const wasHtml = el.innerHTML;
+        const target = el.querySelector('.hw-desc') || el;
+        const wasTarget = target.innerHTML;
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.6';
+        target.textContent = pendingText;
+        // RESTORE, because a refused issue must not leave a dead control. The
+        // organizer has to be able to try again.
+        return function restore() {
+            el.disabled = false;
+            el.removeAttribute('aria-disabled');
+            el.style.pointerEvents = '';
+            el.style.opacity = '';
+            if (target === el) { el.innerHTML = wasHtml; } else { target.innerHTML = wasTarget; }
+        };
+    }
+
+    async function createRoom(pressedEl) {
+        // AND CHECKED AGAIN IN THE HANDLER, not only on the element. pointer-events
+        // stops a thumb; it does not stop the handler being invoked, and `disabled`
+        // means nothing on a <span>. This is the same belt-and-braces the group
+        // filter and the round delete already use: removing the visual state in
+        // devtools, or reaching the handler another way, must achieve nothing.
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const restore = setControlPending(pressedEl, '\u23F3 Starting...');
         try {
             const newCode = await issueUniqueCode({ db, root: 'events' });
             let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
             if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
             window.location.href = dest;
         } catch (err) {
+            restore();
             reportCodeIssueFailure(err, 'round');
         }
     }
