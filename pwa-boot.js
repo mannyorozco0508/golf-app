@@ -98,6 +98,20 @@
     // hole fires four writes in a second. A boolean would clear on the first
     // acknowledgement and claim "Online" while three were still in flight.
     var pending = 0;
+    // WHY A SECOND COUNTER AND NOT A pending THAT NEVER CLEARS. A refused write
+    // and a queued one need opposite words: a queued one lands when the signal
+    // comes back, a refused one never lands at all. MEASURED against the live
+    // database over CDP (tools/offline-measure.js) before this was written:
+    //
+    //   denied while online           REJECTED in ~110ms, PERMISSION_DENIED
+    //   offline at the write          PENDING - never settled in 15s
+    //   online, socket cut mid-flight RESOLVED at 3478ms once it came back
+    //
+    // So a rejection is the server refusing, never a dead spot on the 7th. That
+    // is what makes a distinct, sticky failure state correct here instead of
+    // nagging, and it is why `failed` is cleared by a successful write rather
+    // than by a timer or by reconnecting.
+    var failed = 0;
     var listeners = [];
 
     function notify() {
@@ -118,29 +132,49 @@
     }
 
     function state() {
-        return { online: isOnline(), pending: pending };
+        return { online: isOnline(), pending: pending, failed: failed };
     }
 
-    // Wrap any Firebase write promise. Increments before, decrements on settle
-    // - resolve or reject, because either way it is no longer in flight.
+    // Wrap any Firebase write promise. Increments before, decrements on settle -
+    // resolve or reject, because either way it is no longer in flight - and now
+    // records WHICH of the two it was.
+    //
+    // This used to be `promise.then(settle, settle)`: one handler for both
+    // outcomes, so a refused write decremented the counter exactly like a saved
+    // one and renderPill's last branch then hid the pill, which in this design is
+    // the affirmative claim that everything is saved. The file's own header says
+    // it exists to stop the app claiming success it does not have; that line
+    // committed the same lie by a different route.
+    //
+    // 'neutral' is not a success. track(undefined) is not a write that landed, so
+    // it must not clear a real failure.
     function track(promise) {
         pending++;
         notify();
         var done = false;
-        function settle() {
+        function settle(outcome) {
             if (done) return;
             done = true;
             pending = Math.max(0, pending - 1);
+            if (outcome === 'failed') failed++;
+            else if (outcome === 'ok') failed = 0;
             notify();
         }
         try {
             if (promise && typeof promise.then === 'function') {
-                promise.then(settle, settle);
+                // Observing a rejection necessarily marks the promise handled, so
+                // the browser no longer raises unhandledrejection for it. That is
+                // an acceptable trade only because the failure is now surfaced to
+                // the golfer instead of to a console nobody is reading on a tee
+                // box - and because the ORIGINAL promise is returned untouched, so
+                // a caller's own .catch still receives the real error object.
+                promise.then(function () { settle('ok'); },
+                             function () { settle('failed'); });
             } else {
-                settle();
+                settle('neutral');
             }
         } catch (e) {
-            settle();
+            settle('neutral');
         }
         return promise;
     }
@@ -179,7 +213,18 @@
         if (!el) return;
         var s = state();
         try {
-            if (!s.online && s.pending > 0) {
+            // FIRST, AND STICKY. A refusal is the only state here that needs the
+            // golfer to DO something, and it is the only one that does not resolve
+            // itself: reconnecting does not un-refuse a write the server already
+            // rejected. It clears when a later write actually lands, and at no
+            // other time - not on a timer, not on an 'online' event.
+            if (s.failed > 0) {
+                el.style.display = 'block';
+                el.style.background = '#fdecea';
+                el.style.color = '#8a1c12';
+                el.textContent = '\uD83D\uDD34 ' + s.failed + ' change' + (s.failed === 1 ? '' : 's')
+                    + ' could not be saved. Re-enter and try again.';
+            } else if (!s.online && s.pending > 0) {
                 el.style.display = 'block';
                 el.style.background = '#fff4d6';
                 el.style.color = '#8a6100';
@@ -211,8 +256,14 @@
     // prompt gets dismissed reflexively and then means nothing on the one
     // occasion it matters.
     function onBeforeUnload(e) {
-        if (pending <= 0) return undefined;
-        var msg = 'Changes are still waiting to sync. Leaving now may lose them.';
+        if (pending <= 0 && failed <= 0) return undefined;
+        // A refusal is worse than an outstanding write, not better: the write is
+        // already gone and leaving is the moment the golfer stops being able to
+        // re-enter it. Reading only `pending` meant the one state that is
+        // permanently lost was the one state that raised no warning.
+        var msg = failed > 0
+            ? 'Some changes could not be saved. Leaving now loses them - re-enter them first.'
+            : 'Changes are still waiting to sync. Leaving now may lose them.';
         if (e && typeof e.preventDefault === 'function') e.preventDefault();
         if (e) e.returnValue = msg;
         return msg;
@@ -258,7 +309,7 @@
         state: state,
         track: track,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
-        _reset: function () { pending = 0; listeners = []; pillEl = null; }
+        _reset: function () { pending = 0; failed = 0; listeners = []; pillEl = null; }
     };
 
     if (typeof window !== 'undefined') {

@@ -220,12 +220,17 @@ describe('PENDING-WRITE TRACKING', () => {
         assert.equal(b.net.state().pending, 0);
     });
 
-    test('a rejected write also clears - it is no longer in flight either way', async () => {
+    test('a rejected write also clears the in-flight count - it is no longer in flight either way', async () => {
+        // WAS INERT. This passed Promise.reject(...).catch(() => {}) to track(),
+        // and that promise RESOLVES - so track() never saw a rejection and the
+        // rejection path had no coverage while appearing to have some. The
+        // rejection is now handed to track() un-caught, which is the only way
+        // this test can mean what its name says.
         const b = loadBoot();
         b.net._reset();
-        b.net.track(Promise.reject(new Error('permission denied')).catch(() => {}));
+        b.net.track(Promise.reject(new Error('permission denied')));
         await new Promise((r) => setTimeout(r, 5));
-        assert.equal(b.net.state().pending, 0);
+        assert.equal(b.net.state().pending, 0, 'A refused write is not still in flight.');
     });
 
     test('tracking a non-promise does not strand the counter above zero forever', () => {
@@ -368,5 +373,155 @@ describe('PWA ACTIVATION - manifest and boot script are wired into the shipped p
     test('pwa-boot.js ships in both the offline shell and the native bundle', () => {
         assert.match(read('sw.js'), /'\.\/pwa-boot\.js'/, 'pwa-boot.js must be precached, or the pages that load it break offline.');
         assert.match(read('sync-mobile-web.js'), /'pwa-boot\.js'/, 'pwa-boot.js must ship in the Capacitor bundle, or the native pages 404 on it.');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// A REFUSED WRITE MUST NOT LOOK LIKE A SAVED ONE
+//
+// MEASURED FIRST, against the real firebase-database-compat.js and the live
+// database over CDP (tools/offline-measure.js):
+//
+//   denied while online          REJECTED in ~110ms, PERMISSION_DENIED
+//   offline at the write         PENDING - never settled in 15s
+//   online, socket cut mid-flight RESOLVED at 3478ms once the network returned
+//
+// So a rejection means the server REFUSED. It never means "this golfer is in a
+// dead spot on the 7th", and that is what makes a distinct failure state correct
+// here rather than nagging. Everything below depends on that measurement.
+//
+// The old test above - "a rejected write also clears" - passed
+// Promise.reject(...).catch(() => {}) to track(), which RESOLVES. track() never
+// saw a rejection, so the rejection path had no coverage at all while looking
+// like it did. It is corrected below to pass a genuinely rejecting promise.
+// ---------------------------------------------------------------------------
+
+describe('REFUSED WRITES - the pill must not report all-saved after a refusal', () => {
+
+    // Rejections here are deliberately un-pre-caught: track() is what must
+    // observe them. A .catch() before track() is what made the old test inert.
+    const rejecting = () => Promise.reject(Object.assign(
+        new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' }));
+
+    test('a rejected write leaves a DIFFERENT state than a resolved one', async () => {
+        const a = loadBoot(); a.net._reset();
+        a.net.track(Promise.resolve());
+        await new Promise((r) => setTimeout(r, 5));
+        const afterOk = a.net.state();
+
+        const b = loadBoot(); b.net._reset();
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        const afterFail = b.net.state();
+
+        assert.notDeepEqual(afterFail, afterOk,
+            'A refused write and a successful one must not be indistinguishable - that is the whole defect.');
+        assert.equal(afterOk.pending, 0);
+        assert.equal(afterFail.pending, 0, 'A refused write is no longer in flight either.');
+        assert.equal(afterOk.failed, 0);
+        assert.ok(afterFail.failed > 0, 'A refused write must be counted as failed.');
+    });
+
+    test('two refusals count two, and a success clears them', async () => {
+        const b = loadBoot(); b.net._reset();
+        b.net.track(rejecting());
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        assert.equal(b.net.state().failed, 2);
+        b.net.track(Promise.resolve());
+        await new Promise((r) => setTimeout(r, 5));
+        assert.equal(b.net.state().failed, 0,
+            'The failure state clears on the next write that actually lands, and on nothing else.');
+    });
+
+    test('time alone does not clear a failure', async () => {
+        const b = loadBoot(); b.net._reset();
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 60));
+        assert.ok(b.net.state().failed > 0,
+            'A golfer who looks down two holes later must still learn the score never saved.');
+    });
+
+    test('tracking a non-promise does not invent a success that clears a real failure', async () => {
+        const b = loadBoot(); b.net._reset();
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        b.net.track(undefined);
+        assert.ok(b.net.state().failed > 0,
+            'Only a write that actually landed may clear the failure state.');
+    });
+
+    test('track still returns the promise, and a callers own .catch still runs', async () => {
+        const b = loadBoot(); b.net._reset();
+        const p = rejecting();
+        const returned = b.net.track(p);
+        assert.equal(returned, p, 'track must hand back the same promise it was given.');
+        let seen = null;
+        await returned.catch((e) => { seen = e; });
+        assert.ok(seen, 'A caller attaching its own .catch must still receive the error.');
+        assert.match(String(seen.message), /PERMISSION_DENIED/);
+        assert.equal(seen.code, 'PERMISSION_DENIED', 'The error object must arrive intact, not repackaged.');
+    });
+
+    test('the pill shows a failure state instead of hiding', async () => {
+        // No _reset(): it clears the listener list, which is where the pill's own
+        // renderer lives. A fresh boot already starts at zero.
+        const b = loadBoot({ onLine: true });
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        const pill = b.bodyChildren[0];
+        assert.ok(pill, 'The pill must exist.');
+        assert.notEqual(pill.style.display, 'none',
+            'Hiding IS the claim that everything is saved. After a refusal it is a lie.');
+        assert.ok(pill.textContent.length > 0, 'A visible pill with no text says nothing.');
+        assert.match(pill.textContent, /sav|refus/i, 'The pill must say the write did not save.');
+    });
+
+    test('the failure pill survives a reconnection event', async () => {
+        const b = loadBoot({ onLine: true });
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        (b.winListeners.online || []).forEach((fn) => fn());
+        const pill = b.bodyChildren[0];
+        assert.notEqual(pill.style.display, 'none',
+            'Coming back online does not un-refuse a write the server already rejected.');
+    });
+
+    test('a refusal still shows even while offline', async () => {
+        const b = loadBoot({ onLine: false });
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        const pill = b.bodyChildren[0];
+        assert.notEqual(pill.style.display, 'none');
+        assert.match(pill.textContent, /sav|refus/i,
+            'A refusal is not the same as being offline and must not be worded as one.');
+    });
+
+    test('the pill still says nothing when nothing failed and nothing is pending', () => {
+        const b = loadBoot({ onLine: true });
+        const pill = b.bodyChildren[0];
+        assert.equal(pill.style.display, 'none',
+            'The clean case must stay clean, or this whole block could be satisfied by a pill that is always on.');
+    });
+
+    test('beforeunload warns after a refusal, with nothing pending', async () => {
+        const b = loadBoot(); b.net._reset();
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        assert.equal(b.net.state().pending, 0, 'Precondition: nothing is in flight.');
+        const e = { preventDefault: () => {}, returnValue: undefined };
+        const msg = b.api._onBeforeUnload(e);
+        assert.ok(msg, 'Leaving with a refused write must warn - today pending is 0 and it says nothing.');
+        assert.match(String(msg), /sav|refus/i);
+        assert.match(String(e.returnValue), /sav|refus/i);
+    });
+
+    test('_reset clears the failure count too', async () => {
+        const b = loadBoot();
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        b.net._reset();
+        assert.equal(b.net.state().failed, 0, 'A tracker that cannot be reset makes every later test order-dependent.');
+        assert.equal(b.net.state().pending, 0);
     });
 });

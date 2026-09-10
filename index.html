@@ -779,6 +779,14 @@
             border-radius: 50%;
         }
 
+        /* SAVE STATE - ported verbatim in shape from tournament-scorecard.html:80-83.
+           Red AND bold, never colour alone: this has to read on a phone in
+           direct sun. min-height reserves the row so nothing shifts. */
+        .save-state { min-height: 18px; text-align: center; font-size: 0.78rem; color: var(--text-muted); margin: 6px 0 10px 0; transition: opacity 0.2s; }
+        .save-state.saving { color: var(--text-muted); }
+        .save-state.saved { color: var(--brand-green); font-weight: bold; }
+        .save-state.error { color: var(--accent-red); font-weight: bold; }
+
         .score-input-wrapper {
             position: relative; display: inline-block; width: 48px; height: 48px;
             background-color: var(--bg-card); border-radius: 6px;
@@ -1289,6 +1297,26 @@ html {
         <label for="dot-context-select">Dots:</label>
         <select id="dot-context-select" onchange="setDotContext(this.value)"></select>
     </div>
+
+    <!-- SAVE STATE. Ported from tournament-scorecard.html, which has surfaced
+         exactly this failure on exactly this kind of write since it shipped. No
+         new mechanism and no new copy.
+
+         WHY HERE. Static markup inside the scorecard card, above both view mounts:
+           - #hole-view-card and #full-card-container are both rewritten by
+             innerHTML on every Firebase snapshot. A message placed in either
+             would be wiped by the next render - which, for a failed write, is
+             the render that happens moments later.
+           - It is therefore outside the frozen hole-header / score-box /
+             Prev-Next hierarchy, which lives inside #hole-view-card. Navigation
+             is never pushed away from score entry.
+           - One element serves BOTH views: the same "one presenter, two mounts"
+             shape the live ticker below already uses.
+           - Above the score boxes, so it is on screen while the golfer is still
+             looking at the box they typed into.
+         min-height reserves the row so the boxes do not jump under a thumb when
+         the message appears or clears. -->
+    <div class="save-state" id="save-state" role="status" aria-live="polite"></div>
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
@@ -4935,6 +4963,47 @@ html {
     // navigator.onLine is a weak signal in one direction only: it can report
     // "online" on a captive portal that goes nowhere. That is the safe way for
     // it to be wrong here, because it is used to REFUSE, never to promise.
+    // ---- SAVE STATE ------------------------------------------------------
+    //
+    // PORTED FROM tournament-scorecard.html:321-346. Not re-invented: the sibling
+    // product has surfaced exactly this failure on exactly this kind of write
+    // since it shipped, and a third mechanism would be a third thing to keep
+    // right. The token guard and the asymmetry below are both from there.
+    //
+    // MEASURED BEFORE PORTING (tools/offline-measure.js, real SDK, live database):
+    // an offline write stays PENDING and later RESOLVES; only a server refusal
+    // REJECTS. So .catch here fires when the write will never land, and stays
+    // quiet in a dead zone on the 7th. That is what makes this correct rather
+    // than nagging, and it is why score entry is not blocked when offline.
+    //
+    // ONLY 'saved' AUTO-CLEARS. An error stays until a later write actually
+    // lands, so a golfer who looks down two holes later still learns about it.
+    let saveStateToken = 0;
+    function setSaveState(state, text) {
+        const el = document.getElementById('save-state');
+        if (!el) return;
+        const token = ++saveStateToken;
+        el.className = 'save-state ' + state;
+        el.textContent = text;
+        if (state === 'saved') {
+            setTimeout(() => {
+                if (token === saveStateToken && el.className === 'save-state saved') {
+                    el.textContent = '';
+                }
+            }, 2000);
+        }
+    }
+
+    // The promise is only OBSERVED. The write itself is unchanged, and the
+    // original promise is what callers keep chaining.
+    function trackWrite(promise) {
+        setSaveState('saving', 'Saving\u2026');
+        return promise
+            .then(() => setSaveState('saved', '\u2713 Saved'))
+            .catch(() => setSaveState('error',
+                '\u26A0\uFE0F Could not save \u2014 check your signal and re-enter that hole'));
+    }
+
     function requireOnlineForMoney(title, line) {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
             alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
@@ -4964,6 +5033,11 @@ html {
         if (window.GolfNet && typeof window.GolfNet.track === 'function') {
             window.GolfNet.track(writePromise);
         }
+        // AND observe the outcome. GolfNet.track feeds the page-wide pill; this
+        // says which action failed, at the score box the golfer is looking at.
+        // Both watch the SAME promise - neither replaces the other, and the write
+        // is untouched by either.
+        trackWrite(writePromise);
 
         // RYDER CUP MATCH LOCK. A Cup pairing freezes the moment the first score
         // for that match is posted, so a roster edit can never rewrite holes that
@@ -6139,9 +6213,13 @@ html {
         });
 
         if (!requireOnlineForMoney('DOTS NOT SAVED', 'Reconnect before recording dots for this hole.')) return;
+        // Dots are money - dotPointVal prices them - so this follows the money
+        // pattern the other 19 money writes already use: refuse offline above,
+        // alert on refusal here. Without the .catch the modal simply stayed open
+        // on a refusal, which is indistinguishable from a slow write.
         db.ref(`events/${currentMode}/dots/h${currentDotHole}`).set(tempDots).then(() => {
             closeDotsModal();
-        });
+        }).catch(err => alert('\u26A0\uFE0F DOTS NOT SAVED\n' + (err && err.message)));
     }
 
     function endAndClearRound() {

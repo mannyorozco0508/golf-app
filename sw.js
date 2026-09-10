@@ -521,6 +521,21 @@
 // An installed PWA on v80 carries skins nobody asked to carry and exports a receipt
 // with no money on it.
 // Moved to v82: every golfer gets a label of their own, and HCP says a handicap.
+
+// Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
+// pwa-boot.js's track() was `promise.then(settle, settle)` - one handler for both
+// outcomes - so a rejected write decremented the pending counter identically to a
+// successful one and the pill then HID, which in that design is the affirmative claim
+// that everything is saved. GolfNet now carries a `failed` count, the pill has a red
+// state that clears only when a later write actually lands, and beforeunload warns on
+// a refusal instead of staying silent because pending was 0. index.html gains the
+// save-state line ported from tournament-scorecard.html, and the Dots write gains the
+// .catch the other money writes already had.
+//
+// An installed PWA on v82 keeps a scorecard that loses a refused score in silence and
+// tells the golfer everything is saved. pwa-boot.js is in SHARED_SHELL, so without
+// this bump the devices most likely to have the app installed are the only ones that
+// never get the fix.
 //   THREE FAULTS OFF ONE LIVE ROUND, Y5VGXM - eight golfers, a $40 buy-in pool, and
 // every name a placeholder.
 //   THE WIZARD SAID NOTHING. admin.html saves a blank name box as `Player N`, and no
@@ -544,7 +559,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v82-a-label-of-their-own';
+const CACHE_VERSION = 'golfapp-v83-a-refused-score-says-so';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
