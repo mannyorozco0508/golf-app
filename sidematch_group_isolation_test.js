@@ -634,8 +634,9 @@ describe('PARITY — the two pages cannot drift apart', () => {
 describe('SECURITY — what this does and does not claim', () => {
     test('Firebase rules are UNCHANGED and still open by design', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
-        assert.equal(rules.events.$eventCode['.write'], true,
-            'writes remain open - scoring is deliberately account-free');
+        assert.equal(rules.events.$eventCode['.write'],
+            "newData.exists() || !data.hasChild('scores')",
+            'a round with scores in it cannot be deleted in one write. Writes are still\n             otherwise open - this is an accident guardrail, not authorization, and the\n             assertion below is the half that still says so.');
         assert.ok(!/auth/.test(JSON.stringify(rules.events)),
             'there is still no identity for the server to check against');
     });

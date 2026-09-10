@@ -18,6 +18,21 @@
         "scores": {
           "p101_h1": 4
         }
+      },
+      "NOSCORES": {
+        "gameFormat": "stroke",
+        "players": [
+          {
+            "id": 101,
+            "name": "Marty"
+          }
+        ],
+        "courseData": [
+          {
+            "hole": 1,
+            "par": 4
+          }
+        ]
       }
     },
     "trips": {
@@ -100,7 +115,7 @@
       "canRead": [
         "nobody"
       ],
-      "canWrite": [
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": null
@@ -717,6 +732,14 @@
     "tournaments": {
       "cannotRead": [
         "nobody"
+      ]
+    },
+    "events/NOSCORES": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        }
       ]
     }
   }

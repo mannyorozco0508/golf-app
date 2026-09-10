@@ -524,6 +524,25 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v85: only the organizer link can delete a round, and the control says
+// what it destroys.
+//
+// index.html:1357 carried "🏁 End Current Game / Finished playing? / End & Wipe
+// Round" in STATIC markup at the bottom of the scorecard - on every group link,
+// because every group link is that page. Measured cold: a client on
+// ?game=CODE&group=1 found the button, was asked to confirm, and issued a real
+// delete of the round. A four-ball was four people who could each destroy it, and
+// the copy invited a partner at the turn to read it as "finish MY card".
+//
+// The control now renders only for isOrganizerView(), into an empty mount, so a
+// ?group= link has no button in the DOM at all - display:none would not do,
+// because a hidden button is still clickable from a console. The copy says
+// "Delete round for everyone" and the confirm names the round and the golfer
+// count. database.rules.json refuses a one-write delete of a round that has
+// scores, as the backstop.
+//
+// An installed PWA on v84 hands every playing partner a working delete button.
+
 // Moved to v84: the pill states a COUNT and never advises, and a refused course
 // publish says so on Round Ready.
 //
@@ -575,7 +594,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v84-the-pill-counts-and-does-not-advise';
+const CACHE_VERSION = 'golfapp-v85-only-the-organizer-can-delete-a-round';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

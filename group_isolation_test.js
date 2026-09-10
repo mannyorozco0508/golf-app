@@ -322,8 +322,9 @@ describe('FIREBASE RULES — what the server can and cannot enforce', () => {
         const v = rules.events.$eventCode.scores.$scoreKey['.validate'];
         assert.ok(/isNumber/.test(v), 'shape is validated');
         assert.ok(!/auth/.test(v), 'there is no identity to check against');
-        assert.equal(rules.events.$eventCode['.write'], true,
-            'writes are open by design - scoring is deliberately account-free');
+        assert.equal(rules.events.$eventCode['.write'],
+            "newData.exists() || !data.hasChild('scores')",
+            'a round with scores in it cannot be deleted in one write. Writes are still\n             otherwise open - this is an accident guardrail, not authorization, and the\n             assertion below is the half that still says so.');
     });
 
     test('the shared course library is still protected', () => {

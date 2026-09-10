@@ -221,7 +221,7 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         // It is pinned to the shape, plus the current value, so a bump is a
         // deliberate one-line edit here rather than four mystery failures.
         assert.match(CACHE_NAME, /^golfapp-v\d+/, 'The cache key must carry a version number.');
-        assert.equal(CACHE_NAME, 'golfapp-v84-the-pill-counts-and-does-not-advise', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
+        assert.equal(CACHE_NAME, 'golfapp-v85-only-the-organizer-can-delete-a-round', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
     });
 });
 

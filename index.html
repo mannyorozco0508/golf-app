@@ -1354,11 +1354,18 @@ html {
         <button class="btn-primary" style="margin-top: 0; background-color: var(--brand-navy);" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
     </div>
 
-    <div class="end-box-card">
-        <h3 style="color: var(--accent-red); margin-top: 0; font-size: 1rem;">🏁 End Current Game</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Finished playing? Completely wipe this game to start fresh.</span>
-        <button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">🗑️ End & Wipe Round</button>
-    </div>
+    <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.
+         This was a full-width red button in static markup at the bottom of the
+         scorecard - on EVERY group link, because every group link is this page.
+         Measured cold: a client on ?game=CODE&group=1 found it, was asked to
+         confirm, and issued a real delete of the round. A four-ball was four
+         people who could each destroy it.
+         An empty mount, filled by renderEndRoundControl() only for the
+         organizer, so a ?group= link has NO BUTTON IN THE DOM at all.
+         display:none would not do: a hidden button is still clickable from a
+         console, which is what batch1_safety_test.js:431 already demands of
+         Group Links. -->
+    <div id="end-round-mount"></div>
 </div>
 
 <!-- Dot Game Modal -->
@@ -1699,6 +1706,11 @@ html {
             lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
             lockBadge.style.display = "inline-block";
         }
+
+        // Before any data arrives: this depends only on the URL, and a
+        // scorekeeper must never see the control even for the moment between
+        // arrival and the first snapshot.
+        renderEndRoundControl();
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
@@ -6222,13 +6234,62 @@ html {
         }).catch(err => alert('\u26A0\uFE0F DOTS NOT SAVED\n' + (err && err.message)));
     }
 
+    // ORGANIZER ONLY. Gated on isOrganizerView() - the single definition of
+    // "is this the organizer" that already gates Group Links - and NOT on the
+    // organizer token: the token link renders inside the Group Links panel,
+    // which bails when a round has one group, so the organizer of a four-ball
+    // can never obtain it. Gating on the token would remove this control from
+    // the commonest round in the app with no way to get it back.
+    //
+    // HONEST LIMIT, the same one isOrganizerView() carries everywhere else: it
+    // means "this URL has no ?group=". An organizer who pastes their own
+    // address bar into the group chat hands it back. This is a guardrail
+    // against accidents at the same strength as the ?group= links, not a
+    // security boundary, and database.rules.json is the backstop.
+    function renderEndRoundControl() {
+        const mount = document.getElementById('end-round-mount');
+        if (!mount) return;
+        if (typeof isOrganizerView === 'function' && !isOrganizerView()) {
+            mount.innerHTML = '';
+            return;
+        }
+        mount.innerHTML = '<div class="end-box-card">'
+            + '<h3 style="color: var(--accent-red); margin-top: 0; font-size: 1rem;">🗑️ Delete this round</h3>'
+            + '<span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">'
+            + 'Erases every score for everyone in this round. You do not need to do this when you finish '
+            + '\u2014 scores save as you enter them.</span>'
+            + '<button class="btn-danger" style="margin-top: 0;" onclick="endAndClearRound()">🗑️ Delete round for everyone</button>'
+            + '</div>';
+    }
+
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current game for Game ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
+        // Checked again here, not only at render: removing the button in
+        // devtools must achieve nothing. Same belt-and-braces as filterGroup().
+        if (typeof isOrganizerView === 'function' && !isOrganizerView()) {
+            console.warn('Only the organizer link can delete a round.');
+            return;
+        }
+        const golferCount = (currentData.players || []).length;
+        const msg = `Delete round ${currentMode} for everyone?\n\n`
+            + `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+            + `It cannot be undone.\n\n`
+            + `You do not need to delete a round when you finish playing.`;
+        if (confirm(msg)) {
             db.ref(`events/${currentMode}`).remove().then(() => {
-                alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
-                window.location.href = "admin.html"; 
+                alert("Round deleted. The scorecard is now clear.");
+                window.location.href = "admin.html";
             }).catch((err) => {
-                alert(`Error clearing game: ${err.message}`);
+                // THE SAME CATCH FIRES ON A DROPPED CONNECTION. Saying "this
+                // round has scores in it" for a network failure would be false
+                // half the time, so the two are told apart by the error itself.
+                const m = String((err && err.message) || err || '');
+                if (/PERMISSION_DENIED/i.test(m)) {
+                    alert('This round has scores in it, so it cannot be deleted.\n\n'
+                        + 'That is deliberate \u2014 it stops a round being wiped by accident '
+                        + 'once anyone has started playing.');
+                } else {
+                    alert('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+                }
             });
         }
     }

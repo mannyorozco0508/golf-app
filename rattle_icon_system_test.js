@@ -237,7 +237,11 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
             const label = src.slice(at, src.indexOf('</button>', at));
             assert.match(label, /\u{1F5D1}\ufe0f/u, name + ': the destructive control lost its bin');
             assert.ok(!/\u{1F4E5}/u.test(label), name + ': 📥 must never mean destroy');
-            assert.match(label, /wipe/i, name + ': it no longer says what it does');
+            // "Wipe" became "Delete" deliberately: "End & Wipe" read as "finish MY
+            // card" to a playing partner, which is how a scorekeeper link came to
+            // carry a working delete. The RULE is unchanged - the control must say
+            // what it does - and either verb satisfies it.
+            assert.match(label, /delete|wipe/i, name + ': it no longer says what it does');
         });
         assert.ok(!/\u{1F4E5}[^<\n]{0,12}(End|Wipe)/u.test(ADMIN + IDX),
             '📥 must never mean destroy');
