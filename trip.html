@@ -199,6 +199,10 @@
         .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
         .rc-foot { font-size: 0.66rem; opacity: 0.75; text-align: center; margin-top: 10px; font-weight: 600; }
         .trip-share-btn { margin-top: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--subtle-bg); color: var(--brand-green); font-size: 0.82rem; font-weight: bold; cursor: pointer; }
+        .trip-org-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-mid); text-align: left; }
+        .trip-org-title { font-size: 0.82rem; font-weight: bold; color: var(--accent-teal); }
+        .trip-org-note { font-size: 0.72rem; color: var(--text-muted); margin: 2px 0 6px 0; line-height: 1.35; }
+        .rc-counts-static { opacity: 0.75; cursor: default; }
         .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
         .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
@@ -315,9 +319,19 @@ html {
              already worked; it simply was not surfaced anywhere, so twelve people each
              typed the code by hand. A round has had copyable group links for months. -->
         <div><button class="trip-share-btn" id="trip-share-btn" onclick="copyTripLink(this)">🔗 Share Trip Link</button></div>
+        <!-- Rendered only when the trip actually carries a token, exactly as
+             index.html does it. A legacy trip shows nothing here, which is the
+             honest signal that no override exists on it. -->
+        <div id="trip-organizer-link" style="display:none;"></div>
     </div>
     <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
 
+    <!-- ORGANIZER TOOLS. Withheld from a plain trip link, which is the one that
+         gets shared and the one printed on the recap card. Withholding these must
+         NOT withhold the trip itself - the rounds, the standings, the money and
+         the recap all render for everybody, because watching is the whole point
+         of the link. -->
+    <div id="trip-organizer-tools">
     <hr class="section-divider">
     <h3>🔗 Add a Round to This Trip</h3>
     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
@@ -344,6 +358,7 @@ html {
         </div>
         <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
     </div>
+    </div><!-- /trip-organizer-tools -->
 
     <hr class="section-divider">
 
@@ -819,8 +834,12 @@ html {
                 roundCodes.push(await issueUniqueCode({ db, root: 'events', reserved: usedCodes }));
             }
             let updates = {};
+            // THE CREATOR IS THE ORGANIZER, and has to leave here holding the
+            // token or they lock themselves out of the trip they just made.
+            const tripToken = makeOrganizerToken();
             updates[`trips/${tripCode}/name`] = name;
             updates[`trips/${tripCode}/createdAt`] = Date.now();
+            updates[`trips/${tripCode}/organizerToken`] = tripToken;
 
             roundConfigs.forEach((cfg, cfgIdx) => {
                 const roundCode = roundCodes[cfgIdx];
@@ -845,9 +864,9 @@ html {
                 updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
             });
 
-            return db.ref().update(updates).then(() => tripCode);
-        }).then(tripCode => {
-            window.location.href = `trip.html?trip=${tripCode}`;
+            return db.ref().update(updates).then(() => ({ tripCode, tripToken }));
+        }).then(({ tripCode, tripToken }) => {
+            window.location.href = `trip.html?trip=${tripCode}&organizer=${tripToken}`;
         }).catch(err => {
             buildBtn.innerText = originalText;
             buildBtn.disabled = false;
@@ -898,10 +917,13 @@ html {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { alert('⚠️ Give your trip a name first.'); return; }
         const restore = setControlPending(pressedEl, '\u23F3 Creating...');
-        issueUniqueCode({ db, root: 'trips' }).then(code =>
-            db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} })
-                .then(() => { window.location.href = `trip.html?trip=${code}`; })
-        ).catch(err => {
+        issueUniqueCode({ db, root: 'trips' }).then(code => {
+            // Same as the planner path above: mint here, leave holding it.
+            const tripToken = makeOrganizerToken();
+            return db.ref(`trips/${code}`)
+                .set({ name: name, createdAt: Date.now(), rounds: {}, organizerToken: tripToken })
+                .then(() => { window.location.href = `trip.html?trip=${code}&organizer=${tripToken}`; });
+        }).catch(err => {
             restore();
             const m = String((err && err.message) || err || '');
             alert(/could not issue a free/i.test(m)
@@ -918,9 +940,51 @@ html {
         return base + '?trip=' + encodeURIComponent(currentTripCode || '');
     }
 
+    // THE ORGANIZER LINK. Same shape as index.html's: rendered ONLY when the
+    // record actually carries a token, and only to somebody who already holds it.
+    // Showing it to a follower would hand over the very thing it protects.
+    //
+    // A legacy trip carries no token, so nothing renders here - which is the
+    // honest signal that no override exists on it and everyone still has the
+    // controls, exactly as they did before this existed.
+    function renderTripOrganizerLink(isOrg) {
+        const row = document.getElementById('trip-organizer-link');
+        if (!row) return;
+        const token = tripData && tripData.organizerToken;
+        if (!token || !isOrg) { row.style.display = 'none'; row.innerHTML = ''; return; }
+        row.style.display = '';
+        row.innerHTML = '<div class="trip-org-row">'
+            + '<div class="trip-org-title">\uD83D\uDD11 Organizer Link</div>'
+            + '<div class="trip-org-note">Adds and removes rounds and sets what counts '
+            + 'toward the money \u2014 keep this one private. The plain Share Trip Link '
+            + 'above is the one for the group.</div>'
+            + '<button class="trip-share-btn" onclick="copyTripOrganizerLink(this)">'
+            + '\uD83D\uDCCB Copy Organizer Link</button>'
+            + '</div>';
+    }
+
+    function tripOrganizerUrl() {
+        const token = tripData && tripData.organizerToken;
+        return tripShareUrl() + (token ? '&organizer=' + encodeURIComponent(token) : '');
+    }
+
+    function copyTripOrganizerLink(btn) {
+        if (!currentTripCode || !(tripData && tripData.organizerToken)) {
+            alert('\u26A0\uFE0F This trip has no organizer link.');
+            return;
+        }
+        copyTextToClipboard(tripOrganizerUrl(), btn);
+    }
+
     function copyTripLink(btn) {
         if (!currentTripCode) { alert('\u26A0\uFE0F Open a trip first.'); return; }
-        const url = tripShareUrl();
+        copyTextToClipboard(tripShareUrl(), btn);
+    }
+
+    // ONE CLIPBOARD PATH FOR BOTH LINKS. The plain link and the organizer link
+    // differ only in what they carry; copying them is the same job, and a second
+    // hand-written copy of this is how the two would drift.
+    function copyTextToClipboard(url, btn) {
         const done = () => {
             if (!btn) return;
             const original = btn.innerHTML;
@@ -966,6 +1030,11 @@ html {
     }
 
     function createRoundForTrip() {
+        // CHECKED IN THE HANDLER, not only at render. Removing the visual state
+        // in devtools, or calling this from the console, must achieve nothing -
+        // the same belt-and-braces filterGroup() and endAndClearRound() already
+        // use. Hiding a button is not a gate.
+        if (!hasTripOrganizerAuthority()) return;
         const copyFrom = document.getElementById('copy-from-round-select').value;
         let dest = `admin.html?trip=${currentTripCode}`;
         if (copyFrom) dest += `&copyFrom=${copyFrom}`;
@@ -1000,6 +1069,11 @@ html {
     }
 
     function linkRound() {
+        // CHECKED IN THE HANDLER, not only at render. Removing the visual state
+        // in devtools, or calling this from the console, must achieve nothing -
+        // the same belt-and-braces filterGroup() and endAndClearRound() already
+        // use. Hiding a button is not a gate.
+        if (!hasTripOrganizerAuthority()) return;
         const roundCode = document.getElementById('link-round-code').value.trim().toUpperCase();
         const label = document.getElementById('link-round-label').value.trim();
         if (!roundCode) { alert('⚠️ Enter the game code for the round.'); return; }
@@ -1049,6 +1123,11 @@ html {
     }
 
     function removeRound(roundCode) {
+        // CHECKED IN THE HANDLER, not only at render. Removing the visual state
+        // in devtools, or calling this from the console, must achieve nothing -
+        // the same belt-and-braces filterGroup() and endAndClearRound() already
+        // use. Hiding a button is not a gate.
+        if (!hasTripOrganizerAuthority()) return;
         if (!confirm('Remove this round from the trip? The round itself is untouched, just its trip link.')) return;
         db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).remove().catch(err => {
             // Silent, this read exactly like a slow render - the row stayed in the
@@ -1062,6 +1141,11 @@ html {
     // toward the trip-wide leaderboard, money settlement, points race, or awards — for practice
     // rounds, scrambles, or a rained-out day that shouldn't affect the real competition.
     function toggleRoundCounted(roundCode, currentlyCounts) {
+        // CHECKED IN THE HANDLER, not only at render. Removing the visual state
+        // in devtools, or calling this from the console, must achieve nothing -
+        // the same belt-and-braces filterGroup() and endAndClearRound() already
+        // use. Hiding a button is not a gate.
+        if (!hasTripOrganizerAuthority()) return;
         db.ref(`trips/${currentTripCode}/rounds/${roundCode}/countsTowardTrip`).set(!currentlyCounts)
             .catch(err => {
                 // THIS IS THE ONE THAT MOVES MONEY, so the sentence carries BOTH facts.
@@ -1085,6 +1169,70 @@ html {
     let tripData = {};
     let lbMode = 'gross';
 
+    // ========================================================================
+    // WHO IS ALLOWED TO CHANGE SOMEBODY ELSE'S TRIP.
+    //
+    // AN ACCIDENT GUARDRAIL, NOT A SECURITY BOUNDARY. Say it plainly, because
+    // the shape looks like a permission system and is not one: database.rules
+    // .json grants trips/$tripCode ".write": true, so any client can simply
+    // delete the token node below and re-open the trip. The server enforces
+    // NOTHING here today. This stops a mate tapping the wrong control on a link
+    // you sent him; it does not stop anybody who wants in. Making it stick is
+    // the rules wave, and until that lands this is exactly as strong as the
+    // existing ?group= scorekeeper links - which is to say, strong enough for
+    // people who are not attacking you.
+    //
+    // WHY A TOKEN AND NOT THE BARE LINK. The app already answered this once, in
+    // index.html, and this mirrors that answer rather than inventing a second:
+    // isOrganizerView() there means only "this URL has no ?group=", and its own
+    // comment refuses to treat that as authority because the bare link is the
+    // one shared with the whole group. A trip code is shared WIDER than a round
+    // link - the recap card prints it on the image people screenshot - so the
+    // bare-link model is even more wrong here than it was there.
+    //
+    // THE LEGACY RULE IS THE OPPOSITE OF THE ROUND'S, AND THAT IS DELIBERATE.
+    // On a round the token only ADDS power, so an absent token grants nothing
+    // and legacy rounds are untouched. On a trip the token REMOVES power from
+    // everybody else, so the identical rule would lock every trip that already
+    // exists out of its own controls, with no way back in. Absent therefore
+    // means EVERYONE still has authority - today's behaviour, preserved exactly
+    // - and only trips minted from here on are gated.
+    let organizerTokenParam = null;
+    try {
+        organizerTokenParam = new URLSearchParams(window.location.search).get('organizer');
+    } catch (e) { organizerTokenParam = null; }
+
+    function hasTripOrganizerAuthority() {
+        const stored = tripData && tripData.organizerToken;
+        if (!stored) return true;                 // legacy trip - unchanged, see above
+        if (!organizerTokenParam) return false;
+        return String(organizerTokenParam) === String(stored);
+    }
+
+    // A KNOWN DUPLICATION, AND IT SHOULD NOT SURVIVE.
+    //
+    // admin.html:2071 has this function byte-for-byte. It is private to that
+    // page's inline script and never reaches window, and trip.html loads none of
+    // admin.html - so it is genuinely unreachable from here, not merely awkward.
+    // Trips are created on THIS page, so the token has to be minted on this page.
+    //
+    // It belongs in code-issuer.js, which trip.html already loads and which is
+    // already the home of "issue a secret nobody else has". Move it there the
+    // next time that file is open for another reason, and delete BOTH copies in
+    // the same edit - this project has already paid for a hand-written copy in
+    // each of two pages once, when a per-press Nassau stake reached the engine
+    // but not the pages.
+    function makeOrganizerToken() {
+        try {
+            const buf = new Uint8Array(16);
+            (window.crypto || window.msCrypto).getRandomValues(buf);
+            return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+            console.warn('Secure random unavailable; organizer token is weaker than intended.', e);
+            return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 14);
+        }
+    }
+
     // ONE AMOUNT RULE for the whole page. Whole dollars unless the figure genuinely
     // carries cents, which only a legacy cent-settled round produces.
     function fmtAmt(v) {
@@ -1103,6 +1251,13 @@ html {
     function renderRoundsList() {
         const container = document.getElementById('rounds-list');
         const rounds = tripData.rounds || {};
+        // WHAT A FOLLOWER STILL SEES: every round, its label, its game code, whether
+        // it counts, and the links to open it. What they do not get is the two
+        // controls that change somebody else's trip.
+        const isOrg = hasTripOrganizerAuthority();
+        const tools = document.getElementById('trip-organizer-tools');
+        if (tools) tools.style.display = isOrg ? '' : 'none';
+        renderTripOrganizerLink(isOrg);
         const roundCodes = Object.keys(rounds).sort((a, b) => (rounds[a].addedAt || 0) - (rounds[b].addedAt || 0));
 
         const copyGroup = document.getElementById('copy-from-round-group');
@@ -1128,15 +1283,19 @@ html {
                 <div class="rc-info">
                     <div class="rc-label">${r.label}</div>
                     <div class="rc-sub">Game code: ${code}</div>
-                    <div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
+                    ${isOrg
+                        ? `<div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
                         ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
-                    </div>
+                    </div>`
+                        : `<div class="rc-counts-toggle rc-counts-static">
+                        ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
+                    </div>`}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
                     <a class="rc-link" href="admin.html?game=${code}">⚙️ Edit</a>
                     <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
                 </div>
-                <span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>
+                ${isOrg ? `<span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>` : ''}
             </div>`;
         }).join('');
     }

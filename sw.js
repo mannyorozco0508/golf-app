@@ -524,6 +524,12 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v91: a trip code is no longer a master key. Anyone holding the six
+// characters could remove rounds, change what counts toward the money total, and
+// add rounds to somebody else's trip - and the recap card prints that code on the
+// image people screenshot. An installed device without this bump keeps serving the
+// version where the link you send the group is the same link that can dismantle
+// the week.
 // Moved to v90: playing less is not how you win the trip. The cumulative
 // leaderboard was a raw stroke sum, so a golfer who played one round of four
 // ranked FIRST - on the screen, on the recap card that gets screenshotted, and
@@ -664,7 +670,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v90-playing-less-is-not-how-you-win-the-trip';
+const CACHE_VERSION = 'golfapp-v91-a-trip-code-is-no-longer-a-master-key';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
