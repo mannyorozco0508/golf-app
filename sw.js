@@ -524,6 +524,12 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v89: the trip page tells you when a write fails. Four writes on
+// trip.html failed in silence - the counts-toward-trip toggle, the round remove,
+// and both halves of link-round. An installed device without this bump keeps
+// serving the version where excluding a rained-out day can be refused, the row
+// still reads "Counts toward trip", nothing is said, and the week is settled
+// from a total that still contains the round the organizer took out.
 // Moved to v88: a control that is issuing a code says so, and cannot be pressed twice.
 //
 // v87 gave the Game Day tile and trip.html's "Skip planning" link a database round
@@ -652,7 +658,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v88-a-tile-that-says-it-is-working';
+const CACHE_VERSION = 'golfapp-v89-the-trip-page-says-when-a-write-fails';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

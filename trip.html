@@ -970,6 +970,33 @@ html {
         window.location.href = dest;
     }
 
+    // ONE REPORTER, FOUR CALLERS.
+    //
+    // Every write on this page failed in SILENCE. Measured cold, with the server
+    // refusing: three unhandled rejections in a console nobody opens, and nothing
+    // on screen at all. No alert, no colour, no reverted row.
+    //
+    // NOTHING TO UNWIND, WHICH IS WHY THIS IS SO SMALL. These controls have no
+    // optimistic update - a row only redraws when the trips/ listener fires with
+    // new data - so on a refusal the UI is already correct. It just never said
+    // anything. There is no state to restore, only a sentence to say.
+    //
+    // TWO CAUSES, TOLD APART BY THE ERROR. A refusal and a dropped connection need
+    // different actions from the organizer, and "check your signal" is false half
+    // the time if the rules said no. Same shape createTripBlank already uses.
+    //
+    // A REFUSAL IS THE ONLY CASE ANY OF THIS CAN CATCH. Firebase buffers a write
+    // while disconnected and settles the promise only on server acknowledgement,
+    // so offline the promise never settles and no handler of any kind runs. That
+    // is a different problem and this is not a fix for it.
+    function reportTripWriteFailure(err, what, consequence) {
+        const m = String((err && err.message) || err || '');
+        const why = /PERMISSION_DENIED|permission[ _]denied/i.test(m)
+            ? 'The database refused the change.'
+            : 'Check your signal.';
+        alert('⚠️ ' + what + '\n\n' + why + ' ' + consequence);
+    }
+
     function linkRound() {
         const roundCode = document.getElementById('link-round-code').value.trim().toUpperCase();
         const label = document.getElementById('link-round-label').value.trim();
@@ -996,7 +1023,11 @@ html {
             // update() touches only what is named. addedAt is stamped just once, when
             // the round first joins the trip.
             const roundRef = db.ref(`trips/${currentTripCode}/rounds/${roundCode}`);
-            roundRef.once('value').then(existing => {
+            // RETURNED, NOT LEFT DANGLING. This inner chain was created and dropped:
+            // nothing awaited it, so its rejection could not reach a .catch no matter
+            // where that catch was written. Returning it joins the two into one chain,
+            // which is why this one was a restructure and not a one-line fix.
+            return roundRef.once('value').then(existing => {
                 const patch = { label: label };
                 if (!existing.exists()) patch.addedAt = Date.now();
                 return roundRef.update(patch);
@@ -1004,19 +1035,48 @@ html {
                 document.getElementById('link-round-code').value = '';
                 document.getElementById('link-round-label').value = '';
             });
+        }).catch(err => {
+            // COVERS BOTH REFUSALS IN THIS FUNCTION - the events/<code> lookup and the
+            // trips/.../rounds/<code> write. The sentence is true of either: a refused
+            // read never got as far as writing, and a refused write changed nothing.
+            // The refused READ mattered on its own, because the chain used to die
+            // before the "couldn't find that game code" branch could run.
+            reportTripWriteFailure(err, 'Could not add that round to the trip.',
+                'Nothing was changed and the round is not linked. Try again.');
         });
     }
 
     function removeRound(roundCode) {
         if (!confirm('Remove this round from the trip? The round itself is untouched, just its trip link.')) return;
-        db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).remove();
+        db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).remove().catch(err => {
+            // Silent, this read exactly like a slow render - the row stayed in the
+            // list - so the organizer pressed it again.
+            reportTripWriteFailure(err, 'Could not remove that round from the trip.',
+                'It is still linked and still counting toward the trip totals. Try again.');
+        });
     }
 
     // Lets a round stay linked (still scoreable, still settleable on its own) without counting
     // toward the trip-wide leaderboard, money settlement, points race, or awards — for practice
     // rounds, scrambles, or a rained-out day that shouldn't affect the real competition.
     function toggleRoundCounted(roundCode, currentlyCounts) {
-        db.ref(`trips/${currentTripCode}/rounds/${roundCode}/countsTowardTrip`).set(!currentlyCounts);
+        db.ref(`trips/${currentTripCode}/rounds/${roundCode}/countsTowardTrip`).set(!currentlyCounts)
+            .catch(err => {
+                // THIS IS THE ONE THAT MOVES MONEY, so the sentence carries BOTH facts.
+                // Refused, the row still read "Counts toward trip" and said nothing: the
+                // organizer believes a rained-out day is out of the trip, it is not, and
+                // it stays in the total, the leaderboard, the awards and the points race.
+                // They then settle the week from a number containing a round they took
+                // out. "It did not save" alone does not tell them the total is wrong,
+                // which is the only fact that costs anybody money.
+                reportTripWriteFailure(err,
+                    currentlyCounts
+                        ? 'Could not exclude that round from the trip.'
+                        : 'Could not include that round in the trip.',
+                    currentlyCounts
+                        ? 'It is still counting, and the trip totals above still include it. Try again.'
+                        : 'It is still excluded, and the trip totals above still leave it out. Try again.');
+            });
     }
 
     let currentTripCode = null;
