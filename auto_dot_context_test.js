@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v86-the-log-and-the-card-agree';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v87-one-generator-with-a-check-beside-it';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -537,7 +537,11 @@ describe('SERVICE WORKER', () => {
         // 35 since ryder-cup.js joined the shell: index.html loads it unguarded at
         // parse time, so a cached shell without it does not lose the Ryder Cup card -
         // it breaks the scorecard.
-        assert.equal(entries.length, 35, 'the shell list gained or lost an entry');
+        // 36 since code-issuer.js joined: admin.html, trip.html and tournament.html
+        // all load it, and it is what issues a round/trip/tournament code and checks
+        // the code is free before handing it out. A cached shell without it cannot
+        // start anything at all.
+        assert.equal(entries.length, 36, 'the shell list gained or lost an entry');
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
          './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));

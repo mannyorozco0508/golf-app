@@ -43,6 +43,7 @@
      even though it passed in a test harness that loads every engine. -->
 <script src="pool-engine.js"></script>
     <script src="course-data.js"></script>
+    <script src="code-issuer.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -493,30 +494,9 @@ html {
 
     // Same 4-character code format admin.html uses for game codes, so trip codes and
     // bulk-built round codes are indistinguishable from ones created the normal way.
-    function generateRandomCode() {
-        // SIX CHARACTERS, NOT FOUR.
-        //
-        // A 4-character code from this 32-character alphabet is 1,048,576
-        // possibilities. There is no listing endpoint - every read names a specific
-        // code - but a million is small for a machine, and a hit grants full read
-        // and write to that round. Six raises it to 1,073,741,824: 1,024x.
-        //
-        // Not seven: every code input carries maxlength="6", so a 7-character code
-        // could be generated and linked but never typed.
-        //
-        // Existing 4-character codes are untouched and still join - joinRoom only
-        // rejects codes shorter than 2, and the security rules treat the code
-        // segment as a wildcard.
+        // The generator moved to code-issuer.js, with an existence check beside it.
 
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let code = "";
-        for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
-        return code;
-    }
 
-    function generateTripCode() {
-        return generateRandomCode();
-    }
 
     function showCreateTripForm() {
         document.getElementById('create-trip-form').style.display = 'block';
@@ -819,18 +799,29 @@ html {
         buildBtn.innerText = '⏳ Building...';
         buildBtn.disabled = true;
 
-        db.ref('global_courses').once('value').then(snap => {
+        db.ref('global_courses').once('value').then(async snap => {
             const globalCoursesData = snap.val() || {};
-            const tripCode = generateRandomCode();
-            const usedCodes = new Set([tripCode]);
+            // ONE Set across BOTH roots, which is what the original guaranteed by
+            // seeding it with the trip code: a round in this trip can never be given
+            // the trip's own code. The database check cannot do that job - it knows
+            // nothing about codes this batch has issued and not yet written - so both
+            // layers run, and the issuer adds what it issues so the loop below does
+            // not have to remember.
+            const usedCodes = new Set();
+            const tripCode = await issueUniqueCode({ db, root: 'trips', reserved: usedCodes });
+
+            // Issued up front, sequentially, so the forEach below stays synchronous
+            // and the update payload is still built in one pass.
+            const roundCodes = [];
+            for (let i = 0; i < roundConfigs.length; i++) {
+                roundCodes.push(await issueUniqueCode({ db, root: 'events', reserved: usedCodes }));
+            }
             let updates = {};
             updates[`trips/${tripCode}/name`] = name;
             updates[`trips/${tripCode}/createdAt`] = Date.now();
 
-            roundConfigs.forEach(cfg => {
-                let roundCode = generateRandomCode();
-                while (usedCodes.has(roundCode)) { roundCode = generateRandomCode(); }
-                usedCodes.add(roundCode);
+            roundConfigs.forEach((cfg, cfgIdx) => {
+                const roundCode = roundCodes[cfgIdx];
 
                 const { courseData, courseName } = resolveCourseDataAndName(cfg, globalCoursesData);
                 const players = [];
@@ -867,10 +858,16 @@ html {
     function createTripBlank() {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { alert('⚠️ Give your trip a name first.'); return; }
-        const code = generateTripCode();
-        db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} }).then(() => {
-            window.location.href = `trip.html?trip=${code}`;
-        }).catch(err => alert(`Error: ${err.message}`));
+        issueUniqueCode({ db, root: 'trips' }).then(code =>
+            db.ref(`trips/${code}`).set({ name: name, createdAt: Date.now(), rounds: {} })
+                .then(() => { window.location.href = `trip.html?trip=${code}`; })
+        ).catch(err => {
+            const m = String((err && err.message) || err || '');
+            alert(/could not issue a free/i.test(m)
+                ? 'Could not start a new trip just now.\n\nEvery code we tried was already '
+                  + 'in use. Try again \u2014 the next one will almost certainly be free.'
+                : '\u26A0\uFE0F Could not start a new trip \u2014 check your signal and try again.');
+        });
     }
 
     // ONE LINK, NO TYPING. Same shape the scorecard's group links use:

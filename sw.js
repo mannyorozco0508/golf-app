@@ -524,6 +524,26 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v87: one code generator, with an existence check beside it.
+//
+// admin.html, trip.html and tournament.html each carried a byte-identical
+// six-character generator and not one of them asked whether the code was already
+// in use. The odds are remote - 32^6 is 1,073,741,824, about one in a million at
+// a thousand live codes - but the damage is not: a round save is an update(), a
+// MERGE, and its payload replaces players and courseData while NOT containing
+// scores. A second organizer landing on a live code empties the first group's
+// card mid-round and leaves their scores orphaned against a roster that no longer
+// exists. Trips are worse: the batch builder writes rounds as merge keys, so a
+// colliding trip code puts two unrelated groups into one trip, and trip
+// settlement nets money across every round in a trip. The deployed rules do not
+// catch any of it - a collision is not a delete.
+//
+// code-issuer.js is now precached and in SHARED_SHELL, the three inline
+// generators are gone, and codes come from crypto.getRandomValues with rejection
+// sampling rather than Math.random with a modulo.
+//
+// An installed PWA on v86 can hand two organizers the same code.
+
 // Moved to v86: the audit log and the scorecard can no longer disagree.
 //
 // undoAuditEntry wrote its log entry on the NEXT LINE after the restore, never
@@ -616,7 +636,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v86-the-log-and-the-card-agree';
+const CACHE_VERSION = 'golfapp-v87-one-generator-with-a-check-beside-it';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -650,6 +670,10 @@ const SHELL_FILES = [
     // link and every group-scoped write is measured against. Four pages load it;
     // an offline launch without it would not degrade, it would break the page.
     './grouping.js',
+    // Every page that can START something loads this: it issues the code and
+    // checks it is free first. Precached, or the first offline launch cannot
+    // open the setup screen at all.
+    './code-issuer.js',
     // handicap.js is every stroke a golfer receives. Eight pages load it, and they
     // call it unguarded, so a cached shell missing this file does not compute a
     // wrong number - it fails to render at all, which is the correct failure.

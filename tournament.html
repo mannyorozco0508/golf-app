@@ -26,6 +26,7 @@
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <script src="course-data.js"></script>
+    <script src="code-issuer.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
     <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
          index through the shared primitives; tournament-engine.js calls them as
@@ -689,26 +690,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     addTeam(); // start with one team block visible
 
-    function generateCode() {
-        // SIX CHARACTERS, NOT FOUR.
-        //
-        // A 4-character code from this 32-character alphabet is 1,048,576
-        // possibilities. There is no listing endpoint - every read names a specific
-        // code - but a million is small for a machine, and a hit grants full read
-        // and write to that round. Six raises it to 1,073,741,824: 1,024x.
-        //
-        // Not seven: every code input carries maxlength="6", so a 7-character code
-        // could be generated and linked but never typed.
-        //
-        // Existing 4-character codes are untouched and still join - joinRoom only
-        // rejects codes shorter than 2, and the security rules treat the code
-        // segment as a wildcard.
-
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let code = "";
-        for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
-        return code;
-    }
+        // The generator moved to code-issuer.js, with an existence check beside it.
+    // A colliding tournament code is a .set() - a total replace - so the other
+    // organizer's event vanishes outright rather than merging. Coherent, and
+    // total.
 
     // --- PASTE-A-LIST → AUTO-BUILT TEAMS ---
     // Same "Name" or "Name, Handicap" line format as the Round/Trip paste feature, for
@@ -855,7 +840,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let currentCode = null;
     let tripLinkCode = null; // present when this tournament is being set up FROM a trip
 
-    function saveTournament() {
+    async function saveTournament() {
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
         if (!selectedCourseData) { alert("⚠️ Please select a golf course."); return; }
 
@@ -890,7 +875,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             alert("⚠️ Add at least one team with a player name."); return;
         }
 
-        currentCode = generateCode();
+        // Issued against tournaments/, its own node. A tournament code colliding
+        // with a round code is not a collision.
+        try {
+            currentCode = await issueUniqueCode({ db, root: 'tournaments' });
+        } catch (err) {
+            const m = String((err && err.message) || err || '');
+            alert(/could not issue a free/i.test(m)
+                ? 'Could not start a new event just now.\n\nEvery code we tried was already '
+                  + 'in use. Try again \u2014 the next one will almost certainly be free.'
+                : '\u26A0\uFE0F Could not start a new event \u2014 check your signal and try again.');
+            return;
+        }
         const shambleCountBest = parseInt(document.getElementById('shamble-count-best').value, 10) || 1;
         const entryFee = parseFloat(document.getElementById('t-entry-fee').value) || 0;
 

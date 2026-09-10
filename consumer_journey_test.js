@@ -41,8 +41,15 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
     // Game Day starts a round - not that a particular control exists.
     test('Start a round', () => {
         assert.match(ADMIN, /onclick="selectHomeWidget\('quick'\)"/, 'the primary action');
-        const fn = ADMIN.slice(ADMIN.indexOf('function selectHomeWidget'),
-            ADMIN.indexOf('function generateRoomCode'));
+        // END OF THE FUNCTION, NOT THE NAME OF THE NEXT ONE. This sliced to
+        // 'function generateRoomCode', which this wave deleted - so indexOf
+        // returned -1, the slice ran to the end of the file, and an assertion
+        // that "it must not write anything" failed against the whole of
+        // admin.html. CLAUDE.md names this exact trap: a hand-written
+        // next-function name is a guess about file order that the next feature
+        // silently invalidates.
+        const fnStart = ADMIN.indexOf('function selectHomeWidget');
+        const fn = ADMIN.slice(fnStart, ADMIN.indexOf('\n    function ', fnStart + 30));
         assert.match(fn, /createRoom\(\);/, 'picking Game Day does not start anything');
         assert.match(ADMIN, /function createRoom\(\)[\s\S]{0,300}window\.location\.href/,
             'createRoom no longer goes anywhere');
@@ -101,17 +108,37 @@ describe('CLUB ROUND IS A PRESET, AND IT LEFT CONSUMER WITHOUT BEING DELETED', (
 
     test('it creates the same round Game Day creates', () => {
         // Provable from the handler: it sets a label and a framing string, nothing more.
-        const fn = ADMIN.slice(ADMIN.indexOf('function selectHomeWidget'),
-            ADMIN.indexOf('function generateRoomCode'));
+        // END OF THE FUNCTION, NOT THE NAME OF THE NEXT ONE. This sliced to
+        // 'function generateRoomCode', which this wave deleted - so indexOf
+        // returned -1, the slice ran to the end of the file, and an assertion
+        // that "it must not write anything" failed against the whole of
+        // admin.html. CLAUDE.md names this exact trap: a hand-written
+        // next-function name is a guess about file order that the next feature
+        // silently invalidates.
+        const fnStart = ADMIN.indexOf('function selectHomeWidget');
+        const fn = ADMIN.slice(fnStart, ADMIN.indexOf('\n    function ', fnStart + 30));
         assert.match(fn, /selectedEventType = type;/);
         assert.match(fn, /framingEl\.textContent = eventTypeFraming\[type\]/);
-        assert.ok(!/db\.ref|tournament\.html|flight|season/i.test(fn),
+        // COMMENTS STRIPPED, the way the NEGATIVE CONTROL below already does it and
+        // for the same reason: the drift-proof slice now reaches a comment that
+        // explains why the Tournament exit card was removed, and matching that
+        // prose is not the same as matching a route. What must not appear is a
+        // real write or a real navigation.
+        const live = fn.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        assert.ok(!/db\.ref|tournament\.html|flight|season/i.test(live),
             'it must not write anything or route anywhere');
     });
 
     test('NEGATIVE CONTROL — it must never grow tournament behaviour', () => {
-        const fn = ADMIN.slice(ADMIN.indexOf('function selectHomeWidget'),
-            ADMIN.indexOf('function generateRoomCode'));
+        // END OF THE FUNCTION, NOT THE NAME OF THE NEXT ONE. This sliced to
+        // 'function generateRoomCode', which this wave deleted - so indexOf
+        // returned -1, the slice ran to the end of the file, and an assertion
+        // that "it must not write anything" failed against the whole of
+        // admin.html. CLAUDE.md names this exact trap: a hand-written
+        // next-function name is a guess about file order that the next feature
+        // silently invalidates.
+        const fnStart = ADMIN.indexOf('function selectHomeWidget');
+        const fn = ADMIN.slice(fnStart, ADMIN.indexOf('\n    function ', fnStart + 30));
         // Comments stripped first: the branch below is explained at length in prose,
         // and counting that prose made this fail for the wrong reason. What must stay
         // small is the CODE - the one compatibility branch for cached shells still

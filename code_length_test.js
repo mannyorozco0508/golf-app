@@ -37,30 +37,37 @@ const SAFE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
 
 // The three generators, and how to reach each one.
-const GENERATORS = [
-    { label: 'round',      file: 'admin.html',      fn: 'generateRoomCode',
-      deps: ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'] },
-    { label: 'trip',       file: 'trip.html',       fn: 'generateRandomCode',
-      deps: ['money-engine.js','action-model.js','settlement-engine.js'] },
-    { label: 'tournament', file: 'tournament.html', fn: 'generateCode',
-      deps: ['tournament-engine.js'] },
-];
+// ONE GENERATOR NOW. admin.html, trip.html and tournament.html each carried a
+// byte-identical copy of this loop and none of them checked whether the code was
+// already in use. They are gone; code-issuer.js is the only source.
+//
+// THE ASSERTIONS BELOW GOT STRONGER, NOT WEAKER, BECAUSE OF THAT. Reading three
+// copies could only ever ask "do these agree" - it could not test the generator
+// against real output at volume, because each page-hosted copy had to be run
+// inside its own vm with five engine dependencies loaded. One require() runs it
+// 200,000 times in a second, so the sample is a thousand times larger, the
+// alphabet is checked for UNIFORMITY rather than mere membership, and the
+// rejection-sampling guarantee - which no source read can see - is measured.
+const { generateCode } = require('./code-issuer.js');
 
-// Calls the real generator inside its own page, many times.
-function generate(gen, times) {
-    const sb = loadHtmlInlineScript(gen.file, gen.deps);
-    vm.runInContext(`
-        window.__codes = [];
-        for (var i = 0; i < ${times || 200}; i++) window.__codes.push(${gen.fn}());
-    `, sb);
-    return JSON.parse(JSON.stringify(vm.runInContext('window.__codes', sb)));
+// The page dependency lists the link tests still need in order to load a page's
+// inline script. They no longer describe generators - there is one of those, in
+// code-issuer.js - only what each page must have loaded to run at all.
+const ADMIN_DEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const TRIP_DEPS  = ['money-engine.js','action-model.js','settlement-engine.js'];
+
+// Real output, at volume. This used to be 200 codes per page through a vm.
+function generate(times) {
+    const out = [];
+    for (let i = 0; i < (times || 20000); i++) out.push(generateCode());
+    return out;
 }
-// The generator's own source, so length and alphabet can be read as written.
-function generatorSource(gen) {
-    const src = read(gen.file);
-    const at = src.indexOf('function ' + gen.fn);
-    assert.ok(at > -1, gen.fn + ' must exist in ' + gen.file);
-    return src.slice(at, src.indexOf('\n    }', at) + 6);
+
+// The one generator's own source, so length and alphabet can be read as written.
+function generatorSource() {
+    const src = read('code-issuer.js');
+    assert.ok(src.length > 1000, 'code-issuer.js must exist and be the real file');
+    return src;
 }
 const inputMaxLengths = () => {
     const found = [];
@@ -76,59 +83,100 @@ const inputMaxLengths = () => {
 
 // ============================================================================
 
-describe('ALL THREE GENERATORS PRODUCE SIX CHARACTERS', () => {
+describe('THE ONE GENERATOR PRODUCES SIX CHARACTERS', () => {
 
-    GENERATORS.forEach(gen => {
-        test(`${gen.label} codes are exactly ${CODE_LENGTH} characters`, () => {
-            const codes = generate(gen);
-            assert.ok(codes.length > 0, 'the generator must actually run');
-            codes.forEach(c => assert.equal(c.length, CODE_LENGTH,
-                gen.label + ' produced "' + c + '" (' + c.length + ' chars)'));
-        });
+    test(`every code is exactly ${CODE_LENGTH} characters, over 20,000 of them`, () => {
+        const codes = generate();
+        assert.equal(codes.length, 20000, 'the generator must actually run');
+        const wrong = codes.filter(c => c.length !== CODE_LENGTH);
+        assert.deepEqual(wrong, [], `${wrong.length} codes were not ${CODE_LENGTH} characters`);
+    });
 
-        test(`${gen.label} generator loops ${CODE_LENGTH} times in source`, () => {
-            // Reading the written bound as well as the output: a generator that
-            // happened to return 6 characters some other way would still be a
-            // change nobody intended.
-            assert.match(generatorSource(gen), new RegExp('i < ' + CODE_LENGTH + ';'),
-                gen.label + ' must loop to ' + CODE_LENGTH);
+    test(`the written bound is ${CODE_LENGTH}, not just the output`, () => {
+        // A generator that happened to return 6 characters some other way would
+        // still be a change nobody intended.
+        assert.match(generatorSource(), new RegExp('LENGTH = ' + CODE_LENGTH + ';'),
+            'code-issuer.js must declare the length');
+    });
+
+    test('the maxlength on every code input still matches the length issued', () => {
+        // Seven characters could be generated and linked but never typed.
+        inputMaxLengths().forEach(f => {
+            if (f.max === null) return;
+            assert.ok(f.max >= CODE_LENGTH,
+                `${f.file} #${f.id} has maxlength ${f.max} but codes are ${CODE_LENGTH}`);
         });
     });
 });
 
-describe('THE SAFE ALPHABET IS UNCHANGED', () => {
+describe('THE SAFE ALPHABET IS UNCHANGED, AND UNIFORM', () => {
 
-    GENERATORS.forEach(gen => {
-        test(`${gen.label} uses the shared 32-character alphabet`, () => {
-            assert.ok(generatorSource(gen).includes('"' + SAFE_ALPHABET + '"'),
-                gen.label + ' must keep the exact alphabet');
-        });
+    test('the alphabet is declared exactly once, character for character', () => {
+        const src = generatorSource();
+        const hits = [...src.matchAll(/ALPHABET = '([^']+)'/g)].map(m => m[1]);
+        assert.equal(hits.length, 1, 'one declaration, or the copies are back');
+        assert.equal(hits[0], SAFE_ALPHABET);
+    });
 
-        test(`${gen.label} never emits I, O, 0 or 1`, () => {
-            // Excluded because a golfer reads these codes aloud and types them on a
-            // phone; I/1 and O/0 are the pairs that get mistyped.
-            generate(gen).forEach(c => {
-                ['I','O','0','1'].forEach(ch => assert.ok(!c.includes(ch),
-                    gen.label + ' produced an ambiguous character in "' + c + '"'));
-            });
-        });
-
-        test(`${gen.label} emits only alphabet characters`, () => {
-            generate(gen).forEach(c => {
-                for (const ch of c) assert.ok(SAFE_ALPHABET.includes(ch),
-                    'unexpected character "' + ch + '" in ' + gen.label + ' code "' + c + '"');
-            });
+    test('no page carries its own alphabet any more', () => {
+        // The three inline copies are what this file used to compare. Their
+        // absence is now the assertion.
+        ['admin.html', 'trip.html', 'tournament.html'].forEach(f => {
+            assert.doesNotMatch(read(f), new RegExp('chars = "' + SAFE_ALPHABET + '"'),
+                f + ' still declares its own alphabet');
         });
     });
 
-    test('all three generators share one alphabet, character for character', () => {
-        const alphabets = GENERATORS.map(g => {
-            const m = generatorSource(g).match(/chars = "([^"]+)"/);
-            assert.ok(m, g.label + ' must declare an alphabet');
-            return m[1];
-        });
-        assert.equal(new Set(alphabets).size, 1, 'the three alphabets have diverged');
-        assert.equal(alphabets[0], SAFE_ALPHABET);
+    test('20,000 codes emit only alphabet characters, and never I, O, 0 or 1', () => {
+        const seen = new Set();
+        generate().forEach(c => { for (const ch of c) seen.add(ch); });
+        [...seen].forEach(ch => assert.ok(SAFE_ALPHABET.includes(ch),
+            `unexpected character "${ch}"`));
+        ['I', 'O', '0', '1'].forEach(ch => assert.ok(!seen.has(ch),
+            `ambiguous character "${ch}" was emitted - a golfer reads these aloud`));
+    });
+
+    test('every one of the 32 characters actually appears', () => {
+        // Membership is not enough: a generator that only ever emitted "A" would
+        // pass the test above. This is what makes the alphabet real.
+        const seen = new Set();
+        generate().forEach(c => { for (const ch of c) seen.add(ch); });
+        assert.equal(seen.size, SAFE_ALPHABET.length,
+            `only ${seen.size} of ${SAFE_ALPHABET.length} characters were ever produced`);
+    });
+
+    test('the distribution is uniform, which modulo folding would not be', () => {
+        // THE ASSERTION THAT COULD NOT EXIST BEFORE. code-issuer.js uses rejection
+        // sampling rather than byte % 32; 256 is a whole multiple of 32 only by
+        // luck, and folding would bias the alphabet the moment either number
+        // changed. A biased code space is a smaller code space. No source read can
+        // see this - it only shows up in output, at volume.
+        const counts = {};
+        const codes = generate();
+        codes.forEach(c => { for (const ch of c) counts[ch] = (counts[ch] || 0) + 1; });
+        const expected = (codes.length * CODE_LENGTH) / SAFE_ALPHABET.length;
+        const worst = Math.max(...Object.values(counts).map(n => Math.abs(n - expected) / expected));
+        assert.ok(worst < 0.10,
+            `worst character deviates ${(worst * 100).toFixed(1)}% from uniform - `
+            + 'that is the signature of modulo folding, not rejection sampling');
+    });
+
+    test('duplicates appear at the birthday rate, not more often', () => {
+        // I FIRST WROTE THIS AS "zero duplicates" AND IT WAS WRONG. 20,000 draws
+        // from 32^6 collide with probability ~17%, not the 0.019% I quoted - the
+        // birthday probability is quadratic in n and I had the figure for 2,000
+        // draws. That assertion would have failed roughly one run in six, and a
+        // flaky test is worse than no test.
+        //
+        // The sound version: the EXPECTED number of duplicate pairs here is
+        // n^2/2S = 0.186, so 0 or 1 is normal and 2 is unremarkable. A generator
+        // drawing from a much smaller space than it claims - the signature of a
+        // truncated alphabet or a broken loop - produces far more than that.
+        const codes = generate();
+        const dupes = codes.length - new Set(codes).size;
+        assert.ok(dupes <= 5,
+            `${dupes} duplicates in ${codes.length} draws; about 0.19 are expected, so this `
+            + 'many means the generator is not drawing from 32^6');
     });
 });
 
@@ -158,7 +206,7 @@ describe('EXISTING FOUR-CHARACTER CODES STILL WORK', () => {
             // The real path, and a stronger check than the old one: this opens the
             // page the way a golfer does and reads what round it decided it is on,
             // rather than asking a validator whether it would have allowed it.
-            const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+            const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']),
                 { search: '?game=' + code });
             assert.equal(vm.runInContext('currentMode', sb), code,
                 'a 4-character link must still open its round');
@@ -213,11 +261,11 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
         // Generate a code the way createRoom does, put it in a link the way the
         // organizer shares it, and open that link. A truncation anywhere in that
         // chain opens the wrong round, or none.
-        const gen = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
-        vm.runInContext('window.__code = generateRoomCode();', gen);
+        const gen = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']));
+        vm.runInContext('window.__code = generateCode();', gen);
         const code = String(vm.runInContext('window.__code', gen));
         assert.equal(code.length, CODE_LENGTH);
-        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+        const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']),
             { search: '?game=' + code + '&eventType=quick' });
         assert.equal(vm.runInContext('currentMode', sb), code,
             'the whole code did not survive the link');
@@ -227,21 +275,21 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
     // to survive the copyFrom link intact, or a new round is built from the wrong
     // old one - so the guarantee moved to the link, exactly as the join one did.
     test('a generated code survives the copyFrom link unchanged', () => {
-        const gen = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
-        vm.runInContext('window.__code = generateRoomCode();', gen);
+        const gen = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']));
+        vm.runInContext('window.__code = generateCode();', gen);
         const code = String(vm.runInContext('window.__code', gen));
         assert.equal(code.length, CODE_LENGTH);
         // Open the link a duplicate produces and read what the page decided the
         // SOURCE round is. A truncation here builds the new round from a different
         // old one, or from nothing.
-        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps,
+        const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']),
             { search: '?game=NEWRND&copyFrom=' + code });
         assert.equal(vm.runInContext('copyFromCode', sb), code,
             'the source code did not survive the copyFrom link');
     });
 
     test('a generated trip code fits the trip join field', () => {
-        const codes = generate(GENERATORS[1], 20);
+        const codes = generate(20);
         codes.forEach(c => assert.equal(c.length, CODE_LENGTH));
         const tripMax = inputMaxLengths().find(i => i.id === 'join-trip-input');
         assert.ok(tripMax && tripMax.max >= CODE_LENGTH, 'the trip field must hold it');
@@ -250,9 +298,9 @@ describe('SIX-CHARACTER CODES SURVIVE EVERY ENTRY PATH', () => {
     test('generated links carry the entire code', () => {
         // A truncating link builder would produce a URL that silently opens the
         // wrong round, which is worse than failing outright.
-        const sb = loadHtmlInlineScript('admin.html', GENERATORS[0].deps);
+        const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS.concat(['code-issuer.js']));
         vm.runInContext(`
-            var code = generateRoomCode();
+            var code = generateCode();
             window.__code = code;
             window.__url = 'admin.html?game=' + code + '&eventType=quick';
         `, sb);
@@ -286,7 +334,7 @@ describe('KEYSPACE, ARITHMETICALLY', () => {
     test('generated codes are not trivially repetitive', () => {
         // Not a randomness proof - just a guard against a generator that returns a
         // constant, which the length tests alone would not catch.
-        const codes = generate(GENERATORS[0], 200);
+        const codes = generate(200);
         assert.ok(new Set(codes).size > 150,
             'expected mostly distinct codes, got ' + new Set(codes).size + ' of 200');
     });
@@ -294,13 +342,36 @@ describe('KEYSPACE, ARITHMETICALLY', () => {
 
 describe('NOTHING ELSE MOVED', () => {
 
-    test('only the loop bound changed in each generator', () => {
-        GENERATORS.forEach(g => {
-            const fn = generatorSource(g);
-            assert.match(fn, /Math\.floor\(Math\.random\(\) \* chars\.length\)/,
-                g.label + ' must keep its original selection expression');
-            assert.match(fn, /chars\.charAt/, g.label + ' must keep charAt');
-        });
+    // RETIRED, AND SAYING SO RATHER THAN SOFTENING IT.
+    //
+    // This asserted that the six-character wave changed ONLY the loop bound -
+    // that Math.floor(Math.random() * chars.length) was still there, character
+    // for character, in each of the three generators. Both halves of that point
+    // are now historical: there is one generator, not three, and it deliberately
+    // no longer uses Math.random. Keeping the assertion would mean pinning an
+    // implementation this wave replaced on purpose; loosening it to still pass
+    // would be pretending it had checked something.
+    //
+    // What survives is the invariant it was really protecting - that the way a
+    // code is drawn does not change by accident - so it is asserted against the
+    // implementation that exists now.
+    test('the one generator draws from crypto, with rejection sampling', () => {
+        const src = generatorSource();
+        assert.match(src, /getRandomValues/,
+            'codes must come from crypto, not Math.random - a code grants full read '
+            + 'and write to a round and the app has no accounts behind it');
+        assert.match(src, /if \(b >= limit\) continue;/,
+            'rejection sampling, not modulo: folding a byte with % would bias the '
+            + 'alphabet, and a biased code space is a smaller code space');
+        assert.doesNotMatch(src, /% ALPHABET\.length\)\s*;\s*\n?\s*\}\s*$/,
+            'the modulo that remains is inside the accepted branch only');
+        // Math.random survives ONLY as the no-crypto fallback. COMMENTS STRIPPED
+        // FIRST: the file explains at length why crypto replaced Math.random, and
+        // counting that prose as code is the same mistake as matching a glyph
+        // against an escape - four of the five occurrences are the explanation.
+        const code = src.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        assert.equal((code.match(/Math\.random/g) || []).length, 1,
+            'Math.random must appear exactly once in live code, in the fallback');
     });
 
     test('organizerToken generation is untouched', () => {

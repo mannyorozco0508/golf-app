@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v86-the-log-and-the-card-agree';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v87-one-generator-with-a-check-beside-it';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -369,7 +369,11 @@ describe('SERVICE WORKER', () => {
         // it would restore exactly the dead button that file was added to fix.
         // 35 since ryder-cup.js joined the shell: index.html loads it unguarded at
         // parse time, so a cached shell without it breaks the scorecard.
-        assert.equal(entries.length, 35);
+        // 36 since code-issuer.js joined: admin.html, trip.html and tournament.html
+        // all load it, and it issues every round, trip and tournament code and
+        // checks the code is free first. A cached shell without it cannot start
+        // anything at all.
+        assert.equal(entries.length, 36);
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 

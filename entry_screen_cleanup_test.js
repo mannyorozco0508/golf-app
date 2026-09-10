@@ -70,20 +70,52 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
     });
 
     // Driven through the handler the tile's own onclick names.
-    test('tapping Game Day starts a round', () => {
-        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+    // `db` is a const in admin.html so it cannot be reassigned, but its properties
+    // can be. An empty database answers "free" to every code, which is the normal
+    // case these tests are about.
+    function stubFreeDatabase(sb) {
+        vm.runInContext(
+            'db.ref = function () { return { once: function () {'
+            + ' return Promise.resolve({ exists: function () { return false; } }); } }; };', sb);
+    }
+
+    // createRoom asks the issuer before it navigates, so location.href is set one
+    // round-trip later. Yielding once lets that promise settle.
+    const settle = (sb) => vm.runInContext('new Promise(function (r) { setTimeout(r, 0); })', sb);
+
+    test('tapping Game Day starts a round', async () => {
+        // AWAITS THE NAVIGATION, and asserts exactly what it always did.
+        //
+        // createRoom is async now: it asks code-issuer.js whether the code it drew
+        // is already in use BEFORE navigating, because this function navigates
+        // before anything is written and a collision found at save time would be
+        // found after the organizer had typed a roster. So location.href is set one
+        // database round-trip later, and reading it on the next line read it before
+        // the round-trip finished.
+        //
+        // Nothing here is softened: the same two assertions, on the same href, from
+        // the same tile handler. The only change is waiting for the answer.
+        const sb = loadHtmlInlineScript('admin.html',
+            ['course-data.js', 'action-model.js', 'code-issuer.js']);
         vm.runInContext('alert = function () {};', sb);
+        // The issuer needs a database to ask. An empty one answers "free" to
+        // everything, which is the case this test is about - a normal start.
+        stubFreeDatabase(sb);
         vm.runInContext("selectHomeWidget('quick');", sb);
+        await settle(sb);
         const href = vm.runInContext('location.href', sb);
         assert.match(href, /admin\.html\?game=[A-Z0-9]+/,
             'Game Day did not start anything: ' + href);
         assert.match(href, /eventType=quick/, 'it started the wrong kind of round');
     });
 
-    test('and the code it generates is a full six characters', () => {
-        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+    test('and the code it generates is a full six characters', async () => {
+        const sb = loadHtmlInlineScript('admin.html',
+            ['course-data.js', 'action-model.js', 'code-issuer.js']);
         vm.runInContext('alert = function () {};', sb);
+        stubFreeDatabase(sb);
         vm.runInContext("selectHomeWidget('quick');", sb);
+        await settle(sb);
         const code = /game=([A-Z0-9]+)/.exec(vm.runInContext('location.href', sb))[1];
         assert.equal(code.length, 6, 'short codes are guessable: got "' + code + '"');
     });
@@ -98,10 +130,13 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
     // A cached PWA can still call this with 'club'. It was a preset over the same
     // round engine and must keep working rather than becoming a tile that does
     // nothing - the same reasoning the 'tournament' branch already carries.
-    test('the club preset still starts a round', () => {
-        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+    test('the club preset still starts a round', async () => {
+        const sb = loadHtmlInlineScript('admin.html',
+            ['course-data.js', 'action-model.js', 'code-issuer.js']);
         vm.runInContext('alert = function () {};', sb);
+        stubFreeDatabase(sb);
         vm.runInContext("selectHomeWidget('club');", sb);
+        await settle(sb);
         assert.match(vm.runInContext('location.href', sb), /eventType=club/);
     });
 

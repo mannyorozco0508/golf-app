@@ -36,6 +36,7 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <script src="code-issuer.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -3174,32 +3175,41 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         createRoom();
     }
 
-    function generateRoomCode() {
-        // SIX CHARACTERS, NOT FOUR.
-        //
-        // A 4-character code from this 32-character alphabet is 1,048,576
-        // possibilities. There is no listing endpoint - every read names a specific
-        // code - but a million is small for a machine, and a hit grants full read
-        // and write to that round. Six raises it to 1,073,741,824: 1,024x.
-        //
-        // Not seven: every code input carries maxlength="6", so a 7-character code
-        // could be generated and linked but never typed.
-        //
-        // Existing 4-character codes are untouched and still join - joinRoom only
-        // rejects codes shorter than 2, and the security rules treat the code
-        // segment as a wildcard.
+        // The generator moved to code-issuer.js, with an existence check beside it.
+    // Three byte-identical copies of this loop lived in admin.html, trip.html and
+    // tournament.html and not one of them asked whether the code was already in
+    // use. There is one now, and it checks.
 
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let code = "";
-        for (let i = 0; i < 6; i++) { code += chars.charAt(Math.floor(Math.random() * chars.length)); }
-        return code;
+    // ISSUED, THEN NAVIGATED - and the ordering is the whole point. This function
+    // navigates BEFORE anything is written; the round does not exist until Save &
+    // Start Round, by which time the organizer has typed a roster. A collision
+    // found at save time would be found after the work.
+    async function createRoom() {
+        try {
+            const newCode = await issueUniqueCode({ db, root: 'events' });
+            let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
+            if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+            window.location.href = dest;
+        } catch (err) {
+            reportCodeIssueFailure(err, 'round');
+        }
     }
 
-    function createRoom() {
-        const newCode = generateRoomCode();
-        let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
-        if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
-        window.location.href = dest;
+    // WHAT THE ORGANIZER SEES, and it is not "the app is broken". Two causes
+    // reach here and they need different words: exhausting the retry bound means
+    // the codes we drew were all taken, which at 32^6 effectively never happens
+    // and is worth saying plainly; anything else is the database being
+    // unreachable, which is a signal problem and reads as one.
+    function reportCodeIssueFailure(err, what) {
+        const m = String((err && err.message) || err || '');
+        if (/could not issue a free/i.test(m)) {
+            alert('Could not start a new ' + what + ' just now.\n\n'
+                + 'Every code we tried was already in use. Try again \u2014 the next one '
+                + 'will almost certainly be free.');
+        } else {
+            alert('\u26A0\uFE0F Could not start a new ' + what + ' \u2014 check your signal '
+                + 'and try again.');
+        }
     }
 
     // OPENS THE ROUND. NOT THE WIZARD.
