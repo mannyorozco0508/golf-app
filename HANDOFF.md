@@ -258,6 +258,32 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
+- **The trips rule is NOT "trips are protected now". Read this before assuming it.**
+`trips/$tripCode` now carries `".write": "newData.exists() || !data.hasChild('rounds')"`
+— the events idiom with one word changed — so a trip that has rounds cannot be deleted
+in one write. `trip_delete_rules_test.js` pins all sixteen scenarios including the gaps.
+Three things about it a future reader must not inherit wrongly:
+  - **It guards a whole-trip delete that NO CLIENT PERFORMS.** Every trips write path
+    the app can emit was enumerated from source — `trip.html`, `admin.html:5415` and
+    `tournament.html:2189` all write into trips/ — and none is a whole-trip delete. The
+    only `.remove()` on trips/ anywhere is `trip.html:1132`, a round *pointer*. So this
+    refuses a console or hostile write, not a mis-tap. **That is a weaker justification
+    than Rule A on events**, where a button every golfer could see issued the destroying
+    write and a playing partner actually deleted a live round with it. This closes a
+    wide-open node on a public repo; it does not stop an accident anybody has had.
+  - **It does NOT back up the wave-3 organizer gate.** Measured, not assumed: with
+    `hasTripOrganizerAuthority` stubbed to always grant, a follower's two writes —
+    `remove trips/<code>/rounds/<round>` and `set .../countsTowardTrip` — were put to
+    this rule as "must refuse" and **both were allowed, 2 failures in 2 tests**. For any
+    child write `newData` at `$tripCode` still exists, so the guard clause is never
+    reached. The gate stops a follower removing a round pointer; the rule stops a
+    whole-trip delete. **Different things, neither one the other's second layer.**
+  - **X3, the overwrite, is the destruction path that actually matters for trips, and
+    this rule does not touch it.** A PUT of `{name, createdAt}` over a trip with rounds
+    erases every pointer as completely as a delete, passes `.validate`, and no rule keyed
+    on `newData.exists()` can see it. That is the shape a **colliding trip code** takes;
+    `code-issuer.js` is what made it unlikely, not this.
+
 - **`setControlPending` is duplicated in `admin.html` and `trip.html`, knowingly.** Both
 copies disable a control, show `⏳ …ing...`, and return a `restore()` the failure path
 calls so a refused issue cannot leave a dead button. **They are the same shape, NOT the

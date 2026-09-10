@@ -52,7 +52,7 @@
     "trips": {
       "$tripCode": {
         ".read": true,
-        ".write": true,
+        ".write": "newData.exists() || !data.hasChild('rounds')",
         ".validate": "newData.hasChildren() || newData.val() === null"
       }
     },

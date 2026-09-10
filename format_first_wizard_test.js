@@ -506,7 +506,17 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         'bet-strip.js': '60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',
-        'database.rules.json': '25304a5bfd3f448a11b93534342a6bf093914a7c9cde51898c3b6a2fa0444538',
+        // RE-PINNED for the trips delete rule, with explicit per-file approval.
+        // trips/$tripCode went from ".write": true to
+        //   "newData.exists() || !data.hasChild('rounds')"
+        // so a trip that has rounds cannot be destroyed in one write. That is the
+        // ONLY change in the file - one line, verified by diff. The behaviour it
+        // buys, and the three things it deliberately does NOT buy, are pinned by
+        // trip_delete_rules_test.js, which is where a reader should go: a hash
+        // proves a file did not move, it never proves the file is right.
+        // Previous hash, for the record:
+        //   25304a5bfd3f448a11b93534342a6bf093914a7c9cde51898c3b6a2fa0444538
+        'database.rules.json': '4144a87e1ec5fbac0924d13044d401a2f04477687a90bb7bbbd70ed1608da266',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
