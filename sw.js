@@ -524,6 +524,28 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v86: the audit log and the scorecard can no longer disagree.
+//
+// undoAuditEntry wrote its log entry on the NEXT LINE after the restore, never
+// inside a .then - so the entry describing the undo was written in parallel with
+// the write it claims to describe. A log written that way cannot be correct by
+// construction; it was correct only because the write usually worked. Refuse the
+// restore and the card kept the old value while the log said it had been undone,
+// and the log is what a group uses to settle an argument. The entry is now
+// written only from .then, so a refused restore logs nothing, and the failure is
+// shown on the row in the History modal rather than on the save-state line the
+// modal covers.
+//
+// saveScore watched the score write and not the auditLog write beside it, so a
+// refused log left a score changed with no record of who changed it, no Undo row
+// for it, and a save-state line truthfully reporting "Saved" about the half that
+// landed. Both promises are observed now. clearScoresVerified is handed to
+// GolfNet.track so the verification badge reappearing after a refusal is at
+// least counted.
+//
+// An installed PWA on v85 can show a group an audit trail that disagrees with
+// their own scorecard.
+
 // Moved to v85: only the organizer link can delete a round, and the control says
 // what it destroys.
 //
@@ -594,7 +616,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v85-only-the-organizer-can-delete-a-round';
+const CACHE_VERSION = 'golfapp-v86-the-log-and-the-card-agree';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

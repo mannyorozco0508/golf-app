@@ -5072,7 +5072,22 @@ html {
         maybeLockRyderMatches(playerId, holeNum);
 
         if (oldVal !== newVal) {
-            logAuditEntry(playerId, holeNum, oldVal, newVal);
+            // OBSERVED TOO. The score landing and the record of it landing are two
+            // writes, and only one of them used to be watched - so a refused
+            // auditLog write left the score changed with no record of who changed
+            // it, no Undo row for it, and a save-state line truthfully saying
+            // "Saved" about the half that worked. logAuditEntry now returns its
+            // write so trackWrite settles on BOTH.
+            const auditPromise = logAuditEntry(playerId, holeNum, oldVal, newVal);
+            if (auditPromise && typeof auditPromise.then === 'function') {
+                if (window.GolfNet && typeof window.GolfNet.track === 'function') {
+                    window.GolfNet.track(auditPromise);
+                }
+                // DELIBERATELY NO SECOND MESSAGE. The golfer does not need a
+                // lecture about an audit trail; they need the one surface they
+                // already read to stop saying the write went fine.
+                trackWrite(auditPromise);
+            }
             // VERIFICATION IS CLEARED HERE, in the one canonical score-write path, so
             // EVERY legitimate edit invalidates it automatically - group scorekeeper,
             // organizer review, or anything added later. Centralising it means a new
@@ -5119,7 +5134,14 @@ html {
     function clearScoresVerified() {
         if (!isScoresVerified()) return;
         currentData.scoresVerified = null;
-        db.ref('events/' + currentMode + '/scoresVerified').remove();
+        // TRACKED, AND NOTHING ELSE. Local state is cleared before the write and
+        // RTDB reverts on rejection, so the badge disappears and then silently
+        // comes back moments after a golfer corrects a score. The pill's count is
+        // what makes that explicable; a flag does not warrant its own modal.
+        const cleared = db.ref('events/' + currentMode + '/scoresVerified').remove();
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') {
+            window.GolfNet.track(cleared);
+        }
     }
 
     // The write must LAND before the UI claims anything. Firebase buffers a write
@@ -5159,8 +5181,11 @@ html {
             ts: Date.now()
         };
 
+        // RETURNED so callers can sequence on it. saveScore hands it to
+        // trackWrite; undoAuditEntry writes the entry only after its restore
+        // lands, so nothing here needs to know which caller it has.
         const logRef = db.ref(`events/${currentMode}/auditLog`).push();
-        logRef.set(entry);
+        const logWrite = logRef.set(entry);
 
         // Trim to last 40 entries so the log doesn't grow forever
         db.ref(`events/${currentMode}/auditLog`).once('value').then(snap => {
@@ -5173,6 +5198,26 @@ html {
                 db.ref(`events/${currentMode}/auditLog`).update(updates);
             }
         });
+
+        // THE ENTRY WRITE, not the trim. A failed trim leaves an over-long log,
+        // which is untidy; a failed entry means a score changed with no record of
+        // it. Only the one that matters is handed back.
+        return logWrite;
+    }
+
+    // The row keeps its own failure note until the modal is closed and reopened,
+    // which re-renders from the log. Rendered next to the Undo button that was
+    // pressed, so it cannot be mistaken for a different row's result.
+    function markUndoRowFailed(logKey) {
+        const btn = document.querySelector('.history-undo-btn[onclick*="' + logKey + '"]');
+        const row = btn && btn.closest('.history-row');
+        if (!row) return;
+        if (row.querySelector('.history-undo-failed')) return;
+        const note = document.createElement('div');
+        note.className = 'history-undo-failed';
+        note.style.cssText = 'color:var(--accent-red); font-weight:bold; font-size:0.75rem; margin-top:4px;';
+        note.textContent = '\u26A0\uFE0F Could not undo \u2014 the score did not change. Nothing was logged.';
+        row.appendChild(note);
     }
 
     function undoAuditEntry(logKey) {
@@ -5182,14 +5227,33 @@ html {
         if (!canWritePlayer(entry.playerId)) return rejectCrossGroupWrite(entry.playerId);
         const scoreKey = `p${entry.playerId}_h${entry.hole}`;
 
-        if (entry.oldValue === null || entry.oldValue === undefined) {
-            db.ref(`events/${currentMode}/scores/${scoreKey}`).remove();
-        } else {
-            db.ref(`events/${currentMode}/scores/${scoreKey}`).set(entry.oldValue);
+        // SEQUENCED, NOT PARALLEL. logAuditEntry used to be the NEXT LINE after
+        // this write - so the entry describing the undo was written alongside the
+        // write it claims to describe, never after it. A log written that way
+        // cannot be correct by construction: it was correct only because the
+        // write usually worked. Refuse the restore and the card kept the old
+        // value while the log said it had been undone - and the log is what a
+        // group uses to settle an argument.
+        //
+        // Now the log is written only from .then, so a refused restore logs
+        // NOTHING and the two can no longer disagree.
+        const restore = (entry.oldValue === null || entry.oldValue === undefined)
+            ? db.ref(`events/${currentMode}/scores/${scoreKey}`).remove()
+            : db.ref(`events/${currentMode}/scores/${scoreKey}`).set(entry.oldValue);
+
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') {
+            window.GolfNet.track(restore);
         }
 
-        // Log the undo itself as a new entry so the trail stays honest
-        logAuditEntry(entry.playerId, entry.hole, entry.newValue, entry.oldValue);
+        restore.then(() => {
+            // Only now is it true that the score moved back.
+            logAuditEntry(entry.playerId, entry.hole, entry.newValue, entry.oldValue);
+        }).catch(() => {
+            // ON THE ROW, NOT THE SAVE-STATE LINE. The History modal is over the
+            // top of the scorecard, so a message on the line behind it is not a
+            // message. This is where the golfer's attention already is.
+            markUndoRowFailed(logKey);
+        });
     }
 
     // --- FINISH ROUND ---
