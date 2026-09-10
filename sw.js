@@ -524,6 +524,12 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v94: skins do not carry unless somebody says so. A new round is now
+// born No Carry. The settings a round was created with said CARRY in eight places
+// across three files, while skinsCarriesOver() - which is what settlement actually
+// asks - has always said an absent value does NOT carry. The round's own settings
+// and the engine that paid it pointed opposite ways. No historical money changes:
+// settlement never read the creation default.
 // Moved to v93: the guide describes the app that exists. instructions.html told
 // golfers to tap "Start New Game", "Join Game" and a "Copy Invite Link" button -
 // none of which exist - described a QR Consumer removed, called codes
@@ -685,7 +691,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v93-the-guide-describes-the-app-that-exists';
+const CACHE_VERSION = 'golfapp-v94-skins-do-not-carry-unless-somebody-says-so';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

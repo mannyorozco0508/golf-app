@@ -1012,7 +1012,7 @@ html {
                 </label>
                 <span class="toggle-label-sm" id="skins-carry-label-off" onclick="setSkinsCarrySetting(false)">No Carry</span>
             </div>
-            <input type="hidden" id="skins-carryover" value="true">
+            <input type="hidden" id="skins-carryover" value="false">
             <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="skins-carry-explanation">A tied skin's value moves to the next hole — whoever wins that hole wins both.</p>
         </div>
     </div>
@@ -1250,7 +1250,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     <input type="tel" inputmode="decimal" id="mp-skins-amount" value="280" oninput="mpRecalc()" placeholder="Fixed $" style="margin-top:6px; display:none;">
                     <div style="display:flex; gap:10px; margin-top:6px;">
                         <select id="mp-skins-scoring"><option value="net" selected>Net skins</option><option value="gross">Gross skins</option></select>
-                        <select id="mp-skins-carry"><option value="yes" selected>Carry Over</option><option value="no">No Carry</option></select>
+                        <select id="mp-skins-carry"><option value="yes">Carry Over</option><option value="no" selected>No Carry</option></select>
                     </div>
                     <div class="mp-hint" id="mp-skins-line"></div>
                 </div>
@@ -1910,7 +1910,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         if (stakeText) rows.push(['The Bet', stakeText, 4, SEC_ACTION]);
         if (currentFormat === 'skins') {
             const buyIn = document.getElementById('skins-buyin') ? (document.getElementById('skins-buyin').value || '0') : '0';
-            const carryOn = document.getElementById('skins-carryover') ? document.getElementById('skins-carryover').value !== 'false' : true;
+            const carryOn = document.getElementById('skins-carryover') ? document.getElementById('skins-carryover').value !== 'false' : SKINS_CARRY_DEFAULT;
             rows.push(['Skins', `$${buyIn} — ${carryOn ? 'Carry Over' : 'No Carry'}`, 4, SEC_ACTION]);
         }
         // Every additional game gets its own line, so nobody tees off unaware of a
@@ -2428,7 +2428,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             id: newInstanceId(),
             skinsBuyIn: 10,
             skinsPotFormat: 'gross',
-            skinsCarryOver: true,
+            skinsCarryOver: SKINS_CARRY_DEFAULT,
             startHole: 1,
             participantIds: players.map(p => String(p.id))
         });
@@ -2733,7 +2733,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         set('mp-skins-mode', skins.mode || 'none');
         if (skins.amount !== undefined) set('mp-skins-amount', skins.amount);
         set('mp-skins-scoring', skins.scoring || 'net');
-        set('mp-skins-carry', skins.carryOver === false ? 'no' : 'yes');
+        set('mp-skins-carry', skins.carryOver === true ? 'yes' : 'no');
 
         mpToggle();
     }
@@ -5207,7 +5207,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const skinsBuyIn = skinsBuyInForSave(gameFormat, skinsBuyInEl ? skinsBuyInEl.value : '');
             const skinsPotFormatEl = document.getElementById("skins-pot-format");
             const skinsPotFormat = skinsPotFormatForSave(gameFormat, skinsPotFormatEl ? skinsPotFormatEl.value : '');
-            const skinsCarryOver = document.getElementById("skins-carryover") ? (document.getElementById("skins-carryover").value !== 'false') : true;
+            const skinsCarryOver = document.getElementById("skins-carryover") ? (document.getElementById("skins-carryover").value !== 'false') : SKINS_CARRY_DEFAULT;
             const stablefordPointVal = document.getElementById("stableford-point-value") ? (parseFloat(document.getElementById("stableford-point-value").value) || 0) : 0;
             const stablefordScoring = document.getElementById("stableford-scoring") ? document.getElementById("stableford-scoring").value : "net";
             const stablefordPoints = {

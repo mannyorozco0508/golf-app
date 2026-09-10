@@ -119,7 +119,12 @@ describe('GOLFER LANGUAGE, NOT SPEC LANGUAGE', () => {
         assert.match(card, /value="50,30,20" selected/);
         assert.match(card, /value="remainder" selected/);
         assert.match(card, /value="net" selected/);
-        assert.match(card, /value="yes" selected/);
+        // The Main Pool skins carry picker. Was value="yes" selected - Carry Over -
+        // until the carry default moved to No Carry everywhere. The point of this
+        // test is unchanged: Marty's defaults are pre-filled so only KP holes need
+        // typing. What a pre-filled default IS changed, and this pins the new one.
+        // skins_carry_default_test.js is what holds every carry site to one answer.
+        assert.match(card, /value="no" selected/);
         // The pot itself is never hardcoded - it derives from the field.
         assert.ok(!/480/.test(card), 'the card must not hardcode a pot size');
     });

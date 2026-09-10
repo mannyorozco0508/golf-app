@@ -487,7 +487,19 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // is byte-for-byte unchanged. Each addition is guarded by a suite that asserts
         // its BEHAVIOUR - nassau_autopress_label_test.js, ryder_cross_round_identity_test.js
         // and round_duplicate_name_test.js - rather than trusting this hash to notice.
-        'action-model.js': 'c652eca54e017a9db4518c1d65d31a35fbbfc67b0d8e0570b89103dd81c58dd5',
+        // RE-PINNED for the skins carry default, with explicit per-file approval.
+        // The change is a CONSTANT AND A COMMENT beside skinsCarriesOver():
+        //   var SKINS_CARRY_DEFAULT = false;   plus its export, plus the
+        //   Additional Games catalog reading it instead of a literal true.
+        // NO ARITHMETIC. skinsCarriesOver() is byte-identical - it still reads
+        // `return setting === true;` and still decides what silence means for
+        // stored data. Nothing that computes money moved, and no historical
+        // round can settle differently, because settlement never read a
+        // creation default. skins_carry_default_test.js is where the behaviour
+        // is pinned; this hash only proves the file did not move otherwise.
+        // Previous hash, for the record:
+        //   c652eca54e017a9db4518c1d65d31a35fbbfc67b0d8e0570b89103dd81c58dd5
+        'action-model.js': '555553235d9c5bf57ff9f979da768b566894ebc867e65c042c85fff1038beae5',
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the

@@ -58,7 +58,7 @@ const ADDITIONAL_GAME_CATALOG = {
         // (captureAdditionalGames has always written the defaults out), so their money
         // is untouched by this change. Only games created from here on are affected,
         // and the setup UI states the mode outright.
-        defaults: { skinsBuyIn: 5, skinsCarryOver: true, skinsScoring: 'gross', skinsPotFormat: 'gross' }
+        defaults: { skinsBuyIn: 5, skinsCarryOver: SKINS_CARRY_DEFAULT, skinsScoring: 'gross', skinsPotFormat: 'gross' }
     },
     dots: {
         label: 'Dots / Junk',
@@ -828,6 +828,17 @@ function skinsCarriesOver(setting) {
     return setting === true;
 }
 
+// AND THE SAME ANSWER FOR A ROUND BEING BORN. skinsCarriesOver decides what
+// silence means in STORED data; this decides what a new round is given when
+// nobody has chosen. They must agree, and until now they did not: eight
+// creation sites across three files all said carry, while the resolver above
+// has always said no carry. A round's settings pointed one way and the engine
+// that pays it pointed the other.
+//
+// Declared once so a ninth site cannot quietly say something else.
+// skins_carry_default_test.js holds every site to it.
+var SKINS_CARRY_DEFAULT = false;
+
 // Whether the round said ANYTHING. Flipping the default restates a legacy round's
 // money, so a receipt has to be able to say which rule it applied rather than
 // quietly picking one.
@@ -837,6 +848,7 @@ function skinsCarryRuleRecorded(setting) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports.skinsCarriesOver = skinsCarriesOver;
+    module.exports.SKINS_CARRY_DEFAULT = SKINS_CARRY_DEFAULT;
     module.exports.skinsCarryRuleRecorded = skinsCarryRuleRecorded;
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
     module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
