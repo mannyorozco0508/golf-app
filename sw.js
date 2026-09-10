@@ -524,6 +524,12 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v90: playing less is not how you win the trip. The cumulative
+// leaderboard was a raw stroke sum, so a golfer who played one round of four
+// ranked FIRST - on the screen, on the recap card that gets screenshotted, and
+// in the text people paste into a group chat. An installed device without this
+// bump keeps serving the version that crowns whoever turned up least, and keeps
+// publishing it.
 // Moved to v89: the trip page tells you when a write fails. Four writes on
 // trip.html failed in silence - the counts-toward-trip toggle, the round remove,
 // and both halves of link-round. An installed device without this bump keeps
@@ -658,7 +664,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v89-the-trip-page-says-when-a-write-fails';
+const CACHE_VERSION = 'golfapp-v90-playing-less-is-not-how-you-win-the-trip';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

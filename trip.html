@@ -150,6 +150,8 @@
         .lb-pos { width: 28px; font-weight: bold; color: var(--text-muted); }
         .lb-team { flex: 1; font-weight: bold; }
         .lb-sub { font-size: 0.72rem; color: var(--text-muted); font-weight: normal; }
+        .lb-tier2-head { margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--border-mid); font-size: 0.7rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+        .lb-tier2-note { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px; line-height: 1.35; }
         .lb-score { width: 70px; text-align: right; font-weight: bold; }
         /* Same stacked gross-over-net treatment as the round leaderboard. Net stays
            subordinate through size and weight, not by being muted into invisibility. */
@@ -1278,6 +1280,54 @@ html {
     // Sums gross/net strokes per player (matched by name) across every linked round.
     // Works no matter what format each individual round used, since it's built
     // directly from raw hole scores, not from any one format's settlement math.
+    // ONE RANKER, THREE CALLERS. Playing less cannot be how you win the trip.
+    //
+    // The cumulative board is a RAW STROKE SUM, so fewer holes is a smaller number
+    // and a smaller number wins. Measured cold: a golfer who played ONE round of
+    // four ranked FIRST on the leaderboard, on the recap card, and in the pasted
+    // share text. Ranking on net does not help - net is the same raw sum, and the
+    // card already printed him first under "STANDINGS - NET".
+    //
+    // THREE SURFACES SORTED cachedPlayerTotals BY HAND, with no shared answer
+    // between them, which is how the card came to disagree with the leaderboard
+    // about who was second while agreeing with it about who was first. The card's
+    // own comment claimed the two "can never tell different stories about one
+    // trip"; nothing enforced it. Now one function does.
+    //
+    // THE MAXIMUM IS OBSERVED, NOT THE TRIP'S ROUND COUNT. "Played every counted
+    // round" sounds like the right rule and is wrong mid-trip: on day one of four,
+    // all four rounds are linked and only one has scores, so nobody has played
+    // them all and the ENTIRE FIELD would drop below the line. Taking the fullest
+    // schedule anybody actually played means a trip where everyone turns up every
+    // day has no second tier at all, and the board looks exactly as it did before.
+    //
+    // TOTALS ARE NOT TOUCHED. This decides order and tier, nothing else. Every
+    // gross and net figure is the same number it was, which is why the fix is
+    // this rather than an average - an average changes every number on the screen
+    // and still lets one good round beat four.
+    //
+    // WITHIN A TIER, EACH SURFACE KEEPS ITS OWN SORT. The leaderboard is showing
+    // gross or net by its toggle; the card and the text are always net. That is a
+    // column, not a disagreement, and it is not this function's business.
+    function rankTripPlayers(rows, sortFn) {
+        const most = rows.reduce((m, r) => Math.max(m, r.roundsPlayed || 0), 0);
+        // filter() copies, so sorting these cannot reorder cachedPlayerTotals
+        // underneath the two recap surfaces that read it afterwards.
+        return {
+            most: most,
+            ranked: rows.filter((r) => (r.roundsPlayed || 0) >= most).sort(sortFn),
+            unranked: rows.filter((r) => (r.roundsPlayed || 0) < most).sort(sortFn)
+        };
+    }
+
+    // THE SENTENCE UNDER THE LINE. A reader has to be told WHY somebody is down
+    // here, or it reads as a bug or a snub. It names the mechanism - strokes add
+    // up, so a shorter week is a smaller number - and it says the totals beside
+    // them are still true. The number is real; the position would not be.
+    const TIER2_HEADING = 'Played fewer rounds · not ranked';
+    const TIER2_REASON = 'A trip total is strokes added together, so a shorter week is a '
+        + 'smaller number. These totals are real — a position next to them would not be.';
+
     function renderCumulativeLeaderboard() {
         const container = document.getElementById('trip-leaderboard');
         if (cachedRoundResults.length === 0) return;
@@ -1321,7 +1371,8 @@ html {
 
         let rows = Object.values(playerTotals);
         cachedPlayerTotals = rows;
-        rows.sort((a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
+        const tiers = rankTripPlayers(rows,
+            (a, b) => (lbMode === 'net' ? a.net - b.net : a.gross - b.gross));
 
         if (rows.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No scores entered in any linked round yet.</div>`;
@@ -1331,18 +1382,27 @@ html {
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
             <span class="lb-pos">Pos</span><span class="lb-team">Player</span><span class="lb-score">Score</span>
         </div>`;
-        rows.forEach((r, i) => {
-            // BOTH TOTALS, ALWAYS. This computed gross and net for every golfer and
-            // then showed whichever the toggle happened to be on - so comparing the
-            // trip board against a paper card meant flipping the toggle and holding a
-            // number in your head. Same fix, same stacked shape and the same class
-            // names as the round leaderboard, so the two screens read identically.
-            html += `<div class="lb-row ${i === 0 ? 'leader' : ''}">
-                <span class="lb-pos">${i + 1}</span>
+        // BOTH TOTALS, ALWAYS. This computed gross and net for every golfer and
+        // then showed whichever the toggle happened to be on - so comparing the
+        // trip board against a paper card meant flipping the toggle and holding a
+        // number in your head. Same fix, same stacked shape and the same class
+        // names as the round leaderboard, so the two screens read identically.
+        const lbRow = (r, pos) => `<div class="lb-row ${pos === 1 ? 'leader' : ''}">
+                <span class="lb-pos">${pos === null ? '·' : pos}</span>
                 <span class="lb-team">${escapeHtml(r.name)}<br><span class="lb-sub">${r.roundsPlayed} round${r.roundsPlayed === 1 ? '' : 's'} played</span></span>
                 <span class="lb-score score-cell"><span class="score-gross">${r.gross}</span><span class="score-net">Net ${r.net}</span></span>
             </div>`;
-        });
+
+        tiers.ranked.forEach((r, i) => { html += lbRow(r, i + 1); });
+
+        // THE SECOND TIER. Deliberately still shows both totals - they are correct,
+        // and hiding them would look like the page had lost somebody's scores. What
+        // it withholds is the POSITION, which is the only part that was ever wrong.
+        if (tiers.unranked.length) {
+            html += `<div class="lb-tier2-head">${TIER2_HEADING}</div>`
+                 +  `<div class="lb-tier2-note">${TIER2_REASON}</div>`;
+            tiers.unranked.forEach((r) => { html += lbRow(r, null); });
+        }
         container.innerHTML = html;
     }
 
@@ -2181,18 +2241,33 @@ html {
                  + (cachedTripSettled ? '' : ' \u00B7 still in progress') + '</div>';
 
         // ---- STANDINGS, top 5 ----
-        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
+        // THE SAME RANKER THE SCREEN USES. This block is the one that gets
+        // screenshotted, and it is where the wrong winner was actually published:
+        // the screen at least prints "1 round played" in small grey type under the
+        // name, and this prints a name and a number.
+        const netTiers = rankTripPlayers(cachedPlayerTotals.slice(), (a, b) => a.net - b.net);
         html += '<div class="rc-block"><div class="rc-head">\uD83C\uDFC6 STANDINGS \u00B7 NET</div>';
-        if (netRows.length === 0) {
+        if (cachedPlayerTotals.length === 0) {
             html += '<div class="rc-none">No scores yet.</div>';
         } else {
-            netRows.slice(0, 5).forEach((r, i) => {
+            netTiers.ranked.slice(0, 5).forEach((r, i) => {
                 html += '<div class="rc-row"><span class="rc-pos">' + (i + 1) + '</span>'
                      + '<span class="rc-name">' + esc(r.name) + '</span>'
                      + '<span class="rc-val">' + r.net + '</span></div>';
             });
-            if (netRows.length > 5) {
-                html += '<div class="rc-detail">+ ' + (netRows.length - 5) + ' more</div>';
+            if (netTiers.ranked.length > 5) {
+                html += '<div class="rc-detail">+ ' + (netTiers.ranked.length - 5) + ' more</div>';
+            }
+            if (netTiers.unranked.length) {
+                html += '<div class="rc-detail">' + esc(TIER2_HEADING) + '</div>';
+                netTiers.unranked.slice(0, 5).forEach((r) => {
+                    html += '<div class="rc-row"><span class="rc-pos">\u00B7</span>'
+                         + '<span class="rc-name">' + esc(r.name) + '</span>'
+                         + '<span class="rc-val">' + r.net + '</span></div>';
+                });
+                if (netTiers.unranked.length > 5) {
+                    html += '<div class="rc-detail">+ ' + (netTiers.unranked.length - 5) + ' more</div>';
+                }
             }
         }
         html += '</div>';
@@ -2308,11 +2383,19 @@ html {
              + `\n\n`;
 
         text += `🏆 STANDINGS (Net)\n`;
-        const netRows = cachedPlayerTotals.slice().sort((a, b) => a.net - b.net);
-        if (netRows.length === 0) {
+        // THE THIRD CALLER. Same ranker as the screen and the card, so the pasted
+        // text cannot crown somebody the other two do not.
+        const netTiers = rankTripPlayers(cachedPlayerTotals.slice(), (a, b) => a.net - b.net);
+        if (cachedPlayerTotals.length === 0) {
             text += `No scores yet.\n`;
         } else {
-            netRows.forEach((r, i) => { text += `${i + 1}. ${r.name} — ${r.net}\n`; });
+            netTiers.ranked.forEach((r, i) => { text += `${i + 1}. ${r.name} — ${r.net}\n`; });
+            if (netTiers.unranked.length) {
+                text += `${TIER2_HEADING}:\n`;
+                // No position, and the same "name — value" shape, so a reader sees
+                // one list with a line through it rather than two competing ones.
+                netTiers.unranked.forEach((r) => { text += `${r.name} — ${r.net}\n`; });
+            }
         }
 
         // The recap is the text people paste into the group chat, so it carries the

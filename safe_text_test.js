@@ -167,7 +167,16 @@ describe('NO RAW NAME REACHES MARKUP, PAGE BY PAGE', () => {
         // Its sibling on the recap CARD is escaped - esc(a.mostEagles.name) - because
         // that one is innerHTML; this one is a string handed to the clipboard, where
         // escaping would paste "Mike &amp; Dave" into a group chat.
-        'trip.html': 10,        // recap text block, share title, textContent header
+        //
+        // 11, not 10, since the second tier joined that same block. The trip
+        // standings now print the golfers who played fewer rounds under their own
+        // heading, unnumbered, and that line interpolates a name exactly as the
+        // ranked line directly above it always has - same function, same clipboard,
+        // same reason not to escape. Its sibling on the recap CARD is escaped,
+        // esc(r.name), because that one is innerHTML. The "plain-text exemptions
+        // really are plain text" test below is what actually confirms this one is
+        // text and not markup; this number only records that it was looked at.
+        'trip.html': 11,        // recap text block, share title, textContent header
     };
 
     PAGES.forEach(p => {

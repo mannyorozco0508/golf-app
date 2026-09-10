@@ -74,12 +74,32 @@ function boot({ rounds = [{}, { seed: 1 }], mode = 'gross' } = {}) {
 }
 
 // Pulls one row per golfer out of the rendered board.
+// THE POSITION CELL IS NOT ALWAYS A NUMBER.
+//
+// A golfer who played fewer rounds than the fullest schedule anyone managed is
+// rendered below the line with NO position - the cell carries a middot - because
+// a trip total is strokes added together and a shorter week is a smaller number.
+// The row is otherwise identical and still carries their rounds, gross and net.
+//
+// This regex demanded \d+ there, so such a golfer vanished from the PARSE while
+// rendering perfectly on the page - which is exactly what the "a golfer who
+// missed a round still shows the rounds they played" test below is here to
+// guarantee, and it failed for the parser's reason rather than the page's.
+//
+// WIDENING THIS WEAKENS NOTHING, and it was measured rather than assumed before
+// the change: `pos` is put into the row object here and NEVER read by any
+// assertion anywhere in this file. Nothing below ranks on it, compares it or
+// counts it. It is kept, parsed as a number when it is one and null when it is
+// not, so a future test can assert on it without first having to re-derive that.
 function rows(html) {
     const out = [];
-    const re = /class="lb-pos">(\d+)<\/span>\s*<span class="lb-team">([^<]+)<br><span class="lb-sub">(\d+) round[^<]*<\/span><\/span>\s*<span class="lb-score score-cell"><span class="score-gross">(\d+)<\/span><span class="score-net">Net (\d+)<\/span><\/span>/g;
+    const re = /class="lb-pos">([^<]+)<\/span>\s*<span class="lb-team">([^<]+)<br><span class="lb-sub">(\d+) round[^<]*<\/span><\/span>\s*<span class="lb-score score-cell"><span class="score-gross">(\d+)<\/span><span class="score-net">Net (\d+)<\/span><\/span>/g;
     let m;
     while ((m = re.exec(html)) !== null) {
-        out.push({ pos:+m[1], name:m[2], rounds:+m[3], gross:+m[4], net:+m[5] });
+        out.push({
+            pos: /^\d+$/.test(m[1].trim()) ? +m[1] : null,
+            name:m[2], rounds:+m[3], gross:+m[4], net:+m[5]
+        });
     }
     return out;
 }
