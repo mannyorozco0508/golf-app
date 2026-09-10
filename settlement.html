@@ -1595,7 +1595,13 @@ html {
 
         if (gameFormat === 'skins') {
             const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
-            const carryOver = data.skinsCarryOver !== false;
+            // THE HEADER NOW COMES FROM THE SAME RESOLVER AS THE LEDGER BELOW IT.
+            // This read `!== false` and printed "Final Skins Settlement (Carry
+            // Over)" over a ledger the engine had computed with NO carry - one
+            // page, a label and a number that disagreed. Measured: header said
+            // CARRY OVER, ledger said Ann +$5, Ben +$5, Cal -$10.
+            const carryOver = (typeof skinsCarriesOver === 'function')
+                ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = skinsNet[p.id] || 0;

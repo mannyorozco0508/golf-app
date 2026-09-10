@@ -652,7 +652,18 @@ html {
         // people looking at the same round on two phones could silently see two different pots.
         const potFormat = currentData.skinsPotFormat || 'split';
         const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
-        const carryOver = currentData.skinsCarryOver !== false; // default TRUE — the traditional rule
+        // ONE RESOLVER, NOT A SECOND OPINION. This read `!== false` - absent meant
+        // CARRY - while settlement asks skinsCarriesOver(), where absent means NO
+        // carry. Same round, two answers, and line 672 below picks
+        // computeSkinsCarryOver vs computeSkinsVoid off this value, so it was not a
+        // label: this page COMPUTED one rule while the Receipt paid the other.
+        // Measured on a fieldless round: this page showed Cal $7.22 coming, the
+        // Receipt said he owed $10.
+        // The typeof guard is the same shape settlement-engine.js uses, and the
+        // fallback arm matches the resolver rather than the old reading.
+        const carryOver = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(currentData.skinsCarryOver)
+            : currentData.skinsCarryOver === true;
 
         const potFormatEl = document.getElementById("skins-pot-format");
         const buyInEl = document.getElementById("skins-buyin");

@@ -461,7 +461,13 @@ function gameStatusLine(game, holes, scores, players) {
 // rebuilt from raw scores every time, so a correction simply produces a new answer.
 // One pot's worth of skins, decided on a single scoring key.
 function skinsStatePot(cfg, holes, scores, players, scoringKey, potShare) {
-    const carryOver = cfg.skinsCarryOver !== false;
+    // THE LIVE STRIP ON THE SCORECARD - the number a golfer watches while playing,
+    // so a rule of its own here is the most visible version of the disagreement.
+    // Routed to the same resolver settlement asks. Same typeof guard as the
+    // engines; nothing new is loaded, index.html already has action-model.js at
+    // line 30 against bet-strip.js at 37.
+    const carryOver = (typeof skinsCarriesOver === 'function')
+        ? skinsCarriesOver(cfg.skinsCarryOver) : cfg.skinsCarryOver === true;
     const won = {};
     const awards = [];      // { hole, playerId, units }
     let carry = 1, lastDecidedHole = null;
@@ -561,7 +567,8 @@ function skinsState(cfg, holes, scores, players) {
 
     return {
         won, awards, mode,
-        carryOver: cfg.skinsCarryOver !== false,
+        carryOver: (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(cfg.skinsCarryOver) : cfg.skinsCarryOver === true,
         lastDecidedHole, riding,
         // A representative unit price for callers that show one number. Under split the
         // two halves are equal, so this is exact rather than an average of unlike things.

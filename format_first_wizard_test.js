@@ -515,7 +515,21 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // cup_join_by_code_test.js asserts the BEHAVIOUR of both rather than trusting
         // this hash to notice.
         'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
-        'bet-strip.js': '60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673',
+        // RE-PINNED for the skins carry rule, with explicit per-file approval -
+        // bet-strip.js was named as protected and approved in the same breath.
+        // TWO SITES changed, both from `cfg.skinsCarryOver !== false` to the
+        // canonical skinsCarriesOver(), behind the same typeof guard the engines
+        // already use. NO ARITHMETIC: the carry/void branching, the skin value and
+        // the riding count are untouched - only the boolean feeding them moved to
+        // one resolver. This is the LIVE STRIP on the scorecard, so it was reading
+        // CARRY on a fieldless round while the Receipt paid NO carry.
+        // Nothing new is loaded: index.html already has action-model.js at line 30
+        // against bet-strip.js at 37, and it is the only page that loads the strip.
+        // Behaviour is pinned by skins_carry_agreement_test.js and
+        // tools/skins-carry-agreement-check.js; this hash only proves the file did
+        // not otherwise move. Previous hash, for the record:
+        //   60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673
+        'bet-strip.js': '48d96b32b108250cbdffd383530cf1f0b9b278befd40e0582e297fcad279bf79',
         'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',
         // RE-PINNED for the trips delete rule, with explicit per-file approval.

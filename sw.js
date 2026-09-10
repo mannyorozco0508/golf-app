@@ -524,6 +524,15 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v95: one round, one carry rule, every surface. A round storing no
+// skinsCarryOver was answered two ways with money attached. The Skins page, the
+// live bet strip and the Settle header all read `!== false` - CARRY - and the
+// Skins page COMPUTED that way, while the engines read skinsCarriesOver() - NO
+// carry. Measured: the Skins page showed Cal $7.22 coming while the Receipt said
+// he owed $10, and the Settle page printed "(Carry Over)" over a no-carry ledger.
+// All four now route through the one resolver. An installed device without this
+// bump keeps serving the version where two screens quote a golfer different money
+// for the same round.
 // Moved to v94: skins do not carry unless somebody says so. A new round is now
 // born No Carry. The settings a round was created with said CARRY in eight places
 // across three files, while skinsCarriesOver() - which is what settlement actually
@@ -691,7 +700,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v94-skins-do-not-carry-unless-somebody-says-so';
+const CACHE_VERSION = 'golfapp-v95-one-round-one-carry-rule-every-surface';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
