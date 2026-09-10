@@ -142,14 +142,47 @@ What they don't: `events/$eventCode` is still `.read: true, .write: true`, so an
 
 **Deploying the rules immediately surfaced a latent bug** — `wolfLoneMult` and `wolfBlindMult` were written as strings while every other numeric field was `parseFloat`'d, so every round save was rejected with PERMISSION_DENIED. If a save starts failing after a rules change, look for a type mismatch first.
 
-### The repo file and the live rules are NOT the same right now
+### `global_courses` Tier-B — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-09
 
-The heading above says DEPLOYED and that is true of everything except
-`global_courses`. The Tier-B validation below is **written in `database.rules.json`
-and not yet deployed**, so the live database still accepts what Tier-B refuses.
-Do not read this section as a description of production until that deploy runs
-and `global_courses_rules_test.js` has been checked against the live node rather
-than against targaryen.
+Not "deployed and assumed working". Proven against
+`golfapp-9fb21-default-rtdb` over REST, unauthenticated, the way any client
+would reach it:
+
+- **All 16 forbidden shapes were refused by the server**, `HTTP 401
+  {"error":"Permission denied"}` — data as a string, data missing, name missing,
+  name empty, a 5,000-character name, par 99, par 0, par `"4"`, hcpIndex 0 and
+  99, hole 0 and 19, a one-hole card, a 40-hole card, a hole missing `par`, and
+  a scalar overwrite. Nothing landed: the probe path read back `null` after all
+  sixteen.
+- **A valid 18-hole write was still accepted**, `HTTP 200`, echoed back with 18
+  holes — including a real card (Caledonia's own par 3/4/5 data), so the rule is
+  not simply refusing everything.
+
+Both halves matter. Sixteen refusals alone would also be satisfied by rules that
+reject every course, which would break the "push to global database" flow.
+
+**The rules cannot be read back over REST.** `/.settings/rules.json` answers
+`401 Permission denied` without an admin token, so "does deployed match the
+repo?" is answered *behaviourally* — the live server refuses exactly the 16
+shapes targaryen refuses and accepts what it accepts — not by diffing JSON. That
+is the stronger check anyway: it tests the deployment, not a file.
+
+### A course can be created but NEVER deleted by any client
+
+`.write` is `newData.exists()`, so every client-side delete route fails:
+`DELETE`, `PUT null`, and a parent `PATCH` with a null child all return
+`401 Permission denied`. That is the intended design — it is what stops a
+vandal wiping the shared course list — but it has a consequence worth knowing
+before you write anything:
+
+**Anything written to `global_courses` is permanent unless removed from the
+Firebase console**, which bypasses rules. There is no undo from the app, from a
+script, or from a test. Do not write probe or scratch data to this node.
+
+`tournament.html:1509` renders **every** `global_courses` key as an `<option>`
+in the round-course dropdown, so a stray key is visible in the Tournament
+product. Consumer is narrower: `admin.html:3325` lists only keys starting with
+`comm_`, so a non-`comm_` stray does not reach the Consumer picker.
 
 **Tier-B, what it added.** `global_courses/$courseId` now requires `name` and
 `data`, a non-empty `name` of at most 120 characters, exactly eighteen holes at
