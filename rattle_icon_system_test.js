@@ -29,7 +29,16 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+const { decodeEscapes } = require('./helpers/decode-escapes.js');
+
+// DECODED AT READ TIME. A \uXXXX escape inside a <script> is legitimate
+// JavaScript that resolves at runtime, so this file's glyph assertions used to
+// depend on which form somebody happened to type. The bin on the destructive
+// control was written as an escape once and this test went red while the page
+// was perfectly correct; it was written raw the next time and passed for a
+// reason unrelated to the rule being enforced. Decoding first makes both forms
+// equivalent, so these assertions test the GLYPH and not the typing.
+const read = f => decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 
 const CONSUMER = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
     'skins.html', 'sidematches.html', 'stats.html', 'trip.html', 'instructions.html'];
@@ -208,10 +217,16 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
         // Not a count - a meaning. "⚙️ Edit" on a trip round opens the setup wizard,
         // which is configuration and therefore correct. What is banned is the gear
         // standing in for Home, which no other app does and which collided with Step 4.
+        //
+        // "Setup" joined the list when decoding revealed skins.html's "⚙️ Round Setup",
+        // which this assertion had never seen because it was written as an escape. That
+        // label opens admin.html - the setup wizard - so it satisfies the RULE stated
+        // above exactly as "⚙️ Edit" does. The regex was narrower than the sentence it
+        // claimed to enforce; the label was never wrong.
         everyConsumerFile((src, f) => {
             (src.match(/\u2699\ufe0f?[^<\n]{0,30}/gu) || []).forEach(m =>
-                assert.match(m, /Settings|Edit/,
-                    `${f}: a gear must mean settings or edit, found: ${m.trim()}`));
+                assert.match(m, /Settings|Edit|Setup/,
+                    `${f}: a gear must mean settings, edit or setup, found: ${m.trim()}`));
         });
         assert.match(ADMIN, /\u2699\ufe0f Format Settings/u);
     });

@@ -238,6 +238,44 @@ Neither half is optional. A defect in hidden static markup is invisible to the
 first; a defect assembled at runtime is invisible to the second. When you add a
 guard for a class of defect, ask which half of that pair you have written.
 
+### A source-level assertion about user-facing text must DECODE first
+
+The rule above is about an escape that reaches raw HTML markup. This is the
+mirror image, and it cost the same defect twice in one week.
+
+A `\uXXXX` escape inside a `<script>` is **legitimate JavaScript**. It resolves,
+the golfer sees the glyph, the page is correct. But a test that slices source
+and matches a regex containing the literal character sees six ASCII characters
+and no match:
+
+```
+raw source,     plain regex   true
+ESCAPED source, plain regex   FALSE
+```
+
+`rattle_icon_system_test.js` went red on a perfectly correct page because the
+bin was written as an escape, and one wave later the Undo row's warning sign was
+written the same way and nothing caught it at all.
+
+**The fix is not a convention about which glyph form to type.** This repo holds
+673 escapes against 330 raw characters inside `<script>` blocks across 11 pages.
+A rule about all 1,003 of them, invented to protect one test, would be fixing
+the wrong thing — and a convention no test enforces is how this happened twice.
+
+**The rule.** Any assertion that reads SOURCE and matches user-facing text runs
+it through `helpers/decode-escapes.js` first, so both forms are equivalent and
+neither can hide anything. `user_facing_copy_test.js` pins the six sentences
+where a silent change actually costs something, and does it that way.
+
+**Do not decode when checking for the markup defect above.** There, decoding
+would make a genuine bug invisible — an escape that prints literally is exactly
+what that scan exists to find.
+
+**And a decoder is not a free pass.** Switching `rattle_icon_system_test.js` to
+decode immediately surfaced two rule violations that escapes had been hiding: a
+retired 🎖️ in `trip.html` and a gear whose label the regex was too narrow to
+accept. A guard that could not see half the file was reporting green on both.
+
 **And escaping is not always the fix.** The recap's eagle line is escaped on the
 card, which is `innerHTML`, and deliberately raw in the share text, which goes to
 the clipboard — escaping there would paste `Mike &amp; Dave` into a group chat.

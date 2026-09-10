@@ -2123,7 +2123,7 @@ html {
 
         // ---- POINTS RACE, only when the trip is running one ----
         if (cachedPointsStandings && cachedPointsStandings.length > 0) {
-            html += '<div class="rc-block"><div class="rc-head">\uD83C\uDF96\uFE0F POINTS RACE</div>';
+            html += '<div class="rc-block"><div class="rc-head">🏆 POINTS RACE</div>';
             cachedPointsStandings.slice(0, 5).forEach(sd => {
                 const pts = sd.points % 1 === 0 ? sd.points : sd.points.toFixed(1);
                 html += '<div class="rc-row"><span class="rc-pos">' + sd.rank + '</span>'
