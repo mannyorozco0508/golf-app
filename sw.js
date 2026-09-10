@@ -523,6 +523,22 @@
 // Moved to v82: every golfer gets a label of their own, and HCP says a handicap.
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
+
+// Moved to v84: the pill states a COUNT and never advises, and a refused course
+// publish says so on Round Ready.
+//
+// v83's pill read "N changes could not be saved. Re-enter and try again." That was
+// true while scores were the only tracked write. admin.html now tracks the course
+// publish too, and there is nothing to re-enter when the shared course list refuses
+// a card - the round is fine and the golfer's own scorecard is untouched. It stays
+// true when events/<code> anti-destruction lands and a refused round DELETE joins
+// the list: nothing was "saved" and nothing was lost, the round is still sitting
+// there. So the pill says "N changes did not go through." and beforeunload says
+// "Some changes did not go through.", and neither gives advice - the surface that
+// knows WHAT failed gives the advice instead.
+//
+// An installed PWA on v83 tells an organizer to re-enter a course card that cannot
+// be re-entered, and shows nothing at all when a publish is refused.
 // pwa-boot.js's track() was `promise.then(settle, settle)` - one handler for both
 // outcomes - so a rejected write decremented the pending counter identically to a
 // successful one and the pill then HID, which in that design is the affirmative claim
@@ -559,7 +575,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v83-a-refused-score-says-so';
+const CACHE_VERSION = 'golfapp-v84-the-pill-counts-and-does-not-advise';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

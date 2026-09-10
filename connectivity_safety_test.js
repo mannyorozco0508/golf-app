@@ -473,8 +473,15 @@ describe('REFUSED WRITES - the pill must not report all-saved after a refusal', 
         assert.ok(pill, 'The pill must exist.');
         assert.notEqual(pill.style.display, 'none',
             'Hiding IS the claim that everything is saved. After a refusal it is a lie.');
-        assert.ok(pill.textContent.length > 0, 'A visible pill with no text says nothing.');
-        assert.match(pill.textContent, /sav|refus/i, 'The pill must say the write did not save.');
+        // THE COUNT AND THE PHRASE, not a two-stem alternation. /sav|refus/i passed
+        // on both the old wording and several rewrites of it, so it could never have
+        // caught a copy regression - which is the whole reason this line exists.
+        assert.match(pill.textContent, /\b1 change did not go through\.$/,
+            'The pill states the COUNT and nothing else. Exact copy, so a rewrite goes red.');
+        assert.doesNotMatch(pill.textContent, /re-?enter|try again/i,
+            'THE PILL NEVER GIVES ADVICE. The right action differs per failure - re-enter a '
+            + 'score, nothing to re-enter for a course publish, and a refused round delete '
+            + 'left the round in place - and the pill cannot know which one it holds.');
     });
 
     test('the failure pill survives a reconnection event', async () => {
@@ -493,8 +500,10 @@ describe('REFUSED WRITES - the pill must not report all-saved after a refusal', 
         await new Promise((r) => setTimeout(r, 5));
         const pill = b.bodyChildren[0];
         assert.notEqual(pill.style.display, 'none');
-        assert.match(pill.textContent, /sav|refus/i,
+        assert.match(pill.textContent, /\b1 change did not go through\.$/,
             'A refusal is not the same as being offline and must not be worded as one.');
+        assert.doesNotMatch(pill.textContent, /offline|waiting to sync/i,
+            'A refused write is final. Wording it as a queue would be the opposite of true.');
     });
 
     test('the pill still says nothing when nothing failed and nothing is pending', () => {
@@ -512,8 +521,12 @@ describe('REFUSED WRITES - the pill must not report all-saved after a refusal', 
         const e = { preventDefault: () => {}, returnValue: undefined };
         const msg = b.api._onBeforeUnload(e);
         assert.ok(msg, 'Leaving with a refused write must warn - today pending is 0 and it says nothing.');
-        assert.match(String(msg), /sav|refus/i);
-        assert.match(String(e.returnValue), /sav|refus/i);
+        assert.equal(String(msg), 'Some changes did not go through.',
+            'Exact copy. "could not be saved" is false for a refused DELETE - nothing was '
+            + 'being saved and nothing was lost; the round is still there.');
+        assert.equal(String(e.returnValue), 'Some changes did not go through.');
+        assert.doesNotMatch(String(msg), /re-?enter|try again|loses them/i,
+            'No advice here either, for the same reason as the pill.');
     });
 
     test('_reset clears the failure count too', async () => {
@@ -523,5 +536,64 @@ describe('REFUSED WRITES - the pill must not report all-saved after a refusal', 
         b.net._reset();
         assert.equal(b.net.state().failed, 0, 'A tracker that cannot be reset makes every later test order-dependent.');
         assert.equal(b.net.state().pending, 0);
+    });
+});
+
+
+// ---------------------------------------------------------------------------
+// THE WORDING ITSELF
+//
+// The pill carries the COUNT. Every surface that knows WHAT failed carries the
+// meaning: the save-state line says "re-enter that hole", Round Ready will say
+// the shared course list did not update. The pill sees a number and nothing
+// else, so any advice it gives is a guess.
+//
+// The forward test is a refused ROUND DELETE, which anti-destruction on
+// events/<code> will add: the golfer asked for something to be REMOVED and was
+// refused, so it still exists. "Re-enter and try again" and "could not be
+// saved" are both false for it. "did not go through" is true of all three.
+// ---------------------------------------------------------------------------
+
+describe('PILL AND UNLOAD WORDING - a count, never advice', () => {
+
+    const rejecting = () => Promise.reject(Object.assign(
+        new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' }));
+
+    test('one failure reads "1 change", two read "2 changes"', async () => {
+        const b = loadBoot({ onLine: true });
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        assert.match(b.bodyChildren[0].textContent, /\b1 change did not go through\.$/);
+        b.net.track(rejecting());
+        await new Promise((r) => setTimeout(r, 5));
+        assert.match(b.bodyChildren[0].textContent, /\b2 changes did not go through\.$/,
+            'The plural has to follow the count, or the one thing the pill DOES say is wrong.');
+    });
+
+    test('no surface in pwa-boot.js tells anyone what to do', () => {
+        // Source-level, because a runtime test only sees the states it happens to
+        // drive. Comments are stripped: they discuss re-entering on purpose.
+        const src = read('pwa-boot.js').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        const strings = src.match(/'[^']*'|"[^"]*"/g) || [];
+        const advice = strings.filter((s) => /re-?enter|try again|loses them/i.test(s));
+        assert.deepEqual(advice, [],
+            'pwa-boot.js must not advise. It holds a number; it does not know what failed.');
+    });
+
+    test('the pill still never claims success', () => {
+        // The rule this file has enforced since it was written, restated against
+        // the new wording so a rewrite cannot quietly reintroduce it.
+        const boot = read('pwa-boot.js');
+        assert.doesNotMatch(boot, /textContent = '[^']*\bSaved\b/);
+        assert.doesNotMatch(boot, /textContent = '[^']*\bSynced\b/);
+    });
+
+    test('the offline wording is untouched by any of this', () => {
+        // A refusal and a queued write need opposite words. Pinning both means a
+        // future edit cannot blur them into one sentence.
+        const b = loadBoot({ onLine: false });
+        b.net.track(new Promise(() => {}));
+        assert.match(b.bodyChildren[0].textContent, /2 changes waiting to sync|1 change waiting to sync/);
+        assert.match(b.bodyChildren[0].textContent, /Offline/);
     });
 });

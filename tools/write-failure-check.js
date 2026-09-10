@@ -189,10 +189,27 @@ function preScript(mode) {
     })();`;
 }
 
-// Wording a fix might reasonably use. Deliberately broad: this check must not
-// depend on copy that has not been written yet - it asks whether ANYTHING on
-// screen tells the golfer the write failed.
+// WAS DELIBERATELY BROAD, AND THAT WAS A MISTAKE ONCE THE COPY EXISTED. The old
+// alternation included "try again", so it kept passing straight through a pill
+// rewrite from "could not be saved. Re-enter and try again." to "did not go
+// through." - a regex loose enough to survive a copy change is a regex that
+// cannot catch a copy regression.
+//
+// Now each surface is pinned to ITS OWN copy, because they say different things
+// on purpose:
+//   the pill        carries the COUNT and never advises
+//   the save-state  says which action failed and what to do about it
+// FAIL_RE stays broad ONLY for the "is there anything at all on screen" sweep,
+// which is a floor, not the assertion.
 const FAIL_RE = /(could ?n.?t save|could not save|not saved|failed to save|save failed|did ?n.?t save|couldn.t be saved|permission|denied|try again|re-?enter)/i;
+
+// The pill: count, no advice. Exact, so a rewrite goes red here too.
+const PILL_RE = /\b\d+ changes? did not go through\.$/;
+const PILL_ADVICE_RE = /re-?enter|try again/i;
+
+// The save-state line, ported verbatim from tournament-scorecard.html. Two
+// anchors rather than the whole sentence, so the em dash is not load-bearing.
+const SAVE_STATE_SAYS = [/could not save/i, /re-?enter that hole/i];
 
 const PROBE = `
 (() => {
@@ -334,9 +351,25 @@ async function arm(mode) {
     // save-state line the golfer is actually looking at ever rendered.
     if (!reject.saveState.present) {
         failures.push('#save-state is not in the page at all');
-    } else if (!FAIL_RE.test(reject.saveState.text)) {
-        failures.push('#save-state did not report the refusal: class="'
-            + reject.saveState.cls + '" text="' + reject.saveState.text + '"');
+    } else {
+        SAVE_STATE_SAYS.forEach((re) => {
+            if (!re.test(reject.saveState.text)) {
+                failures.push('#save-state does not carry ' + re + ' - text="'
+                    + reject.saveState.text + '"');
+            }
+        });
+    }
+    // THE PILL, pinned to its own copy and to the absence of advice. Without
+    // this the tool passes on the save-state line alone and says nothing about
+    // whether the pill still tells a golfer to re-enter a course publish.
+    if (reject.pill.present) {
+        if (!PILL_RE.test(reject.pill.text)) {
+            failures.push('the pill does not state the count: text="' + reject.pill.text + '"');
+        }
+        if (PILL_ADVICE_RE.test(reject.pill.text)) {
+            failures.push('THE PILL IS GIVING ADVICE: "' + reject.pill.text + '" - it holds a '
+                + 'number and cannot know whether re-entering is the right action');
+        }
     }
     if (resolve.saveState.present && /could not save/i.test(resolve.saveState.text)) {
         failures.push('CONTROL: #save-state reports a failure on a round whose writes succeeded');

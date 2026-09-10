@@ -222,8 +222,15 @@
                 el.style.display = 'block';
                 el.style.background = '#fdecea';
                 el.style.color = '#8a1c12';
+                // THE COUNT, AND NOTHING ELSE. No advice, ever. The right action
+                // differs per failure - re-enter a score, nothing to re-enter for a
+                // refused course publish, and a refused round DELETE leaves the round
+                // sitting there - and this counter cannot know which it is holding.
+                // Every surface that knows WHAT failed says what to do about it:
+                // index.html's save-state line names the hole, admin.html's Round
+                // Ready note names the shared course list.
                 el.textContent = '\uD83D\uDD34 ' + s.failed + ' change' + (s.failed === 1 ? '' : 's')
-                    + ' could not be saved. Re-enter and try again.';
+                    + ' did not go through.';
             } else if (!s.online && s.pending > 0) {
                 el.style.display = 'block';
                 el.style.background = '#fff4d6';
@@ -261,8 +268,11 @@
         // already gone and leaving is the moment the golfer stops being able to
         // re-enter it. Reading only `pending` meant the one state that is
         // permanently lost was the one state that raised no warning.
+        // "could not be saved" and "loses them" are both false for a refused
+        // DELETE: nothing was being saved, and nothing was lost - the round is
+        // still there. This wording is true of all three failures.
         var msg = failed > 0
-            ? 'Some changes could not be saved. Leaving now loses them - re-enter them first.'
+            ? 'Some changes did not go through.'
             : 'Changes are still waiting to sync. Leaving now may lose them.';
         if (e && typeof e.preventDefault === 'function') e.preventDefault();
         if (e) e.returnValue = msg;

@@ -1300,6 +1300,16 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     <div class="lobby-title">Round Ready</div>
     <p id="rr-course-sub" style="text-align:center; color:var(--text-muted); font-size:0.95rem; margin-bottom:20px;"></p>
 
+    <!-- STATIC, and that is the whole guarantee. renderRoundReady writes only
+         into rr-course-sub, rr-players-list, rr-scoring-text, rr-action-text and
+         the two action boxes' display - it never touches
+         #round-ready-screen.innerHTML, so this sibling is never wiped. -->
+    <div id="rr-course-publish-note" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-red); border-radius:8px; padding:10px 14px; margin-bottom:14px; text-align:left;">
+        <div style="font-size:0.72rem; text-transform:uppercase; font-weight:bold; color:var(--accent-red); margin-bottom:4px;">Course not shared</div>
+        <div style="font-size:0.88rem; color:var(--text-main); line-height:1.5;">Your round is ready and uses the card you entered. This round is not affected.</div>
+        <div style="font-size:0.88rem; color:var(--text-muted); line-height:1.5; margin-top:4px;">The shared course list did not update, so other groups won't get your version of this course.</div>
+    </div>
+
     <div id="rr-players-box" class="wizard-review-row" style="flex-direction:column; align-items:stretch; margin-bottom:14px;">
         <span class="wr-label" style="margin-bottom:6px;">Players</span>
         <div id="rr-players-list" style="font-size:0.9rem; line-height:1.6;"></div>
@@ -1581,6 +1591,35 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // (saveSettings redirected straight into the live scorecard with zero confirmation and no
     // chance to add a side bet first). Reuses the exact same field names/defaults the Step 7
     // review and Bets pages already use — no new data model, this is purely a summary view.
+    // THE COURSE PUBLISH FAILED, AND THE ROUND DID NOT.
+    //
+    // Two facts, and the reassuring one goes first: an organizer reading any
+    // warning on Round Ready asks "is my round broken" before anything else.
+    //
+    // WHY A FLAG AND A RENDERER, NOT JUST ONE OF THEM. The publish is issued
+    // ~280 lines before the round save, and its rejection can land on either
+    // side of Round Ready appearing:
+    //   rejects FIRST  -> the element exists but the screen is display:none and
+    //                     renderRoundReady has not run yet
+    //   rejects SECOND -> the screen is already rendered and nothing re-renders
+    // So the catch sets the flag AND calls this, and renderRoundReady calls it
+    // again at the end. It is idempotent, so either ordering shows it once.
+    //
+    // THE RYDER PATH GETS NOTHING, AND THIS IS NOT COVERAGE.
+    // When creatingRyderCup is set, saveSettings navigates to
+    // sidematches.html?setup=ryder instead of showing Round Ready. A page
+    // navigation tears down GolfNet with the document, so the Cup organizer
+    // loses BOTH this note and the pill: a refused publish on that path is as
+    // silent as it was before this change. That gap is known and unfixed. Do
+    // not read the note's existence as covering it.
+    let coursePublishRefused = false;
+    function renderCoursePublishNote() {
+        if (!coursePublishRefused) return;
+        const el = document.getElementById('rr-course-publish-note');
+        if (!el) return;
+        el.style.display = 'block';
+    }
+
     function showRoundReadyScreen(modeKey) {
         document.getElementById('lobby-screen').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'none';
@@ -1658,6 +1697,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 : '\uD83D\uDCB0 SIDE BETS';
         }
         document.getElementById('rr-action-text').innerHTML = actionLines.map(l => `<div>${l}</div>`).join('');
+
+        // Last, so it survives everything this function rewrote above. See
+        // renderCoursePublishNote for why it is called from here AND the catch.
+        renderCoursePublishNote();
     }
 
     function startScoring() {
@@ -5027,9 +5070,28 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // the course's name WITHOUT the round-length suffix. A group playing the
             // back nine must not shorten or rename the course for everyone else.
             if (preview.isEditing) {
-                db.ref(`global_courses/${courseKey}`).set({
+                // A BARE .set() UNTIL NOW. Nothing observed this promise, so when the
+                // deployed Tier-B rules refused a card the round saved normally, the
+                // organizer was handed Round Ready, and nothing anywhere said the
+                // shared list had not updated. The next group to pick that course
+                // silently got the old card.
+                //
+                // THE ROUND IS NEVER BLOCKED BY THIS. finalCourseData is already
+                // taken from preview.data locally, so a refused publish costs the
+                // shared database an update and costs this round nothing. That is
+                // why this stays fire-and-forget and only ever ADDS a note.
+                const publishPromise = db.ref(`global_courses/${courseKey}`).set({
                     name: selectedCourseName,
                     data: preview.untrimmed
+                });
+                // The page-wide pill, so it stops claiming everything saved. It
+                // carries a COUNT and no advice; the note below says what happened.
+                if (window.GolfNet && typeof window.GolfNet.track === 'function') {
+                    window.GolfNet.track(publishPromise);
+                }
+                publishPromise.catch(() => {
+                    coursePublishRefused = true;
+                    renderCoursePublishNote();
                 });
             }
             if (preview.courseNameOverride !== null) selectedCourseName = preview.courseNameOverride;
