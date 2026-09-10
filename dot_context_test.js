@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v91-a-trip-code-is-no-longer-a-master-key';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v92-one-sentence-says-what-the-money-is';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });

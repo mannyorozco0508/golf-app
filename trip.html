@@ -195,6 +195,11 @@
         .rc-award { display: flex; gap: 8px; padding: 3px 0; font-size: 0.82rem; }
         .rc-award-name { font-weight: 600; }
         .rc-detail { font-size: 0.72rem; opacity: 0.8; }
+        /* Matches .rc-detail, the card's established secondary size. It was 0.62rem
+           and that made the one sentence explaining the money the SMALLEST text on
+           the card - the same defect as burying the true sentence in the smallest
+           type on the panel, which is what this whole wave is about. */
+        .rc-scope { font-size: 0.72rem; opacity: 0.75; line-height: 1.3; margin-top: 6px; }
         .rc-none { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
         .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
         .rc-foot { font-size: 0.66rem; opacity: 0.75; text-align: center; margin-top: 10px; font-weight: 600; }
@@ -406,7 +411,7 @@ html {
     <details class="trip-section">
         <summary>💵 Trip Money Settlement</summary>
         <div class="trip-section-body">
-            <p class="trip-section-sub">Nets every linked round's main-format bet into one final "who pays who" list. Settle up for real over Venmo — this is just the math.</p>
+            <p class="trip-section-sub">Settle up for real over Venmo — this is just the math.</p>
             <div id="trip-money-settlement"></div>
         </div>
     </details>
@@ -1565,9 +1570,19 @@ html {
         container.innerHTML = html;
     }
 
-    // Nets every linked round's main-format money result per player (via the shared
-    // computeRoundMoneyByPlayer engine), sums across the whole trip matched by name,
-    // then runs debt simplification into one minimal "who pays who" list.
+    // Nets every linked round's COMBINED money result per player - via
+    // computeCombinedNetTotals, the same engine each round's own Results page uses -
+    // sums across the whole trip matched by name, then runs debt simplification into
+    // one minimal "who pays who" list.
+    //
+    // THIS COMMENT USED TO SAY "main-format money result ... via the shared
+    // computeRoundMoneyByPlayer engine". Both halves were wrong, and it sat three
+    // lines above the comment explaining that exact claim was a lie. A reader who
+    // stopped after the first sentence got the wrong model of what the trip counts,
+    // and those were the first three lines above the function.
+    // computeRoundMoneyByPlayer is still called, for the format LABEL only - it no
+    // longer decides what money is counted, which the code below says at its own
+    // call site.
     // WHAT THE TRIP TOTAL ACTUALLY CONTAINS.
     //
     // The card used to end by claiming it counted the main format only, and that
@@ -1589,6 +1604,36 @@ html {
         'the main game', 'side games', 'side matches and presses',
         'the Birdie Pool', 'KPs', 'the Main Pool'
     ];
+
+    // THE ONLY THING IN THIS FILE THAT MAY PRODUCE A SENTENCE ABOUT WHAT THE
+    // TOTAL CONTAINS.
+    //
+    // The same lie has been written here TWICE. First the panel's footer claimed
+    // the total held main-format bets ONLY and that side games, side matches and
+    // one-off side bets were still to come. That was false, and it made a group
+    // settle their side matches a second time on top of a total that already held
+    // them. It was fixed by building the footer from the list above. Then THE LIE
+    // MOVED: the section header went on saying the total was every linked round's
+    // main-format bet, a static <p> in markup the guard could not reach.
+    //
+    // THE HISTORICAL WORDING IS PARAPHRASED HERE ON PURPOSE, not quoted.
+    // trip_money_truth_test.js blacklists that exact string against the RAW file
+    // and does not strip comments, so quoting the lie in the comment that explains
+    // the lie fails the suite. Worth knowing before someone pastes it back in - and
+    // worth noting as the same brittleness this builder exists to replace.
+    //
+    // A second string that happens to be correct today is the same defect
+    // waiting, so there is now exactly one. trip_money_scope_test.js refuses
+    // ANY money-scope prose in this page's markup, which makes a hand-written
+    // second copy impossible rather than merely absent, and
+    // tools/trip-money-scope-check.js asserts every surface that shows a trip
+    // total renders THIS function's output - so a new surface fails until it
+    // carries the sentence, and changing the wording here changes it
+    // everywhere at once.
+    function tripTotalScopeSentence() {
+        return 'Includes ' + TRIP_TOTAL_INCLUDES.slice(0, -1).join(', ')
+            + ' and ' + TRIP_TOTAL_INCLUDES[TRIP_TOTAL_INCLUDES.length - 1] + '.';
+    }
 
     // NAMES ARE THE ONLY THING THAT CROSSES ROUNDS, and the trip total is built by
     // matching on them. Two golfers called Mike Dunne therefore become ONE balance:
@@ -1918,7 +1963,7 @@ html {
         });
         html += `</div>`;
 
-        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">Includes ${TRIP_TOTAL_INCLUDES.slice(0, -1).join(', ')} and ${TRIP_TOTAL_INCLUDES[TRIP_TOTAL_INCLUDES.length - 1]}.</div>`;
+        html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:4px 0 0;">${tripTotalScopeSentence()}</div>`;
 
         container.innerHTML = html;
     }
@@ -2449,6 +2494,11 @@ html {
         if (!cachedTripSettled) {
             html += '<div class="rc-warn">\u26A0\uFE0F Not final \u2014 some rounds still have unconfirmed results.</div>';
         }
+        // THE CARD IS THE IMAGE THAT GETS SCREENSHOTTED, and it was SILENT about
+        // what the figure contains - neither the lie nor the truth. Same sentence
+        // as the panel, from the same builder, so the screenshot cannot say
+        // something the screen does not.
+        html += '<div class="rc-scope">' + esc(tripTotalScopeSentence()) + '</div>';
         html += '</div>';
 
         // ---- POINTS RACE, only when the trip is running one ----
@@ -2568,6 +2618,10 @@ html {
         } else {
             cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
         }
+        // THE PASTE IS WHAT PEOPLE SETTLE FROM, and it said nothing at all about
+        // what the figure contains. Same sentence, same builder. Raw, not escaped:
+        // this goes on the clipboard, where an entity would paste literally.
+        text += `${tripTotalScopeSentence()}\n`;
 
         if (cachedPointsStandings && cachedPointsStandings.length > 0) {
             text += `\n🏆 POINTS RACE\n`;

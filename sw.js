@@ -524,6 +524,14 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v92: one sentence says what the trip money is, and every surface that
+// shows the money renders THAT one. The panel's header said the total was "every
+// linked round's main-format bet" while the total contains side matches, presses,
+// the Birdie Pool, KPs and the Main Pool - a group reading it settles their side
+// matches a second time on top of a total that already holds them. The recap card
+// and the pasted share text, which are what people actually settle from, said
+// nothing at all. An installed device without this bump keeps serving the version
+// that invites paying twice.
 // Moved to v91: a trip code is no longer a master key. Anyone holding the six
 // characters could remove rounds, change what counts toward the money total, and
 // add rounds to somebody else's trip - and the recap card prints that code on the
@@ -670,7 +678,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v91-a-trip-code-is-no-longer-a-master-key';
+const CACHE_VERSION = 'golfapp-v92-one-sentence-says-what-the-money-is';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
