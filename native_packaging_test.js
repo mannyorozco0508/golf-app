@@ -167,6 +167,13 @@ describe('THE OFFLINE STORY STAYS HONEST IN NATIVE', () => {
     const boot = read('pwa-boot.js');
 
     test('a failed write is never shown as saved', () => {
+        // TRAP - DO NOT CONVERT THIS FILE TO decodeEscapes WITHOUT REWRITING THIS
+        // PATTERN. It matches the LITERAL escape text in pwa-boot.js source, not
+        // the character. Measured: against raw source this passes; against decoded
+        // source it returns FALSE, so adding the decoder here turns a passing test
+        // red on correct code. If this file is ever converted, this line becomes
+        // /Offline \u2014 keep this page open/ with a real em dash. See CLAUDE.md,
+        // "must DECODE first" - this is the exception it warns exists.
         assert.match(boot, /Offline \\u2014 keep this page open/);
         // Comments stripped: the file explains at length that it never says "Saved"
         // or "Synced", and matching that prose is not the same as matching output.

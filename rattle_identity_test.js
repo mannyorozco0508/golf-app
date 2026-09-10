@@ -30,7 +30,15 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+const { decodeEscapes } = require('./helpers/decode-escapes.js');
+
+// DECODES BEFORE MATCHING, and the negative assertions below are why. A \uXXXX
+// escape inside a <script> is legitimate JavaScript that resolves at runtime, so
+// "this forbidden glyph is absent" was trivially true of a glyph written as an
+// escape - which is exactly how a retired icon survived in trip.html. Do not
+// revert this to a plain read: it would make every `assert.ok(!/glyph/...)` in
+// this file blind again. See CLAUDE.md, "must DECODE first".
+const read = f => decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 const exists = f => fs.existsSync(path.join(__dirname, f));
 
 const CAP = read('capacitor.config.ts');
