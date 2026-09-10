@@ -101,16 +101,19 @@ html {
         <a href="#side-games">Side Games</a>
         <a href="#side-matches">Side Matches</a>
         <a href="#money">Settling Up</a>
+        <a href="#offline">Signal</a>
+        <a href="#trips">Road Trip</a>
     </div>
 
     <section id="getting-started">
         <h2>🏌️ Getting Started</h2>
-        <p class="section-sub">Every round lives behind a 4-character game code — no accounts, no sign-ups.</p>
+        <p class="section-sub">Every round lives behind a 6-character game code — no accounts, no sign-ups.</p>
         <ol class="step-list">
-            <li><strong>Start New Game</strong> on the Home screen if you're setting up the round. You'll pick a course, a format, and add your players.</li>
-            <li><strong>Join Game</strong> if someone already made the room — just type in the 4-character code they sent you.</li>
+            <li>Home opens on two tiles. Tap <strong>Game Day</strong> — “Playing today? Set up in seconds” — if you're setting up a round today. You'll pick a course, a format, and add your players.</li>
+            <li>Tap <strong>Road Trip</strong> for several rounds tied together across days, with one running leaderboard and one money settlement. There's a section on that below.</li>
+            <li>Joining a round somebody else made? Type the 6-character code they sent you into the code box on Home.</li>
             <li>Once a round is saved, everyone taps between <strong>Scorecard, Leaderboard, Action, Matches, Stats,</strong> and <strong>Settle</strong> using the nav bar at the top of every page.</li>
-            <li>Your device remembers your last game — if you close the app and come back, Home will offer a <strong>Resume Game</strong> shortcut.</li>
+            <li>Your device remembers your last game — if you close the app and come back, Home offers a <strong>Resume</strong> shortcut with the code on it.</li>
         </ol>
     </section>
 
@@ -120,10 +123,6 @@ html {
         <div class="info-card">
             <div class="i-name">📱 Group Scorekeeper Links</div>
             <div class="i-desc">Each group gets its own link from the Home screen after you save the round. Send <strong>only</strong> that link to that foursome — it lets them enter scores for their own group and shows everyone else read-only.</div>
-        </div>
-        <div class="info-card">
-            <div class="i-name">👁️ Spectator / Invite Link</div>
-            <div class="i-desc">The QR code and "Copy Invite Link" button on Home give out a link where scores are always read-only. Good for a spouse, a group text, or anyone just watching along — and it's the only link you need if there's just one group of 4 or fewer.</div>
         </div>
     </section>
 
@@ -206,7 +205,57 @@ html {
         </div>
         <div class="info-card">
             <div class="i-name">💰 Settle</div>
-            <div class="i-desc">The final money ledger for the round's main format and side games — who owes who, ready to Venmo.</div>
+            <div class="i-desc">The final money ledger for the round — main format, side games <em>and</em> Side Matches — who owes who, ready to Venmo. Every line it pays is itemised on the page, so you can see exactly where each figure came from.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🧾 Receipt</div>
+            <div class="i-desc">One document with the money, every match and press, and the full scorecard. Reached from the foot of <strong>Stats</strong> or from the <strong>Finish Round</strong> panel. This is the one the group keeps — send it when somebody questions a number.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🗑️ Delete round for everyone</div>
+            <div class="i-desc"><strong>You do not need to delete a round when you finish playing.</strong> Scores save as you enter them and the round simply ends. This control erases every score for everyone in the round, it cannot be undone, and it is there only for a round set up by mistake. It appears on the organizer's own link, not on a group scorekeeper link, and the server refuses it outright once any score has been entered. The wording is that blunt on purpose: an earlier, gentler label read to a playing partner as “finish my card”, and a live round was wiped at the turn.</div>
+        </div>
+    </section>
+
+    <section id="offline">
+        <h2>📶 When the Signal Drops</h2>
+        <p class="section-sub">Half of most courses has no bars. The app is built for that, but two behaviours surprise people.</p>
+        <div class="info-card">
+            <div class="i-name">⏳ The save banner</div>
+            <div class="i-desc">If something did not reach the database you'll see a small banner with a count of changes that did not go through. It states the number and nothing else — deliberately, because the right thing to do differs by case and a banner cannot know which one you're in. Re-enter the hole it names once you have signal.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🚫 Bets are refused offline, not queued</div>
+            <div class="i-desc">A press, a KP, a Wolf call, a new Side Match — anything that creates money — is <strong>refused outright while you're offline</strong> rather than saved up to send later. That is on purpose. A score can be re-entered from the card in your pocket; a $78 press struck on the 7th tee cannot be reconstructed by anybody. So the app would rather tell you now than lose it quietly. Scores themselves keep working normally.</div>
+        </div>
+    </section>
+
+    <section id="trips">
+        <h2>🚐 Road Trip</h2>
+        <p class="section-sub">Several rounds tied together — Myrtle, Bandon, a member-guest weekend. One running leaderboard, one points race, one money settlement across every day.</p>
+        <div class="info-card">
+            <div class="i-name">🔗 Two links, and they are not the same</div>
+            <div class="i-desc">The <strong>Share Trip Link</strong> is the one for the group — everybody can watch the standings, the money and the recap. The <strong>Organizer Link</strong> is the one that can add and remove rounds and set what counts toward the money. Keep that one private; send the other. Everyone can follow a trip, only the organizer can change it.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🏆 Cumulative Leaderboard, and the line partway down it</div>
+            <div class="i-desc">Totals across every linked round, matched by name. Anyone who played fewer rounds than the rest sits below a line and is <strong>not ranked</strong> — their totals are real, but a position next to them would not be. A trip total is strokes added together, so a shorter week is a smaller number, and without that line the golfer who turned up least would win.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🥇 Points Race</div>
+            <div class="i-desc">This is the trip competition. Each round awards points by where you finished that day on net, scaled to how many played, so missing a day costs you. Points post only once a round is fully finished — a card still in progress does not count yet.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">💵 Trip Money Settlement</div>
+            <div class="i-desc">Nets every counted round into one “who pays who” list for the whole trip. The panel ends with a line spelling out exactly which games and bets are in that figure — read it there rather than here, so it can never drift out of step with what the app actually counts. Settle up for real over Venmo; the app is just the math.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">🚫 Leaving a round out</div>
+            <div class="i-desc">Each round in the trip has a toggle for whether it counts toward the trip totals. Use it for a practice round, a scramble, or a day rained out halfway — the round stays scoreable and settles on its own, it just stops feeding the trip's leaderboard, money, points and awards.</div>
+        </div>
+        <div class="info-card">
+            <div class="i-name">📸 Trip Recap Card</div>
+            <div class="i-desc">A card built for a screenshot, plus <strong>Share as Text</strong> for pasting into the group chat. Both carry the standings, the settlement and the awards.</div>
         </div>
     </section>
 

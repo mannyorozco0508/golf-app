@@ -524,6 +524,13 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v93: the guide describes the app that exists. instructions.html told
+// golfers to tap "Start New Game", "Join Game" and a "Copy Invite Link" button -
+// none of which exist - described a QR Consumer removed, called codes
+// 4-character when they are 6, and said the Settle page counts "main format and
+// side games" on a page that pays Side Matches. It had no section on Road Trip at
+// all. An installed device without this bump keeps serving a how-to for a
+// different app.
 // Moved to v92: one sentence says what the trip money is, and every surface that
 // shows the money renders THAT one. The panel's header said the total was "every
 // linked round's main-format bet" while the total contains side matches, presses,
@@ -678,7 +685,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v92-one-sentence-says-what-the-money-is';
+const CACHE_VERSION = 'golfapp-v93-the-guide-describes-the-app-that-exists';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
