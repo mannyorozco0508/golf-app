@@ -1,0 +1,3327 @@
+{
+ "az_talking_oodham": {
+  "data": [
+   {
+    "hcpIndex": 15,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 17,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Talking Stick Golf Club (O'odham)"
+ },
+ "az_talking_piipaash": {
+  "data": [
+   {
+    "hcpIndex": 13,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 14,
+    "par": 5
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Talking Stick Golf Club (Piipaash)"
+ },
+ "az_tpc_champions": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "TPC Scottsdale (Champions)"
+ },
+ "az_tpc_stadium": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 5
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 7,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "TPC Scottsdale (Stadium)"
+ },
+ "az_wekopa_cholla": {
+  "data": [
+   {
+    "hcpIndex": 5,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 5,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 8,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 17,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "We-Ko-Pa Golf Club (Cholla)"
+ },
+ "caledonia": {
+  "data": [
+   {
+    "hcpIndex": 12,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 8,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Caledonia Golf & Fish Club"
+ },
+ "eaglespride_27": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 3,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 6,
+    "par": 5
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Eagle's Pride (Pick 2 Nines)"
+ },
+ "eaglespride_redblue": {
+  "data": [
+   {
+    "hcpIndex": 7,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 6,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Eagle's Pride (Red/Blue)"
+ },
+ "eaglespride_redgreen": {
+  "data": [
+   {
+    "hcpIndex": 7,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 6,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 14,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Eagle's Pride (Red/Green)"
+ },
+ "emerald_hills": {
+  "data": [
+   {
+    "hcpIndex": 11,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 5,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 12,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "The Club at Emerald Hills"
+ },
+ "grassyhill": {
+  "data": [
+   {
+    "hcpIndex": 5,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 5,
+    "par": 5
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Grassy Hill Country Club"
+ },
+ "hollywood_beach": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Hollywood Beach Golf Club"
+ },
+ "manofwar": {
+  "data": [
+   {
+    "hcpIndex": 3,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 8,
+    "par": 5
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Man O' War Golf Club"
+ },
+ "oaklane": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 14,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 17,
+    "par": 5
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Tradition at Oak Lane"
+ },
+ "or_glendoveer_east": {
+  "data": [
+   {
+    "hcpIndex": 5,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 17,
+    "par": 5
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Glendoveer Golf Course (East)"
+ },
+ "or_glendoveer_west": {
+  "data": [
+   {
+    "hcpIndex": 15,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Glendoveer Golf Course (West)"
+ },
+ "or_indiancreek": {
+  "data": [
+   {
+    "hcpIndex": 3,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 5,
+    "par": 3
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 10,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 11,
+    "par": 5
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Indian Creek Golf Course"
+ },
+ "or_reserve_south": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "The Reserve Vineyards (South)"
+ },
+ "or_stonecreek": {
+  "data": [
+   {
+    "hcpIndex": 8,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 8,
+    "par": 5
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 11,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Stone Creek Golf Club"
+ },
+ "or_wildwood": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Wildwood Golf Course"
+ },
+ "orangehills": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 10,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 11,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Orange Hills Country Club"
+ },
+ "pinehills": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 5
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Myrtlewood - Pine Hills"
+ },
+ "pinelakes": {
+  "data": [
+   {
+    "hcpIndex": 15,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 5,
+    "par": 5
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Pine Lakes Country Club"
+ },
+ "prestwick": {
+  "data": [
+   {
+    "hcpIndex": 13,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 7,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 11,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Prestwick Country Club"
+ },
+ "swwa_camasmeadows": {
+  "data": [
+   {
+    "hcpIndex": 7,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 12,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Camas Meadows Golf Club"
+ },
+ "swwa_elkridge": {
+  "data": [
+   {
+    "hcpIndex": 7,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Elk Ridge Golf Course"
+ },
+ "swwa_lewisriver": {
+  "data": [
+   {
+    "hcpIndex": 15,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 5,
+    "par": 5
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 7,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 12,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Lewis River Golf Course"
+ },
+ "swwa_mintvalley": {
+  "data": [
+   {
+    "hcpIndex": 3,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 12,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Mint Valley Golf Course"
+ },
+ "swwa_tahoma_valley": {
+  "data": [
+   {
+    "hcpIndex": 4,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 2,
+    "par": 5
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 12,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Tahoma Valley Golf Course (Yelm)"
+ },
+ "swwa_threerivers": {
+  "data": [
+   {
+    "hcpIndex": 9,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 5,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Three Rivers Golf Course"
+ },
+ "swwa_trimountain": {
+  "data": [
+   {
+    "hcpIndex": 3,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 6,
+    "par": 3
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Tri-Mountain Golf Course"
+ },
+ "trueblue": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 7,
+    "par": 3
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 9,
+    "par": 5
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 11,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 14,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 15,
+    "par": 5
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 16,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "True Blue Golf Club"
+ },
+ "wa_allenmore": {
+  "data": [
+   {
+    "hcpIndex": 1,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 4,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 8,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 13,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 17,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Allenmore Golf Course"
+ },
+ "wa_chambers": {
+  "data": [
+   {
+    "hcpIndex": 3,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 3,
+    "par": 3
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 4,
+    "par": 5
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 7,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 7,
+    "par": 4
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 8,
+    "par": 5
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 9,
+    "par": 3
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 10,
+    "par": 4
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 13,
+    "par": 5
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 15,
+    "par": 3
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 16,
+    "par": 4
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 18,
+    "par": 5
+   }
+  ],
+  "name": "Chambers Bay"
+ },
+ "wa_meadow_park": {
+  "data": [
+   {
+    "hcpIndex": 7,
+    "hole": 1,
+    "par": 4
+   },
+   {
+    "hcpIndex": 15,
+    "hole": 2,
+    "par": 4
+   },
+   {
+    "hcpIndex": 1,
+    "hole": 3,
+    "par": 4
+   },
+   {
+    "hcpIndex": 5,
+    "hole": 4,
+    "par": 3
+   },
+   {
+    "hcpIndex": 17,
+    "hole": 5,
+    "par": 4
+   },
+   {
+    "hcpIndex": 11,
+    "hole": 6,
+    "par": 4
+   },
+   {
+    "hcpIndex": 9,
+    "hole": 7,
+    "par": 5
+   },
+   {
+    "hcpIndex": 13,
+    "hole": 8,
+    "par": 3
+   },
+   {
+    "hcpIndex": 3,
+    "hole": 9,
+    "par": 4
+   },
+   {
+    "hcpIndex": 10,
+    "hole": 10,
+    "par": 5
+   },
+   {
+    "hcpIndex": 6,
+    "hole": 11,
+    "par": 4
+   },
+   {
+    "hcpIndex": 4,
+    "hole": 12,
+    "par": 4
+   },
+   {
+    "hcpIndex": 12,
+    "hole": 13,
+    "par": 3
+   },
+   {
+    "hcpIndex": 2,
+    "hole": 14,
+    "par": 4
+   },
+   {
+    "hcpIndex": 18,
+    "hole": 15,
+    "par": 4
+   },
+   {
+    "hcpIndex": 14,
+    "hole": 16,
+    "par": 5
+   },
+   {
+    "hcpIndex": 16,
+    "hole": 17,
+    "par": 3
+   },
+   {
+    "hcpIndex": 8,
+    "hole": 18,
+    "par": 4
+   }
+  ],
+  "name": "Meadow Park"
+ }
+}

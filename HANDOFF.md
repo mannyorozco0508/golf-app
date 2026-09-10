@@ -142,6 +142,43 @@ What they don't: `events/$eventCode` is still `.read: true, .write: true`, so an
 
 **Deploying the rules immediately surfaced a latent bug** — `wolfLoneMult` and `wolfBlindMult` were written as strings while every other numeric field was `parseFloat`'d, so every round save was rejected with PERMISSION_DENIED. If a save starts failing after a rules change, look for a type mismatch first.
 
+### The repo file and the live rules are NOT the same right now
+
+The heading above says DEPLOYED and that is true of everything except
+`global_courses`. The Tier-B validation below is **written in `database.rules.json`
+and not yet deployed**, so the live database still accepts what Tier-B refuses.
+Do not read this section as a description of production until that deploy runs
+and `global_courses_rules_test.js` has been checked against the live node rather
+than against targaryen.
+
+**Tier-B, what it added.** `global_courses/$courseId` now requires `name` and
+`data`, a non-empty `name` of at most 120 characters, exactly eighteen holes at
+indices `0`–`17`, and every hole to carry `hole` 1–18, `par` 3–6 and `hcpIndex`
+1–18. `.write` is unchanged at `newData.exists()`, so a course still cannot be
+deleted. **The eighteen is deliberate**: the only publishing path is
+`validateCourseGrid()` in `admin.html`, which builds exactly 18 rows, so a
+nine-hole course could never be published anyway. Changing that is a decision,
+not a patch.
+
+**What Tier-B deliberately does NOT stop, measured rather than assumed.**
+Replacing a real course with eighteen par-3s is *allowed*, and always will be —
+every field in that payload is individually valid, and RTDB rules validate
+fields, not truth. Uniqueness is not expressible either, so a duplicate
+`hcpIndex` passes; `hollywood_beach` in the live database already carries
+`hcpIndex` 9 on both hole 1 and hole 18, and today's `validateCourseGrid()`
+would refuse to re-save it. The real exposure — an anonymous client writing a
+well-formed lie — needs the Worker, not a rule.
+
+**`newData.isNumber()` on `par` fires on nothing today, and is not one of the
+ten guards.** Removing it changes the outcome in 0 of 4 cases: the string `"4"`,
+boolean `true`, `null` and a nested object are *all* already refused by the
+range comparison, because a type-mismatched comparison evaluates false in RTDB
+rules. It is kept to state the intent and to become the only guard if the range
+is ever loosened. Do not count it when counting what protects this node, and do
+not "prove" it with a control — it is inert on purpose. The same sentence could
+not be written into `database.rules.json` itself: seven test files `JSON.parse`
+that file, and a `//` comment makes it throw.
+
 ## Course data
 
 `course-data.js` holds a searchable directory of 141 courses. Only 26 have local hole data; the rest rely on Firebase `global_courses`, which any golfer can extend by mapping a course once — it then works for everyone, forever.

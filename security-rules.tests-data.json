@@ -211,7 +211,98 @@
           "auth": "nobody",
           "data": {
             "name": "Pebble Beach Updated",
-            "data": []
+            "data": [
+              {
+                "hole": 1,
+                "par": 4,
+                "hcpIndex": 1
+              },
+              {
+                "hole": 2,
+                "par": 4,
+                "hcpIndex": 2
+              },
+              {
+                "hole": 3,
+                "par": 4,
+                "hcpIndex": 3
+              },
+              {
+                "hole": 4,
+                "par": 4,
+                "hcpIndex": 4
+              },
+              {
+                "hole": 5,
+                "par": 4,
+                "hcpIndex": 5
+              },
+              {
+                "hole": 6,
+                "par": 4,
+                "hcpIndex": 6
+              },
+              {
+                "hole": 7,
+                "par": 4,
+                "hcpIndex": 7
+              },
+              {
+                "hole": 8,
+                "par": 4,
+                "hcpIndex": 8
+              },
+              {
+                "hole": 9,
+                "par": 4,
+                "hcpIndex": 9
+              },
+              {
+                "hole": 10,
+                "par": 4,
+                "hcpIndex": 10
+              },
+              {
+                "hole": 11,
+                "par": 4,
+                "hcpIndex": 11
+              },
+              {
+                "hole": 12,
+                "par": 4,
+                "hcpIndex": 12
+              },
+              {
+                "hole": 13,
+                "par": 4,
+                "hcpIndex": 13
+              },
+              {
+                "hole": 14,
+                "par": 4,
+                "hcpIndex": 14
+              },
+              {
+                "hole": 15,
+                "par": 4,
+                "hcpIndex": 15
+              },
+              {
+                "hole": 16,
+                "par": 4,
+                "hcpIndex": 16
+              },
+              {
+                "hole": 17,
+                "par": 4,
+                "hcpIndex": 17
+              },
+              {
+                "hole": 18,
+                "par": 4,
+                "hcpIndex": 18
+              }
+            ]
           }
         }
       ],
@@ -236,11 +327,118 @@
         {
           "auth": "nobody",
           "data": "not-a-course"
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Pebble Beach Updated",
+            "data": []
+          }
         }
       ]
     },
     "global_courses/brand_new_course": {
       "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Brand New Course",
+            "data": [
+              {
+                "hole": 1,
+                "par": 4,
+                "hcpIndex": 1
+              },
+              {
+                "hole": 2,
+                "par": 4,
+                "hcpIndex": 2
+              },
+              {
+                "hole": 3,
+                "par": 4,
+                "hcpIndex": 3
+              },
+              {
+                "hole": 4,
+                "par": 4,
+                "hcpIndex": 4
+              },
+              {
+                "hole": 5,
+                "par": 4,
+                "hcpIndex": 5
+              },
+              {
+                "hole": 6,
+                "par": 4,
+                "hcpIndex": 6
+              },
+              {
+                "hole": 7,
+                "par": 4,
+                "hcpIndex": 7
+              },
+              {
+                "hole": 8,
+                "par": 4,
+                "hcpIndex": 8
+              },
+              {
+                "hole": 9,
+                "par": 4,
+                "hcpIndex": 9
+              },
+              {
+                "hole": 10,
+                "par": 4,
+                "hcpIndex": 10
+              },
+              {
+                "hole": 11,
+                "par": 4,
+                "hcpIndex": 11
+              },
+              {
+                "hole": 12,
+                "par": 4,
+                "hcpIndex": 12
+              },
+              {
+                "hole": 13,
+                "par": 4,
+                "hcpIndex": 13
+              },
+              {
+                "hole": 14,
+                "par": 4,
+                "hcpIndex": 14
+              },
+              {
+                "hole": 15,
+                "par": 4,
+                "hcpIndex": 15
+              },
+              {
+                "hole": 16,
+                "par": 4,
+                "hcpIndex": 16
+              },
+              {
+                "hole": 17,
+                "par": 4,
+                "hcpIndex": 17
+              },
+              {
+                "hole": 18,
+                "par": 4,
+                "hcpIndex": 18
+              }
+            ]
+          }
+        }
+      ],
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": {

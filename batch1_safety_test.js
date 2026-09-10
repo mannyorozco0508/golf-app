@@ -400,8 +400,12 @@ describe('FIREBASE RULES — writes narrowed, reads deliberately left open', () 
 
     test('a course must actually look like a course', () => {
         const v = rules.global_courses.$courseId['.validate'];
-        assert.ok(/hasChildren\(\['name'\]\)/.test(v));
+        // Tier-B requires BOTH children. The old pin read hasChildren(['name'])
+        // and stopped matching when 'data' was added - the rule got stronger, the
+        // literal did not follow it.
+        assert.ok(/hasChildren\(\['name','data'\]\)/.test(v));
         assert.ok(/length > 0/.test(v));
+        assert.ok(/length <= 120/.test(v), 'an unbounded name is a storage vector');
     });
 
     test('score entries must be plausible strokes on well-formed keys', () => {
