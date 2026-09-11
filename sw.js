@@ -524,7 +524,8 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
-// Moved to v103: the guide states the Skins default the code declares.
+// Moved to v103: the guide states the Skins default the code declares, and
+// says how a card gets into the picker.
 //
 // instructions.html said "ties carry the pot to the next hole". Since v96 a
 // new round does not carry unless somebody says so - SKINS_CARRY_DEFAULT is
@@ -532,7 +533,11 @@
 // rule. It now quotes admin.html's own default explanation and names the
 // switch, and instructions_accuracy_test.js holds that sentence against
 // action-model.js so it cannot go stale silently again. An empty bordered
-// info-card that had sat under Birdie Game since August is gone.
+// info-card that had sat under Birdie Game since August is gone. The course
+// section, one clause since the rewrite, now says the three things that are
+// true on every platform: an added or imported course is shared with every
+// future round, a second import replaces the stored card and nothing can
+// delete it, and the picker matches the name on the sign.
 //
 // An installed device on v102 serves a guide that states the wrong Skins rule.
 

@@ -360,6 +360,111 @@ describe('C. THE STATED SKINS CARRY RULE MATCHES THE DEFAULT THE CODE DECLARES',
 });
 
 // ---------------------------------------------------------------------------
+// D. THE COURSE CARD STATES WHAT THE CODE DOES WITH A SAVED COURSE.
+//
+// Three sentences, each held against the thing it describes, and each note
+// says what the referent can and cannot prove:
+//
+//   REPLACES. The import confirm panel shows 'This replaces the card already
+//   stored for "<name>".' when a key is already taken. The guide quotes the
+//   fixed part of that sentence, and this holds it against the panel's own
+//   string literal - same shape as guard C. Rename the warning and the guide
+//   goes red until it matches.
+//
+//   NOTHING CAN DELETE. database.rules.json gives global_courses/$courseId
+//   ".write": "newData.exists()" - a write that would leave nothing is
+//   refused for every client. The rule text is pinned here EXACTLY, so the
+//   day a delete path is opened the guide's sentence is the thing that fails.
+//   What this proves: the rule as committed. What it does not: that the
+//   deployed database carries this file - HANDOFF.md records that
+//   separately, and global_courses_rules_test.js runs the rule itself.
+//
+//   SHARED. Both publish paths - the typed card and the import - write under
+//   global_courses/, the picker populates itself from a live read of
+//   global_courses, and the rule grants ".read": true. That is what makes
+//   "shared with every future round, for everyone" a claim about code rather
+//   than a hope. What this cannot prove is the round trip: that a second
+//   device's listener actually fires after the first device's write. That is
+//   Firebase's contract, not this repo's, and no test here reaches it.
+//
+//   SIGN NAME. "The picker matches the name on the sign" has a function
+//   referent, courseNameMatches, and nothing more machine-readable than that:
+//   no number, no boolean, no sentence the app shows. Presence is all this
+//   pins. The matching itself is course_picker_match_test.js's job.
+// ---------------------------------------------------------------------------
+function guideCourseCard() {
+    const m = /<div class="i-name">[^<]*Adding a course<\/div>\s*<div class="i-desc">([\s\S]*?)<\/div>/
+        .exec(guideMarkup());
+    return m ? m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : null;
+}
+
+function importReplaceWarning() {
+    const m = /line\('(This replaces the card already stored for) "' \+/.exec(read('admin.html'));
+    return m ? m[1] : null;
+}
+
+function globalCoursesWriteRule() {
+    const rules = JSON.parse(fs.readFileSync(path.join(__dirname, 'database.rules.json'), 'utf8'));
+    const gc = rules.rules && rules.rules.global_courses;
+    return gc ? { read: gc['.read'], write: gc.$courseId && gc.$courseId['.write'] } : null;
+}
+
+describe('D. THE COURSE CARD STATES WHAT THE CODE DOES WITH A SAVED COURSE', () => {
+
+    test('each referent can actually be read, so the comparisons are not vacuous', () => {
+        assert.ok(guideCourseCard(), 'the guide has no "Adding a course" card - this block guards nothing');
+        assert.ok(importReplaceWarning(), 'could not read the replace warning out of admin.html renderImportConfirmPanel');
+        const rule = globalCoursesWriteRule();
+        assert.ok(rule && rule.write, 'could not read global_courses/$courseId .write from database.rules.json');
+        assert.ok(/function courseNameMatches\(/.test(read('admin.html')),
+            'courseNameMatches is gone from admin.html - the sign-name sentence has no referent');
+    });
+
+    test('the overwrite warning is quoted from the confirm panel, verbatim', () => {
+        const card = guideCourseCard();
+        const warning = importReplaceWarning();
+        assert.ok(card.includes(warning),
+            `the guide must quote the panel's own warning "${warning}" - the card reads:\n  "${card}"`);
+    });
+
+    test('the guide says nothing can delete a course, and the rule still says exactly that', () => {
+        const rule = globalCoursesWriteRule();
+        assert.equal(rule.write, 'newData.exists()',
+            'global_courses/$courseId .write is no longer "newData.exists()". If a delete path was '
+            + 'opened on purpose, the guide\'s "nothing can delete it" sentence is now false - rewrite '
+            + 'it before re-pinning this');
+        assert.match(guideCourseCard(), /nothing can delete/i,
+            'the rule refuses every delete and the guide must say so');
+    });
+
+    test('shared: both publish paths write global_courses, the picker reads it live, anyone may read', () => {
+        const src = withoutComments(read('admin.html'));
+        // The import commit and the typed-card publish. Both keyed writes under
+        // the shared path; a third publish site would need adding here.
+        assert.ok(src.includes('db.ref(`global_courses/${importKey}`).update('),
+            'the import no longer writes under global_courses/');
+        assert.ok(src.includes('db.ref(`global_courses/${courseKey}`).update('),
+            'the typed-card publish no longer writes under global_courses/');
+        assert.ok(src.includes("db.ref('global_courses').on('value'"),
+            'the picker no longer reads global_courses live');
+        assert.equal(globalCoursesWriteRule().read, true, 'global_courses is no longer readable by every client');
+        assert.match(guideCourseCard(), /every future round/i,
+            'the guide must say a saved course reaches every future round');
+        assert.match(guideCourseCard(), /for everyone/i,
+            'the guide must say a saved course is shared for everyone, not only this device');
+    });
+
+    test('the sign-name sentence is present and short', () => {
+        const card = guideCourseCard();
+        assert.match(card, /on the sign/i, 'the guide must say the picker matches the name on the sign');
+        // No platform words and no online row: those are the two things this
+        // section was decided NOT to say while the native app hides the importer.
+        assert.ok(!/search online|web version|on the web|iphone|ios|native/i.test(card),
+            'the course card must say nothing platform-specific and nothing about the online row');
+    });
+});
+
+// ---------------------------------------------------------------------------
 // NO CARD RENDERS BLANK. An <div class="info-card"></div> with nothing in it
 // sat under Birdie Game from 2026-08-05 and survived a full rewrite: a bordered
 // empty box, visible on every device, that no assertion here could see because
