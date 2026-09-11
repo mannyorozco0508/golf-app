@@ -218,9 +218,17 @@ describe('MID-EDIT STATES ARE LEFT ALONE', () => {
     test('nothing validates during editing', () => {
         // validateCourseGrid is called only from wizardNext and the save path.
         const callers = SRC_CODE.split('\n').filter(l => /validateCourseGrid\(\)/.test(l));
-        // The definition, captureCourseDataGrid's use, the wizard boundary, and the two
-        // save-path branches. Nothing else may call it.
-        assert.equal(callers.length, 5, 'unexpected call sites:\n' + callers.join('\n'));
+        // The definition, captureCourseDataGrid's use, the wizard boundary, the two
+        // save-path branches, and commitPendingImport. Nothing else may call it.
+        //
+        // 6, not 5, since the course import landed. commitPendingImport is a SAVE
+        // PATH in the sense this test means: it validates the grid the golfer is
+        // looking at, at the moment they press the affirmative button, before a
+        // single byte reaches global_courses - where ".write": "newData.exists()"
+        // means no client can ever delete it again. It is not an editing-time
+        // validation, and the three assertions below are what actually enforce
+        // that distinction: no oninput, no onblur, no onchange may call it.
+        assert.equal(callers.length, 6, 'unexpected call sites:\n' + callers.join('\n'));
         assert.equal(callers.filter(l => /function validateCourseGrid/.test(l)).length, 1);
         assert.ok(!/oninput="[^"]*validateCourseGrid/.test(SRC));
         assert.ok(!/onblur="[^"]*validateCourseGrid/.test(SRC));

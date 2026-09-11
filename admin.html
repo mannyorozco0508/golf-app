@@ -3393,6 +3393,430 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return queryTokens.every(qt => nameTokens.some(nt => nt.indexOf(qt) === 0));
     }
 
+    // ========================================================================
+    // IMPORTING A COURSE FROM THE PROVIDER
+    //
+    // Reached only by tapping the online row. Two requests per course at most -
+    // one search, one detail - against a shared daily budget, so nothing here
+    // fires automatically and nothing is fetched speculatively.
+    //
+    // THE PERMANENT CONSTRAINT GOVERNS EVERY DECISION BELOW.
+    // global_courses/$courseId carries ".write": "newData.exists()". A client may
+    // create and overwrite; it may NEVER delete. Whatever gets written here is
+    // there forever, for every golfer, and the only repair is the Firebase
+    // console.
+    // ========================================================================
+
+    // ---- THE KEY. This is the one that would have cost the most. ----
+    //
+    // The ordinary save path mints an unmapped course as
+    // "comm_" + name.replace(/[^a-z0-9]/g,''). The provider returns FOUR courses
+    // called "Legacy Golf Club" - Leitchfield KY, Henderson NV, Ottawa Lake MI,
+    // Norwalk IA - and all four slug to comm_legacygolfclub. ONE KEY. Import two
+    // of them and the second overwrites the first, card and all, with no way
+    // back from any page ever.
+    //
+    // So an imported course is keyed on the provider's own id, which is unique by
+    // construction and lets a single course be re-fetched later without spending
+    // a search request to find it again.
+    //
+    // A NAME MATCH STILL WINS, and that is deliberate: 114 of the 141 directory
+    // entries have no hole data, and an import filling one in is the whole point.
+    // What makes it safe is not code - it is that the golfer is TOLD, with the
+    // city the provider gave, because the directory carries no city or state and
+    // cannot verify a name match is the same physical course.
+    function importedCourseKey(course, globalCoursesRef) {
+        const nm = String(course.course_name || course.club_name || '').toLowerCase();
+        let found = null;
+        courseDirectory.forEach(g => g.items.forEach(i => {
+            if (i.name.toLowerCase() === nm) found = i.id;
+        }));
+        if (!found) {
+            Object.keys(globalCoursesRef || {}).forEach(k => {
+                if (String((globalCoursesRef[k] || {}).name || '').toLowerCase() === nm) found = k;
+            });
+        }
+        return found || ('gca_' + course.id);
+    }
+
+    function importMatchNote(course, matchedKey, matchedName) {
+        const L = course.location || {};
+        return `${matchedName} is already in your course list. This fills in its hole data, `
+             + `from the ${matchedName} in ${L.city}, ${L.state}.`;
+    }
+
+    // NAMES THE COURSE AND THE CITY. Not "OK", not "Import" - four courses share
+    // a name, and a golfer who has the wrong one must have to read past the city
+    // to confirm it.
+    function importConfirmLabel(course) {
+        const L = course.location || {};
+        return `Use ${course.course_name || course.club_name} \\u2014 ${L.city}, ${L.state}`;
+    }
+
+    // ---- EVERY REASON GETS ITS OWN SENTENCE ----
+    //
+    // NONE OF THEM SAYS "no courses found", and none implies the course does not
+    // exist. Every one means WE COULD NOT ASK. The local picker told a golfer a
+    // course was not there when it was, and then offered to add a duplicate; an
+    // online search that runs out of quota must not repeat it one layer up.
+    //
+    // query_too_short is the odd one out - nothing failed and nothing was spent -
+    // so it tells the golfer what to do instead of reporting a problem.
+    const ONLINE_SEARCH_MESSAGES = {
+        query_too_short: 'Type a little more to search online.',
+        not_configured: "Online search isn't set up yet.",
+        bad_course_id: "That course link didn't work \\u2014 try searching again.",
+        rate_limited: "You've searched online a few times just now. Try again in a few minutes.",
+        daily_limit: "Online search has used up today's lookups. It works again tomorrow \\u2014 "
+                   + "you can still type the card in below.",
+        upstream_error: "Online search isn't answering right now.",
+        network: "Couldn't reach online search. Check your signal."
+    };
+    function onlineSearchMessage(reason) {
+        return ONLINE_SEARCH_MESSAGES[reason] || ONLINE_SEARCH_MESSAGES.upstream_error;
+    }
+
+    // ---- THE CARD, VALIDATED BEFORE IT IS EVER SHOWN OR WRITTEN ----
+    //
+    // Same invariant validateCourseGrid enforces and the same one the Firebase
+    // rules enforce: par 3-6, stroke index a clean permutation of 1-18. About a
+    // tenth of provider records carry no tee data at all and nothing guarantees
+    // the rest are well formed, so a card that cannot satisfy it is refused here
+    // rather than written to a record no client can delete.
+    function importCardOrRefuse(tee) {
+        const holes = (tee && tee.holes) || [];
+        if (holes.length !== 18) {
+            return { ok: false, reason: 'This course has no complete 18-hole card from the provider.' };
+        }
+        const seen = {};
+        const data = [];
+        for (let i = 0; i < 18; i++) {
+            const par = Number(holes[i].par);
+            const si = Number(holes[i].handicap);
+            if (!(par >= 3 && par <= 6)) {
+                return { ok: false, reason: `Hole ${i + 1} has par ${par}, which is outside 3-6.` };
+            }
+            if (!(si >= 1 && si <= 18)) {
+                return { ok: false, reason: `Hole ${i + 1} has handicap ${si}, which is outside 1-18.` };
+            }
+            if (seen[si]) {
+                return { ok: false, reason: `Handicap ${si} is used on both hole ${seen[si]} and hole ${i + 1}.` };
+            }
+            seen[si] = i + 1;
+            data.push({ hole: i + 1, par: par, hcpIndex: si });
+        }
+        for (let n = 1; n <= 18; n++) {
+            if (!seen[n]) return { ok: false, reason: `Handicap ${n} is not used on any hole.` };
+        }
+        return { ok: true, data: data };
+    }
+
+    // ---- THE RECORD ----
+    //
+    // data[18] stays canonical and authoritative - every existing reader expects
+    // exactly that shape and nothing in Consumer reads anything else.
+    //
+    // TEES ARE ARRAYS, NOT A MAP KEYED BY TEE NAME, and this course is the proof:
+    // Firebase keys cannot contain a forward slash and Legacy has tees called
+    // "White/Purple" and "Purple/White". As array values they survive; as keys
+    // they would need escaping, and escaping gets done inconsistently.
+    //
+    // source.siFrom records WHICH tee the canonical stroke index came from.
+    // Without it, a women's round allocated on men's indexes is undetectable
+    // afterwards.
+    function buildImportRecord(summary, detail, siFrom) {
+        const parts = String(siFrom).split('/');
+        const mapTees = g => ((detail.tees || {})[g] || []).map(t => ({
+            name: t.tee_name,
+            rating: t.course_rating,
+            slope: t.slope_rating,
+            totalYards: t.total_yards,
+            parTotal: t.par_total,
+            holes: (t.holes || []).map(h => ({ par: h.par, yardage: h.yardage, hcpIndex: h.handicap }))
+        }));
+        const tee = ((detail.tees || {})[parts[0]] || []).filter(t => t.tee_name === parts[1])[0];
+        const card = importCardOrRefuse(tee);
+        return {
+            name: detail.course_name || detail.club_name,
+            data: card.ok ? card.data : [],
+            location: detail.location || {},
+            tees: { male: mapTees('male'), female: mapTees('female') },
+            source: {
+                provider: 'golfcourseapi',
+                providerCourseId: detail.id,
+                providerClubName: detail.club_name,
+                importedAt: Date.now(),
+                siFrom: siFrom
+            }
+        };
+    }
+
+    // Picks the tee whose stroke index becomes canonical: the longest men's set,
+    // falling back to the longest women's. Recorded in source.siFrom either way.
+    function pickCanonicalTee(detail) {
+        const byYards = (arr) => (arr || []).slice().sort((a, b) => (b.total_yards || 0) - (a.total_yards || 0))[0];
+        const m = byYards((detail.tees || {}).male);
+        if (m) return { gender: 'male', tee: m };
+        const f = byYards((detail.tees || {}).female);
+        if (f) return { gender: 'female', tee: f };
+        return null;
+    }
+
+    // ---- THE SEARCH. FIRED BY A TAP AND NOTHING ELSE. ----
+    let onlineSearchInFlight = false;
+    let pendingImport = null;
+
+    function renderDropdownNote(text, cls) {
+        const d = document.createElement("div");
+        d.style.cssText = "padding:10px 12px; color:var(--text-muted); text-align:center; font-size:0.85rem;";
+        if (cls) d.className = cls;
+        d.textContent = text;
+        return d;
+    }
+
+    async function runOnlineCourseSearch(query, rowEl) {
+        // A SECOND TAP MUST NOT SPEND A SECOND REQUEST. Without this, an
+        // impatient thumb costs two of the day's lookups for one query.
+        if (onlineSearchInFlight) return;
+        onlineSearchInFlight = true;
+        if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
+
+        let payload;
+        try {
+            const res = await fetch('/api/course-search?q=' + encodeURIComponent(query));
+            payload = await res.json();
+        } catch (e) {
+            payload = { status: 'unavailable', reason: 'network' };
+        }
+        onlineSearchInFlight = false;
+        renderOnlineOutcome(payload, query);
+    }
+
+    function renderOnlineOutcome(payload, query) {
+        courseDropdown.innerHTML = "";
+
+        // COULD NOT ASK. Never "no courses found", and the add row stays but says
+        // the check did not happen - removing it would strand a golfer standing
+        // at an unmapped course with no signal, and that is a worse failure than
+        // a duplicate.
+        if (!payload || payload.status !== 'ok') {
+            const reason = (payload && payload.reason) || 'upstream_error';
+            courseDropdown.appendChild(renderDropdownNote(onlineSearchMessage(reason)));
+            courseDropdown.appendChild(
+                buildAddAsNewRow(query, " (we couldn't check online first)"));
+            courseDropdown.style.display = "block";
+            return;
+        }
+
+        // ASKED, AND GENUINELY NOTHING. The only state where offering to add the
+        // course plainly is honest, because it is the only one where we know.
+        if (!payload.courses || payload.courses.length === 0) {
+            courseDropdown.appendChild(renderDropdownNote(`Nothing online matched "${query}".`));
+            courseDropdown.appendChild(buildAddAsNewRow(query, ''));
+            courseDropdown.style.display = "block";
+            return;
+        }
+
+        const head = document.createElement("div");
+        head.className = "custom-select-group";
+        head.textContent = "🌐 Found online";
+        courseDropdown.appendChild(head);
+
+        payload.courses.forEach(c => {
+            const L = c.location || {};
+            const teeCount = Object.keys(c.tees || {}).reduce((n, k) => n + (c.tees[k] || 0), 0);
+            const row = document.createElement("div");
+            row.className = "custom-select-option course-online-result";
+            // CITY AND STATE ON EVERY ROW, WITHOUT EXCEPTION. Four courses are
+            // named "Legacy Golf Club" and the name alone cannot separate them.
+            // The tee count is free from this same payload and lets a golfer skip
+            // an empty record without spending the detail request to discover it.
+            // BUILT AS NODES, NOT MARKUP. Course names, cities and addresses are
+            // third-party strings from the provider; interpolating them into
+            // innerHTML is how a name containing a tag becomes markup. textContent
+            // cannot do that, and needs no escaping to get right.
+            const title = document.createElement("div");
+            title.textContent = c.course_name || c.club_name || '';
+            const sub = document.createElement("div");
+            sub.style.cssText = "font-size:0.74rem; color:var(--text-muted);";
+            sub.textContent = (L.city || '?') + ', ' + (L.state || '?') + ' \u00b7 '
+                + (teeCount ? teeCount + ' tee sets' : 'no tee data');
+            row.appendChild(title);
+            row.appendChild(sub);
+            // NOTHING AUTO-SELECTS. Not even when there is one result - one
+            // result that is the wrong Legacy is exactly the failure being
+            // designed against.
+            row.onclick = () => { openImportConfirm(c); };
+            courseDropdown.appendChild(row);
+        });
+        courseDropdown.style.display = "block";
+    }
+
+    // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
+    async function openImportConfirm(course) {
+        courseDropdown.innerHTML = "";
+        courseDropdown.appendChild(renderDropdownNote('Fetching the card…'));
+
+        let payload;
+        try {
+            const res = await fetch('/api/course/' + encodeURIComponent(course.id));
+            payload = await res.json();
+        } catch (e) {
+            payload = { status: 'unavailable', reason: 'network' };
+        }
+
+        // THE LIMIT LANDING BETWEEN SEARCH AND DETAIL. The golfer has picked a
+        // real course and we hold its name and city; what we do not hold is the
+        // card. NOTHING IS WRITTEN - the rules would refuse a record without
+        // eighteen holes anyway - and the grid stays BLANK, because stamping
+        // plausible numbers into it is how fiction got saved as fact.
+        if (!payload || payload.status !== 'ok' || !payload.course) {
+            const reason = (payload && payload.reason) || 'upstream_error';
+            courseSearchInput.value = course.course_name || course.club_name || '';
+            courseHiddenSelect.value = "";
+            handleCourseChange();
+            courseDropdown.innerHTML = "";
+            courseDropdown.appendChild(renderDropdownNote(
+                `Couldn't fetch the card for ${course.course_name || course.club_name}. `
+                + onlineSearchMessage(reason)));
+            courseDropdown.style.display = "block";
+            return;
+        }
+
+        const detail = payload.course;
+        const canonical = pickCanonicalTee(detail);
+        const card = canonical ? importCardOrRefuse(canonical.tee) : { ok: false, reason: 'This course has no tee data from the provider.' };
+        if (!card.ok) {
+            courseDropdown.innerHTML = "";
+            courseDropdown.appendChild(renderDropdownNote(
+                `${detail.course_name || detail.club_name}: ${card.reason} You can type the card in below.`));
+            courseSearchInput.value = detail.course_name || detail.club_name || '';
+            courseHiddenSelect.value = "";
+            handleCourseChange();
+            courseDropdown.style.display = "block";
+            return;
+        }
+
+        const siFrom = canonical.gender + '/' + canonical.tee.tee_name;
+        const importKey = importedCourseKey(detail, globalCourses);
+        pendingImport = {
+            key: importKey,
+            record: buildImportRecord(course, detail, siFrom),
+            detail: detail
+        };
+
+        // THE 36 NUMBERS GO INTO THE EXISTING GRID, populated and still editable,
+        // BEFORE anything is written. That grid is what validateCourseGrid reads,
+        // so the numbers a golfer confirms are literally the numbers that get
+        // validated and saved - nothing new to keep in sync.
+        courseSearchInput.value = detail.course_name || detail.club_name || '';
+        courseHiddenSelect.value = "";
+        handleCourseChange();
+        const box = document.getElementById('enable-custom-course');
+        if (box && !box.checked) { box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); }
+        const container = document.getElementById('custom-course-container');
+        if (container) container.style.display = 'block';
+        card.data.forEach(h => {
+            const pe = document.getElementById('c-par-' + h.hole);
+            const he = document.getElementById('c-hcp-' + h.hole);
+            if (pe) pe.value = String(h.par);
+            if (he) he.value = String(h.hcpIndex);
+        });
+        if (typeof updateCustomCoursePars === 'function') updateCustomCoursePars();
+
+        renderImportConfirmPanel(detail, card, siFrom, importKey);
+        courseDropdown.style.display = "none";
+    }
+
+    function renderImportConfirmPanel(detail, card, siFrom, importKey) {
+        let panel = document.getElementById('course-import-confirm');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'course-import-confirm';
+            panel.style.cssText = "border:1px solid var(--brand-green); border-radius:8px; padding:12px; margin:10px 0; font-size:0.84rem;";
+            const container = document.getElementById('custom-course-container');
+            if (container && container.parentNode) container.parentNode.insertBefore(panel, container);
+        }
+        panel.innerHTML = "";
+
+        // EVERY LINE IS A NODE WITH textContent. Every string on this panel comes
+        // from the provider - course name, street address, tee names - and an
+        // earlier version of this function assembled them into an innerHTML
+        // template. safe_text_test.js caught it. textContent cannot turn a name
+        // into markup, and needs no escaping to get right.
+        const line = (text, css) => {
+            const d = document.createElement('div');
+            if (css) d.style.cssText = css;
+            d.textContent = text;
+            panel.appendChild(d);
+            return d;
+        };
+        const MUTED = "color:var(--text-muted);";
+        const L = detail.location || {};
+        const known = globalCourses[importKey] || null;
+        const dirName = getCourseNameById(importKey, globalCourses);
+
+        const tees = [];
+        ['male', 'female'].forEach(g => ((detail.tees || {})[g] || []).forEach(t => {
+            tees.push(t.tee_name + ' ' + t.course_rating + '/' + t.slope_rating);
+        }));
+
+        line(detail.course_name || detail.club_name || '', "font-weight:700;");
+        line(L.address || '', MUTED);
+        line('Par ' + card.data.reduce((a, h) => a + h.par, 0) + ' \u00b7 ' + tees.length + ' tee sets',
+             "margin-top:6px;");
+        line(tees.join(' \u00b7 '), MUTED + "font-size:0.76rem;");
+
+        // SAYS WHERE THE NUMBERS CAME FROM, while they are on screen. This page
+        // records that stamping 36 plausible numbers into a grid is how fiction
+        // got saved as fact; an import stamps 36 again, and the only thing that
+        // makes the difference visible is a line saying so.
+        line('Par and stroke index below came from this course\'s '
+             + siFrom.replace('/', ' ') + ' tees. Check them against the card before you save.',
+             "margin-top:8px; " + MUTED + "font-size:0.76rem;");
+
+        // A NAME MATCH IS TOLD, WITH THE PROVIDER'S CITY. The directory carries
+        // no city or state and cannot verify a name match is the same physical
+        // course, so the golfer is the check.
+        if (dirName) line(importMatchNote(detail, importKey, dirName), "margin-top:8px;");
+
+        // AN OVERWRITE IS PERMITTED EVEN THOUGH A DELETE IS NOT, so a second
+        // golfer importing the wrong course over the right one is possible and
+        // neither can undo it. Say what is already there.
+        if (known) {
+            line('This replaces the card already stored for "' + (known.name || '') + '".',
+                 "margin-top:8px; color:var(--accent-amber, #b8860b);");
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'course-import-confirm-btn';
+        btn.className = 'btn-primary';
+        btn.style.cssText = "margin-top:10px; width:100%;";
+        btn.textContent = importConfirmLabel(detail);
+        btn.onclick = () => { commitPendingImport(); };
+        panel.appendChild(btn);
+    }
+
+    // ---- THE WRITE. Merged, validated, and only from the affirmative press. ----
+    function commitPendingImport() {
+        if (!pendingImport) return;
+        // VALIDATED AGAINST THE GRID THE GOLFER JUST SAW, not against what the
+        // provider sent - they may have corrected a cell, and the card that gets
+        // written must be the card that was on screen.
+        const gridCheck = validateCourseGrid();
+        if (!gridCheck.ok) { alert('⚠️ ' + gridCheck.message); return; }
+        const importKey = pendingImport.key;
+        const rec = Object.assign({}, pendingImport.record, { data: gridCheck.data });
+        const p = db.ref(`global_courses/${importKey}`).update(rec);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        p.catch(() => { coursePublishRefused = true; renderCoursePublishNote(); });
+        courseHiddenSelect.value = importKey;
+        const panel = document.getElementById('course-import-confirm');
+        if (panel) panel.remove();
+        pendingImport = null;
+    }
+
     function buildCourseOptionRow(id, name) {
         const optionDiv = document.createElement("div");
         optionDiv.className = "custom-select-option";
@@ -3504,19 +3928,60 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }
         }
 
+        // THE EMPTY STATE BUILDS ELEMENTS AND NO LONGER WIPES.
+        //
+        // This branch used to do courseDropdown.innerHTML = "...", which DELETED
+        // everything already appended - including, once the online row existed,
+        // the online row itself. It would have vanished in exactly the case it
+        // matters most: a golfer whose course is not in the local list.
+        const typedName = filterText.trim();
         if (!hasResults) {
-            const typedName = filterText.trim();
-            if (typedName) {
-                courseDropdown.innerHTML = `<div style="padding:10px 12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No courses found for "${typedName.replace(/</g, '&lt;')}".</div>`;
-                const addDiv = document.createElement("div");
-                addDiv.className = "custom-select-option custom-select-add-option";
-                addDiv.textContent = `➕ Add "${typedName}" as a new course`;
-                addDiv.onclick = () => { addCustomCourse(typedName); };
-                courseDropdown.appendChild(addDiv);
-            } else {
-                courseDropdown.innerHTML = `<div style="padding:12px; color:var(--text-muted); text-align:center;">No courses found.</div>`;
-            }
+            const msg = document.createElement("div");
+            msg.style.cssText = "padding:10px 12px; color:var(--text-muted); text-align:center; font-size:0.85rem;";
+            msg.textContent = typedName
+                ? `No local match for "${typedName}".`
+                : "No courses found.";
+            courseDropdown.appendChild(msg);
         }
+
+        // ---- THE ONLINE ROW ----
+        //
+        // APPENDED LAST, AND ONLY EVER A ROW. It is never fired by the input
+        // event that renders this dropdown - this function runs on every
+        // keystroke, and "Legacy Golf Club" is seventeen of them. Wiring the
+        // search here instead of to a tap would spend half the daily budget on
+        // one word.
+        //
+        // Three characters is the proxy's own MIN_QUERY, so a golfer can never
+        // tap a row whose answer is already decided to be a refusal.
+        if (typedName.length >= 3) {
+            const online = document.createElement("div");
+            online.className = "custom-select-option";
+            online.id = "course-online-search-row";
+            online.textContent = `\uD83C\uDF10 Search online for "${typedName}"`;
+            online.onclick = () => { runOnlineCourseSearch(typedName, online); };
+            courseDropdown.appendChild(online);
+        }
+
+        // ---- THE ADD ROW, DEMOTED ----
+        //
+        // It creates nothing by itself - addCustomCourse only opens the grid -
+        // but it is the path to a permanent key, and offering it above "check
+        // online" invites a duplicate of a course that exists. Below the online
+        // row, so the first thing offered is check rather than create.
+        if (!hasResults && typedName) {
+            courseDropdown.appendChild(buildAddAsNewRow(typedName, ''));
+        }
+    }
+
+    // Built once so the wording cannot drift between the three places it is
+    // offered: no local match, a real zero from online, and a refusal.
+    function buildAddAsNewRow(typedName, suffix) {
+        const addDiv = document.createElement("div");
+        addDiv.className = "custom-select-option custom-select-add-option";
+        addDiv.textContent = `\u2795 Add "${typedName}" as a new course${suffix || ''}`;
+        addDiv.onclick = () => { addCustomCourse(typedName); };
+        return addDiv;
     }
 
     function selectCourse(id, name) {

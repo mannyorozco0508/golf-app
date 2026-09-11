@@ -162,6 +162,72 @@ describe('NO PUBLISH REPLACES THE WHOLE COURSE RECORD', () => {
     });
 });
 
+describe('BOTH WRITE SITES ARE COVERED - THE PUBLISH AND THE IMPORT', () => {
+
+    // THERE ARE TWO WRITERS TO global_courses NOW, and the assertions above were
+    // written when there was one. `indexOf` finds the FIRST occurrence, so
+    // whichever site appears earlier in the file would silently become the only
+    // one checked - and the other could carry a `.set()`, or a payload that
+    // overwrites a child it does not name, with nothing to notice.
+    //
+    // The method rule already covers every site, because it DISCOVERS them. The
+    // payload rule did not, and this block is that gap closed.
+
+    const siteFor = (keyExpr) => {
+        const at = CODE.indexOf('global_courses/' + keyExpr);
+        return at > -1 ? CODE.slice(at, at + 420) : null;
+    };
+    const payloadKeys = (region) =>
+        [...region.matchAll(/^\s*([a-zA-Z_$][\w$]*)\s*:/gm)].map((m) => m[1]).sort();
+
+    test('there are exactly the two write sites we know about', () => {
+        const writes = globalCourseWrites(CODE);
+        const targets = [...new Set(writes.map((w) => w.target))].sort();
+        assert.deepEqual(targets, ['${courseKey}', '${importKey}'],
+            'the set of global_courses write targets changed. Every one of them needs a payload '
+            + 'rule below, or it is a write nothing checks - into a node no client can delete.\n'
+            + '  found: ' + JSON.stringify(targets));
+    });
+
+    test('the ROUND PUBLISH still writes exactly name and data', () => {
+        const region = siteFor('${courseKey}');
+        assert.ok(region, 'the round publish site is gone');
+        assert.deepEqual(payloadKeys(region), ['data', 'name'],
+            'the publish payload grew. .update() only protects the children it does NOT name, '
+            + 'so every key added here is a child it starts overwriting wholesale - which is '
+            + 'the defect this file exists for, re-acquired one field at a time.');
+    });
+
+    test('the IMPORT writes the record buildImportRecord produced, not a hand-built one', () => {
+        const region = siteFor('${importKey}');
+        assert.ok(region, 'the import write site was not found');
+
+        // NOT A LITERAL KEY LIST, and the difference matters. An earlier version
+        // of this asserted the import payload was inline with exactly five named
+        // keys - which is a constraint on how the code is WRITTEN, not on what it
+        // does, and it would have forced the record to be assembled at the call
+        // site rather than by the builder that course_import_test.js pins.
+        //
+        // The shape is already guarded there, by calling buildImportRecord and
+        // checking what comes back. What THIS file uniquely protects is that the
+        // write goes through that builder rather than around it - a second,
+        // hand-assembled payload is how the two would drift.
+        assert.match(region, /buildImportRecord\(|importRecord\b|\brec\b/,
+            'the import write does not hand over a record built by buildImportRecord. A '
+            + 'payload assembled at the call site is a second definition of the record shape, '
+            + 'and the one in course_import_test.js would stop describing what is written.');
+    });
+
+    test('BOTH sites use .update, neither uses .set', () => {
+        const writes = globalCourseWrites(CODE);
+        const bad = writes.filter((w) => w.method !== 'update');
+        assert.deepEqual(bad, [],
+            'a global_courses write is not a merge: ' + JSON.stringify(bad));
+        assert.equal(writes.length >= 2, true,
+            'fewer than two write sites found, so "both are covered" is true of one');
+    });
+});
+
 describe('THE UNTRIMMED SEAM SURVIVES', () => {
 
     // A nine-hole round must not shorten or rename the course for everyone else.

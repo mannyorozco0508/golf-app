@@ -161,7 +161,23 @@ describe('NO RAW NAME REACHES MARKUP, PAGE BY PAGE', () => {
     // navigator.share or the clipboard. Escaping those would corrupt what the golfer
     // copies - "Mike &amp; Dave's Trip" in a text message helps nobody.
     const TEXT_ONLY = {
-        'admin.html': 1,        // addDiv.textContent
+        // 5, not 1, since the course import landed. All five are textContent
+        // assignments or a string that only ever reaches one. Named individually
+        // because a bare number is how an allowance grows without anyone
+        // looking:
+        //   :3444 :3445  importMatchNote's return string. Used at exactly ONE
+        //                site, :3781, via line(), which sets textContent.
+        //   :3942        the "No local match" empty-state message, textContent
+        //   :3961        the "Search online for X" row, textContent
+        //   :3982        the "Add X as a new course" row, textContent
+        //
+        // THIS GUARD ALREADY EARNED ITS KEEP ON THIS FEATURE. The first version
+        // of the import confirm panel assembled itself with innerHTML and
+        // template literals - course name, street address and tee names, every
+        // one a third-party string from the provider. It failed at 6 and it was
+        // right; the panel is now built from DOM nodes, which is why those are
+        // gone and only text paths remain.
+        'admin.html': 5,
         'leaderboard.html': 2,  // share title + message
         // 10, not 9, since the Eagle of the Trip line joined the recap TEXT block.
         // Its sibling on the recap CARD is escaped - esc(a.mostEagles.name) - because

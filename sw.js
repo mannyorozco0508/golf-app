@@ -524,6 +524,30 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v99: the course picker can import a card from the provider, and four
+// courses called "Legacy Golf Club" no longer become one record.
+//
+// THE KEY IS THE POINT. The ordinary save path mints an unmapped course as
+// "comm_" + name.replace(/[^a-z0-9]/g,''). The provider returns FOUR Legacy Golf
+// Clubs - Leitchfield KY, Henderson NV, Ottawa Lake MI, Norwalk IA - and all four
+// slug to comm_legacygolfclub. Import two and the second overwrites the first,
+// card and all, under a key ".write": "newData.exists()" means NO CLIENT CAN EVER
+// DELETE. An imported course is now keyed on the provider id instead.
+//
+// The online search is a ROW the golfer taps - never the input event, which fires
+// on every keystroke and would spend half a day's lookups on one course name.
+// Nothing auto-selects, even on a single result. The 36 numbers land in the
+// existing grid, validated by validateCourseGrid, before anything is written, and
+// the confirm button names the course AND the city because the name alone cannot
+// separate four of them.
+//
+// A refusal never says "no courses found" - every unavailable reason gets its own
+// sentence, because "we could not ask" is not "it is not there", and that
+// confusion is what had the picker offering to add a duplicate of a course that
+// existed.
+//
+// An installed device on v98 has a picker that cannot import at all.
+//
 // Moved to v98: the course picker finds the name on the sign. admin.html
 // filtered with item.name.toLowerCase().includes(lowerFilter) - a substring test
 // on the whole typed string - so every word a golfer added could only narrow.
@@ -766,7 +790,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v98-the-picker-finds-the-name-on-the-sign';
+const CACHE_VERSION = 'golfapp-v99-the-picker-can-import-a-course';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
