@@ -524,6 +524,25 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v101: the Android shell hands out links to the web app, and the trip
+// recap's Share button is never a silent no-op.
+//
+// Capacitor on Android serves the page from https://localhost. shareBaseUrl()
+// judged "can another phone reach this?" from the origin alone, and an https
+// origin with a host passes - so every invite, QR, group scorekeeper, organizer,
+// follow and trip link built on Android read https://localhost/... and opened
+// nothing on the phone that received it. product-links.js now asks Capacitor
+// first: a native shell shares the canonical origin whatever it is served from.
+// A developer's web page on https://localhost, with no Capacitor object, still
+// shares itself.
+//
+// trip.html's shareRecap swallowed a share sheet that rejected. With no share
+// sheet at all it already went to the clipboard; now a share sheet that FAILS
+// for any reason other than the golfer closing it (AbortError) does too.
+//
+// An installed device without this bump keeps building https://localhost links
+// inside the Android shell.
+
 // Moved to v100: a Nassau states its real price on both pages, and the Receipt
 // drops a nine-argument call to the money engine that nothing read.
 //
@@ -824,7 +843,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v100-receipt-drops-a-dead-engine-call';
+const CACHE_VERSION = 'golfapp-v101-android-shell-shares-the-web-app';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -2656,16 +2656,28 @@ html {
             return;
         }
         const text = buildShareRecapText();
-        if (navigator.share) {
-            navigator.share({ title: `${tripData.name} Recap`, text: text }).catch(() => {});
-        } else if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('⧉ Recap copied to clipboard — paste it into your group chat.');
-            }).catch(() => {
+        // No share sheet - Android's WebView has none - so the recap goes to the
+        // clipboard, the way admin.html's shareMainApp does. A share sheet that
+        // FAILS lands there too, so the button is never a silent no-op; a share
+        // sheet the golfer CLOSES is AbortError, a choice, and copies nothing.
+        const copyRecap = () => {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('⧉ Recap copied to clipboard — paste it into your group chat.');
+                }).catch(() => {
+                    alert(text);
+                });
+            } else {
                 alert(text);
+            }
+        };
+        if (navigator.share) {
+            navigator.share({ title: `${tripData.name} Recap`, text: text }).catch((err) => {
+                if (err && err.name === 'AbortError') return;
+                copyRecap();
             });
         } else {
-            alert(text);
+            copyRecap();
         }
     }
 

@@ -69,6 +69,18 @@ function consumerUrl(relativePath) {
 // read location.origin. Sharing a round from the app was simply impossible.
 //
 // THE RULE, and why it is not just "always use the canonical origin":
+//   a native shell -> the canonical origin, whatever it is served from. Asked of
+//                 Capacitor directly, because Android's WebView serves the page
+//                 from https://localhost - an https origin that passes every
+//                 test below and is still not an address another phone can reach.
+//                 The invite link, the QR, every group link and the trip link
+//                 all came out as https://localhost/... on Android, the same
+//                 set capacitor:// broke on iOS, by a door the origin rule
+//                 could not see. window.Capacitor.isNativePlatform() is the only
+//                 answer present on every page from the first line of script;
+//                 html.is-native lands on `load`, and leaderboard.html does not
+//                 load pwa-boot.js at all. A page on https://localhost with no
+//                 Capacitor object is a developer's web page and is left alone.
 //   http/https -> THIS page's origin. A Cloudflare preview deploy must hand out
 //                 links to itself, not to production, or testing a deploy silently
 //                 sends everyone to the live site.
@@ -82,6 +94,11 @@ function consumerUrl(relativePath) {
 const GOLF_WEB_ORIGIN = 'https://golf-app-5a5.pages.dev';
 
 function shareBaseUrl() {
+    // THE SHELL FIRST, before the origin is even read: inside Capacitor the
+    // origin is not evidence of anything.
+    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+        return GOLF_WEB_ORIGIN + '/';
+    }
     const loc = (typeof window !== 'undefined' && window.location) ? window.location
         : (typeof location !== 'undefined' ? location : null);
     // DECIDED FROM THE ORIGIN, not from location.protocol. The question is whether
