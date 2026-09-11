@@ -3,20 +3,32 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <!-- Brand navy where the system paints chrome (the status bar below
+             API 35; edge-to-edge on 35+ ignores it, harmlessly). -->
+        <item name="colorPrimary">@color/rattle_navy</item>
+        <item name="colorPrimaryDark">@color/rattle_navy</item>
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!-- The window behind the WebView is the app's own cream, so the instant
+         between the splash and the first paint is not a white flash. -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/rattle_cream</item>
     </style>
 
-
+    <!-- THE LAUNCH SCREEN. Android 12+ draws the system splash from these three
+         items: cream behind, the adaptive-icon foreground in the middle, then a
+         hand-over to AppTheme.NoActionBar. androidx.core:core-splashscreen
+         backports the same look to API 24-30, which is why the parent stays
+         Theme.SplashScreen. The Capacitor template put its OWN logo here as
+         android:background=@drawable/splash - eleven PNGs of the Capacitor X -
+         and that is what flashed at launch. They are gone. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/rattle_cream</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

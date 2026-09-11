@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// RELEASE SIGNING, READ FROM A FILE THAT IS NOT IN THE REPOSITORY.
+//
+// android/keystore.properties (gitignored at the root, proven by check-ignore in
+// android_release_test.js) names the upload keystore and its passwords. When it
+// is absent - every fresh clone, every CI box, this repo's own history - the
+// release build type simply has no signingConfig: `assembleDebug` still builds
+// with the debug key, and `bundleRelease` produces an UNSIGNED bundle rather
+// than failing. Nothing here can create a key, and no path or password may
+// ever be written into this file. See /tmp/rattle-keystore-steps.txt for the
+// one-time setup, which is done by hand, outside the repo.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.rattlegolf.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +23,11 @@ android {
         applicationId "com.rattlegolf.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // versionCode is Android's own sequence and starts at 1; the iOS build
+        // number (24) is a different counter. versionName is held equal to the
+        // iOS MARKETING_VERSION by android_release_test.js.
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +35,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropertiesFile.exists()) signingConfig signingConfigs.release
         }
     }
 }

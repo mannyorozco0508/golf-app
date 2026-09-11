@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The icon's own canvas colour, read from icon-1024.png by tools/android-icons.js.
+         The foreground layer is opaque cream around the mark, so this must match it. -->
+    <color name="ic_launcher_background">#FCF7ED</color>
 </resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The two brand colours, copied from manifest.json (theme_color and
+     background_color). android_release_test.js reads manifest.json and holds
+     these equal to it, so the web app and the Android window cannot drift. The
+     launcher icon's background is a different file and a different cream on
+     purpose: see values/ic_launcher_background.xml. -->
+<resources>
+    <color name="rattle_navy">#0E2B1F</color>
+    <color name="rattle_cream">#F6F4EC</color>
+</resources>
