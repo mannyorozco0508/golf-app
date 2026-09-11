@@ -56,6 +56,22 @@ www/
 .env
 .env.*
 !.env.example
+
+# wrangler's local secrets file, for `wrangler pages dev --binding`. THIS REPO'S
+# ROOT IS SERVED PUBLICLY BY CLOUDFLARE PAGES - measured: /package.json and
+# /build-shell.js both return 200, so any file here is a downloadable URL. A
+# committed .dev.vars would be live at https://<site>/.dev.vars with the
+# GolfCourseAPI key in it. We use --binding instead and this file should never
+# exist; the line is here so that if a future session creates one by reflex, it
+# cannot be committed.
+.dev.vars
+.dev.vars.*
+
+# wrangler's local state: the simulated KV namespace `wrangler pages dev` uses,
+# and the scratch directory tools/course-api-proxy-check.js creates per run so a
+# previous run's cached entries cannot make "the cache was cold" quietly false.
+.wrangler/
+.wrangler-checkstate-*
 *.pem
 *.p12
 *.mobileprovision

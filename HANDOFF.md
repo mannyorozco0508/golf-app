@@ -258,6 +258,28 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
+- **A MISSPELLED COURSE GETS CACHED AS A GENUINE EMPTY FOR SEVEN DAYS. Decision
+waiting for the fuzzy-spelling wave.** The course proxy caches successful searches
+for 7 days, and a zero-result search IS a success — the API answered, it just
+answered with nothing. So a golfer who types "Quintaro" instead of "Quintero"
+spends one of thirty-five requests to learn nothing, and then that empty answer is
+served to everyone for a week. The next golfer who makes the same typo gets the
+same empty list instantly, which looks identical to "this course does not exist".
+  - **Why it is not fixed in the proxy wave.** The fix is not a TTL tweak. Three
+    options, and they trade against each other: cache zero results for much less
+    (say an hour), which costs quota on repeated typos; do not cache them at all,
+    which is worse — a common misspelling would burn the budget; or correct the
+    spelling before asking, which is the fuzzy wave and needs a local dictionary
+    because the upstream's own matching is a whole-string substring test and
+    cannot help.
+  - **The trap in the third option.** The API's fuzzy_match is substring-on-the-
+    whole-query, so it fails on a misspelling exactly as it failed on "Legacy Golf
+    Club" vs "Legacy Golf Resort". Correction has to happen on our side, before
+    the request, or it costs a request to discover it was needed.
+  - Whatever that wave decides, the zero-result TTL is part of it. It is called out
+    in `functions/api/_lib.js` beside `SEARCH_TTL`.
+
+
 - **`window.currentData` in `tournament-scorecard.html` is `undefined`, and two
 renderers depend on it not being reached.** A trap for whoever adds a third call site.
 `currentData` is declared `let currentData = {}` at script scope (:226). A top-level
