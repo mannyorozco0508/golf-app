@@ -749,6 +749,59 @@ function nassauAutoPressLabel(input) {
 }
 
 // ============================================================================
+// WHAT A NASSAU COSTS, IN ONE SENTENCE, FOR EVERY PAGE THAT NAMES IT
+//
+// A Nassau is three bets, and the app stores them two ways. A Step-6 wager
+// carries frontStake / backStake / overallStake and leaves the legacy `stake` at
+// 0; a legacy round carries only `stake`. Two pages printed that price and each
+// knew about one shape:
+//
+//   Matches tab  `$${sm.stake || 0}/match`  ->  "$0/match" for a $25 Step-6
+//                Nassau. Eight rounds in the live database are shaped that way.
+//   Hole View    coerced a blank segment to zero  ->  "F $0 / B $0 / O $0" for a
+//                $20 legacy Nassau.
+//
+// THE FALLBACK IS NOT A DISPLAY CHOICE. money-engine.js baseStakeFor() resolves a
+// blank segment to the legacy single stake, and that is the amount the golfer is
+// actually charged on that bet. Stating anything else here - a dash, a zero, the
+// word "unset" - would describe a bet the engine is not running.
+//
+// THIS FUNCTION COMPUTES NO MONEY. It reads stakes that are already stored and
+// formats them. It decides no winner, applies no handicap, and settles nothing;
+// changing it cannot move a dollar, only the sentence describing one.
+// ============================================================================
+function nassauStakeLabel(match) {
+    const m = match || {};
+
+    // Blank means "not set". ZERO DOES NOT - a deliberate $0 segment is a real
+    // answer, and must not fall through to the legacy stake. Same rule as
+    // nassauAutoPressLabel above, which is the other half of this sentence.
+    const blank = v => v === undefined || v === null || v === '';
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? undefined : n; };
+    const fallback = num(m.stake);
+    const seg = v => (blank(v) ? fallback : num(v));
+    const cash = v => '$' + (Number.isInteger(v) ? String(v) : v.toFixed(2));
+
+    const front = seg(m.frontStake), back = seg(m.backStake), overall = seg(m.overallStake);
+
+    // Nothing stored at all is reported as nothing. A bet with no price is not a
+    // $0 bet, and the caller keeps whatever it says today.
+    let out = (front === undefined || back === undefined || overall === undefined)
+        ? ''
+        : 'F ' + cash(front) + ' / B ' + cash(back) + ' / O ' + cash(overall);
+
+    // The same words Hole View has always used for the rule; the amount is new.
+    const rule = m.pressRule === '2down' ? 'Auto @ 2 Down'
+        : m.pressRule === '1down' ? 'Auto @ 1 Down'
+        : m.pressRule === 'anytime' ? 'Press any hole' : '';
+    if (rule) {
+        const press = num(m.autoPressStake);
+        out += (out ? ' \u00B7 ' : '') + rule + (press === undefined ? '' : ' (' + cash(press) + ')');
+    }
+    return out;
+}
+
+// ============================================================================
 // WHO IS THIS, ON A ROUND THAT DID NOT CREATE THEM
 //
 // Player ids are per-round and positional - 101 is "the first golfer on THIS
@@ -852,6 +905,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports.skinsCarryRuleRecorded = skinsCarryRuleRecorded;
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;
     module.exports.nassauAutoPressLabel = nassauAutoPressLabel;
+    module.exports.nassauStakeLabel = nassauStakeLabel;
     module.exports.normalisePlayerName = normalisePlayerName;
     module.exports.isPlaceholderPlayerName = isPlaceholderPlayerName;
     module.exports.duplicatePlayerNames = duplicatePlayerNames;

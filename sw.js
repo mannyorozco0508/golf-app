@@ -524,6 +524,40 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v100: a Nassau states its real price on both pages, and the Receipt
+// drops a nine-argument call to the money engine that nothing read.
+//
+// THE LABEL. A Step-6 Nassau keeps its price in frontStake/backStake/overallStake
+// and leaves the legacy `stake` at 0, so the Matches tab - which printed
+// `$${sm.stake || 0}/match` - read "$0/match" for a bet worth $25. EIGHT ROUNDS
+// IN THE LIVE DATABASE ARE SHAPED EXACTLY THAT WAY. Hole View had the mirror
+// bug: its inline builder coerced a blank segment to zero, so a legacy
+// single-stake Nassau read "F $0 / B $0 / O $0" for a $20 bet. Both pages now
+// call nassauStakeLabel() in action-model.js, which applies money-engine.js's own
+// fallback - a blank segment is charged at the legacy stake - and names the
+// auto-press amount, which neither page showed before. No money moves: the
+// function formats stakes that are already stored.
+//
+// An installed device without this bump keeps telling a foursome their Nassau is
+// worth $0.
+//
+// settlement.html's buildSideMatchesHtml computed calculateMatchEngine(...) with
+// nine arguments - no stakeConfig - assigned it to `calc`, and used it for one
+// thing: `if (!calc) return;`. The row was always built by buildReceiptBlock(),
+// which recomputes from buildSideMatchReceipts(). `formatLabel` was assigned and
+// never referenced.
+//
+// NO FIGURE ON SCREEN MOVES, and that was measured rather than assumed: six
+// fixtures across three surfaces - split-stake Nassau, priced auto-press, a
+// side-match Nassau, a single-stake Nassau, a Match Play side match, and the
+// two-players-on-one-team case that is the ONLY input making that call return
+// null - produced byte-identical money before and after, 18 of 18 pairs.
+//
+// An installed device without this bump keeps serving a Receipt whose source
+// reads as though a nine-argument engine call is where its numbers come from.
+// That is the hazard being removed: the next person pricing a Nassau segment
+// there would wire it to the wrong number.
+
 // Moved to v99: the course picker can import a card from the provider, and four
 // courses called "Legacy Golf Club" no longer become one record.
 //
@@ -790,7 +824,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v99-the-picker-can-import-a-course';
+const CACHE_VERSION = 'golfapp-v100-receipt-drops-a-dead-engine-call';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

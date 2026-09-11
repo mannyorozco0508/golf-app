@@ -356,7 +356,11 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
     // over holes nobody bet on. These assert the scoped course reaches every engine call.
     const files = {
         'settlement-engine.js': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateOverallBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
-        'settlement.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
+        // settlement.html no longer calls calculateMatchEngine for a side match at
+        // all: that call computed a result nothing read and was removed in v100.
+        // The Receipt's side-match numbers come from settlement-engine.js, whose
+        // identical assertion above still pins the scoped course.
+        'settlement.html': ['calculateHoleBetEngine([p1, p2], smCourse'],
         'stats.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
         'sidematches.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse']
     };

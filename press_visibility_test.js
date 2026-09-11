@@ -167,7 +167,8 @@ describe('ACTION PAGE — the stored press history, not just the current rate', 
         const html = actionPage(sm);
         assert.ok(!/HP\d/.test(html), 'hole-press labels are Stroke-only');
         assert.match(html, /Press/, 'the press row itself still renders');
-        assert.match(html, /\$50\/match/, 'and the card header is unchanged');
+        assert.match(html, /F \$50 \/ B \$50 \/ O \$50/,
+            'the card header states the single stake on all three Nassau segments');
     });
 
     test('a NASSAU custom stake is live on the scorecard chips, open or closed', () => {

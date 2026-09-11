@@ -3747,12 +3747,29 @@ html {
                 return;
             }
 
+            // NASSAU GETS THE SHARED LABEL; NOTHING ELSE CHANGES AT ALL.
+            //
+            // This line used to print `$${sm.stake || 0}/match` for every format. A
+            // Step-6 Nassau keeps its price in frontStake/backStake/overallStake and
+            // leaves `stake` at 0, so it read "$0/match" for a real bet - 8 rounds in
+            // the live database are shaped that way.
+            //
+            // Match Play and every other format keep the old text EXACTLY, including
+            // the "Press: <rule>" suffix. For Nassau that suffix is dropped, because
+            // nassauStakeLabel already states the rule and now also its price.
+            const nassauPriceText = (m) => {
+                const label = (m.format === 'nassau' && typeof nassauStakeLabel === 'function')
+                    ? nassauStakeLabel(m) : '';
+                if (label) return label;
+                return `$${m.stake || 0}/match`
+                    + (m.pressRule && m.pressRule !== 'none' ? ' • Press: ' + m.pressRule : '');
+            };
             const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
             const scoringLabel = (sm.scoring || 'net').toUpperCase();
 
             html += `<div class="side-match-card" id="sm-card-${matchId}">
                 <div class="side-match-players">${calc.t1Name} 🆚 ${calc.t2Name}</div>
-                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">${formatLabel} • ${scoringLabel} • $${sm.stake || 0}/match${sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:6px;">${formatLabel} • ${scoringLabel} • ${nassauPriceText(sm)}${(typeof sideMatchRangeText === 'function' && sideMatchRangeText(sm, courseData)) ? ` \u2022 ${sideMatchRangeText(sm, courseData)}` : ''}</div>`;
 
             if (sm.format === 'nassau') {
                 ['F9', 'B9', '18'].forEach(bId => {

@@ -2002,11 +2002,14 @@ html {
             const nassaus = relevantSideMatches.filter(sm => sm.format === 'nassau');
             const others = relevantSideMatches.length - nassaus.length;
             nassaus.forEach(sm => {
-                const amt = v => `$${Number(v) || 0}`;
-                const press = sm.pressRule === '2down' ? ' · Auto @ 2 Down'
-                    : sm.pressRule === '1down' ? ' · Auto @ 1 Down'
-                    : sm.pressRule === 'anytime' ? ' · Press any hole' : '';
-                gameLines.push(`⚔️ Nassau · F ${amt(sm.frontStake)} / B ${amt(sm.backStake)} / O ${amt(sm.overallStake)}${press}`);
+                // ONE BUILDER, SHARED WITH THE MATCHES TAB. The inline version that
+                // used to live here coerced a blank segment to zero, so a legacy
+                // single-stake Nassau read "F $0 / B $0 / O $0" for a bet worth $20.
+                // nassauStakeLabel applies money-engine.js's own fallback - a blank
+                // segment is charged at the legacy stake - and adds the auto-press
+                // amount, which this line never showed.
+                const label = (typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '';
+                gameLines.push(label ? `⚔️ Nassau · ${label}` : '⚔️ Nassau');
             });
             if (others > 0) gameLines.push(`⚔️ ${others} Side Bet${others === 1 ? '' : 's'}`);
         }

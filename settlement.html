@@ -785,11 +785,30 @@ html {
 
                 rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             } else {
-                const manualPresses = sm.presses ? Object.values(sm.presses) : [];
-                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses);
-                if (!calc) return;
-                const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
-
+                // THE CALL THAT USED TO LIVE HERE COMPUTED NOTHING ANYONE READ.
+                //
+                // It was calculateMatchEngine(...) with NINE arguments - no
+                // stakeConfig - and its result went into `calc`, which was then
+                // used for exactly one thing: `if (!calc) return;`. The row
+                // itself has always been built by buildReceiptBlock(), which
+                // recomputes from buildSideMatchReceipts(). `formatLabel` was
+                // assigned and never referenced.
+                //
+                // THE EARLY RETURN COULD NOT SAVE ANYTHING, AND THAT WAS
+                // MEASURED RATHER THAN ASSUMED. calculateMatchEngine returns
+                // null on one condition only - teamKeys.length < 2 - and the
+                // guard above already drops the row when virtualPlayers is
+                // shorter than two. The only way through both is two players on
+                // the SAME team (teamBIds empty). Fed exactly that,
+                // buildSideMatchReceipts returns [], so buildReceiptBlock
+                // returns '' and the row renders nothing either way.
+                //
+                // So this is dead-code removal, not a money fix: no input
+                // exists where deleting it changes a figure on screen. It
+                // matters because a nine-argument call to the money engine
+                // sitting in the Receipt reads like the Receipt's source of
+                // truth, and the next person to price a Nassau segment here
+                // would wire it to the wrong number.
                 rows += buildReceiptBlock(matchId, data, courseData, savedScores);
             }
         });
