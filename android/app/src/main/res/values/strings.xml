@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rattle Golf</string>
+    <string name="title_activity_main">Rattle Golf</string>
+    <string name="package_name">com.rattlegolf.app</string>
+    <string name="custom_url_scheme">com.rattlegolf.app</string>
+</resources>

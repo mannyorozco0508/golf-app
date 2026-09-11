@@ -33,10 +33,19 @@
 // hops, and they fail independently:
 //
 //     repo root  --node sync-mobile-web.js-->  www/app  --npx cap sync ios-->  ios/App/App/public
+//                                                       --npx cap sync android-->  android/app/src/main/assets/public
 //
 // ios/App/App/public is the file on the phone, so it is the one that decides the
 // verdict. www/app is compared too, purely so a failure can NAME which hop was
 // skipped instead of leaving that to be guessed.
+//
+// THE ANDROID BUNDLE IS A TWIN, NOT A COUSIN. `npx cap sync android` copies the
+// same www/app into android/app/src/main/assets/public, and it is skipped by the
+// same omitted command. Both directories are gitignored, so both are invisible
+// to git status in exactly the same way. The second block below holds the
+// Android copy to the same three verdicts - absent SKIPS, missing FAILS,
+// differing FAILS - and adds one the iOS block states only by construction:
+// that no Tournament-only file is inside the golfer's app.
 //
 // A MISSING BUNDLE IS NOT A STALE BUNDLE, and they must not share a verdict.
 // Both directories are gitignored, so a fresh clone has neither, and failing there
@@ -65,6 +74,7 @@ const { REPO_ROOT } = require('./helpers/load-script.js');
 
 const SYNC_SCRIPT = 'sync-mobile-web.js';
 const NATIVE = path.join(REPO_ROOT, 'ios', 'App', 'App', 'public');
+const ANDROID = path.join(REPO_ROOT, 'android', 'app', 'src', 'main', 'assets', 'public');
 const WEBDIR = path.join(REPO_ROOT, 'www', 'app');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
@@ -75,6 +85,8 @@ const declared = name => {
 };
 // FILES_TO_SYNC is literally SHARED_SHELL.concat(CONSUMER_SHELL) in the script.
 const FILES = declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL'));
+// The other product. Nothing in this list may be inside the golfer's app.
+const TOURNAMENT_ONLY = declared('TOURNAMENT_SHELL').filter(f => !FILES.includes(f));
 
 // CAPACITOR'S OWN SHIMS. `npx cap sync` writes these into the bundle; they have no
 // repo twin and never will, so they are not drift. Anything else undeclared IS.
@@ -91,6 +103,7 @@ const state = dir => {
     return { present: entries.length > 0, entries };
 };
 const NAT = state(NATIVE);
+const AND = state(ANDROID);
 const WEB = state(WEBDIR);
 
 const ABSENT_REASON = 'ios/App/App/public/ does not exist - this tree has never run '
@@ -248,5 +261,100 @@ describe('THE NATIVE BUNDLE MATCHES THE REPO', () => {
         const src = fs.readFileSync(__filename, 'utf8');
         assert.match(src, /cannot know what was inside the/,
             'the limit of this check must stay written down in it');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// THE ANDROID BUNDLE. Same source, same list, same three verdicts. Written as its
+// own block rather than a loop over the two platforms so that a failure names
+// the platform and the command in plain words, and so the iOS block above is
+// byte-for-byte what it was.
+// ---------------------------------------------------------------------------
+const RESYNC_ANDROID = 'node sync-mobile-web.js && npx cap sync android';
+const ANDROID_REL = 'android/app/src/main/assets/public/';
+const ANDROID_ABSENT = ANDROID_REL + ' does not exist - this tree has never run '
+    + '`' + RESYNC_ANDROID + '`. That is a fresh clone, not a stale bundle: nothing can '
+    + 'be built from a bundle that is not there. Run the sync before building, and '
+    + 'this check starts comparing content.';
+// Capacitor writes the Cordova shims into the Android bundle too. Its config
+// JSON goes one level up, into assets/, so it is not an entry here.
+const CAPACITOR_OWN_ANDROID = ['cordova.js', 'cordova_plugins.js', 'capacitor.config.json'];
+
+describe('THE ANDROID BUNDLE MATCHES THE REPO', () => {
+
+    // POSITIVE FIRST, for the assertion below that is otherwise "none of these is
+    // present": if the Tournament list parses to nothing, that check is vacuous.
+    test('there is a Tournament-only list to refuse', () => {
+        assert.ok(TOURNAMENT_ONLY.length >= 3,
+            'TOURNAMENT_SHELL minus the Consumer bundle parsed to ' + TOURNAMENT_ONLY.length
+            + ' files; the leak check below would guard nothing.');
+        assert.ok(TOURNAMENT_ONLY.includes('tournament.html'),
+            'the organizer console must be in the refused set');
+    });
+
+    test(ANDROID_REL + ' carries every file the sync script declares',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const { missing } = compare(ANDROID);
+        assert.deepEqual(missing, [],
+            'the Android bundle EXISTS but is missing ' + missing.length + ' declared file(s): '
+            + missing.join(', ') + '\nThat is a broken or half-finished sync, not a '
+            + 'fresh clone. Run: ' + RESYNC_ANDROID);
+    });
+
+    test('every file shipped to Android is byte-identical to its repo twin',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const { differing } = compare(ANDROID);
+        const detail = differing.map(f => {
+            const a = sha(path.join(REPO_ROOT, f)).slice(0, 12);
+            const b = sha(path.join(ANDROID, f)).slice(0, 12);
+            return '    ' + f + '\n      repo    ' + a + '\n      android ' + b;
+        }).join('\n');
+        const web = WEB.present ? compare(WEBDIR) : { differing: [], missing: [] };
+        assert.deepEqual(differing, [],
+            '\nTHE BUNDLE IN THE ANDROID PROJECT IS NOT THE REPO. ' + differing.length
+            + ' file(s) differ:\n' + detail
+            + '\n\n  ' + (WEB.present
+                ? diagnose({ differing, missing: [] }, web).replace(/cap sync ios/g, 'cap sync android')
+                : 'www/app is absent, so which hop failed cannot be said.')
+            + '\n\n  Fix: ' + RESYNC_ANDROID
+            + '\n  A commit is not a release - the bundle is copied by hand, and'
+            + '\n  nothing else in this repo can tell you it was not.');
+    });
+
+    test('the service worker shipped to Android carries the repo CACHE_VERSION',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const ver = s => (/CACHE_VERSION = '([^']+)'/.exec(s) || [])[1];
+        const repo = ver(read('sw.js'));
+        const shipped = ver(fs.readFileSync(path.join(ANDROID, 'sw.js'), 'utf8'));
+        assert.ok(repo, 'sw.js at the repo root declares no CACHE_VERSION');
+        assert.ok(shipped, 'the shipped sw.js declares no CACHE_VERSION');
+        assert.equal(shipped, repo,
+            '\nthe Android build would ship ' + shipped + ' while the repo is on ' + repo
+            + '.\n  Fix: ' + RESYNC_ANDROID);
+    });
+
+    test('the Android bundle carries nothing the repo does not ship',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const extra = AND.entries.filter(f => !FILES.includes(f) && !CAPACITOR_OWN_ANDROID.includes(f));
+        assert.deepEqual(extra, [],
+            'the Android bundle contains ' + extra.length + ' file(s) that are neither '
+            + 'declared in ' + SYNC_SCRIPT + ' nor written by Capacitor: ' + extra.join(', ')
+            + '\nA hand-edited bundle is exactly what this file exists to refuse. '
+            + 'Run: ' + RESYNC_ANDROID);
+    });
+
+    // THE PRODUCT BOUNDARY, ON DISK. FILES_TO_SYNC is Consumer-only by declaration,
+    // and the test above would also flag an undeclared file - but that one is
+    // about hand-edits in general. This one says the specific thing: the
+    // organizer product is not inside the golfer's app. It reads the directory,
+    // not the list, so a sync script that started shipping the union would be
+    // caught by the bundle it produced.
+    test('no Tournament-only file ships in the Android bundle',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const leaked = TOURNAMENT_ONLY.filter(f => fs.existsSync(path.join(ANDROID, f)));
+        assert.deepEqual(leaked, [],
+            'the golfer\'s Android app carries the Tournament product: ' + leaked.join(', ')
+            + '\nThe native bundle is SHARED_SHELL + CONSUMER_SHELL, nothing else. '
+            + 'Run: ' + RESYNC_ANDROID);
     });
 });

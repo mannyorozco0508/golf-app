@@ -135,3 +135,36 @@ ios/App/App/capacitor.config.json
 #
 # Regenerating ios/ from scratch on each machine would discard all of it and
 # make an archive irreproducible. See NATIVE-IOS-RELEASE-CHECKLIST.md.
+
+# ============================================================================
+# ANDROID / GRADLE
+#
+# Same decision as iOS: android/ IS source-controlled, generated and per-machine
+# state is not. `npx cap add android` writes android/.gitignore, which already
+# drops build/, .gradle/, local.properties and the copied web assets - but its
+# keystore lines are COMMENTED OUT in the template, and this repository is
+# public and served verbatim by Cloudflare Pages (measured: ios/App/App/Info.plist
+# answers 200 on the live site). A committed upload key would be a download.
+# So the signing material is refused HERE, at the root, where a regenerated
+# android/.gitignore cannot quietly drop it.
+# ============================================================================
+
+# The upload/signing key and the file that holds its passwords. Never in git.
+*.jks
+*.keystore
+keystore.properties
+
+# Per-machine SDK path, written by Android Studio.
+android/local.properties
+
+# Signed release output and the bundles/APKs Gradle produces anywhere.
+android/app/release/
+*.aab
+*.apk
+
+# Capacitor copies the web bundle and its compiled config into the native
+# project on every `cap sync android`. Build artifacts of www/app and
+# capacitor.config.ts, both of which are themselves generated or committed.
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

@@ -97,6 +97,34 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
         assert.deepEqual(listing(outDir('tournament')), SHARED.concat(TOURNAMENT).sort());
     });
 
+    // THE NATIVE PROJECTS ARE NOT WEB OUTPUT. ios/ and android/ hold Xcode and
+    // Gradle projects; dist/ is built by copying flat root filenames out of the
+    // three declarations, so the only way a native tree could reach an output is
+    // a declaration naming a path into it. Pinned here on the declarations AND
+    // on the produced directories, so neither a list edit nor a build-script
+    // edit can do it quietly.
+    //
+    // WHAT THIS DOES NOT SAY, measured 2026-09-11 rather than assumed: the LIVE
+    // Cloudflare Pages site serves the repository root with no build step -
+    // /ios/App/App/Info.plist answers 200 there today - so android/ will be
+    // served the same way once it is on main. This test is about dist/, the
+    // product-split output nothing deploys yet. Keeping secrets out of the
+    // native trees is .gitignore's job, not this file's.
+    test('no shell declaration names a path, so ios/ and android/ cannot enter dist/', () => {
+        const all = SHARED.concat(CONSUMER).concat(TOURNAMENT);
+        assert.ok(all.length >= 30, 'the declarations parsed to ' + all.length + ' entries');
+        const pathy = all.filter(f => /[\/\\]/.test(f));
+        assert.deepEqual(pathy, [], 'a declaration names a path: ' + pathy.join(', '));
+        ['consumer', 'tournament'].forEach(pr => {
+            const entries = listing(outDir(pr));
+            assert.ok(entries.length >= 20, 'dist/' + pr + ' holds ' + entries.length + ' entries');
+            ['ios', 'android', 'ios.zip', 'android.zip'].forEach(t =>
+                assert.ok(!entries.includes(t), 'dist/' + pr + ' contains ' + t));
+            entries.forEach(f => assert.ok(fs.statSync(path.join(outDir(pr), f)).isFile(),
+                'dist/' + pr + '/' + f + ' is not a plain file'));
+        });
+    });
+
     test('no Tournament-only file leaked into Consumer', () => {
         const consumer = listing(outDir('consumer'));
         TOURNAMENT.forEach(f => assert.ok(!consumer.includes(f),
