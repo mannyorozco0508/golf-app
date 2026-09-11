@@ -1,17 +1,21 @@
 // ============================================================================
 // THE PROXY MUST NEVER SAY "NO COURSES" WHEN IT MEANS "I COULD NOT ASK".
 //
-// GolfCourseAPI's free tier is 35 requests a day, and that budget is GLOBAL -
-// one key, shared by every golfer using the site. A Cloudflare Pages Function
-// stands between the app and the API so the key is never in the bundle, but the
-// key was never the hard part. The quota is.
+// GolfCourseAPI's budget is GLOBAL - one key, shared by every golfer using the
+// site. A Cloudflare Pages Function stands between the app and the API so the key
+// is never in the bundle, but the key was never the hard part. The quota was.
+//
+// THIS WAS BUILT AGAINST THE FREE TIER, 35 A DAY. The account is now Pro at
+// 10,000, and the numbers below moved with it - the ceiling, the per-IP cap, the
+// search TTL. The SHAPES did not, and that is the point of this file: the three
+// response shapes and the refusal to collapse them were never about quota.
 //
 // Two things follow, and this file exists to pin both.
 //
-//   THE CACHE IS THE POINT. A search that has been asked once must never cost a
-//   second request, anywhere in the world, for a week. If the cache does not
-//   hold, nothing else here matters - the budget is gone by lunchtime on a
-//   Saturday.
+//   THE CACHE WAS THE POINT, AND IS NOW AN OPTIMISATION. At 35 a day, a search
+//   asked twice was a budget gone by lunchtime on a Saturday. At 10,000 the cache
+//   buys latency and survives a provider outage, and the app would work without
+//   it. Said plainly so nobody defends it on the old grounds.
 //
 //   THE THREE SHAPES MUST STAY THREE. A search that found nothing and a search
 //   that could not be made are DIFFERENT ANSWERS, and collapsing them is the
@@ -123,7 +127,8 @@ const LIVE_SEARCH_EMPTY = { courses: [] };
 // simultaneous requests both read the same counter and both write count+1 - an
 // undercount. This fake will never show that, and teaching it to would be
 // asserting the mock rather than the runtime. The undercount is why the ceiling
-// is 30 of 35 rather than 35 of 35, and that headroom is the mitigation.
+// is 9,000 of 10,000 rather than 10,000 of 10,000, and that headroom is the
+// mitigation. It was 30 of 35 when this was written against the free tier.
 // ---------------------------------------------------------------------------
 function fakeKV(clock) {
     const store = new Map();
@@ -209,12 +214,24 @@ describe('THE MODULE EXISTS AND EXPOSES ONE BUILDER', () => {
          'counterKey', 'rateKey'].forEach((name) => {
             assert.equal(typeof LIB[name], 'function', `_lib.js must export ${name}`);
         });
-        assert.equal(LIB.DAILY_CEILING, 30, 'the ceiling is 30 of 35, leaving headroom for a '
-            + 'retry, a detail fetch, and the undercount eventual consistency permits');
-        assert.equal(LIB.MIN_QUERY, 3);
-        assert.equal(LIB.IP_HOURLY_CAP, 5);
-        assert.equal(LIB.SEARCH_TTL, 7 * 24 * 60 * 60, 'search cached 7 days');
-        assert.equal(LIB.DETAIL_TTL, 30 * 24 * 60 * 60, 'detail cached 30 days');
+        // RE-PINNED FOR PRO. Every one of these moved when the account went from
+        // 35 requests a day to 10,000, and re-pinning them is the deliberate
+        // confirmation this guard exists to demand - not a workaround.
+        assert.equal(LIB.DAILY_CEILING, 9000,
+            'the ceiling is no longer a ration - nothing this app legitimately does approaches '
+            + '9,000 lookups in a day, so reaching it means something is LOOPING');
+        assert.equal(LIB.MIN_QUERY, 3,
+            'unchanged, and deliberately: this was never about quota. It stops a single letter '
+            + 'being sent to a substring matcher.');
+        assert.equal(LIB.IP_HOURLY_CAP, 60,
+            'five an hour made setting up a four-round trip painful. Sixty is invisible to a '
+            + 'person and still stops a script - and it matters MORE now, because it guards a '
+            + 'PAID key.');
+        assert.equal(LIB.SEARCH_TTL, 60 * 60,
+            'search cached an hour, not seven days. A long cache was scarcity protection; its '
+            + 'cost is that a newly added course stays unfindable until it expires.');
+        assert.equal(LIB.DETAIL_TTL, 30 * 24 * 60 * 60,
+            'detail unchanged - par and stroke index do not change');
     });
 
     // CLAUDE.md's standing rule: testing the handler directly proves the handler
@@ -265,7 +282,7 @@ describe('A MISCONFIGURED DEPLOY PRODUCES A REASON, NEVER A CRASH', () => {
     //   one of the three shapes and a caller can do nothing with it.
     //
     //   NO API KEY did not crash, which made it worse: it sent "Bearer
-    //   undefined", SPENT A REQUEST from the 35/day budget to collect a
+    //   undefined", SPENT A REQUEST from the daily budget to collect a
     //   guaranteed 401, and reported upstream_error - pointing whoever read it
     //   at the API rather than at their own dashboard.
 
@@ -285,7 +302,7 @@ describe('A MISCONFIGURED DEPLOY PRODUCES A REASON, NEVER A CRASH', () => {
         assert.equal(res.reason, 'not_configured');
         assert.equal(d.fetch.calls.length, 0,
             'a deploy with no key still called upstream. Every one of those is a request from '
-            + 'a 35/day budget, guaranteed to come back 401, and it would burn the ceiling on '
+            + 'the daily budget, guaranteed to come back 401, and it would burn the ceiling on '
             + 'calls that could never have succeeded.');
         assert.equal(await d.kv.get(LIB.counterKey(d.clock.date())), null,
             'an unconfigured request incremented the daily counter');
@@ -388,12 +405,12 @@ describe('R1 - A CACHE HIT MAKES NO UPSTREAM CALL', () => {
             'the second identical search was not served from cache');
     });
 
-    test('and the cache expires - a 7-day-old search is fetched again', async () => {
+    test('and the cache expires - a stale search is fetched again', async () => {
         skipIfUnbuilt();
         const d = deps();
         await call(d);
         assert.equal(d.fetch.calls.length, 1);
-        d.clock.advance((7 * 24 * 60 * 60 * 1000) + 1000);
+        d.clock.advance((LIB.SEARCH_TTL * 1000) + 1000);
         await call(d);
         assert.equal(d.fetch.calls.length, 2,
             'the cache never expires, so a course added upstream could never be found');
@@ -550,6 +567,37 @@ describe('R4 - ERROR, TIMEOUT AND GARBAGE ALL RETURN unavailable', () => {
 // ===========================================================================
 describe('R5 - A GENUINE ZERO RESULT IS ok WITH AN EMPTY LIST', () => {
 
+    // A ZERO IS STILL AN ANSWER - AND IS NO LONGER STORED.
+    // On the free tier a cached zero was free protection against a repeated typo.
+    // Its cost is that one golfer mistyping "Quintero" makes that misspelling
+    // answer "nothing" for everyone until the entry expires, indistinguishable
+    // from the course not existing. On Pro, re-asking costs one request of ten
+    // thousand and the wrong answer costs a golfer their round.
+    test('a zero result is NOT cached - the next identical search asks again', async () => {
+        skipIfUnbuilt();
+        const clock = fakeClock();
+        const kv = fakeKV(clock);
+        const f = scriptedFetch(() => jsonResponse(LIVE_SEARCH_EMPTY));
+        await call(deps({ clock, kv, fetch: f, q: 'quintaro' }));
+        await call(deps({ clock, kv, fetch: f, q: 'quintaro' }));
+        assert.equal(f.calls.length, 2,
+            'the empty answer was cached, so a single mistyped search makes that spelling '
+            + 'report "nothing" for everyone until it expires');
+        assert.equal(kv.keysMatching('search:').length, 0,
+            'an empty result was written to the cache');
+    });
+
+    test('but a NON-empty result still is - the cache did not simply stop working', async () => {
+        skipIfUnbuilt();
+        const clock = fakeClock();
+        const kv = fakeKV(clock);
+        const f = scriptedFetch(() => jsonResponse(LIVE_SEARCH_LEGACY));
+        await call(deps({ clock, kv, fetch: f, q: 'legacy' }));
+        await call(deps({ clock, kv, fetch: f, q: 'legacy' }));
+        assert.equal(f.calls.length, 1, 'real results are no longer cached either');
+    });
+
+
     test('asked and found nothing -> ok, courses []', async () => {
         skipIfUnbuilt();
         const d = deps({ fetch: scriptedFetch(() => jsonResponse(LIVE_SEARCH_EMPTY)) });
@@ -640,7 +688,7 @@ describe('R7 - KEY NORMALISATION: ONE CACHE ENTRY, NOT FOUR', () => {
             await call(deps({ clock, kv, fetch: fetchStub, q: v }));
         }
         assert.equal(fetchStub.calls.length, 1,
-            `four spellings of one word cost ${fetchStub.calls.length} of 35 requests`);
+            `four spellings of one word cost ${fetchStub.calls.length} requests`);
         assert.equal(kv.keysMatching('search:').length, 1,
             'the store holds more than one entry for the same search');
     });

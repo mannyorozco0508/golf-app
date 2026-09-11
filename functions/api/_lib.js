@@ -10,9 +10,19 @@
 //   200 - so any file in the tree is a downloadable URL. The key lives only in
 //   the Pages encrypted environment and only this Worker ever sees it.
 //
-//   THE QUOTA IS THE HARDER PROBLEM. A cache, a daily ceiling, a per-IP cap and
-//   a minimum query length, because 35 a day divided by a foursome setting up on
-//   a Saturday morning is not many.
+//   THE QUOTA WAS THE HARDER PROBLEM, AND PRO CHANGED THAT. This was built
+//   against the free tier: 35 requests a day, divided by a foursome setting up on
+//   a Saturday morning, is not many. The cache, the daily ceiling, the per-IP cap
+//   and the minimum query length all exist because of that number.
+//
+//   The account is now Pro - 10,000 a day - so the pressure those were built
+//   under is gone. THEY HAVE NOT BEEN REMOVED, and the reasoning below is kept
+//   rather than rewritten, because it explains why the code has the shape it has.
+//   What changed is which of them are load-bearing: the ceiling became a runaway
+//   detector rather than a ration, the per-IP cap now guards a PAID key, and the
+//   cache became an optimisation rather than the difference between working and
+//   not. Said plainly: at 10,000 a day you could delete the cache and the app
+//   would still work. That was not true at 35.
 //
 // WHY THIS FILE EXISTS AT ALL, RATHER THAN THE RULE LIVING IN EACH ROUTE.
 // CLAUDE.md: two entry points means one builder. A hand-written copy in each
@@ -82,27 +92,72 @@
 // The one thing that would still surprise us is the upstream changing its
 // SUCCESS shape. tools/golfcourse-contract-check.js is the answer to that: one
 // real request, run by hand, never in npm test.
+//
+// ---------------------------------------------------------------------------
+// WHY KV AND NOT THE CACHE API - STILL TRUE, AND NO LONGER THE REASON
+// ---------------------------------------------------------------------------
+//
+// Cloudflare's Cache API is per-data-centre: "the contents of the cache do not
+// replicate outside of the originating data center". A 35-a-day budget is
+// GLOBAL, so a search cached in Portland did nothing for a golfer whose request
+// landed in Dallas, and every data centre took its own miss. That is why this
+// uses KV, which is global, and it is still an accurate description of the two
+// products.
+//
+// It is no longer why the code MUST be this way. On Pro the arithmetic that made
+// KV mandatory does not bind. KV is kept for latency, for resilience when the
+// provider is down - a cached course still resolves - and because changing it
+// would buy nothing. The paragraph is left standing because someone will
+// otherwise re-derive the Cache API as an obvious simplification and be right
+// about today and wrong about the reasoning.
 // ============================================================================
 
-// Thirty, not thirty-five. Five in reserve for a retry, for the detail fetch
-// that follows a search, and for the undercount below.
-export const DAILY_CEILING = 30;
+// NINE THOUSAND, AND ITS PURPOSE HAS CHANGED.
+//
+// This was 30 of 35 on the free tier, and it was RATIONING: five in reserve for
+// a retry, the detail fetch that follows a search, and the undercount eventual
+// consistency permits. Every one of those thirty mattered.
+//
+// On Pro - 10,000 a day - rationing is over. The ceiling is now a RUNAWAY
+// DETECTOR. Nothing this app legitimately does approaches nine thousand lookups
+// in a day; a foursome setting up a round costs two. So reaching it does not
+// mean "we have been busy", it means SOMETHING IS LOOPING, and the right
+// response is to look rather than to wait for tomorrow.
+//
+// The thousand of headroom is still there for the same undercount reason.
+export const DAILY_CEILING = 9000;
 export const MIN_QUERY = 3;
-export const IP_HOURLY_CAP = 5;
+// SIXTY AN HOUR, NOT FIVE. Five was tight enough that setting up a four-round
+// trip was painful, and it only made sense while the whole day was thirty-five.
+// It matters MORE now, not less: this is the only thing protecting a PAID key
+// from one bad actor, and sixty is invisible to a person while still stopping a
+// script.
+export const IP_HOURLY_CAP = 60;
 
-// LONG, NOT SHORT, AND THAT IS DELIBERATE. Scarcity inverts the usual instinct:
-// a 7-day search cache costs one request per query per week instead of one per
-// golfer. Course par and stroke index do not change, so detail is cached a
-// month.
-export const SEARCH_TTL = 7 * 24 * 60 * 60;
-// AND A ZERO RESULT IS CACHED FOR THAT SAME WEEK, which is a decision waiting
-// rather than an oversight. A zero result IS a success - the API answered, with
-// nothing - so a misspelled course spends a request to learn nothing and then
-// serves that emptiness to everyone for seven days, indistinguishable from "no
-// such course". Fixing it is the fuzzy-spelling wave, not a TTL tweak: the
-// upstream's own matching is a whole-string substring test and cannot correct a
-// typo, so correction has to happen here, before the request. Recorded under
-// Known open items in HANDOFF.md.
+// ONE HOUR FOR SEARCH, A MONTH FOR DETAIL.
+//
+// Search was SEVEN DAYS because requests were scarce - a week-long cache cost one
+// request per query per week instead of one per golfer. On Pro that pressure is
+// gone, and a long search cache has a cost of its own: a course added upstream
+// stays unfindable until the entry expires. An hour keeps the latency win and
+// the protection against a hammering client, and lets a new course show up the
+// same morning.
+//
+// Detail stays a month. Par and stroke index do not change, and re-fetching them
+// buys nothing.
+export const SEARCH_TTL = 60 * 60;
+// AND A ZERO RESULT IS NO LONGER CACHED AT ALL. That was an open decision while
+// requests were scarce: a zero IS a success - the API answered, with nothing - so
+// caching it was free protection against a repeated typo, at the price of
+// serving that emptiness to everyone for a week, indistinguishable from "no such
+// course". A golfer who mistyped "Quintero" once made it unfindable until the
+// entry expired.
+//
+// On Pro the trade disappears: re-asking costs a request out of ten thousand, and
+// the wrong answer costs a golfer their course. So zeros are not stored. This
+// closes the open item HANDOFF.md recorded under Known open items - not by
+// solving the spelling problem, which is still its own wave, but by removing the
+// part that made a typo persistent.
 export const DETAIL_TTL = 30 * 24 * 60 * 60;
 
 const DEFAULT_BASE = 'https://api.golfcourseapi.com';
@@ -146,7 +201,8 @@ const unavailable = (reason) => ({ status: 'unavailable', reason });
 //
 // KV IS EVENTUALLY CONSISTENT, so two requests arriving together can both read
 // the same count and both write count+1 - an undercount. That is why the
-// ceiling is 30 of 35 rather than 35 of 35. Exact counting needs Durable
+// ceiling is 9,000 of 10,000 rather than 10,000 of 10,000 - it was 30 of 35
+// when this was written against the free tier. Exact counting needs Durable
 // Objects, which is a paid product and more machinery than this earns.
 // ---------------------------------------------------------------------------
 async function bump(kv, key, ttl) {
@@ -167,7 +223,7 @@ const readCount = async (kv, key) => parseInt((await kv.get(key)) || '0', 10);
 //   one of the three shapes and not something a caller can interpret.
 //
 //   NO API KEY. Worse in one way: it did NOT crash. It sent
-//   "Bearer undefined" upstream, SPENT A REQUEST from the 35/day budget to
+//   "Bearer undefined" upstream, SPENT A REQUEST from the daily budget to
 //   collect a guaranteed 401, and reported upstream_error - pointing whoever
 //   read it at the API rather than at their own dashboard. Repeat that and the
 //   day's ceiling is burned on requests that could never have succeeded.
@@ -268,9 +324,17 @@ export async function handleSearch(d) {
     // received. Trimming here would also mean invalidating every cached entry
     // the day ranking arrives.
     //
-    // ONLY SUCCESS IS CACHED. Caching a failure would make one bad upstream
-    // minute hide a course for seven days.
-    await kv.put(searchCacheKey(q), JSON.stringify(asked.value), { expirationTtl: SEARCH_TTL });
+    // ONLY SUCCESS IS CACHED, AND A ZERO RESULT IS NOT A SUCCESS WORTH KEEPING.
+    //
+    // Caching a failure would make one bad upstream minute hide a course for the
+    // whole TTL. And an EMPTY result is the subtler version of the same thing: a
+    // golfer who mistypes a course name once would make that misspelling
+    // permanently answer "nothing", indistinguishable from the course not
+    // existing, for everyone. On Pro, re-asking costs one request out of ten
+    // thousand and the wrong answer costs a golfer their round.
+    if (asked.value.length > 0) {
+        await kv.put(searchCacheKey(q), JSON.stringify(asked.value), { expirationTtl: SEARCH_TTL });
+    }
     return { status: 'ok', courses: asked.value };
 }
 

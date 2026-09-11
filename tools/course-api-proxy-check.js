@@ -159,7 +159,7 @@ async function get(pathname) {
         if (upstreamHits.length !== before) {
             failures.push('a second identical search hit the upstream again, so nothing was '
                 + 'cached. Either context.env.GOLFCOURSE_KV is not a working namespace at '
-                + 'runtime, or the write silently failed - and the 35/day budget has no cache '
+                + 'runtime, or the write silently failed - and the daily budget has no cache '
                 + 'in front of it.');
         }
         if (!again.body || again.body.status !== 'ok' || again.body.courses.length !== 1) {

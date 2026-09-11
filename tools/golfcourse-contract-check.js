@@ -4,6 +4,12 @@
 //
 // MANUAL ONLY. THIS SPENDS QUOTA. IT MUST NEVER RUN IN npm test.
 //
+// The account is on Pro - 10,000 requests a day, not 35 - so one request is no
+// longer expensive. The --live gate STAYS anyway: a tool that costs money should
+// be deliberate, every sweep here globs tools/*check*.js and that filename
+// matches, and a header saying "manual only" cannot stop a glob. What has come
+// down is the alarm, not the gate.
+//
 // course_api_proxy_test.js drives a stub whose success responses are bytes
 // captured from the live API. That stub is the only thing standing between us
 // and a design built on what the API returned once, in September 2026. Four
@@ -15,11 +21,10 @@
 // every test stays green and the live app breaks. No stub can catch that. Only
 // asking the real API can.
 //
-// WHY IT IS NOT IN THE SUITE. The free tier is 35 requests a day, shared by
-// every golfer using the site. A test suite that spends that budget is a suite
-// you stop running, and the day you stop running it is the day it stops
-// protecting anything. So this is a tool you invoke deliberately, and it tells
-// you what it cost.
+// WHY IT IS NOT IN THE SUITE. A test suite that spends a metered budget is a
+// suite you stop running, and the day you stop running it is the day it stops
+// protecting anything. That was acute at 35 a day and is merely true at 10,000.
+// So this is a tool you invoke deliberately, and it tells you what it cost.
 //
 //   node tools/golfcourse-contract-check.js --live            1 request
 //   node tools/golfcourse-contract-check.js --live --detail   2 requests
@@ -67,7 +72,7 @@ const bail = (why, extra) => {
         requestsSpent: spent,
         spentNote: spent > 0
             ? 'AT LEAST ONE REQUEST WAS STARTED. If it reached the API before failing it has '
-              + 'been counted against the 35/day budget, and we cannot tell from here.'
+              + 'been counted against the daily budget, and we cannot tell from here.'
             : 'nothing was sent'
     }, null, 2));
     process.exit(2);
@@ -160,7 +165,7 @@ const OPTED_IN = process.argv.includes('--live')
     if (!OPTED_IN) {
         console.log(JSON.stringify({
             verdict: 'COULD NOT RUN',
-            why: 'this check SPENDS from the 35/day GolfCourseAPI budget and will not run '
+            why: 'this check SPENDS from the GolfCourseAPI daily budget and will not run '
                + 'without an explicit opt-in. Re-run with --live when you actually want to '
                + 'know whether the upstream contract still holds.',
             requestsSpent: 0
@@ -231,7 +236,7 @@ const OPTED_IN = process.argv.includes('--live')
     const verdict = failures.length ? 'FAIL' : 'PASS';
     console.log(JSON.stringify({
         verdict, requestsSpent: spent,
-        note: 'These came out of the 35/day budget. The proxy has its own counter in KV and '
+        note: 'These came out of the daily budget - 10,000 on Pro. The proxy has its own counter in KV and '
             + 'knows nothing about requests made by this tool.',
         failures, observed
     }, null, 2));

@@ -218,7 +218,7 @@ that file, and a `//` comment makes it throw.
 
 **Unmapped courses now seed a BLANK grid**, not par 4 with stroke indexes 1–18. That old seed was a complete, well-formed, fictional card that passed every validation check, and saving it poisoned `global_courses` for all users. Blank makes the existing "Hole 1 is missing a Par" refusal reachable. Don't reintroduce a default.
 
-A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **The free tier is 35 requests/day, not 50** — this line said 50 until 2026-09-11; golfcourseapi.com states "Up to 35 requests per day" and the whole proxy design below is built on 35. Each course still costs two: search returns only a *count* of tee boxes, so the tee data needs a second request by id.
+A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **The account is on the PRO plan: 10,000 requests/day.** The free tier is 35 — this line said 50 until 2026-09-11, then 35, and the upgrade landed the same week. The proxy was designed against 35 and its numbers moved with the plan; the design notes below keep the free-tier reasoning because it explains the shape of the code, not because it still binds. Each course still costs two: search returns only a *count* of tee boxes, so the tee data needs a second request by id.
 
 ## The course API proxy — configuring it in Cloudflare
 
@@ -272,7 +272,7 @@ Open these in any browser, in order. Each rung tells you something the one befor
 | Request | Expected | If you get something else |
 |---|---|---|
 | `/api/course-search?q=ab` | `{"status":"unavailable","reason":"query_too_short"}` | Routing is broken. This rung needs no key and no KV, so it is the cheapest proof Cloudflare is serving the Function at all |
-| `/api/course-search?q=streamsong` | `{"status":"ok","courses":[…]}` — four Streamsong courses. **This spends one of the 35** | See the reading below |
+| `/api/course-search?q=streamsong` | `{"status":"ok","courses":[…]}` — four Streamsong courses. **This spends one request** (of 10,000 on Pro) | See the reading below |
 | the same URL again | identical, instantly, **and no second request spent** | The cache is not working — check the binding *name* |
 
 **The reading — this replaces an earlier version of these notes that was wrong:**
@@ -331,27 +331,24 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
-- **A MISSPELLED COURSE GETS CACHED AS A GENUINE EMPTY FOR SEVEN DAYS. Decision
-waiting for the fuzzy-spelling wave.** The course proxy caches successful searches
-for 7 days, and a zero-result search IS a success — the API answered, it just
-answered with nothing. So a golfer who types "Quintaro" instead of "Quintero"
-spends one of thirty-five requests to learn nothing, and then that empty answer is
-served to everyone for a week. The next golfer who makes the same typo gets the
-same empty list instantly, which looks identical to "this course does not exist".
-  - **Why it is not fixed in the proxy wave.** The fix is not a TTL tweak. Three
-    options, and they trade against each other: cache zero results for much less
-    (say an hour), which costs quota on repeated typos; do not cache them at all,
-    which is worse — a common misspelling would burn the budget; or correct the
-    spelling before asking, which is the fuzzy wave and needs a local dictionary
-    because the upstream's own matching is a whole-string substring test and
-    cannot help.
-  - **The trap in the third option.** The API's fuzzy_match is substring-on-the-
-    whole-query, so it fails on a misspelling exactly as it failed on "Legacy Golf
-    Club" vs "Legacy Golf Resort". Correction has to happen on our side, before
-    the request, or it costs a request to discover it was needed.
-  - Whatever that wave decides, the zero-result TTL is part of it. It is called out
-    in `functions/api/_lib.js` beside `SEARCH_TTL`.
-
+- **CLOSED 2026-09-11 — a misspelled course is no longer cached as a genuine empty.**
+The proxy cached successful searches for 7 days, and a zero-result search *is* a
+success — the API answered, it just answered with nothing. So a golfer typing
+"Quintaro" for "Quintero" spent a request to learn nothing, and then that empty
+answer was served to everyone for a week, indistinguishable from "this course does
+not exist".
+  - **What closed it was the Pro upgrade, not a clever fix.** At 35 requests a day
+    the trade was real: caching zeros was free protection against a repeated typo,
+    and not caching them risked burning the budget on a common misspelling. At
+    10,000 a day re-asking costs one request and the wrong answer costs a golfer
+    their round, so zeros are simply not stored. `functions/api/_lib.js` asserts
+    it both ways — an empty result is fetched again, a non-empty one is still
+    cached.
+  - **The spelling problem itself is still open and still its own wave.** The
+    upstream's `fuzzy_match` is a whole-string substring test, so it fails on a
+    misspelling exactly as it failed on "Legacy Golf Club" vs "Legacy Golf
+    Resort". Correction has to happen on our side, before the request, against a
+    local dictionary. What changed is only that a typo is no longer *persistent*.
 
 - **`window.currentData` in `tournament-scorecard.html` is `undefined`, and two
 renderers depend on it not being reached.** A trap for whoever adds a third call site.
