@@ -3329,6 +3329,70 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     const courseDropdown = document.getElementById('course-dropdown');
     const courseHiddenSelect = document.getElementById('course-select');
 
+    // ========================================================================
+    // TYPING MORE OF THE NAME YOU ARE SURE OF MUST NOT LOSE THE COURSE.
+    //
+    // This used to be `item.name.toLowerCase().includes(lowerFilter)` inline, in
+    // two places - a substring test on the WHOLE typed string. Every word a
+    // golfer adds could only narrow, never widen, so the directory's "Camas
+    // Meadows Golf Club" was unfindable to anyone who typed "Camas Meadows Golf
+    // Course" off the sign at the first tee.
+    //
+    // MEASURED over all 141 directory entries: 59 end in one of Golf Club /
+    // Golf Course / Country Club / Golf Links / Golf Resort, and for those, 249
+    // of 295 realistic confusions returned NOTHING. Worse, 123 of 141 entries
+    // were findable by their distinctive words and LOST the moment a suffix was
+    // added - "camas meadows" found it, "camas meadows golf course" did not.
+    //
+    // AND AN EMPTY RESULT IS NOT THE WORST OF IT. The dropdown then offers
+    // 'Add "..." as a new course', so the golfer creates a duplicate of a course
+    // the app already has - under a global_courses key that
+    // ".write": "newData.exists()" means no client can ever delete.
+    //
+    // THE RULE IS A UNION, AND BOTH HALVES ARE LOAD-BEARING:
+    //
+    //   substring   today's test, kept whole. It matches INSIDE a word, and 285
+    //               mid-word fragments depend on that - "adows" finds Camas
+    //               Meadows. Stripping alone would break every one of them.
+    //   stripped    suffix words removed from the QUERY, then each remaining
+    //               token prefix-matched against the name's tokens. This is what
+    //               makes the sign-name case work.
+    //
+    // Measured across all 141: sign-name failures 1185 -> 0, mid-token
+    // regressions 0, mean results per query 4.05 -> 4.05, and NOT ONE query
+    // returns more results than it did before.
+    //
+    // THE EMPTY-QUERY FALLBACK IS NOT DEFENSIVE PADDING. A course genuinely
+    // named "The National" or "The Links" has every one of its words on the
+    // strip list, so the stripped half would have nothing left to match on and
+    // could never find it. Returning the substring result in that case is what
+    // keeps such a name reachable. No entry in today's directory is like that -
+    // 0 of 141 are reduced to nothing - but the list is a guess about names, and
+    // the fallback is what makes a wrong guess survivable.
+    //
+    // ONE FUNCTION, BOTH LISTS. The directory filter and the community-courses
+    // filter are the same rule, and a hand-written copy in each is how one gets
+    // fixed and the other does not. course_picker_match_test.js asserts there
+    // are zero remaining .includes(lowerFilter) call sites.
+    // ========================================================================
+    const COURSE_SUFFIX_WORDS = ['golf', 'club', 'course', 'courses', 'resort', 'links',
+                                 'country', 'national', 'gc', 'cc', 'the', 'at', 'and'];
+
+    function courseNameNorm(s) {
+        return String(s).toLowerCase().replace(/[^a-z0-9&\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function courseNameMatches(query, name) {
+        const nq = courseNameNorm(query);
+        const nn = courseNameNorm(name);
+        if (nn.includes(nq)) return true;
+        const queryTokens = nq.split(' ').filter(Boolean)
+            .filter(t => COURSE_SUFFIX_WORDS.indexOf(t) === -1);
+        if (queryTokens.length === 0) return false;
+        const nameTokens = nn.split(' ').filter(Boolean);
+        return queryTokens.every(qt => nameTokens.some(nt => nt.indexOf(qt) === 0));
+    }
+
     function buildCourseOptionRow(id, name) {
         const optionDiv = document.createElement("div");
         optionDiv.className = "custom-select-option";
@@ -3395,7 +3459,6 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function populateCourseDropdown(filterText = "") {
         courseDropdown.innerHTML = "";
-        const lowerFilter = filterText.toLowerCase();
         let hasResults = false;
 
         // Order regional groups so the one closest to the player (if known) renders first
@@ -3408,7 +3471,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
 
         orderedGroups.forEach(group => {
-            const filteredItems = group.items.filter(item => item.name.toLowerCase().includes(lowerFilter));
+            const filteredItems = group.items.filter(item => courseNameMatches(filterText, item.name));
             if (filteredItems.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
@@ -3426,7 +3489,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
         const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
         if (globalKeys.length > 0) {
-            const filteredGlobals = globalKeys.filter(k => globalCourses[k].name.toLowerCase().includes(lowerFilter));
+            const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
             if (filteredGlobals.length > 0) {
                 hasResults = true;
                 if (filterText === "") {

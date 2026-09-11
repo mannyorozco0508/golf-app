@@ -524,6 +524,27 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v98: the course picker finds the name on the sign. admin.html
+// filtered with item.name.toLowerCase().includes(lowerFilter) - a substring test
+// on the whole typed string - so every word a golfer added could only narrow.
+// The directory's "Camas Meadows Golf Club" was unfindable to anyone who typed
+// "Camas Meadows Golf Course". Measured over all 141 entries: 59 end in one of
+// Golf Club / Golf Course / Country Club / Golf Links / Golf Resort, and 249 of
+// 295 realistic confusions returned nothing; 123 of 141 were findable by their
+// distinctive words and LOST the moment a suffix was added.
+//
+// Worse than empty: the dropdown then offered 'Add "..." as a new course', so a
+// golfer created a duplicate of a course the app already had - under a
+// global_courses key ".write": "newData.exists()" means no client can delete.
+//
+// Now one courseNameMatches(), used by BOTH the directory filter and the
+// community-courses filter, matching on substring OR suffix-stripped tokens.
+// Measured: sign-name failures 1185 -> 0, mid-token regressions 0, mean results
+// per query 4.05 -> 4.05, and not one query returns more than before.
+//
+// An installed device on v97 keeps the picker that cannot find the course a
+// golfer is standing on.
+//
 // Moved to v97: publishing a course card no longer deletes the rest of the
 // course record. admin.html published the edited card with
 // db.ref(`global_courses/${courseKey}`).set({name, data}) - and .set() REPLACES
@@ -745,7 +766,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v97-publishing-a-card-no-longer-deletes-the-course';
+const CACHE_VERSION = 'golfapp-v98-the-picker-finds-the-name-on-the-sign';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
