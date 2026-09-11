@@ -179,11 +179,48 @@ const findsTarget = (res) => (res.rowText || []).some((t) => t === TARGET);
     // Measured today: "Pine" matches exactly 3 of the 141 directory entries.
     const pine = await typeInPicker('Pine');
     if (!pine.ran) bail('the noise arm did not run: ' + pine.reason);
-    const pineCourses = (pine.rowText || []).filter((t) => !/^Add "/.test(t));
+    // THERE ARE FOUR ROW TYPES IN THIS DROPDOWN NOW, AND THIS LINE KNEW ABOUT TWO.
+    //
+    // When this check was written the dropdown held directory courses and an
+    // 'Add "X" as a new course' row, so "anything that is not Add is a course"
+    // was exactly true. The import wave added two more kinds:
+    //
+    //   'Search online for "X"'  admin.html:3961 - an AFFORDANCE, not a result.
+    //                            It is present whatever the matcher does.
+    //   online results           admin.html:3629, class course-online-result -
+    //                            courses from the provider, not the directory.
+    //
+    // Counting the search affordance as a course is what made this check report
+    // FAIL the moment the feature shipped: "Pine" still matched its 3 directory
+    // courses, and the fourth row was the new affordance sitting underneath them.
+    //
+    // THE EXCLUSION IS BY ROW TYPE, NOT BY SUBTRACTING ONE. A matcher that
+    // genuinely got noisier adds COURSE rows, and every one of those is still
+    // counted - which is what the >3 assertion below is for, unchanged.
+    // NOT ANCHORED, AND THAT IS THE POINT. The original pattern here was
+    // /^Add "/, which matched NOTHING: the add row renders as
+    // '\u2795 Add "Pine" as a new course' (admin.html:3982) and the search row as
+    // '\uD83C\uDF10 Search online for "Pine"' (admin.html:3961) - both lead with a
+    // glyph, so neither is at the start of the string. Caught by the negative
+    // control below: with the Pine courses removed the count read 1, not 0,
+    // because the add row was still being counted as a course.
+    const NOT_A_DIRECTORY_COURSE = /Add "|Search online for/;
+    const pineCourses = (pine.rowText || []).filter((t) => !NOT_A_DIRECTORY_COURSE.test(t));
     observed.noise = { rowCount: pine.rowCount, courseRows: pineCourses };
     if (pineCourses.length > 3) {
         failures.push('typing "Pine" now offers ' + pineCourses.length + ' courses where today '
             + 'it offers 3: ' + JSON.stringify(pineCourses) + '. The matcher got noisier.');
+    }
+
+    // AND THE FLOOR, because the filter above is now the only thing deciding what
+    // counts as a course. A pattern that matched too much would leave this list
+    // empty, and an empty list satisfies "not more than 3" forever - CLAUDE.md's
+    // empty-slice failure, arriving through a filter instead of a slice.
+    if (pineCourses.length < 3) {
+        failures.push('typing "Pine" offers only ' + pineCourses.length + ' courses where today '
+            + 'it offers 3: ' + JSON.stringify(pine.rowText || []) + '. Either the matcher got '
+            + 'narrower, or NOT_A_DIRECTORY_COURSE above is eating real course rows - which '
+            + 'would make the noise assertion unfalsifiable.');
     }
 
     const verdict = failures.length ? 'FAIL' : 'PASS';
