@@ -435,7 +435,18 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
         const save = SRC_CODE.slice(SRC_CODE.indexOf('function saveSettings()'));
         assert.match(save, /const preview = previewCourseData\(courseKey\);/);
         const refusal = save.indexOf('if (!preview.ok) {');
-        const writeIdx = save.indexOf('db.ref(`global_courses/${courseKey}`).set(');
+        // THE ANCHOR IS METHOD-AGNOSTIC ON PURPOSE. It locates the publish by its
+        // PATH, not by the method called on it. An earlier version matched the
+        // literal `.set(`, and when the publish became `.update()` - so that it
+        // stops deleting children it does not name - this assertion and two
+        // others in a second file went red for a change none of them was about.
+        // What each one actually guards was still true the whole time.
+        //
+        // The method IS guarded, deliberately and in one place:
+        // course_publish_merge_test.js owns it, with the reason. Duplicating it
+        // here would put the same rule in three files and break all three the
+        // next time it legitimately moves.
+        const writeIdx = save.indexOf('db.ref(`global_courses/${courseKey}`)');
         assert.ok(refusal > -1, 'saveSettings must refuse an invalid card');
         assert.ok(refusal < writeIdx, 'the refusal must gate the write');
         assert.match(save.slice(refusal, writeIdx), /return;/,
@@ -544,7 +555,11 @@ describe('NOTHING ELSE MOVED', () => {
 
     test('no Firebase rules or security surface changed', () => {
         assert.ok(!/validateCourseGrid/.test(read('database.rules.json')));
-        assert.match(SRC_CODE, /db\.ref\(`global_courses\/\$\{courseKey\}`\)\.set\(/,
+        // Method-agnostic for the reason given above the other anchor in this
+        // file: this asserts there is exactly ONE write path to global_courses,
+        // which is a fact about the path. Whether it is set or update is
+        // course_publish_merge_test.js's business.
+        assert.match(SRC_CODE, /db\.ref\(`global_courses\/\$\{courseKey\}`\)\.(?:set|update)\(/,
             'the same single global-course write path');
     });
 });

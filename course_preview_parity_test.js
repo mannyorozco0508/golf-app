@@ -231,7 +231,14 @@ describe('previewCourseData() publishes the same card it always did', () => {
         const path = require('path');
         const { REPO_ROOT } = require('./helpers/load-script.js');
         const src = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
-        const at = src.indexOf('db.ref(`global_courses/${courseKey}`).set(');
+        // METHOD-AGNOSTIC ANCHOR. This test is about WHICH ARRAY reaches
+        // global_courses - untrimmed, not the round-length-trimmed card. That is
+        // a fact about the payload and has nothing to do with set vs update.
+        // Anchoring on `.set(` made it go red when the publish became `.update()`
+        // to stop deleting children it does not name, which is a change this
+        // assertion has no opinion about. The method is guarded once, in
+        // course_publish_merge_test.js.
+        const at = src.indexOf('db.ref(`global_courses/${courseKey}`)');
         assert.ok(at > -1, 'the publish call must still exist');
         const block = src.slice(at, at + 220);
         assert.match(block, /data: preview\.untrimmed/,

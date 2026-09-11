@@ -5129,8 +5129,37 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // the course's name WITHOUT the round-length suffix. A group playing the
             // back nine must not shorten or rename the course for everyone else.
             if (preview.isEditing) {
-                // A BARE .set() UNTIL NOW. Nothing observed this promise, so when the
-                // deployed Tier-B rules refused a card the round saved normally, the
+                // PUBLISHING MUST NEVER TOUCH A CHILD IT DOES NOT NAME. That is
+                // why this is .update() and not .set(), and it is not a style
+                // preference - it is the difference between editing a course and
+                // deleting most of it.
+                //
+                // .set() REPLACES THE WHOLE NODE. While a course record held only
+                // name and data that was invisible, because those are the two
+                // fields written here. The moment a record holds anything more -
+                // imported tee sets with their own ratings and slopes, a street
+                // address, the provider id it was imported from - a .set() here
+                // removes all of it. Measured: a record seeded with
+                // ["data","location","name","source","tees"] came back as
+                // ["data","name"] after one ordinary save.
+                //
+                // AND THE DAMAGE IS PERMANENT. global_courses/$courseId carries
+                // ".write": "newData.exists()", so a client may create and
+                // overwrite but can NEVER delete. Nothing here can put back what
+                // an overwrite removed - not this page, not any other, not a
+                // later fix. Recovery means importing the course again from the
+                // provider and hoping nobody saves in between.
+                //
+                // The same rule applies to the payload: every key added below is
+                // a key this write starts overwriting wholesale. Widening it
+                // re-acquires the bug one child at a time.
+                //
+                // course_publish_merge_test.js and tools/course-publish-merge-check.js
+                // hold both halves - the method, and the payload staying exactly
+                // name and data.
+                //
+                // NOTHING OBSERVED THIS PROMISE UNTIL v84. When the deployed
+                // Tier-B rules refused a card the round saved normally, the
                 // organizer was handed Round Ready, and nothing anywhere said the
                 // shared list had not updated. The next group to pick that course
                 // silently got the old card.
@@ -5139,7 +5168,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // taken from preview.data locally, so a refused publish costs the
                 // shared database an update and costs this round nothing. That is
                 // why this stays fire-and-forget and only ever ADDS a note.
-                const publishPromise = db.ref(`global_courses/${courseKey}`).set({
+                const publishPromise = db.ref(`global_courses/${courseKey}`).update({
                     name: selectedCourseName,
                     data: preview.untrimmed
                 });

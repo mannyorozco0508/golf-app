@@ -524,6 +524,25 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v97: publishing a course card no longer deletes the rest of the
+// course record. admin.html published the edited card with
+// db.ref(`global_courses/${courseKey}`).set({name, data}) - and .set() REPLACES
+// THE WHOLE NODE. Harmless while a record held only name and data; a silent
+// deletion the moment one holds anything else. Measured cold: a record seeded
+// with ["data","location","name","source","tees"] came back ["data","name"]
+// after one ordinary save. It is now .update(), which merges.
+//
+// THIS BLOCKS THE COURSE IMPORT, which is why it ships alone and first. Every
+// field that import would add - tee sets with their own ratings and slopes, the
+// street address, the provider id - had a golfer-triggered deletion path with no
+// warning. And global_courses/$courseId carries ".write": "newData.exists()", so
+// no client can restore what the overwrite removed: recovery meant importing the
+// course again.
+//
+// An installed device without this bump keeps serving the admin.html that
+// overwrites. One golfer on a stale shell is enough to wipe an imported course
+// for everybody.
+//
 // Moved to v96, PART TWO: a team score goes into the round it was played in, and
 // only when that round is open. tournament-scorecard.html has three functions
 // that write a score and only saveIndividualScore asked either question. Measured
@@ -726,7 +745,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v96-a-team-score-goes-in-its-own-round';
+const CACHE_VERSION = 'golfapp-v97-publishing-a-card-no-longer-deletes-the-course';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
