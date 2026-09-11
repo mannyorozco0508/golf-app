@@ -218,7 +218,80 @@ that file, and a `//` comment makes it throw.
 
 **Unmapped courses now seed a BLANK grid**, not par 4 with stroke indexes 1–18. That old seed was a complete, well-formed, fictional card that passed every validation check, and saving it poisoned `global_courses` for all users. Blank makes the existing "Hole 1 is missing a Par" refusal reachable. Don't reintroduce a default.
 
-A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. Free tier is 50 requests/day and each course costs two.
+A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **The free tier is 35 requests/day, not 50** — this line said 50 until 2026-09-11; golfcourseapi.com states "Up to 35 requests per day" and the whole proxy design below is built on 35. Each course still costs two: search returns only a *count* of tee boxes, so the tee data needs a second request by id.
+
+## The course API proxy — configuring it in Cloudflare
+
+`functions/api/` holds a Pages Function that proxies GolfCourseAPI so the key is never in the browser. **Nothing in the app calls it yet.** Wiring it into the picker is a later wave; until then it is reachable only by curl.
+
+**Why a proxy at all, and why the key can only ever be an environment variable.** Cloudflare Pages serves this repository root *directly*, with no build command — measured on the live site, `/package.json` and `/CLAUDE.md` both return 200. So every file in this tree is a downloadable URL. A key in any file would be one too, and `sw.js` would precache it onto every installed device.
+
+### The walkthrough. Do it in this order — the namespace must exist before it can be bound.
+
+**1. Create the KV namespace**
+
+1. dash.cloudflare.com, log in
+2. Left sidebar → **Storage & Databases** → **KV** (older accounts: **Workers & Pages** → the **KV** tab)
+3. **Create a namespace**
+4. Name it `golfcourse-cache`
+5. Create
+
+Free plan gives 100,000 reads and 1,000 writes a day. This uses at most 35 writes.
+
+**2. Bind it to the Pages project**
+
+6. Left sidebar → **Workers & Pages**
+7. Open the project serving `golf-app-5a5.pages.dev`
+8. **Settings** tab
+9. **Bindings** (older: **Functions** → **KV namespace bindings**)
+10. **Add** → **KV namespace**
+11. Variable name: **`GOLFCOURSE_KV`** — exactly that. The code reads `context.env.GOLFCOURSE_KV`; any other name means no cache and no counter
+12. Namespace: `golfcourse-cache`
+13. Save. If Production and Preview are offered separately, do **both**
+
+**3. The API key**
+
+14. Same Settings page → **Variables and Secrets** (older: **Environment variables**)
+15. Under **Production**, **Add variable**
+16. Name `GOLFCOURSE_API_KEY`, value = the key
+17. **Click Encrypt before saving.** That makes it a secret you can replace but never read back
+18. Save. Repeat under Preview if you use preview deployments
+
+**Do NOT set `GOLFCOURSE_API_BASE` in production.** It defaults to `https://api.golfcourseapi.com` when unset and exists only so a local test can point the Function at a stub upstream. Setting it in production would silently redirect every course lookup away from the real API.
+
+**4. Redeploy — the step everyone misses**
+
+19. **Deployments** tab → most recent → **Retry deployment**
+
+Bindings and variables only reach deployments made *after* they are set. Without this the namespace exists, the key exists, and the Function sees neither.
+
+### The verification ladder
+
+Open these in any browser, in order. Each rung tells you something the one before it cannot.
+
+| Request | Expected | If you get something else |
+|---|---|---|
+| `/api/course-search?q=ab` | `{"status":"unavailable","reason":"query_too_short"}` | Routing is broken. This rung needs no key and no KV, so it is the cheapest proof Cloudflare is serving the Function at all |
+| `/api/course-search?q=streamsong` | `{"status":"ok","courses":[…]}` — four Streamsong courses. **This spends one of the 35** | See the reading below |
+| the same URL again | identical, instantly, **and no second request spent** | The cache is not working — check the binding *name* |
+
+**The reading — this replaces an earlier version of these notes that was wrong:**
+
+- `query_too_short` on `?q=ab` — routing works
+- `not_configured` on a real query — a binding is missing. Check **both** `GOLFCOURSE_KV` and `GOLFCOURSE_API_KEY`, and remember a binding only reaches deployments made *after* it is set, so the answer is often step 19
+- `upstream_error` on a real query — the key is present but **wrong**
+- `courses` — everything is wired
+- **HTTP 500 / "error code: 1101"** — should now be impossible. It meant the Function threw instead of returning a reason, which is what a missing KV binding used to do. If you ever see it again, that is a bug worth reporting
+
+An earlier draft of these notes said a wrong binding name shows as `daily_limit`. It does not and never did — it showed as a 1101, and now shows as `not_configured`.
+
+### Reasons the Function can return
+
+`query_too_short` · `not_configured` · `bad_course_id` · `rate_limited` · `daily_limit` · `upstream_error` · `network`
+
+That vocabulary is closed and documented in `functions/api/_lib.js`; a test asserts every reason the code emits appears in that table and vice versa, so it cannot go stale in either direction.
+
+**The three shapes never collapse.** `ok` with courses, `ok` with an empty array, and `unavailable` with a reason. An `unavailable` carries *no* `courses` key at all — absent, not empty — so a caller that forgets to check `status` cannot read an empty list out of a failure and tell a golfer the course does not exist.
 
 ## Offline — VERIFIED ON REAL HARDWARE, 2026-09-06
 
@@ -385,6 +458,28 @@ Every one passed a green suite and a passing device check. `tools/lib/cold-arriv
 is the shared harness: it blocks the Firebase bundles, injects a small stand-in
 before any page script, and lets the page run its own init, its own listener and
 its own render. If the page does not do something on its own, it does not happen.
+
+**TWO OF THESE ARE NOT COLD-ARRIVAL CHECKS, AND THE DIFFERENCE MATTERS.**
+`tools/course-api-proxy-check.js` and `tools/golfcourse-contract-check.js` drive
+HTTP, not a browser — there is no page to arrive at. Everything else in `tools/`
+means "Chrome, cold, touch nothing"; those two do not, and are called out here so
+nobody reads them as evidence about a rendered page.
+
+- **`tools/course-api-proxy-check.js`** runs the real `wrangler pages dev` against
+  a stub upstream and asserts over HTTP what the unit suite structurally cannot:
+  that Pages routes `functions/api/course-search.js` to `/api/course-search`, that
+  `context.env.GOLFCOURSE_KV` is a working namespace at runtime, that an encrypted
+  variable actually arrives in `context.env`, and that a deploy with **no** KV
+  binding returns `not_configured` rather than Cloudflare's `1101`. It takes about
+  a minute because it starts wrangler twice — once configured, once not. Needs
+  `npm install` first; wrangler is a devDependency.
+- **`tools/golfcourse-contract-check.js` SPENDS FROM THE 35/DAY BUDGET and will
+  not run without `--live`.** It asks the real API one question — has the success
+  shape changed — which is the one thing no stub can ever prove. The gate exists
+  because every sweep here globs `tools/*check*.js` and that filename matches; a
+  header saying "manual only" cannot stop a glob. Without `--live` it exits 2
+  having sent nothing. It reports what it spent, including when a request died
+  in flight and may have been counted upstream anyway.
 
 These exist because the node suite **structurally cannot** assert two things:
 **geometry** — `helpers/mini-dom.js` returns a hard-coded zero rect and implements

@@ -255,6 +255,102 @@ describe('THE MODULE EXISTS AND EXPOSES ONE BUILDER', () => {
 });
 
 // ===========================================================================
+describe('A MISCONFIGURED DEPLOY PRODUCES A REASON, NEVER A CRASH', () => {
+
+    // BOTH OF THESE WERE REAL, AND BOTH WERE FOUND ON THE LIVE SITE AFTER THE
+    // Function had already been pushed - not by reading the code.
+    //
+    //   NO KV BINDING gave "error code: 1101" at HTTP 500, because
+    //   context.env.GOLFCOURSE_KV was undefined and kv.get threw. A 1101 is not
+    //   one of the three shapes and a caller can do nothing with it.
+    //
+    //   NO API KEY did not crash, which made it worse: it sent "Bearer
+    //   undefined", SPENT A REQUEST from the 35/day budget to collect a
+    //   guaranteed 401, and reported upstream_error - pointing whoever read it
+    //   at the API rather than at their own dashboard.
+
+    test('no KV binding -> not_configured, and nothing throws', async () => {
+        skipIfUnbuilt();
+        const d = deps({ kv: undefined, env: { GOLFCOURSE_API_KEY: 'k' } });
+        const res = await call(d);
+        assert.equal(res.status, 'unavailable');
+        assert.equal(res.reason, 'not_configured');
+        assert.ok(!('courses' in res));
+    });
+
+    test('no API key -> not_configured, and NO REQUEST IS SPENT', async () => {
+        skipIfUnbuilt();
+        const d = deps({ env: { GOLFCOURSE_API_BASE: 'https://upstream.test' } });
+        const res = await call(d);
+        assert.equal(res.reason, 'not_configured');
+        assert.equal(d.fetch.calls.length, 0,
+            'a deploy with no key still called upstream. Every one of those is a request from '
+            + 'a 35/day budget, guaranteed to come back 401, and it would burn the ceiling on '
+            + 'calls that could never have succeeded.');
+        assert.equal(await d.kv.get(LIB.counterKey(d.clock.date())), null,
+            'an unconfigured request incremented the daily counter');
+    });
+
+    test('neither binding -> not_configured', async () => {
+        skipIfUnbuilt();
+        const res = await call(deps({ kv: undefined, env: {} }));
+        assert.equal(res.reason, 'not_configured');
+    });
+
+    test('the detail route is guarded the same way', async () => {
+        skipIfUnbuilt();
+        const res = await LIB.handleDetail({ id: 'bwcdmzcy', env: {}, kv: undefined });
+        assert.equal(res.status, 'unavailable');
+        assert.equal(res.reason, 'not_configured');
+        assert.ok(!('course' in res));
+    });
+
+    // THE ORDER MATTERS AND IS ASSERTED. query_too_short must still answer with
+    // nothing configured at all, because that is the cheapest possible live
+    // proof that Cloudflare is routing the file - it needs no key, no KV and no
+    // upstream. It is step one of the dashboard checklist.
+    test('a short query STILL answers with nothing configured - the routing proof', async () => {
+        skipIfUnbuilt();
+        const res = await call(deps({ q: 'ab', kv: undefined, env: {} }));
+        assert.equal(res.reason, 'query_too_short',
+            'the config guard was placed before the length check, so ?q=ab no longer proves '
+            + 'routing on an unconfigured deploy');
+    });
+
+    test('a BAD COURSE ID is still refused before the config guard, for the same reason', async () => {
+        skipIfUnbuilt();
+        const res = await LIB.handleDetail({ id: 'nope', env: {}, kv: undefined });
+        assert.equal(res.reason, 'bad_course_id');
+    });
+
+    test('the reason vocabulary is closed - every reason this can emit is documented', () => {
+        skipIfUnbuilt();
+        // A caller switching on `reason` needs the list to be finite and
+        // written down. This asserts the file documents each one it can produce.
+        const src = fs.readFileSync(path.join(__dirname, LIB_PATH), 'utf8');
+        // COMMENTS ARE THE DOCUMENTATION AND CODE IS THE EMISSION, so the two
+        // halves must read different things or each proves the other.
+        //
+        // And "emitted" cannot mean `unavailable('x')` literally. An earlier
+        // version checked exactly that and failed on upstream_error and network,
+        // which are produced as { error: 'network' } inside ask() and passed
+        // through - correct code, wrong test. Any quoted occurrence in
+        // comment-stripped source counts.
+        const code = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1 ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+        const comments = src.split('\n').filter((l) => l.trim().startsWith('//')).join('\n');
+        ['query_too_short', 'not_configured', 'bad_course_id', 'rate_limited',
+         'daily_limit', 'upstream_error', 'network'].forEach((r) => {
+            const emitted = code.includes("'" + r + "'");
+            const documented = new RegExp('//\\s+' + r + '\\s').test(comments);
+            assert.ok(emitted, `${r} is documented but never emitted - the table is stale`);
+            assert.ok(documented,
+                `${r} is emitted but not in the reason table. A caller cannot switch on a `
+                + 'vocabulary that is not written down.');
+        });
+    });
+});
+
+// ===========================================================================
 describe('R1 - A CACHE HIT MAKES NO UPSTREAM CALL', () => {
 
     // FIRST ASSERTION IN THE FILE BY DESIGN. The whole proxy exists to make 35

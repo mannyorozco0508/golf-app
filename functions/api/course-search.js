@@ -20,7 +20,10 @@ export async function onRequestGet(context) {
         // CF-Connecting-IP is set by Cloudflare's edge and cannot be spoofed by
         // a client header, which is what makes the per-IP cap worth having.
         ip: context.request.headers.get('CF-Connecting-IP'),
-        env: context.env,
-        kv: context.env.GOLFCOURSE_KV
+        env: context.env || {},
+        // OPTIONAL-CHAINED. A missing binding must become a reason in the
+        // handler, not a TypeError here - a route that throws returns
+        // Cloudflare's 1101 and the caller learns nothing.
+        kv: context.env && context.env.GOLFCOURSE_KV
     }));
 }

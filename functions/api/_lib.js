@@ -30,6 +30,29 @@
 //     { status: 'ok',           courses: [] }      asked, genuinely none
 //     { status: 'unavailable',  reason: '...' }    could not ask
 //
+// EVERY REASON, AND WHAT EACH ONE TELLS YOU. This list is the whole vocabulary;
+// a caller can switch on it exhaustively.
+//
+//   query_too_short   under MIN_QUERY characters. Nothing was asked and nothing
+//                     was spent. Reachable with no key and no KV, which makes it
+//                     the cheapest proof that ROUTING works.
+//   not_configured    a required binding is missing - GOLFCOURSE_KV or
+//                     GOLFCOURSE_API_KEY. Check both in the Pages project under
+//                     Settings, and remember a binding only reaches deployments
+//                     made AFTER it is set, so a redeploy may be what is needed.
+//   bad_course_id     detail only: the id is not the 8-character opaque form
+//                     the API's own spec declares. Refused for free rather than
+//                     spending a request to be told it does not exist.
+//   rate_limited      this IP has used its hourly allowance.
+//   daily_limit       the 30-of-35 ceiling for today is reached.
+//   upstream_error    the API answered with something we cannot use - any
+//                     non-200, or a 200 whose body is not the shape we expect.
+//                     If this appears immediately on a fresh day, suspect a
+//                     WRONG key rather than a missing one; a missing one is
+//                     not_configured.
+//   network           the request never completed - thrown fetch, or our own
+//                     5-second timeout aborting it.
+//
 // A FAILURE CARRIES NO courses KEY AT ALL - absent, not empty. A caller that
 // forgets to check `status` must not be able to read an empty list out of a
 // refusal and conclude the course does not exist.
@@ -133,9 +156,38 @@ async function bump(kv, key, ttl) {
 }
 const readCount = async (kv, key) => parseInt((await kv.get(key)) || '0', 10);
 
+// A MISCONFIGURED DEPLOY MUST PRODUCE A REASON, NEVER A CRASH.
+//
+// Both of these were real, and both were found by checking the live site rather
+// than trusting the code:
+//
+//   NO KV BINDING. context.env.GOLFCOURSE_KV came back undefined, kv.get threw
+//   TypeError: Cannot read properties of undefined (reading 'get'), and
+//   Cloudflare turned that into "error code: 1101" at HTTP 500 - which is not
+//   one of the three shapes and not something a caller can interpret.
+//
+//   NO API KEY. Worse in one way: it did NOT crash. It sent
+//   "Bearer undefined" upstream, SPENT A REQUEST from the 35/day budget to
+//   collect a guaranteed 401, and reported upstream_error - pointing whoever
+//   read it at the API rather than at their own dashboard. Repeat that and the
+//   day's ceiling is burned on requests that could never have succeeded.
+//
+// So the guard sits AFTER the short-query check - so ?q=ab still answers
+// query_too_short with nothing configured, which is the cheapest live proof
+// that routing works - and BEFORE the cache, the counter and the call.
+//
+// ONE REASON FOR BOTH, deliberately. The caller only needs "could not ask"; the
+// two bindings are named in the reason table above for whoever is fixing it.
+function isConfigured(w) { return !!(w.kv && w.key); }
+
 // Resolves the injectable pieces. The routes pass nothing but `env`; the tests
 // pass a fake KV, a scripted fetch and a frozen clock. Production code has no
 // idea it is being tested - there is no test-only parameter here.
+//
+// EVERY env READ IS OPTIONAL-CHAINED. context.env itself is always present in a
+// real Pages deployment, but a route that throws on a malformed context is a
+// route that returns 1101 instead of a reason, which is the whole defect this
+// block exists to prevent.
 function wire(d) {
     return {
         kv: d.kv || (d.env && d.env.GOLFCOURSE_KV),
@@ -194,6 +246,9 @@ export async function handleSearch(d) {
     // rather than a fourth shape.
     if (q.length < MIN_QUERY) return unavailable('query_too_short');
 
+    // Before the cache, the counter and the call - see isConfigured above.
+    if (!isConfigured({ kv, key })) return unavailable('not_configured');
+
     // THE CACHE COMES BEFORE EVERY GATE. A cached answer costs no upstream
     // request, so it must cost no budget and no rate-limit allowance either.
     const cached = await kv.get(searchCacheKey(q));
@@ -227,6 +282,7 @@ export async function handleDetail(d) {
     // Same reasoning as the short query: a malformed id is refused for free
     // rather than spending one of thirty-five to be told it does not exist.
     if (!COURSE_ID.test(id)) return unavailable('bad_course_id');
+    if (!isConfigured({ kv, key })) return unavailable('not_configured');
 
     const cached = await kv.get(detailCacheKey(id));
     if (cached) return { status: 'ok', course: JSON.parse(cached) };

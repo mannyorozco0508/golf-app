@@ -256,6 +256,65 @@ async function get(pathname) {
                 + 'validate the id: ' + JSON.stringify(bad.body).slice(0, 200));
         }
 
+        // ---- 7b. A MISCONFIGURED DEPLOY RETURNS A REASON, NOT A 1101 ----
+        //
+        // THIS IS THE ARM THAT MATTERS MOST, because the defect it guards was
+        // found on the LIVE SITE after the Function was already pushed - not by
+        // any test. With no KV binding, context.env.GOLFCOURSE_KV was undefined,
+        // kv.get threw, and Cloudflare returned "error code: 1101" at HTTP 500.
+        // A 1101 is not one of the three shapes and a caller can do nothing with
+        // it.
+        //
+        // It needs its own wrangler instance, because the binding is a
+        // start-time flag. That is why this check takes about a minute.
+        const unconfPort = PAGES_PORT + 1;
+        const unconf = spawn('npx', ['wrangler', 'pages', 'dev', '.',
+            '--port', String(unconfPort),
+            '--binding', 'GOLFCOURSE_API_BASE=http://localhost:' + UPSTREAM_PORT],
+            { cwd: REPO, stdio: ['ignore', 'ignore', 'ignore'] });
+        try {
+            let up = false;
+            for (let i = 0; i < 60 && !up; i++) {
+                await sleep(1000);
+                try { await fetch('http://localhost:' + unconfPort + '/api/course-search?q=x'); up = true; }
+                catch (e) { /* not yet */ }
+            }
+            if (!up) {
+                failures.push('the unconfigured-deploy arm never started, so the 1101 defect is '
+                    + 'unguarded at the HTTP level');
+            } else {
+                const g = async (p) => {
+                    const r = await fetch('http://localhost:' + unconfPort + p);
+                    const t = await r.text();
+                    let b = null; try { b = JSON.parse(t); } catch (e) { /* left null */ }
+                    return { status: r.status, text: t, body: b };
+                };
+                const noKv = await g('/api/course-search?q=streamsong');
+                observed.unconfiguredRealQuery = { status: noKv.status, body: noKv.body,
+                                                   raw: noKv.body ? undefined : noKv.text.slice(0, 80) };
+                if (!noKv.body || noKv.body.status !== 'unavailable'
+                    || noKv.body.reason !== 'not_configured') {
+                    failures.push('a deploy with no KV binding did not return '
+                        + 'unavailable/not_configured over HTTP. Got ' + noKv.status + ' '
+                        + JSON.stringify(noKv.body || noKv.text.slice(0, 120))
+                        + '. If that is a 1101, the Function is throwing instead of degrading '
+                        + 'and a misconfigured deploy is uninterpretable to the app.');
+                }
+                if (noKv.status === 500) {
+                    failures.push('an unconfigured deploy answered HTTP 500. It must answer 503 '
+                        + 'with a reason - 500 is Cloudflare reporting an exception.');
+                }
+                // and the routing proof must still work with NOTHING configured
+                const stillRoutes = await g('/api/course-search?q=ab');
+                observed.unconfiguredShortQuery = { status: stillRoutes.status, body: stillRoutes.body };
+                if (!stillRoutes.body || stillRoutes.body.reason !== 'query_too_short') {
+                    failures.push('?q=ab no longer answers query_too_short on an unconfigured '
+                        + 'deploy. That is the cheapest live proof that Cloudflare is routing '
+                        + 'the file at all, and step one of the dashboard checklist.');
+                }
+            }
+        } finally { unconf.kill(); }
+
         // ---- 8. THE KEY IS NEVER IN A RESPONSE ----
         // SCANNED OVER THE ACTUAL HTTP BODIES, NOT OVER `observed`. An earlier
         // version stringified `observed` - which deliberately records the
