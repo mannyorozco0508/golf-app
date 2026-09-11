@@ -6,7 +6,10 @@
     <title>Live Scorecard</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f4c3a">
-    <script src="pwa-boot.js" defer></script>
+    <!-- NOT deferred: this page registers a hardware-back probe with
+         window.GolfBack from its own script, so pwa-boot.js has to run first.
+         boot() itself still waits for `load`, so nothing else moved. -->
+    <script src="pwa-boot.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and this
@@ -5562,6 +5565,21 @@ html {
         frSection('fr-state-detail', false);
         frSection('fr-state-results', true);
     }
+
+    // HARDWARE BACK, inside the Finish Round modal. Detail or Results go back to
+    // Review first, exactly as the on-screen "‹ Back to Review" does; pwa-boot.js
+    // walks this before its generic modal close, so the NEXT press closes the
+    // modal. Only the Finish Round modal has sub-states; the others close outright.
+    if (window.GolfBack) window.GolfBack.register({
+        name: 'finish-round-review', priority: 1,
+        isOpen: function () {
+            const ov = document.getElementById('finish-round-modal-overlay');
+            if (!ov || ov.style.display !== 'flex') return false;
+            const results = document.getElementById('fr-state-results');
+            return frDetailPlayerId !== null || (!!results && results.style.display !== 'none');
+        },
+        close: frBackToReview
+    });
 
     // A canonical settlement snapshot. READS ONLY.
     // TAKEN OF A ROUND, not of the page. Passing the record in is what lets the

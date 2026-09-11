@@ -524,6 +524,23 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v102: the Android hardware back button closes what is on top.
+//
+// Capacitor 8 core has no back-press code; @capacitor/app fires 'backButton'
+// and otherwise does nothing. pwa-boot.js now owns the press as window.GolfBack,
+// one precedence order on every page that loads it: a sub-state inside a modal
+// goes back first (Finish Round detail/results -> review, New Action owner ->
+// scope), then the top modal overlay closes, then the ⋯ More popover, then the
+// setup wizard steps back (never on its first step, never from Round Ready), and
+// with nothing open the WebView goes back through history or the app minimises.
+// The delete confirm on Matches closes through its own function so the pending
+// id is cleared. Armed only when Capacitor.Plugins.App exists - the web build's
+// behaviour is unchanged. index, admin and sidematches load pwa-boot.js without
+// `defer` now, because they register their probes from their own script.
+//
+// An installed device without this bump keeps a pwa-boot.js with no GolfBack,
+// and a page script that registers into nothing.
+
 // Moved to v101: the Android shell hands out links to the web app, and the trip
 // recap's Share button is never a silent no-op.
 //
@@ -843,7 +860,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v101-android-shell-shares-the-web-app';
+const CACHE_VERSION = 'golfapp-v102-android-back-button-closes-the-top-layer';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

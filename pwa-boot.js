@@ -1,11 +1,13 @@
 // ============================================================================
 // PWA BOOT + CONNECTIVITY SAFETY
 //
-// Two jobs, one small file:
+// Three jobs, one small file:
 //
 //   1. Register the service worker on the web build (never inside Capacitor).
 //   2. Provide window.GolfNet - the connectivity pill, the pending-write
 //      counter, and the beforeunload guard.
+//   3. Provide window.GolfBack - the Android hardware back button, as one
+//      precedence order every page shares. Armed only inside the native runtime.
 //
 // EVERYTHING HERE IS OPTIONAL TO THE ROUND. If this file 404s, fails to parse,
 // or throws, the app must behave exactly as it did before it existed. A golfer
@@ -279,6 +281,183 @@
         return msg;
     }
 
+    // ---- The hardware back button (Android) --------------------------------
+    //
+    // Capacitor 8 core has NO back-press handling: it is delegated entirely to
+    // the @capacitor/app plugin, which fires 'backButton' with { canGoBack } and
+    // otherwise does nothing - so without this block a press inside the Android
+    // shell either closed the app (no plugin) or did nothing at all (plugin, no
+    // listener). Neither is what a golfer means with the Dots modal open.
+    //
+    // ONE PRECEDENCE ORDER, walked top-down; the FIRST open probe acts and the
+    // walk stops. One layer per press, always:
+    //
+    //   1  a sub-state inside an open modal      -> its own back   (page registers)
+    //   2  a modal overlay on screen             -> close it        (generic below;
+    //                                               a page may override ONE overlay's
+    //                                               close, e.g. to clear a pending id)
+    //   3  the ⋯ More popover                    -> close it        (generic below)
+    //   5  the setup wizard past its first step  -> previous step   (admin registers)
+    //   6  nothing open -> history.back() if the WebView can, else App.minimizeApp()
+    //
+    // 4 is reserved for the inline sheets (press panel, add-action, KP entry, hole
+    // picker, group links, Cup join) and is deliberately not wired yet.
+    //
+    // NOT layers, by decision, and nothing here will ever treat them as one: the
+    // Hole View / Full Card mode, accordions, the checkbox-driven Nassau and Main
+    // Pool panels, the Cup setup draft (no Cancel exists; back must not discard
+    // it), Round Ready -> wizard, and the New Trip form.
+    //
+    // WEB BEHAVIOUR IS UNCHANGED. The listener is armed only when
+    // window.Capacitor.Plugins.App exists, which is the native runtime and nothing
+    // else. On the web, press() is defined and never called by anything.
+    //
+    // THE PROBES A PAGE REGISTERS ARE CLOSURES, ON PURPOSE. pressPanelOpen,
+    // currentWizardStep, rcJoin and their kind are script-scope `let`s in the
+    // pages; this file cannot reach them by name and must not try. A page hands
+    // over "is it open" and "close it" and keeps its state private.
+    var backProbes = [];
+    var overlayCloseOverrides = {};
+
+    // probe: { name, priority, isOpen(), close() }
+    //   or  { overlay: '<element id>', close() }  - replaces the generic close for
+    //                                               that one overlay only
+    function registerBackProbe(probe) {
+        try {
+            if (!probe) return false;
+            if (probe.overlay && typeof probe.close === 'function') {
+                overlayCloseOverrides[String(probe.overlay)] = probe.close;
+                return true;
+            }
+            if (typeof probe.isOpen !== 'function' || typeof probe.close !== 'function') return false;
+            backProbes.push({
+                name: String(probe.name || 'probe'),
+                priority: Number(probe.priority) || 9,
+                isOpen: probe.isOpen,
+                close: probe.close
+            });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // An overlay is on screen when its inline display says so - every page opens
+    // one by writing style.display = 'flex' - or when it carries the `open` class,
+    // which is how admin.html's paste modal is shown. CSS keeps them display:none
+    // otherwise, so a blank inline style means closed.
+    function overlayIsShown(el) {
+        try {
+            if (el.classList && el.classList.contains('open')) return true;
+            var d = el.style && el.style.display;
+            return !!d && d !== 'none';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function shownOverlays() {
+        try {
+            var all = document.querySelectorAll('.modal-overlay, .recap-overlay');
+            var out = [];
+            for (var i = 0; i < all.length; i++) if (overlayIsShown(all[i])) out.push(all[i]);
+            return out;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // The LAST shown overlay in document order is treated as the top one. Two can
+    // only be open together by a devtools call; one press still closes one.
+    function closeTopOverlay() {
+        var open = shownOverlays();
+        if (open.length === 0) return;
+        var el = open[open.length - 1];
+        var override = el.id && overlayCloseOverrides[el.id];
+        if (typeof override === 'function') { override(); return; }
+        if (el.classList && el.classList.contains('open')) el.classList.remove('open');
+        else el.style.display = 'none';
+    }
+
+    function openPopovers() {
+        try {
+            var all = document.querySelectorAll('details.nav-more[id]');
+            var out = [];
+            for (var i = 0; i < all.length; i++) if (all[i].open) out.push(all[i]);
+            return out;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // The two generic probes. Registered here so every page that loads this file
+    // gets them without writing anything.
+    registerBackProbe({ name: 'modal', priority: 2,
+        isOpen: function () { return shownOverlays().length > 0; },
+        close: closeTopOverlay });
+    registerBackProbe({ name: 'popover', priority: 3,
+        isOpen: function () { return openPopovers().length > 0; },
+        close: function () { var d = openPopovers(); if (d.length) d[d.length - 1].open = false; } });
+
+    function nativeApp() {
+        try {
+            var C = window.Capacitor;
+            return (C && C.Plugins && C.Plugins.App) || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Returns the name of the layer that acted, or 'history' / 'minimize' / 'none'
+    // when nothing was open. Tests read that; the listener ignores it.
+    function pressBack(info) {
+        var sorted = backProbes.slice().sort(function (a, b) { return a.priority - b.priority; });
+        for (var i = 0; i < sorted.length; i++) {
+            var probe = sorted[i];
+            var open = false;
+            // A probe that throws is a broken probe, not a reason to swallow the
+            // press: skip it and keep walking.
+            try { open = !!probe.isOpen(); } catch (e) { open = false; }
+            if (!open) continue;
+            try { probe.close(); } catch (e) { /* the layer stays; the walk still stops */ }
+            return probe.name;
+        }
+        var canGoBack = !!(info && info.canGoBack);
+        if (canGoBack && typeof history !== 'undefined' && history && typeof history.back === 'function') {
+            history.back();
+            return 'history';
+        }
+        var App = nativeApp();
+        if (App && typeof App.minimizeApp === 'function') {
+            // The root of the app. Minimise rather than exit: the round stays warm,
+            // and one press can never lose the app the way exitApp() would.
+            try { App.minimizeApp(); } catch (e) { /* nothing to do */ }
+            return 'minimize';
+        }
+        return 'none';
+    }
+
+    function armBackButton() {
+        var App = nativeApp();
+        if (!App || typeof App.addListener !== 'function') return false;
+        try {
+            App.addListener('backButton', function (ev) { pressBack({ canGoBack: !!(ev && ev.canGoBack) }); });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    var GolfBack = {
+        register: registerBackProbe,
+        press: pressBack,
+        probes: function () {
+            return backProbes.slice().sort(function (a, b) { return a.priority - b.priority; })
+                .map(function (p) { return p.name; });
+        },
+        armed: false
+    };
+
     // ---- Boot --------------------------------------------------------------
     // MARK THE NATIVE SHELL ON THE DOCUMENT.
     //
@@ -324,6 +503,10 @@
 
     if (typeof window !== 'undefined') {
         window.GolfNet = GolfNet;
+        // Armed at load, not in boot(): the Capacitor bridge is injected before
+        // any page script runs, and a page's first tap can come before `load`.
+        GolfBack.armed = armBackButton();
+        window.GolfBack = GolfBack;
         if (document.readyState === 'complete') {
             boot();
         } else {
@@ -337,6 +520,7 @@
             canRegister: canRegister,
             registerServiceWorker: registerServiceWorker,
             GolfNet: GolfNet,
+            GolfBack: GolfBack,
             _boot: boot,
             _onBeforeUnload: onBeforeUnload
         };

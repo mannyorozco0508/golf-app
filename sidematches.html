@@ -6,7 +6,10 @@
     <title>Action</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f4c3a">
-    <script src="pwa-boot.js" defer></script>
+    <!-- NOT deferred: this page registers a hardware-back probe with
+         window.GolfBack from its own script, so pwa-boot.js has to run first.
+         boot() itself still waits for `load`, so nothing else moved. -->
+    <script src="pwa-boot.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
@@ -2360,6 +2363,25 @@ html {
     function closeSideMatchDeleteModal() {
         pendingDeleteMatchId = null;
         document.getElementById('sidematch-delete-modal').style.display = 'none';
+    }
+
+    // HARDWARE BACK. The owner step goes back to the scope step, as its own
+    // "← Back" does. The form step has no Back on screen, so a press there
+    // closes the modal through pwa-boot's generic close - back does not invent a
+    // move no button makes. The delete confirm closes through ITS OWN function:
+    // a bare display:none would leave pendingDeleteMatchId set, and the next
+    // Delete would remove this match instead of the one tapped.
+    if (window.GolfBack) {
+        window.GolfBack.register({
+            name: 'new-action-scope', priority: 1,
+            isOpen: function () {
+                const m = document.getElementById('sidematch-modal');
+                const owner = document.getElementById('sm-owner-step');
+                return !!m && m.style.display === 'flex' && !!owner && owner.style.display === 'block';
+            },
+            close: backToScopeStep
+        });
+        window.GolfBack.register({ overlay: 'sidematch-delete-modal', close: closeSideMatchDeleteModal });
     }
 
     function confirmDeleteSideMatch() {

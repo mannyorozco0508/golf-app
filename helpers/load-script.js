@@ -103,6 +103,14 @@ function makeStubSandbox() {
         Set: Set, Map: Map,
         __elementRegistry: elementRegistry, // exposed so tests can inspect rendered output directly
         __dbHandlers: captured,             // the value handlers the page registered
+        // window.addEventListener, as a no-op. No page calls it at top level (grep:
+        // 0 uses across the ten pages), so nothing that ran before now runs
+        // differently. pwa-boot.js does call it - `window.addEventListener('load',
+        // boot)` - and threw here, which is why no page realm could load the file
+        // that defines window.GolfBack. document.readyState stays undefined on
+        // purpose: boot() therefore never runs in a realm, so the service-worker
+        // and pill code stay out of every page test, as VENDOR_SKIP intends.
+        addEventListener() { }, removeEventListener() { },
     };
     sandbox.window = sandbox;
     return sandbox;
@@ -282,6 +290,31 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     while ((det = detailsRe.exec(html)) !== null) {
         const el = sandbox.document.__declare(det[2], 'details');
         el.open = /\bopen\b/.test(det[1]);
+        // With its class, and IN THE TREE, so a selector such as
+        // `details.nav-more[open]` finds it the way a browser does. The element is
+        // the same registry object getElementById hands out, so nothing a test or
+        // a page already does with it changes.
+        const cls = /\bclass="([^"]*)"/.exec(det[1]);
+        if (cls) el.className = cls[1];
+        sandbox.document.__mount(el);
+    }
+
+    // THE MODAL OVERLAYS, the same way. Every page writes them as static markup -
+    // `<div class="modal-overlay" id="dots-modal">` - and opens them by setting
+    // style.display on the element getElementById returns. Without this pass the
+    // element exists in the registry but carries no class and sits in no tree, so
+    // anything generic that asks the document "which overlays are on screen?" -
+    // the back-button handler in pwa-boot.js - sees an empty page while the modal
+    // it just opened is, by every other measure, open. Class and tree only; the
+    // inner markup is not parsed, exactly as for <select>.
+    const overlayRe = /<div\b([^>]*\bclass="([^"]*\b(?:modal-overlay|recap-overlay)\b[^"]*)"[^>]*)>/gi;
+    let ov;
+    while ((ov = overlayRe.exec(html)) !== null) {
+        const idm = /\bid="([^"]+)"/.exec(ov[1]);
+        if (!idm) continue;
+        const el = sandbox.document.__declare(idm[1], 'div');
+        el.className = ov[2];
+        sandbox.document.__mount(el);
     }
 
     dependencies.forEach(depPath => {

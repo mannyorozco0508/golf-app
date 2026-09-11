@@ -6,7 +6,10 @@
     <title>Trip & Round Setup - Home</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f4c3a">
-    <script src="pwa-boot.js" defer></script>
+    <!-- NOT deferred: this page registers a hardware-back probe with
+         window.GolfBack from its own script, so pwa-boot.js has to run first.
+         boot() itself still waits for `load`, so nothing else moved. -->
+    <script src="pwa-boot.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
@@ -1819,6 +1822,23 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     function wizardBack(fromStep) {
         goToWizardStep(wizardNeighbourStep(fromStep, -1));
     }
+
+    // HARDWARE BACK on the wizard: a step after the first goes to the previous
+    // one through the same neighbour rule as the on-screen Back. Nothing on the
+    // first step (its Back is hidden - nowhere to go), nothing on the lobby, and
+    // nothing on Round Ready: the round exists by then, and editRoundFromReady()
+    // is the deliberate way back into the wizard.
+    if (window.GolfBack) window.GolfBack.register({
+        name: 'wizard-step', priority: 5,
+        isOpen: function () {
+            const screen = document.getElementById('admin-screen');
+            const ready = document.getElementById('round-ready-screen');
+            if (!screen || screen.style.display !== 'block') return false;
+            if (ready && ready.style.display === 'block') return false;
+            return currentWizardStep !== wizardFirstStep();
+        },
+        close: function () { wizardBack(currentWizardStep); }
+    });
 
     // WHAT THE SIDE MATCH WILL ACTUALLY BE, or that it will not be saved.
     //
