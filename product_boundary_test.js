@@ -71,6 +71,21 @@ function writesIn(file) {
     return [...new Set(out)];
 }
 
+// THE SCORE WRITERS DO NOT HAND db.ref() A LITERAL ANY MORE, SO writesIn CANNOT
+// SEE THEM. All three pass a KEY to scorePath(), which builds the stored path in
+// one place and puts round identity in it. writesIn returned [] the moment that
+// landed - and the only thing that noticed was the positive `keys.length > 0`
+// assertion below, because a forEach over an empty array satisfies every
+// per-element check in it forever. That is CLAUDE.md's empty-slice failure, and
+// it is why the positive assertion is the first one in that test.
+//
+// This reads the keys themselves, which is what those guards were always about:
+// a rename here orphans every score already recorded.
+function scoreKeysIn(file) {
+    const code = codeOf(file);
+    return [...new Set([...code.matchAll(/scorePath\(`([^`]+)`\)/g)].map((m) => m[1]))];
+}
+
 const CONSUMER_PAGES = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
                         'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
                         'shared.html', 'instructions.html'];
@@ -251,17 +266,29 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
         // a team. What must not change is that it writes ONLY scores, and only for the
         // golfers this link covers.
         const w = writesIn('tournament-scorecard.html');
-        assert.ok(w.length > 0, 'the scoring page must still write scores');
-        w.forEach(p => assert.match(p, /^tournaments\/\$\{currentCode\}\/scores\//,
-            'the scoring link may only write scores, got: ' + p));
+        // ALL THREE WRITERS NOW GO THROUGH scorePath(). The keys are unchanged;
+        // what moved is where they are stored, and only for a MULTI-round event -
+        // round identity lives in the path, so a cross-round write is structurally
+        // impossible rather than merely validated against. Measured before and
+        // after: a single-round event writes tournaments/<code>/scores/team1_h1
+        // either way, byte for byte. A multi-round event gains /rounds/<rid>.
+        const keys = scoreKeysIn('tournament-scorecard.html');
+        // POSITIVE FIRST. Everything under this is an "each of them" check, and
+        // each of them is true of nothing at all.
+        assert.ok(keys.length > 0,
+            'the scoring page must still write scores. No scorePath() call sites were '
+            + 'found, so every key assertion below would pass against an empty list.');
+        assert.ok(keys.includes('team${myTeamNum}_h${holeNum}'),
+            'the legacy scramble key must survive - a rename orphans recorded scores');
+        assert.ok(keys.includes('team${myTeamNum}_p${playerIdx}_h${holeNum}'),
+            'the legacy per-player team key must survive - the leg used by best ball '
+            + 'and shamble');
+        assert.ok(keys.includes('${playerId}_h${holeNum}'),
+            'the individual key must survive');
 
-        assert.ok(w.some(p => /scores\/team\$\{myTeamNum\}_h/.test(p)),
-            'the legacy scramble write must survive');
-        // The individual write now goes through scorePath(), which puts the ROUND in
-        // the path for a multi-round event and leaves a single-round event exactly
-        // where it was. The key shape is unchanged either way, which is the point -
-        // round identity lives in the path so a cross-round write is structurally
-        // impossible rather than merely validated against.
+        // AND THE STORED LOCATION, NOT ONLY THE KEY. scorePath is the single place
+        // a score path is built, so pinning both of its branches pins where every
+        // one of those keys actually lands.
         const card = codeOf('tournament-scorecard.html');
         assert.match(card, /db\.ref\(scorePath\(`\$\{playerId\}_h\$\{holeNum\}`\)\)/,
             'the individual write is player-keyed');
@@ -269,13 +296,13 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
             'a multi-round score is written under its round');
         assert.match(card, /tournaments\/\$\{currentCode\}\/scores\/\$\{suffix\}/,
             'and a single-round score stays exactly where it was');
-        // savePlayerHoleScore builds its path into a variable before db.ref(), so the
-        // call-site scan above cannot see it. Asserted directly rather than left out -
-        // it is the per-player leg of legacy shamble and best ball scoring.
-        const cardSrc = codeOf('tournament-scorecard.html');
-        assert.match(cardSrc,
-            /const path = `tournaments\/\$\{currentCode\}\/scores\/team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}`/,
-            'the legacy per-player team key must survive');
+
+        // THE BOUNDARY ITSELF, which is what this test is named for: whatever
+        // literal paths remain, this page may only write inside its own
+        // tournament. Kept as a scan over call sites so a NEW write that skips
+        // scorePath is still caught.
+        w.forEach(p => assert.match(p, /^tournaments\/\$\{currentCode\}\//,
+            'the scoring link may only write inside its own tournament, got: ' + p));
 
         // THE CROSS-GROUP GUARD. A player id arriving from anywhere must be checked
         // against this group before a stroke is written, or one group's link could
@@ -293,8 +320,21 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
         // UI wording may say group; storage stays team{n}. A rename here would orphan
         // every score already recorded.
         const t = codeOf('tournament-scorecard.html');
-        assert.match(t, /scores\/team\$\{myTeamNum\}_h\$\{holeNum\}/);
-        assert.match(t, /scores\/team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}/);
+        // THE KEY IS UNCHANGED; IT IS NOW HANDED TO scorePath() RATHER THAN BAKED
+        // INTO THE PATH, so round identity lives in the path instead of the key.
+        // Measured before and after the round-scoring wave: a single-round event
+        // writes tournaments/<code>/scores/team1_h1 either way, byte for byte, and
+        // a multi-round event gains /rounds/<rid>. Nothing recorded is orphaned.
+        //
+        // Both branches of scorePath are pinned too, so this holds the stored
+        // LOCATION and not merely the key - the key alone would go green on a page
+        // that had quietly stopped putting scores under their round.
+        assert.match(t, /scorePath\(`team\$\{myTeamNum\}_h\$\{holeNum\}`\)/);
+        assert.match(t, /scorePath\(`team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}`\)/);
+        assert.match(t, /rounds\/\$\{myRoundId\}\/scores\/\$\{suffix\}/,
+            'a multi-round score must still be written under its round');
+        assert.match(t, /tournaments\/\$\{currentCode\}\/scores\/\$\{suffix\}/,
+            'and a single-round score must still land exactly where it always did');
         const eng = codeOf('tournament-engine.js');
         assert.match(eng, /team\$\{team\.num\}_h\$\{h\.hole\}/,
             'the engine must still read the scramble key shape');

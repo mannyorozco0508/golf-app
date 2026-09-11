@@ -322,7 +322,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v95-one-round-one-carry-rule-every-surface';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v96-a-team-score-goes-in-its-own-round';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

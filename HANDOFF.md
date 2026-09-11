@@ -258,6 +258,33 @@ explicitly **not** a reason to touch the sync path, which is now proven.
 
 ## Known open items
 
+- **`window.currentData` in `tournament-scorecard.html` is `undefined`, and two
+renderers depend on it not being reached.** A trap for whoever adds a third call site.
+`currentData` is declared `let currentData = {}` at script scope (:226). A top-level
+`let` does **not** become a property of `window`, so `window.currentData` has always
+been `undefined` — measured cold, `typeof window.currentData === "undefined"` on a
+rendered card, not inferred from reading.
+  - That makes **both** of these effectively `roundScope || undefined`:
+    `renderGroup:497` (long-standing) and `renderAll:616` (added in the round-scoring
+    wave). Neither has ever fallen back to anything.
+  - They work only because `roundScope = view` is assigned at **:274**, immediately
+    before the **sole** call site at :276 — `if (group) renderGroup(group); else
+    renderAll();` — and `view` is null-checked earlier, so `roundScope` is provably
+    truthy at render time. Today this is unreachable, not merely unlikely.
+  - **Why it was not fixed in place.** The obvious form, `const currentData =
+    roundScope || currentData`, is a TDZ error — the shadowing declaration cannot read
+    the outer binding it shadows. That is *why* `renderGroup` reached for
+    `window.currentData` in the first place. Fixing one of two twin renderers would
+    have recreated exactly the asymmetry the round-scoring wave existed to remove
+    (`renderAll` was round-blind while `renderGroup` was not), so `renderAll` was
+    written to match `renderGroup` deliberately.
+  - **What breaks it.** Any new caller of `renderAll` or `renderGroup` that runs before
+    :274, or any refactor that moves the assignment after the render dispatch. The page
+    would throw on `currentData.teams` rather than degrade. `tournament_round_scoring_test.js`
+    pins the assignment-before-render ordering, which is the part that keeps this safe.
+  - Its own wave: hoist the resolution above both renderers under a distinct name and
+    pass it in, so neither has a fallback to be wrong about.
+
 - **The trips rule is NOT "trips are protected now". Read this before assuming it.**
 **DEPLOYED 2026-09-10** and proven against the live database, not only against targaryen.
 `trips/$tripCode` carries `".write": "newData.exists() || !data.hasChild('rounds')"`

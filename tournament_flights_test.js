@@ -341,8 +341,21 @@ describe('HISTORICAL — a tournament from before flights is unchanged', () => {
         assert.match(eng, /scores\[`team\$\{team\.num\}_h\$\{h\.hole\}`\]/);
         assert.match(eng, /scores\[`team\$\{team\.num\}_p\$\{pIdx\}_h\$\{h\.hole\}`\]/);
         const card = codeOf('tournament-scorecard.html');
-        assert.match(card, /scores\/team\$\{myTeamNum\}_h\$\{holeNum\}/);
-        assert.match(card, /scores\/team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}/);
+        // THE KEY IS UNCHANGED; IT IS NOW HANDED TO scorePath() RATHER THAN BAKED
+        // INTO THE PATH, so round identity lives in the path instead of the key.
+        // Measured before and after the round-scoring wave: a single-round event
+        // writes tournaments/<code>/scores/team1_h1 either way, byte for byte, and
+        // a multi-round event gains /rounds/<rid>. Nothing recorded is orphaned.
+        //
+        // Both branches of scorePath are pinned too, so this holds the stored
+        // LOCATION and not merely the key - the key alone would go green on a page
+        // that had quietly stopped putting scores under their round.
+        assert.match(card, /scorePath\(`team\$\{myTeamNum\}_h\$\{holeNum\}`\)/);
+        assert.match(card, /scorePath\(`team\$\{myTeamNum\}_p\$\{playerIdx\}_h\$\{holeNum\}`\)/);
+        assert.match(card, /rounds\/\$\{myRoundId\}\/scores\/\$\{suffix\}/,
+            'a multi-round score must still be written under its round');
+        assert.match(card, /tournaments\/\$\{currentCode\}\/scores\/\$\{suffix\}/,
+            'and a single-round score must still land exactly where it always did');
     });
 
     test('16. scoring links are still team-based, never flight-based', () => {

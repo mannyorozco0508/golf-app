@@ -524,6 +524,32 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v96, PART TWO: a team score goes into the round it was played in, and
+// only when that round is open. tournament-scorecard.html has three functions
+// that write a score and only saveIndividualScore asked either question. Measured
+// on both team formats: a SETUP round accepted a team score and wrote it with
+// every box live, so did a CLOSED one; Day 1 and Day 2 of the same event both
+// wrote tournaments/<code>/scores/team1_h1, the second day overwriting the first
+// as it was played; and renderAll read the EVENT ROOT, so 18 scores stored under
+// the round rendered 0 of 18 filled boxes. The read moved WITH the write - moving
+// the write alone would have blanked the card on save. An installed device
+// without this bump keeps serving a card that silently discards scores into a
+// round nobody is counting.
+//
+// ONE BUMP COVERS BOTH WAVES, and that is deliberate rather than an oversight.
+// v96 has never been published - main is on v95 - so no device has ever held a
+// v96 shell, and a second bump would be inventing a version nobody could be
+// upgrading from. Both changes ship to a v95 device as one update. Note that the
+// version SLUG names the first wave only; the two Moved-to entries under v96 are
+// the record of what is in it.
+//
+// Moved to v96, PART ONE: the team links say what they do. tournament.html told a head pro,
+// beside the links, "They can only enter their own team's scores." Measured:
+// ?team=1 and ?team=7 each open 18 of 18 editable inputs, so the team number is a
+// URL parameter nothing checks, and tournaments/$tourneyCode is ".write": true.
+// The sentence is read by the person deciding how carefully to send the links, so
+// it made an organizer careless. An installed device without this bump keeps
+// serving the promise.
 // Moved to v95: one round, one carry rule, every surface. A round storing no
 // skinsCarryOver was answered two ways with money attached. The Skins page, the
 // live bet strip and the Settle header all read `!== false` - CARRY - and the
@@ -700,7 +726,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v95-one-round-one-carry-rule-every-surface';
+const CACHE_VERSION = 'golfapp-v96-a-team-score-goes-in-its-own-round';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

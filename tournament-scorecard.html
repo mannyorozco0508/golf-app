@@ -345,13 +345,25 @@
             .catch(() => setSaveState('error', '⚠️ Could not save — check your signal and re-enter that hole'));
     }
 
+    // THE TWO TEAM WRITERS ASK THE SAME TWO QUESTIONS THE INDIVIDUAL ONE DOES:
+    // which round am I in, and is it open. They did neither until now, and the
+    // pair of them is one defect wearing two hats - renderAll picks which by
+    // format, scramble getting the team box and every other team format getting
+    // a box per player, so a fix to one alone repairs half of it.
+    //
+    // Measured before: a SETUP round accepted a team score and wrote it, so did a
+    // CLOSED one, and Day 1 and Day 2 of the same event both wrote
+    // tournaments/<code>/scores/team1_h1 - the second day overwriting the first
+    // in storage as it was played.
     function saveHoleScore(holeNum, val) {
-        const ref = db.ref(`tournaments/${currentCode}/scores/team${myTeamNum}_h${holeNum}`);
+        if (roundLocked) return;
+        const ref = db.ref(scorePath(`team${myTeamNum}_h${holeNum}`));
         trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
 
     function savePlayerHoleScore(holeNum, playerIdx, val) {
-        const path = `tournaments/${currentCode}/scores/team${myTeamNum}_p${playerIdx}_h${holeNum}`;
+        if (roundLocked) return;
+        const path = scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`);
         const ref = db.ref(path);
         trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
     }
@@ -586,6 +598,22 @@
     }
 
     function renderAll() {
+        // THE READ MOVES WITH THE WRITE, NOT AFTER IT.
+        // Without this line the team writers above now save into
+        // rounds/<rid>/scores while this renderer keeps reading the event root,
+        // so every box would blank the instant a score saved. Measured on a
+        // multi-round card: 18 team scores at rounds/r1/scores rendered 0 of 18
+        // filled boxes, and the same scores at the root rendered 18 of 18.
+        //
+        // renderGroup:485 has resolved its data this way for a while, and
+        // renderLeaderboard resolves through resolveLeaderboardView. renderAll
+        // was the one site left reading the root on both sides - which is exactly
+        // why the team path looked correct: root in, root out. :283 records this
+        // same failure biting once already on the leaderboard tab.
+        //
+        // A single-round record passes itself through roundScope, so this reads
+        // the event exactly as it did before.
+        const currentData = roundScope || window.currentData;
         const team = currentData.teams[`team${myTeamNum}`];
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const scores = currentData.scores || {};
@@ -647,7 +675,13 @@
             });
         }
 
-        setHolesListPreservingFocus(html);
+        // THE SALT IS NOT DECORATION. setHolesListPreservingFocus patches values
+        // in place when the shape key matches, and `disabled` is applied
+        // imperatively below rather than in the markup - so without roundLocked
+        // in the key, a round the organizer REOPENS would keep its boxes disabled
+        // with nothing to re-enable them. renderGroup:564 salts it for the same
+        // reason.
+        setHolesListPreservingFocus(html, 'locked:' + roundLocked);
 
         // Starting hole is purely a display/navigation aid — the scored hole is always the
         // real golf hole (hole 8 is still hole 8, stored the same way regardless of when it
@@ -670,7 +704,24 @@
         const toPar = thru > 0 ? total - parPlayed : null;
         const toParStr = toPar === null ? '' : (toPar === 0 ? 'E' : (toPar > 0 ? `+${toPar}` : toPar));
         document.getElementById('status-main').textContent = thru > 0 ? `Thru ${thru} — ${total} strokes` : `Enter Hole 1`;
-        document.getElementById('status-sub').textContent = toPar === null ? 'Enter your team\'s score below to get started' : `${toParStr} to par`;
+        // A GUARD THAT SILENTLY DROPS THE WRITE IS WORSE THAN NO GUARD.
+        // Refusing the save while leaving eighteen live boxes on screen lets a
+        // team enter a full round, watch the numbers sit there, and save none of
+        // them with nothing to say so. Before this, a Setup round told the team
+        // "Enter your team's score below to get started" while the organizer's
+        // screen said nobody could enter scores yet.
+        //
+        // Same two sentences renderGroup:568 uses, so a golfer on a team card and
+        // a golfer on an individual card asking why they cannot score get the
+        // same answer.
+        document.getElementById('status-sub').textContent = roundLocked
+            ? (currentData.roundStatus === 'closed'
+                ? 'This round is closed — scores are final'
+                : 'This round is not open for scoring yet')
+            : (toPar === null ? 'Enter your team\'s score below to get started' : `${toParStr} to par`);
+        if (roundLocked) {
+            document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
+        }
     }
 </script>
 </body>
