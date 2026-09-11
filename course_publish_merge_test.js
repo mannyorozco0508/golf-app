@@ -119,7 +119,7 @@ describe('THE SCAN CAN SEE THE PUBLISH AT ALL', () => {
     test('the publish is still gated on the custom-course edit', () => {
         // If this gate disappears, every save republishes and the blast radius of
         // a wrong method goes from "golfers who edit a card" to "everyone".
-        assert.match(CODE, /if\s*\(\s*preview\.isEditing\s*\)/,
+        assert.match(CODE, /if\s*\(\s*preview\.isEditing\b/,
             'the publish is no longer gated on preview.isEditing');
     });
 });

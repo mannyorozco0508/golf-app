@@ -2004,9 +2004,42 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // page offline. Do not reintroduce a date gate here in any form.
     // ---------------------------
 
+    // ========================================================================
+    // THE NATIVE SHELL, ASKED EXACTLY ONCE.
+    //
+    // pwa-boot.js:39 isNativeShell() is the ONLY native detection in this app,
+    // and pwa-boot.js:292 publishes its answer as html.is-native. Reading that
+    // class is how this page reuses that one decision. Do not add a second
+    // check here - a page that asks window.Capacitor itself is a second
+    // detection that can disagree with the first, and then two screens disagree
+    // about what kind of app the golfer is holding.
+    //
+    // TIMING, MEASURED: pwa-boot boots on window load, so the class is not
+    // present during first paint. Every guard below runs on a gesture - a tap, a
+    // keystroke, a Save - which is always after load. Do not move one of these
+    // into a render that runs at parse time without re-checking that.
+    //
+    // WHY ANY OF THIS EXISTS: the App Store reply states the iOS app has no
+    // hidden features, no user content visible to strangers, and one external
+    // service. admin.html ships in the iOS bundle (CONSUMER_SHELL in
+    // sync-mobile-web.js), so each of those three claims needs a native no-op
+    // here. The WEB product is unchanged, and native_review_surface_test.js
+    // holds both halves of that: native absent, web present.
+    // ========================================================================
+    function isNativeApp() {
+        try {
+            return !!(document.documentElement
+                && document.documentElement.classList.contains('is-native'));
+        } catch (e) { return false; }
+    }
+
     // --- SECRET TAP LOGIC ---
     let tapCount = 0;
     function handleSecretTap() {
+        // NATIVE NO-OP. The panel offers a mass write to the shared course
+        // database, a settlement-mode switch and a beta-distribution share - a
+        // hidden feature by any reading of Guideline 2.1.
+        if (isNativeApp()) return;
         tapCount++;
         if (tapCount >= 5) {
             document.getElementById('secret-master-panel').style.display = 'block';
@@ -3578,6 +3611,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         // A SECOND TAP MUST NOT SPEND A SECOND REQUEST. Without this, an
         // impatient thumb costs two of the day's lookups for one query.
         if (onlineSearchInFlight) return;
+        // NATIVE NO-OP AT THE NETWORK ITSELF. G3 removes the row, so nothing
+        // native can tap its way here; this is the independent second guard, and
+        // native_review_surface_test.js proves it fires ON ITS OWN - with the row
+        // guard removed and the row tapped, no request is made.
+        if (isNativeApp()) return;
         onlineSearchInFlight = true;
         if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
 
@@ -3654,6 +3692,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
     async function openImportConfirm(course) {
+        // NATIVE NO-OP. Same reasoning as the search fetch above: the second
+        // request of an import is spent here, and it must not be spendable from
+        // the iOS app by any route.
+        if (isNativeApp()) return;
         courseDropdown.innerHTML = "";
         courseDropdown.appendChild(renderDropdownNote('Fetching the card…'));
 
@@ -3801,6 +3843,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // ---- THE WRITE. Merged, validated, and only from the affirmative press. ----
     function commitPendingImport() {
         if (!pendingImport) return;
+        // NATIVE NO-OP, and a backstop rather than the main gate: the native
+        // shell never renders the online row, so this is unreachable there. It
+        // is here because it is a WRITE to a node no client can delete, and a
+        // write like that should not depend on an earlier screen staying hidden.
+        if (isNativeApp()) return;
         // VALIDATED AGAINST THE GRID THE GOLFER JUST SAW, not against what the
         // provider sent - they may have corrected a cell, and the card that gets
         // written must be the card that was on screen.
@@ -3911,7 +3958,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             }
         });
 
-        const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
+        // NATIVE NO-OP: community-mapped courses are written by other users, and
+        // the iOS app does not show user-generated content from strangers. The
+        // golfer's local directory is unaffected.
+        const globalKeys = isNativeApp()
+            ? []
+            : Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
         if (globalKeys.length > 0) {
             const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
             if (filteredGlobals.length > 0) {
@@ -3954,7 +4006,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         //
         // Three characters is the proxy's own MIN_QUERY, so a golfer can never
         // tap a row whose answer is already decided to be a refusal.
-        if (typedName.length >= 3) {
+        // NATIVE NO-OP: the second external service is not advertised in the iOS
+        // app. The rest of the picker is untouched - the local directory and the
+        // golfer's own courses still match and still list.
+        if (typedName.length >= 3 && !isNativeApp()) {
             const online = document.createElement("div");
             online.className = "custom-select-option";
             online.id = "course-online-search-row";
@@ -5656,7 +5711,10 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // Publishing order is deliberate and unchanged: the UNTRIMMED card, under
             // the course's name WITHOUT the round-length suffix. A group playing the
             // back nine must not shorten or rename the course for everyone else.
-            if (preview.isEditing) {
+            // NATIVE NO-OP: no permanent write to the shared course list. The
+            // round is unaffected - finalCourseData is already taken from
+            // preview.data locally, which is why this block is fire-and-forget.
+            if (preview.isEditing && !isNativeApp()) {
                 // PUBLISHING MUST NEVER TOUCH A CHILD IT DOES NOT NAME. That is
                 // why this is .update() and not .set(), and it is not a style
                 // preference - it is the difference between editing a course and
