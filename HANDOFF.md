@@ -161,11 +161,23 @@ would reach it:
 Both halves matter. Sixteen refusals alone would also be satisfied by rules that
 reject every course, which would break the "push to global database" flow.
 
-**The rules cannot be read back over REST.** `/.settings/rules.json` answers
-`401 Permission denied` without an admin token, so "does deployed match the
-repo?" is answered *behaviourally* — the live server refuses exactly the 16
-shapes targaryen refuses and accepts what it accepts — not by diffing JSON. That
-is the stronger check anyway: it tests the deployment, not a file.
+**The rules cannot be read back over REST *unauthenticated*.**
+`/.settings/rules.json` answers `401 Permission denied` without an admin token,
+so from a client's position "does deployed match the repo?" is answered
+*behaviourally* — the live server refuses exactly the 16 shapes targaryen
+refuses and accepts what it accepts — not by diffing JSON. That is the stronger
+check anyway: it tests the deployment, not a file.
+
+**With an admin token it CAN be read back**, and that turned out to matter:
+
+    npx firebase-tools database:get "/.settings/rules" \
+        --project golfapp-9fb21 --instance golfapp-9fb21-default-rtdb
+
+You are already logged in if you can deploy. This answers a question the
+behavioural check cannot: *is the thing running the exact file in the repo, or
+something close to it?* Used on 2026-09-11 it returned a ruleset byte-identical
+to `database.rules.json` — which is also what made it safe to fire a probe at
+`global_courses` that had to be refused. See below.
 
 ### A course can be created but NEVER deleted by any client
 
@@ -211,6 +223,86 @@ is ever loosened. Do not count it when counting what protects this node, and do
 not "prove" it with a control — it is inert on purpose. The same sentence could
 not be written into `database.rules.json` itself: seven test files `JSON.parse`
 that file, and a `//` comment makes it throw.
+
+### `gca_` provenance — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-11
+
+Until this date `$courseId` appeared **nowhere** in `global_courses/$courseId`'s
+validate. Any key at all could be created, as long as the record carried a name
+and eighteen holes. With the course importer live, that meant a record could be
+filed under `gca_abc12345` while the provider id inside it named a different
+course — into a node no client can delete. The clause appended:
+
+    (!$courseId.beginsWith('gca_') ||
+     $courseId === 'gca_' + newData.child('source/providerCourseId').val())
+
+The leading negation is the whole design: a key that does not begin `gca_`
+short-circuits to true and is **completely unconstrained**, which is what makes
+all 36 pre-existing keys safe by construction rather than by luck. All 36 were
+tested individually, not sampled — including `zz_scratch_probe`, which has no
+`source` node at all and still writes back cleanly.
+
+**Timing was the point.** Zero of the 36 live keys began `gca_`, so the rule
+landed at the only moment when a mistake in it could not break a course anyone
+was using. A week of imports later, that is no longer true.
+
+**What was PROVEN LIVE**, unauthenticated REST against
+`golfapp-9fb21-default-rtdb`, the way any client reaches it:
+
+- A `gca_probe001` record naming `providerCourseId: "wrongid99"` —
+  **`HTTP 401 {"error":"Permission denied"}`**.
+- A `gca_probe002` record with **no `source` node at all** — same refusal.
+- Neither landed. Both keys read back `null`, and the key list is still **36**,
+  none of them beginning `gca_`, identical to the committed snapshot plus
+  `zz_scratch_probe`.
+- The refusal is not a dead endpoint refusing everything: the same
+  unauthenticated curl shape wrote to `events/`, read it back, deleted it, and
+  confirmed `null`. `events/` was chosen for the control precisely because it is
+  the one node whose rules permit deletion, so the control leaves nothing.
+
+**What was NOT proven live, deliberately: the ACCEPT half.**
+
+There is **no way to prove it without permanent debris**, and this records why
+rather than leaving it to be re-discovered. Proving that a *matching* `gca_`
+write is accepted requires the write to succeed, and `.write` is
+`newData.exists()` — no client, script or test can then remove it. That is
+exactly how `zz_scratch_probe` came to exist. An unproven accept half is the
+better trade against a second undeletable row.
+
+How far it was raised without writing anything: the ruleset was **read back
+from the server** and `gca_provenance_rules_test.js` re-run against *that* text
+rather than against the repo file — 46/46, including the accept case and the
+merge case. So the expression proven by targaryen is known to be the expression
+the database is running. The residual gap is narrow and stated plainly: whether
+Firebase's own evaluator agrees with targaryen on the accept path. It agrees on
+the refuse path — targaryen refuses those two shapes and so did the server.
+
+**The debris-free confirmation arrives on its own.** The first genuine import
+creates a real `gca_` row as ordinary use. At that moment the accept half is
+proven for free, and so is the merge — check that a subsequent round publish
+onto that record still works. Do it then; do not manufacture it before.
+
+**The merge case was measured, not reasoned.** Firebase applies a multi-path
+update as writes to the children, and whether the parent `.validate` sees the
+merge was an open question, not an assumption. A `{name, data}` update onto an
+existing `gca_` record is accepted, so the round publish after an import still
+works.
+
+**The first version of that test passed 46 of 46 and was worth nothing.** Its
+verdict parser looked for a line shape targaryen does not print — targaryen
+emits an ANSI box-drawing table, not `✗ path` lines — so it returned an empty
+list every time and every assertion was true of nothing. It was caught by
+forcing the rule to an impossible value and watching the suite stay green. That
+impossible rule is now a permanent test in the file.
+
+**The provider quota was accidentally a brake on all of this.** At 35 requests
+a day, a runaway import could not do much damage. The account is on Pro at
+10,000 a day, so that brake is gone and this clause is what remains.
+
+**`global_courses` is enumerable by anyone.** `.read: true` sits on the parent
+and has since the file was created, so `GET /global_courses.json?shallow=true`
+returns the whole key list to an unauthenticated client. That is how the count
+of 36 above was taken. It is not a leak — the node is a shared public course
+list — but do not write anything here expecting it to be unlisted.
 
 ## Course data
 
