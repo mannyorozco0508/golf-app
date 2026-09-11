@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v103: the guide states the Skins default the code declares.
+//
+// instructions.html said "ties carry the pot to the next hole". Since v96 a
+// new round does not carry unless somebody says so - SKINS_CARRY_DEFAULT is
+// false - so a golfer who read the guide and touched nothing got the opposite
+// rule. It now quotes admin.html's own default explanation and names the
+// switch, and instructions_accuracy_test.js holds that sentence against
+// action-model.js so it cannot go stale silently again. An empty bordered
+// info-card that had sat under Birdie Game since August is gone.
+//
+// An installed device on v102 serves a guide that states the wrong Skins rule.
+
 // Moved to v102: the Android hardware back button closes what is on top.
 //
 // Capacitor 8 core has no back-press code; @capacitor/app fires 'backButton'
@@ -860,7 +872,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v102-android-back-button-closes-the-top-layer';
+const CACHE_VERSION = 'golfapp-v103-the-guide-states-the-skins-default';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

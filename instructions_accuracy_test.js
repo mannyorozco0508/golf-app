@@ -18,7 +18,7 @@
 // be worse than leaving it alone. "Lowest total wins", "the format most rounds
 // start from", "Points awarded per hole based on your score vs. par" - these
 // are prose with no machine-checkable referent. No test can know whether they
-// are true. This file therefore guards exactly two things that ARE checkable:
+// are true. This file therefore guards exactly three things that ARE checkable:
 //
 //   A. NAMED THINGS MUST EXIST. Every UI string the guide quotes must appear
 //      in a real page. A guide that names a button is making a checkable
@@ -26,6 +26,25 @@
 //   B. STATED NUMBERS MUST MATCH THE CODE. A number in prose is exactly the
 //      kind of fact that goes stale in silence, and the code that owns it can
 //      be read.
+//   C. A STATED DEFAULT MUST MATCH THE DEFAULT THE CODE DECLARES. The guide
+//      said "ties carry the pot to the next hole" for a day and a half after
+//      SKINS_CARRY_DEFAULT became false - the rewrite that made this file
+//      landed the same afternoon as the carry change and missed it. A rule
+//      with a boolean referent is as checkable as a number: the guide must
+//      describe the default the code declares, in the sentence the app itself
+//      shows for it, and must not describe the other one as the rule.
+//
+// DELIBERATELY NOT GUARDED: ABSENCE.
+//
+// The guide said nothing about the course importer for the wave it shipped
+// in. No assertion here can catch that. A and B check what IS written; a
+// feature the guide never mentions produces no string and no number for
+// either to test. The only way to assert presence is to pin copy - "the
+// guide must contain 'Search online'" - and that is the guard that demanded
+// the QR lie be restored (see NAMED_IN_PROSE below): the day the row is
+// renamed or pulled, the pin demands the guide keep describing it. There is
+// no machine-readable list of features to walk. So a missing section is
+// found by reading, and this comment is the honest record of that.
 //
 // DELIBERATELY NOT GUARDED: THE SETTLE SCOPE SENTENCE.
 //
@@ -256,6 +275,110 @@ describe('B. EVERY NUMBER THE GUIDE STATES MATCHES THE CODE', () => {
         });
         assert.deepEqual(wrong, [], 'the guide states a number the code contradicts.\n  '
             + wrong.join('\n  '));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// C. THE SKINS CARRY RULE THE GUIDE STATES IS THE DEFAULT THE CODE DECLARES.
+//
+// THE REFERENT IS THE APP'S OWN SENTENCE, NOT A PARAPHRASE. admin.html shows
+// one of two explanations under the Carry Over / No Carry switch, chosen by
+// the setting; action-model.js declares which setting a new round is born
+// with. So the true sentence for the default is not something this test has
+// to invent - it is the string the setup screen shows a golfer who touches
+// nothing. The guide's Skins card must contain that sentence and must NOT
+// contain the other one as its rule.
+//
+// Flip SKINS_CARRY_DEFAULT and this fails until the guide is rewritten. Edit
+// the explanation copy in admin.html and this fails until the guide matches.
+// Both directions are the point: the three files cannot drift apart quietly.
+//
+// Both sources are read through decodeEscapes, so an author who writes the
+// em dash as — in either file changes nothing here.
+// ---------------------------------------------------------------------------
+function skinsCarryDefault() {
+    const m = /var SKINS_CARRY_DEFAULT = (true|false);/.exec(read('action-model.js'));
+    return m ? m[1] === 'true' : null;
+}
+
+// The two explanations, as the ternary in setSkinsCarrySetting writes them.
+function skinsCarryExplanations() {
+    const src = read('admin.html');
+    const m = /skins-carry-explanation'\)\.textContent = isCarryOver\s*\?\s*"([^"]+)"\s*:\s*"([^"]+)"/
+        .exec(src);
+    return m ? { true: m[1], false: m[2] } : null;
+}
+
+function guideSkinsCard() {
+    const m = /<div class="f-name">[^<]*Skins<\/div>\s*<div class="f-desc">([\s\S]*?)<\/div>/
+        .exec(guideMarkup());
+    return m ? m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : null;
+}
+
+describe('C. THE STATED SKINS CARRY RULE MATCHES THE DEFAULT THE CODE DECLARES', () => {
+
+    test('each referent can actually be read, so the comparison is not vacuous', () => {
+        assert.notEqual(skinsCarryDefault(), null,
+            'could not read SKINS_CARRY_DEFAULT from action-model.js');
+        const ex = skinsCarryExplanations();
+        assert.ok(ex && ex.true.length > 20 && ex.false.length > 20,
+            'could not read both carry explanations out of admin.html setSkinsCarrySetting');
+        assert.notEqual(ex.true, ex.false, 'the two explanations must differ or the test proves nothing');
+        assert.ok(guideSkinsCard(), 'the guide no longer has a Skins card - this block guards nothing');
+    });
+
+    test('the guide states the default rule in the sentence the app shows for it', () => {
+        const def = skinsCarryDefault();
+        const ex = skinsCarryExplanations();
+        const card = guideSkinsCard();
+        assert.ok(card.includes(ex[String(def)]),
+            `SKINS_CARRY_DEFAULT is ${def}, so the guide's Skins card must contain the app's own `
+            + `explanation for that setting:\n  "${ex[String(def)]}"\n  but the card reads:\n  "${card}"`);
+    });
+
+    test('the guide does not describe the OTHER setting as the rule', () => {
+        const def = skinsCarryDefault();
+        const ex = skinsCarryExplanations();
+        const card = guideSkinsCard();
+        assert.ok(!card.includes(ex[String(!def)]),
+            `the guide states the non-default rule as if it were the rule: "${ex[String(!def)]}"`);
+        // The specific sentence that shipped false, so it cannot come back in a
+        // rewrite that drops the app's wording.
+        if (def === false) {
+            assert.ok(!/ties carry/i.test(card),
+                'the guide says ties carry, and a new round does not carry unless somebody says so');
+        }
+    });
+
+    test('the guide names the switch a golfer flips to get the other rule', () => {
+        // Both labels are real controls (admin.html skins-carry-label-on/-off),
+        // so guard A above also holds them against the page.
+        const card = guideSkinsCard();
+        assert.ok(/Carry Over/.test(card) && /No Carry/.test(card),
+            'the card must name both positions of the switch so a golfer knows there is one');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// NO CARD RENDERS BLANK. An <div class="info-card"></div> with nothing in it
+// sat under Birdie Game from 2026-08-05 and survived a full rewrite: a bordered
+// empty box, visible on every device, that no assertion here could see because
+// every assertion here is about text. This one is about the absence of it.
+// ---------------------------------------------------------------------------
+describe('NO INFO CARD IS EMPTY', () => {
+    test('every info-card has a name and a description', () => {
+        // Each card's chunk runs to the next card or the end of its section. A
+        // lazy "up to the next </div></div>" would let an EMPTY card borrow the
+        // name and description of the card after it and pass - which is exactly
+        // the card this exists to catch.
+        const markup = guideMarkup();
+        const chunks = markup.split('<div class="info-card">').slice(1)
+            .map((c) => c.split('</section>')[0]);
+        assert.ok(chunks.length >= 10, `only ${chunks.length} info-cards parsed - the split is broken`);
+        const blank = chunks.filter((c) => !/class="i-name"/.test(c) || !/class="i-desc"/.test(c));
+        assert.equal(blank.length, 0,
+            'an info-card with no name or no description renders as a bordered blank box:\n  '
+            + blank.map((c) => JSON.stringify(c.trim().slice(0, 80))).join('\n  '));
     });
 });
 
