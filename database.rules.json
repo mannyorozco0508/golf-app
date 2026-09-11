@@ -67,7 +67,7 @@
       ".read": true,
       "$courseId": {
         ".write": "newData.exists()",
-        ".validate": "newData.hasChildren(['name','data']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120",
+        ".validate": "(newData.hasChildren(['name','data']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120) && (!$courseId.beginsWith('gca_') || $courseId === 'gca_' + newData.child('source/providerCourseId').val())",
         "data": {
           ".validate": "newData.hasChildren([\"0\", \"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"10\", \"11\", \"12\", \"13\", \"14\", \"15\", \"16\", \"17\"])",
           "$index": {

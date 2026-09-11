@@ -542,7 +542,18 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // proves a file did not move, it never proves the file is right.
         // Previous hash, for the record:
         //   25304a5bfd3f448a11b93534342a6bf093914a7c9cde51898c3b6a2fa0444538
-        'database.rules.json': '4144a87e1ec5fbac0924d13044d401a2f04477687a90bb7bbbd70ed1608da266',
+        // RE-PINNED 2026-09-11, with Manny's explicit per-file approval, for ONE
+        // clause appended to global_courses/$courseId's validate: a key beginning
+        // gca_ must equal 'gca_' + source/providerCourseId. Nothing else in the file
+        // changed - verified by diffing every other node before and after.
+        //
+        // THE HASH IS NOT WHAT GUARDS THAT CLAUSE, and a reader chasing this line
+        // should go to gca_provenance_rules_test.js instead. That file runs targaryen
+        // against all 36 live keys, proves the clause refuses a mismatched key and
+        // accepts a matching one, and measures the merge case the round publish
+        // depends on. A hash notices that a byte moved; it cannot tell you whether
+        // the rule is right.
+        'database.rules.json': '47aedf1be507c0dad4676c29f56eb3271185cb8de7a4cd665a0ed8c58bfef854',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
