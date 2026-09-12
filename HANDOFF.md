@@ -39,7 +39,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 ## Current state
 
 ```
-1151 suites · 5858 tests · 5857 passing · 0 failing · 1 todo
+1289 suites · 6467 tests · 6465 passing · 0 failing · 2 todo
 ```
 
 15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
@@ -49,6 +49,8 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 - `action-model.js` — normalizes "what games are we playing" into one list
 
 **Duplication is intentional.** Several pages carry their own copies of the engines because there's no module system. Parity tests guard them. Never "helpfully" consolidate them.
+
+**The shell is at `CACHE_VERSION` v104** (`048a302`, 2026-09-12): `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
 
 ## iOS / App Store status
 
@@ -130,11 +132,22 @@ Leave it. It is recorded here so the next person spends no time on it.
 
 ## Firebase security rules — DEPLOYED
 
-`database.rules.json` is live on `golfapp-9fb21-default-rtdb`. Deploy with:
+`database.rules.json` is live on `golfapp-9fb21-default-rtdb`.
+
+**How the rules actually reach the database — read this before deploying.** The
+Firebase CLI is **not installed** on this Mac: no `firebase` on the PATH, no
+`firebase-tools` in `package.json`. Every rules change has been published through
+the **Firebase console** (Realtime Database → Rules → paste → Publish), and the
+console is therefore the source of truth for what is live. A CLI deploy would
+overwrite the live ruleset wholesale from the repo file, which is only safe if the
+two are already identical. The command, for the record, is
 
 ```
 npx firebase-tools deploy --only database --project golfapp-9fb21
 ```
+
+(`npx` fetches it on demand — a cached copy sits in `~/.npm/_npx`, which is how
+the read-back on 2026-09-11 below worked — but nothing here depends on it.)
 
 What they do: a `$other` catch-all denies anything not explicitly listed, money fields must be numbers in [0, 100000], scores must be numbers 1–29 keyed `p{n}_h{n}`, `global_courses` entries can be created or updated but never deleted.
 
@@ -303,6 +316,32 @@ and has since the file was created, so `GET /global_courses.json?shallow=true`
 returns the whole key list to an unauthenticated client. That is how the count
 of 36 above was taken. It is not a leak — the node is a shared public course
 list — but do not write anything here expecting it to be unlisted.
+
+### tournaments delete rule — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-12
+
+`tournaments/$tourneyCode` carried `".write": true` with a validate that admitted
+`null`, so anyone holding a code could delete a whole tournament in one write.
+Commit `279d9f8` changed the one line to
+
+    ".write": "!data.exists() || newData.exists()"
+
+— a write is allowed when the node does not yet exist (create) or when the new
+value is not null (rename, child write, child delete). The only write refused is
+the one that would leave the node absent. `.read` and `.validate` are untouched.
+
+**Written test-first.** Five targaryen rows were added to
+`security-rules.tests-data.json` before the rule moved: create `tournaments/NEWCODE`,
+rename `QRST`, write and delete `QRST/rounds/r1` (all `canWrite`), and delete `QRST`
+outright (`cannotWrite`). Run against the OLD rule the delete row was **red** —
+`write was allowed` — and the other four green, which is what proves the row measures
+something; against the new rule all 85 rows pass with no previously-green row
+flipped. Two file-level pins moved with it and say why: the frozen sha256 in
+`format_first_wizard_test.js` and the literal `.write` assertion in
+`deployment_build_test.js:443`. Neither is what guards the rule; the five rows are.
+
+**Published to the live database via the console on 2026-09-12** and verified by
+reading the rules back after a hard refresh. Not deployed from the CLI — see the
+note at the top of this section.
 
 ## Course data
 
@@ -533,6 +572,47 @@ covers both surfaces, so a move that breaks one goes red.
 - Four separate "Save as PDF" buttons exist; only the Round Receipt is canonical
 - The Tesseract OCR scorecard scanner loads from a CDN at runtime, so it fails offline — exactly where it's most needed
 - **Still not tested on an actual course during an actual round.** That remains the real next step. (Offline behaviour specifically *has* now been verified on hardware — see the section above.)
+- **CLOSED 2026-09-12 — `zz_scratch_probe` is no longer in the live database.** The
+`global_courses` key the Tier-B probe left behind (see above) reads absent now. Nothing
+to remove; the two mentions of it above are history, not a to-do.
+
+- **CLOSED 2026-09-12 — the prize calculator "pays 4th and 5th and nothing to the
+winner": NOT REPRODUCED.** The sentence appears nowhere in this repo's history — not in
+any revision of this file, not in a commit, not in a test. `payouts.js`
+(`allocatePlacePayouts` indexes `amounts[pos-1]`), the `payout-spot-${i}` DOM loop in
+`tournament.html` (zero-based), and `computeTournamentPayouts` (delegates to the
+shared allocator) were all read and are correct. What every unit test skipped — that
+the **rendered** board position is the row handed `spotAmounts[0]` — is now measured
+by `tools/tournament-payout-rank-seam-check.js` (`5d15911`) and is green on a clean,
+tie-free, single-round, unflighted team board. If the symptom ever resurfaces, the
+cases that check does not exercise are the places to look: **ties, flights, a
+round-filtered view, individual mode.**
+
+- **CLOSED — Nassau in the main format list is already solved by design.**
+`'nassau-modern'` is a wizard-only intent token: `normalizeGameFormatForSave` turns it
+into `'stroke'` at save, and `wantsModernNassau()` → `syncSetupNassauAvailability()`
+pre-arms the Step 6 wager builder. A saved round never carries the token. No action
+needed; do not add a Nassau "format".
+
+- **Traps worth not rediscovering, 2026-09-12.**
+  - **macOS has no `timeout`.** A sweep runner written around it exited **127 on all
+    57 checks in 0 s** — a run that looks like it happened and measured nothing. Use
+    `gtimeout` (coreutils) or a Node-side timeout, and read the per-check exit codes,
+    not the runner's.
+  - **10,242 leftover `cold-arrival-*` Chrome profile directories in `$TMPDIR`, 593 MB**,
+    oldest 2026-09-07. `tools/lib/cold-arrival.js` removes its profile in `finally`; these
+    are from runs that never reached it (killed, timed out, or a path around the
+    registry). Not cleaned up. Which path leaks them is unmeasured — measure before
+    deleting.
+
+- **Still open, named so they are not lost.** An admin-SDK seeding script for courses
+(Pro tier, 10,000 requests a day, and the `gca_` provenance rule must hold for every
+key it writes); fuzzy course spelling (see the Quintero item above — correction has to
+happen on our side before the request); and the loose legacy root keys in the live
+database — `activeCourseKey`, `active_event_mode`, `eventName`, `gameFormat`,
+`courseData` — orphaned, nothing reads them, blocked by the `$other` rule. Left in place
+deliberately.
+
 - **No monetization built. v1.1 is specced in `MONETIZATION.md` — read that before touching any of it.** One round stays free forever; a trip is paid. The **Trip Pass is $19.99, trip-scoped and consumable** — bought per trip, so Apple will not restore it, which is fine because the entitlement lives at `trips/<code>/entitlement/paid` rather than on the buyer's device. That is also what makes it exploitable today: **`database.rules.json` is step one and blocks everything else**, because right now any client can write that node, the repo is public and a trip code is six characters. Nothing can be sold until the rules are right. `database.rules.json` is a protected file and needs explicit per-file approval. Note that `MONETIZATION.md` is a plan, not a record — nothing in it exists
 
 ## Checks that live outside `npm test`
@@ -799,7 +879,17 @@ crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-
 `share-url-check.js` (every builder returns `https` from a non-web origin) ·
 `trip-awards-check.js` (awards refuse a merged name; no page renders a literal escape) ·
 `cup-join-check.js` ·
-`trip-money-check.js` · `wizard-wager-check.js`.
+`trip-money-check.js` · `wizard-wager-check.js` ·
+`tournament-pairings-check.js` (clicks the page's own Print Pairings button, then
+emulates print media: everything outside the sheet has a zero rect, every golfer is on
+it once, the HOLE NOT SET count matches) ·
+`tournament-payout-rank-seam-check.js` (the team the board shows first is the team paid
+`spotAmounts[0]`, and so on down the paid places — the seam no unit test covers).
+
+**`cold-arrival.js` gained an optional `steps` array** (`048a302`): `{ expression }` or
+`{ media: 'print' }`, run in order after arrival, so a check can press the page's own
+button and only then emulate print media. The `expression` path is unchanged for every
+existing check — the full 57-check sweep was run on the day to prove it.
 
 ## How I want you to work
 
