@@ -422,3 +422,80 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
         });
     });
 });
+
+// ===========================================================================
+describe('7. THE LIST WAS CUT - /v1/search stops at 25 and says nothing', () => {
+    // MEASURED, 2026-09-12, six live requests: a query matching hundreds of
+    // courses returns exactly 25, in the same order, whatever paging parameter
+    // is sent (page, current_page, page_size, offset all ignored), with no
+    // total_records and nothing beside `courses`. So 25 means "possibly cut",
+    // never "25 matched" - the API does not say how many matched and neither
+    // may the picker. Fewer than 25 means the list is complete; say nothing.
+    // The notice must sit BEFORE any offer to add the course as new, because
+    // adding creates a key no client can delete, and the golfer's course may
+    // simply be the 26th match.
+    //
+    // Reached the way a tap reaches it: the online row's onclick is
+    // runOnlineCourseSearch(typedName, row) - asserted from source below - and
+    // the only thing replaced is the network.
+    const dropdown = () => PAGEMOD.document.getElementById('course-dropdown');
+    const courses = (n) => [...Array(n)].map((_, i) => ({
+        id: 'c' + String(i).padStart(7, '0'), club_name: 'Club ' + i, course_name: 'Course ' + i,
+        location: { city: 'Town', state: 'ST', country: 'United States' }, tees: { male: 1 }
+    }));
+    async function searchOnline(n) {
+        if (loadError) assert.fail('admin.html did not load: ' + loadError.message);
+        PAGEMOD.fetch = async () => ({ json: async () => ({ status: 'ok', courses: courses(n) }) });
+        await need('runOnlineCourseSearch')('golf club', null);
+        return dropdown().children;
+    }
+    const isRow = (el) => /course-online-result/.test(el.className || '');
+    const isAdd = (el) => /custom-select-add-option/.test(el.className || '');
+    const isNotice = (el) => !isRow(el) && !isAdd(el) && /\b25\b/.test(el.textContent || '')
+        && /narrow|shorter|more specific|try/i.test(el.textContent || '');
+
+    test('the online row reaches the search through runOnlineCourseSearch', () => {
+        const src = fs.readFileSync(path.join(REPO_ROOT, PAGE), 'utf8');
+        assert.match(src, /online\.onclick = \(\) => \{ runOnlineCourseSearch\(typedName, online\); \};/);
+    });
+
+    test('at exactly 25 results the picker says the list was cut', async () => {
+        const kids = await searchOnline(25);
+        assert.equal(kids.filter(isRow).length, 25, 'all 25 result rows still render');
+        const notices = kids.filter(isNotice);
+        assert.equal(notices.length, 1, 'one notice, naming 25 and telling the golfer to narrow the search: '
+            + JSON.stringify(kids.map(k => (k.textContent || '').slice(0, 60))));
+    });
+
+    test('the notice does not claim to know how many matched', async () => {
+        const kids = await searchOnline(25);
+        const text = kids.filter(isNotice).map(k => k.textContent).join(' ');
+        assert.ok(!/\d+\s+(courses?\s+)?match/i.test(text), 'claims a match count: ' + text);
+        assert.ok(!/\bof\s+\d+/i.test(text), 'claims a total ("of N"): ' + text);
+        assert.ok(!/\btotal\b|\ball\s+\d+/i.test(text), 'claims a total: ' + text);
+        assert.ok(!/\bexactly\b/i.test(text), '25 is a ceiling, not a count: ' + text);
+    });
+
+    test('the notice comes BEFORE the offer to add the course as new', async () => {
+        const kids = await searchOnline(25);
+        const n = kids.findIndex(isNotice);
+        const a = kids.findIndex(isAdd);
+        assert.ok(n >= 0, 'no notice');
+        assert.ok(a >= 0, 'at 25 the golfer\'s course may be the 26th match - the add row must be offered, after the notice');
+        assert.ok(n < a, `the notice (index ${n}) must sit above the add row (index ${a})`);
+        // And the rows themselves are untouched: every row is still name + city line.
+        kids.filter(isRow).forEach(r => assert.equal(r.children.length, 2, 'a result row is title + sub, unchanged'));
+    });
+
+    test('at 24 results nothing is said and nothing is offered - the list is complete', async () => {
+        const kids = await searchOnline(24);
+        assert.equal(kids.filter(isRow).length, 24);
+        assert.equal(kids.filter(isNotice).length, 0, 'a complete list carries no notice');
+        assert.equal(kids.filter(isAdd).length, 0, 'a complete list offers no duplicate');
+    });
+
+    test('at 26 - which the API never returns - the notice still fires, so a raised ceiling is not silently missed', async () => {
+        const kids = await searchOnline(26);
+        assert.equal(kids.filter(isNotice).length, 1);
+    });
+});

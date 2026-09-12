@@ -3519,6 +3519,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     //
     // query_too_short is the odd one out - nothing failed and nothing was spent -
     // so it tells the golfer what to do instead of reporting a problem.
+    // The provider's hard ceiling on a search: at this many results the list
+    // may have been cut. Named here, next to the messages, because the sentence
+    // that quotes it must move with it.
+    const ONLINE_SEARCH_CEILING = 25;
+
     const ONLINE_SEARCH_MESSAGES = {
         query_too_short: 'Type a little more to search online.',
         not_configured: "Online search isn't set up yet.",
@@ -3711,6 +3716,22 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             row.onclick = () => { openImportConfirm(c); };
             courseDropdown.appendChild(row);
         });
+
+        // THE LIST MAY HAVE BEEN CUT, AND ONLY THE COUNT CAN SAY SO. Measured
+        // 2026-09-12, six live requests: /v1/search returns AT MOST 25 courses,
+        // in the same order whatever paging parameter is sent, with no
+        // total_records and nothing beside `courses`. So 25 is not "25 matched"
+        // - the API never says how many matched - it is "possibly more". Below
+        // 25 the list is complete and this says nothing. The notice sits ABOVE
+        // the add row, because a golfer whose course is the 26th match must be
+        // told to narrow the search before being offered a key no client can
+        // delete.
+        if (payload.courses.length >= ONLINE_SEARCH_CEILING) {
+            courseDropdown.appendChild(renderDropdownNote(
+                `Only the first ${ONLINE_SEARCH_CEILING} are shown \u2014 the list stops there. `
+                + `If yours isn't here, try a narrower search: add the town, or the club's full name.`));
+            courseDropdown.appendChild(buildAddAsNewRow(query, " (only if a narrower search can't find it)"));
+        }
         courseDropdown.style.display = "block";
     }
 

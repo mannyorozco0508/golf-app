@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v106: the picker tells a golfer when an online search was cut
+// at 25.
+//
+// Six live requests on 2026-09-12 proved /v1/search returns at most 25
+// courses, in the same order whatever paging parameter is sent, with no
+// total_records and nothing beside `courses` (48d2077). A golfer whose
+// course was the 26th match saw 25 others and nothing else - no signal, no
+// way forward. At 25 or more the dropdown now says only the first 25 are
+// shown and to narrow the search, without claiming how many matched
+// (the API never says), and offers the add row below that notice with a
+// narrower-search caveat. Below 25 nothing changes. course_import_test.js
+// holds it at 24, 25 and 26.
+//
+// An installed device on v105 keeps a picker that cuts the list in silence.
+
 // Moved to v105: admin.html's picker no longer prints "undefined" for a
 // course record with no location.city.
 //
@@ -906,7 +921,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v105-picker-no-longer-prints-undefined';
+const CACHE_VERSION = 'golfapp-v106-the-picker-says-when-a-search-was-cut';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
