@@ -627,12 +627,15 @@ needed; do not add a Nassau "format".
     Course data and "The API ceiling" under the proxy). A seeder takes a list of names
     *we* supply, spends two requests per course, needs no admin SDK, and must satisfy
     the `gca_` provenance validate like any other client.
-  - **Fuzzy course spelling — UNTESTED against the API's own matching.** The Quintero
-    item above assumed correction has to happen on our side. But the upstream's
-    `fuzzy_match` defaults to true and matches substrings server-side — "hurst" is
-    documented to match "Pinehurst" — and nothing here has ever measured what it does
-    with a misspelling. **One live request would establish whether this item is already
-    solved upstream before anything is built.** Do that first.
+  - **Fuzzy course spelling — NOT solved upstream. Tested 2026-09-12, one live request:**
+    `search_query` "chambrs bay" (one dropped letter from Chambers Bay) with
+    `fuzzy_match` at its default returned **zero courses**. The API's fuzzy matching
+    handles substrings of correctly-spelled text — "hurst" matches "Pinehurst" — but
+    does not correct a misspelling. **Correction has to happen on our side, before the
+    request**, as the Quintero item above assumed. Not established: whether
+    `fuzzy_match=true` sent explicitly differs from the default, or whether a
+    correctly-spelled fragment alone would match; neither changes the answer for a
+    golfer who mistypes.
   - The loose legacy root keys in the live database — `activeCourseKey`,
     `active_event_mode`, `eventName`, `gameFormat`, `courseData` — orphaned, nothing
     reads them, blocked by the `$other` rule. Left in place deliberately.
