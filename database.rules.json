@@ -59,7 +59,7 @@
     "tournaments": {
       "$tourneyCode": {
         ".read": true,
-        ".write": true,
+        ".write": "!data.exists() || newData.exists()",
         ".validate": "newData.hasChildren() || newData.val() === null"
       }
     },

@@ -438,7 +438,9 @@ describe('FIREBASE — one project, unchanged', () => {
     test('the security rules were not touched by a deployment batch', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
         assert.equal(rules.events.$eventCode['.read'], true);
-        assert.equal(rules.tournaments.$tourneyCode['.write'], true);
+        // An exact string, not a looser match: the rule that stops an anonymous
+        // whole-tournament delete must survive a deployment batch byte for byte.
+        assert.equal(rules.tournaments.$tourneyCode['.write'], '!data.exists() || newData.exists()');
         assert.equal(rules.app_settings['.write'], false);
     });
 });

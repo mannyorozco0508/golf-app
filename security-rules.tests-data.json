@@ -42,7 +42,12 @@
     },
     "tournaments": {
       "QRST": {
-        "name": "Existing Tourney"
+        "name": "Existing Tourney",
+        "rounds": {
+          "r1": {
+            "name": "Round One"
+          }
+        }
       }
     },
     "global_courses": {
@@ -193,6 +198,12 @@
           "data": {
             "name": "Renamed Tourney"
           }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": null
         }
       ]
     },
@@ -739,6 +750,30 @@
         {
           "auth": "nobody",
           "data": null
+        }
+      ]
+    },
+    "tournaments/QRST/rounds/r1": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Renamed Round"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/NEWCODE": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Brand New Tourney"
+          }
         }
       ]
     }

@@ -553,7 +553,24 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // accepts a matching one, and measures the merge case the round publish
         // depends on. A hash notices that a byte moved; it cannot tell you whether
         // the rule is right.
-        'database.rules.json': '47aedf1be507c0dad4676c29f56eb3271185cb8de7a4cd665a0ed8c58bfef854',
+        // Previous hash, for the record:
+        //   47aedf1be507c0dad4676c29f56eb3271185cb8de7a4cd665a0ed8c58bfef854
+        // RE-PINNED 2026-09-12, with Manny's explicit per-file approval, for ONE
+        // line: tournaments/$tourneyCode ".write" moved from
+        //   true
+        // to
+        //   "!data.exists() || newData.exists()"
+        // so nobody can delete a whole tournament in one anonymous write. A
+        // tournament can still be created (no data yet), renamed, and have its
+        // children written or removed; only the write that would leave the node
+        // absent is refused. Nothing else in the file changed - one line, by diff.
+        //
+        // THE HASH IS NOT WHAT GUARDS THAT RULE. security-rules.tests-data.json
+        // carries the five rows that do - create, rename, child write, child
+        // delete allowed; whole-tournament delete refused - and the targaryen suite
+        // runs them. The delete row was written FIRST and shown red against the old
+        // rule, so it is known to measure something.
+        'database.rules.json': 'fce5b6f3df7c08e7760f4acfc79c113940dfdc508763e36fb02284a17fa125d1',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
