@@ -335,8 +335,13 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         assert.ok(others.length >= 9, 'sanity: the other data pages were enumerated');
         others.forEach(p => assert.ok(!/firebase-auth-compat/.test(read(p)),
             p + ' loads the auth SDK; only the organizer console may'));
-        assert.ok(!/firebase\.auth\(/.test(read('tournament.html')),
-            'nothing calls firebase.auth() yet - this step vendors the file and nothing else');
+        // Step 1 of the auth wave vendored the file with no caller; step 2 added
+        // the caller. What must stay true is the split: the console calls it,
+        // the scorecard never does.
+        assert.match(read('tournament.html'), /firebase\.auth\(\)\.onAuthStateChanged/,
+            'tournament.html is the page that signs in; it must listen for the auth state');
+        assert.ok(!/firebase\.auth\(/.test(read('tournament-scorecard.html')),
+            'the scorecard must never call firebase.auth()');
     });
 
     test('THE REMAINING LIMITATION: SDK availability is not data availability', () => {

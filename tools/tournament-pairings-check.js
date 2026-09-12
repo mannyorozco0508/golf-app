@@ -72,6 +72,10 @@ const PRE = `window.__prints = 0; window.print = function () { window.__prints++
 
 const CLICK = `
 (() => {
+  // Since the auth wave the print buttons live on the Leaderboard tab. A legacy
+  // record lands on Setup, so tap the tab a starter would before pressing Print.
+  const lb = Array.prototype.slice.call(document.querySelectorAll('.top-nav-item')).find(x => /Leaderboard/.test(x.textContent || ''));
+  if (lb) lb.click();
   const btn = Array.prototype.slice.call(document.querySelectorAll('button'))
     .find(b => /Print Pairings/.test(b.textContent || ''));
   if (!btn) return JSON.stringify({ found: false });

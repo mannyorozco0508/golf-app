@@ -343,6 +343,44 @@ flipped. Two file-level pins moved with it and say why: the frozen sha256 in
 reading the rules back after a hard refresh. Not deployed from the CLI — see the
 note at the top of this section.
 
+## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
+
+Organizers sign in (Firebase Auth, email/password); golfers never do — a scoring
+link is all a golfer gets, and `tournament-scorecard.html` loads no auth SDK and
+calls no auth API (`tournament_signin_gate_test.js` §g pins it). On
+`tournament.html`:
+
+- A tournament created while signed in carries `ownerUid` in the same `.set()`
+  that creates it. Signed out, `saveTournament` refuses before reading a field.
+- An **owned** tournament renders the Setup & Links tab only for the signed-in
+  user whose uid is its `ownerUid`. For everyone else the tab and its panel are
+  **removed from the DOM** — not hidden, not greyed. Signed in as somebody else
+  is the same as signed out. The Leaderboard, both print buttons and the scoring
+  links stay open to everyone (they moved out of the Setup panel for that reason).
+- A **legacy** tournament (no `ownerUid`) is exactly as before: fully open, no
+  claim path, nothing writes `ownerUid` onto it. `§d` of the test file is the
+  grandfather promise.
+- The gate runs on both the record's value handler and `onAuthStateChanged`,
+  because a browser delivers them in either order; both orders are driven.
+
+**THE HONEST LIMIT.** This gate decides what the page *renders*. It is a
+guardrail against the casual case — a golfer who followed a link into the console
+and tapped something — and **not a security boundary**: `database.rules.json`
+still lets anyone holding the six-character code write every child the Setup tab
+edits, and the rules did not change in this wave. No UI string may say
+"protected", "secure" or "locked", and the tests refuse those words on the page.
+The same sentence sits in a comment at the gate in `tournament.html`.
+
+In **individual** mode the group scoring links moved too: they used to be one line
+inside the scoring-group editor (Setup), and in a multi-round event showed only the
+round being *edited*. They now render on the Leaderboard tab from the record alone
+— every round's groups, labelled by round — while the editor stays in Setup and goes
+with it. That is a deliberate difference from the editor, which shows one round at
+a time.
+
+`tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
+(rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
+
 ## Course data
 
 `course-data.js` holds a searchable directory of 141 courses. Only 26 have local hole data; the rest rely on Firebase `global_courses`, which any golfer can extend by mapping a course once — it then works for everyone, forever.

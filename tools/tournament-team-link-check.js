@@ -81,6 +81,11 @@ const CARD_PROBE = `
 // The organizer's own screen, read the way a head pro reads it.
 const ORGANIZER_PROBE = `
 (() => {
+  // Since the auth wave the scoring-link block lives on the Leaderboard tab,
+  // beside the print buttons, so it stays open when the Setup tab is not
+  // rendered. A legacy record lands on Setup, so tap the tab a user would.
+  const lb = Array.prototype.slice.call(document.querySelectorAll('.top-nav-item')).find(x => /Leaderboard/.test(x.textContent || ''));
+  if (lb) lb.click();
   const body = (document.body.innerText || '');
   const lines = body.split('\\n').map(s => s.trim()).filter(Boolean);
   const i = lines.findIndex(l => /Team Scorecard Links/i.test(l));

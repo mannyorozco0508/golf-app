@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v109: organizers sign in to manage a tournament.
+//
+// tournament.html gates its Setup & Links tab: an owned tournament renders it
+// only for the signed-in user whose uid is its ownerUid, a legacy tournament
+// (no ownerUid) exactly as before. saveTournament requires a signed-in
+// organizer and writes ownerUid in the same set. Printing and every scoring
+// link moved onto the Leaderboard tab so they stay open to everyone. A
+// GUARDRAIL, NOT A BOUNDARY: the rules did not change, and anyone holding
+// the code can still write what the tab edits; the page and HANDOFF say so.
+// tournament-scorecard.html is untouched - a golfer never sees a sign-in.
+//
+// An installed organizer on v108 has a console with no sign-in and a Setup
+// tab open to whoever holds the code.
+
 // Moved to v108: firebase-auth-compat.js joins the shell.
 //
 // The auth wave lands its vendored SDK first and alone, so a red says which
@@ -950,7 +964,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v108-auth-sdk-vendored';
+const CACHE_VERSION = 'golfapp-v109-organizers-sign-in';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

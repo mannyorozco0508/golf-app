@@ -202,6 +202,8 @@
 
 <div class="container" id="setup-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div id="signed-in-as-setup" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
+    <div id="signin-panel-setup" class="signin-panel" style="display:none;"></div>
     <div class="lobby-logo">🏆</div>
     <div class="lobby-title">Tournament</div>
     <p class="lobby-sub">Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.</p>
@@ -358,6 +360,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
 <div class="container" id="manage-screen" style="display:none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
+         gates what this page renders, not what the database accepts. -->
+    <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
+    <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div class="top-nav-bar">
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
@@ -435,11 +441,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
 
         <hr class="section-divider">
-        <h3>🔒 Team Scorecard Links</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Tap 📤 to get a QR code or copy the link.</p>
-        <div id="team-links-list"></div>
-
-        <hr class="section-divider">
         <button class="btn-outline" onclick="showAddTeamPanel()">➕ Add Another Team</button>
         <div id="add-team-panel" style="display:none; margin-top:12px;">
             <div class="team-card">
@@ -467,10 +468,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
 
         <hr class="section-divider">
-        <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
-        <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
-
-        <hr class="section-divider">
         <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='tournament.html'">➕ Start a Different Tournament</button>
     </div>
 
@@ -495,6 +492,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <div id="payout-spot-amounts"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
+
+        <!-- MOVED HERE FROM THE SETUP PANEL in the auth wave. The Setup tab is not
+             rendered for anyone but the owner of an owned tournament; printing and
+             the scoring links stay open to everyone, so they live beside the board.
+             The handlers read nothing from the Setup panel - measured before the move. -->
+        <hr class="section-divider">
+        <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
+        <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
+
+        <hr class="section-divider">
+        <h3>🔒 Team Scorecard Links</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Tap 📤 to get a QR code or copy the link.</p>
+        <div id="team-links-list"></div>
+        <!-- Individual mode: the group scoring links. The group EDITOR stays in
+             Setup; only the links live here, so a signed-out visitor of an owned
+             tournament can still send a group its card. -->
+        <div id="group-links-block" style="display:none;">
+            <h3>🔒 Group Scoring Links</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. In a multi-round event every round has its own links.</p>
+            <div id="group-links-list"></div>
+        </div>
     </div>
 
     <div id="tournament-print-view"></div>
@@ -845,6 +863,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let tripLinkCode = null; // present when this tournament is being set up FROM a trip
 
     async function saveTournament() {
+        // SIGNED IN, FIRST - before a single field is read, so nobody fills in a
+        // whole tournament to be told at the end. ownerUid is written in the same
+        // .set() that creates the record, so an owned tournament never exists
+        // without its owner. (The rules do not enforce this; see the gate note.)
+        if (!authUser) {
+            alert('Sign in to create a tournament. Organizers sign in; golfers never need to.');
+            return;
+        }
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
         if (!selectedCourseData) { alert("⚠️ Please select a golf course."); return; }
 
@@ -916,7 +942,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             entryFee: entryFee,
             shambleCountBest: shambleCountBest,
             teams: teams,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            ownerUid: authUser.uid
         };
 
         if (isMultiRoundSetup) {
@@ -1130,12 +1157,124 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     function showTab(tab) {
-        document.getElementById('manage-tab-setup').style.display = tab === 'setup' ? 'block' : 'none';
+        // The Setup tab may not exist: it is removed for anyone who is not the
+        // owner of an owned tournament (applyManageGate). Asking for it then
+        // lands on the leaderboard.
+        const setupPanel = document.getElementById('manage-tab-setup');
+        const setupBtn = document.getElementById('tab-btn-setup');
+        if (tab === 'setup' && !setupPanel) tab = 'leaderboard';
+        if (setupPanel) setupPanel.style.display = tab === 'setup' ? 'block' : 'none';
         document.getElementById('manage-tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
-        document.getElementById('tab-btn-setup').classList.toggle('active', tab === 'setup');
+        if (setupBtn) setupBtn.classList.toggle('active', tab === 'setup');
         document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
         if (tab === 'leaderboard') renderLeaderboard();
     }
+
+    // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
+    //
+    // THE HONEST LIMIT, FIRST. This gate decides what the PAGE renders. It is a
+    // guardrail against the casual case - a golfer who followed a link into the
+    // console and tapped something - and NOT a security boundary. database.rules
+    // .json still lets anyone holding the six-character code write every child
+    // the Setup tab edits; the rules do not change this wave. Nothing on this
+    // page may say "protected", "secure" or "locked", because nothing is.
+    //
+    // WHO MAY MANAGE: a LEGACY tournament (no ownerUid) is open to everyone,
+    // exactly as before this wave - no claim path, nothing writes ownerUid onto
+    // it. An OWNED tournament renders the Setup tab only for the signed-in user
+    // whose uid is its ownerUid. Signed in as somebody else is the same as
+    // signed out. The gate runs on BOTH the record's value handler and
+    // onAuthStateChanged, because a browser delivers those in either order.
+    let authUser = null;
+    let gateStash = null;   // the removed tab and panel, for re-insertion on sign-in
+
+    function canManage() {
+        const owner = currentData && currentData.ownerUid;
+        if (!owner) return true;
+        return !!(authUser && authUser.uid === owner);
+    }
+
+    function applyManageGate() {
+        // Only once a record is on screen. currentData starts as {} on the setup
+        // screen, and the auth listener fires before any record arrives; gating
+        // an empty object would remove the tab of a tournament not yet loaded
+        // and render a leaderboard of nothing.
+        if (!currentCode || !currentData || Object.keys(currentData).length === 0) return;
+        const allowed = canManage();
+        const tab = document.getElementById('tab-btn-setup');
+        const panel = document.getElementById('manage-tab-setup');
+        if (!allowed && (tab || panel)) {
+            // NOT hidden, NOT disabled: removed. A control that is not rendered
+            // cannot be tapped by mistake, and there is nothing to grey out.
+            gateStash = {
+                tab: tab, tabParent: tab && tab.parentNode, tabNext: tab && tab.nextSibling,
+                panel: panel, panelParent: panel && panel.parentNode, panelNext: panel && panel.nextSibling
+            };
+            if (tab) tab.remove();
+            if (panel) panel.remove();
+            showTab('leaderboard');
+        } else if (allowed && gateStash) {
+            // The owner signed in after the record arrived: put the tab back
+            // exactly where it was.
+            const s = gateStash; gateStash = null;
+            if (s.tab && s.tabParent) s.tabParent.insertBefore(s.tab, s.tabNext || null);
+            if (s.panel && s.panelParent) s.panelParent.insertBefore(s.panel, s.panelNext || null);
+            showTab('setup');
+        }
+        renderSignedInAs();
+    }
+
+    // "Signed in as <email>" - a fact about the session, never a claim about
+    // safety. Signed out, the line is empty and the sign-in panel shows.
+    function renderSignedInAs() {
+        const who = authUser ? `Signed in as ${authUser.email || authUser.uid}` : '';
+        ['signed-in-as', 'signed-in-as-setup'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = '';
+            if (!authUser) return;
+            el.appendChild(document.createTextNode(who + ' \u00b7 '));
+            const out = document.createElement('a');
+            out.href = '#'; out.textContent = 'Sign out';
+            out.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); signOutNow(); };
+            el.appendChild(out);
+        });
+        renderSignInPanels();
+    }
+
+    function renderSignInPanels() {
+        ['signin-panel-manage', 'signin-panel-setup'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (authUser) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            el.style.display = 'block';
+            el.innerHTML = `
+                <div style="border:1px solid var(--border-mid); border-radius:8px; padding:12px; margin-bottom:12px;">
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.</div>
+                    <input type="email" id="${id}-email" placeholder="Email" autocomplete="username" style="margin-bottom:6px;">
+                    <input type="password" id="${id}-password" placeholder="Password" autocomplete="current-password" style="margin-bottom:6px;">
+                    <button class="btn-outline" onclick="signInNow('${id}')">Sign in</button>
+                    <div id="${id}-error" style="font-size:0.78rem; color:var(--accent-red); margin-top:6px;"></div>
+                </div>`;
+        });
+    }
+
+    function signInNow(panelId) {
+        const email = (document.getElementById(panelId + '-email') || {}).value || '';
+        const password = (document.getElementById(panelId + '-password') || {}).value || '';
+        const err = document.getElementById(panelId + '-error');
+        if (err) err.textContent = '';
+        firebase.auth().signInWithEmailAndPassword(email.trim(), password).catch((e) => {
+            if (err) err.textContent = (e && e.message) ? String(e.message) : 'Sign-in failed.';
+        });
+    }
+    function signOutNow() { firebase.auth().signOut(); }
+
+    firebase.auth().onAuthStateChanged((user) => {
+        authUser = user || null;
+        applyManageGate();
+        renderSignedInAs();
+    });
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
     // computeTournamentPayouts now live in tournament-engine.js so this page and
@@ -1947,6 +2086,42 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // URL a golfer who kept yesterday's message would enter today's scores into
     // yesterday's round - silently, because the group id is the same either way.
     // Single-round events keep exactly the link they already had.
+    // THE GROUP LINKS, RENDERED FOR EVERYONE. This used to be one line inside the
+    // group editor's rows, which meant two things: it vanished with the Setup
+    // panel, and in a multi-round event it showed only the round being EDITED
+    // (editingRoundId) - a state only an organizer in the editor has. Here it
+    // depends on the record alone: every round's groups, labelled by round, in a
+    // single-round event the root groups. That is a deliberate difference from
+    // the editor, which still shows one round at a time.
+    function renderGroupLinks() {
+        const block = document.getElementById('group-links-block');
+        const list = document.getElementById('group-links-list');
+        if (!block || !list) return;
+        if (!recordIsIndividual()) { block.style.display = 'none'; list.innerHTML = ''; return; }
+        const players = currentData.players || {};
+        const sections = recordIsMultiRound()
+            ? Object.keys(currentData.rounds || {})
+                .sort((a, b) => ((currentData.rounds[a].createdAt || 0) - (currentData.rounds[b].createdAt || 0)))
+                .map(rid => ({ rid, label: currentData.rounds[rid].name || 'Round', groups: currentData.rounds[rid].scoringGroups || {} }))
+            : [{ rid: null, label: '', groups: currentData.scoringGroups || {} }];
+        let html = '';
+        sections.forEach(sec => {
+            const gids = Object.keys(sec.groups).sort((a, b) => (sec.groups[a].createdAt || 0) - (sec.groups[b].createdAt || 0));
+            if (gids.length === 0) return;
+            if (sec.label) html += `<div style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${sec.label}</div>`;
+            gids.forEach(gid => {
+                const g = sec.groups[gid];
+                const names = (g.playerIds || []).filter(pid => players[pid]).map(pid => players[pid].name);
+                html += `<div class="team-link-row" style="flex-wrap:wrap;">
+                    <span>🏌️ ${g.name || 'Group'} <span style="font-weight:normal; color:var(--text-muted);">— ${names.join(', ') || 'nobody assigned yet'}</span></span>
+                    <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
+                </div>`;
+            });
+        });
+        block.style.display = 'block';
+        list.innerHTML = html || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No groups yet.</div>`;
+    }
+
     function groupScorecardUrl(gid, rid) {
         // SAME ORIGIN, ALWAYS. This is an internal Tournament link, not a
         // cross-product one, so it is built the way team links are and never through
@@ -1995,9 +2170,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <button class="flight-del" onclick="deleteScoringGroup('${gid}')" ${ids.length ? 'disabled' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
                     ${ids.length ? ids.map(pid => players[pid].name).join(', ') : 'Nobody assigned yet'}
-                </div>
-                <div style="flex-basis:100%; margin-top:6px;">
-                    <a class="rc-link" href="${groupScorecardUrl(gid, recordIsMultiRound() ? editingRoundId : null)}">Open scoring link ▶</a>
                 </div>
             </div>`;
         }).join('');
@@ -2439,10 +2611,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // Team scorecard links belong to team events only.
             const teamLinksHeading = document.getElementById('team-links-list');
             if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
+            renderGroupLinks();
             renderLeaderboardRoundFilter();
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
+            // Last, so it can remove what the renders above filled in. Runs on
+            // every snapshot: the record may gain an owner while the page is open.
+            applyManageGate();
         });
     }
 

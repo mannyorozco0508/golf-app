@@ -42,6 +42,22 @@ function makeStubSandbox() {
     const documentStub = createDocument();
     const elementRegistry = documentStub.__registry;
     const captured = [];
+    const writes = [];
+    // firebase.auth(), signed out by default. A page that asks for auth at load
+    // must find something, and the vendored SDK is skipped (VENDOR_SKIP). The
+    // listener the page registers is captured; sandbox.__auth.setUser(user)
+    // fires it with { uid, email } or null, the way onAuthStateChanged does.
+    const authListeners = [];
+    const authState = { user: null };
+    const authStub = {
+        get currentUser() { return authState.user; },
+        onAuthStateChanged(cb) {
+            if (typeof cb === 'function') { authListeners.push(cb); cb(authState.user); }
+            return () => {};
+        },
+        signInWithEmailAndPassword() { return Promise.reject(new Error('stub: sign-in is not simulated here')); },
+        signOut() { authState.user = null; authListeners.forEach((cb) => cb(null)); return Promise.resolve(); }
+    };
     const dbStub = {
         ref(p) {
             // push() returns a FULL reference, as real Firebase does. It used to hand
@@ -61,8 +77,13 @@ function makeStubSandbox() {
                     if (typeof cb === 'function') captured.push({ path: p, event: ev, cb: cb });
                 },
                 once() { return Promise.resolve({ val() { return null; }, exists() { return false; } }); },
-                set() { return Promise.resolve(); }, update() { return Promise.resolve(); },
-                remove() { return Promise.resolve(); },
+                // WRITES ARE CAPTURED TOO, since the auth wave. A test about
+                // "nothing was written" or "ownerUid was written" needs to see
+                // the write, not trust that a function returned. Each entry is
+                // { path, op, value }; sandbox.__dbWrites holds them in order.
+                set(v) { writes.push({ path: p, op: 'set', value: v }); return Promise.resolve(); },
+                update(v) { writes.push({ path: p, op: 'update', value: v }); return Promise.resolve(); },
+                remove() { writes.push({ path: p, op: 'remove', value: null }); return Promise.resolve(); },
                 push() { return ref; }
             };
             return ref;
@@ -94,7 +115,7 @@ function makeStubSandbox() {
                 clear: () => { mem.clear(); }
             };
         })(),
-        firebase: { initializeApp() {}, database() { return dbStub; } },
+        firebase: { initializeApp() {}, database() { return dbStub; }, auth() { return authStub; } },
         db: dbStub,
         alert() {}, confirm() { return true; }, prompt() { return null; },
         URLSearchParams: URLSearchParams,
@@ -103,6 +124,8 @@ function makeStubSandbox() {
         Set: Set, Map: Map,
         __elementRegistry: elementRegistry, // exposed so tests can inspect rendered output directly
         __dbHandlers: captured,             // the value handlers the page registered
+        __dbWrites: writes,                 // every set/update/remove the page made, in order
+        __auth: { setUser(u) { authState.user = u; authListeners.forEach((cb) => cb(u)); }, listeners: authListeners },
         // window.addEventListener, as a no-op. No page calls it at top level (grep:
         // 0 uses across the ten pages), so nothing that ran before now runs
         // differently. pwa-boot.js does call it - `window.addEventListener('load',

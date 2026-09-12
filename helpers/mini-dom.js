@@ -137,6 +137,7 @@ class MiniNode {
         if (!node) return node;
         if (node.parentNode) node.parentNode.removeChild(node);
         node.parentNode = this;
+        node.__removed = false;
         this.children.push(node);
         return node;
     }
@@ -146,6 +147,7 @@ class MiniNode {
         if (!node) return node;
         if (node.parentNode) node.parentNode.removeChild(node);
         node.parentNode = this;
+        node.__removed = false;
         const i = ref ? this.children.indexOf(ref) : -1;
         if (i >= 0) this.children.splice(i, 0, node); else this.children.push(node);
         return node;
@@ -206,7 +208,19 @@ class MiniNode {
         return node;
     }
     // The method the old stub was missing entirely.
-    remove() { if (this.parentNode) this.parentNode.removeChild(this); }
+    //
+    // A REMOVED ELEMENT IS GONE, EVEN A REGISTRY ONE. Static markup is never
+    // parsed into the tree, so a control like #tab-btn-setup only exists here
+    // as a detached registry element that getElementById hands back on demand.
+    // Before the auth wave, calling .remove() on one of those did nothing and
+    // the next getElementById returned it again - so "the Setup tab is not
+    // rendered" was unmeasurable. In a browser, getElementById after
+    // element.remove() is null; now it is here too. A tree element is removed
+    // from its parent as before.
+    remove() {
+        if (this.parentNode) this.parentNode.removeChild(this);
+        this.__removed = true;
+    }
 
     insertAdjacentHTML(_pos, html) { this._html += String(html); }
 
@@ -281,9 +295,20 @@ function createDocument() {
         getElementById(id) {
             const inTree = root.querySelectorAll('#' + id)[0];
             if (inTree) return inTree;
+            // Removed and never re-created: null, as a browser answers. A page
+            // that later builds a fresh element with the same id and mounts it
+            // is found in the tree above, so re-creation still works.
+            if (registry.has(id) && registry.get(id).__removed) return null;
             if (!registry.has(id)) {
                 const el = new MiniNode('div');
                 el.id = id;
+                // A static element has a parent in a browser. The stub records
+                // the body as its parent WITHOUT joining body.children, so a page
+                // can remove it and put it back where it was (insertBefore on the
+                // parent), which is what the manage gate does when the owner
+                // signs in after the record arrived. Tree queries still do not
+                // see it until it is genuinely inserted.
+                el.parentNode = root;
                 registry.set(id, el);
             }
             return registry.get(id);
