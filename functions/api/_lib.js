@@ -62,6 +62,16 @@
 //                     not_configured.
 //   network           the request never completed - thrown fetch, or our own
 //                     5-second timeout aborting it.
+//   no_such_route     HTTP 404, from functions/api/[[path]].js: an /api path
+//                     with no Function behind it. Without the catch-all
+//                     Pages answered these with index.html at 200 (no
+//                     404.html, SPA fallback), which a caller trusting the
+//                     status reads as success.
+//   method_not_allowed HTTP 405 with an Allow header, same file: a method the
+//                     route does not export (a POST to the GET-only search).
+//                     A method mismatch on a routed module falls through to
+//                     the catch-all - measured - so this is the only place
+//                     Allow can be set.
 //
 // A FAILURE CARRIES NO courses KEY AT ALL - absent, not empty. A caller that
 // forgets to check `status` must not be able to read an empty list out of a
@@ -371,12 +381,27 @@ export async function handleDetail(d) {
 // and never a cacheable response - the Function's own KV is the cache, and a
 // browser or edge cache holding a 503 would outlast the condition that caused
 // it.
-export function toResponse(out) {
+//
+// init is OPTIONAL and the two proxy routes pass none. The catch-all passes
+// { status: 404 } or { status: 405, headers: { Allow: 'GET' } }; its headers
+// are merged over the two fixed ones, never in place of them, so a refusal
+// is JSON and no-store whatever its status.
+export function toResponse(out, init) {
     return new Response(JSON.stringify(out), {
-        status: out.status === 'ok' ? 200 : 503,
-        headers: {
+        status: (init && init.status) || (out.status === 'ok' ? 200 : 503),
+        headers: Object.assign({
             'content-type': 'application/json; charset=utf-8',
             'cache-control': 'no-store'
-        }
+        }, (init && init.headers) || {})
     });
+}
+
+// THE CATCH-ALL'S TWO REFUSALS, built here so the reason table above and the
+// code that emits each reason stay in one file - course_api_proxy_test.js
+// holds them together.
+export function noSuchRoute() {
+    return toResponse(unavailable('no_such_route'), { status: 404 });
+}
+export function methodNotAllowed(allow) {
+    return toResponse(unavailable('method_not_allowed'), { status: 405, headers: { Allow: allow.join(', ') } });
 }

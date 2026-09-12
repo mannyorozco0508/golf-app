@@ -355,8 +355,12 @@ describe('A MISCONFIGURED DEPLOY PRODUCES A REASON, NEVER A CRASH', () => {
         // comment-stripped source counts.
         const code = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1 ').replace(/\/\*[\s\S]*?\*\//g, ' ');
         const comments = src.split('\n').filter((l) => l.trim().startsWith('//')).join('\n');
+        // no_such_route and method_not_allowed are the catch-all's two: an
+        // unmatched /api path and a method the route does not export. Emitted
+        // by helpers in _lib.js, so the table and the emitter stay in one file.
         ['query_too_short', 'not_configured', 'bad_course_id', 'rate_limited',
-         'daily_limit', 'upstream_error', 'network'].forEach((r) => {
+         'daily_limit', 'upstream_error', 'network',
+         'no_such_route', 'method_not_allowed'].forEach((r) => {
             const emitted = code.includes("'" + r + "'");
             const documented = new RegExp('//\\s+' + r + '\\s').test(comments);
             assert.ok(emitted, `${r} is documented but never emitted - the table is stale`);
