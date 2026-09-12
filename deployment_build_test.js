@@ -320,6 +320,57 @@ describe('PWA — two independent installable apps', () => {
         });
     });
 
+    // THE FOUR REGEXES ABOVE ARE TEXT STANDING IN FOR STRUCTURE, and text let
+    // the two handlers drift: the root sw.js stopped intercepting /api on
+    // 2026-09-12 and build-shell.js's template copy did not, and every regex
+    // above stayed green. So this runs each GENERATED worker's own fetch
+    // handler through the same driver sw_api_bypass_test.js runs the real one
+    // through, and measures what it does with an /api GET - not what its
+    // source says.
+    describe('BOTH GENERATED WORKERS LEAVE /api ALONE - measured, not matched', () => {
+        const { loadServiceWorker, ORIGIN } = require('./helpers/sw-harness.js');
+        const API = ORIGIN + '/api/course-search?q=legacy';
+
+        ['consumer', 'tournament'].forEach(p => {
+            test(`${p}: online, an /api GET is not intercepted and nothing is written to the cache`, async () => {
+                const sw = loadServiceWorker(path.join(outDir(p), 'sw.js'), { online: true });
+                const r = await sw.request({ url: API });
+                assert.equal(r.handled, false,
+                    `${p} worker called respondWith for an /api GET - the browser's own fetch must handle it`);
+                assert.ok(!sw.puts.some(u => /\/api\//.test(u)),
+                    `${p} worker wrote an /api response into ${sw.cacheName}: ` + JSON.stringify(sw.puts));
+            });
+
+            test(`${p}: offline, an /api GET gets neither a stored body nor the HTML shell`, async () => {
+                const stale = { status: 503, body: '{"status":"unavailable","reason":"daily_limit"}' };
+                const sw = loadServiceWorker(path.join(outDir(p), 'sw.js'), { online: false, seed: [[API, stale]] });
+                const r = await sw.request({ url: API });
+                // The message is built only on failure: JSON.stringify(undefined)
+                // has no .slice, and an eager message threw on the PASSING path.
+                if (r.handled) {
+                    assert.fail(`${p} worker answered an offline /api GET with `
+                        + (r.rejected ? 'a rejection' : ('status ' + (r.response && r.response.status) + ' '
+                            + String(JSON.stringify(r.response && r.response.body)).slice(0, 60))));
+                }
+            });
+
+            test(`${p}: POSITIVE CONTROL - a shell GET is still intercepted and cached by the same worker`, async () => {
+                // Without this, a worker that intercepts NOTHING passes both
+                // tests above. The exemption must be for /api, not for everything.
+                const sw = loadServiceWorker(path.join(outDir(p), 'sw.js'), { online: true });
+                const page = p === 'consumer' ? 'index.html?game=ABCD' : 'tournament.html?tourney=ABCD';
+                const r = await sw.request({ url: page, mode: 'navigate', destination: 'document' });
+                assert.equal(r.handled, true, `${p} worker did not intercept its own shell page`);
+                assert.ok(sw.puts.includes(ORIGIN + '/' + page), `${p} worker did not cache its own shell page`);
+                // And the pathname rule: "/api" in a QUERY is still the shell.
+                const sw2 = loadServiceWorker(path.join(outDir(p), 'sw.js'), { online: true });
+                const tricky = ORIGIN + '/' + page.split('?')[0] + '?next=/api/x';
+                const r2 = await sw2.request({ url: tricky, mode: 'navigate', destination: 'document' });
+                assert.equal(r2.handled, true, `${p} worker exempted a shell URL because its query mentions /api`);
+            });
+        });
+    });
+
     test('each manifest is valid, installable and distinct', () => {
         const c = manifestOf('consumer');
         const t = manifestOf('tournament');

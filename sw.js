@@ -524,6 +524,22 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v107: the service worker leaves /api alone.
+//
+// The fetch handler exempted only non-GET and cross-origin requests, so a
+// same-origin GET to the course proxy was intercepted like a shell file and
+// every response - a 503 refusal included - was written into this cache; the
+// Cache API does not honour the Function's no-store. Offline, the worker then
+// served that stale refusal back, or answered a JSON fetch with the HTML
+// "No connection" shell. Measured in the /functions recon of 2026-09-11 and
+// pinned red-first by sw_api_bypass_test.js. /api/* is now exempt by
+// pathname in the same early return as the cross-origin rule: respondWith is
+// never called, the browser's own fetch handles it, a refusal is never a
+// document, and an offline call rejects into admin.html's own catch.
+//
+// An installed device on v106 keeps a worker that caches refusals and holds
+// every /api answer it has ever seen until the next bump.
+
 // Moved to v106: the picker tells a golfer when an online search was cut
 // at 25.
 //
@@ -921,7 +937,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v106-the-picker-says-when-a-search-was-cut';
+const CACHE_VERSION = 'golfapp-v107-the-worker-leaves-api-alone';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1052,7 +1068,20 @@ self.addEventListener('fetch', (event) => {
     // (Firebase calls, external scripts, POSTs, etc.) passes straight through
     // to the network untouched. Firebase Realtime Database runs on a different
     // origin over its own WebSocket, so none of this touches live data sync.
-    if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
+    //
+    // AND /api IS NOT THE SHELL. The course proxy (functions/api/) answers from
+    // this origin, so it used to be intercepted like a page: every response -
+    // a 503 {status:"unavailable"} included - was cache.put() below, because
+    // the Cache API ignores the Function's cache-control: no-store, and offline
+    // a golfer got that stale refusal back, or the HTML "No connection" shell
+    // where a JSON body was expected. The proxy's KV is its cache; this worker
+    // leaves /api entirely to the browser's own fetch, so a refusal is never a
+    // document and an offline call simply rejects into the caller's catch.
+    // Matched on the PATHNAME - a shell URL whose query happens to contain
+    // "/api" is still the shell.
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.origin !== self.location.origin
+        || /^\/api(\/|$)/.test(url.pathname)) {
         return;
     }
 

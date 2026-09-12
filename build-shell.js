@@ -183,7 +183,17 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const request = event.request;
-    if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
+    // Same-origin GETs only - and /api IS NOT THE SHELL. The course proxy
+    // (functions/api/) answers from this origin; intercepting it cached every
+    // response, a 503 refusal included, because the Cache API ignores the
+    // Function's no-store, and served it back offline. The proxy's KV is its
+    // cache; this worker leaves /api to the browser's own fetch. Matched on
+    // the PATHNAME - a shell URL whose query mentions "/api" is still the
+    // shell. Kept identical to sw.js; deployment_build_test.js runs both
+    // generated workers through the same driver as the root one.
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.origin !== self.location.origin
+        || /^\\/api(\\/|$)/.test(url.pathname)) {
         return;
     }
     const isNavigation = request.mode === 'navigate' || request.destination === 'document';
