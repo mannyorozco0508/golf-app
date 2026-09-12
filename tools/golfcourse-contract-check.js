@@ -48,6 +48,11 @@ const { execFileSync } = require('child_process');
 
 const BASE = process.env.GOLFCOURSE_API_BASE || 'https://api.golfcourseapi.com';
 const WANT_DETAIL = process.argv.includes('--detail');
+// --query <text> overrides the probe query. The default stays Streamsong, a
+// small known set; a deliberately broad query ("Golf Club") is how to see
+// whether `courses` is a capped page - still one request, still no paging
+// parameter, so the answer describes the request the proxy actually sends.
+const QUERY = (() => { const i = process.argv.indexOf('--query'); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : 'Streamsong'; })();
 
 function keyFromKeychain() {
     try {
@@ -187,7 +192,7 @@ const OPTED_IN = process.argv.includes('--live')
     };
 
     let search;
-    try { search = await get('/v1/search?search_query=Streamsong'); }
+    try { search = await get('/v1/search?search_query=' + encodeURIComponent(QUERY)); }
     catch (e) { bail('the search request did not complete: ' + (e && e.message)); }
 
     observed.searchStatus = search.status;
@@ -210,6 +215,14 @@ const OPTED_IN = process.argv.includes('--live')
 
     if (body) {
         failures.push(...checkSearchShape(body));
+        // EVERY TOP-LEVEL KEY, not only `courses`. The spec defines a Metadata
+        // schema (current_page, page_size, first_page, last_page, total_records)
+        // that no endpoint references; the proxy keeps body.courses and discards
+        // the rest, and the fixtures are trimmed. So nothing in the repo could
+        // say whether a search body carries pagination. This line can.
+        observed.query = QUERY;
+        observed.searchTopLevelKeys = Object.keys(body);
+        observed.coursesLength = Array.isArray(body.courses) ? body.courses.length : null;
         observed.courseCount = (body.courses || []).length;
         observed.firstCourse = (body.courses || [])[0]
             ? { id: body.courses[0].id, club_name: body.courses[0].club_name,
