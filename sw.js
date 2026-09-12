@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v105: admin.html's picker no longer prints "undefined" for a
+// course record with no location.city.
+//
+// A real provider record - Gore Golf Club, kjr804p4, measured live on
+// 2026-09-12 - carries state "Unknown", country "Unknown" and no city at all.
+// The result row already showed that as "?", but the confirm panel's match
+// note and the confirm button interpolated L.city raw, so the button that
+// writes to a node nobody can delete read "Use Gore Golf Club — undefined,
+// Unknown". Both strings now use the row's own (L.city || '?') idiom;
+// course_import_test.js holds all three against a fixture shaped like that
+// record.
+//
+// An installed device on v104 keeps the picker that prints "undefined".
+
 // Moved to v104: tournament.html prints a pairings sheet.
 //
 // The sheet a starter holds at 6am: every team or group as a row, every golfer
@@ -892,7 +906,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v104-printed-pairings';
+const CACHE_VERSION = 'golfapp-v105-picker-no-longer-prints-undefined';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -3492,10 +3492,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return found || ('gca_' + course.id);
     }
 
+    // A MISSING CITY PRINTS "?", the same way the result row shows it. A real
+    // record - Gore Golf Club, measured live 2026-09-12 - carries state
+    // "Unknown" and no city at all, and a raw interpolation put the word
+    // "undefined" on the confirm button that writes to a node nobody can delete.
     function importMatchNote(course, matchedKey, matchedName) {
         const L = course.location || {};
         return `${matchedName} is already in your course list. This fills in its hole data, `
-             + `from the ${matchedName} in ${L.city}, ${L.state}.`;
+             + `from the ${matchedName} in ${L.city || '?'}, ${L.state || '?'}.`;
     }
 
     // NAMES THE COURSE AND THE CITY. Not "OK", not "Import" - four courses share
@@ -3503,7 +3507,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // to confirm it.
     function importConfirmLabel(course) {
         const L = course.location || {};
-        return `Use ${course.course_name || course.club_name} \\u2014 ${L.city}, ${L.state}`;
+        return `Use ${course.course_name || course.club_name} \\u2014 ${L.city || '?'}, ${L.state || '?'}`;
     }
 
     // ---- EVERY REASON GETS ITS OWN SENTENCE ----

@@ -178,6 +178,41 @@ describe('2. A NAME MATCH WRITES TO THE DIRECTORY KEY, AND THE PANEL SAYS SO', (
         assert.ok(!/^(OK|Import|Confirm)$/i.test(t.trim()),
             'a bare "OK" lets a golfer confirm the wrong Legacy without reading anything');
     });
+
+    // A REAL RECORD WITH NO CITY. Measured live on 2026-09-12 by
+    // tools/golfcourse-contract-check.js --query "Golf Club": the first course
+    // returned, kjr804p4 Gore Golf Club, carries location { state: "Unknown",
+    // country: "Unknown" } - no city, no address. The fixtures above all have a
+    // city, so nothing here knew the field is optional, and two golfer-facing
+    // strings interpolated it raw. The result row at admin.html:3700 already
+    // solves the same case with (L.city || '?'); these two must do the same.
+    const GORE = { id: 'kjr804p4', club_name: 'Gore Golf Club', course_name: 'Gore Golf Club',
+                   location: { state: 'Unknown', country: 'Unknown' }, tees: { female: 3, male: 2 } };
+
+    test('a course with no city never prints the word "undefined" - the match note', () => {
+        const note = need('importMatchNote');
+        const text = note(GORE, 'gca_kjr804p4', 'Gore Golf Club');
+        assert.ok(!/undefined/.test(text), 'the note printed "undefined": ' + text);
+        assert.match(text, /\?, Unknown/, 'the missing city is shown the way the result row shows it: "?"');
+        assert.match(text, /Gore Golf Club/);
+    });
+
+    test('a course with no city never prints the word "undefined" - the confirm button', () => {
+        const label = need('importConfirmLabel');
+        const t = label(GORE);
+        assert.ok(!/undefined/.test(t), 'the confirm button printed "undefined": ' + t);
+        assert.match(t, /\?, Unknown/, 'the missing city is shown the way the result row shows it: "?"');
+        assert.match(t, /Gore Golf Club/);
+    });
+
+    test('and a record with no location at all is handled the same way', () => {
+        const note = need('importMatchNote');
+        const label = need('importConfirmLabel');
+        const bare = { id: 'kjr804p4', club_name: 'Gore Golf Club', course_name: 'Gore Golf Club' };
+        assert.ok(!/undefined/.test(note(bare, 'k', 'Gore Golf Club')));
+        assert.ok(!/undefined/.test(label(bare)));
+        assert.match(label(bare), /\?, \?/);
+    });
 });
 
 // ===========================================================================
