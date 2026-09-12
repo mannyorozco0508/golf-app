@@ -116,6 +116,15 @@ describe('OWNERSHIP — named, so a file cannot quietly change sides', () => {
             .forEach(f => assert.ok(SHARED.includes(f), f + ' must be SHARED'));
     });
 
+    test('the auth SDK is TOURNAMENT, not SHARED - only the organizer console loads it', () => {
+        // Golfers never sign in and no Consumer page references it; SHARED would
+        // ship 132KB into the Consumer native bundle for nothing. Measured before
+        // this assertion was written.
+        assert.ok(TOURNAMENT.includes('firebase-auth-compat.js'), 'firebase-auth-compat.js must be TOURNAMENT');
+        assert.ok(!SHARED.includes('firebase-auth-compat.js'), 'firebase-auth-compat.js must not be SHARED');
+        assert.ok(!CONSUMER.includes('firebase-auth-compat.js'), 'firebase-auth-compat.js must not be CONSUMER');
+    });
+
     test('the ICONS are not shared — an icon is identity, not runtime', () => {
         // THE CONTRACT CHANGED IN WAVE 19, and it got stronger rather than weaker.
         // icon-192/512 used to be asserted SHARED as "runtime plumbing". They are

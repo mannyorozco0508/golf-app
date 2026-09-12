@@ -95,6 +95,17 @@ function firebaseStub(dbJson) {
       window.firebase = {
         initializeApp: function () { return {}; },
         database: function () { return { ref: refFor }; },
+        // auth(): the real SDK is blocked above, so a page that asks for it must
+        // find something. Signed out, always; a check that needs a signed-in
+        // organizer stubs onAuthStateChanged itself.
+        auth: function () {
+          return {
+            currentUser: null,
+            onAuthStateChanged: function (cb) { setTimeout(function () { cb(null); }, 0); return function () {}; },
+            signInWithEmailAndPassword: function () { return Promise.reject(new Error('stub: no auth in a cold check')); },
+            signOut: function () { return Promise.resolve(); }
+          };
+        },
         apps: []
       };
     })();`;
@@ -221,7 +232,7 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
 
         // The real bundles must not load, or they would replace the stand-in.
         await rpc(ws, id++, 'Network.setBlockedURLs',
-            { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js']
+            { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js', '*firebase-auth-compat.js']
                 .concat(blockUrls || []) });
         await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
             { source: firebaseStub(JSON.stringify(db || { events: rounds || {} })) });

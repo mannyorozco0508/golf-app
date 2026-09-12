@@ -274,7 +274,7 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         // What did NOT change: the 11 pages still load from gstatic, so the
         // cold-offline problem is not yet solved - asserted below and in 7A's own
         // transitional block.
-        ['firebase-app-compat.js','firebase-database-compat.js'].forEach(f => {
+        ['firebase-app-compat.js','firebase-database-compat.js','firebase-auth-compat.js'].forEach(f => {
             assert.ok(fs.existsSync(path.join(REPO_ROOT, f)),
                 f + ' must exist at the repo root');
             assert.ok(shellFiles().includes(f),
@@ -311,6 +311,32 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
             assert.ok(filesToSync().includes(f),
                 f + ' must ship to www/app/ or the native app still fetches gstatic');
         });
+        // And NOT the auth SDK: the Consumer bundle has no page that loads it.
+        // filesToSync() above is the OLD three-list union; the bundle that ships
+        // is SHARED_SHELL.concat(CONSUMER_SHELL) (sync-mobile-web.js FILES_TO_SYNC),
+        // so read exactly those two lists for this assertion.
+        const smw = read('sync-mobile-web.js');
+        const declared = (name) => [...smw.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];'))[1]
+            .matchAll(/'([^']+)'/g)].map(m => m[1]);
+        const consumerBundle = declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL'));
+        assert.ok(consumerBundle.length >= 30, 'sanity: the Consumer bundle list parsed');
+        assert.ok(!consumerBundle.includes('firebase-auth-compat.js'),
+            'firebase-auth-compat.js is in the Consumer native bundle, which never loads it');
+        assert.ok(declared('TOURNAMENT_SHELL').includes('firebase-auth-compat.js'),
+            'firebase-auth-compat.js must ship with the Tournament product');
+    });
+    test('the auth SDK is loaded by the organizer console ONLY - never by the scorecard a golfer opens', () => {
+        // Golfers never authenticate; a link still scores. The scorecard page is
+        // opened on a tee box and must not download a 132KB sign-in SDK it will
+        // never call. tournament.html is the one page that will.
+        assert.match(read('tournament.html'), /src="\.\/firebase-auth-compat\.js"/,
+            'tournament.html must load auth-compat after app-compat');
+        const others = DATA_PAGES.filter(p => p !== 'tournament.html');
+        assert.ok(others.length >= 9, 'sanity: the other data pages were enumerated');
+        others.forEach(p => assert.ok(!/firebase-auth-compat/.test(read(p)),
+            p + ' loads the auth SDK; only the organizer console may'));
+        assert.ok(!/firebase\.auth\(/.test(read('tournament.html')),
+            'nothing calls firebase.auth() yet - this step vendors the file and nothing else');
     });
 
     test('THE REMAINING LIMITATION: SDK availability is not data availability', () => {

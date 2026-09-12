@@ -160,6 +160,17 @@ function statefulStub(dbJson) {
       window.firebase = {
         initializeApp: function () { return {}; },
         database: function () { return { ref: refFor }; },
+        // auth(): the real SDK is blocked above, so a page that asks for it must
+        // find something. Signed out, always; a check that needs a signed-in
+        // organizer stubs onAuthStateChanged itself.
+        auth: function () {
+          return {
+            currentUser: null,
+            onAuthStateChanged: function (cb) { setTimeout(function () { cb(null); }, 0); return function () {}; },
+            signInWithEmailAndPassword: function () { return Promise.reject(new Error('stub: no auth in a cold check')); },
+            signOut: function () { return Promise.resolve(); }
+          };
+        },
         apps: []
       };
 
@@ -255,7 +266,7 @@ async function openJourney(opts) {
     await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
         { width: v.width, height: v.height, deviceScaleFactor: 2, mobile: true });
     await rpc(ws, id++, 'Network.setBlockedURLs',
-        { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js'] });
+        { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js', '*firebase-auth-compat.js'] });
 
     let db = o.db || { events: {}, trips: {} };
     let injected = null;

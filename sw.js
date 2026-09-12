@@ -524,6 +524,19 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v108: firebase-auth-compat.js joins the shell.
+//
+// The auth wave lands its vendored SDK first and alone, so a red says which
+// half broke - the eleven lists a third vendored file has to join, or the
+// rules that come later. firebase-auth-compat.js 9.22.2 (132195 bytes) is
+// precached and loaded by tournament.html after app-compat. Nothing calls
+// firebase.auth() yet; tournament-scorecard.html does not load it and never
+// will - a golfer on a tee box does not download a sign-in SDK.
+//
+// An installed device on v107 has a shell with no auth SDK; when the console
+// starts using it, that device's first offline launch of tournament.html
+// would throw. Bumped now so the file is on every device before that.
+
 // Moved to v107: the service worker leaves /api alone.
 //
 // The fetch handler exempted only non-GET and cross-origin requests, so a
@@ -937,7 +950,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v107-the-worker-leaves-api-alone';
+const CACHE_VERSION = 'golfapp-v108-auth-sdk-vendored';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1023,6 +1036,13 @@ const SHELL_FILES = [
     // flips them over.
     './firebase-app-compat.js',
     './firebase-database-compat.js',
+    // The auth-compat build of the same 9.22.2 release. Loaded by tournament.html
+    // ONLY - the organizer console - never by the scorecard a golfer opens. It
+    // is precached so the first offline launch of the console does not throw
+    // before the page script runs; nothing calls the auth API yet.
+    // NO APOSTROPHES IN THIS BLOCK - three tests read this list by matching
+    // every single-quoted run, and a contraction becomes a shell file.
+    './firebase-auth-compat.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png',

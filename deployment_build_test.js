@@ -484,6 +484,12 @@ describe('FIREBASE — one project, unchanged', () => {
             assert.equal(sha(path.join(outDir('consumer'), f)), src);
             assert.equal(sha(path.join(outDir('tournament'), f)), src);
         });
+        // The auth SDK is Tournament-only: byte-identical to source in that
+        // output, and ABSENT from Consumer, which has no page that loads it.
+        const auth = 'firebase-auth-compat.js';
+        assert.equal(sha(path.join(outDir('tournament'), auth)), sha(path.join(REPO_ROOT, auth)));
+        assert.ok(!fs.existsSync(path.join(outDir('consumer'), auth)),
+            'firebase-auth-compat.js leaked into dist/consumer - no Consumer page loads it');
     });
 
     test('the security rules were not touched by a deployment batch', () => {

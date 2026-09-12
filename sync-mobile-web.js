@@ -130,6 +130,13 @@ const TOURNAMENT_SHELL = [
     // deployment_build_test.js asserts this file is byte-identical to what
     // build-shell.js generates for the tournament output, so the two cannot drift.
     'tournament-manifest.json',
+    // THE AUTH SDK IS TOURNAMENT ONLY. Organizers sign in; golfers never do, and
+    // no Consumer page loads it. Declared here rather than SHARED so the
+    // Consumer native bundle and dist/consumer do not carry 132KB no page of
+    // theirs references - measured: as SHARED it shipped to iOS for nothing.
+    // The root sw.js still precaches it, because the combined root deployment
+    // serves tournament.html too.
+    'firebase-auth-compat.js',
 ];
 
 // Exactly the production runtime files the app needs - no tests, no fallback/archive

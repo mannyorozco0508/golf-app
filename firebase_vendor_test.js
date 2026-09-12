@@ -59,7 +59,15 @@ const SDK = [
       bytes: 165658,
       sha256: '1fdd331f8fd0448f9d7ce97573cb828a83aad7a7bb2c4da0e75fdb9563eef129',
       cdn: `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-database-compat.js` },
+    // Downloaded 2026-09-12 from the same release. registerVersion inside it reads
+    // "@firebase/auth-compat" "0.4.2", the auth-compat build that ships in 9.22.2.
+    { file: 'firebase-auth-compat.js',
+      bytes: 132195,
+      sha256: '1451e1285d1a09eed6c9f71b07ba01fb097add66b024d13e2454ba07d50a53c6',
+      cdn: `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth-compat.js` },
 ];
+// The pages that load the auth SDK. One, by decision: golfers never sign in.
+const AUTH_PAGES = ['tournament.html'];
 // app defines the global that database attaches to, so app must load first.
 const APP_SDK = SDK[0].file;
 const DATABASE_SDK = SDK[1].file;
@@ -205,7 +213,10 @@ describe('EVERY PAGE NOW LOADS THE LOCAL SDK', () => {
     FIREBASE_PAGES.forEach(page => {
         test(`${page} loads both SDKs locally`, () => {
             const srcs = scriptSrcs(page);
-            SDK.forEach(s => assert.ok(srcs.includes('./' + s.file),
+            // app and database on every Firebase page; auth only where AUTH_PAGES
+            // says - a golfer's scorecard never downloads a sign-in SDK.
+            SDK.filter(s => s.file !== 'firebase-auth-compat.js' || AUTH_PAGES.includes(page))
+               .forEach(s => assert.ok(srcs.includes('./' + s.file),
                 page + ' must load ./' + s.file + ' from this origin'));
         });
     });
@@ -252,6 +263,21 @@ describe('EVERY PAGE NOW LOADS THE LOCAL SDK', () => {
         });
     });
 
+    test('the auth SDK loads AFTER app on the pages that load it, and on no other page', () => {
+        // auth-compat attaches to the same global app-compat defines, exactly as
+        // database does. Order is the whole point of a compat build.
+        AUTH_PAGES.forEach(page => {
+            const srcs = scriptSrcs(page).filter(s => /firebase-(app|database|auth)-compat/.test(s));
+            assert.equal(srcs.length, 3, page + ' should load exactly three Firebase scripts');
+            assert.match(srcs[0], /firebase-app-compat/, page + ': app SDK must come first');
+            assert.match(srcs[2], /firebase-auth-compat/, page + ': auth SDK must come after app');
+        });
+        FIREBASE_PAGES.filter(p => !AUTH_PAGES.includes(p)).forEach(page => {
+            assert.ok(!scriptSrcs(page).some(s => /firebase-auth-compat/.test(s)),
+                page + ' loads the auth SDK - only ' + AUTH_PAGES.join(', ') + ' may');
+        });
+    });
+
     test('instructions.html still needs no Firebase at all', () => {
         NO_FIREBASE_PAGES.forEach(p => {
             assert.ok(!read(p).includes('firebase'),
@@ -274,10 +300,13 @@ describe('EVERY PAGE NOW LOADS THE LOCAL SDK', () => {
 
 describe('BATCH 7A CHANGED NO PAGE', () => {
 
-    test('all 11 Firebase pages still carry exactly two Firebase scripts', () => {
+    test('all 11 Firebase pages still carry exactly two Firebase scripts - three where auth loads', () => {
+        // Two on every page; three on AUTH_PAGES since the auth wave vendored
+        // auth-compat. Exact counts, so a fourth script or a dropped one shows.
         FIREBASE_PAGES.forEach(page => {
             const n = scriptSrcs(page).filter(s => /firebase/.test(s)).length;
-            assert.equal(n, 2, page + ' has ' + n + ' Firebase scripts, expected 2');
+            const want = AUTH_PAGES.includes(page) ? 3 : 2;
+            assert.equal(n, want, page + ' has ' + n + ' Firebase scripts, expected ' + want);
         });
     });
 

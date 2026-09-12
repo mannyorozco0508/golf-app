@@ -210,7 +210,7 @@ function attachDomHelpers(sandbox) {
 // page loads them, and no test has ever wanted them - makeStubSandbox() supplies a
 // firebase stub instead. pwa-boot.js is skipped for the same reason: it registers
 // a service worker, which is not a thing a page realm should do.
-const VENDOR_SKIP = /firebase-(app|database)-compat\.js$|^pwa-boot\.js$/;
+const VENDOR_SKIP = /firebase-(app|database|auth)-compat\.js$|^pwa-boot\.js$/;
 
 function scriptsDeclaredBy(html) {
     return [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)]

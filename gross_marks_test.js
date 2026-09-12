@@ -322,7 +322,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v107-the-worker-leaves-api-alone';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v108-auth-sdk-vendored';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -340,7 +340,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it issues every round, trip and tournament code and
         // checks the code is free first. A cached shell without it cannot start
         // anything at all.
-        assert.equal(entries.length, 36);
+        assert.equal(entries.length, 37);  // 37: firebase-auth-compat.js joined (tournament.html only)
         ['./index.html','./score-marks.js','./firebase-app-compat.js','./firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });
