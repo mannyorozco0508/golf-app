@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v104: tournament.html prints a pairings sheet.
+//
+// The sheet a starter holds at 6am: every team or group as a row, every golfer
+// on their own line, sorted by starting hole on a shotgun with a blank hole
+// FIRST and HOLE NOT SET in the row, the count of missing holes at the top, a
+// withdrawn golfer printed and flagged WD and left OUT of the golfer total,
+// and in individual mode an UNASSIGNED block for anyone in no group. One
+// trigger, printSheet(build), now serves both this and the results sheet.
+// tournament_pairings_print_test.js holds the multiset of printed names
+// against the record; tools/tournament-pairings-check.js proves the print CSS
+// on this sheet in Chrome.
+//
+// An installed organizer on v103 has a Tournament page with no Print
+// Pairings button.
+
 // Moved to v103: the guide states the Skins default the code declares, and
 // says how a card gets into the picker.
 //
@@ -877,7 +892,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v103-the-guide-states-the-skins-default';
+const CACHE_VERSION = 'golfapp-v104-printed-pairings';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

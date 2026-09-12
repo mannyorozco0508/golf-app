@@ -150,7 +150,15 @@ function readDevToolsPort(profileDir, timeoutMs) {
     });
 }
 
-async function arriveCold({ url, rounds, db, expression, viewport, settleMs, preScript, blockUrls }) {
+// STEPS, for a check that must act between arrival and measurement. Each step is
+// { expression } (evaluated, its value collected) or { media: 'print' | 'screen'
+// | '' } (Emulation.setEmulatedMedia, nothing collected). The result's `value`
+// is then the ARRAY of collected values, in order. The rule about a device
+// check not calling a page function still holds: an expression here may click
+// the page's own button, and nothing else. Introduced for the pairings sheet,
+// whose @media print rules can only be measured with print media emulated
+// AFTER the button that builds the sheet has been pressed.
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls }) {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
@@ -224,13 +232,32 @@ async function arriveCold({ url, rounds, db, expression, viewport, settleMs, pre
         await rpc(ws, id++, 'Page.navigate', { url: url });
         await new Promise(r => setTimeout(r, settleMs || 3000));
 
-        const m = await rpc(ws, id++, 'Runtime.evaluate',
-            { expression: expression, returnByValue: true });
-        if (m.result && m.result.exceptionDetails) {
-            const ex = m.result.exceptionDetails.exception;
-            return { ok: false, reason: 'page threw: ' + (ex && ex.description) };
+        let value;
+        if (Array.isArray(steps)) {
+            value = [];
+            for (const step of steps) {
+                if (step.media !== undefined) {
+                    await rpc(ws, id++, 'Emulation.setEmulatedMedia', { media: step.media });
+                    continue;
+                }
+                const r = await rpc(ws, id++, 'Runtime.evaluate',
+                    { expression: step.expression, returnByValue: true });
+                if (r.result && r.result.exceptionDetails) {
+                    const ex = r.result.exceptionDetails.exception;
+                    return { ok: false, reason: 'page threw: ' + (ex && ex.description) };
+                }
+                value.push(r.result.result.value);
+            }
+        } else {
+            const m = await rpc(ws, id++, 'Runtime.evaluate',
+                { expression: expression, returnByValue: true });
+            if (m.result && m.result.exceptionDetails) {
+                const ex = m.result.exceptionDetails.exception;
+                return { ok: false, reason: 'page threw: ' + (ex && ex.description) };
+            }
+            value = m.result.result.value;
         }
-        return { ok: true, value: m.result.result.value,
+        return { ok: true, value: value,
                  requests: requests.slice(),
                  finalUrl: (await rpc(ws, id++, 'Runtime.evaluate',
                      { expression: 'document.URL', returnByValue: true })).result.result.value };

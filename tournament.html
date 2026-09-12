@@ -465,6 +465,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         <hr class="section-divider">
         <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
+        <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
 
         <hr class="section-divider">
         <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='tournament.html'">➕ Start a Different Tournament</button>
@@ -2253,12 +2254,153 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         container.innerHTML = html;
     }
 
-    function printTournamentResults() {
-        buildResultsPrintView();
+    // --- PRINT PAIRINGS: THE SHEET A STARTER HOLDS AT 6AM ---
+    //
+    // Who is in which group, and where they start. The failure this sheet
+    // exists to stop is a MISSING FOURSOME nobody notices until the shotgun,
+    // so pairingsRows() below is written to be counted against: every team or
+    // group is a row, every golfer is in exactly one, and the golfer total is
+    // the number of carts - a withdrawn golfer stays in the group's playerIds
+    // (withdrawPlayer() writes status only), so they print, flagged WD, and are
+    // left OUT of that total. tournament_pairings_print_test.js holds the
+    // multiset of printed names against the record; tools/tournament-pairings-
+    // check.js proves the print CSS on this sheet in Chrome.
+    //
+    // startingHole is a LABEL, not a number: autoAssignShotgunHoles writes "1",
+    // "2" and, past eighteen teams, "1A", "1B". A lexical sort puts "10" before
+    // "2"; this one splits number and wave. A blank hole sorts FIRST on a
+    // shotgun so the starter sees it before anything else, and the sheet says
+    // how many there are at the top.
+    function parseHoleLabel(label) {
+        const m = /^(\d+)\s*([A-Za-z]?)$/.exec(String(label === undefined || label === null ? '' : label).trim());
+        return m ? { n: Number(m[1]), w: m[2].toUpperCase() } : null;
+    }
+    function startingHoleOrder(a, b) {
+        if (!a.hole && !b.hole) return 0;
+        if (!a.hole) return -1;
+        if (!b.hole) return 1;
+        const pa = parseHoleLabel(a.hole), pb = parseHoleLabel(b.hole);
+        if (pa && pb) return (pa.n - pb.n) || pa.w.localeCompare(pb.w);
+        if (pa) return -1;
+        if (pb) return 1;
+        return String(a.hole).localeCompare(String(b.hole));
+    }
+
+    // The rows a pairings sheet prints, from the record alone. roundId matters
+    // only for an individual multi-round event, where each round has its own
+    // draw under rounds/<rid>/scoringGroups; with none selected there is no
+    // draw to print and rows come back empty.
+    function pairingsRows(data, roundId) {
+        data = data || {};
+        const shotgun = data.startType === 'shotgun';
+        const isPlayer = data.scoringModel === PLAYER_MODEL;
+        const holeOf = (v) => { const h = String(v === undefined || v === null ? '' : v).trim(); return h || null; };
+        let rows = [];
+        let unassigned = [];
+        if (!isPlayer) {
+            const teams = data.teams || {};
+            rows = Object.keys(teams).map(k => teams[k])
+                .sort((a, b) => (a.num || 0) - (b.num || 0))
+                .map(t => ({
+                    key: 'team' + t.num, label: t.name || `Team ${t.num}`, hole: holeOf(t.startingHole),
+                    players: (t.players || []).map(n => ({ name: String(n), wd: false }))
+                }));
+        } else {
+            const players = data.players || {};
+            const groups = isMultiRound(data)
+                ? ((roundId && data.rounds && data.rounds[roundId]) ? (data.rounds[roundId].scoringGroups || {}) : null)
+                : (data.scoringGroups || {});
+            if (groups) {
+                const seen = {};
+                rows = Object.keys(groups)
+                    .sort((a, b) => (groups[a].createdAt || 0) - (groups[b].createdAt || 0))
+                    .map(gid => {
+                        const g = groups[gid];
+                        // A golfer listed in two groups prints in the first; the
+                        // sheet partitions the field, it does not repeat it.
+                        const ids = (g.playerIds || []).filter(pid => players[pid] && !seen[pid] && (seen[pid] = true));
+                        return {
+                            key: gid, label: g.name || 'Group', hole: holeOf(g.startingHole),
+                            players: ids.map(pid => ({ name: String(players[pid].name || ''), wd: isWithdrawn(players[pid]) }))
+                        };
+                    });
+                unassigned = Object.keys(players).filter(pid => !seen[pid])
+                    .map(pid => ({ name: String(players[pid].name || ''), wd: isWithdrawn(players[pid]) }));
+            }
+        }
+        if (shotgun) rows.sort(startingHoleOrder);
+        const missingHole = shotgun ? rows.filter(r => !r.hole).length : 0;
+        const golferTotal = rows.reduce((n, r) => n + r.players.filter(p => !p.wd).length, 0);
+        return { kind: isPlayer ? 'player' : 'team', shotgun, rows, unassigned, missingHole, golferTotal };
+    }
+
+    // Returns false when there is nothing honest to print, so printSheet does
+    // not open a print dialog on a blank page.
+    function buildPairingsPrintView() {
+        const container = document.getElementById('tournament-print-view');
+        const data = currentData || {};
+        const multi = recordIsMultiRound();
+        const roundId = multi ? editingRoundId : null;
+        if (multi && recordIsIndividual() && !roundId) {
+            alert('Pick a round above (Edit) first — each round has its own draw, so the sheet needs to know which one.');
+            return false;
+        }
+        const out = pairingsRows(data, roundId);
+        if (out.rows.length === 0) {
+            alert(out.kind === 'player' ? '⚠️ No groups yet — nothing to print.' : '⚠️ No teams yet — nothing to print.');
+            return false;
+        }
+        // Names are the organizer's text; on a sheet that leaves the building
+        // a stray angle bracket must print as itself.
+        const esc = (v) => String(v === undefined || v === null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const round = (multi && roundId && data.rounds) ? data.rounds[roundId] : null;
+        const courseName = (round && round.courseName) || data.courseName || '';
+        const unit = out.kind === 'player' ? 'group' : 'team';
+        const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+        const li = (p) => `<li style="padding:2px 0;">${esc(p.name)}${p.wd ? ' <span class="wd" style="font-weight:bold; color:#b00020;">WD</span>' : ''}</li>`;
+
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">${esc(data.name)}</h1>
+            <p style="color:#666; margin:0;">${esc(courseName)}${data.format ? ` • ${esc(formatLabelFor(data.format))}` : ''}${round ? ` • ${esc(round.name || '')}` : ''}</p>
+            <p style="margin:8px 0 0 0; font-size:1.3rem; font-weight:bold; letter-spacing:1px;">${out.shotgun ? 'SHOTGUN' : 'TEE TIMES'} — PAIRINGS</p>
+            <p style="margin:4px 0 0 0; color:#333;">${plural(out.rows.length, unit)} · ${plural(out.golferTotal, 'golfer')}${out.unassigned.length ? ` · ${out.unassigned.length} unassigned` : ''}</p>`;
+        if (out.missingHole > 0) {
+            html += `<p style="margin:6px 0 0 0; font-weight:bold; color:#b00020;">${out.missingHole} ${unit}${out.missingHole === 1 ? ' has' : 's have'} no starting hole</p>`;
+        }
+        html += `<table style="width:100%; border-collapse:collapse; margin-top:14px; font-size:1rem;">
+            <thead style="display:table-header-group;"><tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
+                ${out.shotgun ? '<th style="padding:8px 4px; width:5.5em;">Hole</th>' : ''}<th style="padding:8px 4px; width:11em;">${esc(entryColumnLabel(data))}</th><th style="padding:8px 4px;">Golfers</th>
+            </tr></thead><tbody>`;
+        out.rows.forEach(r => {
+            html += `<tr style="border-bottom:1px solid #ddd; page-break-inside:avoid; vertical-align:top;">
+                ${out.shotgun ? `<td style="padding:8px 4px; font-weight:bold; font-size:1.2rem;">${r.hole ? esc(r.hole) : '<span style="color:#b00020; font-size:0.8rem;">HOLE NOT SET</span>'}</td>` : ''}
+                <td style="padding:8px 4px; font-weight:bold;">${esc(r.label)}</td>
+                <td style="padding:8px 4px;"><ul style="list-style:none; margin:0; padding:0;">${r.players.map(li).join('')}</ul></td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        if (out.unassigned.length) {
+            html += `<div style="margin-top:16px; page-break-inside:avoid;">
+                <p style="margin:0 0 4px 0; font-weight:bold; color:#b00020;">UNASSIGNED (${out.unassigned.length})</p>
+                <ul style="list-style:none; margin:0; padding:0;">${out.unassigned.map(li).join('')}</ul>
+            </div>`;
+        }
+        html += `<p style="margin-top:18px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
+        container.innerHTML = html;
+        return true;
+    }
+
+    // --- ONE TRIGGER, TWO SHEETS. The builder decides what is on the page;
+    // this decides only how the page becomes paper. A builder that returns
+    // false has already told the organizer why, and nothing prints.
+    function printSheet(build) {
+        if (build() === false) return;
         document.body.classList.add('printing-results');
         window.print();
         window.addEventListener('afterprint', () => document.body.classList.remove('printing-results'), { once: true });
     }
+    function printTournamentResults() { printSheet(buildResultsPrintView); }
+    function printTournamentPairings() { printSheet(buildPairingsPrintView); }
 
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
