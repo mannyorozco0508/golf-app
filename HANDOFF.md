@@ -39,7 +39,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 ## Current state
 
 ```
-1289 suites · 6467 tests · 6465 passing · 0 failing · 2 todo
+1290 suites · 6476 tests · 6474 passing · 0 failing · 2 todo
 ```
 
 15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
@@ -50,7 +50,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 
 **Duplication is intentional.** Several pages carry their own copies of the engines because there's no module system. Parity tests guard them. Never "helpfully" consolidate them.
 
-**The shell is at `CACHE_VERSION` v104** (`048a302`, 2026-09-12): `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
+**The shell is at `CACHE_VERSION` v106** (`47ee108`, 2026-09-12; v105 was `6d6b661` the same afternoon, v104 `048a302`). v105 and v106 are both the course picker — see "The API ceiling" under the proxy section. v104: `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
 
 ## iOS / App Store status
 
@@ -351,9 +351,25 @@ note at the top of this section.
 
 A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **The account is on the PRO plan: 10,000 requests/day.** The free tier is 35 — this line said 50 until 2026-09-11, then 35, and the upgrade landed the same week. The proxy was designed against 35 and its numbers moved with the plan; the design notes below keep the free-tier reasoning because it explains the shape of the code, not because it still binds. Each course still costs two: search returns only a *count* of tee boxes, so the tee data needs a second request by id.
 
+**Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail, comfortably inside 10,000 a day. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
+
 ## The course API proxy — configuring it in Cloudflare
 
-`functions/api/` holds a Pages Function that proxies GolfCourseAPI so the key is never in the browser. **Nothing in the app calls it yet.** Wiring it into the picker is a later wave; until then it is reachable only by curl.
+`functions/api/` holds a Pages Function that proxies GolfCourseAPI so the key is never in the browser. **The picker calls it** — `admin.html` fetches `/api/course-search` from the "Search online" row and `/api/course/<id>` from the confirm panel (`8dd55d5`, v99). This paragraph said "nothing in the app calls it yet" until 2026-09-12; that was stale by a wave.
+
+### The API ceiling — SETTLED 2026-09-12, DO NOT RE-INVESTIGATE
+
+Six live requests across two sessions, all through `tools/golfcourse-contract-check.js --live` (`adf5b91`, `48d2077`), established this and it is not worth a seventh:
+
+- `/v1/search` returns **at most 25 courses** and carries **exactly one top-level key, `courses`**. No metadata, no `total_records`, nothing to say the list was cut. An unmodified "Streamsong" search returned four; "Golf Club" returned 25.
+- **`page`, `current_page`, `page_size` and `offset` are all ignored.** All five request shapes — unmodified, `page=2`, `current_page=2`, `page_size=100`, `offset=25` — returned the **same 25 ids in the same order, compared whole**. A second page that begins with the first page's first course is not a second page.
+- The spec's `Metadata` schema (`current_page`, `page_size`, `first_page`, `last_page`, `total_records`) describes a paging model the endpoint does not implement; it is referenced by no endpoint and honoured by no parameter name it implies.
+- There is no list endpoint and no geographic query, and ids are opaque 8-character strings from a 32-character alphabet. **The directory cannot be enumerated by any means.**
+- If the vendor has paging, it is undocumented. **The next step is asking them, not another request.**
+
+What the app does about it (`47ee108`, v106): at 25 or more results the picker says *Only the first 25 are shown — the list stops there. If yours isn't here, try a narrower search: add the town, or the club's full name.* It deliberately does **not** claim how many matched, because the API never says; `course_import_test.js` refuses "N matched", "of N", "total" and "exactly" in that sentence. The add row is offered **below** that notice, with a narrower-search caveat, because adding creates a key no client can delete and the golfer's course may simply be the 26th match. Below 25 nothing changes: a list under the ceiling is complete. Held at 24, 25 and 26 — 26, which the API never returns, so a raised ceiling cannot be missed in silence.
+
+**Found by the contract check on the way, and fixed in `6d6b661` (v105):** Gore Golf Club, `kjr804p4`, is a real record with **no `location.city`** and state `"Unknown"`. Two golfer-facing strings interpolated it raw and printed the word "undefined" — one of them the confirm button that writes to `global_courses`. The result row at `admin.html:3700` already handled the same record with `(L.city || '?')` and was not changed; the two strings now use that idiom, and `course_import_test.js` holds all three against a fixture shaped like the live record. That was the first run where the check's FAIL was a truth about the upstream rather than about the tool.
 
 **Why a proxy at all, and why the key can only ever be an environment variable.** Cloudflare Pages serves this repository root *directly*, with no build command — measured on the live site, `/package.json` and `/CLAUDE.md` both return 200. So every file in this tree is a downloadable URL. A key in any file would be one too, and `sw.js` would precache it onto every installed device.
 
@@ -605,13 +621,21 @@ needed; do not add a Nassau "format".
     registry). Not cleaned up. Which path leaks them is unmeasured — measure before
     deleting.
 
-- **Still open, named so they are not lost.** An admin-SDK seeding script for courses
-(Pro tier, 10,000 requests a day, and the `gca_` provenance rule must hold for every
-key it writes); fuzzy course spelling (see the Quintero item above — correction has to
-happen on our side before the request); and the loose legacy root keys in the live
-database — `activeCourseKey`, `active_event_mode`, `eventName`, `gameFormat`,
-`courseData` — orphaned, nothing reads them, blocked by the `$other` rule. Left in place
-deliberately.
+- **Still open, named so they are not lost.**
+  - **Course seeding — scope revised 2026-09-12.** Not "every course in WA, AZ and OR";
+    the API cannot produce that list (see "Seeding the directory by region" under
+    Course data and "The API ceiling" under the proxy). A seeder takes a list of names
+    *we* supply, spends two requests per course, needs no admin SDK, and must satisfy
+    the `gca_` provenance validate like any other client.
+  - **Fuzzy course spelling — UNTESTED against the API's own matching.** The Quintero
+    item above assumed correction has to happen on our side. But the upstream's
+    `fuzzy_match` defaults to true and matches substrings server-side — "hurst" is
+    documented to match "Pinehurst" — and nothing here has ever measured what it does
+    with a misspelling. **One live request would establish whether this item is already
+    solved upstream before anything is built.** Do that first.
+  - The loose legacy root keys in the live database — `activeCourseKey`,
+    `active_event_mode`, `eventName`, `gameFormat`, `courseData` — orphaned, nothing
+    reads them, blocked by the `$other` rule. Left in place deliberately.
 
 - **No monetization built. v1.1 is specced in `MONETIZATION.md` — read that before touching any of it.** One round stays free forever; a trip is paid. The **Trip Pass is $19.99, trip-scoped and consumable** — bought per trip, so Apple will not restore it, which is fine because the entitlement lives at `trips/<code>/entitlement/paid` rather than on the buyer's device. That is also what makes it exploitable today: **`database.rules.json` is step one and blocks everything else**, because right now any client can write that node, the repo is public and a trip code is six characters. Nothing can be sold until the rules are right. `database.rules.json` is a protected file and needs explicit per-file approval. Note that `MONETIZATION.md` is a plan, not a record — nothing in it exists
 
@@ -648,7 +672,12 @@ nobody reads them as evidence about a rendered page.
   because every sweep here globs `tools/*check*.js` and that filename matches; a
   header saying "manual only" cannot stop a glob. Without `--live` it exits 2
   having sent nothing. It reports what it spent, including when a request died
-  in flight and may have been counted upstream anyway.
+  in flight and may have been counted upstream anyway. Since `48d2077` it takes
+  `--query <text>` (default Streamsong) and `--param <name>=<value>`, appended to
+  the search URL only when given, and `observed` records every top-level key and
+  every id returned — that is how the ceiling above was measured. (The "35/DAY"
+  in this bullet's title is the free tier the check was written against; the
+  account is Pro, 10,000 a day, and the gate stays regardless.)
 
 These exist because the node suite **structurally cannot** assert two things:
 **geometry** — `helpers/mini-dom.js` returns a hard-coded zero rect and implements
