@@ -53,6 +53,24 @@ const WANT_DETAIL = process.argv.includes('--detail');
 // whether `courses` is a capped page - still one request, still no paging
 // parameter, so the answer describes the request the proxy actually sends.
 const QUERY = (() => { const i = process.argv.indexOf('--query'); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : 'Streamsong'; })();
+// --param <name>=<value> appends &<name>=<value> to the search URL, ONLY when
+// given; --page <n> is the same thing spelled for one name. The default request
+// stays exactly what the proxy sends. Added to learn whether the 25-course
+// result on a broad query is a page the API will move past under SOME name
+// (page, current_page, offset) or widen (page_size), or a hard ceiling. On
+// 2026-09-12 `page=2` returned the same first course as page 1.
+const EXTRA_PARAMS = (() => {
+    const out = [];
+    for (let i = 0; i < process.argv.length; i++) {
+        if (process.argv[i] === '--page' && /^\d+$/.test(process.argv[i + 1] || '')) out.push(['page', process.argv[i + 1]]);
+        if (process.argv[i] === '--param' && /^[A-Za-z_]+=.+$/.test(process.argv[i + 1] || '')) {
+            const eq = process.argv[i + 1].indexOf('=');
+            out.push([process.argv[i + 1].slice(0, eq), process.argv[i + 1].slice(eq + 1)]);
+        }
+    }
+    return out;
+})();
+const EXTRA_QS = EXTRA_PARAMS.map(([k, v]) => '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('');
 
 function keyFromKeychain() {
     try {
@@ -192,7 +210,7 @@ const OPTED_IN = process.argv.includes('--live')
     };
 
     let search;
-    try { search = await get('/v1/search?search_query=' + encodeURIComponent(QUERY)); }
+    try { search = await get('/v1/search?search_query=' + encodeURIComponent(QUERY) + EXTRA_QS); }
     catch (e) { bail('the search request did not complete: ' + (e && e.message)); }
 
     observed.searchStatus = search.status;
@@ -221,6 +239,8 @@ const OPTED_IN = process.argv.includes('--live')
         // the rest, and the fixtures are trimmed. So nothing in the repo could
         // say whether a search body carries pagination. This line can.
         observed.query = QUERY;
+        observed.extraParams = EXTRA_PARAMS.map(([k, v]) => k + '=' + v);
+        observed.courseIds = Array.isArray(body.courses) ? body.courses.map((c) => c && c.id) : null;
         observed.searchTopLevelKeys = Object.keys(body);
         observed.coursesLength = Array.isArray(body.courses) ? body.courses.length : null;
         observed.courseCount = (body.courses || []).length;
