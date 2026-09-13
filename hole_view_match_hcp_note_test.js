@@ -355,8 +355,14 @@ describe('D1 — THE CELLS DO NOT MOVE (Section 6.6)', () => {
     // before the fix. The sha256 pins are byte-identity guards: if a future change
     // legitimately alters a cell, re-pin them DELIBERATELY, having read the diff -
     // never by pasting whatever the run printed.
-    const ERIC_TD_SHA = '5f39fef9fe156c5cb77c444f7775a266ca99426a1f154cbc58236cf8a76bed3e';
-    const CHRIS_TD_SHA = '8938cbdfb70a2a032496abec0af96266697af355b7ec8ce3ec268e4d719cc7bb';
+    //
+    // RE-PINNED 2026-09-13 (score-entry focus fix, v121): every score box gained
+    // data-player-id="<id>" data-hole="<n>" so focus can find the same box after a
+    // rebuild by identity. Read: stripping exactly those two attributes from the
+    // rendered cells gives back the previous pins (5f39fef9fe15 / 8938cbdfb70a) -
+    // nothing else in either cell moved. The arithmetic is unchanged.
+    const ERIC_TD_SHA = 'a013a3d5d3c616d318844b45175de7671d715e0f8317707f9913a507bccc566f';
+    const CHRIS_TD_SHA = '591ac6447849ec6cb903c295c33fe0e18763bee30932cb87ef461aae797b6eb5';
 
     test('Eric reads -2, with no net mark and no pips', () => {
         const call = symptom();

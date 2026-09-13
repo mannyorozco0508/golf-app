@@ -4927,14 +4927,86 @@ html {
     }
 
     function advanceToNextScoreInput(currentInputEl) {
-        const inputs = Array.from(document.querySelectorAll('.score-input:not([disabled])'));
+        // WITHIN THE VIEW THE BOX IS IN. The list used to be document-wide, and
+        // #hole-view-card sits before the hidden #full-card-container, so from the
+        // last golfer on the hole "next" was the Full Card's first box - display:none,
+        // focus() silently failed, and the blur() branch below was never reached.
+        // Same visible result, now on purpose.
+        const root = currentInputEl.closest('#hole-view-card') || currentInputEl.closest('#full-card-container') || document;
+        const inputs = Array.from(root.querySelectorAll('.score-input:not([disabled])'));
         const idx = inputs.indexOf(currentInputEl);
         if (idx > -1 && idx < inputs.length - 1) {
             const next = inputs[idx + 1];
-            next.focus();
-            next.select();
+            // THE MOVE IS ANNOUNCED BEFORE IT IS MADE. next.focus() blurs the current
+            // box, which fires change -> saveScore -> set() -> the SDK raises 'value'
+            // synchronously -> renderScorecard rebuilds this view under our feet. The
+            // rebuild reads pendingScoreFocus and focuses the NEW element with this
+            // identity, still inside this keystroke's event; the browser then drops
+            // its own in-flight move to the detached `next` because a handler
+            // shifted focus. Without this, focus ended on <body> and the keyboard
+            // closed on every score - measured, 2026-09-13.
+            pendingScoreFocus = scoreBoxIdentity(next);
+            try { next.focus(); next.select(); }
+            finally { pendingScoreFocus = null; }
         } else {
             currentInputEl.blur();
+        }
+    }
+
+    // ---- Focus across a rebuild ------------------------------------------------
+    //
+    // renderScorecard() rewrites the Full Card and the Hole View with innerHTML on
+    // EVERY snapshot - this device's own save included, because the vendored
+    // Firebase SDK raises the round's 'value' event synchronously inside set().
+    // A box that had focus is destroyed with the markup. These three pieces put
+    // focus back on the box with the SAME IDENTITY (player id + hole), never on
+    // an element or an index, and do it synchronously so iOS keeps the keyboard.
+    //
+    // WHICH BOX, and when NOT to:
+    //   pendingScoreFocus   the advance is mid-move: restore to its target.
+    //   a change in flight  this device is saving because the golfer LEFT the box
+    //                       (a tap elsewhere, the last golfer's blur()): restore
+    //                       nothing, or the box would grab focus back and the
+    //                       keyboard would never close.
+    //   otherwise           a snapshot arrived (another group's score) while this
+    //                       golfer is typing: restore the box, what they had typed
+    //                       and their caret, so nothing is stolen mid-entry.
+    let pendingScoreFocus = null;      // { playerId, hole } while advanceToNextScoreInput's focus() runs
+    let scoreChangeInFlight = false;   // true while a score box's change event is being dispatched
+    document.addEventListener('change', e => { if (e.target && e.target.classList && e.target.classList.contains('score-input')) scoreChangeInFlight = true; }, true);
+    document.addEventListener('change', e => { if (e.target && e.target.classList && e.target.classList.contains('score-input')) scoreChangeInFlight = false; }, false);
+
+    function scoreBoxIdentity(el) {
+        if (!el || !el.classList || !el.classList.contains('score-input')) return null;
+        const playerId = el.getAttribute('data-player-id'), hole = el.getAttribute('data-hole');
+        return (playerId && hole) ? { playerId, hole } : null;
+    }
+
+    function captureScoreFocus() {
+        if (pendingScoreFocus) return { target: pendingScoreFocus, typed: null, sel: null };
+        if (scoreChangeInFlight) return null;
+        const a = document.activeElement;
+        const id = scoreBoxIdentity(a);
+        if (!id || a.disabled) return null;
+        let sel = null;
+        try { sel = [a.selectionStart, a.selectionEnd]; } catch (e) { sel = null; }
+        return { target: id, typed: a.value, sel };
+    }
+
+    function restoreScoreFocus(memo) {
+        if (!memo) return;
+        const root = currentViewMode === 'hole' ? document.getElementById('hole-view-card') : document.getElementById('full-card-container');
+        if (!root) return;
+        const el = root.querySelector('.score-input[data-player-id="' + memo.target.playerId + '"][data-hole="' + memo.target.hole + '"]:not([disabled])');
+        if (!el) return;
+        // Mid-entry: the rebuild drew the SAVED score; what the golfer has typed
+        // and not yet committed goes back, or a remote snapshot would wipe it.
+        if (memo.typed !== null && memo.typed !== undefined && el.value !== memo.typed) el.value = memo.typed;
+        el.focus();
+        if (memo.sel && typeof el.setSelectionRange === 'function' && memo.sel[0] !== null && memo.sel[0] !== undefined) {
+            try { el.setSelectionRange(memo.sel[0], memo.sel[1]); } catch (e) { el.select(); }
+        } else {
+            el.select();
         }
     }
 
@@ -7490,6 +7562,8 @@ html {
     }
 
     function renderScorecard() {
+        // Focus survives the rebuild below - see captureScoreFocus / restoreScoreFocus.
+        const focusMemo = (typeof captureScoreFocus === 'function') ? captureScoreFocus() : null;
         const historyModal = document.getElementById("history-modal-overlay");
         if (historyModal && historyModal.style.display === "flex") {
             renderHistoryList();
@@ -7929,9 +8003,12 @@ html {
                 const markClass = (typeof scoreMarkClass === 'function') ? scoreMarkClass(scoreVal, h.par) : '';
 
                 const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);
+                // data-player-id / data-hole name the box, so focus can find "the same
+                // box" again after a rebuild (see restoreScoreFocus) - by identity,
+                // never by element or position.
                 const scoreInputHtml = isLocked
-                    ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" disabled>`
-                    : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)" oninput="handleScoreInput(this)">`;
+                    ? `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" data-player-id="${p.id}" data-hole="${h.hole}" value="${scoreVal}" disabled>`
+                    : `<input type="tel" inputmode="numeric" pattern="[0-9]*" class="score-input" data-player-id="${p.id}" data-hole="${h.hole}" value="${scoreVal}" onfocus="this.select()" onchange="saveScore(${p.id}, ${h.hole}, this.value)" oninput="handleScoreInput(this)">`;
 
                 rowHtml += `
                     <td>
@@ -8443,7 +8520,7 @@ html {
             currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
         }
         if (currentViewMode === 'hole') renderHoleView();
-
+        restoreScoreFocus(focusMemo);
     }
 
     // --- MAGIC HORIZONTAL PRINT SCORECARD GENERATOR ---

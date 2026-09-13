@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v121: entering a score moves the keyboard to the next golfer.
+//
+// index.html: auto-advance never survived its own save. Moving focus blurred
+// the box, blur fired change, change saved, and the vendored SDK raised the
+// round's value event synchronously inside set() - so renderScorecard rebuilt
+// the Hole View under the move and focus ended on <body> with the keyboard
+// closed, on every score, since the day auto-advance was added. Now the advance
+// names its target (player id + hole) before it moves, renderScorecard captures
+// what should have focus and re-focuses the rebuilt box synchronously, inside
+// the same keystroke. A snapshot from another group mid-entry keeps the golfer's
+// box, typed digits and caret. Leaving a box (a tap elsewhere, the last golfer)
+// still closes the keyboard. Nothing about the save or the listener changed.
+//
+// An installed device on v120 loses the keyboard after every score.
+
 // Moved to v120: the live skins surfaces build from the right config.
 //
 // New shared file live-skins.js, precached. index.html (the SKINS WON card,
@@ -1111,7 +1126,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v120-live-skins-config';
+const CACHE_VERSION = 'golfapp-v121-score-entry-focus';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

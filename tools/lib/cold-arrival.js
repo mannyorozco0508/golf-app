@@ -162,8 +162,10 @@ function readDevToolsPort(profileDir, timeoutMs) {
 }
 
 // STEPS, for a check that must act between arrival and measurement. Each step is
-// { expression } (evaluated, its value collected) or { media: 'print' | 'screen'
-// | '' } (Emulation.setEmulatedMedia, nothing collected). The result's `value`
+// { expression } (evaluated, its value collected), { media: 'print' | 'screen'
+// | '' } (Emulation.setEmulatedMedia, nothing collected), { cdp: { method,
+// params } } (a raw DevTools command - a real tap or keystroke through Input.*;
+// 'ok' collected) or { sleep: ms }. The result's `value`
 // is then the ARRAY of collected values, in order. The rule about a device
 // check not calling a page function still holds: an expression here may click
 // the page's own button, and nothing else. Introduced for the pairings sheet,
@@ -249,6 +251,24 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
             for (const step of steps) {
                 if (step.media !== undefined) {
                     await rpc(ws, id++, 'Emulation.setEmulatedMedia', { media: step.media });
+                    continue;
+                }
+                // A REAL INPUT, not a synthetic event. { cdp: { method, params } } sends a
+                // raw DevTools command - Input.dispatchMouseEvent / Input.dispatchKeyEvent -
+                // so a tap is a tap and a keystroke is a keystroke, with the browser's own
+                // focus, change and blur sequencing. A dispatched DOM event cannot do that:
+                // a programmatic value change never fires `change` on blur, which is the
+                // step that reproduces the score-entry focus loss. The rule still holds -
+                // this presses keys and buttons; it calls nothing the page defines.
+                // { sleep: ms } waits, for a keyboard-driven change to settle.
+                if (step.cdp) {
+                    const r = await rpc(ws, id++, step.cdp.method, step.cdp.params || {});
+                    value.push(r && r.error ? 'cdp error: ' + JSON.stringify(r.error) : 'ok');
+                    continue;
+                }
+                if (step.sleep !== undefined) {
+                    await new Promise(r => setTimeout(r, step.sleep));
+                    value.push('slept ' + step.sleep);
                     continue;
                 }
                 const r = await rpc(ws, id++, 'Runtime.evaluate',
