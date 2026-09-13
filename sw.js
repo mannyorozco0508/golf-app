@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v118: the Paste Player List box reads groups and bare handicaps.
+//
+// admin.html: a blank line between runs of names is a group boundary, and the
+// run sizes are written to groupSizeOverrides (a paste with no blank line
+// changes nothing about groups - byte-identical to before); a trailing token
+// like "9", "+2" or "14.3" after a name is a handicap without a comma, "Matt H"
+// stays a name, a line that is only a number is a name. The preview says how
+// many groups the paste makes.
+//
+// An installed device on v117 has to size the groups by hand after a paste and
+// loses "Marty 9" as a name with no handicap.
+
 // Moved to v117: flight labels on the receipt's ledger; skins never carry by
 // default.
 //
@@ -1071,7 +1083,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v117-flights-ledger-labels';
+const CACHE_VERSION = 'golfapp-v118-paste-groups';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

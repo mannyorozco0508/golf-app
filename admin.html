@@ -1088,11 +1088,13 @@ html {
                 <span>📋 Paste Player List</span>
                 <button class="close-modal" onclick="closePastePlayersModal()" aria-label="Close">&times;</button>
             </div>
-            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. Add a handicap after a comma if you have it — totally optional.</label>
-            <textarea id="paste-players-textarea" rows="8" placeholder="John Smith, 8
+            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A handicap after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
+            <textarea id="paste-players-textarea" rows="8" placeholder="John Smith 8
 Mike Jones, 12
 Robert Garcia
-Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
+Tom Wilson +2
+
+Next group..." oninput="previewPastedPlayers()"></textarea>
             <div id="paste-preview-summary" style="font-size:0.82rem; margin:10px 0; color:var(--text-muted);"></div>
             <button class="btn-primary" id="paste-players-commit-btn" onclick="commitPastedPlayers()" disabled>Add Players</button>
         </div>
@@ -4812,37 +4814,64 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     }
 
     // --- PASTE-A-LIST BULK PLAYER ENTRY ---
-    // One player per line: "Name" or "Name, Handicap". The handicap is stored exactly as typed
-    // (e.g. "+2", "12.5") — same convention manual entry already uses — it's parsed later by
-    // parseHcp() at scoring/settlement time, never here. A line that reduces to an empty
-    // name (e.g. someone pasted ",8" with nothing before the comma) is flagged rather than
-    // silently creating a nameless player; everything else that's non-blank is accepted, since
-    // manual entry doesn't validate names either and duplicate names are already allowed.
+    // One player per line: "Name", "Name, Handicap" or "Name Handicap". The handicap is
+    // stored exactly as typed (e.g. "+2", "12.5") — same convention manual entry already
+    // uses — it's parsed later by parseHcp() at scoring/settlement time, never here. A
+    // line that reduces to an empty name (e.g. someone pasted ",8" with nothing before
+    // the comma) is flagged rather than silently creating a nameless player; everything
+    // else that's non-blank is accepted, since manual entry doesn't validate names either
+    // and duplicate names are already allowed.
+    //
+    // BLANK LINES ARE GROUP BOUNDARIES. A run of non-empty lines is one group; one or
+    // more blank (or whitespace-only) lines between runs is a boundary; blanks before
+    // the first name and after the last are nothing. `groups` is the size of each run,
+    // in order, counting only the players that were accepted. A paste with no blank
+    // line inside it is ONE group, and the commit below leaves the round's group sizes
+    // alone in that case - exactly what the box did before it understood blank lines.
+    //
+    // A BARE TRAILING HANDICAP. With no comma on the line, a last token that looks like
+    // a handicap - optional sign, one or two digits, at most one decimal place, within
+    // -10..54 - is one: "Marty 9", "Marty +2", "Lance 14.3". Anything else stays part
+    // of the name, so "Matt H" and "Tommy Chen" are whole names, "Marty 99" is a name,
+    // and a line that is ONLY a number ("12") is a name too - the token must follow
+    // whitespace after at least one character of name. The comma form is untouched:
+    // when a comma is present the line splits there, as it always has.
+    const BARE_HCP_RE = /^(.+?)\s+([+-]?\d{1,2}(?:\.\d)?)$/;
+    function splitNameAndHcp(line) {
+        const commaIdx = line.indexOf(',');
+        if (commaIdx !== -1) {
+            return { name: line.slice(0, commaIdx).trim(), hcp: line.slice(commaIdx + 1).trim() };
+        }
+        const m = BARE_HCP_RE.exec(line);
+        if (m) {
+            const v = parseFloat(m[2]);
+            if (v >= -10 && v <= 54) return { name: m[1].trim(), hcp: m[2] };
+        }
+        return { name: line, hcp: '' };
+    }
+
     function parsePlayerPasteText(text) {
         const lines = text.split('\n');
         let validPlayers = [];
         let flaggedLines = [];
+        let groups = [];
+        let inGroup = false;     // true while inside a run of non-empty lines
         lines.forEach((rawLine, idx) => {
             const line = rawLine.trim();
-            if (line === '') return; // blank line — skip silently, not an error
+            if (line === '') { inGroup = false; return; }   // blank: closes the current run (a boundary) or is leading/trailing nothing
+            if (!inGroup) { groups.push(0); inGroup = true; }
 
-            let name, hcp;
-            const commaIdx = line.indexOf(',');
-            if (commaIdx === -1) {
-                name = line;
-                hcp = '';
-            } else {
-                name = line.slice(0, commaIdx).trim();
-                hcp = line.slice(commaIdx + 1).trim();
-            }
+            const { name, hcp } = splitNameAndHcp(line);
 
             if (name === '') {
                 flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' });
                 return;
             }
             validPlayers.push({ name, hcp });
+            groups[groups.length - 1]++;
         });
-        return { validPlayers, flaggedLines };
+        groups = groups.filter(n => n > 0);   // a run made only of flagged lines is not a group
+        return { validPlayers, flaggedLines, groups };
     }
 
     function openPastePlayersModal() {
@@ -4856,7 +4885,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines } = parsePlayerPasteText(text);
+        const { validPlayers, flaggedLines, groups } = parsePlayerPasteText(text);
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -4867,6 +4896,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         }
 
         let html = `<strong style="color:var(--brand-green);">${validPlayers.length} player${validPlayers.length === 1 ? '' : 's'} ready to add</strong>`;
+        // Only when the paste drew boundaries: say the groups it will make. A
+        // single-run paste says nothing, because it changes nothing about groups.
+        if (groups.length > 1) {
+            html += ` <span>in ${groups.length} groups (${groups.join(', ')})</span>`;
+        }
         if (flaggedLines.length > 0) {
             const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
             html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
@@ -4880,10 +4914,24 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // at once instead of one blank one. Existing players are never replaced or cleared.
     function commitPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers } = parsePlayerPasteText(text);
+        const { validPlayers, groups } = parsePlayerPasteText(text);
         if (validPlayers.length === 0) return;
 
         const existingData = captureCurrentPlayerInputs();
+
+        // GROUPS FROM THE PASTE, only when the paste drew a boundary. The golfers
+        // already on the roster keep the groups they are in - each of those is
+        // written explicitly so a partial last group stays closed instead of
+        // absorbing the first pasted golfers - and the pasted runs follow, one
+        // override per run. Group overrides are positional, so the pasted golfers
+        // must be appended (they are, below) for these sizes to land on them.
+        // A paste with no blank line inside it writes nothing here.
+        if (groups.length > 1) {
+            const kept = computeGroupSizes(existingData.length, groupSizeOverrides);
+            groupSizeOverrides = {};
+            kept.concat(groups).forEach((size, i) => { groupSizeOverrides[i] = size; });
+        }
+
         validPlayers.forEach(p => {
             existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
         });
