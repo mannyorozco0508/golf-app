@@ -24,6 +24,7 @@
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
+    <script src="live-skins.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
          in which foursome, which is what every ?group=N scorekeeper link and every
          group-scoped write permission is measured against. This page carried its own
@@ -817,31 +818,36 @@ html {
         // answered "no skins" and this surface silently rendered nothing.
         if (!roundHasSkinsGame(data)) return;
 
-        let bundle;
+        // FROM THE RIGHT CONFIG (live-skins.js): one section per skins wager, built
+        // from that wager's own config, plus the Main Pool bucket's own section
+        // (gross or net as the bucket says, never flighted). This used to hand the
+        // ROUND to the ledger builder, so a pool-only round drew NET cards per
+        // flight for a gross, field-wide pot. Per flight within a flighted section
+        // (Wave 2): one card per flight, the hole rows carrying the flight.
+        if (typeof liveSkinsLedgerEntries !== 'function') return;
+        let entries;
         try {
-            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: lbSkinsGroupOf });
+            entries = liveSkinsLedgerEntries(data, courseData, savedScores, { groupOf: lbSkinsGroupOf });
         } catch (e) {
             return;   // a presenter must never take the leaderboard down with it
         }
-        // PER FLIGHT (Wave 2). The ledger's `flights` - one entry when the round
-        // is not flighted - never the top level, which is null when it is (and
-        // rendered nothing here until this moved). One card per flight, the hole
-        // rows carrying the flight in their heading.
-        const entries = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross, bundle: fl })).filter(e => e.L);
         if (entries.length === 0) return;
-        if (entries.length === 1 && entries[0].L.participants.length === 0) return;
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        mount.innerHTML = entries.map(e => renderLiveSkinsCard(e, entries.length > 1, esc)).join('');
+        const many = entries[0].section.count > 1;
+        mount.innerHTML = entries.map(e => renderLiveSkinsCard(e, e.flighted, esc, many ? e.section.label : '')).join('');
     }
 
-    function renderLiveSkinsCard(entry, flighted, esc) {
+    function renderLiveSkinsCard(entry, flighted, esc, sectionLabel) {
         const bundle = entry.bundle;
         const L = entry.L;
         // BASIS COMES FROM THE SKINS GAME, not the leaderboard's ranking toggle.
         // Those are different questions and must not be allowed to drift together.
         const basis = bundle.net ? 'Net' : 'Gross';
 
-        let html = '<div class="ls-card"><div class="ls-head">\uD83E\uDD69 LIVE SKINS' + (flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
+        // The section label names WHICH skins money this card is, only when the
+        // round has more than one (a wager and the pool bucket, or two wagers).
+        let html = '<div class="ls-card"><div class="ls-head">\uD83E\uDD69 LIVE SKINS' + (sectionLabel ? ' \u2014 ' + esc(sectionLabel).toUpperCase() : '')
+            + (flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
         if (flighted && L.participants.length === 0) {
             return html + '<div class="ls-summary ls-quiet">Nobody in this flight.</div></div>';
         }

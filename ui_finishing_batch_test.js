@@ -69,7 +69,12 @@ function board({ thru = [6,5,4], skins = true, tweak = null, scoring = 'net' } =
     if (tweak) tweak(sc);
     const d = { players: ps, courseData: cd, scores: sc, gameFormat:'stroke',
                 skinsCarryOver:false };
-    if (skins) { d.skinsBuyIn = 5; d.additionalGames = { skins: true }; }
+    // A STACKED skins wager in the shape the wizard writes. This used to be
+    // `additionalGames: { skins: true }` with the buy-in at the round root - a
+    // shape no writer produces - and passed only because the board was built from
+    // the ROUND. Since live-skins.js builds from the wager's own config, the
+    // fixture says what the wager is: $5, net, no carry (the board asserts "Net").
+    if (skins) { d.skinsBuyIn = 0; d.additionalGames = { skins: { enabled: true, skinsBuyIn: 5, skinsPotFormat: 'net', skinsScoring: 'net', skinsCarryOver: false, startHole: 1 } }; }
     vm.runInContext(`
         currentBoardData = ${JSON.stringify(d)};
         activeView = 'individual'; groupViewMode = 'flat'; activeScoring = '${scoring}';
@@ -347,7 +352,9 @@ describe('NO SECOND RESOLVER, NO DUPLICATE MATHS', () => {
     };
 
     test('it consumes the canonical ledger', () => {
-        assert.match(fn(), /computeSkinsHoleLedger\(data, courseData, savedScores/);
+        // Since live-skins.js: through liveSkinsLedgerEntries, one ledger per skins
+        // wager / pool bucket, each from its own config.
+        assert.match(fn(), /liveSkinsLedgerEntries\(data, courseData, savedScores/);
     });
 
     test('it resolves nothing itself', () => {

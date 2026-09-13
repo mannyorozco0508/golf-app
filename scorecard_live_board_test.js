@@ -374,7 +374,9 @@ describe('SKINS WON — WINNERS ONLY', () => {
         // widget and the modal read one answer instead of each asking the question.
         const shared = src.slice(src.indexOf('function liveSkinsLedger'),
                                  src.indexOf('function renderSkinsWonHtml'));
-        assert.match(shared, /computeSkinsHoleLedger\(data, courseData, savedScores/);
+        // Since live-skins.js: the shared reader asks liveSkinsLedgerEntries, which
+        // builds one canonical ledger per skins wager / pool bucket from its own config.
+        assert.match(shared, /liveSkinsLedgerEntries\(data, courseData, savedScores/);
         assert.match(shared, /r\.official/);
         assert.match(shared, /r\.state === 'tie'/);
         ['getStrokes(','parseHcp(','Math.min(','officialThru =']
@@ -382,7 +384,10 @@ describe('SKINS WON — WINNERS ONLY', () => {
 
         const at = src.indexOf('function renderSkinsWonHtml');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(fn, /liveSkinsLedger\(\)/, 'the modal consumes the shared helper');
+        // Since live-skins.js the list walks EVERY entry (every wager / pool section
+        // and every flight); the first-entry-only liveSkinsLedger() is gone.
+        assert.match(fn, /liveSkinsLedgers\(\)/, 'the modal consumes the shared helper');
+        assert.match(fn, /entries\.forEach/, 'and every entry of it');
         assert.match(fn, /skinsWinners\(L\)/);
     });
 });
@@ -670,8 +675,11 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
 
     test('A. the scorecard detects skins on the real Main Pool shape', () => {
         const b = poolRound();
-        assert.notEqual(b.run('liveSkinsLedger()'), null,
-            'this returned null on the deployed round, suppressing the widget');
+        // Since live-skins.js: one entry, the pool bucket's own section.
+        const entries = b.run('liveSkinsLedgers()');
+        assert.notEqual(entries, null, 'this returned null on the deployed round, suppressing the widget');
+        assert.equal(entries.length, 1);
+        assert.equal(entries[0].section.kind, 'pool');
     });
 
     test('B/C. the widget is present and visible', () => {
@@ -681,11 +689,18 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
                                                       html.indexOf('SKINS WON'))));
     });
 
-    test('D. the ledger receives NET scoring, from the pool config', () => {
+    test('D. the ledger receives NET scoring, from the pool config - and GROSS when the bucket says gross', () => {
+        // This used to assert `.net` on a ledger built from the ROUND, which passed
+        // for the wrong reason: the round has no skinsPotFormat, so it resolved to
+        // split and carried a net half whatever the bucket said. The section is now
+        // built from the bucket's own scoring (live-skins.js), so flipping the
+        // bucket flips the ledger - the assertion the old one could not make.
         const b = poolRound();
-        assert.equal(b.run(`!!computeSkinsHoleLedger(currentData, currentData.courseData,
-            currentData.scores, { groupOf: liveSkinsGroupOf }).net`), true,
-            'moneyPool.skins.scoring is "net"');
+        assert.equal(b.run('liveSkinsLedgers()[0].bundle.mode'), 'net', 'moneyPool.skins.scoring is "net"');
+        const gross = Object.assign({}, MONEY_POOL, { skins: { mode: 'remainder', scoring: 'gross', carryOver: false } });
+        const g = poolRound({ pool: gross });
+        assert.equal(g.run('liveSkinsLedgers()[0].bundle.mode'), 'gross');
+        assert.equal(g.run('liveSkinsLedgers()[0].bundle.net'), null, 'no net half under a gross bucket');
     });
 
     test('E. through hole 5: Carp 1+3, Scott 2, Rocco 5', () => {

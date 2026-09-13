@@ -524,6 +524,23 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v120: the live skins surfaces build from the right config.
+//
+// New shared file live-skins.js, precached. index.html (the SKINS WON card,
+// the Finish Round list, the hole-by-hole mount), leaderboard.html (the live
+// skins board) and settlement.html (LIVE RESULTS' SKINS WON) used to hand the
+// ROUND to the ledger builder: a round whose only skins money is the Main Pool
+// bucket printed NET SKINS per flight for a gross, field-wide pot, and a stacked
+// or instance wager's own Gross/Net was never read. Now: one section per skins
+// wager from that wager's config, plus the pool bucket's own section from the
+// pool's scoring and carry, never flighted. The Finish Round list also shows
+// every flight (it listed Flight A only). A flightless main-format wager
+// renders byte for byte as before (live_skins_golden_test.js). The engines are
+// untouched; nothing paid changes.
+//
+// An installed device on v119 shows a net, per-flight skins ledger for a gross
+// pool bucket, and has no live-skins.js to serve offline.
+
 // Moved to v119: the paste drops the blank arrival row.
 //
 // admin.html: Step 5 opens with a blank player row, and Paste Player List
@@ -1094,7 +1111,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v119-paste-empty-row';
+const CACHE_VERSION = 'golfapp-v120-live-skins-config';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1158,6 +1175,10 @@ const SHELL_FILES = [
     './bet-strip.js',
     './hole-events.js',
     './pool-engine.js',
+    // live-skins.js decides which config each live skins surface builds its
+    // ledger from (the wager itself, or the pool bucket). index.html,
+    // leaderboard.html and settlement.html all load it.
+    './live-skins.js',
     './course-data.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the

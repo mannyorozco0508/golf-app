@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v119-paste-empty-row';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v120-live-skins-config';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -580,7 +580,7 @@ describe('SERVICE WORKER', () => {
         // 37 since firebase-auth-compat.js joined: tournament.html loads it after
         // app-compat, and a first offline launch of the console would throw
         // before its script ran without it. No other page loads it.
-        assert.equal(entries.length, 37, 'the shell list gained or lost an entry');
+        assert.equal(entries.length, 38, 'the shell list gained or lost an entry');  // 38: live-skins.js joined (index, leaderboard, settlement)
     });
 
     test('fetch strategy is unchanged - still network-first', () => {

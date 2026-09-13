@@ -30,6 +30,7 @@
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
+<script src="live-skins.js"></script>
 <script src="pool-engine.js"></script>
     <style>
         :root {
@@ -1367,16 +1368,19 @@ html {
         // gets its own SKINS WON card; a hole can be a skin in A and a tie in B.
         let ledgers = [];
         // ONE PREDICATE FOR THE WHOLE APP - roundHasSkinsGame() in action-model.js.
-        if (roundHasSkinsGame(data) && typeof computeSkinsHoleLedger === 'function') {
+        // FROM THE RIGHT CONFIG (live-skins.js): one section per skins wager, from
+        // that wager's own config, plus the Main Pool bucket's own section - gross
+        // or net as the bucket says, never flighted. This used to hand the ROUND to
+        // the ledger builder, so a pool-only round drew NET cards per flight for a
+        // gross, field-wide pot.
+        if (roundHasSkinsGame(data) && typeof liveSkinsLedgerEntries === 'function') {
             try {
-                const bundle = computeSkinsHoleLedger(data, courseData, savedScores,
-                    { groupOf: id => liveGroupOf(data, id) });
-                ledgers = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross })).filter(e => e.L);
-                if (ledgers.length === 1 && ledgers[0].L.participants.length === 0) ledgers = [];
+                ledgers = liveSkinsLedgerEntries(data, courseData, savedScores, { groupOf: id => liveGroupOf(data, id) });
             } catch (e) { ledgers = []; }
         }
         const L = ledgers.length ? ledgers[0].L : null;
-        const flighted = ledgers.length > 1;
+        // Section labels only when the round holds more than one skins pot.
+        const manySections = ledgers.length > 0 && ledgers[0].section.count > 1;
         // THE FIELD'S FLIGHTS for the standings: enabled is enough - standings are
         // not a game, so no scope decides them. Absent -> one section, as always.
         const fl = data.flights;
@@ -1433,8 +1437,10 @@ html {
             const winners = Object.values(byPlayer).sort((a, b) => b.holes.length - a.holes.length
                 || a.holes[0] - b.holes[0] || String(a.name).localeCompare(String(b.name)));
 
-            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON' + (flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
-            if (flighted && LL.participants.length === 0) {
+            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON'
+                 + (manySections ? ' \u2014 ' + esc(entry.section.label).toUpperCase() : '')
+                 + (entry.flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
+            if (entry.flighted && LL.participants.length === 0) {
                 html += '<div class="lr-none">Nobody in this flight.</div>';
             } else if (winners.length === 0) {
                 html += '<div class="lr-none">No official skins yet.</div>';

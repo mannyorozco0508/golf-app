@@ -46,10 +46,18 @@ function boot({ thru = { 1: 18, 2: 18, 3: 18 }, spec = {}, carry = false, buyIn 
     const groupMap = {};
     p.forEach(pl => { groupMap[String(pl.id)] = groupOf(pl.id); });
 
+    // A STACKED skins wager in the shape the wizard actually writes (an object
+    // with its own mode, stake and carry). This fixture used to be
+    // `additionalGames: { skins: true }` with the values at the round root - a
+    // shape no writer in the repo has ever produced. It passed only because the
+    // card was built from the ROUND; the engine settled that round as the
+    // catalog's $5 GROSS wager while the card said NET $240. Since the live
+    // surfaces build from the wager's own config (live-skins.js), the fixture
+    // has to say what the wager is.
     const data = {
         gameFormat: 'stroke', players: p, courseData: cd, scores,
-        skinsPotFormat: 'net', skinsCarryOver: carry, skinsBuyIn: buyIn,
-        additionalGames: { skins: true },
+        skinsBuyIn: 0, skinsCarryOver: false,
+        additionalGames: { skins: { enabled: true, skinsBuyIn: buyIn, skinsPotFormat: 'net', skinsScoring: 'net', skinsCarryOver: carry, startHole: 1 } },
     };
 
     vm.runInContext(`
@@ -283,7 +291,10 @@ describe('NO DUPLICATE ARITHMETIC', () => {
         // the widget, which is where computeSkinsHoleLedger is called.
         assert.match(fn, /liveSkinsLedgers\(\)/, 'It must consume the canonical ledger (through the shared reader).');
         const reader = src.slice(src.indexOf('function liveSkinsLedgers'), src.indexOf('function liveSkinsLedger('));
-        assert.match(reader, /computeSkinsHoleLedger\(/, 'the shared reader consumes the canonical ledger');
+        // Since live-skins.js: the reader asks liveSkinsLedgerEntries(), which is
+        // where computeSkinsHoleLedger is called - once per skins wager / pool bucket.
+        assert.match(reader, /liveSkinsLedgerEntries\(/, 'the shared reader consumes the canonical ledger through live-skins.js');
+        assert.match(read('live-skins.js'), /computeSkinsHoleLedger\(c\.cfg/, 'and live-skins.js is where the ledger is built');
         assert.doesNotMatch(fn, /getStrokes\(/, 'No second handicap calculator.');
         assert.doesNotMatch(fn, /Math\.min\(/, 'No second low-score calculator.');
         assert.doesNotMatch(fn, /computeSkinsCarryOverForSettle|computeSkinsVoidForSettle/,

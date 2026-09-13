@@ -322,7 +322,10 @@ describe('NO DUPLICATE MATH', () => {
     });
 
     test('skins come from the canonical ledger', () => {
-        assert.match(fn(), /computeSkinsHoleLedger\(data, courseData, savedScores/);
+        // Since live-skins.js: through liveSkinsLedgerEntries, one ledger per skins
+        // wager / pool bucket, each from its own config - never the round.
+        assert.match(fn(), /liveSkinsLedgerEntries\(data, courseData, savedScores/);
+        assert.ok(!/computeSkinsHoleLedger\(data,/.test(fn()), 'the round is no longer handed to the ledger builder');
     });
 
     test('it allocates nothing and resolves nothing', () => {

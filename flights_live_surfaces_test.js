@@ -275,10 +275,13 @@ describe('NO HOLE-KEYED SURFACE READS THE FLAT VIEW', () => {
         assert.ok(!/computeSkinsPayoutLines\(/.test(skins), 'skins.html must not read the flat view');
         const index = strip(read('index.html'));
         assert.ok(!/computeSkinsPayoutLines\(/.test(index));
-        assert.match(index, /bundle\.flights \|\| \[bundle\]/, 'index.html loops the hole ledger\'s flights');
+        // Since live-skins.js the flights loop lives there, shared by index.html,
+        // leaderboard.html and settlement.html; each page reads the entries.
+        assert.match(index, /liveSkinsLedgerEntries\(/, 'index.html reads the per-flight entries');
+        assert.match(strip(read('live-skins.js')), /bundle\.flights \|\| \[bundle\]/, 'live-skins.js loops the hole ledger\'s flights');
         const settle = strip(read('settlement.html'));
         assert.ok(!/computeSkinsPayoutLines\(/.test(settle));
-        assert.match(settle, /bundle\.flights \|\| \[bundle\]/);
+        assert.match(settle, /liveSkinsLedgerEntries\(/);
         const events = strip(read('hole-events.js'));
         assert.ok(!/computeSkinsPayoutLines/.test(events));
         assert.match(events, /now\.awards\.filter\(a => a\.hole === hole\)/, 'every award on the hole, not the first');

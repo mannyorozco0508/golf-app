@@ -32,6 +32,7 @@
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
     <script src="settlement-engine.js"></script>
+    <script src="live-skins.js"></script>
     <!-- Ryder Cup competition layer. MUST load after money-engine.js: it adapts
          calculateMatchEngine for hole arithmetic and does nothing on its own.
          Carries no money - a Cup match awards points, never dollars. -->
@@ -622,6 +623,8 @@
         .live-skins { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
         .ls-title { font-size: 0.68rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
         .ls-thru { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+        .ls-section { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.03em; color: var(--text-secondary); margin-top: 10px; text-transform: uppercase; }
+        .ls-flight-label { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-top: 8px; }
         .ls-standings { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
         .ls-chip { font-size: 0.76rem; font-weight: 600; background: var(--card-bg); border: 1px solid var(--border-faint); border-radius: 12px; padding: 3px 9px; }
         .ls-none { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
@@ -1084,6 +1087,11 @@
         .lw-scount { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
         .lw-sholes { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; }
         .lw-none { font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+        /* Which skins money a block is (a wager, or the Main Pool bucket) - shown
+           only when the round holds more than one - and which flight, when the
+           section is flighted. */
+        .lw-section, .sw-section { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); margin-top: 8px; }
+        .lw-flight, .sw-flight { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-top: 6px; }
         .rc-srow { display:flex; justify-content:space-between; align-items:baseline; padding:1px 0; }
         .rc-sname { font-weight:bold; font-size:0.9rem; color:var(--text-main); }
         .rc-spts { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
@@ -3117,12 +3125,18 @@ html {
         const entries = liveSkinsLedgers();
         if (!entries) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        const flighted = entries.length > 1;
+        // Per SECTION (one skins wager, or the pool bucket) and per flight within a
+        // flighted section. A round with one flightless section renders exactly as
+        // it always has: no section label, no flight head.
+        const sections = entries.length ? entries[0].section.count : 0;
+        const flighted = entries.some(e => e.flighted);
         const thruOf = (L) => L.officialThru > 0 ? 'Thru Hole ' + L.officialThru : 'Not official yet';
         const minThru = Math.min.apply(null, entries.map(e => e.L.officialThru || 0));
 
-        const blocks = entries.map(e => {
+        const blocks = entries.map((e, i) => {
             const L = e.L;
+            const sectionHead = (sections > 1 && (i === 0 || entries[i - 1].section.key !== e.section.key))
+                ? '<div class="lw-section">' + esc(e.section.label) + '</div>' : '';
             const winners = skinsWinners(L);
             let body;
             if (L.participants.length === 0) {
@@ -3136,8 +3150,8 @@ html {
                     + '<span class="lw-sholes">' + (w.holes.length === 1 ? 'Hole ' : 'Holes ') + w.holes.join(', ') + '</span>'
                     + '</div>').join('');
             }
-            const head = flighted ? '<div class="lw-flight">Flight ' + e.flight + ' \u00B7 ' + thruOf(L) + '</div>' : '';
-            return head + body;
+            const head = e.flighted ? '<div class="lw-flight">Flight ' + e.flight + ' \u00B7 ' + thruOf(L) + '</div>' : '';
+            return sectionHead + head + body;
         }).join('');
 
         return '<div class="lw-card">'
@@ -3157,7 +3171,7 @@ html {
     // `flights`, never its top level (null when flighted). A hole can be a skin
     // in A and a tie in B; two ledgers, two lists.
     function liveSkinsLedgers() {
-        if (typeof computeSkinsHoleLedger !== 'function') return null;
+        if (typeof computeSkinsHoleLedger !== 'function' || typeof liveSkinsLedgerEntries !== 'function') return null;
         const data = currentData || {};
         const courseData = data.courseData || [];
         const savedScores = data.scores || {};
@@ -3165,17 +3179,15 @@ html {
         // ONE PREDICATE FOR THE WHOLE APP - see roundHasSkinsGame() in action-model.js,
         // which carries the reasoning about why a Money Pool bucket is not a "game".
         if (!roundHasSkinsGame(data)) return null;
+        // FROM THE RIGHT CONFIG (live-skins.js): one section per skins wager, built
+        // from that wager's own mode / carry / participants / flights, plus the Main
+        // Pool bucket's own section - gross or net as the bucket says, never flighted.
+        // This used to hand the ROUND to the ledger builder, so a pool-only round
+        // printed NET SKINS per flight for a gross, field-wide pot.
         try {
-            const bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
-            const entries = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross, bundle: fl }));
-            if (entries.some(e => !e.L)) return null;
-            if (entries.length === 1 && entries[0].L.participants.length === 0) return null;
-            return entries;
+            const entries = liveSkinsLedgerEntries(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
+            return entries.length ? entries : null;
         } catch (e) { return null; }
-    }
-    function liveSkinsLedger() {
-        const entries = liveSkinsLedgers();
-        return entries ? entries[0].L : null;
     }
 
     function skinsWinners(L) {
@@ -3297,28 +3309,37 @@ html {
     // are not yet official across every group are simply absent - the canonical
     // ledger decides that, never this function.
     function renderSkinsWonHtml() {
-        const L = liveSkinsLedger();
-        if (!L) return '';
+        const entries = liveSkinsLedgers();
+        if (!entries) return '';
 
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        const thru = L.officialThru > 0
+        const thruText = (L) => L.officialThru > 0
             ? 'Official through Hole ' + L.officialThru
             : 'No holes official yet';
 
-        // Same helper the widget uses, so the two surfaces cannot disagree.
-        const winners = skinsWinners(L);
-
-        let html = '<div class="sw-head">\uD83E\uDD69 SKINS WON</div>'
-                 + '<div class="sw-thru">' + thru + '</div>';
-        if (winners.length === 0) {
-            return html + '<div class="sw-none">No official skins yet.</div>';
-        }
-        html += winners.map(w => {
-            const n = w.holes.length;
-            return '<div class="sw-row"><span class="sw-name">' + esc(w.name) + '</span>'
-                 + '<span class="sw-detail">' + n + (n === 1 ? ' skin \u00B7 Hole ' : ' skins \u00B7 Holes ')
-                 + w.holes.join(', ') + '</span></div>';
-        }).join('');
+        // EVERY SECTION AND EVERY FLIGHT. This used to read the first ledger only,
+        // so on a flighted round Flight B's skins were simply missing from the
+        // Finish Round list. One flightless wager renders exactly as before.
+        const sections = entries[0].section.count;
+        let html = '<div class="sw-head">\uD83E\uDD69 SKINS WON</div>';
+        entries.forEach((e, i) => {
+            const L = e.L;
+            if (sections > 1 && (i === 0 || entries[i - 1].section.key !== e.section.key)) {
+                html += '<div class="sw-section">' + esc(e.section.label) + '</div>';
+            }
+            if (e.flighted) html += '<div class="sw-flight">Flight ' + e.flight + '</div>';
+            html += '<div class="sw-thru">' + thruText(L) + '</div>';
+            if (e.flighted && L.participants.length === 0) { html += '<div class="sw-none">Nobody in this flight.</div>'; return; }
+            // Same helper the widget uses, so the two surfaces cannot disagree.
+            const winners = skinsWinners(L);
+            if (winners.length === 0) { html += '<div class="sw-none">No official skins yet.</div>'; return; }
+            html += winners.map(w => {
+                const n = w.holes.length;
+                return '<div class="sw-row"><span class="sw-name">' + esc(w.name) + '</span>'
+                     + '<span class="sw-detail">' + n + (n === 1 ? ' skin \u00B7 Hole ' : ' skins \u00B7 Holes ')
+                     + w.holes.join(', ') + '</span></div>';
+            }).join('');
+        });
         return html;
     }
 
@@ -3347,14 +3368,18 @@ html {
         const entries = liveSkinsLedgers();
         if (!entries) return;
         const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-        const flighted = entries.length > 1;
-        const sections = entries.map(e => renderLiveSkinsSection(e, data, flighted, esc));
+        // Per SECTION (a skins wager, or the pool bucket), per flight within a
+        // flighted section. Section labels appear only when there is more than one.
+        const many = entries[0].section.count > 1;
+        const labelOf = (e, i) => (many && (i === 0 || entries[i - 1].section.key !== e.section.key))
+            ? '<div class="ls-section">' + esc(e.section.label) + '</div>' : '';
+        const sections = entries.map((e, i) => Object.assign(renderLiveSkinsSection(e, e.section.cfg, e.flighted, esc), { label: labelOf(e, i), flighted: e.flighted }));
         const toggle = '<button type="button" class="ls-toggle" onclick="toggleLiveSkins()">'
             + (liveSkinsOpen ? 'hide hole-by-hole' : 'hole-by-hole') + '</button>';
         // Order as it always was: heads and standings, the one toggle, then the
         // hole-by-hole rows (each flight's rows under its own label when flighted).
-        mount.innerHTML = '<div class="live-skins">' + sections.map(x => x.top).join('') + toggle
-            + sections.map(x => x.ledger ? ((flighted && x.ledger) ? '<div class="ls-flight-label">Flight ' + x.flight + '</div>' : '') + x.ledger : '').join('') + '</div>';
+        mount.innerHTML = '<div class="live-skins">' + sections.map(x => x.label + x.top).join('') + toggle
+            + sections.map(x => x.ledger ? ((x.flighted && x.ledger) ? '<div class="ls-flight-label">Flight ' + x.flight + '</div>' : '') + x.ledger : '').join('') + '</div>';
     }
 
     function renderLiveSkinsSection(entry, data, flighted, esc) {
@@ -3365,6 +3390,8 @@ html {
         }
         const basis = bundle.net ? 'NET' : 'GROSS';
         const carryLabel = bundle.carryOver ? 'CARRY' : 'NO CARRY';
+        // `data` is the SECTION's config - the wager's own buy-in (the round itself
+        // for a main-format wager; 0 for the pool bucket, whose pot is not per golfer).
         const pot = Number(data.skinsBuyIn || 0) * L.participants.length;
         const potLabel = pot > 0 ? ' \u00B7 $' + pot : '';
 

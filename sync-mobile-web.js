@@ -90,6 +90,9 @@ const CONSUMER_SHELL = [
     'icon-192.png', 'icon-512.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
+    // live-skins.js: which config each live skins surface builds its ledger
+    // from. index.html, leaderboard.html and settlement.html load it.
+    'live-skins.js',
     // The Ryder Cup competition layer, loaded by the scorecard. Without it here
     // the iOS bundle would ship a scorecard that cannot render the Cup card while
     // the browser can - the exact web/native divergence this list exists to stop.
