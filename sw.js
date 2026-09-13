@@ -524,6 +524,19 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v110: the team cards are back on the Setup tab, and the public
+// scoring-link rows carry no editing control.
+//
+// One row was doing two jobs. The "Team Scorecard Links" block moved to the
+// Leaderboard tab in v109 carried the editable Team Handicap input with it,
+// so an owner opened Setup and found no teams, and every signed-out visitor
+// gained a control the gate exists to withhold. Both shipped. The row is
+// built once now - teamRowHtml(t, { editable }) - written editable into the
+// Setup cards and read-only into the public links, and
+// tournament_setup_inventory_test.js counts what each Setup section renders.
+//
+// An installed organizer on v109 has a Setup tab with no team cards.
+
 // Moved to v109: organizers sign in to manage a tournament.
 //
 // tournament.html gates its Setup & Links tab: an owned tournament renders it
@@ -964,7 +977,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v109-organizers-sign-in';
+const CACHE_VERSION = 'golfapp-v110-team-cards-back-on-setup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -441,6 +441,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
 
         <hr class="section-divider">
+        <h3>🏌️ Teams</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team, its golfers and its handicap. The scoring links are on the Leaderboard tab.</p>
+        <div id="team-cards-list"></div>
+
+        <hr class="section-divider">
         <button class="btn-outline" onclick="showAddTeamPanel()">➕ Add Another Team</button>
         <div id="add-team-panel" style="display:none; margin-top:12px;">
             <div class="team-card">
@@ -1010,26 +1015,50 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return shareBaseUrl() + 'tournament-scorecard.html';
     }
 
+    // ONE ROW BUILDER, TWO LISTS. The same row used to serve as both the Setup
+    // tab's per-team card and the public scoring-link list - one <div> in
+    // #team-links-list carried the name, the golfers, the hole badge, the
+    // EDITABLE handicap and the Share button. When the links block moved to the
+    // Leaderboard tab (v109) the cards went with it: an owner opened Setup and
+    // found no teams, and the public tab gained a handicap input. Measured live.
+    // Now the row is built once, with `editable` deciding whether the handicap
+    // input is on it: true for the Setup card, false for the public link row.
+    function teamRowHtml(t, opts) {
+        const editable = !!(opts && opts.editable);
+        const isShotgun = currentData.startType === 'shotgun';
+        const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+        const names = (t.players || []).join(', ');
+        const teamName = t.name || `Team ${t.num}`;
+        const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
+        const startBadge = (isShotgun && t.startingHole) ? `<span style="background:var(--nassau-box-bg); color:var(--brand-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:bold; margin-left:6px;">🚀 Hole ${t.startingHole}</span>` : '';
+        const hcpInput = editable
+            ? `<input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">`
+            : '';
+        return `<div class="team-link-row" style="flex-wrap:wrap;">
+            <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
+            <span style="display:flex; align-items:center; gap:6px;">
+                ${hcpInput}
+                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
+            </span>
+        </div>`;
+    }
+    function sortedTeams() {
+        const teams = currentData.teams || {};
+        return Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num).map(tid => teams[tid]);
+    }
+    const NO_TEAMS = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
+
+    // The Setup tab's per-team cards: editable. Goes with the gate.
+    function renderTeamCards() {
+        const list = document.getElementById('team-cards-list');
+        if (!list) return;
+        list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: true })).join('') || NO_TEAMS;
+    }
+    // The Leaderboard tab's scoring links: read-only rows with a Share button.
     function renderTeamLinks() {
         const list = document.getElementById('team-links-list');
-        const teams = currentData.teams || {};
-        const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
-        const isShotgun = currentData.startType === 'shotgun';
-        list.innerHTML = teamIds.map(tid => {
-            const t = teams[tid];
-            const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
-            const names = t.players.join(', ');
-            const teamName = t.name || `Team ${t.num}`;
-            const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
-            const startBadge = (isShotgun && t.startingHole) ? `<span style="background:var(--nassau-box-bg); color:var(--brand-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:bold; margin-left:6px;">🚀 Hole ${t.startingHole}</span>` : '';
-            return `<div class="team-link-row" style="flex-wrap:wrap;">
-                <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
-                <span style="display:flex; align-items:center; gap:6px;">
-                    <input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">
-                    <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
-                </span>
-            </div>`;
-        }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
+        if (!list) return;
+        list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
     }
 
     // --- SHOTGUN STARTS (Tournament Mode only — never touches Round/Trip/Nassau/Skins) ---
@@ -2602,6 +2631,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('start-type-label-normal').classList.toggle('active', !isShotgun);
             document.getElementById('start-type-label-shotgun').classList.toggle('active', isShotgun);
 
+            renderTeamCards();
             renderTeamLinks();
             renderShotgunAssignments();
             renderRounds();
@@ -2611,6 +2641,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // Team scorecard links belong to team events only.
             const teamLinksHeading = document.getElementById('team-links-list');
             if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
+            const teamCards = document.getElementById('team-cards-list');
+            if (teamCards) teamCards.style.display = recordIsIndividual() ? 'none' : 'block';
             renderGroupLinks();
             renderLeaderboardRoundFilter();
             renderLeaderboardFlightFilter();

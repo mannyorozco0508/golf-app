@@ -381,6 +381,25 @@ a time.
 `tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
 (rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
 
+**What v109 shipped broken, and why — two findings, not one.** The "Team
+Scorecard Links" block that moved to the Leaderboard tab was also the Setup tab's
+per-team card list: **one row was doing two jobs** — name, golfers, the shotgun
+hole badge, the **editable Team Handicap input** and the Share button, all in the
+same `team-link-row`. Moving the container did two things at once: (1) the Setup
+tab lost its team cards — measured live on an owned tournament, nothing between
+Flights and "Add Another Team"; (2) the public Leaderboard rows gained an editable
+handicap input for every visitor, signed out included — the exact control the
+gate exists to withhold, invisible to a signed-in owner. It shipped because the
+gate tests pinned the Setup tab's *presence* and nothing pinned its *contents*.
+The fix is **one builder with two callers**: `teamRowHtml(t, { editable })`,
+written editable into `#team-cards-list` (Setup) by `renderTeamCards()` and
+read-only into `#team-links-list` (Leaderboard) by `renderTeamLinks()`, so the
+shape cannot recur without a second copy — and
+`tournament_setup_inventory_test.js` refuses a second copy, counts every Setup
+section's rows against the record, and refuses any `<input>` on the public rows;
+`tools/tournament-signin-gate-check.js` counts them in Chrome and, run against the
+v109 page, goes red on both halves. Individual mode was measured unaffected.
+
 ## Course data
 
 `course-data.js` holds a searchable directory of 141 courses. Only 26 have local hole data; the rest rely on Firebase `global_courses`, which any golfer can extend by mapping a course once — it then works for everyone, forever.

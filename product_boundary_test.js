@@ -453,7 +453,13 @@ describe('TRIP \u2194 TOURNAMENT — one relationship, two pointers', () => {
         // guarantee that matters - never routed through the cross-product seam - is
         // unchanged and asserted below.
         assert.match(t, /function scorecardBaseUrl\(\)[\s\S]{0,220}shareBaseUrl\(\)/);
-        const linkFn = t.slice(t.indexOf('function renderTeamLinks'), t.indexOf('function renderTeamLinks') + 1400);
+        // The row - and its link - is built by teamRowHtml() since the v109 team-card
+        // fix, which is what renderTeamLinks() and renderTeamCards() both call. Slice
+        // that one builder to its own end, so a re-ordering cannot empty the slice.
+        const at = t.indexOf('function teamRowHtml(');
+        assert.ok(at > 0, 'teamRowHtml() is the one builder of a team row');
+        const linkFn = t.slice(at, t.indexOf('\n    function ', at + 30));
+        assert.ok(linkFn.length > 200, 'the builder slice is not empty');
         assert.match(linkFn, /\$\{scorecardBaseUrl\(\)\}\?tourney=\$\{currentCode\}&team=\$\{t\.num\}/);
         assert.ok(!/consumerUrl\(`?tournament-scorecard|tournamentUrl\(`?tournament-scorecard/.test(t),
             'a scoring link must never be built through the cross-product seam');

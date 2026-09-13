@@ -71,7 +71,10 @@ const PROBE = `
     board: { visible: visible('#leaderboard-list'), names: (document.getElementById('leaderboard-list') || {}).innerText || '' },
     printResults: !!(byText(/Print \\/ Send Results/) && byText(/Print \\/ Send Results/).getBoundingClientRect().height > 0),
     printPairings: !!(byText(/Print Pairings/) && byText(/Print Pairings/).getBoundingClientRect().height > 0),
-    teamLinks: { visible: visible('#team-links-list'), shareButtons: document.querySelectorAll('#team-links-list button').length },
+    teamLinks: { visible: visible('#team-links-list'), shareButtons: document.querySelectorAll('#team-links-list button').length,
+                 editableControls: document.querySelectorAll('#team-links-list input, #team-links-list select').length },
+    teamCards: { exists: !!document.getElementById('team-cards-list'),
+                 handicapInputs: document.querySelectorAll('#team-cards-list input').length },
     groupLinks: { visible: visible('#group-links-list'), links: Array.prototype.slice.call(document.querySelectorAll('#group-links-list a')).filter(a => a.getBoundingClientRect().height > 0).map(a => (a.getAttribute('href') || '').replace(/^.*\\?/, '')) },
     editorVisible: visible('#scoring-groups-section'),
     signedInAs: ((document.getElementById('signed-in-as') || {}).innerText || '').trim(),
@@ -105,6 +108,12 @@ async function look(code) {
     if (!/Eagles/.test(owned.board.names)) failures.push('owned: the board does not list the teams');
     if (!owned.printResults || !owned.printPairings) failures.push('owned: a print button has no rect signed out - printing must stay open');
     if (!owned.teamLinks.visible || owned.teamLinks.shareButtons < 2) failures.push('owned: the scoring links are not on screen signed out (' + owned.teamLinks.shareButtons + ' share buttons)');
+    // THE LEAK v109 SHIPPED: the public link rows carried the editable handicap.
+    if (owned.teamLinks.editableControls > 0) failures.push('owned: ' + owned.teamLinks.editableControls + ' editable control(s) on the PUBLIC scoring-link rows');
+    if (owned.teamCards.exists) failures.push('owned: the team cards (Setup) still exist for a signed-out visitor');
+    // LEGACY keeps its cards, and they are the editable ones.
+    if (!legacy.teamCards.exists || legacy.teamCards.handicapInputs < 2) failures.push('legacy: the Setup team cards are missing or have no handicap inputs - the bug v109 shipped');
+    if (legacy.teamLinks.editableControls > 0) failures.push('legacy: editable control(s) on the public scoring-link rows');
     if (owned.signedInAs) failures.push('owned: "Signed in as" rendered while signed out: ' + owned.signedInAs);
     if (!owned.signInPanel) failures.push('owned: no sign-in panel on screen for a signed-out visitor');
     if (owned.lockWords.length) failures.push('owned: lock words on screen: ' + JSON.stringify(owned.lockWords));
