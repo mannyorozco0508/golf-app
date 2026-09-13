@@ -232,8 +232,96 @@ describe('THE PASTE PATH WITH FLIGHTS ON', () => {
         run(sb, 'setFlightsEnabled(true)');
         paste(sb, 'Ann\nBen');
         run(sb, 'toggleRowFlight(document.querySelectorAll(".player-row")[1].querySelector(".p-flight-input"))');
+        reattach(sb, ['Ann', 'Ben']);       // harness: markup-only rows read as empty, and an empty row is now dropped
         paste(sb, 'Cal\nDee');
         assert.deepEqual(rowsRead(sb).map(r => r.flight), ['A', 'B', 'A', 'A']);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// THE EMPTY ROW ON ARRIVAL. Step 5 arrives with one blank player row (a fresh
+// code: addPlayerRow() with nothing in it). commitPastedPlayers captured that
+// row as a golfer, so it took the first slot of group 1 - 23 pasted as
+// 4/4/4/4/4/3 landed as 1+3 / 1+3 / ... every group shifted by one - and the
+// save later named the blank row "Player 1". The commit now drops any existing
+// row that has no name AND no handicap before it counts sizes or appends. A row
+// with a name and no handicap is a golfer and stays. A row with a handicap and
+// no name is NOT this rule's business and is left exactly as today.
+//
+// HARNESS: addPlayerRow() here builds a row whose inputs are markup only, so the
+// capture reads name '' / hcp '' - the same thing a blank arrival row reads as.
+// A named row is made by re-attaching a real input (reattach / reattachHcp).
+// ---------------------------------------------------------------------------
+function reattachHcp(sb, hcps) {
+    sb.__hcps = hcps;
+    run(sb, `document.querySelectorAll('.player-row').forEach(function (row, i) {
+        if (!row.querySelector('.p-hcp-input')) { var h = document.createElement('input'); h.className = 'p-hcp-input'; h.value = __hcps[i] || ''; row.appendChild(h); }
+        if (!row.querySelector('.p-name-input')) { var n = document.createElement('input'); n.className = 'p-name-input'; n.value = ''; row.appendChild(n); }
+    });`);
+}
+const namesAny = (sb) => J(run(sb, `document.querySelectorAll('.player-row').map(function (r) {
+    var el = r.querySelector('.p-name-input'); if (el) return el.value;
+    var m = /class="p-name-input"[^>]*value="([^"]*)"/.exec(r.innerHTML); return m ? m[1] : null; })`));
+
+describe('THE EMPTY ROW ON ARRIVAL is dropped by the paste', () => {
+    test('the real 23 onto a fresh Step 5 (one blank row): 4/4/4/4/4/3, 23 rows, no blank golfer, every pair right', () => {
+        const sb = adminPage();
+        run(sb, 'addPlayerRow()');                             // the arrival row
+        assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 1);
+        paste(sb, realText());
+        // Sizes first: with the blank row carried they come out {0:1, 1:4, ... 6:3},
+        // every group shifted by one - the shape of the bug, named in the red.
+        assert.deepEqual(overrides(sb), { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 3 }, 'group sizes shifted by the blank arrival row');
+        const rows = rowsRead(sb);
+        assert.equal(rows.length, 23, 'the blank row is gone, not carried');
+        assert.deepEqual(rows.map(r => [unescape(r.name), r.hcp]), REAL.map(r => [r[1], r[2]]));
+    });
+    test('onto two real golfers plus a trailing blank row: the two kept, the blank dropped, sizes 2 then the runs', () => {
+        const sb = adminPage();
+        paste(sb, 'Ann\nBen');
+        run(sb, 'addNewPlayerAndRefresh()');                   // the + button: a blank third row
+        reattach(sb, ['Ann', 'Ben', '']);
+        assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 3);
+        paste(sb, 'Cal\nDee\nEli\n\nFay');
+        assert.deepEqual(namesAny(sb), ['Ann', 'Ben', 'Cal', 'Dee', 'Eli', 'Fay']);
+        assert.deepEqual(overrides(sb), { 0: 2, 1: 3, 2: 1 });
+    });
+    test('a row with a name and no handicap is never dropped', () => {
+        const sb = adminPage();
+        run(sb, 'addPlayerRow()');
+        reattach(sb, ['Randy']);                               // name, hcp ''
+        paste(sb, 'Cal\nDee\n\nEli');
+        assert.deepEqual(namesAny(sb), ['Randy', 'Cal', 'Dee', 'Eli']);
+        assert.deepEqual(overrides(sb), { 0: 1, 1: 2, 2: 1 });
+    });
+    test('a row with a handicap and no name is NOT dropped by this rule (today\'s behaviour, unchanged: it stays and the save would name it "Player N")', () => {
+        const sb = adminPage();
+        run(sb, 'addPlayerRow()');
+        reattachHcp(sb, ['8']);                                // hcp, name ''
+        paste(sb, 'Cal\nDee\n\nEli');
+        assert.deepEqual(namesAny(sb), ['', 'Cal', 'Dee', 'Eli']);
+        assert.deepEqual(overrides(sb), { 0: 1, 1: 2, 2: 1 });
+        assert.match(ADMIN, /row\.querySelector\('\.p-name-input'\)\.value\.trim\(\) \|\| `Player \$\{idx \+ 1\}`/, 'the save names a nameless row');
+    });
+    test('a no-blank-line paste onto the blank arrival row: default sizing untouched, and the blank row still dropped', () => {
+        const sb = adminPage();
+        run(sb, 'addPlayerRow(); groupSizeOverrides = { 0: 3 };');
+        paste(sb, realText('\n'));
+        assert.equal(rowsRead(sb).length, 23);
+        assert.deepEqual(overrides(sb), { 0: 3 });
+    });
+    test('flights ON: the blank row and its control go; the remaining tags are undisturbed', () => {
+        const sb = adminPage();
+        run(sb, 'setFlightsEnabled(true)');
+        paste(sb, 'Ann\nBen');
+        run(sb, 'toggleRowFlight(document.querySelectorAll(".player-row")[1].querySelector(".p-flight-input"))');   // Ben -> B
+        run(sb, 'addNewPlayerAndRefresh()');                   // blank third row, control A
+        reattach(sb, ['Ann', 'Ben', '']);
+        assert.deepEqual(rowsRead(sb).map(r => r.flight), ['A', 'B', 'A']);
+        paste(sb, 'Cal\n\nDee');
+        assert.deepEqual(namesAny(sb), ['Ann', 'Ben', 'Cal', 'Dee']);
+        assert.deepEqual(rowsRead(sb).map(r => r.flight), ['A', 'B', 'A', 'A']);
+        assert.deepEqual(overrides(sb), { 0: 2, 1: 1, 2: 1 });
     });
 });
 
@@ -246,6 +334,7 @@ describe('THE SEAM (source)', () => {
         const commit = ADMIN.slice(ADMIN.indexOf('function commitPastedPlayers('), ADMIN.indexOf('function removePlayerRowAndRefresh('));
         assert.match(commit, /groups\.length > 1/);
         assert.match(commit, /groupSizeOverrides\[/);
+        assert.match(commit, /isEmptyRow|name\)\.trim\(\) === '' && String\(p\.hcp\)\.trim\(\) === ''/, 'the empty-row drop lives in the commit');
     });
     test('the modal\'s label says what the box accepts: blank lines for groups, a handicap after the name', () => {
         const label = /<label for="paste-players-textarea"[^>]*>([\s\S]*?)<\/label>/.exec(ADMIN);

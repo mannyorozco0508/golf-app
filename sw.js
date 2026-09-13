@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v119: the paste drops the blank arrival row.
+//
+// admin.html: Step 5 opens with a blank player row, and Paste Player List
+// captured it as a golfer - it took the first slot of group 1, so 23 pasted
+// as 4/4/4/4/4/3 landed as 1/4/4/4/4/4/3, and the save named it "Player 1".
+// A row with no name and no handicap is dropped by the paste before sizes
+// are counted. A named row with no handicap stays.
+//
+// An installed device on v118 pastes a list and gets a phantom golfer at the
+// top of group 1 with every group shifted by one.
+
 // Moved to v118: the Paste Player List box reads groups and bare handicaps.
 //
 // admin.html: a blank line between runs of names is a group boundary, and the
@@ -1083,7 +1094,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v118-paste-groups';
+const CACHE_VERSION = 'golfapp-v119-paste-empty-row';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

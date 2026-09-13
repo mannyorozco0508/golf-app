@@ -195,6 +195,14 @@ describe('IDS SURVIVE THE REBUILD SITES', () => {
         loadSavedRound(sb, [
             { id: 101, name: 'Ann', hcp: '5', team: '', squad: 'red', playingForMoney: true },
             { id: 109, name: 'Bob', hcp: '6', team: '', squad: 'blue', playingForMoney: true }]);
+        // HARNESS LIMIT (v119): the rebuilt rows carry their names only in innerHTML,
+        // which mini-dom does not parse, so the capture reads them as name '' / hcp ''
+        // - and the paste now drops a row with neither, the blank arrival row. In a
+        // browser these rows have real inputs. Re-attach them with the names above so
+        // the rows read as the golfers they are; the ids under test are untouched.
+        run(sb, `document.querySelectorAll('.player-row').forEach(function (row, i) {
+            if (!row.querySelector('.p-name-input')) { var n = document.createElement('input'); n.className = 'p-name-input'; n.value = ['Ann', 'Bob'][i]; row.appendChild(n); }
+        });`);
         run(sb, 'document.getElementById("paste-players-textarea").value = "Cal, 7\\nDee, 9";');
         run(sb, 'commitPastedPlayers();');
 

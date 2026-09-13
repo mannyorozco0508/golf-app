@@ -4917,7 +4917,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const { validPlayers, groups } = parsePlayerPasteText(text);
         if (validPlayers.length === 0) return;
 
-        const existingData = captureCurrentPlayerInputs();
+        // THE EMPTY ROW ON ARRIVAL. Step 5 opens with one blank row, and it was
+        // captured here as a golfer: it took the first slot of group 1 (23 pasted as
+        // 4/4/4/4/4/3 landed as 1 / 4 / 4 / 4 / 4 / 4 / 3), and the save later named
+        // it "Player 1". A row with no name AND no handicap is nobody; it is dropped
+        // from the roster before sizes are counted or anyone is appended. A row with
+        // a name and no handicap is a golfer and stays. A row with a handicap and no
+        // name is left exactly as it was (the save names it "Player N", as before).
+        // Only the paste path does this.
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const existingData = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
 
         // GROUPS FROM THE PASTE, only when the paste drew a boundary. The golfers
         // already on the roster keep the groups they are in - each of those is
