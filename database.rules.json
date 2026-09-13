@@ -60,7 +60,19 @@
       "$tourneyCode": {
         ".read": true,
         ".write": "!data.exists() || newData.exists()",
-        ".validate": "newData.hasChildren() || newData.val() === null"
+        ".validate": "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
+        "ownerUid": {
+          ".validate": "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
+        }
+      }
+    },
+    "registrations": {
+      "$code": {
+        ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
+        "$entryId": {
+          ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
+          ".validate": "newData.hasChildren(['name', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('createdAt').isNumber()"
+        }
       }
     },
     "global_courses": {

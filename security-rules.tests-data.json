@@ -48,6 +48,10 @@
             "name": "Round One"
           }
         }
+      },
+      "OWNED": {
+        "name": "Owned Tourney",
+        "ownerUid": "u-org"
       }
     },
     "global_courses": {
@@ -58,10 +62,24 @@
     },
     "app_settings": {
       "beta_expiration": "2026-09-01T00:00:00"
+    },
+    "registrations": {
+      "OWNED": {
+        "e1": {
+          "name": "Ann Alpha",
+          "createdAt": 1
+        }
+      }
     }
   },
   "users": {
-    "nobody": null
+    "nobody": null,
+    "organizer": {
+      "uid": "u-org"
+    },
+    "stranger": {
+      "uid": "u-stranger"
+    }
   },
   "tests": {
     "app_settings/beta_expiration": {
@@ -773,6 +791,182 @@
           "auth": "nobody",
           "data": {
             "name": "Brand New Tourney"
+          }
+        }
+      ]
+    },
+    "tournaments/QRST/ownerUid": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "u-org"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "u-org"
+        },
+        {
+          "auth": "organizer",
+          "data": "u-stranger"
+        }
+      ]
+    },
+    "tournaments/OWNED/ownerUid": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "u-org"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "stranger",
+          "data": "u-stranger"
+        },
+        {
+          "auth": "nobody",
+          "data": null
+        },
+        {
+          "auth": "organizer",
+          "data": "u-stranger"
+        }
+      ]
+    },
+    "tournaments/OWNED": {
+      "canRead": [
+        "nobody"
+      ],
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "X",
+            "ownerUid": "u-org"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "X"
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/name": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": "X"
+        }
+      ]
+    },
+    "registrations": {
+      "cannotRead": [
+        "organizer",
+        "stranger",
+        "nobody"
+      ]
+    },
+    "registrations/OWNED": {
+      "canRead": [
+        "organizer"
+      ],
+      "cannotRead": [
+        "stranger",
+        "nobody"
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "e9": {
+              "name": "Zed",
+              "createdAt": 9
+            }
+          }
+        }
+      ]
+    },
+    "registrations/OWNED/e2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Bo Bravo",
+            "createdAt": 2
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Bo Bravo"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "",
+            "createdAt": 2
+          }
+        }
+      ]
+    },
+    "registrations/OWNED/e1": {
+      "cannotRead": [
+        "nobody",
+        "stranger"
+      ],
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Ann Alpha-Corrected",
+            "createdAt": 1
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Ann2",
+            "createdAt": 1
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": null
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "Ann2",
+            "createdAt": 1
+          }
+        }
+      ]
+    },
+    "registrations/QRST/e1": {
+      "cannotRead": [
+        "organizer",
+        "stranger",
+        "nobody"
+      ]
+    },
+    "registrations/QRST/e2": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Late Entry",
+            "createdAt": 5
           }
         }
       ]

@@ -343,6 +343,86 @@ flipped. Two file-level pins moved with it and say why: the frozen sha256 in
 reading the rules back after a hard refresh. Not deployed from the CLI — see the
 note at the top of this section.
 
+### ownerUid and registrations — COMMITTED, NOT YET PUBLISHED (rules wave, 2026-09-12)
+
+The approved diff (+13 / −1) added two things to `database.rules.json` and changed
+nothing else — `tournaments/$tourneyCode`'s `.write` is untouched:
+
+    "tournaments": { "$tourneyCode": {
+        ".validate": "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
+        "ownerUid": { ".validate": "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" }
+    } },
+    "registrations": { "$code": {
+        ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
+        "$entryId": {
+            ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
+            ".validate": "newData.hasChildren(['name', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('createdAt').isNumber()"
+        }
+    } }
+
+**What is and is not a boundary.** Anyone holding a code can still write a
+tournament's teams, players, rounds and scores signed out — the Setup gate on
+`tournament.html` remains a guardrail. Two things are now boundaries: `ownerUid`
+(set once, by a signed-in client, to its own uid; never taken, changed or dropped —
+a whole-record PUT that omits it is refused, and so is a code collision onto another
+organizer's tournament, which before this wave silently overwrote it) and
+`registrations/$code` (owner-only read; create-only for anyone, but only under a
+tournament that HAS an owner, so a submission never lands where nobody can read it;
+owner may correct an entry; nobody deletes one). The rules do **not** require a
+tournament to have an `ownerUid` — a stale bundle still creates a legacy record.
+
+**Measured.** 31 rows added to `security-rules.tests-data.json` (116 total, 0
+failures; 85/85 pre-existing unchanged). Every write shape `tournament.html` and
+`tournament-scorecard.html` actually make was run against the real file through
+targaryen's JS API, including the one multi-location `update()` at the tournament
+node (`autoAssignShotgunHoles`): all allowed signed out on an owned record. The one
+new failure an organizer can meet: creating with a stale `authUser` (signed out in
+another tab) is refused with the SDK's `PERMISSION_DENIED` after the form is filled.
+Nothing in the app writes `registrations/` yet; a future form on a LEGACY
+tournament will be refused until that tournament is re-created or a claim path
+exists — decide that before building the form.
+
+**The registrations rows were green before the block existed.** `$other` already
+refused everything under `registrations/`, so seventeen negative rows proved nothing
+about the block. `registrations_rules_isolation_test.js` stubs the block permissive
+(`{".read": true, ".write": true}`) in a temp copy and requires all seventeen to go
+red, the three positive rows to stay green, the 96 rows outside `registrations/` to
+hold, and the clean file to be green. The count is read from the data file, not
+typed. Two old wave guards (`code_length_test.js`, `firebase_vendor_test.js`) asserted
+the rules never mention `auth`; both now assert `auth` appears in exactly the three
+expressions above and nowhere else.
+
+**Two clauses behaved differently from the plan under negative control, neither
+changed:**
+
+- Removing the child `ownerUid` `.validate` frees take-over and the two wrong-uid
+  rows, but NOT "nobody clears it". Removing the parent `.validate` clause frees the
+  PUT-dropping row AND the clear row. A child `.validate` is not evaluated when that
+  child is written null, so **the parent clause alone is what refuses clearing
+  ownerUid.**
+- Removing `auth != null &&` from the ownerUid validate moved no row: in targaryen
+  `newData.val() === auth.uid` evaluates false on a null auth by itself. The clause is
+  stated intent, kept as written; a second control (uid comparison relaxed) proved the
+  "nobody sets it" row is live.
+
+**Two UNKNOWNs — settle in the Rules Playground BEFORE the console publish, not
+after:**
+
+1. Whether the real engine evaluates the PARENT `.validate` on a child write.
+   targaryen does (that is what refuses "remove ownerUid"). If the real RTDB does
+   not, `remove(tournaments/X/ownerUid)` would go through, and the clear row is
+   guarded by nothing. Playground check: path `tournaments/<an owned code>/ownerUid`,
+   write `null`, unauthenticated — must say denied. Then the same as the owner's uid —
+   must also say denied.
+2. Whether the real engine treats `auth.uid` on a null auth as false (as targaryen
+   does) or as an evaluation error (also a refusal). Either way the write is refused;
+   the question is only whether the `auth != null` clause is doing anything.
+   Playground check: `tournaments/<a fresh code>/ownerUid`, write any string,
+   unauthenticated — must say denied.
+
+**Not published.** The console is the deploy; the commit is not. Publishing without
+the two checks above ships an assumption about the engine.
+
 ## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
 
 Organizers sign in (Firebase Auth, email/password); golfers never do — a scoring
@@ -367,7 +447,9 @@ calls no auth API (`tournament_signin_gate_test.js` §g pins it). On
 guardrail against the casual case — a golfer who followed a link into the console
 and tapped something — and **not a security boundary**: `database.rules.json`
 still lets anyone holding the six-character code write every child the Setup tab
-edits, and the rules did not change in this wave. No UI string may say
+edits — the rules did not change in this wave, and the rules wave that followed
+left the parent `.write` alone (it made `ownerUid` and `registrations/` boundaries;
+see "ownerUid and registrations" above). No UI string may say
 "protected", "secure" or "locked", and the tests refuse those words on the page.
 The same sentence sits in a comment at the gate in `tournament.html`.
 

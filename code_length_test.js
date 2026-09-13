@@ -381,8 +381,25 @@ describe('NOTHING ELSE MOVED', () => {
     });
 
     test('no Firebase, rules or auth change', () => {
-        const rules = read('database.rules.json');
-        assert.ok(!rules.includes('auth'), 'this batch adds no authentication');
+        // Written as "the rules never mention auth" when this batch landed, and
+        // true until the rules wave of 2026-09-12 gave tournaments an ownerUid
+        // and registrations an owner-only read, with Manny's approval of that
+        // exact diff. The claim this batch makes is narrower and still holds:
+        // code generation put no auth anywhere. So the assertion is now that
+        // `auth` appears ONLY in the three expressions that wave approved.
+        const rules = JSON.parse(read('database.rules.json')).rules;
+        const authSites = (function walk(n, p, out) {
+            Object.entries(n || {}).forEach(([k, v]) => {
+                if (typeof v === 'string') { if (/auth/.test(v)) out.push(p + '/' + k); }
+                else if (v && typeof v === 'object') walk(v, p + '/' + k, out);
+            });
+            return out;
+        })(rules, '', []);
+        assert.deepEqual(authSites.sort(), [
+            '/registrations/$code/$entryId/.write',
+            '/registrations/$code/.read',
+            '/tournaments/$tourneyCode/ownerUid/.validate'
+        ], 'auth reached a rule outside the approved rules wave: ' + JSON.stringify(authSites));
         ['money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('generateRoomCode'),
                 f + ' must know nothing about code generation'));

@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v111: the comments in tournament.html say what the rules now hold.
+//
+// database.rules.json gained ownerUid and registrations rules (published from
+// the console, not from a deploy). Two sentences on the page said the rules
+// did not enforce ownership; from the publish on, they enforce that ownerUid
+// is the writer's own uid and can never change, and still do not require a
+// tournament to have one. No behaviour moved; the words describing it did.
+//
+// An installed organizer on v110 reads a comment that lies about the rules.
+
 // Moved to v110: the team cards are back on the Setup tab, and the public
 // scoring-link rows carry no editing control.
 //
@@ -977,7 +987,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v110-team-cards-back-on-setup';
+const CACHE_VERSION = 'golfapp-v111-rules-say-what-they-hold';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

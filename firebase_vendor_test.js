@@ -330,8 +330,25 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
     test('this batch adds no authentication and no rules change', () => {
         // Vendoring the SDK does not hide the Firebase config, add auth, or change
         // RTDB authorization. Stated so the two projects stay separate.
-        const rules = read('database.rules.json');
-        assert.ok(!rules.includes('auth'), 'no authentication was introduced');
+        // "The rules never mention auth" was true when the SDK was vendored and
+        // stopped being true on 2026-09-12, when the rules wave gave tournaments
+        // an ownerUid and registrations an owner-only read, with Manny's
+        // approval of that exact diff. Vendoring still introduced nothing: the
+        // assertion is now that `auth` appears ONLY in the three expressions
+        // that wave approved. code_length_test.js holds the same list.
+        const rules = JSON.parse(read('database.rules.json')).rules;
+        const authSites = (function walk(n, p, out) {
+            Object.entries(n || {}).forEach(([k, v]) => {
+                if (typeof v === 'string') { if (/auth/.test(v)) out.push(p + '/' + k); }
+                else if (v && typeof v === 'object') walk(v, p + '/' + k, out);
+            });
+            return out;
+        })(rules, '', []);
+        assert.deepEqual(authSites.sort(), [
+            '/registrations/$code/$entryId/.write',
+            '/registrations/$code/.read',
+            '/tournaments/$tourneyCode/ownerUid/.validate'
+        ], 'auth reached a rule outside the approved rules wave: ' + JSON.stringify(authSites));
         assert.match(read('admin.html'), /function makeOrganizerToken/,
             'organizerToken is untouched');
     });

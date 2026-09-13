@@ -871,7 +871,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // SIGNED IN, FIRST - before a single field is read, so nobody fills in a
         // whole tournament to be told at the end. ownerUid is written in the same
         // .set() that creates the record, so an owned tournament never exists
-        // without its owner. (The rules do not enforce this; see the gate note.)
+        // without its owner. The rules enforce that ownerUid is the writer's own
+        // uid and can never change; they do NOT enforce that a tournament has
+        // one - that is this page's doing, and a stale bundle still creates a
+        // legacy record. The Setup gate below is still a guardrail, because the
+        // parent .write is unchanged.
         if (!authUser) {
             alert('Sign in to create a tournament. Organizers sign in; golfers never need to.');
             return;
@@ -1205,8 +1209,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // guardrail against the casual case - a golfer who followed a link into the
     // console and tapped something - and NOT a security boundary. database.rules
     // .json still lets anyone holding the six-character code write every child
-    // the Setup tab edits; the rules do not change this wave. Nothing on this
-    // page may say "protected", "secure" or "locked", because nothing is.
+    // the Setup tab edits - the parent .write is unchanged. What the rules DO
+    // hold: ownerUid can only be set by a signed-in client to its own uid and
+    // never taken, changed or dropped after; registrations/ is owner-only to
+    // read. Nothing on this page may say "protected", "secure" or "locked",
+    // because the management surface is not.
     //
     // WHO MAY MANAGE: a LEGACY tournament (no ownerUid) is open to everyone,
     // exactly as before this wave - no claim path, nothing writes ownerUid onto

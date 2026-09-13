@@ -570,7 +570,27 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // delete allowed; whole-tournament delete refused - and the targaryen suite
         // runs them. The delete row was written FIRST and shown red against the old
         // rule, so it is known to measure something.
-        'database.rules.json': 'fce5b6f3df7c08e7760f4acfc79c113940dfdc508763e36fb02284a17fa125d1',
+        // Previous hash, for the record:
+        //   fce5b6f3df7c08e7760f4acfc79c113940dfdc508763e36fb02284a17fa125d1
+        // RE-PINNED 2026-09-12 (second time that day), with Manny's explicit
+        // per-file approval of the exact diff, for TWO additions and no other
+        // change - +13 / -1 lines, by diff:
+        //   tournaments/$tourneyCode gained a ".validate" (a PUT onto an owned
+        //     record may not drop ownerUid) and an "ownerUid" child whose
+        //     validate lets it be set once, to the writer's own uid, and never
+        //     changed. ".write" is untouched; deployment_build_test.js:443 still
+        //     pins its literal.
+        //   a new top-level "registrations" block: readable by the tournament's
+        //     owner only; an entry can be created by anyone under an OWNED
+        //     tournament, and overwritten or removed by the owner only; shape
+        //     validated (name 1..120 chars, numeric createdAt).
+        //
+        // THE HASH IS NOT WHAT GUARDS ANY OF THAT. security-rules.tests-data.json
+        // carries the 31 rows that do (116 in all), and
+        // registrations_rules_isolation_test.js proves the registrations rows are
+        // refused by the block and not by the $other catch-all - they were green
+        // before the block existed, which is why that file has to exist.
+        'database.rules.json': '28fd0e7b13dd76e0987c7d78e11efdddb9f4419a0b6df0bb9c7de822ca360c4c',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
