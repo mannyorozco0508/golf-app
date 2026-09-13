@@ -239,10 +239,15 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         if (mut) mut(s, players, cd);
         return s;
     }
+    // FLIGHTS WAVE (2026-09-13): index.html's own copy is GONE too - defined,
+    // never called by the page (whole-tree grep before the delete: the page's
+    // definition, one comment, and this file). index.html loads the engine, so
+    // "index" below is the canonical function reached through the page realm,
+    // the same inversion stats.html went through in Batch 3.
     function allThree(data, sc) {
         return {
             settle: settle.calculateBirdieGameTotalsForSettle(data, cd, sc),
-            index: ix.calculateBirdieGameTotals(data, cd, sc),
+            index: ix.calculateBirdieGameTotalsForSettle(data, cd, sc),
             stats: st.calculateBirdieGameTotalsForSettle(data, cd, sc),
         };
     }
@@ -344,18 +349,19 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         Object.values(totals).forEach(v => assert.equal(v, 0));
     });
 
-    test('two independent copies remain, and stats.html is now a consumer — this guard is not vacuous', () => {
-        // A copy WAS deleted, which is good news, and this suite was told rather
-        // than left silently passing against survivors. The two genuine copies are
-        // still pinned; stats.html is pinned the other way round.
-        const files = {
-            'settlement-engine.js': /function calculateBirdieGameTotalsForSettle\(/,
-            'index.html': /function calculateBirdieGameTotals\(/,
-        };
-        Object.keys(files).forEach(f => {
-            const src = fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-            assert.match(src, files[f], f + ' no longer has the copy this suite compares');
-        });
+    test('ONE implementation remains; index.html and stats.html are consumers — this guard is not vacuous', () => {
+        // Both page copies have now been deleted (stats.html in Batch 3, index.html
+        // in the flights wave), and this suite was told each time rather than left
+        // silently passing against survivors. The engine's copy is pinned; both
+        // pages are pinned the other way round - they must NOT redeclare it and
+        // must load the engine.
+        const engSrc = fs.readFileSync(path.join(REPO_ROOT, 'settlement-engine.js'), 'utf8');
+        assert.match(engSrc, /function calculateBirdieGameTotalsForSettle\(/, 'settlement-engine.js must hold the one implementation');
+        assert.equal((engSrc.match(/function calculateBirdieGameTotalsForSettle\(/g) || []).length, 1);
+        const indexSrc = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
+        assert.ok(!/function calculateBirdieGameTotals(ForSettle)?\s*\(/.test(indexSrc.replace(/<script src=[^>]*><\/script>/g, '')),
+            'index.html must not redeclare a birdie total function');
+        assert.match(indexSrc, /<script src="settlement-engine\.js">/, 'index.html must load the canonical Birdie totals instead');
 
         // BATCH 3. Coverage is not weakened, it is inverted: stats.html must NOT
         // declare its own, and must load the canonical engine instead.
@@ -366,7 +372,7 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         assert.match(statsSrc, /<script src="settlement-engine\.js">/,
             'stats.html must load the canonical Birdie totals instead');
         [settle.calculateBirdieGameTotalsForSettle,
-         ix.calculateBirdieGameTotals,
+         ix.calculateBirdieGameTotalsForSettle,
          st.calculateBirdieGameTotalsForSettle].forEach((fn, i) =>
             assert.equal(typeof fn, 'function', 'copy ' + i + ' must be callable'));
     });

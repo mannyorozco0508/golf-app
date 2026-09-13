@@ -202,7 +202,9 @@ describe('skins.html - the Bets ledger is the engine\'s ledger', () => {
     test('the page defines no resolver and no allocation of its own, and loads the engine', () => {
         const src = read('skins.html');
         assert.ok(!/function (computeSkinsVoid|computeSkinsCarryOver|getSkinsHoleScores)\s*\(/.test(src));
-        assert.match(src, /computeSkinsPayoutLines\(currentData, courseData, savedScores\)/);
+        // Wave 2: the page reads the PER-FLIGHT ledger, never the flat view (which holds a hole twice under flights).
+        assert.match(src, /computeSkinsPayoutLinesByFlight\(currentData, courseData, savedScores\)/);
+        assert.ok(!/computeSkinsPayoutLines\(currentData/.test(src), 'the flat view is not read by this hole-keyed page');
         assert.match(src, /<script src="settlement-engine\.js"><\/script>/);
     });
 });

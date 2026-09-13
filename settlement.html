@@ -976,10 +976,14 @@ html {
             return html;
         }
 
+        // THE MAIN POOL IS FLIGHT-BLIND (Wave 2 scope): its bucket is priced over
+        // the pool's participants by pool-engine, so this ledger must not inherit
+        // the round's flights, or the top-level ledger would be null.
         const ledgerCfg = Object.assign({}, data, {
             participantIds: r.participants.map(p => String(p.id)),
             skinsPotFormat: scoring,
             skinsCarryOver: r.skins.carryOver,
+            flights: undefined,
         });
         const bundle = computeSkinsHoleLedger(ledgerCfg, courseData, savedScores);
         const L = scoring === 'gross' ? bundle.gross : bundle.net;
@@ -1185,9 +1189,40 @@ html {
         mount.innerHTML = html;
     }
 
+    // FLIGHT LABELS ON THE LEDGER (Wave 2, Step 7). A ledger line earned inside a
+    // flight says which one: "Skins (A)", "Birdie Pool (B)". Only lines from a
+    // wager the round actually scopes per flight get the suffix - the resolver's
+    // flightScopeApplies() is the one rule, so a field-wide birdie game on a
+    // flighted round stays "Birdie Pool", exactly as the engine paid it. The
+    // engine's label strings are not touched: the suffix is presentation, added
+    // here and nowhere else. Totals and Who Pays Who carry no badge.
+    //
+    // Which lines a scope covers, by the label the engine emits:
+    //   'skins'    every skins WAGER line - "Skins", "Skins (2)" (getRoundGames
+    //              hands the round's `flights` to each instance, so all of them
+    //              settle per flight together). The Main Pool's skins bucket is
+    //              flight-blind and its note reads "Net Skins · 2 skins" - a note
+    //              line, and not this label - so it is never suffixed.
+    //   'birdies'  the "Birdie Pool" line.
+    // A golfer the roster cannot name gets no suffix rather than a guessed one.
+    const FLIGHT_LABEL_SCOPES = [
+        { scope: 'skins', matches: label => /^Skins( \(\d+\))?$/.test(label) },
+        { scope: 'birdies', matches: label => label === 'Birdie Pool' }
+    ];
+    function flightLabelSuffix(data, golferName, line) {
+        if (!data || line.note || typeof flightScopeApplies !== 'function') return '';
+        const rule = FLIGHT_LABEL_SCOPES.find(r => r.matches(line.label));
+        if (!rule || !flightScopeApplies(data, rule.scope)) return '';
+        const p = (data.players || []).find(pl => pl && pl.name === golferName);
+        if (!p) return '';
+        return ' (' + playerFlight(p) + ')';
+    }
+
     // Presenter only. Reads canonical contributions and formats them; the only
     // arithmetic is summing the lines it was handed, to prove they add up.
-    function buildPlayerLedgerHtml(contributions, sortedTotals) {
+    // `data` is read for the flight suffix alone; without it every label prints
+    // exactly as the engine wrote it.
+    function buildPlayerLedgerHtml(contributions, sortedTotals, data) {
         if (!contributions) return '';
         const keys = Object.keys(contributions);
         if (keys.length === 0) return '';
@@ -1294,7 +1329,7 @@ html {
                     }
                     lastGroup = l.group || null;
                     total += l.amount;
-                    html += `<div class="pl-row"><span>${l.label}</span>${money(l.amount)}</div>`;
+                    html += `<div class="pl-row"><span>${l.label}${flightLabelSuffix(data, c.name, l)}</span>${money(l.amount)}</div>`;
                 });
             }
             // The total is the sum of the lines PRINTED ABOVE IT, so this section can
@@ -1327,22 +1362,31 @@ html {
     function buildLiveResultsHtml(data, courseData, savedScores) {
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
-        let L = null;
+        // PER FLIGHT (Wave 2). The ledger's `flights` - one entry when the round is
+        // not flighted - never its top level, which is null when it is. Each entry
+        // gets its own SKINS WON card; a hole can be a skin in A and a tie in B.
+        let ledgers = [];
         // ONE PREDICATE FOR THE WHOLE APP - roundHasSkinsGame() in action-model.js.
         if (roundHasSkinsGame(data) && typeof computeSkinsHoleLedger === 'function') {
             try {
                 const bundle = computeSkinsHoleLedger(data, courseData, savedScores,
                     { groupOf: id => liveGroupOf(data, id) });
-                const cand = bundle.net || bundle.gross;
-                if (cand && cand.participants.length > 0) L = cand;
-            } catch (e) { L = null; }
+                ledgers = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross })).filter(e => e.L);
+                if (ledgers.length === 1 && ledgers[0].L.participants.length === 0) ledgers = [];
+            } catch (e) { ledgers = []; }
         }
+        const L = ledgers.length ? ledgers[0].L : null;
+        const flighted = ledgers.length > 1;
+        // THE FIELD'S FLIGHTS for the standings: enabled is enough - standings are
+        // not a game, so no scope decides them. Absent -> one section, as always.
+        const fl = data.flights;
+        const standingsFlighted = !!(fl && fl.enabled === true) && typeof playerFlight === 'function';
 
         // THRU is the OFFICIAL point across every group, never whichever hole this
         // device happens to be looking at.
         let thru = 0;
-        if (L && L.officialThru > 0) {
-            thru = L.officialThru;
+        if (ledgers.length && ledgers.every(e => e.L.officialThru > 0)) {
+            thru = Math.min.apply(null, ledgers.map(e => e.L.officialThru));
         } else if (typeof computePlayerRoundTotals === 'function') {
             const played = (data.players || []).map(p => {
                 try { return computePlayerRoundTotals(p, courseData, savedScores).holesPlayed; }
@@ -1357,10 +1401,16 @@ html {
             + '</div>';
 
         if (typeof computeNetToParStandings === 'function') {
-            const rows = computeNetToParStandings(data.players || [], courseData, savedScores,
-                { basis: 'net' }).filter(r => r.started);
-            if (rows.length > 0) {
-                html += '<div class="settle-card"><div class="settle-header">OVERALL \u2014 NET</div>';
+            // PER FLIGHT: two lists, ranked within the flight, headed by it - the
+            // same sectioning the leaderboard uses. One list, as always, otherwise.
+            const groups = standingsFlighted
+                ? ['A', 'B'].map(f => ({ label: 'FLIGHT ' + f + ' \u2014 NET', players: (data.players || []).filter(p => playerFlight(p) === f) }))
+                : [{ label: 'OVERALL \u2014 NET', players: data.players || [] }];
+            groups.forEach(g => {
+                const rows = computeNetToParStandings(g.players, courseData, savedScores,
+                    { basis: 'net' }).filter(r => r.started);
+                if (rows.length === 0) return;
+                html += '<div class="settle-card"><div class="settle-header">' + g.label + '</div>';
                 rows.slice(0, 5).forEach(r => {
                     html += '<div class="lr-row"><span class="lr-pos">' + r.positionLabel + '</span>'
                          + '<span class="lr-name">' + esc(r.name) + '</span>'
@@ -1368,12 +1418,13 @@ html {
                 });
                 html += '<a class="lr-more" href="leaderboard.html?game=' + encodeURIComponent(currentMode)
                      + '">View Full Leaderboard \u203A</a></div>';
-            }
+            });
         }
 
-        if (L) {
+        ledgers.forEach(entry => {
+            const LL = entry.L;
             const byPlayer = {};
-            L.holes.forEach(r => {
+            LL.holes.forEach(r => {
                 if (!r.official || r.state === 'tie' || !r.winner) return;
                 const k = String(r.winner.id);
                 if (!byPlayer[k]) byPlayer[k] = { name: r.winner.name, holes: [] };
@@ -1382,8 +1433,10 @@ html {
             const winners = Object.values(byPlayer).sort((a, b) => b.holes.length - a.holes.length
                 || a.holes[0] - b.holes[0] || String(a.name).localeCompare(String(b.name)));
 
-            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON</div>';
-            if (winners.length === 0) {
+            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON' + (flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
+            if (flighted && LL.participants.length === 0) {
+                html += '<div class="lr-none">Nobody in this flight.</div>';
+            } else if (winners.length === 0) {
                 html += '<div class="lr-none">No official skins yet.</div>';
             } else {
                 winners.forEach(w => {
@@ -1395,9 +1448,9 @@ html {
                 });
             }
             html += '<div class="lr-foot">Tied holes are not shown'
-                 + (L.officialThru > 0 ? ' \u00B7 Official through Hole ' + L.officialThru : '')
+                 + (LL.officialThru > 0 ? ' \u00B7 Official through Hole ' + LL.officialThru : '')
                  + '</div></div>';
-        }
+        });
 
         if (typeof computeMoneyPool === 'function') {
             try {
@@ -1572,7 +1625,7 @@ html {
         //
         // Every participant appears, including anyone who finishes exactly even. A
         // golfer who cannot find their own name assumes the app lost them.
-        html += buildPlayerLedgerHtml(contributions, sorted);
+        html += buildPlayerLedgerHtml(contributions, sorted, data);
 
         // ---- WHO PAYS WHO, ONLY WHEN ANYBODY ACTUALLY PAYS ANYBODY ----------
         //

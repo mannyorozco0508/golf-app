@@ -117,7 +117,94 @@
         return !carries;
     }
 
+    // ========================================================================
+    // FLIGHTS (Wave 2, 2026-09-13). A round may split its field into A and B
+    // and scope skins and birdies to them. flightSlices(data, scopeName) in
+    // action-model.js is the ONE resolver; it composes on fieldParticipants and
+    // answers with one null slice (today) or exactly two (A then B).
+    //
+    // HOW A PER-FLIGHT GAME RUNS HERE: the same function, once per slice, on a
+    // config NARROWED to that slice - participantIds set to the slice's ids and
+    // flights removed, so the inner call sees one null slice and runs the
+    // arithmetic it has always run. The pot is therefore buyIn x the FLIGHT's
+    // size, the odd-dollar allocation is per flight in hole order (a hole may
+    // carry the extra dollar in A and not in B), and a tie in B on a hole A won
+    // outright is two different rows. The per-slice results are then MERGED.
+    // Slices are disjoint by construction; mergeSliceNets refuses to write a
+    // key twice rather than trust that.
+    //
+    // A round with no flights, flights off, or the scope set to 'field' takes
+    // the single null slice and produces exactly today's numbers -
+    // flights_absent_golden_test.js pins that byte for byte.
+    // ========================================================================
+    function skinsSlicesOf(data, scopeName) {
+        if (typeof flightSlices !== 'function') return [{ flight: null, players: null }];
+        return flightSlices(data, scopeName);
+    }
+    // The slice's players become the config's roster. NOT participantIds: an
+    // EMPTY participantIds means "everybody" to fieldParticipants (by design,
+    // participant_skins_test.js), so an empty flight narrowed that way would
+    // have become the whole field. slice.players already came through
+    // fieldParticipants, so playingForMoney and the wager's own participantIds
+    // are honoured; the copy clears them so nothing is applied twice.
+    function narrowToSlice(data, slice) {
+        return Object.assign({}, data, {
+            players: slice.players,
+            participantIds: undefined,
+            flights: undefined
+        });
+    }
+    function mergeSliceNets(parts) {
+        const out = {};
+        parts.forEach(part => {
+            Object.keys(part).forEach(id => {
+                if (Object.prototype.hasOwnProperty.call(out, id)) {
+                    throw new Error('flight slices overlap on player ' + id + ' - a golfer cannot be in two flights');
+                }
+                out[id] = part[id];
+            });
+        });
+        return out;
+    }
+
+    // THE PER-FLIGHT LEDGER. One entry per slice - ONE entry, flight null,
+    // when the round is not flighted, so a surface loops `flights` the same
+    // way in both cases and never special-cases the off round. Every line
+    // carries its flight; each flight has its own pot per half.
+    function computeSkinsPayoutLinesByFlight(data, courseData, savedScores) {
+        const slices = skinsSlicesOf(data, 'skins');
+        const flights = slices.map(sl => {
+            const cfg = slices.length > 1 ? narrowToSlice(data, sl) : data;
+            const r = computeSkinsPayoutLinesFor(cfg, courseData, savedScores);
+            const tag = (h) => Object.assign({}, h, { lines: h.lines.map(l => Object.assign({ flight: sl.flight }, l)) });
+            const golfers = sl.players ? sl.players.length
+                : ((typeof fieldParticipants === 'function') ? fieldParticipants(data) : (data.players || [])).length;
+            return { flight: sl.flight, golfers, rule: r.rule, gross: tag(r.gross), net: tag(r.net) };
+        });
+        return { rule: flights[0].rule, flights };
+    }
+
+    // THE FLAT LEDGER - today's shape, byte for byte (flights_absent_golden_
+    // test.js pins it). Off: the single slice's own result. Flighted: the
+    // flights' halves MERGED - pots summed, lines concatenated in hole order
+    // - so a per-golfer sum over the lines is still right. Two lines can then
+    // share a hole (a winner in A and a winner in B); anything that keys by
+    // hole must read computeSkinsPayoutLinesByFlight instead.
     function computeSkinsPayoutLines(data, courseData, savedScores) {
+        const slices = skinsSlicesOf(data, 'skins');
+        if (slices.length <= 1) return computeSkinsPayoutLinesFor(data, courseData, savedScores);
+        const by = computeSkinsPayoutLinesByFlight(data, courseData, savedScores);
+        const merge = (key) => ({
+            pot: by.flights.reduce((t, f) => t + f[key].pot, 0),
+            perGolfer: by.flights[0][key].perGolfer,
+            pendingUnits: by.flights.reduce((t, f) => t + f[key].pendingUnits, 0),
+            lines: [].concat.apply([], by.flights.map(f => f[key].lines.map(l => { const c = Object.assign({}, l); delete c.flight; return c; })))
+                .sort((a, b) => a.hole - b.hole)
+        });
+        return { rule: by.rule, gross: merge('gross'), net: merge('net') };
+    }
+
+    function computeSkinsPayoutLinesFor(data, courseData, savedScores) {
         const allPlayers = (typeof fieldParticipants === 'function')
             ? fieldParticipants(data)
             : (data.players || []).filter(p => p.playingForMoney !== false);
@@ -164,26 +251,50 @@
         };
     }
 
+    // AN ODD-DOLLAR POT PAYS FROM ITS LINES AND NOTHING ELSE. `players` is the
+    // pot's own field (the whole field, or one flight); a half with no skin won
+    // charges nobody - the same refund rule the legacy path applies through
+    // its inPlay multiplier - and since every stake is an integer, every net
+    // is too. The ONE place a per-golfer odd-dollar skins number is computed.
+    function payFromSkinsLines(players, gross, net) {
+        const payout = {};
+        players.forEach(p => { payout[p.id] = 0; });
+        gross.lines.forEach(l => { payout[l.playerId] += l.value; });
+        net.lines.forEach(l => { payout[l.playerId] += l.value; });
+        const grossStake = gross.lines.length > 0 ? gross.perGolfer : 0;
+        const netStake = net.lines.length > 0 ? net.perGolfer : 0;
+        const out = {};
+        players.forEach(p => { out[p.id] = payout[p.id] - grossStake - netStake; });
+        return out;
+    }
+
     function computeSkinsSettlementNet(data, courseData, savedScores) {
-        // THE ODD-DOLLAR ROUND pays from the per-skin ledger and nothing else.
-        // A half with no skin won charges nobody - the same refund rule the
-        // legacy path below applies through its inPlay multiplier - and since
-        // every stake is an integer, every net is too. Legacy rounds never
-        // enter this block; everything after it is byte-for-byte what it was.
+        const slices = skinsSlicesOf(data, 'skins');
+        // A FLIGHTED ODD-DOLLAR ROUND pays each flight FROM THE PER-FLIGHT
+        // LEDGER - computeSkinsPayoutLinesByFlight's own slice lines minus that
+        // slice's stake - so the numbers the Bets ledger draws and the numbers
+        // the Receipt pays are one computation, not two that happen to agree.
+        // (Step 4.0 found them agreeing by sharing a worker; a control that
+        // re-allocated the ledger moved the ledger and not the nets.)
+        if (slices.length > 1 && skinsOddDollarApplies(data)) {
+            const by = computeSkinsPayoutLinesByFlight(data, courseData, savedScores);
+            return mergeSliceNets(slices.map((sl, i) => payFromSkinsLines(sl.players, by.flights[i].gross, by.flights[i].net)));
+        }
+        // A FLIGHTED LEGACY (carry / unflagged) ROUND: the same function once per
+        // slice on a narrowed config, merged. The legacy arithmetic never had
+        // lines to pay from; it is the code that has always run, per flight.
+        if (slices.length > 1) {
+            return mergeSliceNets(slices.map(sl => computeSkinsSettlementNet(narrowToSlice(data, sl), courseData, savedScores)));
+        }
+        // THE ODD-DOLLAR ROUND (one slice) pays from the per-skin ledger and
+        // nothing else. Legacy rounds never enter this block; everything after
+        // it is byte-for-byte what it was.
         if (skinsOddDollarApplies(data)) {
             const L = computeSkinsPayoutLines(data, courseData, savedScores);
             const allPlayers = (typeof fieldParticipants === 'function')
                 ? fieldParticipants(data)
                 : (data.players || []).filter(p => p.playingForMoney !== false);
-            const payout = {};
-            allPlayers.forEach(p => { payout[p.id] = 0; });
-            L.gross.lines.forEach(l => { payout[l.playerId] += l.value; });
-            L.net.lines.forEach(l => { payout[l.playerId] += l.value; });
-            const grossStake = L.gross.lines.length > 0 ? L.gross.perGolfer : 0;
-            const netStake = L.net.lines.length > 0 ? L.net.perGolfer : 0;
-            const out = {};
-            allPlayers.forEach(p => { out[p.id] = payout[p.id] - grossStake - netStake; });
-            return out;
+            return payFromSkinsLines(allPlayers, L.gross, L.net);
         }
         // The wager's own field. For a round-wide skins game this is everyone playing
         // for money, exactly as before; for a participant-scoped game it is only the
@@ -343,6 +454,15 @@
 
     function calculateBirdieGameTotalsForSettle(data, courseData, savedScores) {
         if (data.birdieGameEnabled !== true) return {};
+        // PER FLIGHT: a birdie in A is paid by A only - n is the FLIGHT's size,
+        // so the every-other-golfer formula runs inside the flight. Off (one
+        // null slice) the roster filter below is the one this function has
+        // always used, untouched.
+        const slices = skinsSlicesOf(data, 'birdies');
+        if (slices.length > 1) {
+            return mergeSliceNets(slices.map(sl => calculateBirdieGameTotalsForSettle(
+                Object.assign({}, data, { players: sl.players, flights: undefined }), courseData, savedScores)));
+        }
         const players = (data.players || []).filter(p => p.playingForMoney !== false);
         const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 0;
         const scoringType = data.birdieScoringType || 'gross';
@@ -1514,6 +1634,19 @@
     // and carry rule through exactly the same calls computeSkinsSettlementNet
     // makes, so the two can never disagree about who is in or how ties behave.
     function computeSkinsHoleLedger(data, courseData, savedScores, opts) {
+        // PER FLIGHT: a hole can show a winner in A and a tie in B, so the two
+        // ledgers cannot be merged into one row list. `flights` ALWAYS holds the
+        // per-slice ledgers (one entry, flight null, when off) so a surface loops
+        // it uniformly; the top-level gross/net are the off round's own ledger
+        // as always, and null when the round is flighted.
+        const slices = skinsSlicesOf(data, 'skins');
+        if (slices.length > 1) {
+            const per = slices.map(sl => Object.assign({ flight: sl.flight },
+                computeSkinsHoleLedger(narrowToSlice(data, sl), courseData, savedScores, opts)));
+            return { mode: per[0].mode, carryOver: per[0].carryOver,
+                     participants: [].concat.apply([], per.map(h => h.participants)),
+                     gross: null, net: null, flights: per.map(h => { const c = Object.assign({}, h); delete c.flights; return c; }) };
+        }
         const participants = (typeof fieldParticipants === 'function')
             ? fieldParticipants(data)
             : (data.players || []).filter(p => p.playingForMoney !== false);
@@ -1525,7 +1658,7 @@
         const carryOver = (typeof skinsCarriesOver === 'function')
             ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
 
-        return {
+        const one = {
             mode,
             carryOver,
             participants,
@@ -1534,6 +1667,8 @@
             net: (mode === 'split' || mode === 'net')
                 ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
         };
+        one.flights = [Object.assign({ flight: null }, one)];
+        return one;
     }
 
     // ========================================================================

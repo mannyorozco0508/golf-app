@@ -489,7 +489,28 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // the float, captured at 034a4d0 before this change; skins_odd_dollar_
         // test.js holds the rule itself, the gate, the pool-bucket parity and the
         // stacked-instance inheritance.
-        'settlement-engine.js': '783a1039d83f0a1b7217d7a2e806fd6ffad42f5754b7d26c3093cf384268b5c5',
+        // Previous hash, for the record:
+        //   783a1039d83f0a1b7217d7a2e806fd6ffad42f5754b7d26c3093cf384268b5c5
+        // RE-PINNED 2026-09-13, with Manny's explicit per-file approval for the
+        // flights wave (Wave 2, Step 3): skins and birdies run PER FLIGHT. Four
+        // seams added (skinsSlicesOf, narrowToSlice, mergeSliceNets,
+        // computeSkinsPayoutLinesByFlight) and a per-slice branch at the top of
+        // computeSkinsSettlementNet, calculateBirdieGameTotalsForSettle,
+        // computeSkinsPayoutLines and computeSkinsHoleLedger. A round with no
+        // flights takes the single null slice into the code that has always run
+        // - flights_absent_golden_test.js pins that byte for byte, and
+        // flights_engine_test.js proves one flight holding the whole field is
+        // the whole field. This hash only proves nothing else moved.
+        // Previous hash, for the record:
+        //   19e7e6f433c43ac3e4d5e64dc4ce1c040eef5f99ef73deec2af548e16937f60a
+        // RE-PINNED 2026-09-13 (Wave 2, Step 4.0b), same per-file approval:
+        // the flighted odd-dollar branch of computeSkinsSettlementNet now pays
+        // FROM computeSkinsPayoutLinesByFlight's slice lines through one helper
+        // (payFromSkinsLines), so the per-flight ledger and the nets are one
+        // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
+        // FLIGHT" holds it; a control that re-allocates the ledger now moves the
+        // nets too.
+        'settlement-engine.js': 'adc3cd9f9ae5745ac4486e2ea9526b2c3a030ef8a4297e9ec26c4fb2f851b4b4',
         'pool-engine.js': 'c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
@@ -514,7 +535,17 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // is pinned; this hash only proves the file did not move otherwise.
         // Previous hash, for the record:
         //   c652eca54e017a9db4518c1d65d31a35fbbfc67b0d8e0570b89103dd81c58dd5
-        'action-model.js': '09d920e8b504ac2776c3b9f7952695739b6470fec77cf963e28fb683817f001b',
+        // Previous hash, for the record:
+        //   09d920e8b504ac2776c3b9f7952695739b6470fec77cf963e28fb683817f001b
+        // RE-PINNED 2026-09-13, with Manny's explicit per-file approval for the
+        // flights wave (Wave 2, Step 2): THREE FUNCTIONS ADDED beside
+        // fieldParticipants - flightScopeApplies, playerFlight, flightSlices -
+        // plus their export, plus a comment. fieldParticipants is byte-identical
+        // (flight_slices_test.js pins its text) and NOTHING CALLS flightSlices
+        // yet (the same file pins zero production callers), so every existing
+        // caller runs exactly what it ran. flights_absent_golden_test.js is
+        // what guards the behaviour; this hash only proves nothing else moved.
+        'action-model.js': 'ded862809c049a156008d12e783cc3fdf4ec39a5a40babe13740e79f0ce275f2',
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the
@@ -558,8 +589,20 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // not final until the last skin; :218 and every carry path untouched.
         // skins_live_surfaces_test.js pins both, including the deliberate
         // mid-round divergence between the strip's awards and the engine's lines.
-        'bet-strip.js': '59cb038116ee43b05a2a975a0dce57916bb18dfa48a305add18eedbfea5cc336',
-        'hole-events.js': 'bb759cb19c7eb66365fd6b746568de8e016813bbfce4fd34725794b9775d2def',
+        // Previous hash, for the record:
+        //   59cb038116ee43b05a2a975a0dce57916bb18dfa48a305add18eedbfea5cc336
+        // RE-PINNED 2026-09-13 (flights wave, Wave 2 Step 5), per-file approval:
+        // skinsState runs its own walk once per flight slice and merges (awards carry their flight, `flights` holds each flight's state); skinsStatus prefixes each flight's clause. One null slice is the walk that always ran.
+        // flights_live_surfaces_test.js pins the behaviour; the flightless golden
+        // (flights_absent_golden_test.js) pins that nothing else moved.
+        'bet-strip.js': '43880a617d7230f15553ffdf778dc15c1b67423b3d2d5ff04a943469694b145a',
+        // Previous hash, for the record:
+        //   bb759cb19c7eb66365fd6b746568de8e016813bbfce4fd34725794b9775d2def
+        // RE-PINNED 2026-09-13 (flights wave, Wave 2 Step 5), per-file approval:
+        // skinsEvents emits one SKIN_WON card per award on the hole (a hole can carry one per flight), each named by its flight; the odd-dollar no-dollar rule is unchanged.
+        // flights_live_surfaces_test.js pins the behaviour; the flightless golden
+        // (flights_absent_golden_test.js) pins that nothing else moved.
+        'hole-events.js': '6fd7f7edf41e848bebd89a95fe2f82442aa5d6831d16a8c86ad04a3182f6d244',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',
         // RE-PINNED for the trips delete rule, with explicit per-file approval.
         // trips/$tripCode went from ".write": true to

@@ -1017,6 +1017,7 @@ html {
             </div>
             <input type="hidden" id="skins-carryover" value="false">
             <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;" id="skins-carry-explanation">A tied skin's value moves to the next hole — whoever wins that hole wins both.</p>
+            <p id="skins-flight-note" style="display:none; font-size:0.72rem; color:var(--brand-green); margin:8px 0 0 0;"></p>
         </div>
     </div>
         <div class="wizard-nav-row">
@@ -1032,6 +1033,49 @@ html {
         ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Main Pool.
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
+    <!-- FLIGHTS (A/B). Optional; OFF by default. A property of the roster, so it
+         lives here beside the rows it tags, not on a game's card. The two scope
+         switches decide which games run per flight; the games' own cards only
+         REPORT that (a read-only line), so there is one control per decision.
+         The live count reads the rows through the same capture the save uses -
+         captureCurrentPlayerInputs() - never a counter kept beside them. -->
+    <div id="flights-block" style="border:1px solid var(--border-mid); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+        <div class="toggle-row" style="margin:0;">
+            <span class="toggle-label-sm active" id="flights-label-off" onclick="setFlightsEnabled(false)">One field</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="flights-switch" onchange="setFlightsEnabled(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label-sm" id="flights-label-on" onclick="setFlightsEnabled(true)">Flights (A/B)</span>
+        </div>
+        <input type="hidden" id="flights-enabled" value="false">
+        <div id="flights-detail" style="display:none; margin-top:8px;">
+            <div id="flights-count" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;"></div>
+            <div id="flights-scopes">
+                <div class="toggle-row" style="margin:0 0 6px 0;">
+                    <span style="font-size:0.75rem; min-width:52px;">Skins</span>
+                    <span class="toggle-label-sm active" id="flights-skins-label-flight" onclick="setFlightScope('skins','flight')">Per flight</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="flights-skins-switch" onchange="setFlightScope('skins', this.checked ? 'field' : 'flight')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="flights-skins-label-field" onclick="setFlightScope('skins','field')">Whole field</span>
+                </div>
+                <div class="toggle-row" style="margin:0;">
+                    <span style="font-size:0.75rem; min-width:52px;">Birdies</span>
+                    <span class="toggle-label-sm active" id="flights-birdies-label-flight" onclick="setFlightScope('birdies','flight')">Per flight</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="flights-birdies-switch" onchange="setFlightScope('birdies', this.checked ? 'field' : 'flight')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="flights-birdies-label-field" onclick="setFlightScope('birdies','field')">Whole field</span>
+                </div>
+                <input type="hidden" id="flights-scope-skins" value="flight">
+                <input type="hidden" id="flights-scope-birdies" value="flight">
+            </div>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer's A/B to move them. Any split is allowed. Side matches and the Main Pool never use flights.</p>
+        </div>
+    </div>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
     <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
@@ -1155,7 +1199,8 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
             </label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores. Every other player pays the achiever per birdie (eagle counts double).</p>
+            <p id="birdie-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores. Every other player pays the achiever per birdie (eagle counts double).</p>
+            <p id="birdie-flight-note" style="display:none; font-size:0.72rem; color:var(--brand-green); margin:-4px 0 8px 26px;"></p>
             <div style="margin: 0 0 12px 26px; max-width: 200px;">
                 <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
                 <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
@@ -1245,7 +1290,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
                 <div class="mp-section">
                     <div class="mp-section-title">🥣 Skins</div>
-                    <select id="mp-skins-mode" onchange="mpRecalc()">
+                    <select id="mp-skins-mode" onchange="mpRecalc(); refreshFlightScopeNotes();">
                         <option value="remainder" selected>Everything left over</option>
                         <option value="fixed">Fixed amount</option>
                         <option value="none">No skins pot</option>
@@ -1256,6 +1301,12 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                         <select id="mp-skins-carry"><option value="yes">Carry Over</option><option value="no" selected>No Carry</option></select>
                     </div>
                     <div class="mp-hint" id="mp-skins-line"></div>
+                    <!-- FLIGHTS: the pool's skins bucket is ONE field-wide pot (pool-engine
+                         settles it over the pool's participants and knows nothing of
+                         flights). Said here, beside the controls that create it, when the
+                         round has flights and this bucket is on - written by
+                         refreshFlightScopeNotes, like the skins cards' notes. -->
+                    <p id="mp-skins-flight-note" style="display:none; font-size:0.72rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:8px 10px; margin:8px 0 0 0; line-height:1.45;"></p>
                 </div>
 
                 <div id="mp-math"></div>
@@ -1674,7 +1725,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             actionLines.push(`$${data.stablefordPointVal} per point Stableford`);
         } else if (format === 'skins') {
             const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
-            actionLines.push(`$${buyIn} Skins — ${data.skinsCarryOver !== false ? 'Carry Over' : 'No Carry'}`);
+            actionLines.push(`$${buyIn} Skins — ${skinsCarriesOver(data.skinsCarryOver) ? 'Carry Over' : 'No Carry'}`);
         }
 
         // Stacked games come from getRoundGames() rather than being re-derived here, so this
@@ -2377,9 +2428,23 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
     // The stake is a BUY-IN PER GOLFER, not a price per skin - that is what
     // computeSkinsSettlementNet does with the number (pot = buyIn x players), so the
     // label says so. Getting this backwards would misstate real money between friends.
+    // The read-only line a skins card shows when the round scopes skins per
+    // flight. `twice` names the instance case: narrowed within the named
+    // participants FIRST, then by flight.
+    function flightScopeLineHtml(twice) {
+        if (!(typeof flightsEnabledNow === 'function' && flightsEnabledNow() && flightScopeNow('skins') === 'flight')) return '';
+        const text = twice
+            ? 'Per flight \u2014 set in Players. Narrowed twice: within the golfers named here, then by flight \u2014 two pots, A pays A, B pays B.'
+            : 'Per flight \u2014 set in Players. Two pots: A pays A, B pays B.';
+        return `<p class="flight-scope-line" style="font-size:0.72rem; color:var(--brand-green); margin:8px 0 0 0;">${text}</p>`;
+    }
+
     function renderSkinsExtras() {
         const st = stackedGameState.skins || {};
-        const carry = st.carryOver !== false;
+        // skinsCarriesOver() decides what an untouched or absent flag means - NO
+        // CARRY, the same answer the engine pays. `!== false` here painted Carry
+        // Over on a state nobody had set, and the save below wrote it.
+        const carry = skinsCarriesOver(st.carryOver);
         const players = collectWizardPlayers();
         const chosen = skinsChosenIds();
 
@@ -2419,7 +2484,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 <p style="font-size:0.7rem; color:var(--text-muted); margin:0 0 6px 0;">
                     Everyone's in by default \u2014 tap to take someone out. ${potLine}</p>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">${chips || '<span style="font-size:0.75rem; color:var(--text-muted);">Add players in Step 5 first.</span>'}</div>
-            </div>`;
+            </div>${flightScopeLineHtml(true)}`;
     }
 
     // Players currently entered in the wizard, in the same shape the round will save.
@@ -2545,9 +2610,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
             const carryBtn = (val, label) => `<button type="button" onclick="setInstanceField('${inst.id}','skinsCarryOver',${val})"
                 style="flex:1; min-height:44px; border-radius:8px; font-size:0.78rem; cursor:pointer;
-                       border:1px solid ${(inst.skinsCarryOver !== false) === val ? 'var(--brand-green)' : 'var(--border-mid)'};
-                       background:${(inst.skinsCarryOver !== false) === val ? 'var(--brand-green)' : 'transparent'};
-                       color:${(inst.skinsCarryOver !== false) === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
+                       border:1px solid ${skinsCarriesOver(inst.skinsCarryOver) === val ? 'var(--brand-green)' : 'var(--border-mid)'};
+                       background:${skinsCarriesOver(inst.skinsCarryOver) === val ? 'var(--brand-green)' : 'transparent'};
+                       color:${skinsCarriesOver(inst.skinsCarryOver) === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
 
             return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -2579,7 +2644,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 <label style="font-size:0.74rem;">Who's in?</label>
                 <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
                     ${chips || '<span style="font-size:0.75rem; color:var(--text-muted);">Add players in Step 5 first.</span>'}
-                </div>
+                </div>${flightScopeLineHtml(true)}
             </div>`;
         }).join('');
 
@@ -2614,7 +2679,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 skinsBuyIn: parseFloat(inst.skinsBuyIn) || 0,
                 skinsPotFormat: inst.skinsPotFormat || 'gross',
                 skinsScoring: inst.skinsPotFormat === 'net' ? 'net' : 'gross',
-                skinsCarryOver: inst.skinsCarryOver !== false,
+                skinsCarryOver: skinsCarriesOver(inst.skinsCarryOver),
                 startHole: inst.startHole || 1
             };
             if (chosen.length < players.length) entry.participantIds = chosen;
@@ -2633,7 +2698,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 id: id,
                 skinsBuyIn: cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 10,
                 skinsPotFormat: cfg.skinsPotFormat || 'gross',
-                skinsCarryOver: cfg.skinsCarryOver !== false,
+                skinsCarryOver: skinsCarriesOver(cfg.skinsCarryOver),
                 startHole: cfg.startHole || 1,
                 participantIds: Array.isArray(cfg.participantIds)
                     ? cfg.participantIds.map(String)
@@ -3111,7 +3176,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             entry[spec.stakeField] = isNaN(amount) ? 0 : amount;
 
             if (format === 'skins') {
-                entry.skinsCarryOver = st.carryOver !== false;
+                // The catalog default (SKINS_CARRY_DEFAULT, false) is in `entry`
+                // already; `!== false` overwrote it with TRUE on an untouched state.
+                entry.skinsCarryOver = skinsCarriesOver(st.carryOver);
                 // participantIds is written ONLY when the organizer actually narrowed the
                 // field. A whole-group game saves nothing, so it stays byte-identical to
                 // every skins game saved before this feature existed.
@@ -3139,7 +3206,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 amount: saved[format][spec.stakeField]
             };
             if (format === 'skins') {
-                stackedGameState.skins.carryOver = saved.skins.skinsCarryOver !== false;
+                // A legacy game with no flag was PAID no-carry; reopening it as
+                // Carry Over and re-saving would have restated that money.
+                stackedGameState.skins.carryOver = skinsCarriesOver(saved.skins.skinsCarryOver);
                 if (Array.isArray(saved.skins.participantIds)) {
                     stackedGameState.skins.participantIds = saved.skins.participantIds.map(String);
                 }
@@ -4485,6 +4554,143 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         return minted;
     }
 
+    // ---- FLIGHTS (A/B) ---------------------------------------------------------
+    // The hidden inputs ARE the state (the same idiom as #skins-carryover), so a
+    // rebuild of the roster cannot forget them. Everything that writes the round
+    // reads them through flightsSetting(); everything that shows them reads the
+    // rows through captureCurrentPlayerInputs().
+    function flightsEnabledNow() {
+        const el = document.getElementById('flights-enabled');
+        return !!el && el.value === 'true';
+    }
+    function flightScopeNow(name) {
+        const el = document.getElementById('flights-scope-' + name);
+        return (el && el.value === 'field') ? 'field' : 'flight';
+    }
+    // What the payload writes: null when off (update() deletes the key, the
+    // moneyPool pattern), the object when on.
+    function flightsSetting() {
+        if (!flightsEnabledNow()) return null;
+        return { enabled: true, scopes: { skins: flightScopeNow('skins'), birdies: flightScopeNow('birdies') } };
+    }
+    function setFlightsEnabled(on) {
+        const el = document.getElementById('flights-enabled');
+        if (!el) return;
+        el.value = on ? 'true' : 'false';
+        const sw = document.getElementById('flights-switch');
+        if (sw) sw.checked = !!on;
+        const lOn = document.getElementById('flights-label-on'), lOff = document.getElementById('flights-label-off');
+        if (lOn) lOn.classList.toggle('active', !!on);
+        if (lOff) lOff.classList.toggle('active', !on);
+        const detail = document.getElementById('flights-detail');
+        if (detail) detail.style.display = on ? 'block' : 'none';
+        // The column (or the second line) comes and goes on every existing row
+        // the way format changes already rebuild the roster.
+        if (typeof renderPlayerList === 'function' && document.getElementById('player-list')) renderPlayerList();
+        refreshFlightScopeNotes();
+    }
+    function setFlightScope(name, value) {
+        const el = document.getElementById('flights-scope-' + name);
+        if (!el) return;
+        el.value = value === 'field' ? 'field' : 'flight';
+        const sw = document.getElementById('flights-' + name + '-switch');
+        if (sw) sw.checked = el.value === 'field';
+        const a = document.getElementById('flights-' + name + '-label-flight'), b = document.getElementById('flights-' + name + '-label-field');
+        if (a) a.classList.toggle('active', el.value === 'flight');
+        if (b) b.classList.toggle('active', el.value === 'field');
+        refreshFlightScopeNotes();
+    }
+    // THE LIVE COUNT reads the rows the way the save does. A counter kept
+    // beside the rows could disagree with the payload on a 32-man field where
+    // somebody mis-tapped; this cannot, because it is the same read.
+    function refreshFlightsCount() {
+        const el = document.getElementById('flights-count');
+        if (!el) return;
+        if (!flightsEnabledNow()) { el.textContent = ''; return; }
+        const list = captureCurrentPlayerInputs();
+        const a = list.filter(p => p.flight !== 'B').length;
+        const b = list.length - a;
+        el.textContent = 'A: ' + a + ' \u00B7 B: ' + b;
+        // A Cup has no Games step: nothing in that round reads the scopes, so
+        // the switches are noise there. Hidden, not removed - the hidden inputs
+        // still hold a value and the payload still writes it.
+        const scopes = document.getElementById('flights-scopes');
+        if (scopes && typeof wizardWorkflow === 'function') scopes.style.display = wizardWorkflow().indexOf('action') === -1 ? 'none' : '';
+    }
+    function toggleRowFlight(btn) {
+        const next = btn.getAttribute('data-flight') === 'B' ? 'A' : 'B';
+        btn.setAttribute('data-flight', next);
+        btn.textContent = next;
+        refreshFlightsCount();
+    }
+    // The control, one element for both placements: a sixth column on a plain
+    // row (explicit grid column 3, so the auto-placed delete button moves to
+    // 4); a second line spanning the row where team/squad columns already sit
+    // (a sixth column on a ryder row leaves 89px for a name on a phone - the
+    // Step 4 addendum). Built as a DOM ELEMENT and appended, not written into
+    // the row's innerHTML: the tag is read back by captureCurrentPlayerInputs
+    // on every rebuild, and an element is what a query can find.
+    function appendFlightControl(row, flight, asLine) {
+        const f = flight === 'B' ? 'B' : 'A';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'p-flight-input';
+        btn.setAttribute('data-flight', f);
+        btn.setAttribute('title', 'Flight - tap to switch');
+        btn.textContent = f;
+        btn.onclick = function () { toggleRowFlight(btn); };
+        btn.style.cssText = 'min-height:36px; min-width:36px; border-radius:8px; border:1px solid var(--brand-green); background:transparent; color:var(--brand-green); font-weight:bold; cursor:pointer;';
+        if (!asLine) {
+            // BOTH axes, explicitly. Chrome places an item with a definite row AND
+            // column first; with only the column set, the earlier, fully-auto
+            // delete button took column 3 of row 1 and this control landed on a
+            // second grid row under it - measured at 390px by
+            // tools/flights-leaderboard-check.js (row 82px tall against a 40px
+            // flightless row). Row 1 pins it beside the name; the delete button
+            // then auto-places to column 4.
+            btn.style.gridColumn = '3';
+            btn.style.gridRow = '1';
+            row.appendChild(btn);
+            return;
+        }
+        const line = document.createElement('div');
+        line.className = 'p-flight-line';
+        line.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-muted); margin-top:4px;';
+        line.style.gridColumn = '1 / -1';
+        const label = document.createElement('span');
+        label.textContent = 'Flight';
+        line.appendChild(label);
+        line.appendChild(btn);
+        row.appendChild(line);
+    }
+    // COPY THAT IS BEHAVIOUR. The games' own cards say when a scope is per
+    // flight, and the birdie blurb stops claiming "every other player" when it
+    // is every other player IN THE FLIGHT.
+    function refreshFlightScopeNotes() {
+        const on = flightsEnabledNow();
+        const note = (id, text) => { const el = document.getElementById(id); if (!el) return; el.style.display = (on && text) ? 'block' : 'none'; if (text) el.textContent = text; };
+        const skinsPer = on && flightScopeNow('skins') === 'flight';
+        const birdiesPer = on && flightScopeNow('birdies') === 'flight';
+        note('skins-flight-note', skinsPer ? 'Per flight \u2014 set in Players. Two pots: A pays A, B pays B.' : '');
+        note('birdie-flight-note', birdiesPer ? 'Per flight \u2014 set in Players. A birdie in A is paid by A only.' : '');
+        // THE MAIN POOL'S SKINS BUCKET IS ONE POT, whatever the skins scope says:
+        // pool-engine settles it over the pool's participants and never reads
+        // flights. Shown whenever flights are on and the bucket exists, so an
+        // organizer expecting A and B pots finds out here, not on the Receipt.
+        const mpMode = document.getElementById('mp-skins-mode');
+        const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
+        note('mp-skins-flight-note', (on && poolSkinsOn)
+            ? 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.'
+            : '');
+        const blurb = document.getElementById('birdie-blurb');
+        if (blurb) blurb.textContent = birdiesPer
+            ? 'Automatic \u2014 birdies/eagles are read from scores. Every other player in the same flight pays the achiever per birdie (eagle counts double).'
+            : 'Automatic \u2014 birdies/eagles are read from scores. Every other player pays the achiever per birdie (eagle counts double).';
+        // the stacked-skins extras and each instance card are rendered from
+        // state and read the scope when drawn
+        if (typeof renderStackedGames === 'function' && document.getElementById('stacked-games-list')) renderStackedGames();
+    }
+
     function captureCurrentPlayerInputs() {
         const rows = document.querySelectorAll('.player-row');
         const list = [];
@@ -4498,7 +4704,13 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             const squadVal = row.querySelector('.p-squad-input') ? row.querySelector('.p-squad-input').value : (idx % 2 === 0 ? "red" : "blue");
             const moneyInput = row.querySelector('.p-money-input');
             const moneyVal = moneyInput ? moneyInput.checked : true;
-            list.push({ id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+            const flightBtn = row.querySelector('.p-flight-input');
+            const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+            // The tag rides along whenever the row carries it, so a rebuild (format
+            // switch, delete, paste) hands it back to addPlayerRow. Absent control
+            // (flights off) -> no key, the same as a round that never had flights.
+            if (flightBtn) entry.flight = flightBtn.getAttribute('data-flight') === 'B' ? 'B' : 'A';
+            list.push(entry);
         });
         return list;
     }
@@ -4535,8 +4747,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
             headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
-            headerRow.style.gridTemplateColumns = "2fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${moneyHeaderHtml}<span></span>`;
+            const flt = flightsEnabledNow();
+            headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
+            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
         }
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
@@ -4581,7 +4794,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id);
+            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight);
         });
         updateCount();
     }
@@ -4594,7 +4807,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         existingData.push({ name: '', hcp: '', team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
         updateCount();
     }
 
@@ -4676,7 +4889,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
         updateCount();
 
         document.getElementById('paste-players-textarea').value = '';
@@ -4691,7 +4904,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id));
+        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
         updateCount();
     }
 
@@ -5290,7 +5503,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 });
             }
             if (document.getElementById("skins-carryover")) {
-                setSkinsCarrySetting(data.skinsCarryOver !== false);
+                setSkinsCarrySetting(skinsCarriesOver(data.skinsCarryOver));
             }
             if (document.getElementById("skins-pot-format")) {
                 // Absent has always meant 'split' downstream; show the round the way
@@ -5317,6 +5530,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 if (sp.eagle !== undefined && document.getElementById("stableford-pts-eagle")) document.getElementById("stableford-pts-eagle").value = sp.eagle;
                 if (sp.albatross !== undefined && document.getElementById("stableford-pts-albatross")) document.getElementById("stableford-pts-albatross").value = sp.albatross;
             }
+
+            // FLIGHTS restore, BEFORE the roster rebuild below - the column renders
+            // only if the switch is already known.
+            const fl = data.flights;
+            const flOn = !!(fl && fl.enabled === true);
+            setFlightScope('skins', flOn && fl.scopes && fl.scopes.skins === 'field' ? 'field' : 'flight');
+            setFlightScope('birdies', flOn && fl.scopes && fl.scopes.birdies === 'field' ? 'field' : 'flight');
+            setFlightsEnabled(flOn);
 
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
@@ -5421,7 +5642,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -5512,7 +5733,14 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         } else {
             row.setAttribute("data-player-id", String(nextPlayerId()));
         }
-        row.style.gridTemplateColumns = baseColumns + (showMoneyCheckbox ? " 46px" : "") + " 38px";
+        // FLIGHTS: a sixth column on a plain row; a second line spanning the row
+        // where team/squad columns already sit (a sixth column there leaves 89px
+        // for a name on a phone - the Step 4 addendum). Rendered only when the
+        // round's flights are on, so an off round's row is byte-identical.
+        const flightsOn = flightsEnabledNow();
+        const flightAsLine = !!(teamFieldHtml || squadFieldHtml);
+        const flightColumn = (flightsOn && !flightAsLine) ? " 0.7fr" : "";
+        row.style.gridTemplateColumns = baseColumns + flightColumn + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
             <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
@@ -5521,6 +5749,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             ${moneyCheckboxHtml}
             <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
+        if (flightsOn) appendFlightControl(row, flight, flightAsLine);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -5529,6 +5758,7 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
+        refreshFlightsCount();
     }
 
     // --- CUSTOM GROUP SIZING ---
@@ -5911,7 +6141,15 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                     }
                 }
 
-                playersList.push({ id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal });
+                const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+                // FLIGHTS ON: every golfer is written with a flight, 'A' when the
+                // control says so or is somehow missing - the record says what the
+                // engine will do. Off: no key, byte-identical to before.
+                if (flightsEnabledNow()) {
+                    const fb = row.querySelector('.p-flight-input');
+                    entry.flight = (fb && fb.getAttribute('data-flight') === 'B') ? 'B' : 'A';
+                }
+                playersList.push(entry);
             });
 
             try {
@@ -5984,6 +6222,9 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // The whole-round pot. null when the box is unticked, so legacy
                 // rounds and pool-less Mondays are byte-identical to before.
                 moneyPool: captureMoneyPool(),
+                // FLIGHTS (A/B). null when off, so update() deletes the key and an
+                // off round is byte-identical to one that never had flights.
+                flights: flightsSetting(),
                 additionalGameInstances: captureSkinsInstances(),
                 birdieGameEnabled: birdieGameEnabled,
                 birdieUnitVal: birdieUnitVal,

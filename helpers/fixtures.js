@@ -19,12 +19,20 @@ function makeCourseData(numHoles = 18) {
 // real test during development (see side-matches.test.js's git history / test comments).
 // The safe pattern is almost always ONE makePlayers() call with everyone in it, then
 // assign teams/squads afterward if needed.
-function makePlayers(names, hcps, startId = 101) {
-    return names.map((name, i) => ({
-        id: startId + i, name, hcp: String(hcps ? (hcps[i] || 0) : 0),
-        team: i % 2 === 0 ? 'Team 1' : 'Team 2', squad: i % 2 === 0 ? 'red' : 'blue',
-        playingForMoney: true
-    }));
+// `flights` is OPTIONAL (Wave 2, flights): an array of 'A' | 'B' by roster
+// position. When it is omitted the player has EXACTLY the six keys it always
+// had - skins_golden_test.js asserts that shape and must keep passing - and a
+// `flight` key is added only for the positions the array names.
+function makePlayers(names, hcps, startId = 101, flights) {
+    return names.map((name, i) => {
+        const p = {
+            id: startId + i, name, hcp: String(hcps ? (hcps[i] || 0) : 0),
+            team: i % 2 === 0 ? 'Team 1' : 'Team 2', squad: i % 2 === 0 ? 'red' : 'blue',
+            playingForMoney: true
+        };
+        if (Array.isArray(flights) && flights[i] !== undefined) p.flight = flights[i];
+        return p;
+    });
 }
 
 // Distributes `total` gross strokes across `holes` holes (default 18), front-loading

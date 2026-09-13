@@ -60,8 +60,13 @@ describe('BACKWARD COMPATIBILITY — Round Ready on data from before this batch 
         // Simulates a round saved before the Skins setup fields existed in the wizard at all.
         const oldData = { eventName: 'Old Round', courseName: 'Old Course', players: [{ name: 'A', hcp: '0' }], gameFormat: 'skins' };
         assert.doesNotThrow(() => sandbox.renderRoundReady(oldData));
-        assert.ok(sandbox.document.getElementById('rr-action-text').innerHTML.includes('$0 Skins — Carry Over'),
-            'should fall back to the same defaults skins.html itself already establishes');
+        // Re-pinned 2026-09-13: this used to expect "Carry Over". An absent flag is
+        // paid NO CARRY by the money engines (skinsCarriesOver), and skins.html
+        // asks the same resolver; the Round Ready line now does too, so the line
+        // says what the round will actually pay. skins_carry_wizard_default_test.js
+        // holds it both ways (absent -> No Carry, explicit true -> Carry Over).
+        assert.ok(sandbox.document.getElementById('rr-action-text').innerHTML.includes('$0 Skins — No Carry'),
+            'an absent carry flag reads as the rule the engine pays: No Carry');
     });
 
     test('a round with no sideMatches field at all (predates Side Matches) renders without throwing', () => {

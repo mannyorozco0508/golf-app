@@ -145,6 +145,12 @@
         .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
         .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
+        /* FLIGHTS (Wave 2): a three-way control cannot be a two-position switch, so a
+           flighted round swaps the group-view toggle for a pill row. Hidden otherwise. */
+        .view-pills { display: none; justify-content: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .view-pill { font-size: 0.8rem; font-weight: bold; padding: 8px 12px; min-height: 40px; border-radius: 16px; border: 1px solid var(--brand-green); color: var(--brand-green); background: transparent; cursor: pointer; }
+        .view-pill.active { background: var(--brand-green); color: #fff; }
+        .player-flight { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; color: var(--brand-green); border: 1px solid var(--brand-green); vertical-align: middle; }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
 
         .h2h-banner { background: var(--brand-navy); color: white; padding: 16px; border-radius: 10px; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
@@ -294,6 +300,13 @@ html {
             <span class="toggle-slider"></span>
         </label>
         <span class="toggle-label" id="label-all-view" onclick="switchGroupView('all')">📋 All Players</span>
+    </div>
+    <!-- FLIGHTS: shown INSTEAD of the toggle above when the round has flights -
+         three-way when it also has more than one group, two-way otherwise. -->
+    <div class="view-pills" id="view-pills">
+        <button type="button" class="view-pill" id="pill-group-view" onclick="switchGroupView('group')">🏌️ By Group</button>
+        <button type="button" class="view-pill" id="pill-flight-view" onclick="switchGroupView('flight')">🅰🅱 By Flight</button>
+        <button type="button" class="view-pill" id="pill-all-view" onclick="switchGroupView('all')">📋 All Players</button>
     </div>
 
     <div id="board-content">
@@ -463,12 +476,24 @@ html {
         renderBoard();
     }
 
+    let groupViewChosen = false;   // did the golfer pick a mode, or is this the default?
     function switchGroupView(mode) {
         groupViewMode = mode;
+        groupViewChosen = true;
         document.getElementById('group-view-toggle-input').checked = (mode === 'all');
         document.getElementById('label-group-view').classList.toggle('active', mode === 'group');
         document.getElementById('label-all-view').classList.toggle('active', mode === 'all');
+        ['group', 'flight', 'all'].forEach(m => {
+            const el = document.getElementById('pill-' + m + '-view');
+            if (el) el.classList.toggle('active', mode === m);
+        });
         renderBoard();
+    }
+    // FLIGHTS ON THE BOARD: enabled is enough - standings are not a game, so no
+    // scope decides them. Absent or off: false, and every branch below is today's.
+    function boardFlightsOn() {
+        const f = currentBoardData && currentBoardData.flights;
+        return !!(f && f.enabled === true) && typeof playerFlight === 'function';
     }
 
     function shareResults() {
@@ -798,15 +823,28 @@ html {
         } catch (e) {
             return;   // a presenter must never take the leaderboard down with it
         }
-        const L = bundle.net || bundle.gross;
-        if (!L || L.participants.length === 0) return;
+        // PER FLIGHT (Wave 2). The ledger's `flights` - one entry when the round
+        // is not flighted - never the top level, which is null when it is (and
+        // rendered nothing here until this moved). One card per flight, the hole
+        // rows carrying the flight in their heading.
+        const entries = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross, bundle: fl })).filter(e => e.L);
+        if (entries.length === 0) return;
+        if (entries.length === 1 && entries[0].L.participants.length === 0) return;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        mount.innerHTML = entries.map(e => renderLiveSkinsCard(e, entries.length > 1, esc)).join('');
+    }
 
+    function renderLiveSkinsCard(entry, flighted, esc) {
+        const bundle = entry.bundle;
+        const L = entry.L;
         // BASIS COMES FROM THE SKINS GAME, not the leaderboard's ranking toggle.
         // Those are different questions and must not be allowed to drift together.
         const basis = bundle.net ? 'Net' : 'Gross';
-        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
-        let html = '<div class="ls-card"><div class="ls-head">\uD83E\uDD69 LIVE SKINS</div>';
+        let html = '<div class="ls-card"><div class="ls-head">\uD83E\uDD69 LIVE SKINS' + (flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
+        if (flighted && L.participants.length === 0) {
+            return html + '<div class="ls-summary ls-quiet">Nobody in this flight.</div></div>';
+        }
 
         const standings = Object.keys(L.countsByPlayerId)
             .map(id => ({ id, n: L.countsByPlayerId[id] }))
@@ -847,15 +885,76 @@ html {
                  + ' \u00B7 ' + basis + ' ' + r.low + units + '</div>';
         }).join('') + '</div></div>';
 
-        mount.innerHTML = html;
+        return html;
     }
 
-    function renderFlatBoard(results, container) {
-        let sorted = results.slice().sort((a, b) => {
+    // ONE ROW BUILDER for every standings table on this page - the flat board, the
+    // group cards and the flight cards. Two entry points means one builder
+    // (CLAUDE.md); the Wave 1 team-card regression is what happens otherwise.
+    // `posStyle` is the group cards' narrow position cell; `badge` is the A/B
+    // tag, shown ONLY where the section does not already say it (All Players).
+    function boardSort(results) {
+        return results.slice().sort((a, b) => {
             if (a.thru === 0 && b.thru > 0) return 1;
             if (b.thru === 0 && a.thru > 0) return -1;
             return a.sortVal - b.sortVal;
         });
+    }
+    function boardRowHtml(r, idx, opts) {
+        const posStyle = (opts && opts.posStyle) ? ` style="${opts.posStyle}"` : '';
+        const badge = (opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '';
+        // The two tables were written with different source indentation and the
+        // rendered-board golden pins each byte for byte; the indent is a parameter
+        // so ONE builder can still produce both.
+        const ind = (opts && opts.indent) || '                    ';
+        if (r.thru === 0) {
+            return `<tr><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
+        }
+        let posClass = idx === 0 ? 'row-leader' : '';
+        return `<tr class="${posClass}">
+${ind}<td${posStyle}>${idx + 1}</td>
+${ind}<td class="player-name">${escapeHtml(r.name)}${badge}<span class="player-hcp">HCP: ${r.hcp}</span></td>
+${ind}${scoreCellHtml(r)}
+${ind}<td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
+${ind}<td>${r.thru}</td>
+${ind.slice(4)}</tr>`;
+    }
+    // A SECTION CARD: one group, or one flight. Ranked within the section.
+    function boardSectionHtml(title, sectionResults, emptyText) {
+        const maxThru = Math.max(0, ...sectionResults.map(r => r.thru));
+        const sortedGroup = boardSort(sectionResults);
+        let html = `<div style="margin-top:18px; border:1px solid var(--border-mid); border-radius:10px; overflow:hidden;">
+                <div style="background:var(--nav-bg); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold; color:var(--brand-green);">${title}</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">${maxThru > 0 ? `Thru ${maxThru}` : 'Not started'}</span>
+                </div>
+                <table class="board-table" style="margin-bottom:0;">
+                    <tbody>`;
+        if (sectionResults.length === 0 && emptyText) {
+            html += `<tr><td style="padding:14px; color:var(--text-muted); text-align:center;">${emptyText}</td></tr>`;
+        }
+        sortedGroup.forEach((r, idx) => {
+            html += boardRowHtml(r, idx, { posStyle: 'width:30px;', indent: '                        ' });
+        });
+        html += `</tbody></table></div>`;
+        return html;
+    }
+    function fieldLeaderBannerHtml(results) {
+        const fieldSorted = boardSort(results);
+        const fieldLeader = fieldSorted.find(r => r.thru > 0);
+        if (!fieldLeader) return '';
+        const toParPlain = fieldLeader.toPar === 0 ? 'E' : (fieldLeader.toPar > 0 ? `+${fieldLeader.toPar}` : `${fieldLeader.toPar}`);
+        return `<div class="h2h-banner">
+                <div class="h2h-status">🏆 Leading the Field: ${escapeHtml(fieldLeader.name)}</div>
+                <div class="h2h-sub">${toParPlain} thru ${fieldLeader.thru}</div>
+            </div>`;
+    }
+
+    function renderFlatBoard(results, container, opts) {
+        const badges = !!(opts && opts.badges);
+        const players = (currentBoardData && currentBoardData.players) || [];
+        const flightOf = (r) => { const p = players.find(x => String(x.id) === String(r.id)); return p ? playerFlight(p) : 'A'; };
+        let sorted = boardSort(results);
 
         let html = `
             <table class="board-table">
@@ -863,78 +962,38 @@ html {
                 <tbody>
         `;
         sorted.forEach((r, idx) => {
-            if (r.thru === 0) {
-                html += `<tr><td>-</td><td class="player-name">${escapeHtml(r.name)}</td><td>-</td><td>-</td><td>0</td></tr>`;
-            } else {
-                let posClass = idx === 0 ? 'row-leader' : '';
-                html += `<tr class="${posClass}">
-                    <td>${idx + 1}</td>
-                    <td class="player-name">${escapeHtml(r.name)}<span class="player-hcp">HCP: ${r.hcp}</span></td>
-                    ${scoreCellHtml(r)}
-                    <td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
-                    <td>${r.thru}</td>
-                </tr>`;
-            }
+            html += boardRowHtml(r, idx, badges ? { badge: flightOf(r) } : null);
         });
         html += `</tbody></table>`;
         html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
         container.innerHTML = html;
     }
 
+    // BY FLIGHT: the same cards and banner as By Group, sliced by TAG, never by
+    // roster position. Both flights always render - an empty flight is an empty
+    // card, not a vanished one - and the card header carries the flight, so the
+    // rows do not repeat it.
+    function renderFlightedBoard(results, container) {
+        const players = (currentBoardData && currentBoardData.players) || [];
+        const tagOf = (r) => { const p = players.find(x => String(x.id) === String(r.id)); return p ? playerFlight(p) : 'A'; };
+        let html = fieldLeaderBannerHtml(results);
+        ['A', 'B'].forEach(f => {
+            const section = results.filter(r => tagOf(r) === f);
+            html += boardSectionHtml(`${f === 'A' ? '🅰' : '🅱'} Flight ${f}`, section, 'Nobody in this flight.');
+        });
+        html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
+        container.innerHTML = html;
+    }
     // Club Day headline view: one card per foursome (by tee-sheet order, same grouping the
     // scorekeeper links already use) so nobody has to scroll a 28-name list to find their group.
     // Each card shows that group's own mini-leaderboard plus how far they've gotten, and a small
     // banner up top still answers "who's actually winning" across the whole field.
     function renderGroupedBoard(results, boundaries, container) {
-        let fieldSorted = results.slice().sort((a, b) => {
-            if (a.thru === 0 && b.thru > 0) return 1;
-            if (b.thru === 0 && a.thru > 0) return -1;
-            return a.sortVal - b.sortVal;
-        });
-        const fieldLeader = fieldSorted.find(r => r.thru > 0);
-
-        let html = "";
-        if (fieldLeader) {
-            const toParPlain = fieldLeader.toPar === 0 ? 'E' : (fieldLeader.toPar > 0 ? `+${fieldLeader.toPar}` : `${fieldLeader.toPar}`);
-            html += `<div class="h2h-banner">
-                <div class="h2h-status">🏆 Leading the Field: ${escapeHtml(fieldLeader.name)}</div>
-                <div class="h2h-sub">${toParPlain} thru ${fieldLeader.thru}</div>
-            </div>`;
-        }
-
+        let html = fieldLeaderBannerHtml(results);
         boundaries.forEach(b => {
             const groupResults = results.slice(b.startIdx, b.startIdx + b.size);
-            const maxThru = Math.max(0, ...groupResults.map(r => r.thru));
-            const sortedGroup = groupResults.slice().sort((a, c) => {
-                if (a.thru === 0 && c.thru > 0) return 1;
-                if (c.thru === 0 && a.thru > 0) return -1;
-                return a.sortVal - c.sortVal;
-            });
-
-            html += `<div style="margin-top:18px; border:1px solid var(--border-mid); border-radius:10px; overflow:hidden;">
-                <div style="background:var(--nav-bg); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-weight:bold; color:var(--brand-green);">👥 Group ${b.group}</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted);">${maxThru > 0 ? `Thru ${maxThru}` : 'Not started'}</span>
-                </div>
-                <table class="board-table" style="margin-bottom:0;">
-                    <tbody>`;
-            sortedGroup.forEach((r, idx) => {
-                if (r.thru === 0) {
-                    html += `<tr><td style="width:30px;">-</td><td class="player-name">${escapeHtml(r.name)}</td><td>-</td><td>-</td><td>0</td></tr>`;
-                } else {
-                    let posClass = idx === 0 ? 'row-leader' : '';
-                    html += `<tr class="${posClass}">
-                        <td style="width:30px;">${idx + 1}</td>
-                        <td class="player-name">${escapeHtml(r.name)}<span class="player-hcp">HCP: ${r.hcp}</span></td>
-                        ${scoreCellHtml(r)}
-                        <td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
-                        <td>${r.thru}</td>
-                    </tr>`;
-                }
-            });
-            html += `</tbody></table></div>`;
+            html += boardSectionHtml(`👥 Group ${b.group}`, groupResults, null);
         });
-
         html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
         container.innerHTML = html;
     }
@@ -972,13 +1031,41 @@ html {
 
             const boundaries = computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {});
             const groupToggle = document.getElementById('group-view-toggle');
-            groupToggle.style.display = boundaries.length > 1 ? 'flex' : 'none';
+            const pills = document.getElementById('view-pills');
+            const flightsOn = boardFlightsOn();
 
-            if (boundaries.length > 1 && groupViewMode === 'group') {
-                renderGroupedBoard(results, boundaries, container);
-            } else {
-                renderFlatBoard(results, container);
+            if (!flightsOn) {
+                // TODAY, EXACTLY. The two-position toggle, when there is more than
+                // one group; the pill row never shows.
+                groupToggle.style.display = boundaries.length > 1 ? 'flex' : 'none';
+                if (pills) pills.style.display = 'none';
+                if (groupViewMode === 'flight') groupViewMode = 'group';
+                if (boundaries.length > 1 && groupViewMode === 'group') {
+                    renderGroupedBoard(results, boundaries, container);
+                } else {
+                    renderFlatBoard(results, container);
+                }
+                return;
             }
+
+            // FLIGHTED. The pill row replaces the toggle: By Group / By Flight / All
+            // Players when there is more than one group, By Flight / All Players
+            // otherwise. A mode the round cannot show resolves to By Flight, and so
+            // does the default until the golfer picks.
+            groupToggle.style.display = 'none';
+            const multiGroup = boundaries.length > 1;
+            if (pills) {
+                pills.style.display = 'flex';
+                document.getElementById('pill-group-view').style.display = multiGroup ? '' : 'none';
+            }
+            if (!groupViewChosen || (groupViewMode === 'group' && !multiGroup)) groupViewMode = 'flight';
+            ['group', 'flight', 'all'].forEach(m => {
+                const el = document.getElementById('pill-' + m + '-view');
+                if (el) el.classList.toggle('active', groupViewMode === m);
+            });
+            if (groupViewMode === 'group') renderGroupedBoard(results, boundaries, container);
+            else if (groupViewMode === 'flight') renderFlightedBoard(results, container);
+            else renderFlatBoard(results, container, { badges: true });
             return;
         }
 

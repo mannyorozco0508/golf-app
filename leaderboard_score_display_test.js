@@ -212,8 +212,13 @@ describe('FLAT AND GROUPED BOARDS BEHAVE THE SAME', () => {
         const src = read(PAGE);
         assert.equal((src.match(/function scoreCellHtml/g) || []).length, 1,
             'two copies would drift apart');
-        assert.equal((src.match(/\$\{scoreCellHtml\(r\)\}/g) || []).length, 2,
-            'both the flat and grouped renderers must call it');
+        // Flights wave: the flat board and the section cards (group AND flight)
+        // now share ONE row builder, boardRowHtml, which is the one caller of the
+        // cell builder; the row builder itself is called from both renderers.
+        assert.equal((src.match(/\$\{scoreCellHtml\(r\)\}/g) || []).length, 1,
+            'the one row builder calls it');
+        assert.equal((src.match(/html \+= boardRowHtml\(r, idx/g) || []).length, 2,
+            'both the flat board and the section cards call the row builder');
     });
 
     test('the flat header names the new column', () => {

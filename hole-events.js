@@ -199,21 +199,29 @@ function skinsEvents(game, gameCourse, scores, before, players, hole, meId, push
     const now = skinsState(game.config, gameCourse, scores, players);
     const prev = skinsState(game.config, gameCourse, before, players);
 
-    const award = now.awards.find(a => a.hole === hole);
-    if (award) {
-        const p = players.find(pl => String(pl.id) === String(award.playerId));
-        const value = award.units * now.skinValue;
-        const who = nameFor(p, meId);
-        const verb = who === 'You' ? 'win' : 'wins';
-        // AN ODD-DOLLAR ROUND PRINTS NO DOLLAR HERE. Under that rule a skin's
-        // dollars depend on the FINAL skin count and move every time another is
-        // won; the count is final the moment the hole is official, the money is
-        // not. A final-looking integer that will move is worse than none. Legacy
-        // rounds keep today's figure.
-        const money = (!now.oddDollar && value > 0) ? ` \u00B7 $${value.toFixed(0)}` : '';
-        push('SKIN_WON', '\uD83E\uDD69',
-            `${who} ${verb} ${award.units} skin${award.units === 1 ? '' : 's'}${money}`,
-            { personal: who === 'You' });
+    // FLIGHTS: a hole can carry one award per flight, each judged within its
+    // own flight by skinsState (which runs the walk per slice). One card per
+    // award, named by flight, so "Ben wins 1 skin" in B never reads as Ben
+    // beating an A golfer who beat him.
+    const awards = now.awards.filter(a => a.hole === hole);
+    if (awards.length > 0) {
+        awards.forEach(award => {
+            const p = players.find(pl => String(pl.id) === String(award.playerId));
+            const flightState = (now.flighted && award.flight) ? now.flights.find(f => f.flight === award.flight) : now;
+            const value = award.units * (flightState ? flightState.skinValue : now.skinValue);
+            const who = nameFor(p, meId);
+            const verb = who === 'You' ? 'win' : 'wins';
+            // AN ODD-DOLLAR ROUND PRINTS NO DOLLAR HERE. Under that rule a skin's
+            // dollars depend on the FINAL skin count and move every time another is
+            // won; the count is final the moment the hole is official, the money is
+            // not. A final-looking integer that will move is worse than none. Legacy
+            // rounds keep today's figure.
+            const money = (!now.oddDollar && value > 0) ? ` \u00B7 $${value.toFixed(0)}` : '';
+            const where = award.flight ? ` (Flight ${award.flight})` : '';
+            push('SKIN_WON', '\uD83E\uDD69',
+                `${who} ${verb} ${award.units} skin${award.units === 1 ? '' : 's'}${where}${money}`,
+                { personal: who === 'You' });
+        });
         return;
     }
 

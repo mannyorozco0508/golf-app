@@ -315,7 +315,10 @@ describe('NO DUPLICATE MATH', () => {
     };
 
     test('standings come from the shared helper', () => {
-        assert.match(fn(), /computeNetToParStandings\(data\.players \|\| \[\], courseData, savedScores/);
+        // Flights wave: the standings run once per section - the whole field
+        // (`data.players || []`) or each flight - through the same helper.
+        assert.match(fn(), /computeNetToParStandings\(g\.players, courseData, savedScores/);
+        assert.match(fn(), /players: data\.players \|\| \[\] \}\]/, 'the flightless section is the whole roster');
     });
 
     test('skins come from the canonical ledger', () => {

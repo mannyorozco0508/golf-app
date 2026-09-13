@@ -140,6 +140,25 @@ describe('the organizer link survives a re-save', () => {
     });
 });
 
+describe('flights are RESTORED, not declared (Wave 2, 2026-09-13)', () => {
+    // `flights` is written by the payload (null when off - the moneyPool
+    // pattern - so update() deletes the key) and RESTORED by loadModeData
+    // before the roster rebuild, so it needs no DECLARED entry: an entry
+    // there would claim not restoring it is correct, which it is not - a
+    // re-save of a flighted round with no restore would silently un-flight it.
+    test('the payload writes flights and loadModeData restores the switch and both scopes before the rows are rebuilt', () => {
+        assert.ok(payloadKeys().includes('flights'), 'flights is a payload field');
+        const body = fnBody('loadModeData');
+        assert.match(body, /const fl = data\.flights;/);
+        assert.match(body, /setFlightsEnabled\(flOn\)/);
+        assert.match(body, /setFlightScope\('skins'/);
+        assert.match(body, /setFlightScope\('birdies'/);
+        assert.ok(body.indexOf('setFlightsEnabled(flOn)') < body.indexOf('storedPlayersTemp = data.players'),
+            'the switch must be known before the roster rebuild, or the rows render without their column');
+        assert.match(SRC, /flights: flightsSetting\(\),/, 'null when off, the object when on');
+    });
+});
+
 describe('a legacy round keeps the settlement mode it was played under', () => {
 
     test('NO_SILENT_MODE_CONVERSION: the key is dropped when editing', () => {

@@ -558,7 +558,36 @@ function skinsStatePot(cfg, holes, scores, players, scoringKey, potShare) {
 // Under 'split' two skins games genuinely run at once, so the live view combines
 // them: a golfer who takes both the gross and the net skin on a hole is two up, and
 // each award carries its own value because the two half-pots are priced separately.
+// FLIGHTS (Wave 2). A flighted skins wager is TWO wagers, one per flight, and
+// the strip shows them as such. skinsState runs the single-field walk below
+// once per slice from flightSlices() - each slice on a config narrowed to its
+// own golfers, so the engine prices its pot by the FLIGHT's size - and merges:
+// every award carries its flight, the counts are per golfer either way, and
+// `flights` holds each flight's own state for the text and the recap card.
+// One null slice (no flights) is the walk that has always run, untouched.
 function skinsState(cfg, holes, scores, players) {
+    const slices = (typeof flightSlices === 'function') ? flightSlices(cfg, 'skins') : [{ flight: null, players }];
+    if (slices.length <= 1) return skinsStateFor(cfg, holes, scores, players);
+    const flights = slices.map(sl => {
+        const narrowed = Object.assign({}, cfg, { players: sl.players, participantIds: undefined, flights: undefined });
+        const st = skinsStateFor(narrowed, holes, scores, sl.players);
+        st.flight = sl.flight;
+        st.awards.forEach(a => { a.flight = sl.flight; });
+        return st;
+    });
+    const won = {};
+    flights.forEach(f => Object.keys(f.won).forEach(id => { won[id] = (won[id] || 0) + f.won[id]; }));
+    const awards = [].concat.apply([], flights.map(f => f.awards)).sort((a, b) => a.hole - b.hole || (a.flight < b.flight ? -1 : 1));
+    return {
+        flighted: true, flights, won, awards,
+        mode: flights[0].mode, carryOver: flights[0].carryOver, oddDollar: flights.every(f => f.oddDollar),
+        lastDecidedHole: flights.reduce((m, f) => (f.lastDecidedHole !== null && (m === null || f.lastDecidedHole > m)) ? f.lastDecidedHole : m, null),
+        riding: flights.reduce((t, f) => t + f.riding, 0),
+        skinValue: flights.reduce((t, f) => t + f.skinValue, 0) / flights.length
+    };
+}
+
+function skinsStateFor(cfg, holes, scores, players) {
     const mode = (typeof resolveSkinsMode === 'function')
         ? resolveSkinsMode(cfg)
         : ((cfg && cfg.skinsPotFormat) || 'split');
@@ -607,6 +636,23 @@ function skinsState(cfg, holes, scores, players) {
 
 function skinsStatus(cfg, holes, scores, players) {
     const st = skinsState(cfg, holes, scores, players);
+    // FLIGHTED: one clause per flight, prefixed, so "Ann 2" is never read as a
+    // lead over a golfer she is not playing against. "A: Ann 2 · Ben 1 / B: Eli 1".
+    if (st.flighted) {
+        const slices = flightSlices(cfg, 'skins');
+        const clauses = st.flights.map((f, i) => {
+            const names = slices[i].players
+                .filter(p => f.won[p.id] > 0)
+                .sort((a, b) => f.won[b.id] - f.won[a.id])
+                .slice(0, 2)
+                .map(p => `${shortName(p.name)} ${f.won[p.id]}`);
+            const riding = f.riding > 0 ? `${f.riding} riding` : '';
+            const body = names.length ? names.join(' \u00B7 ') + (riding ? ` \u00B7 ${riding}` : '') : (riding ? `All square \u00B7 ${riding}` : 'No skins yet');
+            return `${f.flight}: ${body}`;
+        });
+        const any = st.flights.some(f => Object.values(f.won).some(n => n > 0));
+        return { text: clauses.join(' / '), tone: any ? 'up' : (st.riding > 0 ? 'even' : 'idle') };
+    }
     const holders = players
         .filter(p => st.won[p.id] > 0)
         .sort((a, b) => st.won[b.id] - st.won[a.id])

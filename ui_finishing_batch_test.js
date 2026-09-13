@@ -327,8 +327,10 @@ describe('SKINS BASIS IS INDEPENDENT OF THE RANKING TOGGLE', () => {
 
     test('the renderer reads the basis from the ledger, not the toggle', () => {
         const src = read('leaderboard.html');
+        // Flights wave: the board reads the ledger's `flights` and renders each
+        // through renderLiveSkinsCard, which is where the basis is read.
         const at = src.indexOf('function renderLiveSkinsBoard');
-        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        const fn = src.slice(at, src.indexOf('\n    function ', src.indexOf('function renderLiveSkinsCard', at) + 10));
         assert.match(fn, /bundle\.net \? 'Net' : 'Gross'/);
         assert.ok(!/activeScoring/.test(fn), 'the ranking toggle must not leak in here');
     });
@@ -337,9 +339,11 @@ describe('SKINS BASIS IS INDEPENDENT OF THE RANKING TOGGLE', () => {
 describe('NO SECOND RESOLVER, NO DUPLICATE MATHS', () => {
 
     const fn = () => {
+        // Flights wave: the board and the per-flight card it renders through are
+        // two functions; the presenter under test is both of them.
         const src = read('leaderboard.html');
         const at = src.indexOf('function renderLiveSkinsBoard');
-        return src.slice(at, src.indexOf('\n    function ', at + 10));
+        return src.slice(at, src.indexOf('\n    function ', src.indexOf('function renderLiveSkinsCard', at) + 10));
     };
 
     test('it consumes the canonical ledger', () => {

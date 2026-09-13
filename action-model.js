@@ -340,6 +340,45 @@ function fieldParticipants(data) {
     return eligible.filter(p => wanted.includes(String(p.id)));
 }
 
+// FLIGHTS (Wave 2, 2026-09-13). A round may split its field into two flights,
+// A and B, and scope a game to them:
+//
+//   round.flights = { enabled: true, scopes: { skins: 'flight', birdies: 'field' } }
+//   player.flight = 'A' | 'B'        (an untagged golfer is A)
+//
+// flightSlices(data, scopeName) is THE ONE RESOLVER a per-flight game asks.
+// It answers with the slices the game runs over, and it composes ON
+// fieldParticipants so participantIds and playingForMoney keep their meaning:
+// a flight narrows WITHIN the wager's own field, never around it.
+//
+//   flights absent, enabled !== true, or scopes[scopeName] !== 'flight'
+//       -> [{ flight: null, players: fieldParticipants(data) }]   (today)
+//   otherwise
+//       -> [{ flight: 'A', players: [...] }, { flight: 'B', players: [...] }]
+//          ALWAYS both, in that order, even when one is empty. An empty
+//          flight is an empty slice - a pot of nobody pays nobody - not an
+//          error and not a reason to collapse to one slice.
+//
+// Nothing calls this yet: Step 2 adds the resolver, later steps the callers.
+// flights_absent_golden_test.js is what "today" means for every one of them.
+function flightScopeApplies(data, scopeName) {
+    const f = data && data.flights;
+    if (!f || f.enabled !== true) return false;
+    const scopes = f.scopes || {};
+    return scopes[scopeName] === 'flight';
+}
+function playerFlight(p) {
+    return (p && p.flight === 'B') ? 'B' : 'A';
+}
+function flightSlices(data, scopeName) {
+    const field = fieldParticipants(data);
+    if (!flightScopeApplies(data, scopeName)) return [{ flight: null, players: field }];
+    return [
+        { flight: 'A', players: field.filter(p => playerFlight(p) === 'A') },
+        { flight: 'B', players: field.filter(p => playerFlight(p) === 'B') }
+    ];
+}
+
 // Have all the players this wager depends on finished this hole?
 //
 // Reads raw saved scores, never "which hole is showing". Groups play at different
@@ -520,7 +559,7 @@ if (typeof module !== 'undefined' && module.exports) {
         ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
         gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
-        fieldParticipants, participantsCompletedHole, gameCoversHole,
+        fieldParticipants, flightSlices, flightScopeApplies, playerFlight, participantsCompletedHole, gameCoversHole,
         resolveSkinsMode, skinsPotShares,
         sideMatchHoles, sideMatchStartHole, sideMatchRangeText
     };

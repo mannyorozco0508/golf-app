@@ -39,7 +39,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 ## Current state
 
 ```
-1290 suites · 6476 tests · 6474 passing · 0 failing · 2 todo
+6799 tests · 6797 passing · 0 failing · 2 todo   (2026-09-13, npm test, twice)
 ```
 
 15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
@@ -50,7 +50,7 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 
 **Duplication is intentional.** Several pages carry their own copies of the engines because there's no module system. Parity tests guard them. Never "helpfully" consolidate them.
 
-**The shell is at `CACHE_VERSION` v106** (`47ee108`, 2026-09-12; v105 was `6d6b661` the same afternoon, v104 `048a302`). v105 and v106 are both the course picker — see "The API ceiling" under the proxy section. v104: `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
+**The shell is at `CACHE_VERSION` v117** (Wave 2 flights, 2026-09-13 — v114 through v117 are one commit; v112/v113 are `7d24422`, skins wave 1; v106 was `47ee108`, 2026-09-12; v105 was `6d6b661` the same afternoon, v104 `048a302`). v105 and v106 are both the course picker — see "The API ceiling" under the proxy section. v104: `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
 
 ## iOS / App Store status
 
@@ -617,6 +617,128 @@ the product even though the engineering underneath it is correct.
 Worth building when there is room: a queued/synced indicator. Not urgent, and
 explicitly **not** a reason to touch the sync path, which is now proven.
 
+## Flights (A/B) — Wave 2, 2026-09-13
+
+A round can split its field into two flights, A and B, so a skins wager and a
+birdie game pay within the flight instead of across the field. **The engine
+files are the only place that decides who plays whom; every page reads the
+engine's per-flight view.** Skins wave 1 (`7d24422`, whole-dollar skins) came the
+same day; the two are separate commits.
+
+**The model.** `round.flights = { enabled: true, scopes: { skins: 'flight' |
+'field', birdies: 'flight' | 'field' } }` and `player.flight = 'A' | 'B'`. An
+untagged golfer is A. Off means `flights` is written `null` and no golfer carries
+a `flight` key — an old round and a switched-off round are the same bytes.
+
+**The resolver — `action-model.js`.** `flightScopeApplies(data, scope)`,
+`playerFlight(p)`, and `flightSlices(data, scope)`, composed on
+`fieldParticipants`: one `{ flight: null, players }` slice when a scope does not
+apply, otherwise always `[A, B]`, an empty flight being an empty slice.
+`flight_slices_test.js` pins its callers to `settlement-engine.js`,
+`bet-strip.js` and `skins.html`; nothing else may slice.
+
+**The engine — `settlement-engine.js`.** `computeSkinsPayoutLinesByFlight` is
+the per-flight view (one entry per slice, every line carrying its `flight`);
+`computeSkinsSettlementNet` pays each slice from those same lines through
+`payFromSkinsLines` — the ONE place a golfer's whole-dollar skins number is
+computed, so the ledger a golfer reads and the money they are paid cannot
+disagree (`flights_engine_test.js` "4.0 LEDGER == SETTLEMENT per flight"). The
+flat `computeSkinsPayoutLines` keeps today's shape; on a flighted round it is
+the merge of both flights and can hold a hole twice, so no hole-keyed surface
+reads it (pinned). Birdies run per slice with n = flight size. The Main Pool's
+skins bucket is **flight-blind** by design (`pool-engine.js` has no notion of a
+flight): one pot for the whole field, a cross-flight tie pays nobody. The wizard
+says so on the bucket. A golfer who wants A-only and B-only skins pots uses a
+Skins wager.
+
+**The wizard — `admin.html`.** Step 5 (Players) gains a Flights (A/B) switch, a
+live count read through the same capture the save uses, and Skins / Birdies
+scope switches; each roster row gets a tap-to-flip A/B. On a plain row the
+control sits in its own grid column with `gridRow = '1'` — without the row Chrome
+auto-places the delete button into that column and drops the control to a
+second line (measured: 82px row vs 40px). On a team / Ryder row it is a second
+line spanning the row, by design.
+
+**The surfaces.** `bet-strip.js` prices and lists skins per flight ("A: Ann 2 ·
+Ben 1 / B: Eli 2"); `hole-events.js` announces one skin per flight per hole;
+`skins.html`, `index.html`'s live widget and modal, `settlement.html`'s LIVE
+RESULTS and SKINS WON, and `leaderboard.html`'s live skins board all read the
+per-flight ledger. The leaderboard adds a By Flight view — the group cards
+sliced by tag — behind a pill row that replaces the group toggle only when the
+round has flights, and an A/B badge on All Players rows. The Receipt's Player
+Payouts ledger reads "Skins (A)" / "Birdie Pool (B)" beside a line from a wager
+scoped per flight — presentation in `settlement.html`, the engine's labels
+untouched, nothing on the totals or Who Pays Who.
+
+**The goldens.** `flights_absent_golden_test.js` + `.fixture.json` hold a round
+with no `flights` key — every engine literal and four rendered leaderboard
+boards by sha — and prove it renders byte-for-byte as before the wave;
+`enabled: false` is asserted identical to absent. `skins_golden_test.js` is the
+wave 1 golden. Neither file was touched in the wave; both must stay untouched.
+
+**Checks.** `tools/flights-leaderboard-check.js` (the pill row, both flight
+cards, the badges, the admin rows measured at 390px, reached through the page's
+own Back buttons) and `tools/skins-carry-wizard-check.js` (below).
+
+**Skins never carry by default — the READ sites are fixed; the stored data is
+NOT (open item below).** Every `!== false` reader of a carry flag in
+`admin.html` (eight) and `index.html` (one) now asks `skinsCarriesOver()`, the
+resolver the money engines pay by. (This part was done in Step 7 without the
+paste approving `admin.html` for it — the work stands, the process did not: a
+deferred item is recorded, not implemented, until a paste says so.) Before: a fresh
+"Also Playing → Skins", touched by nobody, saved `skinsCarryOver: true` and
+painted Carry Over — the catalog default was `false` and the save overwrote it;
+a legacy round with no flag reopened as Carry Over and re-saving would have
+restated money the engine had already paid no-carry.
+`skins_carry_wizard_default_test.js` drives the tick, the reopen and the Round
+Ready screen; `tools/skins-carry-wizard-check.js` ticks the box in Chrome and
+reads which button is filled. Two of the nine sites (the instance card's paint
+and the instance capture) are held by the source scan only: after the restore
+fix their input is always a boolean, so `!== false` there would be inert, not
+wrong.
+
+**Deferred from the wave, each its own paste:**
+
+- **OPEN — rounds already converted by the old restore path.** Any round that
+  was reopened in the wizard and re-saved before v117 with no stored carry flag
+  was written `skinsCarryOver: true` (the round's own flag, a stacked
+  `additionalGames.skins`, or an instance), and a stored `true` is exactly what a
+  deliberate Carry Over choice writes — the two are **indistinguishable in the
+  data**. Those rounds settle as carry rounds today and will keep doing so; the
+  fix above stops new conversions and changes nothing stored. A remediation would
+  need: (1) a READ-ONLY scan of live `events/*` for every `skinsCarryOver: true`
+  (three shapes) with the round's date, whether it has scores, and whether it is
+  already settled — `tools/orphan-match-check.js` is the pattern for a read-only
+  scan; (2) since the data cannot tell a converted round from a chosen one, a
+  per-round decision by Manny from the list, never an automated rewrite; (3) for
+  a round that IS rewritten, the receipt changes — `skinsCarryRuleRecorded` exists
+  so a receipt can say which rule it applied, and a rewrite of a settled round
+  must be announced to the group, not silent. Nothing is scanned yet; nothing is
+  rewritten. Needs a paste and `database.rules.json` is not involved (writes go
+  through the existing round update path).
+
+- **A golfer at exactly $0 is omitted from Final Results.** `addAmount` in
+  `computeCombinedNetTotals` returns on a zero amount, so a golfer whose every
+  game nets exactly 0 gets no `netByName` entry and no `contributions` entry, and
+  `settlement.html` renders only what `netByName` holds (measured: a birdie game
+  nobody won → `netByName {}` → the card renders nothing at all). A golfer who
+  finished even cannot find their name. Decision taken: show them at $0 — in the
+  engine's output, since the page must not invent a row. Not built;
+  `settlement-engine.js` is protected.
+- **The Chrome harness capacity flake.** `native_review_surface_test.js` fails
+  under full-suite load and passes alone; it has gone 1 → 2 → 5 rows over three
+  runs. Reported each time, not fixed; it is the harness, not the app.
+- **Flight tags reset to A when the switch is turned off and on again.** The tags
+  are read from the rows, and switching off removes the controls. Keep them in
+  session memory if it is cheap; otherwise say so on the switch.
+- **The wizard refuses Next at Step 1 on a round whose main format is the legacy
+  `skins`** ("Please select a game format") because legacy wager formats have no
+  format card. Pre-existing; the device check's plain-row fixture is a stroke
+  round with skins stacked for that reason.
+- **The Tournament product's `flights` / `flightId` are unrelated.** A tournament
+  flight is a tee-time wave in `tournament.html`; a round flight is a payout
+  scope. They share a word and nothing else. Do not "unify" them.
+
 ## Known open items
 
 - **CLOSED 2026-09-11 — a misspelled course is no longer cached as a genuine empty.**
@@ -1057,7 +1179,11 @@ crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-
 emulates print media: everything outside the sheet has a zero rect, every golfer is on
 it once, the HOLE NOT SET count matches) ·
 `tournament-payout-rank-seam-check.js` (the team the board shows first is the team paid
-`spotAmounts[0]`, and so on down the paid places — the seam no unit test covers).
+`spotAmounts[0]`, and so on down the paid places — the seam no unit test covers) ·
+`flights-leaderboard-check.js` (a flighted round on the leaderboard and the admin
+rows at 390px, reached through the page's own Back buttons) ·
+`skins-carry-wizard-check.js` (a fresh code, the wizard's own Next buttons, the
+Also Playing Skins box ticked; reads which Ties button is filled by computed colour).
 
 **`cold-arrival.js` gained an optional `steps` array** (`048a302`): `{ expression }` or
 `{ media: 'print' }`, run in order after arrival, so a check can press the page's own

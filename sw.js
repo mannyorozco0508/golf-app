@@ -524,6 +524,61 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v117: flight labels on the receipt's ledger; skins never carry by
+// default.
+//
+// settlement.html: under each golfer on Player Payouts, a skins or birdie
+// line from a wager the round scopes per flight reads "Skins (A)" / "Birdie
+// Pool (B)". A field-wide wager on a flighted round, and every line on a
+// round without flights, prints exactly as before. Totals and Who Pays Who
+// carry no badge. Presentation only - the engine's labels are unchanged.
+//
+// admin.html and index.html: every place that read an absent skins carry
+// flag for itself (`!== false`, which is CARRY) now asks skinsCarriesOver(),
+// the resolver the money engines pay by (absent is NO CARRY). A fresh "Also
+// Playing -> Skins" saved skinsCarryOver: true and painted Carry Over on a
+// game nobody had configured; a legacy round with no flag reopened as Carry
+// Over and would have re-saved as carry, restating money the engine had
+// already paid no-carry.
+//
+// An installed device on v116 shows "Skins" with no flight beside it, and
+// its wizard writes a carrying skins game for a group that never chose one.
+
+// Moved to v116: the leaderboard shows flights.
+//
+// leaderboard.html: the live skins board reads the per-flight ledger (it drew
+// nothing on a flighted round before); a By Flight view - the group cards
+// sliced by tag - behind a pill row that replaces the group toggle only when
+// the round has flights; an A/B badge on All Players rows. One row builder
+// for every table. A round with no flights renders byte for byte as before.
+//
+// An installed device on v115 shows no skins board on a flighted round.
+
+// Moved to v115: the live surfaces show skins per flight.
+//
+// bet-strip.js prices and lists skins per flight ("A: Ann 2 / B: Eli 1");
+// hole-events.js announces one skin per flight per hole, named; skins.html
+// draws one ledger section per flight from the per-flight engine view;
+// index.html's live skins widget and hole-by-hole modal and settlement.html's
+// LIVE RESULTS and SKINS WON cards read the per-flight ledger, where a hole
+// can be a skin in A and a tie in B. index.html lost a birdie-total copy
+// nothing called. A round with no flights renders exactly as before.
+//
+// An installed device on v114 shows one field on every live surface.
+
+// Moved to v114: flights (A/B) - the setup block, the row tag, the engine.
+//
+// admin.html's Players step gains a Flights (A/B) switch (off by default), a
+// live A/B count read through the same capture the save uses, and Skins /
+// Birdies scope switches; every row gets a tap-to-flip A/B when it is on.
+// The payload writes flights and an explicit flight on every golfer, null
+// when off. settlement-engine.js runs skins and birdies per flight through
+// flightSlices (action-model.js); a round with no flights key settles and
+// renders byte-identically to before (flights_absent_golden_test.js).
+// The live surfaces and the leaderboard read flights in later steps.
+//
+// An installed device on v113 saves a round with no way to tag a flight.
+
 // Moved to v113: admin.html writes skinsRounding on a new round, and a new
 // round is a new round again.
 //
@@ -1016,7 +1071,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v113-new-rounds-carry-both-flags';
+const CACHE_VERSION = 'golfapp-v117-flights-ledger-labels';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -1967,7 +1967,7 @@ html {
             gameLines.push(`💵 ${betText}`);
         } else if (gameFormat === 'skins') {
             const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
-            const carryOver = currentData.skinsCarryOver !== false;
+            const carryOver = skinsCarriesOver(currentData.skinsCarryOver);   // the engine's answer, not a private one
             gameLines.push(`🥩 $${buyIn} Skins — ${carryOver ? 'Carry Over' : 'No Carry'}`);
         } else if (gameFormat === 'wolf') {
             gameLines.push(`🐺 $${currentData.wolfPointVal || 0} per point Wolf`);
@@ -2043,7 +2043,7 @@ html {
     // --- LIVE ACTION AGGREGATOR ---
     // This is a PRESENTATION layer only. It never computes golf/money results itself - every
     // status/dollar figure here comes straight from calculateMatchEngine, settlement-engine.js's
-    // skins resolvers, calcWolfEngine, calcDotsEngine, calculateBirdieGameTotals/calculateKPGameTotals -
+    // skins resolvers, calcWolfEngine, calcDotsEngine, calculateBirdieGameTotalsForSettle/calculateKPGameTotals -
     // the exact same functions already used elsewhere on this page. Its only job is collecting
     // those existing outputs into one standardized shape so the UI can show a single glanceable
     // summary instead of forcing the golfer to mentally combine several boxes.
@@ -3112,35 +3112,51 @@ html {
         // A configured skins game earns its widget even before a single hole is
         // official. Hiding it because the opening holes tied is how a golfer concludes
         // the feature is broken.
-        const L = liveSkinsLedger();
-        if (!L) return '';
+        // PER FLIGHT (Wave 2): one block per ledger entry - the whole field, or
+        // flight A then B - so a skin in B is never listed as if it beat A.
+        const entries = liveSkinsLedgers();
+        if (!entries) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        const thru = L.officialThru > 0 ? 'Thru Hole ' + L.officialThru : 'Not official yet';
+        const flighted = entries.length > 1;
+        const thruOf = (L) => L.officialThru > 0 ? 'Thru Hole ' + L.officialThru : 'Not official yet';
+        const minThru = Math.min.apply(null, entries.map(e => e.L.officialThru || 0));
 
-        const winners = skinsWinners(L);
-        let body;
-        if (winners.length === 0) {
-            body = '<div class="lw-none">No official skins yet.</div>';
-        } else {
-            body = winners.map(w => '<div class="lw-srow">'
-                + '<span class="lw-sname">' + esc(w.name) + '</span>'
-                + '<span class="lw-scount">' + w.holes.length + (w.holes.length === 1 ? ' skin' : ' skins') + '</span>'
-                + '<span class="lw-sholes">' + (w.holes.length === 1 ? 'Hole ' : 'Holes ') + w.holes.join(', ') + '</span>'
-                + '</div>').join('');
-        }
+        const blocks = entries.map(e => {
+            const L = e.L;
+            const winners = skinsWinners(L);
+            let body;
+            if (L.participants.length === 0) {
+                body = '<div class="lw-none">Nobody in this flight.</div>';
+            } else if (winners.length === 0) {
+                body = '<div class="lw-none">No official skins yet.</div>';
+            } else {
+                body = winners.map(w => '<div class="lw-srow">'
+                    + '<span class="lw-sname">' + esc(w.name) + '</span>'
+                    + '<span class="lw-scount">' + w.holes.length + (w.holes.length === 1 ? ' skin' : ' skins') + '</span>'
+                    + '<span class="lw-sholes">' + (w.holes.length === 1 ? 'Hole ' : 'Holes ') + w.holes.join(', ') + '</span>'
+                    + '</div>').join('');
+            }
+            const head = flighted ? '<div class="lw-flight">Flight ' + e.flight + ' \u00B7 ' + thruOf(L) + '</div>' : '';
+            return head + body;
+        }).join('');
 
         return '<div class="lw-card">'
             + '<div class="lw-head"><span class="lw-title">\uD83E\uDD69 SKINS WON</span>'
-            + '<span class="lw-sub">' + thru + '</span></div>'
-            + body
+            + '<span class="lw-sub">' + (flighted ? (minThru > 0 ? 'Thru Hole ' + minThru : 'Not official yet') : thruOf(entries[0].L)) + '</span></div>'
+            + blocks
             + '<div class="lw-foot">Tied holes are not shown'
-            + (L.officialThru > 0 ? ' \u00B7 Official through Hole ' + L.officialThru : '') + '</div>'
+            + (minThru > 0 ? ' \u00B7 Official through Hole ' + minThru : '') + '</div>'
             + '</div>';
     }
 
     // Shared by both the widget and the modal, so the two can never disagree about
     // who has won what. Reads the canonical ledger; resolves nothing.
-    function liveSkinsLedger() {
+    //
+    // PER FLIGHT: returns [{ flight, L, bundle }] - one entry for a flightless
+    // round (flight null), one per flight otherwise - read from the ledger's
+    // `flights`, never its top level (null when flighted). A hole can be a skin
+    // in A and a tie in B; two ledgers, two lists.
+    function liveSkinsLedgers() {
         if (typeof computeSkinsHoleLedger !== 'function') return null;
         const data = currentData || {};
         const courseData = data.courseData || [];
@@ -3151,9 +3167,15 @@ html {
         if (!roundHasSkinsGame(data)) return null;
         try {
             const bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
-            const L = bundle.net || bundle.gross;
-            return (L && L.participants.length > 0) ? L : null;
+            const entries = (bundle.flights || [bundle]).map(fl => ({ flight: fl.flight || null, L: fl.net || fl.gross, bundle: fl }));
+            if (entries.some(e => !e.L)) return null;
+            if (entries.length === 1 && entries[0].L.participants.length === 0) return null;
+            return entries;
         } catch (e) { return null; }
+    }
+    function liveSkinsLedger() {
+        const entries = liveSkinsLedgers();
+        return entries ? entries[0].L : null;
     }
 
     function skinsWinners(L) {
@@ -3318,15 +3340,29 @@ html {
         // answered "no skins" and this surface silently rendered nothing.
         if (!roundHasSkinsGame(data)) return;
 
-        let bundle;
-        try {
-            bundle = computeSkinsHoleLedger(data, courseData, savedScores, { groupOf: liveSkinsGroupOf });
-        } catch (e) {
-            return;   // a presenter must never take the scorecard down with it
-        }
-        const L = bundle.net || bundle.gross;
-        if (!L || L.participants.length === 0) return;
+        // PER FLIGHT (Wave 2): the ledger's `flights` - one entry when the round is
+        // not flighted - never the top level, which is null when it is. Each
+        // entry renders its own head, standings and hole-by-hole rows; a hole
+        // can be a skin in A and a tie in B.
+        const entries = liveSkinsLedgers();
+        if (!entries) return;
+        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const flighted = entries.length > 1;
+        const sections = entries.map(e => renderLiveSkinsSection(e, data, flighted, esc));
+        const toggle = '<button type="button" class="ls-toggle" onclick="toggleLiveSkins()">'
+            + (liveSkinsOpen ? 'hide hole-by-hole' : 'hole-by-hole') + '</button>';
+        // Order as it always was: heads and standings, the one toggle, then the
+        // hole-by-hole rows (each flight's rows under its own label when flighted).
+        mount.innerHTML = '<div class="live-skins">' + sections.map(x => x.top).join('') + toggle
+            + sections.map(x => x.ledger ? ((flighted && x.ledger) ? '<div class="ls-flight-label">Flight ' + x.flight + '</div>' : '') + x.ledger : '').join('') + '</div>';
+    }
 
+    function renderLiveSkinsSection(entry, data, flighted, esc) {
+        const bundle = entry.bundle;
+        const L = entry.L;
+        if (flighted && L.participants.length === 0) {
+            return { flight: entry.flight, top: '<div class="ls-title">FLIGHT ' + entry.flight + '</div><div class="ls-none">Nobody in this flight.</div>', ledger: '' };
+        }
         const basis = bundle.net ? 'NET' : 'GROSS';
         const carryLabel = bundle.carryOver ? 'CARRY' : 'NO CARRY';
         const pot = Number(data.skinsBuyIn || 0) * L.participants.length;
@@ -3342,9 +3378,7 @@ html {
                 return { name: pl ? pl.name : '?', n: r.n };
             });
 
-        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-        let head = '<div class="ls-title">WHOLE-FIELD ' + basis + ' SKINS' + potLabel + ' \u00B7 ' + carryLabel + '</div>';
+        let head = '<div class="ls-title">' + (flighted ? 'FLIGHT ' + entry.flight + ' \u00B7 ' : 'WHOLE-FIELD ') + basis + ' SKINS' + potLabel + ' \u00B7 ' + carryLabel + '</div>';
         head += '<div class="ls-thru">Official thru ' + (L.officialThru > 0 ? L.officialThru : '\u2014') + '</div>';
 
         let body = '';
@@ -3393,10 +3427,7 @@ html {
             }).join('') + '</div>';
         }
 
-        const toggle = '<button type="button" class="ls-toggle" onclick="toggleLiveSkins()">'
-            + (liveSkinsOpen ? 'hide hole-by-hole' : 'hole-by-hole') + '</button>';
-
-        mount.innerHTML = '<div class="live-skins">' + head + body + toggle + ledgerHtml + '</div>';
+        return { flight: entry.flight, top: head + body, ledger: ledgerHtml };
     }
 
 
@@ -6937,29 +6968,6 @@ html {
     // Same rule as Dots/Junk, verified consistent — a stroke-under-par unit (birdie=1,
     // eagle=2, already correctly weighted since "under" is the literal stroke count) is worth
     // its dollar value paid by every other player, not an isolated credit with no payer.
-    function calculateBirdieGameTotals(data, courseData, savedScores) {
-        if (data.birdieGameEnabled !== true) return {};
-        const players = (data.players || []).filter(p => p.playingForMoney !== false);
-        const unitVal = data.birdieUnitVal !== undefined ? data.birdieUnitVal : 0;
-        const scoringType = data.birdieScoringType || 'gross';
-        let units = {};
-        players.forEach(p => units[p.id] = 0);
-        (courseData || []).forEach(h => {
-            players.forEach(p => {
-                const v = savedScores[`p${p.id}_h${h.hole}`];
-                if (!v || v <= 0) return;
-                let score = parseInt(v, 10);
-                if (scoringType === 'net') score -= getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                const under = parseInt(h.par) - score;
-                if (under >= 1) units[p.id] += under;
-            });
-        });
-        const n = players.length;
-        const totalUnits = players.reduce((s, p) => s + units[p.id], 0);
-        let totals = {};
-        players.forEach(p => { totals[p.id] = n > 1 ? unitVal * (n * units[p.id] - totalUnits) : 0; });
-        return totals;
-    }
 
     // KP already correctly credited the winner (buyIn * (n-1)) — it just never debited anyone.
     // Same rule, now complete on both sides: each KP win is paid by every other player.

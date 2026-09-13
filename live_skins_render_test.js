@@ -279,7 +279,11 @@ describe('NO DUPLICATE ARITHMETIC', () => {
         const src = read('index.html');
         const at = src.indexOf('function renderLiveSkins');
         const fn = src.slice(at, src.indexOf('\n    }', src.indexOf('mount.innerHTML = \'<div class="live-skins"')));
-        assert.match(fn, /computeSkinsHoleLedger\(/, 'It must consume the canonical ledger.');
+        // Flights wave: the ledger is read through liveSkinsLedgers(), shared with
+        // the widget, which is where computeSkinsHoleLedger is called.
+        assert.match(fn, /liveSkinsLedgers\(\)/, 'It must consume the canonical ledger (through the shared reader).');
+        const reader = src.slice(src.indexOf('function liveSkinsLedgers'), src.indexOf('function liveSkinsLedger('));
+        assert.match(reader, /computeSkinsHoleLedger\(/, 'the shared reader consumes the canonical ledger');
         assert.doesNotMatch(fn, /getStrokes\(/, 'No second handicap calculator.');
         assert.doesNotMatch(fn, /Math\.min\(/, 'No second low-score calculator.');
         assert.doesNotMatch(fn, /computeSkinsCarryOverForSettle|computeSkinsVoidForSettle/,

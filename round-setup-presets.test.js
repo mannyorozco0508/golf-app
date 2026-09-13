@@ -111,12 +111,18 @@ describe('index.html — renderLandingSummary (the player "first 10 seconds" sum
 
 describe('BACKWARD COMPATIBILITY — old rounds without the new Skins fields still work correctly', () => {
     const ix = loadHtmlInlineScript('index.html');
-    const { computeSkinsCarryOverLive } = ix;
 
-    test('a round with no skinsCarryOver field at all still defaults to Carry Over, matching skins.html\'s own established default', () => {
-        // This mirrors exactly how skins.html and the live box already read this field —
-        // `!== false` means "anything other than explicitly false" defaults to true.
-        const carryOverDefault = (undefined) !== false;
-        assert.equal(carryOverDefault, true, 'an old round with the field entirely absent must still behave as Carry Over, not silently switch to Void');
+    // This block used to assert `(undefined) !== false === true` - a statement
+    // about JavaScript, not about the page - under a claim that an absent flag
+    // "defaults to Carry Over". It never did in the money: skinsCarriesOver()
+    // (action-model.js) has always paid an absent flag as NO CARRY, and since
+    // 431cf40 every surface asks it. The assertion below is about the page:
+    // the resolver index.html actually loads, and what it answers.
+    test('a round with no skinsCarryOver field at all is NO CARRY on index.html, the same answer the engine pays', () => {
+        assert.equal(typeof ix.skinsCarriesOver, 'function', 'index.html loads the one resolver');
+        assert.equal(ix.skinsCarriesOver(undefined), false, 'absent means no carry');
+        assert.equal(ix.skinsCarriesOver(true), true, 'and an explicit true still carries');
+        assert.ok(!/skinsCarryOver\s*!==\s*false/.test(require('fs').readFileSync(require('path').join(__dirname, 'index.html'), 'utf8')),
+            'index.html holds no private `!== false` answer to the carry question');
     });
 });
