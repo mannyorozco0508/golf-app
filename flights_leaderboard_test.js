@@ -127,7 +127,9 @@ describe('6.2 / 6.3 THE SECTIONS AND THE BADGES', () => {
         const b = r.board.slice(r.board.indexOf('Flight B'));
         assert.deepEqual(namesIn(a).sort(), ['Ann', 'Cal', 'Eli', 'Gus'], 'A is the odd roster positions - by tag, not by position');
         assert.deepEqual(namesIn(b).sort(), ['Ben', 'Dee', 'Fay', 'Hal']);
-        assert.ok(/<td style="width:30px;">1<\/td>/.test(a) && /<td style="width:30px;">1<\/td>/.test(b), 'each card ranks from 1');
+        // Ranks from 1 WITHIN the card - "1" or, since the positions wave, "T1" when
+        // the card's leaders are tied (this MIXED round ties at the top of a flight).
+        assert.ok(/<td style="width:30px;">T?1<\/td>/.test(a) && /<td style="width:30px;">T?1<\/td>/.test(b), 'each card ranks from 1');
         assert.ok(!/player-flight/.test(r.board), 'no badge in By Flight - the card header carries it');
         assert.equal((r.board.match(/Group \d/g) || []).length, 0, 'no group cards in this mode');
     });

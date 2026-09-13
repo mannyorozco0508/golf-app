@@ -1843,6 +1843,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         //
         // Re-rendering on arrival costs nothing and keeps the picker honest.
         if (n === WIZARD_STEP_OF.action && typeof renderSetupNassauPlayers === 'function') {
+            // The card's availability and its "already has a Nassau" note name the
+            // golfers, so they are refreshed on arrival too, after any roster edit.
+            if (typeof syncSetupNassauAvailability === 'function') syncSetupNassauAvailability();
             const box = document.getElementById('setup-nassau-enabled');
             if (box && box.checked) renderSetupNassauPlayers();
         }
@@ -2536,7 +2539,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // same format can appear as many times as golfers want to bet it, and so nothing
     // already saved has to be rewritten. getRoundGames() normalizes both.
     // ------------------------------------------------------------------
-    let skinsInstances = [];   // [{ id, skinsBuyIn, skinsPotFormat, skinsCarryOver, startHole, participantIds }]
+    let skinsInstances = [];   // [{ id, skinsBuyIn, skinsPotFormat, skinsCarryOver, startHole, participantIds, enabled }]
+    // INSTANCES THE WIZARD DOES NOT OWN. additionalGameInstances is one map, and
+    // the save writes the WHOLE map - so anything not carried here is deleted. An
+    // Action-tab dots game lives in that map, and a Step 7 save used to erase it
+    // with its money (measured, 2026-09-13). Every instance whose format is not
+    // skins is held here exactly as loaded, never rendered, never edited, and
+    // written back byte for byte.
+    let foreignGameInstances = {};
 
     function newInstanceId() {
         return 'sk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -2546,6 +2556,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const players = collectWizardPlayers();
         skinsInstances.push({
             id: newInstanceId(),
+            enabled: true,
             skinsBuyIn: 10,
             skinsPotFormat: 'gross',
             skinsCarryOver: SKINS_CARRY_DEFAULT,
@@ -2671,13 +2682,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function captureSkinsInstances() {
         const out = {};
+        // Held instances first, untouched - see foreignGameInstances.
+        Object.keys(foreignGameInstances).forEach(id => { out[id] = JSON.parse(JSON.stringify(foreignGameInstances[id])); });
         const players = collectWizardPlayers().map(p => String(p.id));
         skinsInstances.forEach(inst => {
             const chosen = (inst.participantIds || []).map(String).filter(id => players.includes(id));
             if (chosen.length < 2) return;   // a skins game needs somebody to play against
             const entry = {
                 format: 'skins',
-                enabled: true,
+                enabled: inst.enabled !== false,
                 skinsBuyIn: parseFloat(inst.skinsBuyIn) || 0,
                 skinsPotFormat: inst.skinsPotFormat || 'gross',
                 skinsScoring: inst.skinsPotFormat === 'net' ? 'net' : 'gross',
@@ -2692,12 +2705,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function loadSkinsInstances(data) {
         skinsInstances = [];
+        foreignGameInstances = {};
         const saved = (data && data.additionalGameInstances) || {};
         Object.keys(saved).forEach(id => {
             const cfg = saved[id];
-            if (!cfg || cfg.format !== 'skins') return;
+            if (!cfg) return;
+            if (cfg.format !== 'skins') { foreignGameInstances[id] = JSON.parse(JSON.stringify(cfg)); return; }
             skinsInstances.push({
                 id: id,
+                // A wager the Action tab switched off stays off. The capture used to
+                // write enabled: true unconditionally, re-arming it on every save.
+                enabled: cfg.enabled !== false,
                 skinsBuyIn: cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 10,
                 skinsPotFormat: cfg.skinsPotFormat || 'gross',
                 skinsCarryOver: skinsCarriesOver(cfg.skinsCarryOver),
@@ -4957,7 +4975,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Same idea in reverse — removing a player could drop a 1v1 round back to exactly 2
     // players, which should hide the Team column again rather than leave it stale.
     function removePlayerRowAndRefresh(btnEl) {
-        btnEl.closest('.player-row').remove();
+        const row = btnEl.closest('.player-row');
+        // A GOLFER WITH POSTED SCORES IS ASKED ABOUT. Their scores stay in the
+        // record under their id (nothing here deletes a score, and ids are never
+        // re-minted), but with the row gone no surface will show them, and adding
+        // the person back issues a NEW id the old scores never reattach to.
+        const holes = row ? holesScoredFor(playerIdOfRow(row)) : 0;
+        if (holes > 0) {
+            const nameEl = row.querySelector('.p-name-input');
+            const name = (nameEl && nameEl.value.trim()) || 'This golfer';
+            if (!confirm(name + ' has posted scores on ' + holes + ' hole' + (holes === 1 ? '' : 's') + '.\n\n'
+                + 'Remove ' + name + ' from the round? Their posted scores will no longer appear anywhere, '
+                + 'and adding them back later starts a fresh card.')) return;
+        }
+        row.remove();
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
@@ -5176,19 +5207,40 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // THE NASSAU A ROUND ALREADY HOLDS. Step 6 creates a Nassau ONCE - on the
+    // save that starts the round. A reopened round arrives as a stroke round
+    // with the box unticked (nassau-modern is normalised to 'stroke' at save),
+    // so a plain re-save pushes nothing; but the card gave no sign the wager
+    // existed, and ticking the box again pushed a SECOND Nassau beside the
+    // first. Wagers are edited on the Bets tab; the wizard says so and steps
+    // aside. Read from the round as loaded, so it needs no live listener.
+    let loadedSideMatches = {};
+    function roundAlreadyHasNassau() {
+        return Object.keys(loadedSideMatches || {}).map(k => loadedSideMatches[k])
+            .filter(m => m && m.format === 'nassau');
+    }
+    function describeExistingNassau(m) {
+        const players = collectWizardPlayers();
+        const nameOf = id => { const p = players.find(x => String(x.id) === String(id)); return p ? p.name : 'Golfer ' + id; };
+        const side = ids => (ids || []).map(nameOf).join(' & ');
+        return side(m.teamAIds) + ' v ' + side(m.teamBIds) + ' \u2014 $' + (m.frontStake || 0) + ' / $' + (m.backStake || 0) + ' / $' + (m.overallStake || 0);
+    }
+
     function syncSetupNassauAvailability() {
         // Picking Nassau in Step 3 already said what the golfer wants; make Step 6
         // reflect it rather than asking twice. The card keeps its own 10/10/20
         // defaults - this sets no stakes, so there is one source of truth for them.
         const wants = wantsModernNassau();
+        const existing = roundAlreadyHasNassau();
         const box0 = document.getElementById('setup-nassau-enabled');
-        if (wants && box0 && !box0.disabled && !box0.checked) {
+        if (wants && box0 && !box0.disabled && !box0.checked && existing.length === 0) {
             box0.checked = true;
             toggleSetupNassau();
         }
         const box = document.getElementById('setup-nassau-enabled');
         const note = document.getElementById('setup-nassau-legacy-note');
-        const blocked = legacyMainGameBlocksNassau();
+        const legacy = legacyMainGameBlocksNassau();
+        const blocked = legacy || existing.length > 0;
         if (box) {
             box.disabled = blocked;
             // An already-ticked box on a round that turns out to be legacy must not
@@ -5198,9 +5250,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const card = document.getElementById('setup-nassau-box');
         if (card) card.style.opacity = blocked ? '0.55' : '';
         if (note) {
-            note.textContent = 'This round already uses the legacy Nassau setup. '
-                + 'Edit its Nassau settings in Step 4, or start a new round to use the '
-                + 'newer Front / Back / Overall setup.';
+            note.textContent = legacy
+                ? 'This round already uses the legacy Nassau setup. '
+                    + 'Edit its Nassau settings in Step 4, or start a new round to use the '
+                    + 'newer Front / Back / Overall setup.'
+                : existing.length > 0
+                    ? 'This round already has a Nassau: ' + existing.map(describeExistingNassau).join('; ') + '. '
+                        + 'Edit it, or add another, on the Bets tab.'
+                    : '';
             note.style.display = blocked ? 'block' : 'none';
         }
     }
@@ -5337,6 +5394,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Last gate before the write. The checkbox alone is not trusted: this is
         // money, and a manipulated DOM must not be able to persist a second Nassau.
         if (legacyMainGameBlocksNassau()) return null;
+        if (roundAlreadyHasNassau().length > 0) return null;
         if (typeof buildNassauWagerPayload !== 'function') return null;
         const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
         const p1 = v('setup-nassau-p1'), p2 = v('setup-nassau-p2');
@@ -5428,6 +5486,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // token would hand its secret to a different round.
     let loadedOrganizerToken = null;
     let loadedExistingRound = false;
+    // THE ROUND'S OWN CARD. A re-save rebuilt courseData from the LIVE global
+    // card (previewCourseData), so a card edited by anyone since setup - or
+    // hand-edited for this round - rewrote pars and stroke indexes under posted
+    // scores. On an existing round whose course has not been changed, the save
+    // writes these back unchanged; picking a different course is a real change
+    // and takes the new card as it always has.
+    let loadedCourseKey = null;
+    let loadedCourseData = null;
+    // The scores as loaded, read only to say how many holes a golfer has posted
+    // before their row is removed. Never written by the wizard.
+    let loadedScores = {};
+    function holesScoredFor(playerId) {
+        const prefix = 'p' + String(playerId) + '_h';
+        return Object.keys(loadedScores || {}).filter(k => k.indexOf(prefix) === 0 && loadedScores[k] > 0).length;
+    }
 
     function loadModeData(modeKey) {
         const isThisRound = String(modeKey) === String(currentMode);
@@ -5461,6 +5534,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             
             handleCourseChange();
 
+            loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
+            loadedSideMatches = (isThisRound && snapshot.exists() && data.sideMatches) ? JSON.parse(JSON.stringify(data.sideMatches)) : {};
+            loadedCourseKey = isThisRound && snapshot.exists() ? (data.activeCourseKey || null) : null;
+            loadedCourseData = isThisRound && snapshot.exists() && Array.isArray(data.courseData) && data.courseData.length > 0
+                ? JSON.parse(JSON.stringify(data.courseData)) : null;
+            // THE ROUND LENGTH, from the holes the round actually holds. The selector
+            // is read on save and was never restored, so a Front-9 round re-saved as
+            // 18 holes. Nine holes all at or below 9 is the front; all above 9, the
+            // back; anything else is the full card.
+            const lenSel = document.getElementById('round-length-select');
+            if (lenSel && data.courseData && data.courseData.length > 0) {
+                const holes = data.courseData.map(h => Number(h.hole));
+                lenSel.value = (holes.length === 9 && holes.every(n => n <= 9)) ? 'front'
+                    : (holes.length === 9 && holes.every(n => n > 9)) ? 'back' : '18';
+            }
             // Populate Grid with saved data if it exists
             if (data.courseData && data.courseData.length > 0) {
                 data.courseData.forEach(h => {
@@ -6049,6 +6137,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 return;
             }
             let finalCourseData = preview.data;
+            // AN EXISTING ROUND KEEPS ITS OWN CARD when the course was not changed
+            // (see loadedCourseData). The preview's name suffix and the Money Pool
+            // validation below still run against what is actually written.
+            if (loadedExistingRound && loadedCourseData && courseKey === loadedCourseKey) {
+                finalCourseData = JSON.parse(JSON.stringify(loadedCourseData));
+            }
 
             // Publishing order is deliberate and unchanged: the UNTRIMMED card, under
             // the course's name WITHOUT the round-length suffix. A group playing the

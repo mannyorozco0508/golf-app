@@ -524,6 +524,27 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v122: a re-save keeps what the wizard does not own; the leaderboard
+// ranks ties.
+//
+// admin.html: a Step 7 save on a round in play used to rebuild
+// additionalGameInstances from the wizard's skins list only (an Action-tab dots
+// game was deleted with its money, a switched-off skins wager came back on),
+// re-save a Front-9 round as 18 holes (the round length was never restored),
+// and rebuild courseData from the LIVE course card (a since-edited card rewrote
+// pars and stroke indexes under posted scores). Now: instances of other formats
+// are held and written back untouched, enabled:false stays, the length is
+// restored from the round's own holes, and an existing round keeps its own card
+// unless the course is deliberately changed. Step 6 says when the round already
+// holds a Nassau instead of offering a second one. Removing a golfer who has
+// posted scores asks first (scores are never deleted; ids are never re-minted).
+// leaderboard.html: positions come from the engine - 1, T2, T2, T4 - on the
+// flat board, the flight cards and the group cards, instead of 1, 2, 3, 4 down
+// a tie.
+//
+// An installed device on v121 can delete a dots game by saving the wizard, and
+// shows 1-2-3-4 down a tie on the leaderboard.
+
 // Moved to v121: entering a score moves the keyboard to the next golfer.
 //
 // index.html: auto-advance never survived its own save. Moving focus blurred
@@ -1126,7 +1147,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v121-score-entry-focus';
+const CACHE_VERSION = 'golfapp-v122-resave-and-positions';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

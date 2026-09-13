@@ -32,6 +32,14 @@
 //
 // Do not "fix" this golden to match a new engine or a new renderer. A golden
 // that moves on a flightless round is the finding.
+//
+// RE-PINNED 2026-09-13, the leaderboard positions fix, the two GROSS boards
+// only - read first, then written. This round has no ties on NET (the two net
+// boards are untouched, sha for sha) but on GROSS five golfers sit on 67 and
+// two on 68, and the board printed 1, 2, 3, 4, 5, 6, 7, 8 down them. It now
+// prints the engine's label: gross_all 1, T2 x5, T7 x2; gross_group card 1
+// reads 1, T2, T2, T2 and card 2 reads T1, T1, T3, T3. Row order, names, HCPs,
+// scores and to-par are byte-identical; only the position cells moved.
 // ============================================================================
 
 const { test, describe } = require('node:test');

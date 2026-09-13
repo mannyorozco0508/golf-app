@@ -906,6 +906,22 @@ html {
             return a.sortVal - b.sortVal;
         });
     }
+    // THE POSITION LABEL COMES FROM THE ENGINE. computeNetToParStandings() ranks
+    // with the tie rule - 1, T2, T2, T4 - and hands every row a positionLabel;
+    // this page used to print its own index over its own sort and read 1, 2, 3,
+    // 4 straight down a tie. A card ranks WITHIN the card, so it asks the same
+    // engine for the card's golfers: one rule, one implementation, and the same
+    // answer settlement.html's LIVE RESULTS and the Receipt already give.
+    // Returns { id -> label }; a golfer not started is '-' (as the row draws it).
+    function boardPositionLabels(sectionResults) {
+        const map = {};
+        const ids = new Set(sectionResults.map(r => String(r.id)));
+        const players = ((currentBoardData && currentBoardData.players) || []).filter(p => ids.has(String(p.id)));
+        const rows = computeNetToParStandings(players, currentBoardData.courseData || [], currentBoardData.scores || {},
+            { basis: activeScoring === 'net' ? 'net' : 'gross' });
+        rows.forEach(r => { map[String(r.id)] = r.started ? r.positionLabel : '-'; });
+        return map;
+    }
     function boardRowHtml(r, idx, opts) {
         const posStyle = (opts && opts.posStyle) ? ` style="${opts.posStyle}"` : '';
         const badge = (opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '';
@@ -918,7 +934,7 @@ html {
         }
         let posClass = idx === 0 ? 'row-leader' : '';
         return `<tr class="${posClass}">
-${ind}<td${posStyle}>${idx + 1}</td>
+${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
 ${ind}<td class="player-name">${escapeHtml(r.name)}${badge}<span class="player-hcp">HCP: ${r.hcp}</span></td>
 ${ind}${scoreCellHtml(r)}
 ${ind}<td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
@@ -939,8 +955,9 @@ ${ind.slice(4)}</tr>`;
         if (sectionResults.length === 0 && emptyText) {
             html += `<tr><td style="padding:14px; color:var(--text-muted); text-align:center;">${emptyText}</td></tr>`;
         }
+        const labels = boardPositionLabels(sectionResults);
         sortedGroup.forEach((r, idx) => {
-            html += boardRowHtml(r, idx, { posStyle: 'width:30px;', indent: '                        ' });
+            html += boardRowHtml(r, idx, { posStyle: 'width:30px;', indent: '                        ', label: labels[String(r.id)] });
         });
         html += `</tbody></table></div>`;
         return html;
@@ -967,8 +984,11 @@ ${ind.slice(4)}</tr>`;
                 <thead><tr><th>Pos</th><th style="text-align:left;">Player</th><th>Score</th><th>To Par</th><th>Thru</th></tr></thead>
                 <tbody>
         `;
+        // Field-wide labels: the rows already carry them, and asking again keeps one
+        // path for every table.
+        const labels = boardPositionLabels(results);
         sorted.forEach((r, idx) => {
-            html += boardRowHtml(r, idx, badges ? { badge: flightOf(r) } : null);
+            html += boardRowHtml(r, idx, Object.assign({ label: labels[String(r.id)] }, badges ? { badge: flightOf(r) } : {}));
         });
         html += `</tbody></table>`;
         html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
