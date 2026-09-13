@@ -524,6 +524,35 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v113: admin.html writes skinsRounding on a new round, and a new
+// round is a new round again.
+//
+// The wizard now writes skinsRounding: 'odd-dollar' beside settlementMode at
+// creation, guarded the same way on edit. Finding on the way: the guard's
+// loadedExistingRound was set for a FRESH code too (the lobby lands on
+// ?game=CODE before anything is written), so every wizard-created round since
+// v41 had settlementMode deleted from its first save and settled in cents.
+// The guard now requires a stored record (snapshot.exists()). No round that
+// exists changes; rounds created from here on get both flags.
+//
+// An installed device on v112 creates rounds with neither flag.
+
+// Moved to v112: skins pay whole dollars on new rounds, and every surface reads
+// the engine for them.
+//
+// settlement-engine.js gained the odd-dollar rule (base = floor(pot / skins),
+// the remainder one dollar each in hole order; an odd split buy-in goes
+// ceil/floor per golfer), gated per round by skinsRounding: 'odd-dollar' so
+// no round already played moves. skins.html now draws the engine's per-skin
+// ledger instead of its own copy of the resolvers and pot math; bet-strip.js
+// prices its live awards from the engine's pots and allocator; hole-events.js
+// prints no dollar on a flagged round's recap card because that dollar is not
+// final until the last skin; index.html lost three skins resolvers nothing
+// called. admin.html does not write the flag yet (Step 5), so no live round is
+// flagged by this build.
+//
+// An installed device on v111 keeps a skins.html that computes its own money.
+
 // Moved to v111: the comments in tournament.html say what the rules now hold.
 //
 // database.rules.json gained ownerUid and registrations rules (published from
@@ -987,7 +1016,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v111-rules-say-what-they-hold';
+const CACHE_VERSION = 'golfapp-v113-new-rounds-carry-both-flags';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

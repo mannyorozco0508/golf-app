@@ -507,16 +507,44 @@ function skinsStatePot(cfg, holes, scores, players, scoringKey, potShare) {
     // own hole range, which is what makes "3 riding = $60" an honest number rather
     // than a guess. Mirrors computeSkinsSettlementNet's own arithmetic, including the
     // half-pot share when gross and net are both running.
+    //
+    // THE ODD-DOLLAR ROUND (skinsRounding: 'odd-dollar', no carry) takes its money
+    // from the engine and only its money: the half-pot comes from
+    // computeSkinsPayoutLines (the ceil/floor split of an odd buy-in lives there,
+    // not in a fourth copy here) and each award's dollars from
+    // allocateSkinsOddDollar over THIS walk's awards, in hole order. NOT the
+    // engine's skin list: the settlement resolvers decide a hole from whoever
+    // has posted, so mid-round they report a skin on a hole three golfers have
+    // not played. This walk requires everyone, which is the live truth. The two
+    // lists are pinned apart in skins_live_surfaces_test.js on purpose.
+    //
+    // Every value here is PROVISIONAL until the last official hole - the
+    // remainder moves as skins are won - which is why hole-events.js prints no
+    // dollar on an odd-dollar round's recap card. Legacy rounds are untouched.
     const buyIn = cfg.skinsBuyIn !== undefined ? cfg.skinsBuyIn : 0;
-    const pot = buyIn * players.length * potShare;
-    const skinValue = carryOver
-        ? (holes.length > 0 ? pot / holes.length : 0)
-        : (awards.length > 0 ? pot / awards.length : 0);
+    const oddDollar = typeof skinsOddDollarApplies === 'function'
+        && typeof computeSkinsPayoutLines === 'function'
+        && typeof allocateSkinsOddDollar === 'function'
+        && skinsOddDollarApplies(cfg);
+    let pot, skinValue, awardValues;
+    if (oddDollar) {
+        // Scores deliberately withheld: only the pots are wanted from the engine.
+        const pots = computeSkinsPayoutLines(cfg, holes, {});
+        pot = scoringKey === 'gross' ? pots.gross.pot : pots.net.pot;
+        awardValues = allocateSkinsOddDollar(pot, awards.length);
+        skinValue = awards.length > 0 ? pot / awards.length : 0;
+    } else {
+        pot = buyIn * players.length * potShare;
+        skinValue = carryOver
+            ? (holes.length > 0 ? pot / holes.length : 0)
+            : (awards.length > 0 ? pot / awards.length : 0);
+        awardValues = awards.map(a => a.units * skinValue);
+    }
 
     return {
         won, awards, carryOver, lastDecidedHole,
         riding: carryOver && carry > 1 ? carry - 1 : 0,
-        skinValue
+        skinValue, awardValues, oddDollar
     };
 }
 
@@ -544,7 +572,7 @@ function skinsState(cfg, holes, scores, players) {
     if (parts.length === 1) {
         const only = parts[0][1];
         only.mode = mode;
-        only.awards.forEach(a => { a.pot = parts[0][0]; a.value = a.units * only.skinValue; });
+        only.awards.forEach((a, i) => { a.pot = parts[0][0]; a.value = only.awardValues[i]; });
         return only;
     }
 
@@ -554,9 +582,9 @@ function skinsState(cfg, holes, scores, players) {
     parts.forEach(pair => {
         const key = pair[0], st = pair[1];
         Object.keys(st.won).forEach(id => { won[id] = (won[id] || 0) + st.won[id]; });
-        st.awards.forEach(a => awards.push({
+        st.awards.forEach((a, i) => awards.push({
             hole: a.hole, playerId: a.playerId, units: a.units,
-            pot: key, value: a.units * st.skinValue
+            pot: key, value: st.awardValues[i]
         }));
         riding += st.riding;
         if (st.lastDecidedHole !== null && (lastDecidedHole === null || st.lastDecidedHole > lastDecidedHole)) {
@@ -570,6 +598,7 @@ function skinsState(cfg, holes, scores, players) {
         carryOver: (typeof skinsCarriesOver === 'function')
             ? skinsCarriesOver(cfg.skinsCarryOver) : cfg.skinsCarryOver === true,
         lastDecidedHole, riding,
+        oddDollar: parts.every(pr => pr[1].oddDollar),
         // A representative unit price for callers that show one number. Under split the
         // two halves are equal, so this is exact rather than an average of unlike things.
         skinValue: parts.reduce((sum, pr) => sum + pr[1].skinValue, 0) / parts.length

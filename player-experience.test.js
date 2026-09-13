@@ -86,8 +86,11 @@ describe('settlement.html — computeCombinedNetTotals (the new "Final Results" 
 });
 
 describe('index.html — live Skins status box (the biggest coverage gap found this batch)', () => {
+    // The page's own Live copies are gone (skins odd-dollar wave, 2026-09-13);
+    // these are settlement-engine.js's resolvers as loaded by index.html.
     const ix = loadHtmlInlineScript('index.html');
-    const { computeSkinsCarryOverLive, computeSkinsVoidLive } = ix;
+    const computeSkinsCarryOverLive = ix.computeSkinsCarryOverForSettle;
+    const computeSkinsVoidLive = ix.computeSkinsVoidForSettle;
 
     test('carry-over mode correctly shows accumulated units for the live box, matching skins.html\'s tested engine', () => {
         const players = makePlayers(['A', 'B'], [0, 0]);
@@ -113,7 +116,7 @@ describe('index.html — live Skins status box (the biggest coverage gap found t
 
 describe('index.html — score correction recalculation (Part 10, reconfirmed against the real live-box functions)', () => {
     const ix = loadHtmlInlineScript('index.html');
-    const { computeSkinsCarryOverLive } = ix;
+    const computeSkinsCarryOverLive = ix.computeSkinsCarryOverForSettle;
 
     test('correcting an earlier hole correctly changes the carry-over chain', () => {
         const players = makePlayers(['A', 'B'], [0, 0]);

@@ -5,8 +5,14 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 const fs = require('fs');
 const path = require('path');
 
+// index.html's own "Live" copies of the resolvers were deleted in the skins
+// odd-dollar wave (2026-09-13): defined, never called by the page, and a third
+// copy of settlement-engine.js's computeSkins*ForSettle. The page realm still
+// has the resolvers - the ones settlement pays from - so the scenarios below
+// now run against the function index.html actually loads.
 const ix = loadHtmlInlineScript('index.html');
-const { computeSkinsCarryOverLive, computeSkinsVoidLive } = ix;
+const computeSkinsCarryOverLive = ix.computeSkinsCarryOverForSettle;
+const computeSkinsVoidLive = ix.computeSkinsVoidForSettle;
 
 describe('PRINT/PDF SKINS BUG FIX — the exact reproduction scenario from the audit', () => {
     test('REGRESSION: hole 1 ties, hole 2 ties, hole 3 won outright — Carry-Over correctly absorbs both carried holes', () => {

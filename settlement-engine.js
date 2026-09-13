@@ -64,7 +64,127 @@
         return { skins, pendingUnits: 0 };
     }
 
+    // ========================================================================
+    // THE SKINS ODD-DOLLAR RULE (Wave 1, 2026-09-13). Whole dollars per skin.
+    //
+    //   base      = floor(pot / skinsWon)
+    //   remainder = pot - base * skinsWon
+    //   The remainder goes one dollar each, in ASCENDING HOLE ORDER, to the
+    //   winning skins. The extra follows the SKIN: a golfer holding two
+    //   remainder skins collects both dollars. Payouts sum to the pot exactly.
+    //
+    // Split mode splits at the BUY-IN, per golfer, never at the pot:
+    //   grossPerGolfer = ceil(buyIn / 2), netPerGolfer = floor(buyIn / 2)
+    // so $5 is $3 gross / $2 net each, every stake is an integer, and a
+    // golfer's net stays whole even when one half is unwon. An even buy-in
+    // splits exactly as today.
+    //
+    // GATED PER ROUND. Settlement is recomputed from raw scores every time a
+    // round is opened - no final money is stored - so an ungated change here
+    // would rewrite the receipt of every skins round already played. The flag
+    //     skinsRounding: 'odd-dollar'
+    // is written by admin.html when a round is CREATED, beside settlementMode,
+    // and never retrofitted. Absent means the float math below, forever;
+    // skins_golden_test.js pins that to the float.
+    //
+    // CARRY-OVER ROUNDS ARE EXCLUDED this wave, decided ONLY by
+    // skinsCarriesOver() - the resolver the engine already pays from. A
+    // carried skin is worth several units and the rule above is written for
+    // equal skins; a flagged round that carries takes the legacy path.
+    //
+    // computeSkinsPayoutLines() is the ONE per-skin ledger: one line per skin
+    // won, in hole order, with the dollars THAT skin pays. On an odd-dollar
+    // round computeSkinsSettlementNet pays from those lines, so the ledger a
+    // page draws and the net a golfer is charged cannot drift. On a legacy
+    // round the lines carry today's float value (units x pot/skins, or
+    // units x pot/holes under carry) and the settlement below is untouched.
+    // ========================================================================
+    function allocateSkinsOddDollar(potDollars, count) {
+        const n = Number(count) || 0;
+        if (n <= 0) return [];
+        const pot = Math.round(Number(potDollars) || 0);
+        const base = Math.floor(pot / n);
+        let remainder = pot - base * n;
+        const out = new Array(n).fill(base);
+        for (let i = 0; i < n && remainder > 0; i++) { out[i] += 1; remainder -= 1; }
+        return out;
+    }
+
+    function skinsOddDollarApplies(data) {
+        if (!data || data.skinsRounding !== 'odd-dollar') return false;
+        const carries = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
+        return !carries;
+    }
+
+    function computeSkinsPayoutLines(data, courseData, savedScores) {
+        const allPlayers = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
+        const potFormat = (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(data)
+            : (data.skinsPotFormat || 'split');
+        const buyIn = data.skinsBuyIn !== undefined ? data.skinsBuyIn : 0;
+        const carryOver = (typeof skinsCarriesOver === 'function')
+            ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
+        const totalHoles = (courseData || []).length;
+        const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
+        const applies = skinsOddDollarApplies(data);
+        const n = allPlayers.length;
+
+        // Per-golfer stakes for each half. Under the rule the odd dollar of an
+        // odd buy-in goes to GROSS at the buy-in; legacy halves the pot.
+        let grossPer = 0, netPer = 0;
+        if (potFormat === 'split') {
+            if (applies) { grossPer = Math.ceil(buyIn / 2); netPer = Math.floor(buyIn / 2); }
+            else { grossPer = buyIn / 2; netPer = buyIn / 2; }
+        } else if (potFormat === 'gross') { grossPer = buyIn; }
+        else if (potFormat === 'net') { netPer = buyIn; }
+
+        const half = (key, perGolfer, on) => {
+            const pot = perGolfer * n;
+            const r = on ? computeFn(allPlayers, courseData, savedScores, key) : { skins: [], pendingUnits: 0 };
+            let vals;
+            if (applies) {
+                vals = allocateSkinsOddDollar(pot, r.skins.length);
+            } else {
+                const v = carryOver
+                    ? (totalHoles > 0 ? pot / totalHoles : 0)
+                    : (r.skins.length > 0 ? pot / r.skins.length : 0);
+                vals = r.skins.map(s => s.unitsWon * v);
+            }
+            return { pot, perGolfer, pendingUnits: r.pendingUnits,
+                     lines: r.skins.map((s, i) => ({ hole: s.hole, playerId: s.player.id, playerName: s.player.name,
+                                                     units: s.unitsWon, value: vals[i] })) };
+        };
+        return {
+            rule: applies ? 'odd-dollar' : 'legacy',
+            gross: half('gross', grossPer, potFormat === 'split' || potFormat === 'gross'),
+            net: half('net', netPer, potFormat === 'split' || potFormat === 'net')
+        };
+    }
+
     function computeSkinsSettlementNet(data, courseData, savedScores) {
+        // THE ODD-DOLLAR ROUND pays from the per-skin ledger and nothing else.
+        // A half with no skin won charges nobody - the same refund rule the
+        // legacy path below applies through its inPlay multiplier - and since
+        // every stake is an integer, every net is too. Legacy rounds never
+        // enter this block; everything after it is byte-for-byte what it was.
+        if (skinsOddDollarApplies(data)) {
+            const L = computeSkinsPayoutLines(data, courseData, savedScores);
+            const allPlayers = (typeof fieldParticipants === 'function')
+                ? fieldParticipants(data)
+                : (data.players || []).filter(p => p.playingForMoney !== false);
+            const payout = {};
+            allPlayers.forEach(p => { payout[p.id] = 0; });
+            L.gross.lines.forEach(l => { payout[l.playerId] += l.value; });
+            L.net.lines.forEach(l => { payout[l.playerId] += l.value; });
+            const grossStake = L.gross.lines.length > 0 ? L.gross.perGolfer : 0;
+            const netStake = L.net.lines.length > 0 ? L.net.perGolfer : 0;
+            const out = {};
+            allPlayers.forEach(p => { out[p.id] = payout[p.id] - grossStake - netStake; });
+            return out;
+        }
         // The wager's own field. For a round-wide skins game this is everyone playing
         // for money, exactly as before; for a participant-scoped game it is only the
         // golfers named on it. Everyone else is not in this pot at all - they cannot

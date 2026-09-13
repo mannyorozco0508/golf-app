@@ -191,3 +191,57 @@ describe('skins.html — the states are wired to real markup', () => {
         assert.match(html, /id="skins-config-carry"/);
     });
 });
+
+// ---------------------------------------------------------------------------
+// ADDED in the skins odd-dollar wave (Step 4, 2026-09-13). Everything above is
+// untouched. The page no longer computes a dollar: it draws the engine's
+// computeSkinsPayoutLines(). On a FLAGGED round those are whole dollars in
+// hole order, and the ledger must show exactly them.
+// ---------------------------------------------------------------------------
+describe('skins.html — a FLAGGED round draws the engine\'s whole-dollar ledger', () => {
+    const ENG = (() => {
+        const { loadJsFile } = require('./helpers/load-script.js');
+        return loadJsFile('settlement-engine.js', ['handicap.js', 'action-model.js']);
+    })();
+    function flagged() {
+        // 4 golfers at $8 gross: A wins holes 2 and 9, B wins hole 5 -> 11, 11, 10.
+        const players = makePlayers(['A', 'B', 'C', 'D'], [0, 0, 0, 0]);
+        const cd = makeCourseData(18);
+        const scores = {};
+        players.forEach(p => cd.forEach(h => { scores[`p${p.id}_h${h.hole}`] = 5; }));
+        scores[`p${players[0].id}_h2`] = 4; scores[`p${players[1].id}_h5`] = 4; scores[`p${players[0].id}_h9`] = 4;
+        return { players, courseData: cd, scores, gameFormat: 'skins', skinsBuyIn: 8, skinsPotFormat: 'gross',
+                 skinsCarryOver: false, settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar' };
+    }
+    const ledgerTotal = (html, name) => {
+        const ledger = html.slice(html.indexOf('ledger-table'));
+        const m = new RegExp('<td class="winner-name">' + name + '</td>[\\s\\S]*?<td class="[^"]*">\\$([0-9.]+)</td>').exec(ledger);
+        return m ? m[1] : null;
+    };
+
+    test('the ledger totals are the engine\'s per-golfer line sums, whole dollars', () => {
+        const data = flagged();
+        const r = render(data);
+        const L = ENG.computeSkinsPayoutLines(data, data.courseData, data.scores);
+        assert.equal(L.rule, 'odd-dollar');
+        const won = {}; data.players.forEach(p => { won[p.name] = 0; });
+        L.gross.lines.forEach(l => { won[l.playerName] += l.value; });
+        assert.equal(ledgerTotal(r.content, 'A'), String(won.A));
+        assert.equal(ledgerTotal(r.content, 'B'), String(won.B));
+        assert.equal(won.A, 21); assert.equal(won.B, 11);
+        assert.match(r.content, LEDGER);
+    });
+
+    test('the Won column carries each skin\'s own dollars in hole order: 11, 11, 10', () => {
+        const r = render(flagged());
+        assert.match(r.content, /<td>\$11<\/td>[\s\S]*<td>\$11<\/td>[\s\S]*<td>\$10<\/td>/);
+        assert.ok(!/\$10\.67|\$21\.33/.test(r.content), 'no legacy fraction anywhere on a flagged round');
+    });
+
+    test('the same round WITHOUT the flag still draws today\'s fractions', () => {
+        const data = flagged(); delete data.skinsRounding;
+        const r = render(data);
+        assert.equal(ledgerTotal(r.content, 'A'), '21.33');
+        assert.equal(ledgerTotal(r.content, 'B'), '10.67');
+    });
+});

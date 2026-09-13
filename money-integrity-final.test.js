@@ -45,14 +45,20 @@ describe('DUPLICATION PARITY — calculateHiLoEngine (index.html vs settlement.h
 });
 
 // ============================================================================
-// PART 3 — SKINS CANONICALITY: three independent implementations (skins.html,
-// index.html's "Live" copy, settlement.html's "ForSettle" copy). Same reasoning as Hi-Lo —
-// proving parity rather than extracting.
+// PART 3 — SKINS CANONICALITY. This block used to prove PARITY between three
+// independent copies of the resolvers (skins.html, index.html's "Live" copy,
+// settlement-engine.js's "ForSettle"). The skins odd-dollar wave (2026-09-13)
+// deleted the two page copies - skins.html consumes computeSkinsPayoutLines()
+// and index.html's were never called - so there is one implementation and
+// nothing to compare. The three-way compare now reads the ONE resolver through
+// each page's realm, which proves every page reaches the same function rather
+// than that three functions happen to agree; and the structural test at the
+// end proves the copies have not come back.
 // ============================================================================
 describe('DUPLICATION PARITY — Skins engine across skins.html / index.html / settlement.html', () => {
     function threeWayCompare(players, cd, scores, scoreKey, carryOver) {
-        const fn1 = carryOver ? skinsPage.computeSkinsCarryOver : skinsPage.computeSkinsVoid;
-        const fn2 = carryOver ? ix.computeSkinsCarryOverLive : ix.computeSkinsVoidLive;
+        const fn1 = carryOver ? skinsPage.computeSkinsCarryOverForSettle : skinsPage.computeSkinsVoidForSettle;
+        const fn2 = carryOver ? ix.computeSkinsCarryOverForSettle : ix.computeSkinsVoidForSettle;
         const fn3 = carryOver ? settlement.computeSkinsCarryOverForSettle : settlement.computeSkinsVoidForSettle;
         const r1 = fn1(players, cd, scores, scoreKey);
         const r2 = fn2(players, cd, scores, scoreKey);
@@ -126,6 +132,25 @@ describe('DUPLICATION PARITY — Skins engine across skins.html / index.html / s
 // ============================================================================
 // PART 5 — ZERO-SUM AUDIT (every player-funded game, tested independently)
 // ============================================================================
+describe('DUPLICATION PARITY — the page copies stay deleted', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+    test('skins.html and index.html define no skins resolver of their own; settlement-engine.js defines each once', () => {
+        const names = ['computeSkinsVoid', 'computeSkinsCarryOver', 'getSkinsHoleScores'];
+        names.forEach(n => {
+            const re = new RegExp('function ' + n + '(Live)?\\s*\\(');
+            assert.ok(!re.test(read('skins.html')), 'skins.html grew a copy of ' + n);
+            assert.ok(!re.test(read('index.html')), 'index.html grew a copy of ' + n);
+        });
+        ['computeSkinsVoidForSettle', 'computeSkinsCarryOverForSettle', 'getSkinsHoleScoresForSettle'].forEach(n => {
+            const count = (read('settlement-engine.js').match(new RegExp('function ' + n + '\\s*\\(', 'g')) || []).length;
+            assert.equal(count, 1, n + ' must be defined exactly once, in settlement-engine.js');
+        });
+        assert.match(read('skins.html'), /<script src="settlement-engine\.js"><\/script>/, 'skins.html must load the engine it consumes');
+    });
+});
+
 describe('ZERO-SUM AUDIT — every player-vs-player monetary game', () => {
     test('Nassau (no press) is zero-sum', () => {
         const cd = makeCourseData(18);

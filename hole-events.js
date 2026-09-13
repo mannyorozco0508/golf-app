@@ -205,7 +205,12 @@ function skinsEvents(game, gameCourse, scores, before, players, hole, meId, push
         const value = award.units * now.skinValue;
         const who = nameFor(p, meId);
         const verb = who === 'You' ? 'win' : 'wins';
-        const money = value > 0 ? ` \u00B7 $${value.toFixed(0)}` : '';
+        // AN ODD-DOLLAR ROUND PRINTS NO DOLLAR HERE. Under that rule a skin's
+        // dollars depend on the FINAL skin count and move every time another is
+        // won; the count is final the moment the hole is official, the money is
+        // not. A final-looking integer that will move is worse than none. Legacy
+        // rounds keep today's figure.
+        const money = (!now.oddDollar && value > 0) ? ` \u00B7 $${value.toFixed(0)}` : '';
         push('SKIN_WON', '\uD83E\uDD69',
             `${who} ${verb} ${award.units} skin${award.units === 1 ? '' : 's'}${money}`,
             { personal: who === 'You' });

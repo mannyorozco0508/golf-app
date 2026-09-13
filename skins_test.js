@@ -3,8 +3,13 @@ const assert = require('node:assert/strict');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
+// skins.html's own copies of the resolvers were deleted in the skins odd-dollar
+// wave (2026-09-13); the page now consumes settlement-engine.js's
+// computeSkinsPayoutLines(). The page realm loads the engine, so these are the
+// resolvers the page - and settlement - actually run.
 const skins = loadHtmlInlineScript('skins.html');
-const { computeSkinsVoid, computeSkinsCarryOver } = skins;
+const computeSkinsVoid = skins.computeSkinsVoidForSettle;
+const computeSkinsCarryOver = skins.computeSkinsCarryOverForSettle;
 
 function sumPayouts(skinsList, skinValueOrFn) {
     return skinsList.reduce((s, skin) => s + skin.unitsWon * (typeof skinValueOrFn === 'function' ? skinValueOrFn(skin) : skinValueOrFn), 0);

@@ -112,7 +112,13 @@ describe('SETTLEMENT INTEGRATION GAP — Hi-Lo as main format (confirmed bug, no
 });
 
 describe('PARITY — the new Skins settlement math matches skins.html\'s actual displayed payout exactly', () => {
+    // skins.html no longer has resolvers of its own (skins odd-dollar wave,
+    // 2026-09-13): it draws computeSkinsPayoutLines(). The "page side" of this
+    // parity is therefore the engine's resolver reached through the page realm,
+    // priced the way the page's legacy branch prices it - which is what this
+    // test has always reconstructed by hand below.
     const skinsPage = loadHtmlInlineScript('skins.html');
+    skinsPage.computeSkinsCarryOver = skinsPage.computeSkinsCarryOverForSettle;
 
     test('same round, same inputs: settlement.html\'s net-of-buyin plus each player\'s buyIn equals skins.html\'s displayed gross payout', () => {
         const cd = makeCourseData(5);

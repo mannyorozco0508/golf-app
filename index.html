@@ -2042,8 +2042,8 @@ html {
 
     // --- LIVE ACTION AGGREGATOR ---
     // This is a PRESENTATION layer only. It never computes golf/money results itself - every
-    // status/dollar figure here comes straight from calculateMatchEngine, computeSkinsCarryOverLive/
-    // VoidLive, calcWolfEngine, calcDotsEngine, calculateBirdieGameTotals/calculateKPGameTotals -
+    // status/dollar figure here comes straight from calculateMatchEngine, settlement-engine.js's
+    // skins resolvers, calcWolfEngine, calcDotsEngine, calculateBirdieGameTotals/calculateKPGameTotals -
     // the exact same functions already used elsewhere on this page. Its only job is collecting
     // those existing outputs into one standardized shape so the UI can show a single glanceable
     // summary instead of forcing the golfer to mentally combine several boxes.
@@ -6382,57 +6382,6 @@ html {
     // Total strokes for the round, low total wins the stake — the simpler alternative to
     // calculateMatchEngine's hole-by-hole match play, used when a 1v1's Scoring Style is set
     // to Stroke Play. No presses, exactly 2 players — mirrors Side Matches' stroke-play logic.
-    // Mirrors skins.html's tested Skins engine exactly — used only for the live "current
-    // status" box on the scorecard. Deliberately NOT touching the separate, older Skins logic
-    // in buildPrintScorecard() below (that copy predates Carry-Over mode and always shows Void
-    // results regardless of the round's actual setting — a real, pre-existing inconsistency,
-    // documented rather than silently fixed here since it's outside this batch's scope).
-    function getSkinsHoleScoresLive(players, savedScores, h) {
-        let holeScores = [];
-        players.forEach(p => {
-            let v = savedScores[`p${p.id}_h${h.hole}`];
-            if (v && v > 0) {
-                let gross = parseInt(v, 10);
-                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                holeScores.push({ id: p.id, name: p.name, gross, net });
-            }
-        });
-        return holeScores;
-    }
-
-    function computeSkinsVoidLive(players, courseData, savedScores, scoreKey) {
-        let skins = [];
-        courseData.forEach(h => {
-            const holeScores = getSkinsHoleScoresLive(players, savedScores, h);
-            if (holeScores.length === 0) return;
-            const scores = holeScores.map(s => s[scoreKey]);
-            const min = Math.min(...scores);
-            const winners = holeScores.filter(s => s[scoreKey] === min);
-            if (winners.length === 1) skins.push({ hole: h.hole, player: winners[0], unitsWon: 1 });
-        });
-        return { skins, pendingUnits: 0 };
-    }
-
-    function computeSkinsCarryOverLive(players, courseData, savedScores, scoreKey) {
-        let skins = [];
-        let carryUnits = 1;
-        courseData.forEach(h => {
-            const holeScores = getSkinsHoleScoresLive(players, savedScores, h);
-            if (holeScores.length === 0) return;
-            const scores = holeScores.map(s => s[scoreKey]);
-            const min = Math.min(...scores);
-            const winners = holeScores.filter(s => s[scoreKey] === min);
-            if (winners.length === 1) {
-                skins.push({ hole: h.hole, player: winners[0], unitsWon: carryUnits });
-                carryUnits = 1;
-            } else {
-                carryUnits += 1;
-            }
-        });
-        const pendingUnits = carryUnits > 1 ? carryUnits - 1 : 0;
-        return { skins, pendingUnits };
-    }
-
     function calculateStrokeHeadToHead(players, courseData, savedScores, scoringType, stake) {
         if (players.length !== 2) return null;
         const p1 = players[0], p2 = players[1];

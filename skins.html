@@ -22,6 +22,10 @@
          participant-scoped instance are both real Skins games. Without this the gate
          below degrades to the old unconditional render. -->
     <script src="action-model.js"></script>
+    <!-- The skins ledger below consumes computeSkinsPayoutLines() and
+         computeSkinsHoleLedger() from settlement-engine.js; this page used to
+         carry its own copy of the resolvers and the pot arithmetic. -->
+    <script src="settlement-engine.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <style>
         :root {
@@ -508,56 +512,23 @@ html {
 
 
 
-    // Extracts a hole's score list for one player set, used by both skin-computation modes.
-    function getSkinsHoleScores(players, savedScores, h) {
-        let holeScores = [];
-        players.forEach(p => {
-            let v = savedScores[`p${p.id}_h${h.hole}`];
-            if (v && v > 0) {
-                let gross = parseInt(v, 10);
-                let net = gross - getStrokes(h.hcpIndex, parseHcp(p.hcp));
-                holeScores.push({ id: p.id, name: p.name, gross, net });
-            }
-        });
-        return holeScores;
-    }
-
-    // VOID MODE: a tied hole is simply thrown out — no skin awarded, nothing carries forward.
-    function computeSkinsVoid(players, courseData, savedScores, scoreKey) {
-        let skins = [];
-        courseData.forEach(h => {
-            const holeScores = getSkinsHoleScores(players, savedScores, h);
-            if (holeScores.length === 0) return;
-            const scores = holeScores.map(s => s[scoreKey]);
-            const min = Math.min(...scores);
-            const winners = holeScores.filter(s => s[scoreKey] === min);
-            if (winners.length === 1) skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: 1 });
-        });
-        return { skins, pendingUnits: 0 };
-    }
-
-    // CARRY-OVER MODE: each hole is worth a fixed base value (pot / total holes) set upfront.
-    // A tied hole's value stacks onto the next hole instead of vanishing, so the eventual
-    // winner takes the accumulated units — matches how a real carry-over skins game is priced,
-    // rather than the value per skin drifting based on how many holes happen to get decided.
-    function computeSkinsCarryOver(players, courseData, savedScores, scoreKey) {
-        let skins = [];
-        let carryUnits = 1;
-        courseData.forEach(h => {
-            const holeScores = getSkinsHoleScores(players, savedScores, h);
-            if (holeScores.length === 0) return;
-            const scores = holeScores.map(s => s[scoreKey]);
-            const min = Math.min(...scores);
-            const winners = holeScores.filter(s => s[scoreKey] === min);
-            if (winners.length === 1) {
-                skins.push({ hole: h.hole, par: h.par, player: winners[0], score: min, unitsWon: carryUnits });
-                carryUnits = 1;
-            } else {
-                carryUnits += 1;
-            }
-        });
-        const pendingUnits = carryUnits > 1 ? carryUnits - 1 : 0;
-        return { skins, pendingUnits };
+    // THE RESOLVERS AND THE POT MATH THAT USED TO LIVE HERE ARE GONE. This page
+    // carried its own getSkinsHoleScores / computeSkinsVoid / computeSkinsCarryOver
+    // and its own pot-halving and per-skin value - a third copy of the skins
+    // settlement, beside settlement-engine.js and bet-strip.js. It now consumes
+    // computeSkinsPayoutLines(): one line per skin, in hole order, with the
+    // dollars THAT skin pays, on the same resolvers settlement pays from. The
+    // par and the winning score are display data read from the course and the
+    // saved scores; the dollars are never derived on this page.
+    //
+    // A skin line's winning score, for the table: the raw gross, or gross less
+    // the winner's strokes on that hole for the net table.
+    function skinWinningScore(line, hole, key, savedScores, players) {
+        const raw = parseInt(savedScores[`p${line.playerId}_h${hole.hole}`], 10);
+        if (isNaN(raw)) return '';
+        if (key === 'gross') return raw;
+        const p = players.find(x => String(x.id) === String(line.playerId));
+        return p ? raw - getStrokes(hole.hcpIndex, parseHcp(p.hcp)) : raw;
     }
 
     function renderSkinsEngine() {
@@ -654,9 +625,11 @@ html {
         const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
         // ONE RESOLVER, NOT A SECOND OPINION. This read `!== false` - absent meant
         // CARRY - while settlement asks skinsCarriesOver(), where absent means NO
-        // carry. Same round, two answers, and line 672 below picks
-        // computeSkinsCarryOver vs computeSkinsVoid off this value, so it was not a
-        // label: this page COMPUTED one rule while the Receipt paid the other.
+        // carry. Same round, two answers, and this page's own resolvers (since
+        // removed) picked carry vs void off this value, so it was not a label:
+        // this page COMPUTED one rule while the Receipt paid the other. The
+        // value is now only a label - the switch and the carry note - while the
+        // engine's lines decide the money.
         // Measured on a fieldless round: this page showed Cal $7.22 coming, the
         // Receipt said he owed $10.
         // The typeof guard is the same shape settlement-engine.js uses, and the
@@ -673,41 +646,42 @@ html {
         document.getElementById("skins-carry-label-off").classList.toggle('active', !carryOver);
         document.getElementById("skins-carry-label-on").classList.toggle('active', carryOver);
 
-        let totalPot = buyIn * players.length;
-        let grossPot = 0, netPot = 0;
-        if (potFormat === 'split') { grossPot = totalPot / 2; netPot = totalPot / 2; }
-        else if (potFormat === 'gross') { grossPot = totalPot; }
-        else if (potFormat === 'net') { netPot = totalPot; }
-
+        // ONE SOURCE FOR EVERY DOLLAR ON THIS PAGE. The engine resolves the skins
+        // and prices them; on a legacy round that is today's float per skin (or
+        // per hole under carry), on an odd-dollar round it is the whole-dollar
+        // allocation in hole order. The lines carry the winner and the value;
+        // the tables below add par and the winning score from the course and
+        // the saved scores.
+        const L = computeSkinsPayoutLines(currentData, courseData, savedScores);
+        const grossResult = L.gross, netResult = L.net;
+        const totalPot = grossResult.pot + netResult.pot;
         const totalHoles = courseData.length;
-        const computeFn = carryOver ? computeSkinsCarryOver : computeSkinsVoid;
-        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(players, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
-        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(players, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
-
-        // In Void mode the value per skin depends on how many holes actually got decided (the
-        // original behavior). In Carry-Over mode the value per hole is fixed upfront and units
-        // stack, so it's pot / total holes instead.
-        const grossSkinValue = carryOver
-            ? (totalHoles > 0 ? grossPot / totalHoles : 0)
-            : (grossResult.skins.length > 0 ? grossPot / grossResult.skins.length : 0);
-        const netSkinValue = carryOver
-            ? (totalHoles > 0 ? netPot / totalHoles : 0)
-            : (netResult.skins.length > 0 ? netPot / netResult.skins.length : 0);
+        const oddDollar = L.rule === 'odd-dollar';
+        const holeOf = (n) => courseData.find(h => h.hole === n) || { hole: n, par: '', hcpIndex: 0 };
+        // A representative per-skin figure for the pot boxes. Under the legacy
+        // rule every skin is worth the same; under the odd-dollar rule skins
+        // differ by a dollar, so the boxes show the pot itself and the tables
+        // carry each skin's own dollars.
+        const perSkin = (half) => half.lines.length > 0 ? half.lines[0].value / (half.lines[0].units || 1) : 0;
+        const grossSkinValue = carryOver ? (totalHoles > 0 ? grossResult.pot / totalHoles : 0) : perSkin(grossResult);
+        const netSkinValue = carryOver ? (totalHoles > 0 ? netResult.pot / totalHoles : 0) : perSkin(netResult);
 
         let playerStats = {};
         players.forEach(p => { playerStats[p.id] = { name: p.name, grossCount: 0, netCount: 0, payout: 0 }; });
-
-        grossResult.skins.forEach(s => {
-            playerStats[s.player.id].grossCount += 1;
-            playerStats[s.player.id].payout += s.unitsWon * grossSkinValue;
+        grossResult.lines.forEach(l => {
+            if (!playerStats[l.playerId]) return;
+            playerStats[l.playerId].grossCount += 1;
+            playerStats[l.playerId].payout += l.value;
         });
-        netResult.skins.forEach(s => {
-            playerStats[s.player.id].netCount += 1;
-            playerStats[s.player.id].payout += s.unitsWon * netSkinValue;
+        netResult.lines.forEach(l => {
+            if (!playerStats[l.playerId]) return;
+            playerStats[l.playerId].netCount += 1;
+            playerStats[l.playerId].payout += l.value;
         });
 
         // Any carry still pending when the round ends has nowhere left to go — split it evenly
         // across everyone so the full pot is always accounted for, instead of quietly vanishing.
+        // (Carry rounds are legacy-priced: units x pot/holes, as the engine's lines are.)
         if (carryOver && grossResult.pendingUnits > 0 && players.length > 0) {
             const share = (grossResult.pendingUnits * grossSkinValue) / players.length;
             players.forEach(p => playerStats[p.id].payout += share);
@@ -717,16 +691,38 @@ html {
             players.forEach(p => playerStats[p.id].payout += share);
         }
 
-        let html = `
+        // PROVISIONAL UNTIL THE LAST OFFICIAL HOLE. computeSkinsHoleLedger() knows
+        // which holes every participant has posted; while that is short of the
+        // wager's hole count, an odd-dollar round's integers will still move
+        // (the remainder follows the final skin count), so the ledger says so.
+        let provisional = '';
+        if (oddDollar && typeof computeSkinsHoleLedger === 'function') {
+            const HL = computeSkinsHoleLedger(currentData, courseData, savedScores);
+            const halves = [HL.gross, HL.net].filter(Boolean);
+            const thru = halves.length ? Math.min.apply(null, halves.map(h => h.officialThru || 0)) : 0;
+            if (thru < totalHoles) {
+                provisional = `<div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.8rem; color:var(--warn-text);">
+                    Provisional \u2014 official through Hole ${thru}. Skins pay whole dollars, and the extra dollars follow the final skin count, so these figures can still move.
+                </div>`;
+            }
+        }
+
+        const money = (v) => oddDollar ? `$${v}` : `$${v.toFixed(2)}`;
+        let html = provisional + `
             <div class="pot-summary">
                 <div class="pot-box">
                     <span class="pot-label">Total Pot</span>
-                    <span class="pot-val">$${totalPot.toFixed(2)}</span>
+                    <span class="pot-val">${money(totalPot)}</span>
                 </div>
         `;
 
         if (potFormat === 'split' || potFormat === 'gross') {
-            html += `
+            html += oddDollar ? `
+                <div class="pot-box">
+                    <span class="pot-label">Gross Pot</span>
+                    <span class="pot-val">$${grossResult.pot} <span style="font-size:0.7rem; font-weight:normal;">/ ${grossResult.lines.length} skin${grossResult.lines.length === 1 ? '' : 's'}</span></span>
+                </div>
+            ` : `
                 <div class="pot-box">
                     <span class="pot-label">Gross Value</span>
                     <span class="pot-val">$${grossSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
@@ -734,7 +730,12 @@ html {
             `;
         }
         if (potFormat === 'split' || potFormat === 'net') {
-            html += `
+            html += oddDollar ? `
+                <div class="pot-box">
+                    <span class="pot-label">Net Pot</span>
+                    <span class="pot-val">$${netResult.pot} <span style="font-size:0.7rem; font-weight:normal;">/ ${netResult.lines.length} skin${netResult.lines.length === 1 ? '' : 's'}</span></span>
+                </div>
+            ` : `
                 <div class="pot-box">
                     <span class="pot-label">Net Value</span>
                     <span class="pot-val">$${netSkinValue.toFixed(2)} <span style="font-size:0.7rem; font-weight:normal;">/ ${carryOver ? 'hole' : 'skin'}</span></span>
@@ -755,18 +756,20 @@ html {
 
         // Render Gross Skins Table
         if (potFormat === 'split' || potFormat === 'gross') {
-            html += `<h3>Gross Skins Won (${grossResult.skins.length})</h3>`;
-            if (grossResult.skins.length === 0) {
+            html += `<h3>Gross Skins Won (${grossResult.lines.length})</h3>`;
+            if (grossResult.lines.length === 0) {
                 html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright gross skins won yet.</div>`;
             } else {
-                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
-                grossResult.skins.forEach(s => {
+                const wonCol = carryOver || oddDollar;
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Gross</th>${wonCol ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                grossResult.lines.forEach(l => {
+                    const h = holeOf(l.hole);
                     html += `<tr>
-                        <td>${s.hole}</td>
-                        <td style="color:var(--text-muted);">${s.par}</td>
-                        <td class="winner-name">${escapeHtml(s.player.name)}</td>
-                        <td><span class="score-circle">${s.score}</span></td>
-                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * grossSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${grossSkinValue.toFixed(2)}`}</td>` : ''}
+                        <td>${l.hole}</td>
+                        <td style="color:var(--text-muted);">${h.par}</td>
+                        <td class="winner-name">${escapeHtml(l.playerName)}</td>
+                        <td><span class="score-circle">${skinWinningScore(l, h, 'gross', savedScores, players)}</span></td>
+                        ${wonCol ? `<td>${oddDollar ? `$${l.value}` : (l.units > 1 ? `$${l.value.toFixed(2)} (${l.units}x)` : `$${l.value.toFixed(2)}`)}</td>` : ''}
                     </tr>`;
                 });
                 html += `</tbody></table>`;
@@ -775,18 +778,20 @@ html {
 
         // Render Net Skins Table
         if (potFormat === 'split' || potFormat === 'net') {
-            html += `<h3>Net Skins Won (${netResult.skins.length})</h3>`;
-            if (netResult.skins.length === 0) {
+            html += `<h3>Net Skins Won (${netResult.lines.length})</h3>`;
+            if (netResult.lines.length === 0) {
                 html += `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">No outright net skins won yet.</div>`;
             } else {
-                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th>${carryOver ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
-                netResult.skins.forEach(s => {
+                const wonCol = carryOver || oddDollar;
+                html += `<table class="skin-table"><thead><tr><th>Hole</th><th>Par</th><th style="text-align:left;">Winner</th><th>Net</th>${wonCol ? '<th>Won</th>' : ''}</tr></thead><tbody>`;
+                netResult.lines.forEach(l => {
+                    const h = holeOf(l.hole);
                     html += `<tr>
-                        <td>${s.hole}</td>
-                        <td style="color:var(--text-muted);">${s.par}</td>
-                        <td class="winner-name">${escapeHtml(s.player.name)}</td>
-                        <td><span class="score-circle">${s.score}</span></td>
-                        ${carryOver ? `<td>${s.unitsWon > 1 ? `$${(s.unitsWon * netSkinValue).toFixed(2)} (${s.unitsWon}x)` : `$${netSkinValue.toFixed(2)}`}</td>` : ''}
+                        <td>${l.hole}</td>
+                        <td style="color:var(--text-muted);">${h.par}</td>
+                        <td class="winner-name">${escapeHtml(l.playerName)}</td>
+                        <td><span class="score-circle">${skinWinningScore(l, h, 'net', savedScores, players)}</span></td>
+                        ${wonCol ? `<td>${oddDollar ? `$${l.value}` : (l.units > 1 ? `$${l.value.toFixed(2)} (${l.units}x)` : `$${l.value.toFixed(2)}`)}</td>` : ''}
                     </tr>`;
                 });
                 html += `</tbody></table>`;
@@ -813,7 +818,7 @@ html {
                 <td class="winner-name">${escapeHtml(p.name)}</td>
                 ${potFormat === 'split' || potFormat === 'gross' ? `<td>${p.grossCount}</td>` : ''}
                 ${potFormat === 'split' || potFormat === 'net' ? `<td>${p.netCount}</td>` : ''}
-                <td class="${moneyClass}">$${p.payout.toFixed(2)}</td>
+                <td class="${moneyClass}">${money(p.payout)}</td>
             </tr>`;
         });
 

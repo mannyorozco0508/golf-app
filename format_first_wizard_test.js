@@ -474,7 +474,22 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // hashes to notice - including that a legacy single-stake wager and a uniform
         // $20/$20/$20 wager settle byte-identically, so no round already paid in cash
         // moves, and that the live strip and the receipt quote the same prices.
-        'settlement-engine.js': 'dec9585ed6f5f236b9dce26cb823d50b5684b56ab27a67268119fb7de2d10fbc',
+        // Previous hash, for the record:
+        //   dec9585ed6f5f236b9dce26cb823d50b5684b56ab27a67268119fb7de2d10fbc
+        // RE-PINNED 2026-09-13, with Manny's explicit per-file approval for the
+        // skins odd-dollar wave (Wave 1, Step 3): three functions ADDED
+        // (allocateSkinsOddDollar, skinsOddDollarApplies, computeSkinsPayoutLines)
+        // and ONE early branch at the top of computeSkinsSettlementNet that pays
+        // an odd-dollar round from the per-skin ledger. Gated per round by
+        // skinsRounding: 'odd-dollar'; a round without the flag never enters the
+        // branch and everything after it is byte-for-byte what it was.
+        //
+        // THE HASH IS NOT WHAT GUARDS THAT. skins_golden_test.js freezes three
+        // flagless rounds (no-carry, carry, and the rounding-repair tie-break) to
+        // the float, captured at 034a4d0 before this change; skins_odd_dollar_
+        // test.js holds the rule itself, the gate, the pool-bucket parity and the
+        // stacked-instance inheritance.
+        'settlement-engine.js': '783a1039d83f0a1b7217d7a2e806fd6ffad42f5754b7d26c3093cf384268b5c5',
         'pool-engine.js': 'c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
@@ -529,8 +544,22 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // tools/skins-carry-agreement-check.js; this hash only proves the file did
         // not otherwise move. Previous hash, for the record:
         //   60f17c6db798a8d66212d00c02baac3ab94bb532c28f78cca5b3c42f10831673
-        'bet-strip.js': '48d96b32b108250cbdffd383530cf1f0b9b278befd40e0582e297fcad279bf79',
-        'hole-events.js': '4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf',
+        // Previous hashes, for the record:
+        //   bet-strip.js   48d96b32b108250cbdffd383530cf1f0b9b278befd40e0582e297fcad279bf79
+        //   hole-events.js 4f16bd6b58db89cad5354ed63d2eea4a1ab67e6b789603005b4a1dc0ef8f74cf
+        // RE-PINNED 2026-09-13, with Manny's explicit per-file approval for the
+        // skins odd-dollar wave (Wave 1, Step 4). bet-strip.js: skinsStatePot
+        // prices an odd-dollar round's awards from the ENGINE - its half-pots
+        // from computeSkinsPayoutLines and each award's dollars from
+        // allocateSkinsOddDollar over the strip's own official-only awards; the
+        // legacy branch is the same expression it was, and skinsState carries a
+        // new `oddDollar` flag. hole-events.js: ONE line - the SKIN_WON recap
+        // card prints no dollar on an odd-dollar round, because that dollar is
+        // not final until the last skin; :218 and every carry path untouched.
+        // skins_live_surfaces_test.js pins both, including the deliberate
+        // mid-round divergence between the strip's awards and the engine's lines.
+        'bet-strip.js': '59cb038116ee43b05a2a975a0dce57916bb18dfa48a305add18eedbfea5cc336',
+        'hole-events.js': 'bb759cb19c7eb66365fd6b746568de8e016813bbfce4fd34725794b9775d2def',
         'score-marks.js': '02f972d6d2fc7cad5c586eb74bcbcafaa1face8a8ba6bba46f4abf0154b5c3f3',
         // RE-PINNED for the trips delete rule, with explicit per-file approval.
         // trips/$tripCode went from ".write": true to

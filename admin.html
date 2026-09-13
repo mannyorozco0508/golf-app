@@ -5163,7 +5163,17 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
         const isThisRound = String(modeKey) === String(currentMode);
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
-            if (isThisRound) {
+            // AN EXISTING ROUND HAS A RECORD. A brand-new round arrives on this
+            // same path - the lobby mints a code and lands on ?game=CODE before
+            // anything is written - and until 2026-09-13 this line set
+            // loadedExistingRound for it too, because the code matched. Every
+            // round created through the wizard therefore had settlementMode
+            // DELETED from its first save and settled in cents; the whole-dollar
+            // default had no round it could ever apply to. Measured in
+            // skins_flag_persistence_test.js by arriving on a fresh code and
+            // letting this load resolve before saving. snapshot.exists() is the
+            // difference between "this code" and "this round".
+            if (isThisRound && snapshot.exists()) {
                 loadedExistingRound = true;
                 loadedOrganizerToken = data.organizerToken || null;
             }
@@ -5926,6 +5936,18 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
                 // new round wants the same answer. The organizer can still switch an
                 // in-progress round from the admin panel.
                 settlementMode: 'whole-dollar',
+                // SKINS ROUNDING - new rounds pay skins in whole dollars.
+                //
+                // base = floor(pot / skins won), the remainder one dollar each in
+                // hole order (settlement-engine.js, the odd-dollar rule). Written
+                // at creation, like settlementMode and for the same reason: it is
+                // a property of THIS round, never a global switch, so a round
+                // already played keeps the float math it was settled under -
+                // settlement is recomputed from raw scores on every open. Same
+                // guard below: deleted from the payload when editing an existing
+                // round. No setup question, no toggle; a round that carries takes
+                // the legacy path on its own (skinsOddDollarApplies()).
+                skinsRounding: 'odd-dollar',
                 // ORGANIZER TOKEN.
                 //
                 // A bearer token for the final-score-review workflow. It exists because
@@ -6023,6 +6045,11 @@ Tom Wilson, +2" oninput="previewPastedPlayers()"></textarea>
             // round deliberately from the admin panel, which is where that decision
             // belongs.
             if (loadedExistingRound) delete payload.settlementMode;
+            // The skins rounding flag, the same way and for the same reason: a
+            // round played under the float math stays under it. A COPY of an old
+            // round is a NEW round - loadedExistingRound is false on the copy
+            // path - so it gets the flag, exactly as it gets settlementMode.
+            if (loadedExistingRound) delete payload.skinsRounding;
 
             // UNNAMED GOLFERS ARE A CHOICE. THIS IS WHERE IT GETS MADE.
             //

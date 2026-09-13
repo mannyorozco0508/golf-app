@@ -68,6 +68,11 @@ const DECLARED = {
         + 'the payload when editing an existing one so the stored value - including '
         + "a legacy round's deliberate absence, meaning cents - is never touched. "
         + 'Guarded by NO_SILENT_MODE_CONVERSION below.',
+    skinsRounding:
+        'ONE-WAY FOR NEW ROUNDS ONLY, like settlementMode. Written as '
+        + "'odd-dollar' for a brand-new round (skins pay whole dollars); DELETED "
+        + 'from the payload when editing an existing one so a round played under '
+        + 'the float math keeps it. Guarded by skins_flag_persistence_test.js.',
     richHoleBet:
         'RETIRED FIELD. Written as null to clear legacy data; nothing reads it.',
     richHoleBetPresses:
@@ -126,8 +131,12 @@ describe('the organizer link survives a re-save', () => {
         // organizer token into a new round would hand out its secret.
         const body = fnBody('loadModeData');
         assert.match(body, /const isThisRound = String\(modeKey\) === String\(currentMode\)/);
-        assert.match(body, /if \(isThisRound\) \{/,
-            'the capture must be gated on editing this round, not copying another');
+        // "This round" is the code AND a stored record. A brand-new round arrives
+        // on ?game=CODE before anything is written; until 2026-09-13 the plain
+        // `if (isThisRound)` marked it as existing and deleted settlementMode from
+        // its first save (skins_flag_persistence_test.js measures the arrival).
+        assert.match(body, /if \(isThisRound && snapshot\.exists\(\)\) \{/,
+            'the capture must be gated on editing this round - code AND record - not copying another, and not a fresh code');
     });
 });
 
