@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v129: the hole landing shows the heading and opens no keyboard.
+//
+// index.html, after a real round on v128. Next, Prev and the 1-18 jump now scroll
+// so the hole heading ("Hole 5 · Par 4") sits at the top with the score boxes
+// under it, instead of the first box at the top with the heading above the fold;
+// and nothing is focused on a hole change, so the keyboard no longer covers the
+// page on every Next. Auto-advance while entering scores, the pending-score
+// commit and the tap guards from v128 are unchanged. An installed device on v128
+// keeps the heading-less landing and the keyboard pop.
+
 // Moved to v128: Hole View lands on the first score box, and Next never misses.
 //
 // index.html. Next, Prev and the 1-18 jump now scroll so the next hole's first
@@ -1225,7 +1235,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v128-hole-landing';
+const CACHE_VERSION = 'golfapp-v129-hole-heading';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

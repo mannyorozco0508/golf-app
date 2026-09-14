@@ -407,13 +407,14 @@ describe('ONE PRESENTER, AND THE LAYOUT HOLDS', () => {
 
 // ---------------------------------------------------------------------------
 describe('PART 3 IS NOT REOPENED', () => {
-    test('the hole landing measures the first score box and knows nothing about Dots', () => {
+    test('the hole landing measures the hole heading and knows nothing about Dots', () => {
         // RE-PINNED 2026-09-14: withNavAnchor (a measured nav-row delta) became
-        // landOnHole (an explicit scroll to the first score box). A taller Dots
-        // board above the boxes is simply part of the measured position.
+        // landOnHole (an explicit scroll to the hole heading; v128 anchored the
+        // first box). A taller Dots board above the heading is simply part of the
+        // measured position.
         const fn = IDX.slice(IDX.indexOf('function landOnHole'),
             IDX.indexOf('\n    function ', IDX.indexOf('function landOnHole') + 30));
-        assert.match(fn, /first\.getBoundingClientRect\(\)\.top/);
+        assert.match(fn, /anchor\.getBoundingClientRect\(\)\.top/);
         assert.ok(!/ld-row|ld-chips|renderDotsWidgetHtml|LIVE DOTS/.test(fn),
             'a taller board is just a different measurement — never a hardcoded offset');
         assert.ok(!/setTimeout/.test(fn));

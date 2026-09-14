@@ -2125,21 +2125,23 @@ html {
     // landing is now the boxes, and it is the same every time.
     //
     // THE RULE. After every Hole View navigation - Next, Prev, and the 1-18 jump,
-    // all three - the page scrolls so the FIRST score box sits HOLE_LANDING_OFFSET
-    // px from the top of the viewport (an explicit scrollTo, direct, never smooth,
-    // never a nudge from wherever the page was), and then the first EMPTY box a
-    // golfer may write to is focused and selected. A hole whose golfers all have
-    // a score focuses NOTHING - no keyboard over a completed hole. Disabled boxes
-    // (a spectator, another group's rows) are skipped by the focus and ignored by
-    // nothing else: the scroll still lands the same.
+    // all three - the page scrolls so the HOLE HEADING ("Hole 5 · Par 4") sits
+    // HOLE_LANDING_OFFSET px from the top of the viewport with the score boxes
+    // directly under it: an explicit scrollTo, direct, never smooth, never a nudge
+    // from wherever the page was. Nothing is focused.
     //
-    // THE FOCUS LIVES HERE, IN THE NAVIGATION HANDLERS, AND NOWHERE ELSE. Never in
-    // renderHoleView(), which also runs on every snapshot: a score arriving from
-    // another group would pop this device's keyboard. And it runs SYNCHRONOUSLY
-    // inside the tap's click, which is the only place iOS opens the keyboard for a
-    // programmatic focus - the same rule auto-advance depends on.
+    // WHY THE HEADING, AND WHY NO FOCUS (2026-09-14, after a real round on v128).
+    // v128 put the FIRST SCORE BOX at the top and focused the first empty one. On
+    // the course that meant the heading was above the fold - a golfer scrolled up
+    // to confirm which hole they were on - and the keyboard opened over the page
+    // on every Next. So the anchor is the heading element itself (measured: the
+    // first box sits 80px below the heading's top on a 4- and an 8-golfer card,
+    // so anchoring the box at any small offset clips the heading), and the focus
+    // is gone. Auto-advance while ENTERING scores (handleScoreInput) is untouched:
+    // once a golfer taps into a box, typing still walks to the next golfer.
     //
-    // FAIL OPEN. No card, no boxes, no scroll API: navigation still happens.
+    // FAIL OPEN. No card, no heading and no boxes, no scroll API: navigation still
+    // happens. With no heading (a hole with no data) the first box is the anchor.
     const HOLE_LANDING_OFFSET = 12;
 
     // THE TAP THAT WENT NOWHERE (fix 1). A score typed and not yet left - a lone
@@ -2166,27 +2168,18 @@ html {
 
     function landOnHole() {
         const card = document.getElementById('hole-view-card');
-        if (!card || typeof card.querySelectorAll !== 'function') return;
-        const boxes = Array.from(card.querySelectorAll('.score-input'));
-        const first = boxes[0];
-        if (!first) return;
+        if (!card || typeof card.querySelector !== 'function') return;
+        const anchor = card.querySelector('.hole-view-header') || card.querySelector('.score-input');
+        if (!anchor) return;
         // THE SCROLL: an absolute target, so the landing is identical whatever the
         // golfer count, the banners above, or where the page was.
         try {
-            if (first.getBoundingClientRect && typeof window.scrollTo === 'function') {
-                const y = first.getBoundingClientRect().top + (window.pageYOffset || 0) - HOLE_LANDING_OFFSET;
+            if (anchor.getBoundingClientRect && typeof window.scrollTo === 'function') {
+                const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0) - HOLE_LANDING_OFFSET;
                 window.scrollTo(0, Math.max(0, y));
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }
-        // THE FOCUS: the first EMPTY writable box, or nothing.
-        const empty = boxes.find(b => !b.disabled && !String(b.value === undefined || b.value === null ? '' : b.value).trim());
-        if (!empty) return;
-        // Announced by identity, as auto-advance does, so a rebuild raised while
-        // this focus() runs restores the same box instead of dropping to <body>.
-        pendingScoreFocus = scoreBoxIdentity(empty);
-        try { empty.focus(); if (typeof empty.select === 'function') empty.select(); }
-        catch (e) { /* a disabled or detached box: no keyboard, no harm */ }
-        finally { pendingScoreFocus = null; }
+        // NO FOCUS HERE, deliberately - see the note above.
     }
 
     function goToAdjacentHole(delta) {

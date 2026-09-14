@@ -188,10 +188,10 @@ describe('HOLE NAVIGATION', () => {
         assert.ok(!/scrollToHoleCard\(\)|withNavAnchor\(/.test(fn), 'neither earlier scroll rule');
     });
 
-    test('the landing targets the first score box, not the card and not the page top', () => {
+    test('the landing targets the hole heading (v129; v128 anchored the first box), not the card and not the page top', () => {
         const at = IDX.indexOf('function landOnHole');
         const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
-        assert.match(fn, /querySelectorAll\('\.score-input'\)/, 'must target the boxes');
+        assert.match(fn, /querySelector\('\.hole-view-header'\)/, 'must target the heading');
         assert.match(fn, /- HOLE_LANDING_OFFSET/, 'a small offset keeps the box off the edge');
         assert.ok(!/scrollTo\(0, 0\)|top: 0/.test(fn), 'scrolling to page top would lose the hole');
     });
