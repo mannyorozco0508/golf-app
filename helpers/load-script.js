@@ -345,6 +345,14 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
         vm.runInContext(depCode, sandbox, { filename: depPath });
     });
 
+    // BEFORE THE PAGE RUNS. A page issues its arrival reads at parse time, so a
+    // test that must shape those reads - delay one, reorder two, reject one -
+    // has to patch sandbox.db.ref before the inline script runs, not after. The
+    // stub above resolves every read on the next tick in the order it was asked,
+    // which is an order the product never guarantees; arrival_loader_test.js is
+    // the test that exists because that fixed order hid a race.
+    if (options && typeof options.beforeRun === 'function') options.beforeRun(sandbox);
+
     try {
         vm.runInContext(inlineCode, sandbox, { filename: relativePath });
     } catch (e) {

@@ -2311,7 +2311,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             link.href = navHref;
         });
 
-        loadModeData(currentMode);
+        // ONE LOADER ON ARRIVAL. loadModeData(currentMode) used to be called here
+        // as well as from the arrival block near the end of this script. Two loads
+        // of the same page raced: each ends by wiping #player-list and rebuilding
+        // it, so whichever read resolved last owned the roster. A copy
+        // (?copyFrom=OLD) whose events/NEW read landed last lost its 23 golfers to
+        // one blank row, and a fresh code opened Step 5 with TWO blank rows. The
+        // arrival block is the one place that decides: an edit loads the round, a
+        // copy loads the source, a fresh code adds the blank row.
     }
 
     function resumeGame() {
@@ -5576,8 +5583,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function loadModeData(modeKey) {
         const isThisRound = String(modeKey) === String(currentMode);
-        db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
+        return db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
+            // THE ROSTER IS REBUILT LAST, AND A FAILURE IS SAID OUT LOUD. Everything
+            // between here and the roster rebuild is the settings restore; an
+            // exception in it used to be a silent unhandled rejection inside this
+            // .then - the banner up, the format select at its default, no golfers -
+            // indistinguishable from the double-load race this page used to have.
+            // Now the restore is tried, the roster is rebuilt regardless, and the
+            // failure is reported with its message.
+            let restoreFailure = null;
+            try {
             // AN EXISTING ROUND HAS A RECORD. A brand-new round arrives on this
             // same path - the lobby mints a code and lands on ?game=CODE before
             // anything is written - and until 2026-09-13 this line set
@@ -5756,6 +5772,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             setFlightScope('birdies', flOn && fl.scopes && fl.scopes.birdies === 'field' ? 'field' : 'flight');
             setFlightsEnabled(flOn);
 
+            } catch (err) {
+                restoreFailure = err;
+            }
+
             if (data.players && data.players.length > 0) {
                 storedPlayersTemp = data.players;
             } else {
@@ -5768,7 +5788,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             } else {
                 addPlayerRow(); 
             }
+
+            if (restoreFailure) reportRoundLoadFailure(modeKey, restoreFailure);
+        }).catch(err => {
+            // The read itself, or the roster rebuild, failed: say so - never a
+            // silent rejection with a half-drawn wizard behind it.
+            reportRoundLoadFailure(modeKey, err);
         });
+    }
+
+    function reportRoundLoadFailure(modeKey, err) {
+        const msg = String((err && err.message) || err || 'unknown error');
+        console.error('loadModeData(' + modeKey + ') failed:', err);
+        alert('\u26A0\uFE0F Some of round ' + String(modeKey).toUpperCase() + '\u2019s settings could not be loaded.\n\n'
+            + msg + '\n\nCheck every step before saving.');
     }
 
     // Converts the internal signed handicap number back to standard golf notation for display.
@@ -6642,6 +6675,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     if (currentMode) {
+        // THE ONE LOADER ON ARRIVAL. This block decides, and nothing else loads:
+        // an edit loads the round; a copy loads the source; a fresh code loads
+        // its own (empty) record, which sets every control to its default and
+        // adds the ONE blank row. The parse-time loadModeData(currentMode) that
+        // used to run beside this raced it - see the note where it was removed.
         db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
@@ -6653,7 +6691,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     const banner = document.getElementById('copy-from-banner');
                     if (banner) banner.style.display = 'block';
                 } else {
-                    addPlayerRow();
+                    loadModeData(currentMode);
                 }
                 // Fresh round, nothing saved yet - starting at Step 1 (already done above) is right.
             } else {

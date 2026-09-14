@@ -40,28 +40,40 @@ const SOURCE = { eventName: 'Thu', gameFormat: 'stroke', activeCourseKey: 'comm_
 // A lobby (no ?game), with the db stub answering per code: records[code] is the
 // round, or null for "no such round". Every other code is free (the issuer's
 // existence check reads null).
-function lobby(records, search) {
-    const sb = loadHtmlInlineScript('admin.html', [], search ? { search } : undefined);
-    sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function (m) { window.__alerts.push(String(m)); }; window.__alerts = []; window.__once = [];');
-    const orig = sb.db.ref.bind(sb.db);
-    sb.db.ref = (p) => {
-        const r = orig(p);
-        const m = /^events\/([A-Z0-9]+)$/.exec(p);
-        r.once = () => {
-            run(sb, 'window.__once.push(' + JSON.stringify(p) + ')');
-            const rec = m && Object.prototype.hasOwnProperty.call(records, m[1]) ? records[m[1]] : null;
-            return Promise.resolve({ val: () => (rec ? J(rec) : null), exists: () => rec != null });
+// THE STUB IS INSTALLED BEFORE THE PAGE RUNS (beforeRun) and can DELAY a read
+// per path and per call (delays: { 'events/CODE': [ms1, ms2, ...] }). The first
+// version of this file patched db.ref AFTER the page had parsed, with once()
+// resolving on the next tick - so the page's arrival reads never went through
+// it, and the ones that did resolved in the order they were asked. That fixed
+// an order the product never guaranteed and hid the double-load race the
+// arrival tests below now drive (arrival_loader_test.js drives every ordering).
+function lobby(records, search, delays) {
+    const seen = {}; const once = [];
+    const sb = loadHtmlInlineScript('admin.html', [], { search: search || '', beforeRun: (sandbox) => {
+        const orig = sandbox.db.ref.bind(sandbox.db);
+        sandbox.db.ref = (p) => {
+            const r = orig(p);
+            const m = /^events\/([A-Z0-9]+)$/.exec(p);
+            r.once = () => {
+                seen[p] = (seen[p] || 0) + 1;
+                const ms = (delays && delays[p] && delays[p][seen[p] - 1]) || 0;
+                once.push(p);
+                const rec = m && Object.prototype.hasOwnProperty.call(records, m[1]) ? records[m[1]] : null;
+                return new Promise(res => setTimeout(() => res({ val: () => (rec ? J(rec) : null), exists: () => rec != null }), ms));
+            };
+            return r;
         };
-        return r;
-    };
+        sandbox.crypto = require('crypto').webcrypto;
+    } });
+    run(sb, 'alert = function (m) { window.__alerts.push(String(m)); }; window.__alerts = [];');
     run(sb, 'globalCourses = ' + JSON.stringify({ comm_links: { name: 'Test Links', data: CD } }) + ';');
+    sb.__once = once;
     return sb;
 }
 const settle = () => new Promise(r => setTimeout(r, 40));
 const dest = (sb) => String(sb.location.href);
 const alerts = (sb) => J(run(sb, 'window.__alerts'));
-const onces = (sb) => J(run(sb, 'window.__once'));
+const onces = (sb) => sb.__once.slice();
 const params = (href) => Object.fromEntries([...new URLSearchParams(href.split('?')[1] || '')]);
 
 describe('FIX 1 - the lobby field', () => {
@@ -87,10 +99,11 @@ describe('FIX 1 - the lobby field', () => {
         await settle();
         assert.equal(params(dest(sb)).copyFrom, 'OLDR2');
     });
-    test('the copied wizard: arriving on the minted URL shows the banner and the roster with tags, at Step 3', async () => {
-        const sb = lobby({ OLDR3: SOURCE }, '?game=NEWR3&copyFrom=OLDR3');
+    test('the copied wizard, with the NEW read landing slow: the banner and the roster with tags arrive', async () => {
+        // The losing order of the old double load: events/NEW resolves late.
+        const sb = lobby({ OLDR3: SOURCE }, '?game=NEWR3&copyFrom=OLDR3', { 'events/NEWR3': [200] });
         run(sb, 'document.__mount(document.getElementById("player-list"));');
-        await settle(); await settle();
+        await new Promise(r => setTimeout(r, 500));
         assert.equal(run(sb, "document.getElementById('copy-from-banner').style.display"), 'block');
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 4);
         assert.deepEqual(J(run(sb, 'captureCurrentPlayerInputs().map(function (p) { return [p.id, p.flight]; })')), [[101, 'A'], [102, 'B'], [103, 'A'], [104, 'B']]);
@@ -126,9 +139,9 @@ describe('FIX 1 - the lobby field', () => {
     });
     test('the arrival guard is untouched: a source typo that names a LIVE round cannot open it as an edit, because the NEW code is the one that opens', async () => {
         // The minted code has no players, so the copy runs; the source is only read.
-        const sb = lobby({ OLDR4: SOURCE }, '?game=NEWR4&copyFrom=OLDR4');
+        const sb = lobby({ OLDR4: SOURCE }, '?game=NEWR4&copyFrom=OLDR4', { 'events/NEWR4': [150], 'events/OLDR4': [50] });
         run(sb, 'document.__mount(document.getElementById("player-list"));');
-        await settle(); await settle();
+        await new Promise(r => setTimeout(r, 500));
         assert.equal(run(sb, 'currentMode'), 'NEWR4');
         assert.equal(run(sb, 'loadedExistingRound'), false);
         assert.ok(!sb.__dbWrites.some(w => w.path.startsWith('events/OLDR4')), 'nothing written to the source');

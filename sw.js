@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v124: one loader on arrival.
+//
+// admin.html loaded a new round TWICE - once as the page parsed and once from
+// the arrival block - and each load ended by wiping the roster and rebuilding
+// it, so whichever read resolved last owned it. A copy (Start from a previous
+// round) whose own empty read landed last showed the copied-from banner over
+// ONE blank row: 23 golfers gone. A fresh code opened Step 5 with two blank
+// rows. Now the arrival block is the only loader (an edit loads the round, a
+// copy loads the source, a fresh code loads its own empty record and adds the
+// one row), the roster is rebuilt last, and a failure inside the restore is
+// reported with its message instead of vanishing as an unhandled rejection.
+//
+// An installed device on v123 can lose the copied roster to the race and
+// opens every fresh round with two blank rows.
+
 // Moved to v123: start a new round from a previous one, from the lobby.
 //
 // admin.html: the prefill admin.html?game=NEW&copyFrom=OLD has always worked
@@ -1161,7 +1176,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v123-copy-from-lobby';
+const CACHE_VERSION = 'golfapp-v124-one-loader';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
