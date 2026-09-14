@@ -1,6 +1,7 @@
 # Rattle Golf Consumer — v1.1 Monetization Spec
 
-Rewritten 2026-09-14. Supersedes the 2026-09-09 version entirely.
+Rewritten 2026-09-14, revised the same day after the round-code issuance
+investigation. Supersedes the 2026-09-09 version entirely.
 Nothing in here is built. This is the plan, not a record.
 
 **No pricing work ships until iOS build 24 clears review.** See "Sequencing
@@ -58,12 +59,39 @@ A joiner never sees a paywall of any kind. Not a nag, not a banner, not a
 
 ## What is free to try
 
-- **Three round creations, ever.** Not three per week, not three per month.
-  Three, then the pass is required.
+- **Twenty-one days of unlimited round creation**, starting the first time an
+  organizer creates anything. Then the pass is required.
 
-Three is deliberate: one round is not enough to trust a settlement engine with
-real money between friends. Three Mondays is. The ask lands after the value is
-proven, not before.
+### Why a window and not a count
+
+The first draft of this spec said "three round creations, ever." That was
+changed for one hard reason and several good ones.
+
+**The hard reason: Realtime Database rules cannot count.** There is no
+`numChildren()` in the rules language, so a creation counter is not enforceable
+in rules at all — it requires the Worker, which does not exist. Counting would
+have made the receipt-validation Worker a prerequisite for the free trial,
+putting weeks of server and StoreKit work in front of the first thing worth
+learning.
+
+A window is native to the rules language: a write-once timestamp compared
+against `now`. It ships without a Worker, without StoreKit, and without a new
+binary.
+
+**The good reasons:**
+
+- Twenty-one days is three Mondays — the same intent the number three was
+  reaching for — and it covers a full trip end to end rather than burning three
+  creations on day one.
+- A count punishes exploration. Setting up a round, getting the format wrong
+  and starting over should not cost a third of the trial.
+- The trip planner mints a batch and writes five rounds in a single update.
+  Under a count that is five creations for one trip. Under a window it is
+  nothing.
+
+**The honest cost:** a window resets if someone deletes the app and returns
+with a fresh anonymous uid. So does a count, for exactly the same reason. It is
+not a trade between the two.
 
 ---
 
@@ -162,32 +190,61 @@ cross-device entitlement problem dissolves.
 
 ### What replaces it
 
-**A durable organizer identity**, because "three free creations, ever" is
-meaningless if deleting and reinstalling the app resets the counter.
+**A durable organizer identity**, because a trial window is meaningless if the
+app cannot tell one organizer from another.
 
-    organizers/<uid>/createdCount      integer, Worker-incremented
+    organizers/<uid>/firstSeenAt       write-once, immutable by rule
     organizers/<uid>/pass/type         "season" | "trip" | "promo"
     organizers/<uid>/pass/expiresAt    server timestamp
     organizers/<uid>/pass/transactionId
 
-**The identity question is the first real decision and it is not obvious.**
+**Identity: Firebase Anonymous Auth.** This is now settled rather than open.
+The App Store description promises "No sign-up, no password, no email" — a
+public commitment, live on the product page. Sign in with Apple would break it
+and require a metadata change to ship. Anonymous Auth keeps the promise: no
+screen, no credential, nothing for a golfer to do.
 
-- **Firebase Anonymous Auth** — no friction, no sign-in screen, and the uid
-  survives app updates. It does *not* survive a delete-and-reinstall, so the
-  free-creation counter is farmable by anyone who notices. Probably acceptable:
-  someone willing to reinstall the app every three rounds to dodge $29.99 was
-  never going to pay.
-- **Sign in with Apple** — genuinely durable, restores across devices, and
-  makes the Season Pass work properly when Marty gets a new phone. Costs a
-  sign-in screen on first launch, which is real friction for an app whose whole
-  pitch is "tap a link and start scoring."
+The pass itself restores through Apple on a new device, because auto-renewable
+subscriptions are restorable. So a lost uid costs a buyer their trial clock,
+never their purchase.
 
-**Recommendation: Anonymous Auth for the counter, StoreKit for the pass.** The
-pass itself restores through Apple on a new device because auto-renewable
-subscriptions are restorable — unlike the old consumable Trip Pass, which was
-not. The counter only gates the free trial, so farming it costs you a trial,
-not a sale. Revisit if abuse ever shows up in the numbers, which it probably
-will not.
+### Where the gate goes — and where it cannot go
+
+**The gate cannot live at code issuance.** The 2026-09-14 investigation found
+four independent paths to a round, and the issuer is not common to them:
+
+1. Lobby tile → `createRoom` → issuer → wizard → `saveSettings`
+2. Lobby "start from previous round" → issuer → wizard → `saveSettings`
+3. Trip planner → issuer × N → direct batch write, no wizard
+4. **A hand-typed `?game=` URL** — no issuance, no existence check. The wizard
+   opens on whatever string was typed and Save & Start Round creates the round.
+
+Path 4 alone defeats any client-side gate: edit the address bar and walk around
+it. Path 3 bypasses `saveSettings` entirely.
+
+**The gate goes on the write to `events/$eventCode`, in
+`database.rules.json`.** That is the one place every path converges. A rule
+there covers the wizard, the planner, the hand-typed URL, the web and the
+native app, in a single expression.
+
+### Port `ownerUid` from the tournament rules
+
+This already exists and works. Commit `034a4d0` locked `tournaments` so
+`ownerUid` is set from `auth.uid` at creation and cannot afterwards be taken,
+changed or dropped. `events/$eventCode` needs the same shape.
+
+**This is not only a monetization change.** The current rule —
+
+    ".write": "newData.exists() || !data.hasChild('scores')"
+
+— lets any client create *or overwrite* any round, refusing only the deletion
+of a scored one. Anyone who knows a six-character code can overwrite a live
+round mid-Monday. That is a correctness bug you have today, independent of
+pricing, and `ownerUid` fixes it and the trial gate in the same rule.
+
+**The wall is on creating a round, never on finishing one.** An owner keeps
+editing their own round forever, trial expired or not. Nobody loses a game in
+progress because a clock ran out.
 
 ### The consumable/subscription split matters
 
@@ -245,35 +302,42 @@ Server API. **Verify against current Apple docs before building.**
 
 Each step depends on the one before. Do not reorder.
 
-**1. `database.rules.json`** — PROTECTED FILE, needs explicit per-file
+**1. Anonymous Auth** — sign in silently at boot on both surfaces. No UI, no
+sign-in screen, nothing a golfer sees. Everything below depends on `auth.uid`
+existing.
+
+**2. `database.rules.json`** — PROTECTED FILE, needs explicit per-file
 approval. The current rules are better than the old spec claimed: they validate
 score ranges, stake ceilings, course schema, and tournament `ownerUid`
-ownership. What they do not do is *authorize*. `trips/$tripCode` and
-`events/$eventCode` are writable by any client, so `organizers/<uid>` must be
-locked to Worker-only writes from the start. A mistake here breaks live rounds
-mid-game for real groups.
+ownership. What they do not do is *authorize*. This step adds `ownerUid` to
+`events/$eventCode` (ported from `034a4d0`), makes `organizers/<uid>/firstSeenAt`
+write-once, and locks `organizers/<uid>/pass` to Worker-only writes. A mistake
+here breaks live rounds mid-game for real groups — this is the highest-risk
+step in the whole plan and the one to test hardest.
 
-**2. Anonymous Auth + the creation counter** — organizer identity, Worker-
-incremented count, enforced server-side so the web and the app share one gate.
-Ship this *before* any purchase exists and watch the numbers: it tells you how
-many organizers actually exist and how many rounds they run, which is the data
-the old spec correctly said you did not have when it parked the annual tier.
+**3. The trial window** — creation allowed while
+`now < firstSeenAt + 21 days`, or a valid pass exists. Pure rules, no server.
+**Ship this before any purchase exists** and watch what happens: how many
+distinct organizers there are, how many reach the wall, and what they do next.
+That is the data the old spec correctly said you did not have when it parked
+the annual tier — and it arrives before a single line of StoreKit is written.
 
-**3. The Worker** — receipt validation, transaction-ID replay protection, sole
-writer of the pass node.
+**4. The Worker** — receipt validation, transaction-ID replay protection, sole
+writer of the pass node. No longer a prerequisite for the trial; it exists to
+validate purchases, which is its actual job.
 
-**4. App Store Connect products** — Season Pass subscription group first, then
+**5. App Store Connect products** — Season Pass subscription group first, then
 the Trip Pass consumable. Deliberately after the infrastructure so nothing can
 be sold before the gate works.
 
-**5. Native IAP plugin and purchase flow** — new build. States: idle,
+**6. Native IAP plugin and purchase flow** — new build. States: idle,
 purchasing, validating, unlocked, failed. Handle user cancel, payment failure,
 network drop mid-validation, Worker unreachable after a successful charge.
 
-**6. Gating at round creation** — read the pass, show or hide. The easiest part
-and the last.
+**7. Gating in the UI** — the rule is already enforcing it; this is only the
+purchase prompt and the explanation. The easiest part and the last.
 
-**7. Trip Pass feature payload** — awards, recap, archive, multi-day Ryder Cup.
+**8. Trip Pass feature payload** — awards, recap, archive, multi-day Ryder Cup.
 
 ### Where the paywall goes
 
@@ -327,6 +391,11 @@ Probably: let the current round finish, block the next one. Decide explicitly.
 year is simpler and auto-renewable subscriptions are date-based anyway. Going
 with purchase date unless there is a reason not to.
 
+**Trips and tournaments need the same treatment.** This spec gates
+`events/$eventCode`. `trips/$tripCode` has the identical open write rule and
+the trip planner writes rounds directly. Decide whether the trial window covers
+trip creation too, or whether a trip is always pass-only.
+
 **Charged but not granted.** Purchase succeeds, Worker unreachable, pass never
 written. Needs a retry path and a manual grant tool. The subscription case
 recovers via StoreKit restore; the Trip Pass consumable does not.
@@ -335,8 +404,14 @@ recovers via StoreKit restore; the Trip Pass consumable does not.
 message has to be genuinely useful rather than a dead end — probably a deep
 link to the App Store and a note that their existing rounds stay accessible.
 
-**Do the three free creations reset, ever?** Currently no. Consider whether a
-dormant organizer returning after a year should get another look.
+**Does the window ever reset?** Currently no — `firstSeenAt` is write-once and
+immutable. Consider whether a dormant organizer returning a year later deserves
+another look.
+
+**What about rounds created before the gate ships?** Existing rounds have no
+`ownerUid`. The rule has to keep them editable or Monday breaks. Probably: no
+`ownerUid` present means legacy, leave the old behaviour; require it only on
+newly created rounds.
 
 **Tournaments is a separate app.** Nothing here applies. Different buyer — a
 club or charity event with a budget — and probably better economics than
