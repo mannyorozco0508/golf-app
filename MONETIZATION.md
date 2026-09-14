@@ -1,223 +1,243 @@
 # Rattle Golf Consumer — v1.1 Monetization Spec
 
-Written 2026-09-09, the day v1.0 (build 21) went to review.
+Rewritten 2026-09-14. Supersedes the 2026-09-09 version entirely.
 Nothing in here is built. This is the plan, not a record.
+
+**No pricing work ships until iOS build 24 clears review.** See "Sequencing
+against App Review" at the bottom — it is not optional ordering, it is an
+App Store Connect constraint.
+
+---
+
+## What changed, and why
+
+The 2026-09-09 spec said: one round is free forever, a trip costs $19.99.
+
+That was inverted. The user who gets the most value paid nothing and the user
+who got the least paid once. Marty's group runs roughly forty Mondays a year
+and never hits a paywall. The Bandon organizer uses the app three days and pays
+twenty dollars. The weekly money game is the core use case, not the free
+sample.
+
+The demand signal that forced the rethink: after a Monday round, Lance — the
+one who handles the money and reads every scorecard — asked for the app
+specifically because settlement was easier. That is a buyer. The old model
+never charged him.
 
 ---
 
 ## The decision, in one line
 
-**One round is free. A trip is paid. The organizer buys once and the whole
-group is covered.**
+**Joining is free forever. Organizing is paid.**
+
+---
+
+## The structural fact everything rests on
+
+**Only one person per group ever pays.**
+
+Lance sets up the round. Eleven other golfers open a link. Those eleven were
+never buyers at any price, so giving them the app for nothing costs nothing and
+buys distribution. The pricing question is not "what will twelve golfers pay,"
+it is "what will one organizer pay," and the answer is a great deal more than
+$9.99.
 
 ---
 
 ## What is free, permanently
 
-Everything a Monday game needs:
+- **Joining any round via a group or spectator link.** Unlimited. No account,
+  no purchase, no limit, ever.
+- Every format, every bet type, presses, side matches, the Money Pool,
+  Dots/Junk, live leaderboards, full per-round settlement — all visible and
+  fully functional to a joiner.
+- Course search and the shared course database.
 
-- Single rounds, every format — Stroke, Match, Nassau, Best Ball, Scramble,
-  Wolf, Stableford, Skins, Hi-Lo, Dots, **single-round Ryder Cup**
-- All betting: presses, side matches, the Money Pool, Dots/Junk
-- Settlement for a single round
-- Group-locked scorekeeper links, spectator links
-- Course search, the scanner, the shared course database
+A joiner never sees a paywall of any kind. Not a nag, not a banner, not a
+"create your own round" interstitial after the eighteenth hole.
 
-This is not a crippled tier. Marty's group at Talking Stick should never hit
-a paywall on a Monday, forever. That group is the beta, the word of mouth, and
-the reason the app is any good.
+## What is free to try
 
-**The temptation to resist:** when the paid tier looks thin, the instinct is
-to move existing free features behind it. That makes the free product worse
-without making the paid one more compelling. Build new value instead.
+- **Three round creations, ever.** Not three per week, not three per month.
+  Three, then the pass is required.
 
----
-
-## What the Trip Pass unlocks — $19.99
-
-Bought per trip. Everything inside that trip is included.
-
-- Multi-round trips (linking rounds into one event)
-- Cumulative gross/net standings across every round
-- **Trip-wide money settlement** — every round's bets netted into one final
-  "who owes who for the week"
-- End-of-trip awards and superlatives — Most Birdies, Biggest Blow-Up Hole,
-  Best Comeback, Sandbagger of the Week
-- The trip archive — a permanent record after the trip ends
-- One-tap shareable trip recap for the group chat
-- **Multi-day Ryder Cup** (see "Not yet built" below)
-
-### Why $19.99
-
-The buyer is organizing a trip where each player is spending $1,500–$3,000.
-Against green fees alone this is a rounding error, and it is split zero ways —
-one person pays for the group. At four players that is $5 a head.
-
-$14.99 and $19.99 land the same psychologically. Both are "twenty bucks."
-
-Under $10 reads as a toy. For a product whose job is tracking real money
-between friends, cheap undercuts trust.
-
-Raising prices later is much harder than lowering them. Start high, discount
-if needed.
-
-**No launch promo.** Introductory pricing anchors the product low and makes
-the later increase feel like a penalty. Give early groups free promo codes
-from App Store Connect instead — better than discounting publicly.
-
-### The annual tier is parked
-
-$49.99/year with unlimited passes was considered and deliberately deferred.
-It only earns its place at three-plus trips a year, and there is no data yet
-on how many organizers buy two. Revisit when purchase counts exist.
-
-Building a subscription for customers who do not exist yet is how three months
-disappear.
+Three is deliberate: one round is not enough to trust a settlement engine with
+real money between friends. Three Mondays is. The ask lands after the value is
+proven, not before.
 
 ---
 
-## The honest weakness
+## The products
 
-**Nothing stops a group from running four free single rounds and settling by
-hand at the bar.**
+### Season Pass — $29.99 / year
 
-That is true and it is fine. The free version is genuinely useful; the pass
-removes a specific annoyance. People who do not mind the arithmetic will not
-pay, and they were never going to.
+Unlimited round creation. Everything the organizer does, all season.
 
-But it means the pass cannot rest on convenience alone. Four clean per-round
-settlements is not a painful workaround — this app is already good at
-settlement.
+Auto-renewable subscription. This is the primary product and the one most
+buyers should end up on.
 
-**The awards and the shareable recap matter more than they look.** Those are
-not calculations someone can do at the bar. They are the thing that gets
-screenshotted into the group chat. Convenience is a weak paywall; a social
-artifact is a stronger one. Build those properly or the pass is thin.
+**Why $29.99.** Marty's group plays roughly forty Mondays a year, so this is
+about seventy-five cents a round for the person already counting a two-hundred
+dollar pot by hand in the parking lot. It is also consistent with the rest of
+the portfolio: the planned GPS app is $39.99/year against the ~$70/year Manny
+already pays for a competitor. A ten dollar price on the betting and
+settlement engine — the harder product — undercuts both.
 
----
+### Trip Pass — $19.99
 
-## The entitlement model — and why it is the hard part
+Thirty days of unlimited round creation, plus everything trip-shaped:
+multi-round trips, cumulative standings, trip-wide money settlement, the trip
+archive, awards and superlatives, the shareable recap, multi-day Ryder Cup once
+it exists.
 
-### The problem
+Consumable. Bought per trip.
 
-StoreKit ties purchases to an **Apple ID**. Marty buys the pass; StoreKit tells
-Marty's devices he owns it. Lance opens the same trip and StoreKit tells Lance
-he owns nothing.
+**Why it still exists alongside the Season Pass.** The Bandon organizer plays
+one trip a year and will never buy a season. Against $1,500–$3,000 a head in
+green fees and flights, twenty dollars split across four players is five bucks
+each. Different buyer, different shape, worth keeping.
 
-If the gate asks StoreKit, Lance hits a paywall on a trip that is already paid
-for. That breaks the entire model.
+### Pricing principles carried over from the previous spec
 
-### The answer
+These were right and still are:
 
-**The entitlement lives on the trip, not the device.**
-
-    trips/<tripCode>/entitlement/paid            true
-    trips/<tripCode>/entitlement/transactionId   <Apple transaction id>
-    trips/<tripCode>/entitlement/grantedAt       <server timestamp>
-
-Marty's purchase writes it. Everyone in the trip reads it.
-
-### The problem that creates
-
-**Right now, anyone can write that.** `database.rules.json` has no meaningful
-rules, the repo is public, and a trip code is six characters. Unlocking every
-paid feature would be one Firebase write away, and the code showing exactly
-how is on GitHub.
-
-This is why the rules work comes first and why nothing can be sold until it
-is done.
-
-### The Trip Pass is a CONSUMABLE, not a non-consumable
-
-This matters and it is easy to get wrong.
-
-- **Non-consumable** — bought once, owned forever, restorable (e.g. "remove ads")
-- **Consumable** — bought, used up, buyable again (e.g. "100 coins")
-
-A Trip Pass is bought per trip. Marty buys one for Myrtle and another for
-Bandon. That is a consumable.
-
-**Consequence: Apple does not restore consumables.** If Marty deletes the app
-and reinstalls, StoreKit will not tell him he bought anything.
-
-**That is fine, because the entitlement is not on his device — it is on the
-trip.** The trip stays paid regardless of what happens to Marty's phone. This
-is a point in favour of the trip-scoped model, not against it.
-
-Still needs handling in the UI: a purchase that completes but fails to reach
-the server must be recoverable. See "Open questions."
+- **No launch promo.** Introductory pricing anchors the product low and makes
+  the later increase feel like a penalty.
+- **Start high, discount later.** Raising a price is much harder than lowering
+  one.
+- **Under $10 reads as a toy.** For a product whose job is tracking real money
+  between friends, cheap undercuts trust.
 
 ---
 
-## Receipt validation — the piece that does not exist yet
+## Grandfathering the beta groups
 
-Without server-side validation the paywall is decorative.
+Marty's Talking Stick group and the Myrtle Beach crew get **permanent free
+access via App Store promo codes.** They do not pay, and they are not asked to.
 
-### Flow
+The previous spec argued that group should never hit a paywall because they are
+the beta, the word of mouth, and the reason the app is any good. That argument
+is still correct — it just does not require giving the weekly use case away to
+everyone on earth. Promo codes were already the proposed mechanism for early
+groups. Use them.
 
-1. Marty creates the trip (free). Gets a trip code.
-2. Marty taps "Unlock this trip."
-3. StoreKit completes the purchase and returns a signed transaction.
-4. App sends `{ signedTransaction, tripCode }` to the Worker.
-5. **Worker validates the transaction with Apple.**
-6. **Worker checks the transaction ID has not already been used on another
-   trip.** Without this check, one purchase could unlock unlimited trips —
-   replay the same receipt against every trip code.
-7. Worker writes the entitlement, including the transaction ID.
-8. Every client in that trip reads `paid` and unlocks.
-
-Clients never write the entitlement. Only the Worker holds credentials that
-can.
-
-### Where it runs
-
-Cloudflare Worker. You are already on Cloudflare for Pages and DNS, so it is
-one less vendor. A Firebase Cloud Function is the alternative and would sit
-closer to the database.
-
-It is one endpoint with one job. Not a service to maintain.
-
-### Verify the Apple side against current docs before building
-
-`verifyReceipt` is deprecated. The current path is StoreKit 2's signed
-transaction JWS, verified server-side against Apple's public keys, or the App
-Store Server API. **Check Apple's current documentation when you start** —
-this area changes and anything written here today may be stale by then.
+This is a standing decision, not a launch promotion. Do not revisit it when
+revenue looks thin.
 
 ---
 
-## Native IAP plugin
+## The honest weakness — and it is worse than last time
 
-- A Capacitor IAP plugin, wired to StoreKit
-- Purchase flow with proper states: idle, purchasing, validating, unlocked, failed
-- Error handling for: user cancels, payment fails, network drops mid-validation,
-  Worker unreachable after a successful charge
-- **Apple requires a restore path.** Consumables are not restorable through
-  StoreKit, so this needs a different answer — likely "contact support" plus a
-  manual grant tool. Decide before submitting.
+**`golf-app-5a5.pages.dev` is public, ungated, and can create rounds.**
 
-This is a new build, new native code, and Apple reviews IAP products
-separately. **Your first in-app purchase must be submitted alongside an app
-version** — so this ships as 1.1, never as a metadata-only update.
+Under the old model the web leak cost you the Trip Pass. Under this model the
+web leak costs you *everything*, because round creation is now the entire
+gate. Lance can bookmark the browser and never pay a cent.
+
+This is the strongest argument against the new pricing and it has to be
+answered, not noted.
+
+**The answer: the gate is server-side, so it covers both surfaces.** Creation
+entitlement is enforced in Firebase rules and the Worker, not in client
+JavaScript. Purchase happens on iOS through StoreKit. A web organizer who runs
+out of free creations is told to get the app. The web stays fully usable for
+joining, spectating, and reading — forever, unchanged.
+
+A client-side gate would be decorative here in a way it was not before: the
+repo is public and the code showing exactly how to bypass it is on GitHub.
 
 ---
 
-## Not yet built: multi-day Ryder Cup
+## The entitlement model
 
-**This does not exist.** Do not assume it does.
+### What changed from the old spec
 
-What ships today is single-round Ryder Cup, and the Myrtle 2026 plan is five
-separate single-round Cups precisely because the wired multi-day version was
-never built.
+The old model put entitlement on the **trip**, because Lance had to be able to
+read Marty's purchase. That was a real problem and a good solution to it.
 
-Multi-day Ryder Cup — points accumulating across every round of a trip, with a
-running Cup score over several days — is a **build item**, not a feature being
-gated. It belongs in the Trip Pass because it is genuinely trip-shaped and
-cannot be faked with five separate rounds.
+**It no longer applies.** Under this model, the only person who needs an
+entitlement check is the person creating the round, on their own device, where
+StoreKit is already authoritative. Joiners are never checked. The entire
+cross-device entitlement problem dissolves.
 
-Note the existing namespace trap from HANDOFF.md: `gameFormat:'ryder'` is a
-legacy field-wide best-ball money match with no points system, unrelated to the
-Ryder Cup competition type.
+### What replaces it
+
+**A durable organizer identity**, because "three free creations, ever" is
+meaningless if deleting and reinstalling the app resets the counter.
+
+    organizers/<uid>/createdCount      integer, Worker-incremented
+    organizers/<uid>/pass/type         "season" | "trip" | "promo"
+    organizers/<uid>/pass/expiresAt    server timestamp
+    organizers/<uid>/pass/transactionId
+
+**The identity question is the first real decision and it is not obvious.**
+
+- **Firebase Anonymous Auth** — no friction, no sign-in screen, and the uid
+  survives app updates. It does *not* survive a delete-and-reinstall, so the
+  free-creation counter is farmable by anyone who notices. Probably acceptable:
+  someone willing to reinstall the app every three rounds to dodge $29.99 was
+  never going to pay.
+- **Sign in with Apple** — genuinely durable, restores across devices, and
+  makes the Season Pass work properly when Marty gets a new phone. Costs a
+  sign-in screen on first launch, which is real friction for an app whose whole
+  pitch is "tap a link and start scoring."
+
+**Recommendation: Anonymous Auth for the counter, StoreKit for the pass.** The
+pass itself restores through Apple on a new device because auto-renewable
+subscriptions are restorable — unlike the old consumable Trip Pass, which was
+not. The counter only gates the free trial, so farming it costs you a trial,
+not a sale. Revisit if abuse ever shows up in the numbers, which it probably
+will not.
+
+### The consumable/subscription split matters
+
+- **Season Pass — auto-renewable subscription.** Restorable through StoreKit.
+  Apple's restore-purchases requirement is satisfied natively. This solves a
+  problem the old spec had to hand-wave.
+- **Trip Pass — consumable.** Not restorable. If a purchase completes but never
+  reaches the Worker, the buyer is out $19.99 with nothing. Needs a retry path
+  and a manual grant tool. Unchanged from the old spec, still true, still the
+  failure that generates angry email.
+
+### Auto-renewable subscriptions carry extra App Store requirements
+
+A subscription is not just a different price, it is a different compliance
+surface. Before submitting:
+
+- A subscription group in App Store Connect, with localized display name and
+  description per product.
+- Functional links to **both** a Privacy Policy and Terms of Use (EULA) inside
+  the app and in the App Store metadata. The Privacy Policy URL field is
+  already outstanding from the v1 submission — this makes it mandatory rather
+  than merely missing.
+- Price, duration, and renewal terms disclosed in the purchase UI itself, not
+  only on the App Store page.
+- Restore Purchases must be reachable without buying anything.
+
+Check Apple's current requirements when building. This area changes.
+
+---
+
+## Receipt validation
+
+Unchanged in shape from the old spec, different in what it writes.
+
+1. Organizer taps "Unlock."
+2. StoreKit completes the purchase and returns a signed transaction.
+3. App sends `{ signedTransaction, uid }` to the Worker.
+4. Worker validates the transaction with Apple.
+5. Worker checks the transaction ID has not already been used on another uid.
+   Without this, one purchase unlocks unlimited organizers by replay.
+6. Worker writes `organizers/<uid>/pass`.
+7. Client reads the pass and unlocks creation.
+
+Clients never write the pass or the counter. Only the Worker holds credentials
+that can.
+
+Runs as a Cloudflare Worker — already on Cloudflare for Pages and DNS, one
+fewer vendor. `verifyReceipt` is deprecated; the current path is StoreKit 2
+signed transaction JWS verified against Apple's public keys, or the App Store
+Server API. **Verify against current Apple docs before building.**
 
 ---
 
@@ -225,76 +245,113 @@ Ryder Cup competition type.
 
 Each step depends on the one before. Do not reorder.
 
-**1. `database.rules.json`** — PROTECTED FILE, needs explicit per-file approval.
-Lock writes so no client can grant itself an entitlement. Everything else
-depends on this being right. A mistake here breaks live rounds mid-game for
-real groups.
+**1. `database.rules.json`** — PROTECTED FILE, needs explicit per-file
+approval. The current rules are better than the old spec claimed: they validate
+score ranges, stake ceilings, course schema, and tournament `ownerUid`
+ownership. What they do not do is *authorize*. `trips/$tripCode` and
+`events/$eventCode` are writable by any client, so `organizers/<uid>` must be
+locked to Worker-only writes from the start. A mistake here breaks live rounds
+mid-game for real groups.
 
-**2. The Worker** — receipt validation, transaction-ID replay protection, the
-only writer of the entitlement node.
+**2. Anonymous Auth + the creation counter** — organizer identity, Worker-
+incremented count, enforced server-side so the web and the app share one gate.
+Ship this *before* any purchase exists and watch the numbers: it tells you how
+many organizers actually exist and how many rounds they run, which is the data
+the old spec correctly said you did not have when it parked the annual tier.
 
-**3. App Store Connect product** — create the Trip Pass, consumable, $19.99.
-Cheap and quick; deliberately after the infrastructure so it cannot be sold
-before the gate works.
+**3. The Worker** — receipt validation, transaction-ID replay protection, sole
+writer of the pass node.
 
-**4. Native IAP plugin and purchase flow** — new build.
+**4. App Store Connect products** — Season Pass subscription group first, then
+the Trip Pass consumable. Deliberately after the infrastructure so nothing can
+be sold before the gate works.
 
-**5. Gating in the app** — read `trips/<code>/entitlement/paid`, show or hide.
-The easiest part, and the last.
+**5. Native IAP plugin and purchase flow** — new build. States: idle,
+purchasing, validating, unlocked, failed. Handle user cancel, payment failure,
+network drop mid-validation, Worker unreachable after a successful charge.
 
-**6. Awards, recap, archive** — the things that make the pass worth buying
-rather than merely functional.
+**6. Gating at round creation** — read the pass, show or hide. The easiest part
+and the last.
 
-**7. Multi-day Ryder Cup** — the largest feature. Can ship after 1.1.
+**7. Trip Pass feature payload** — awards, recap, archive, multi-day Ryder Cup.
+
+### Where the paywall goes
+
+**At round creation. Never at settlement.**
+
+If someone finishes eighteen holes with $240 on the table and hits a wall
+before seeing who owes who, you have made an enemy of your best user. The gate
+must fire before anyone tees off, or not at all.
 
 ### Testing standards apply throughout
 
 Tests first. Negative controls that actually fire. Full suite green before any
-commit. The native bundle synced by hand as part of finishing a wave, not
-releasing.
+commit. Native bundle synced by hand as part of finishing a wave.
 
-**A specific warning for this work:** a test that mocks the entitlement as
-already granted will pass while the device fails. This project has shipped
-three broken device builds behind three green suites. Prove the gate from the
-entry point a real user arrives through.
+**A specific warning for this work:** a test that mocks the pass as already
+granted will pass while the device fails. This project has shipped three broken
+device builds behind three green suites. Prove the gate from the entry point a
+real user arrives through, on a physical device, with a real StoreKit sandbox
+transaction.
+
+---
+
+## Sequencing against App Review
+
+**Do not create the IAP products while build 24 is unapproved.** In-app
+purchases attached to an app version that has not been approved cannot be
+submitted for changes until that version clears. Getting stuck there has
+historically required contacting Apple support to unwind.
+
+**Metadata is editable now, the binary is not.** While a version sits in
+Waiting for Review, text fields can still be edited; changing screenshots or
+the build requires removing the version from review and restarting the queue.
+Scrub any free-tier promises from the description and promotional text now.
+Leave the screenshots alone.
+
+**Manual release was the right call.** Once approved and pending developer
+release, metadata, pricing, and availability can still change. The binary
+cannot.
+
+**The first in-app purchase must be submitted alongside an app version.** This
+ships as 1.1. It is never a metadata-only update.
 
 ---
 
 ## Open questions — decide before building, not after
 
-**Refunds.** Apple refunds the organizer. Does the trip go back to locked?
-Mid-trip? That is a group of eight losing their standings on day three because
-one person charged back. Probably: leave it unlocked and eat it. Decide
-explicitly.
+**Refunds.** Apple refunds the organizer mid-season. Does creation re-lock?
+Probably: let the current round finish, block the next one. Decide explicitly.
 
-**Wrong trip.** Marty buys a pass, then abandons the trip and starts a new one
-with a corrected date. Is that a second purchase? Probably needs a grace
-window or a manual move. This will generate support email.
+**Season boundaries.** A "year" from purchase date, or a golf season? Calendar
+year is simpler and auto-renewable subscriptions are date-based anyway. Going
+with purchase date unless there is a reason not to.
 
-**Charged but not granted.** Purchase succeeds, the Worker is unreachable, the
-entitlement never gets written. Marty is out $19.99 with nothing to show. Needs
-a retry path and a manual grant tool — this is the failure that produces angry
-email, and consumables cannot be restored through StoreKit.
+**Charged but not granted.** Purchase succeeds, Worker unreachable, pass never
+written. Needs a retry path and a manual grant tool. The subscription case
+recovers via StoreKit restore; the Trip Pass consumable does not.
 
-**The web version is free.** `golf-app-5a5.pages.dev` is public and ungated.
-Whatever is paywalled in the iOS app, the browser does for nothing. Not fatal —
-plenty of products live with it — but choose it deliberately rather than
-discovering it after launch.
+**What a web organizer sees at the wall.** They cannot buy on the web. The
+message has to be genuinely useful rather than a dead end — probably a deep
+link to the App Store and a note that their existing rounds stay accessible.
 
-**Tournaments is a separate app.** Nothing here applies to it. It has a
-different buyer (a club or charity event with a budget) and probably different
-economics. Per HANDOFF.md it needs its own Capacitor project at a separate
-`ios.path` — not a second Xcode target, because Capacitor's CLI rewrites every
+**Do the three free creations reset, ever?** Currently no. Consider whether a
+dormant organizer returning after a year should get another look.
+
+**Tournaments is a separate app.** Nothing here applies. Different buyer — a
+club or charity event with a budget — and probably better economics than
+consumer IAP. Per HANDOFF.md it needs its own Capacitor project at a separate
+`ios.path`, not a second Xcode target, because Capacitor's CLI rewrites every
 `PRODUCT_BUNDLE_IDENTIFIER` with a global regex.
 
 ---
 
-## One strategic note
+## One strategic note, unchanged
 
-Tournaments is the more likely money maker: a real buyer with a budget and a
-line item, paying once for an event rather than $20 from a consumer. That is a
-better economic shape than consumer IAP.
+Tournaments remains the more likely money maker: a real buyer with a budget and
+a line item, paying once for an event rather than $30 from a consumer. That is
+a better economic shape.
 
-Which is an argument for keeping the Trip Pass **simple**. One product, one
-price, ship it, learn from it — and put the real effort where the buyer already
-has money set aside.
+Which is still an argument for keeping consumer pricing **simple**. Two
+products, two prices, ship them, learn from them — and put the real effort
+where the buyer already has money set aside.
