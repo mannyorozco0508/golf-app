@@ -48,6 +48,20 @@
 //                     card, no flight, the same winners.
 // Before the change flighted-stacked and pool-only were IDENTICAL on every
 // surface (the same five shas) - the one-line proof no surface read a config.
+//
+// RE-PINNED 2026-09-13, the MAIN POOL SKINS PER FLIGHT wave (pool-engine.js,
+// live-skins.js). flat-main and flighted-stacked: UNCHANGED, sha for sha (the
+// diff of the fixture is the pool-only block only). What moved, and why:
+//   pool-only         the round's skins scope is per flight, so the bucket now
+//                     SPLITS into a pot per flight and each pot resolves on its
+//                     own golfers. Every surface: WHOLE-FIELD -> FLIGHT A /
+//                     FLIGHT B heads. Winners: A = Ann H1 H2, Ben H3;
+//                     B = Eli H2 H11, Gus H7 H13, Fay H5, Hal H9. H2 (Ann v
+//                     Eli) was a field-wide tie and is a skin in BOTH flights;
+//                     H13 (Cal, Dee, Gus) was a field-wide tie, still a tie in
+//                     A, Gus's skin in B. settlement: two SKINS WON cards.
+//                     The same pool on a scope-'field' round keeps the old
+//                     shape - live_skins_config_test's POOL_FIELD block.
 // ============================================================================
 
 const { test, describe } = require('node:test');

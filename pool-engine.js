@@ -546,62 +546,115 @@ function computeMoneyPool(data, courseData, savedScores) {
         // THE CANONICAL SKINS ENGINE decides the winners and the units - the same
         // functions every skins wager in the app settles through. This bucket only
         // divides a fixed pot by those units.
-        const calc = carry
-            ? computeSkinsCarryOverForSettle(participants, courseData || [], savedScores, scoring)
-            : computeSkinsVoidForSettle(participants, courseData || [], savedScores, scoring);
-        const totalUnits = calc.skins.reduce((a, s) => a + s.unitsWon, 0) + calc.pendingUnits;
-        const lines = [];
-        let paid = 0;
-        if (totalUnits > 0 && calc.skins.length > 0) {
-            // TELESCOPING ALLOCATION. Rounding each line independently overpaid the
-            // pot - eighteen Math.rounds summed to $480.08 on a $480 pot, which the
-            // reconciliation invariant caught on the first run. Each line instead
-            // gets floor(amount * cumulativeUnits / total) minus the previous
-            // cumulative floor: the differences telescope, so the lines sum to at
-            // most the pot by construction, every cent lands on a real winner, and
-            // the pending carry's share falls out as the exact residue.
-            if (wholeDollar) {
-                // ONE ALLOCATOR OVER THE CANONICAL UNITS. The skins engine above still
-                // decides which holes produced units and who owns them - this only
-                // divides the actual bucket. Weights include the pending carry as a
-                // final entry so an unwon carry keeps its exact share of the pot
-                // instead of that share being smeared across the winners; whatever it
-                // is allocated falls out as `unwon` below and refunds to the field.
-                //
-                // Skins are in hole order, so hole order is the stable order and the
-                // extra dollars land on the earliest holes.
-                const weights = calc.skins.map(s => s.unitsWon);
-                if (calc.pendingUnits > 0) weights.push(calc.pendingUnits);
-                const alloc = allocateWholeDollars(amountCents / 100, weights);
-                calc.skins.forEach((s, idx) => {
-                    const cents = D(alloc[idx]);
+        //
+        // PER FLIGHT (2026-09-13). When the round has flights AND its skins scope is
+        // 'flight' (flightScopeApplies, action-model.js - the same rule every skins
+        // WAGER slices by), the bucket is two pots: each flight's share of the bucket
+        // by headcount, whole dollars on a whole-dollar round (cents otherwise),
+        // the remainder to A - B = floor(bucket x golfersB / golfers), A = bucket - B.
+        // Each pot is then resolved and allocated on its own, in hole order, over
+        // that flight's golfers alone: a golfer only ever competes against their own
+        // flight, exactly as a per-flight wager. An empty flight is a pot of zero
+        // that pays nobody; the other takes the whole bucket. KP and Net Finish are
+        // NOT touched - they stay field-wide, above. Flights off, or scope 'field':
+        // one slice over every participant, byte for byte as before (the golden
+        // pool_flights_golden_test.js holds both).
+        const perFlight = (typeof flightScopeApplies === 'function') && flightScopeApplies(data, 'skins');
+        const flightOf = (p) => (typeof playerFlight === 'function') ? playerFlight(p) : 'A';
+        const slices = perFlight
+            ? ['A', 'B'].map(f => ({ flight: f, players: participants.filter(p => flightOf(p) === f) }))
+            : [{ flight: null, players: participants }];
+        // The split, by headcount. potB floors; A carries the remainder.
+        const unit = wholeDollar ? 100 : 1;
+        let sliceCents;
+        if (perFlight) {
+            const nA = slices[0].players.length, nB = slices[1].players.length, n = nA + nB;
+            const potB = n > 0 ? Math.floor((amountCents / unit) * nB / n) * unit : 0;
+            sliceCents = [amountCents - potB, potB];
+        } else {
+            sliceCents = [amountCents];
+        }
+
+        // ONE RESOLVE + ONE ALLOCATION PER SLICE - the code that always ran for the
+        // whole field, now run per pot.
+        const allocateSlice = (slicePlayers, sliceAmountCents, flight) => {
+            const calc = carry
+                ? computeSkinsCarryOverForSettle(slicePlayers, courseData || [], savedScores, scoring)
+                : computeSkinsVoidForSettle(slicePlayers, courseData || [], savedScores, scoring);
+            const totalUnits = calc.skins.reduce((a, s) => a + s.unitsWon, 0) + calc.pendingUnits;
+            const lines = [];
+            let paid = 0;
+            if (totalUnits > 0 && calc.skins.length > 0 && sliceAmountCents > 0) {
+                // TELESCOPING ALLOCATION. Rounding each line independently overpaid the
+                // pot - eighteen Math.rounds summed to $480.08 on a $480 pot, which the
+                // reconciliation invariant caught on the first run. Each line instead
+                // gets floor(amount * cumulativeUnits / total) minus the previous
+                // cumulative floor: the differences telescope, so the lines sum to at
+                // most the pot by construction, every cent lands on a real winner, and
+                // the pending carry's share falls out as the exact residue.
+                if (wholeDollar) {
+                    // ONE ALLOCATOR OVER THE CANONICAL UNITS. The skins engine above still
+                    // decides which holes produced units and who owns them - this only
+                    // divides the actual bucket. Weights include the pending carry as a
+                    // final entry so an unwon carry keeps its exact share of the pot
+                    // instead of that share being smeared across the winners; whatever it
+                    // is allocated falls out as `unwon` below and refunds to the field.
+                    //
+                    // Skins are in hole order, so hole order is the stable order and the
+                    // extra dollars land on the earliest holes.
+                    const weights = calc.skins.map(s => s.unitsWon);
+                    if (calc.pendingUnits > 0) weights.push(calc.pendingUnits);
+                    const alloc = allocateWholeDollars(sliceAmountCents / 100, weights);
+                    calc.skins.forEach((s, idx) => {
+                        const cents = D(alloc[idx]);
+                        pay(s.player.id, cents);
+                        paid += cents;
+                        const line = { hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
+                                       units: s.unitsWon, cents };
+                        if (flight) line.flight = flight;
+                        lines.push(line);
+                    });
+                } else {
+                let cumUnits = 0, prevFloor = 0;
+                calc.skins.forEach(s => {
+                    cumUnits += s.unitsWon;
+                    const cumFloor = Math.floor(sliceAmountCents * cumUnits / totalUnits);
+                    const cents = cumFloor - prevFloor;
+                    prevFloor = cumFloor;
                     pay(s.player.id, cents);
                     paid += cents;
-                    lines.push({ hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
-                                 units: s.unitsWon, cents });
+                    const line = { hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
+                                   units: s.unitsWon, cents };
+                    if (flight) line.flight = flight;
+                    lines.push(line);
                 });
-            } else {
-            let cumUnits = 0, prevFloor = 0;
-            calc.skins.forEach(s => {
-                cumUnits += s.unitsWon;
-                const cumFloor = Math.floor(amountCents * cumUnits / totalUnits);
-                const cents = cumFloor - prevFloor;
-                prevFloor = cumFloor;
-                pay(s.player.id, cents);
-                paid += cents;
-                lines.push({ hole: s.hole, winnerId: String(s.player.id), winnerName: s.player.name,
-                             units: s.unitsWon, cents });
-            });
+                }
             }
-        }
-        const unwon = amountCents - paid;
+            const unwon = sliceAmountCents - paid;
+            return { calc, lines, totalUnits, unwon };
+        };
+
+        const parts = slices.map((sl, i) => Object.assign({ flight: sl.flight, golfers: sl.players.length, amountCents: sliceCents[i] },
+            allocateSlice(sl.players, sliceCents[i], sl.flight)));
+        const lines = [].concat.apply([], parts.map(x => x.lines));
+        const unwon = parts.reduce((a, x) => a + x.unwon, 0);
+        const totalUnits = parts.reduce((a, x) => a + x.totalUnits, 0);
+        const pendingUnits = parts.reduce((a, x) => a + x.calc.pendingUnits, 0);
         if (unwon > 0) {
             refundCents += unwon;
-            if (calc.skins.length === 0) refundReason('Skins pot refunded — no skins were won.');
-            else if (calc.pendingUnits > 0) refundReason(`Carry of ${calc.pendingUnits} unwon skin${calc.pendingUnits === 1 ? '' : 's'} refunded.`);
+            if (lines.length === 0) refundReason('Skins pot refunded — no skins were won.');
+            else if (pendingUnits > 0) refundReason(`Carry of ${pendingUnits} unwon skin${pendingUnits === 1 ? '' : 's'} refunded.`);
         }
         result.skins = { amountCents, scoring, carryOver: carry, lines,
-                         totalUnits, pendingUnits: calc.pendingUnits, unwonCents: unwon };
+                         totalUnits, pendingUnits, unwonCents: unwon };
+        // The per-flight view, only when the bucket was split: each pot's lines,
+        // units, pending carry and unwon money, so a surface can draw two ledgers
+        // and hold each to its own pot. Absent on a field-wide bucket so a round
+        // without flights keeps the exact shape it always had.
+        if (perFlight) {
+            result.skins.flights = parts.map(x => ({ flight: x.flight, golfers: x.golfers, amountCents: x.amountCents,
+                lines: x.lines, totalUnits: x.totalUnits, pendingUnits: x.calc.pendingUnits, unwonCents: x.unwon }));
+        }
     }
 
     // ---- REFUNDS -----------------------------------------------------------

@@ -511,7 +511,18 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
         'settlement-engine.js': 'adc3cd9f9ae5745ac4486e2ea9526b2c3a030ef8a4297e9ec26c4fb2f851b4b4',
-        'pool-engine.js': 'c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af',
+        // Previous hash, for the record:
+        //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
+        // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
+        // explicit per-file approval for this wave: the SKINS section of
+        // computeMoneyPool now splits the bucket into a pot per flight by
+        // headcount when the round's skins scope is per flight, and resolves
+        // and allocates each pot on its own golfers. KP and net untouched.
+        // pool_flights_test.js holds the arithmetic ($720 -> A $376 / B $344,
+        // remainder to A, pots sum to the bucket, per-flight zero-sum);
+        // pool_flights_golden_test.js pins flights-off and scope-'field' byte
+        // for byte against the pre-change capture.
+        'pool-engine.js': 'f4d7cdbbf6bee2ca68d34cf97e6dbb76145af456b0da97a11176f6e9c059df81',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:

@@ -230,7 +230,12 @@ describe('NO DUPLICATE SKINS LOGIC IN THE PAGE', () => {
 
     test('it passes the pool basis and participants to the ledger explicitly', () => {
         const fn = fnSrc();
-        assert.match(fn, /participantIds: r\.participants\.map/);
+        // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT): the ledger is now
+        // built per POT in buildSkinsPotLedgerHtml (inside this slice), and the
+        // pot's participants are r.participants filtered to the pot's flight -
+        // the whole field when the pool did not slice.
+        assert.match(fn, /const potIds = r\.participants\s*\.filter\(p => !flighted \|\| tagOf\(p\.id\) === pot\.flight\)/);
+        assert.match(fn, /participantIds: potIds/);
         assert.match(fn, /skinsPotFormat: scoring/);
         assert.match(fn, /skinsCarryOver: r\.skins\.carryOver/);
     });

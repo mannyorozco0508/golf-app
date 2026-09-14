@@ -325,7 +325,9 @@ describe('LEGACY PARITY - no historical result may move', () => {
 
     test('legacy skins still use the telescoping cent allocation', () => {
         const src = read('pool-engine.js');
-        assert.match(src, /const cumFloor = Math\.floor\(amountCents \* cumUnits \/ totalUnits\);/);
+        // Since the per-flight split the allocation runs once per pot (slice), so
+        // the line divides sliceAmountCents - the same telescoping rule, per pot.
+        assert.match(src, /const cumFloor = Math\.floor\(sliceAmountCents \* cumUnits \/ totalUnits\);/);
         assert.match(src, /TELESCOPING ALLOCATION/);
     });
 

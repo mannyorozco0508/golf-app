@@ -24,9 +24,10 @@
 //     the round's skins scope (getRoundGames already merges the round under
 //     each wager, so `flights` reaches every one).
 //   - If the Main Pool skins bucket is on, its own section, from the pool's
-//     scoring and carry, over the pool's participants, with flights undefined:
-//     it is ONE field-wide pot and gets no flight headers. This is exactly what
-//     settlement.html's Receipt has always done for the pool (its ledgerCfg).
+//     scoring and carry, over the pool's participants. Flights are kept on it
+//     exactly when the round's skins scope is per flight - pool-engine.js
+//     splits the bucket into an A pot and a B pot then - and stripped when the
+//     bucket is one field-wide pot (flights off, or scope 'field').
 //   - Both, when a round has both. Nothing, when a round has no skins money.
 //   - The legacy shape - a round with skinsBuyIn > 0 and no wager the game list
 //     knows about - keeps rendering from the round, as it always has.
@@ -60,6 +61,12 @@ function liveSkinsLedgerConfigs(data) {
         // absent participantIds already means to fieldParticipants).
         const ids = (Array.isArray(mp.participantIds) && mp.participantIds.length > 0) ? mp.participantIds.map(String) : undefined;
         const carry = (typeof skinsCarriesOver === 'function') ? skinsCarriesOver(mp.skins.carryOver) : mp.skins.carryOver === true;
+        // THE BUCKET SPLITS BY FLIGHT when the round's skins scope is per flight -
+        // pool-engine.js resolves it as two pots then (2026-09-13). The ledger
+        // follows the same rule: the round's flights are kept exactly when the
+        // resolver says the scope applies, and stripped otherwise, so a field-wide
+        // bucket keeps its one ledger and a split one draws A and B.
+        const perFlight = (typeof flightScopeApplies === 'function') && flightScopeApplies(data, 'skins');
         out.push({ key: 'pool', kind: 'pool', label: 'Main Pool Skins',
                    cfg: Object.assign({}, data, {
                        participantIds: ids,
@@ -69,7 +76,7 @@ function liveSkinsLedgerConfigs(data) {
                        // skins stake; a surface that prices "skinsBuyIn x golfers"
                        // must not invent a number here.
                        skinsBuyIn: 0,
-                       flights: undefined
+                       flights: perFlight ? data.flights : undefined
                    }) });
     }
 

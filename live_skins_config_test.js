@@ -63,6 +63,8 @@ const STACKED = { skins: { enabled: true, skinsBuyIn: 5, skinsPotFormat: 'gross'
 const base = () => ({ players: J(P), gameFormat: 'stroke', skinsBuyIn: 0, skinsCarryOver: false, flights: J(ON),
     courseData: CD, scores: J(SCORES), settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar' });
 const POOL_ONLY = Object.assign(base(), { moneyPool: J(POOL) });
+// The same pool on a round whose skins scope is WHOLE-FIELD: one pot, one ledger.
+const POOL_FIELD = Object.assign(base(), { moneyPool: J(POOL), flights: { enabled: true, scopes: { skins: 'field', birdies: 'field' } } });
 const WAGER_ONLY = Object.assign(base(), { additionalGames: J(STACKED) });
 const BOTH = Object.assign(base(), { moneyPool: J(POOL), additionalGames: J(STACKED) });
 
@@ -107,8 +109,12 @@ describe('NON-VACUOUS: on these scores net and gross name different winners', ()
     });
 });
 
-describe('POOL ONLY: 23 golfers, flights on, bucket GROSS, no wager -> ONE section, GROSS, no flight headers, the pool\'s winners', () => {
-    const entries = J(entriesFor(POOL_ONLY).map(e => ({ kind: e.section.kind, count: e.section.count, flight: e.flight, flighted: e.flighted, mode: e.bundle.mode, carry: e.bundle.carryOver, winners: winnersOf(e.L), n: e.L.participants.length })));
+// RE-PINNED 2026-09-13: the Main Pool's skins bucket SPLITS by flight when the
+// round's skins scope is per flight (pool-engine.js), so the pool section on
+// POOL_ONLY (scope 'flight') is now two flighted entries, each holding its own
+// pot's winners. The whole-field case (POOL_FIELD) keeps the one-section shape.
+describe('POOL ONLY, scope WHOLE-FIELD: ONE section, GROSS, no flight headers, the pool\'s winners', () => {
+    const entries = J(entriesFor(POOL_FIELD).map(e => ({ kind: e.section.kind, count: e.section.count, flight: e.flight, flighted: e.flighted, mode: e.bundle.mode, carry: e.bundle.carryOver, winners: winnersOf(e.L), n: e.L.participants.length })));
     const poolLines = J(vm.runInContext('(function(){ var r = computeMoneyPool(__d, __d.courseData, __d.scores); return r.skins.lines.map(function (l) { return [l.hole, String(l.winnerId)]; }); })()', ENG));
 
     test('one entry: the pool section, flight null, not flighted, mode gross, no carry, all 23 in it', () => {
@@ -119,10 +125,10 @@ describe('POOL ONLY: 23 golfers, flights on, bucket GROSS, no wager -> ONE secti
         assert.deepEqual(entries[0].winners, poolLines);
     });
     test('rendered: index mount says WHOLE-FIELD GROSS SKINS, no FLIGHT anywhere on any surface, the chips are the pool\'s winners', () => {
-        const S = surfaces(POOL_ONLY);
-        assert.match(S.mount, /WHOLE-FIELD GROSS SKINS · NO CARRY/);
+        const S = surfaces(POOL_FIELD);
+        assert.match(S.mount, /WHOLE-FIELD GROSS SKINS \u00B7 NO CARRY/);
         ['widget', 'won', 'mount', 'board'].forEach(k => assert.ok(!/FLIGHT|Flight [AB]/.test(S[k]), k + ' carries a flight header'));
-        assert.ok(!/SKINS WON — FLIGHT/.test(S.live), 'settlement SKINS WON is not flighted');
+        assert.ok(!/SKINS WON \u2014 FLIGHT/.test(S.live), 'settlement SKINS WON is not flighted');
         assert.equal(skinsWonCards(S.live), 1, 'one SKINS WON card');
         assert.ok(!/NET SKINS|Net Skins|Net \d/.test(S.mount + S.board), 'nothing says net');
         const byId = Object.fromEntries(P.map(p => [String(p.id), p.name]));
@@ -133,6 +139,28 @@ describe('POOL ONLY: 23 golfers, flights on, bucket GROSS, no wager -> ONE secti
         // The standings cards above SKINS WON use lr-name too; read the skins card only.
         assert.deepEqual([...new Set(names(S.live.slice(S.live.indexOf('SKINS WON')), 'lr-name'))].sort(), expected);
         assert.ok(!/\$\d/.test(S.mount.slice(0, S.mount.indexOf('Official'))), 'no per-golfer pot is invented for the pool: ' + S.mount.slice(0, 80));
+    });
+});
+
+describe('POOL ONLY, scope PER FLIGHT: the bucket splits - two flighted entries, each its own pot\'s winners', () => {
+    const entries = J(entriesFor(POOL_ONLY).map(e => ({ kind: e.section.kind, count: e.section.count, flight: e.flight, flighted: e.flighted, mode: e.bundle.mode, winners: winnersOf(e.L), n: e.L.participants.length })));
+    const perFlight = J(vm.runInContext('(function(){ var r = computeMoneyPool(__d, __d.courseData, __d.scores); return r.skins.flights.map(function (f) { return { flight: f.flight, golfers: f.golfers, lines: f.lines.map(function (l) { return [l.hole, String(l.winnerId)]; }) }; }); })()', ENG));
+
+    test('two entries, A then B, one pool section, flighted, gross, 12 and 11 golfers', () => {
+        assert.deepEqual(entries.map(e => [e.kind, e.count, e.flight, e.flighted, e.mode, e.n]), [['pool', 1, 'A', true, 'gross', 12], ['pool', 1, 'B', true, 'gross', 11]]);
+    });
+    test('each flight\'s winners are exactly what pool-engine pays THAT flight, hole for hole', () => {
+        assert.equal(perFlight.length, 2);
+        perFlight.forEach((f, i) => { assert.ok(f.lines.length >= 3, 'flight ' + f.flight + ' paid: ' + f.lines.length); assert.deepEqual(entries[i].winners, f.lines, 'flight ' + f.flight); });
+    });
+    test('rendered: FLIGHT A / FLIGHT B heads on every surface, GROSS, no per-golfer pot', () => {
+        const S = surfaces(POOL_ONLY);
+        assert.match(S.mount, /FLIGHT A \u00B7 GROSS SKINS \u00B7 NO CARRY/); assert.match(S.mount, /FLIGHT B \u00B7 GROSS SKINS \u00B7 NO CARRY/);
+        assert.equal((S.board.match(/LIVE SKINS \u2014 FLIGHT [AB]/g) || []).length, 2);
+        assert.equal((S.live.match(/SKINS WON \u2014 FLIGHT [AB]/g) || []).length, 2);
+        assert.match(S.won, /Flight A/); assert.match(S.won, /Flight B/);
+        assert.ok(!/NET SKINS/.test(S.mount));
+        assert.ok(!/\$\d/.test(S.mount.slice(0, S.mount.indexOf('Official'))), 'no per-golfer pot is invented for the pool');
     });
 });
 
@@ -166,22 +194,24 @@ describe('WAGER ONLY: bucket off, a stacked GROSS wager -> per-flight sections, 
 
 describe('BOTH: the wager\'s per-flight sections AND the pool\'s field-wide section', () => {
     const entries = J(entriesFor(BOTH).map(e => ({ kind: e.section.kind, label: e.section.label, count: e.section.count, flight: e.flight, flighted: e.flighted, mode: e.bundle.mode })));
-    test('three entries: wager A, wager B, then the pool; every section counts 2', () => {
+    test('four entries: wager A, wager B, pool A, pool B (the bucket splits under the per-flight scope); every section counts 2', () => {
         assert.deepEqual(entries, [
             { kind: 'wager', label: '$5 Skins', count: 2, flight: 'A', flighted: true, mode: 'gross' },
             { kind: 'wager', label: '$5 Skins', count: 2, flight: 'B', flighted: true, mode: 'gross' },
-            { kind: 'pool', label: 'Main Pool Skins', count: 2, flight: null, flighted: false, mode: 'gross' }]);
+            { kind: 'pool', label: 'Main Pool Skins', count: 2, flight: 'A', flighted: true, mode: 'gross' },
+            { kind: 'pool', label: 'Main Pool Skins', count: 2, flight: 'B', flighted: true, mode: 'gross' }]);
     });
-    test('rendered: section labels on every surface, the pool block unflighted after the flighted wager blocks', () => {
+    test('rendered: section labels on every surface, the pool block flighted like the wager block (scope per flight)', () => {
         const S = surfaces(BOTH);
         assert.match(S.widget, /lw-section">\$5 Skins/); assert.match(S.widget, /lw-section">Main Pool Skins/);
         assert.match(S.won, /sw-section">\$5 Skins/); assert.match(S.won, /sw-section">Main Pool Skins/);
         assert.match(S.mount, /ls-section">\$5 Skins/); assert.match(S.mount, /ls-section">Main Pool Skins/);
-        assert.match(S.board, /LIVE SKINS — \$5 SKINS — FLIGHT A/); assert.match(S.board, /LIVE SKINS — MAIN POOL SKINS<\/div>/);
-        assert.match(S.live, /SKINS WON — \$5 SKINS — FLIGHT B/); assert.match(S.live, /SKINS WON — MAIN POOL SKINS<\/div>/);
+        assert.match(S.board, /LIVE SKINS — \$5 SKINS — FLIGHT A/); assert.match(S.board, /LIVE SKINS — MAIN POOL SKINS — FLIGHT A/); assert.match(S.board, /LIVE SKINS — MAIN POOL SKINS — FLIGHT B/);
+        assert.match(S.live, /SKINS WON — \$5 SKINS — FLIGHT B/); assert.match(S.live, /SKINS WON — MAIN POOL SKINS — FLIGHT B/);
+        assert.ok(!/MAIN POOL SKINS<\/div>/.test(S.board + S.live), 'no unflighted pool head');
         const poolPart = S.mount.slice(S.mount.indexOf('ls-section">Main Pool Skins'));
-        assert.match(poolPart, /WHOLE-FIELD GROSS SKINS · NO CARRY/);
-        assert.equal(skinsWonCards(S.live), 3);
+        assert.match(poolPart, /FLIGHT A · GROSS SKINS · NO CARRY/); assert.match(poolPart, /FLIGHT B · GROSS SKINS · NO CARRY/);
+        assert.equal(skinsWonCards(S.live), 4);
     });
 });
 
@@ -201,7 +231,9 @@ describe('NOTHING, and the LEGACY shape', () => {
         const off = Object.assign(base(), { moneyPool: Object.assign(J(POOL), { skins: { mode: 'none' } }) });
         assert.deepEqual(entriesFor(off).length, 0);
         const narrow = Object.assign(base(), { moneyPool: Object.assign(J(POOL), { participantIds: P.slice(0, 5).map(p => String(p.id)) }) });
-        assert.deepEqual(J(entriesFor(narrow).map(e => e.L.participants.length)), [5]);
+        // The five narrowed golfers are all in A (the first twelve are A), so the
+        // split gives A the five and B nobody.
+        assert.deepEqual(J(entriesFor(narrow).map(e => [e.flight, e.L.participants.length])), [['A', 5], ['B', 0]]);
     });
 });
 
@@ -220,7 +252,7 @@ describe('THE SEAM (source): three surfaces, one builder, engines untouched', ()
         const src = read('live-skins.js');
         assert.match(src, /skinsPotFormat: mp\.skins\.scoring === 'gross' \? 'gross' : 'net'/);
         assert.match(src, /skinsCarryOver: carry/);
-        assert.match(src, /flights: undefined/);
+        assert.match(src, /flights: perFlight \? data\.flights : undefined/, 'flights kept on the pool section exactly when the skins scope applies');
         assert.match(src, /skinsBuyIn: 0/);
         assert.match(src, /g\.format !== 'skins'/);
     });

@@ -4772,14 +4772,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const birdiesPer = on && flightScopeNow('birdies') === 'flight';
         note('skins-flight-note', skinsPer ? 'Per flight \u2014 set in Players. Two pots: A pays A, B pays B.' : '');
         note('birdie-flight-note', birdiesPer ? 'Per flight \u2014 set in Players. A birdie in A is paid by A only.' : '');
-        // THE MAIN POOL'S SKINS BUCKET IS ONE POT, whatever the skins scope says:
-        // pool-engine settles it over the pool's participants and never reads
-        // flights. Shown whenever flights are on and the bucket exists, so an
-        // organizer expecting A and B pots finds out here, not on the Receipt.
+        // THE MAIN POOL'S SKINS BUCKET follows the round's skins scope since
+        // 2026-09-13: one pot when the scope is whole-field, an A pot and a B pot
+        // (by headcount, remainder to A) when it is per flight - pool-engine.js
+        // does the split. Each sentence says its own case, beside the bucket's
+        // controls, so an organizer finds out here and not on the Receipt. The
+        // two strings are pinned verbatim by flights_admin_test.js 6c, and the
+        // per-flight one is held against pool-engine's seam there - copy that
+        // describes behaviour is behaviour.
         const mpMode = document.getElementById('mp-skins-mode');
         const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
+        const ONE_POT_NOTE = 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+        const SPLIT_NOTE = 'With Skins per flight, the Main Pool\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
         note('mp-skins-flight-note', (on && poolSkinsOn)
-            ? 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.'
+            ? (skinsPer ? SPLIT_NOTE : ONE_POT_NOTE)
             : '');
         const blurb = document.getElementById('birdie-blurb');
         if (blurb) blurb.textContent = birdiesPer

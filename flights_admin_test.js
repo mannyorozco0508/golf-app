@@ -454,29 +454,59 @@ describe('6b THE PLAIN-ROW CONTROL SITS ON THE NAME\'S LINE: grid column 3, grid
 // ---------------------------------------------------------------------------
 describe('6c THE MAIN POOL SKINS NOTE', () => {
     const NOTE = 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+    // The per-flight sentence, approved 2026-09-14 (COMMIT 2 paste), verbatim.
+    const SPLIT = 'With Skins per flight, the Main Pool\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
     const note = (sb) => run(sb, "(function () { var e = document.getElementById('mp-skins-flight-note'); return e.style.display === 'none' ? null : e.textContent; })()");
     const setMode = (sb, v) => run(sb, "document.getElementById('mp-skins-mode').value = " + JSON.stringify(v) + "; refreshFlightScopeNotes();");
 
-    test('appears only when flights are ON and the bucket\'s mode is not "none"', async () => {
+    // RE-PINNED 2026-09-13/14: the bucket now SPLITS by flight when the skins scope
+    // is per flight (pool-engine.js), so the "one pot" sentence is true only under
+    // the whole-field scope and is shown only then; under per flight the note says
+    // the split (SPLIT). The two sentences are bound to the two behaviours: the
+    // scope switch flips the sentence, and the bucket's mode "none" empties it.
+    test('appears when flights are ON and the bucket\'s mode is not "none": the one-pot sentence whole-field, the split sentence per flight', async () => {
         const sb = await wizard('FLT070');
         assert.equal(note(sb), null, 'off by default');
         run(sb, 'setFlightsEnabled(true)');
-        assert.equal(note(sb), NOTE, 'the exact sentence, on');
+        assert.equal(note(sb), SPLIT, 'per flight is the default scope: the DEFAULT state says the split, exactly');
+        run(sb, "setFlightScope('skins', 'field')");
+        assert.equal(note(sb), NOTE, 'the exact sentence, whole-field');
         setMode(sb, 'none');
         assert.equal(note(sb), null, 'no bucket, no note');
         setMode(sb, 'fixed');
         assert.equal(note(sb), NOTE, 'a fixed bucket is still one pot');
         setMode(sb, 'remainder');
         assert.equal(note(sb), NOTE);
+        run(sb, "setFlightScope('skins', 'flight')");
+        assert.equal(note(sb), SPLIT, 'back to per flight: the bucket splits, the sentence says so');
+        setMode(sb, 'none');
+        assert.equal(note(sb), null, 'no bucket, no split sentence either');
+        setMode(sb, 'remainder');
         run(sb, 'setFlightsEnabled(false)');
         assert.equal(note(sb), null, 'gone with the switch');
     });
 
-    test('the Skins scope does not change it: whole-field skins on the wager side is still one pot in the pool', async () => {
+    test('the Skins scope flips the sentence: whole-field -> one pot; per flight -> two pots by headcount', async () => {
         const sb = await wizard('FLT071');
         run(sb, 'setFlightsEnabled(true)');
         run(sb, "setFlightScope('skins', 'field')");
-        assert.equal(note(sb), NOTE, 'the pool bucket is one pot either way; the scope is about wagers');
+        assert.equal(note(sb), NOTE);
+        run(sb, "setFlightScope('skins', 'flight')");
+        assert.equal(note(sb), SPLIT);
+        assert.ok(!/one pot|ONE pot/i.test(note(sb)), 'the per-flight sentence never says one pot');
+        assert.match(note(sb), /KP and Net Finish stay whole-field/, 'and it says what does NOT split');
+    });
+
+    test('the split sentence describes what pool-engine does: two pots, by headcount, KP and net whole-field', () => {
+        // Copy that describes behaviour is behaviour: the words are held against the
+        // engine's seam so a change to the split has to change the sentence too.
+        const eng = fs.readFileSync(path.join(REPO_ROOT, 'pool-engine.js'), 'utf8');
+        const skins = eng.slice(eng.indexOf('// ---- SKINS ----'), eng.indexOf('// ---- REFUNDS ----'));
+        assert.match(skins, /flightScopeApplies\(data, 'skins'\)/, 'the split follows the skins scope');
+        assert.match(skins, /potB = .*nB \/ n/, 'by headcount');
+        const kp = eng.slice(eng.indexOf('// ---- KP ----'), eng.indexOf('// ---- SKINS ----'));
+        assert.ok(!/flight/i.test(kp), 'KP and net whole-field');
+        assert.match(SPLIT, /two pots by headcount/); assert.match(SPLIT, /KP and Net Finish stay whole-field/);
     });
 
     test('it sits inside the Main Pool skins section, after the bucket\'s controls, and the mode select drives it live', () => {
@@ -486,6 +516,6 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
         assert.match(sec, /<select id="mp-skins-mode" onchange="mpRecalc\(\); refreshFlightScopeNotes\(\);">/);
         assert.match(sec, /id="mp-skins-flight-note" style="display:none;/);
         const fn = ADMIN.slice(ADMIN.indexOf('function refreshFlightScopeNotes('), ADMIN.indexOf('function captureCurrentPlayerInputs('));
-        assert.match(fn, /note\('mp-skins-flight-note', \(on && poolSkinsOn\)/, 'written by the same helper as the skins-card notes, gated on the switch');
+        assert.match(fn, /note\('mp-skins-flight-note', \(on && poolSkinsOn\)\s*\? \(skinsPer \? SPLIT_NOTE : ONE_POT_NOTE\)/, 'written by the same helper as the skins-card notes, gated on the switch and the bucket, the sentence chosen by the scope');
     });
 });

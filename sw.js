@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v126: the Main Pool's skins bucket splits by flight.
+//
+// When flights are on and the round's skins scope is per flight, pool-engine.js
+// now splits the bucket into a pot per flight by headcount (whole dollars,
+// remainder to A) and resolves each pot on its own golfers, like a per-flight
+// wager. KP and Net Finish stay whole-field; flights off or scope whole-field
+// is byte-identical. live-skins.js keeps the flights on the pool section in
+// that case, so every live skins surface shows FLIGHT A / FLIGHT B pots; the
+// Receipt (settlement.html) prints the split line and a ledger per pot; the
+// wizard's Main Pool note (admin.html) says which case the round is in. An
+// installed device on v125 keeps a pool-engine.js that pays one field-wide
+// pot under a per-flight scope, a live-skins.js whose pool section is always
+// whole-field, a Receipt that disagrees with the new engine, and a wizard
+// note that calls the bucket one pot when it is two.
+
 // Moved to v125: reopening a saved round no longer throws in the restore.
 //
 // admin.html's loadModeData called updatePressRuleExplanation on a Nassau
@@ -1190,7 +1205,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v125-reopen-restore';
+const CACHE_VERSION = 'golfapp-v126-pool-skins-per-flight';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

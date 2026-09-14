@@ -949,7 +949,7 @@ html {
         // already said Carry Over / No Carry.
         const carryLabel = r.skins.carryOver ? 'carries' : 'no carry';
 
-        let html = `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD69 Skins Pot \u2014 ${$(r.skins.amountCents)} `
+        let html = `<div class="ledger-row" style="font-weight:bold;"><span>🥩 Skins Pot — ${$(r.skins.amountCents)} `
             + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;
 
         // A ROUND THAT NEVER SAID SAYS SO. An absent carry setting used to mean
@@ -963,7 +963,7 @@ html {
             : true;
         if (!carryRecorded) {
             html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);">`
-                 + `<span>This round did not record a carry rule \u2014 settled as `
+                 + `<span>This round did not record a carry rule — settled as `
                  + `<strong>No Carry</strong>, one skin per hole won outright.</span><span></span></div>`;
         }
 
@@ -977,11 +977,51 @@ html {
             return html;
         }
 
-        // THE MAIN POOL IS FLIGHT-BLIND (Wave 2 scope): its bucket is priced over
-        // the pool's participants by pool-engine, so this ledger must not inherit
-        // the round's flights, or the top-level ledger would be null.
+        // ONE POT OR TWO. pool-engine.js splits the bucket by flight when the
+        // round's skins scope is per flight (r.skins.flights carries each pot's
+        // golfers, dollars and lines); a field-wide bucket has no such view and is
+        // drawn exactly as it always was. Either way each pot's ledger is built over
+        // THAT pot's golfers with the round's flights stripped - the pool decided
+        // the slicing, so the ledger must not slice again.
+        const pots = r.skins.flights
+            ? r.skins.flights
+            : [{ flight: null, golfers: r.participants.length, amountCents: r.skins.amountCents, lines: r.skins.lines,
+                 pendingUnits: r.skins.pendingUnits, unwonCents: r.skins.unwonCents }];
+        if (r.skins.flights) {
+            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);"><span>Split by flight, by headcount: `
+                 + r.skins.flights.map(f => `Flight ${f.flight} ${$(f.amountCents)} (${f.golfers} golfer${f.golfers === 1 ? '' : 's'})`).join(' · ')
+                 + `</span><span></span></div>`;
+        }
+        pots.forEach(pot => {
+            html += buildSkinsPotLedgerHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel);
+        });
+        return html;
+    }
+
+    // One pot's ledger: every hole in order, the summary by golfer, the unwon money.
+    // The pool's participants are narrowed to the pot's golfers by flight tag
+    // (playerFlight, the same rule pool-engine sliced by).
+    function buildSkinsPotLedgerHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel) {
+        let html = '';
+        const flighted = pot.flight !== null && pot.flight !== undefined;
+        if (flighted) {
+            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Flight ${pot.flight} — ${$(pot.amountCents)}</span><span></span></div>`;
+            if (pot.golfers === 0) {
+                html += `<div class="ledger-row"><span>Nobody in this flight — no pot.</span><span></span></div>`;
+                return html;
+            }
+        }
+        // r.participants carries id and name only; the tag lives on the round's
+        // player record, so the flight is read from there by id.
+        const tagOf = (id) => { const p = (data.players || []).find(x => String(x.id) === String(id)); return p && typeof playerFlight === 'function' ? playerFlight(p) : 'A'; };
+        const potIds = r.participants
+            .filter(p => !flighted || tagOf(p.id) === pot.flight)
+            .map(p => String(p.id));
+        // THE MAIN POOL DECIDED THE SLICING (or did not slice): this ledger is priced
+        // over the pot's participants by pool-engine, so it must not inherit the
+        // round's flights, or the top-level ledger would be null.
         const ledgerCfg = Object.assign({}, data, {
-            participantIds: r.participants.map(p => String(p.id)),
+            participantIds: potIds,
             skinsPotFormat: scoring,
             skinsCarryOver: r.skins.carryOver,
             flights: undefined,
@@ -993,7 +1033,7 @@ html {
         // Dollars per hole come from the POOL's allocated lines, keyed by hole. In
         // whole-dollar mode those are already integers; nothing here rounds anything.
         const centsByHole = {};
-        r.skins.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
+        pot.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
 
         // EVERY hole, in order - won, tied, or still waiting on a card.
         L.holes.forEach(row => {
@@ -1004,18 +1044,18 @@ html {
                 const who = row.missing.length > 0
                     ? row.missing.map(m => m.name).join(', ')
                     : `${row.requiredCount - row.postedCount} golfer(s)`;
-                html += `<div class="ledger-row"><span>${label} \u2014 Waiting on ${who}</span><span></span></div>`;
+                html += `<div class="ledger-row"><span>${label} — Waiting on ${who}</span><span></span></div>`;
                 return;
             }
             if (row.state === 'tie') {
                 // The score is named, so a golfer can see WHY the hole paid nothing
                 // without reaching for the card.
-                html += `<div class="ledger-row"><span>${label} \u2014 Tie at ${basisLabel} ${row.low} \u2014 No Skin</span><span></span></div>`;
+                html += `<div class="ledger-row"><span>${label} — Tie at ${basisLabel} ${row.low} — No Skin</span><span></span></div>`;
                 return;
             }
             const cents = centsByHole[String(row.hole)];
             const units = row.unitsWon > 1 ? ` (${row.unitsWon} skins)` : '';
-            html += `<div class="ledger-row"><span>${label} \u2014 ${escapeHtml(row.winner.name)} \u2014 ${basisLabel} ${row.low} \u2014 Skin${units}</span>`
+            html += `<div class="ledger-row"><span>${label} — ${escapeHtml(row.winner.name)} — ${basisLabel} ${row.low} — Skin${units}</span>`
                 + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
         });
 
@@ -1025,7 +1065,7 @@ html {
         // per-player money, to the dollar, by construction rather than by luck.
         const centsByPlayer = {};
         const countByPlayer = {};
-        r.skins.lines.forEach(l => {
+        pot.lines.forEach(l => {
             const k = String(l.winnerId);
             centsByPlayer[k] = (centsByPlayer[k] || 0) + l.cents;
         });
@@ -1046,9 +1086,9 @@ html {
         }).sort((a, b) => b.skins - a.skins || b.cents - a.cents || a.name.localeCompare(b.name));
 
         if (winners.length > 0) {
-            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary</span><span></span></div>`;
+            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary${flighted ? ' — Flight ' + pot.flight : ''}</span><span></span></div>`;
             winners.forEach(w => {
-                html += `<div class="ledger-row"><span>${escapeHtml(w.name)} \u2014 ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
+                html += `<div class="ledger-row"><span>${escapeHtml(w.name)} — ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
                     + `<span class="val-pos">${$(w.cents)}</span></div>`;
             });
         } else {
@@ -1058,12 +1098,12 @@ html {
         // ---- MONEY THAT FOUND NO WINNER ------------------------------------
         // Stated outright. An unwon carry or a fully tied round leaves real money in
         // the pot, and a Receipt that just omits it looks like the money vanished.
-        if (r.skins.unwonCents > 0) {
-            const why = r.skins.pendingUnits > 0
-                ? `${r.skins.pendingUnits} unwon skin${r.skins.pendingUnits === 1 ? '' : 's'} carried to the end`
+        if (pot.unwonCents > 0) {
+            const why = pot.pendingUnits > 0
+                ? `${pot.pendingUnits} unwon skin${pot.pendingUnits === 1 ? '' : 's'} carried to the end`
                 : 'no skins won';
-            html += `<div class="ledger-row"><span>\u21A9\uFE0F Unwon skins money (${why}) \u2014 refunded to the field</span>`
-                + `<span>${$(r.skins.unwonCents)}</span></div>`;
+            html += `<div class="ledger-row"><span>↩️ Unwon skins money (${why}) — refunded to the field</span>`
+                + `<span>${$(pot.unwonCents)}</span></div>`;
         }
 
         return html;
