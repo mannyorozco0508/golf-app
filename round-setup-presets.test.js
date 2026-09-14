@@ -27,14 +27,16 @@ describe('admin.html — stake presets write the exact same field manual entry w
         assert.equal(sandbox.document.getElementById('skins-carryover').value, 'false');
     });
 
-    test('press rule explanations only cover the 4 options the engine actually supports', () => {
-        const validRules = ['2down', '1down', 'anytime', 'none'];
-        validRules.forEach(rule => {
-            sandbox.__setElement('nassau-press-rule', rule);
-            sandbox.updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation');
-            const text = sandbox.document.getElementById('nassau-press-explanation').textContent;
-            assert.ok(text.length > 0, `${rule} should produce real explanation text`);
-        });
+    // The press-rule explanation test that stood here drove updatePressRuleExplanation
+    // against a <select> the page lost in de07a2f (2026-08-27). It kept passing
+    // because mini-dom resolves any id; in a browser the same helper threw on every
+    // reopen of every wizard-saved round (round_reopen_test.js). Helper, table and
+    // call are gone; this pins that they stay gone.
+    test('the legacy Nassau press-rule helper is gone with its control, and loadModeData no longer restores the retired editor', () => {
+        const src = require('fs').readFileSync(require('path').join(__dirname, 'admin.html'), 'utf8').replace(/\/\/[^\n]*/g, '');
+        assert.ok(!/updatePressRuleExplanation\(|function updatePressRuleExplanation|nassau-press-explanation/.test(src));
+        assert.ok(!/getElementById\("nassau-(type|scoring|stake|press-rule)"\)\.value = data\./.test(src), 'no restore into a retired Nassau control');
+        assert.equal(typeof sandbox.updatePressRuleExplanation, 'undefined');
     });
 });
 

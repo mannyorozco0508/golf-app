@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v125: reopening a saved round no longer throws in the restore.
+//
+// admin.html's loadModeData called updatePressRuleExplanation on a Nassau
+// <select> deleted in de07a2f (2026-08-27), for every round the wizard had
+// saved (the save writes nassauPressRule "2down" on all of them). The throw
+// emptied Step 5 on every reopen before v124, and after v124 left the flights
+// switch off, both flight scopes at their defaults and the Stableford block
+// unrestored - a re-save then wrote flights: null and dropped every tag. The
+// helper, its table, its call and the retired editor's guarded restores are
+// gone. tools/round-reopen-check.js reopens a wizard-saved round in Chrome.
+//
+// An installed device on v124 reopens every round with flights off and an
+// alert about a null element.
+
 // Moved to v124: one loader on arrival.
 //
 // admin.html loaded a new round TWICE - once as the page parsed and once from
@@ -1176,7 +1190,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v124-one-loader';
+const CACHE_VERSION = 'golfapp-v125-reopen-restore';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

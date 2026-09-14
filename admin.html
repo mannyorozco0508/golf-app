@@ -5150,19 +5150,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             : "A tied hole is simply worth nothing — no skin is won, nothing carries forward.";
     }
 
-    // --- NASSAU PRESS EXPLANATION ---
-    // Plain-English text for whichever of the engine's real 4 press-rule options is selected —
-    // no option here that the engine doesn't actually support.
-    const pressRuleExplanations = {
-        '2down': "Automatically starts a new bet on the next hole once a side falls 2 holes behind — the original bet keeps going too.",
-        '1down': "Automatically starts a new bet on the next hole once a side falls 1 hole behind — the original bet keeps going too.",
-        'anytime': "No automatic presses — but a \"Press\" button is always available on the scorecard so either side can start one on any hole, any time.",
-        'none': "No presses at all — just the original Front 9 / Back 9 / Overall bets, start to finish."
-    };
-    function updatePressRuleExplanation(selectId, explanationId) {
-        const val = document.getElementById(selectId).value;
-        document.getElementById(explanationId).textContent = pressRuleExplanations[val] || '';
-    }
+    // The NASSAU PRESS EXPLANATION helper that sat here (updatePressRuleExplanation)
+    // is gone with its <select>: the legacy Nassau editor left the markup in
+    // de07a2f (2026-08-27) and the helper kept being called from loadModeData for
+    // every round the wizard had saved - the save writes nassauPressRule "2down" on
+    // all of them - throwing on a null element. That throw emptied Step 5 on every
+    // reopen before v124, and left the flights switch off after it. The Nassau's
+    // press rule is set on the Bets tab now; nothing on this page explains it.
 
     const formatDescriptions = {
         stroke: "Total strokes for the round — low score wins.",
@@ -5649,8 +5643,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // Detect a saved money-bearing main game before anything re-renders, so an
             // old multi-group Best Ball round keeps its stake instead of being quietly
             // converted to a no-money round the next time it is saved.
+            // ALL FOUR legacy Nassau settings are held here - the retired editor's
+            // controls are gone, so this holder is the only place a reopened legacy
+            // round's type, scoring and press rule survive on the page. The Review
+            // reads the stake from it. NOTE (2026-09-13): the save still writes
+            // nassauType / nassauScoring / nassauPressRule from the retired controls'
+            // fallbacks ('team' / 'net' / '2down'), not from this holder - a legacy
+            // Nassau round re-saved keeps its stake and loses those three. Pre-
+            // existing since de07a2f; reading them from here at the save is the fix,
+            // deliberately not made in the wave that removed the dead restores.
             loadedLegacyNassau = (data.gameFormat === 'nassau')
-                ? { stake: data.nassauStake, pressRule: data.nassauPressRule, scoring: data.nassauScoring }
+                ? { stake: data.nassauStake, pressRule: data.nassauPressRule, scoring: data.nassauScoring, type: data.nassauType }
                 : null;
             loadedLegacyMainStake = (parseFloat(data.matchStake) || 0) > 0
                 || (parseFloat(data.nassauStake) || 0) > 0
@@ -5708,15 +5711,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (data.matchStake && document.getElementById("match-stake")) document.getElementById("match-stake").value = data.matchStake;
             if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
             
-            if (data.nassauType && document.getElementById("nassau-type")) document.getElementById("nassau-type").value = data.nassauType;
-            if (data.nassauScoring && document.getElementById("nassau-scoring")) { document.getElementById("nassau-scoring").value = data.nassauScoring; syncToggle("nassau-scoring", "nassau-scoring-switch", "nassau-scoring-label-net", "nassau-scoring-label-gross", "net"); }
             loadAdditionalGames(data);
             // Same loader serves reopening a round and copying one, so a duplicated
             // round now brings its pot with it - which is the whole point of copying
             // a setup.
             loadMoneyPool(data);
-            if (data.nassauStake && document.getElementById("nassau-stake")) document.getElementById("nassau-stake").value = data.nassauStake;
-            if (data.nassauPressRule && document.getElementById("nassau-press-rule")) document.getElementById("nassau-press-rule").value = data.nassauPressRule;
+            // The legacy Nassau editor's restores (nassau-type / -scoring / -stake /
+            // -press-rule and the stake presets) stood here, each guarded on an
+            // element that left the page in de07a2f. Dead since; removed with the
+            // helper that was NOT guarded (see the note above formatDescriptions).
+            // A legacy Nassau round's stake still reaches the Review through
+            // loadedLegacyNassau, and the Bets tab edits the wager itself.
             if (data.wolfPointVal && document.getElementById("wolf-point-value")) document.getElementById("wolf-point-value").value = data.wolfPointVal;
             if (data.wolfLoneMult && document.getElementById("wolf-lone-mult")) document.getElementById("wolf-lone-mult").value = data.wolfLoneMult;
             if (data.wolfBlindMult && document.getElementById("wolf-blind-mult")) document.getElementById("wolf-blind-mult").value = data.wolfBlindMult;
@@ -5745,13 +5750,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 document.getElementById("skins-pot-format").value =
                     (pf === 'gross' || pf === 'net' || pf === 'split') ? pf : 'split';
             }
-            if (document.getElementById("nassau-stake")) {
-                const nStake = data.nassauStake || 10;
-                document.querySelectorAll('#nassau-stake-presets .preset-btn').forEach(b => {
-                    b.classList.toggle('active', parseFloat((b.textContent || '').replace('$', '')) === nStake);
-                });
-            }
-            if (data.nassauPressRule) updatePressRuleExplanation('nassau-press-rule', 'nassau-press-explanation');
             if (data.stablefordPointVal && document.getElementById("stableford-point-value")) document.getElementById("stableford-point-value").value = data.stablefordPointVal;
             if (data.stablefordScoring && document.getElementById("stableford-scoring")) { document.getElementById("stableford-scoring").value = data.stablefordScoring; syncToggle("stableford-scoring", "stableford-scoring-switch", "stableford-scoring-label-net", "stableford-scoring-label-gross", "net"); }
             if (data.stablefordPoints) {

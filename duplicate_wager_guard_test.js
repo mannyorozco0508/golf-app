@@ -268,9 +268,12 @@ describe('NOTHING LEGITIMATE WAS BLOCKED', () => {
         const r = settle(round(LEGACY));
         assert.equal(r.receipts, 1);
         assert.equal(r.marty, 40);
+        // Since v125 the retired editor's restores are gone; a legacy round's four
+        // settings are held in loadedLegacyNassau (the Review reads the stake there).
         const src = read('admin.html');
+        const holder = src.slice(src.indexOf('loadedLegacyNassau = (data.gameFormat'), src.indexOf(': null;', src.indexOf('loadedLegacyNassau = (data.gameFormat')));
         ['data.nassauStake','data.nassauPressRule','data.nassauScoring','data.nassauType']
-            .forEach(k => assert.ok(src.includes(k), k + ' must still load'));
+            .forEach(k => assert.ok(holder.includes(k), k + ' must still load (into loadedLegacyNassau)'));
     });
 
     test('a modern Nassau plus Skins is fine', () => {

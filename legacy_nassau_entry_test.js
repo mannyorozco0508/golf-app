@@ -138,11 +138,18 @@ describe('A GENUINE LEGACY ROUND STILL LOADS, UNCHANGED', () => {
         assert.equal(loadRound({ gameFormat: 'dots', dotPointVal: 1 }).format, 'dots');
     });
 
-    test('every legacy field is still populated from the saved round', () => {
-        // The screen must stay fully editable; the notice explains, it does not remove.
+    test('every legacy field is still held from the saved round (in loadedLegacyNassau - the editor itself is gone)', () => {
+        // This used to assert the SOURCE mentioned `data.nassauType` etc., which the
+        // dead restores into retired controls satisfied while restoring nothing (the
+        // controls left in de07a2f). The four settings live in loadedLegacyNassau
+        // now; the Review shows the stake from it. The save still writes type /
+        // scoring / pressRule from fallbacks - recorded in admin.html beside the
+        // holder, deferred.
         const src = read('admin.html');
+        const holder = src.slice(src.indexOf('loadedLegacyNassau = (data.gameFormat'), src.indexOf(': null;', src.indexOf('loadedLegacyNassau = (data.gameFormat')));
         ['data.nassauStake','data.nassauPressRule','data.nassauScoring','data.nassauType']
-            .forEach(k => assert.ok(src.includes(k), k + ' must still be loaded'));
+            .forEach(k => assert.ok(holder.includes(k), k + ' must still be held'));
+        assert.ok(!/getElementById\("nassau-(type|scoring|stake|press-rule)"\)\.value = data\./.test(src), 'no restore into a control the page no longer has');
     });
 
     test('and it says plainly what the screen is', () => {
