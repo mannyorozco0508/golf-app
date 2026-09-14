@@ -182,6 +182,8 @@ describe('THE SEAM (source)', () => {
         const iTry = fn.indexOf('try {'), iCatch = fn.indexOf('} catch (err) {\n                restoreFailure = err;'), iRoster = fn.indexOf('storedPlayersTemp = data.players'), iRebuild = fn.indexOf('handleFormatChange(true)'), iReport = fn.indexOf('if (restoreFailure) reportRoundLoadFailure(');
         assert.ok(iTry > 0 && iCatch > iTry && iRoster > iCatch && iRebuild > iRoster && iReport > iRebuild, [iTry, iCatch, iRoster, iRebuild, iReport].join(' < '));
         assert.match(fn, /\.catch\(err => \{[\s\S]*?reportRoundLoadFailure\(modeKey, err\)/);
-        assert.match(fn, /return db\.ref/, 'the promise is returned, so a caller can await the load');
+        // RE-PINNED 2026-09-14: the read is wrapped in readWithTimeout (code-issuer.js)
+        // so a load that never answers rejects instead of hanging; still returned.
+        assert.match(fn, /return readWithTimeout\(db\.ref/, 'the promise is returned (through the shared timeout), so a caller can await the load');
     });
 });

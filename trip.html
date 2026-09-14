@@ -821,7 +821,10 @@ html {
         buildBtn.innerText = '⏳ Building...';
         buildBtn.disabled = true;
 
-        db.ref('global_courses').once('value').then(async snap => {
+        // Timed (code-issuer.js readWithTimeout): this read sits ahead of every
+        // code the planner issues, and with the network cut it would hold the
+        // button on "⏳ Building..." forever before the issuer's own timer ran.
+        readWithTimeout(db.ref('global_courses').once('value'), { what: 'the course list' }).then(async snap => {
             const globalCoursesData = snap.val() || {};
             // ONE Set across BOTH roots, which is what the original guaranteed by
             // seeding it with the trip code: a round in this trip can never be given
@@ -875,6 +878,13 @@ html {
         }).catch(err => {
             buildBtn.innerText = originalText;
             buildBtn.disabled = false;
+            // The issuer's timeout (code-issuer.js, err.code 'timeout'): the code
+            // check never answered. Say what did not happen, not why - the app
+            // cannot tell a dead socket from a slow one.
+            if (err && err.code === 'timeout') {
+                alert('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
+                return;
+            }
             alert(`Error building trip: ${err.message}`);
         });
     }
@@ -931,6 +941,12 @@ html {
         }).catch(err => {
             restore();
             const m = String((err && err.message) || err || '');
+            // Same shape as the planner above: a timeout is "not created", never
+            // "check your signal".
+            if (err && err.code === 'timeout') {
+                alert('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
+                return;
+            }
             alert(/could not issue a free/i.test(m)
                 ? 'Could not start a new trip just now.\n\nEvery code we tried was already '
                   + 'in use. Try again \u2014 the next one will almost certainly be free.'

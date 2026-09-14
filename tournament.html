@@ -354,7 +354,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
     </div>
 
-    <button class="btn-primary" onclick="saveTournament()">💾 Save Tournament &amp; Get Team Links</button>
+    <button class="btn-primary" onclick="saveTournament(this)">💾 Save Tournament &amp; Get Team Links</button>
     <button class="btn-outline" onclick="window.location.href='admin.html'">← Back to Home</button>
 </div>
 
@@ -867,7 +867,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let currentCode = null;
     let tripLinkCode = null; // present when this tournament is being set up FROM a trip
 
-    async function saveTournament() {
+    // Pending / restore for the Save button, the shape admin.html and trip.html
+    // use for their tiles (setControlPending there). aria-disabled as well as
+    // disabled, and checked in the handler, so reaching it another way while a
+    // save is in flight achieves nothing.
+    function setSavePending(el, pendingText) {
+        if (!el) return function () {};
+        const wasHtml = el.innerHTML;
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+        el.textContent = pendingText;
+        return function restore() {
+            el.disabled = false;
+            el.removeAttribute('aria-disabled');
+            el.innerHTML = wasHtml;
+        };
+    }
+
+    async function saveTournament(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         // SIGNED IN, FIRST - before a single field is read, so nobody fills in a
         // whole tournament to be told at the end. ownerUid is written in the same
         // .set() that creates the record, so an owned tournament never exists
@@ -916,16 +934,30 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         // Issued against tournaments/, its own node. A tournament code colliding
         // with a round code is not a collision.
+        //
+        // THE BUTTON SHOWS IT IS WORKING, AND COMES BACK. This handler used to
+        // change no button state at all, so a code check that never answered (a
+        // dead socket - the issuer now times out, code-issuer.js) left the page
+        // looking untouched with the organizer tapping again into the same wait.
+        // Pending while the issuer runs; restored on every exit but the success
+        // path, which leaves the page.
+        const restoreSave = setSavePending(pressedEl, '\u23F3 Saving\u2026');
         try {
             currentCode = await issueUniqueCode({ db, root: 'tournaments' });
         } catch (err) {
+            restoreSave();
             const m = String((err && err.message) || err || '');
+            if (err && err.code === 'timeout') {
+                alert('\u26A0\uFE0F EVENT NOT CREATED\nThe event could not be set up just now. Nothing was saved. Try again.');
+                return;
+            }
             alert(/could not issue a free/i.test(m)
                 ? 'Could not start a new event just now.\n\nEvery code we tried was already '
                   + 'in use. Try again \u2014 the next one will almost certainly be free.'
                 : '\u26A0\uFE0F Could not start a new event \u2014 check your signal and try again.');
             return;
         }
+        restoreSave();
         const shambleCountBest = parseInt(document.getElementById('shamble-count-best').value, 10) || 1;
         const entryFee = parseFloat(document.getElementById('t-entry-fee').value) || 0;
 

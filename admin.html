@@ -3441,7 +3441,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const restore = setControlPending(pressedEl, '\u23F3 Checking\u2026');
         try {
-            const snap = await db.ref('events/' + code).once('value');
+            // THROUGH THE SAME TIMER AS THE ISSUER. This read sits AHEAD of
+            // issueUniqueCode, and measured with the network cut it hung on
+            // "⏳ Checking…" forever - the issuer's timeout was never reached.
+            const snap = await readWithTimeout(db.ref('events/' + code).once('value'), { what: 'the round to copy' });
             const source = (snap && snap.exists && snap.exists()) ? (snap.val() || {}) : null;
             if (!source) {
                 restore();
@@ -3470,7 +3473,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // unreachable, which is a signal problem and reads as one.
     function reportCodeIssueFailure(err, what) {
         const m = String((err && err.message) || err || '');
-        if (/could not issue a free/i.test(m)) {
+        // A TIMEOUT SAYS "NOT CREATED", NOT "CHECK YOUR SIGNAL". The issuer gives
+        // up after its own timer (code-issuer.js, err.code 'timeout') when the
+        // code check never answers - a dead socket, a captive portal, a bar of
+        // signal with no throughput. navigator.onLine read true under a real
+        // offline emulation, so the app cannot honestly say why; it can say
+        // what did not happen and what to do.
+        if (err && err.code === 'timeout') {
+            alert('\u26A0\uFE0F ' + what.toUpperCase() + ' NOT CREATED\n'
+                + 'The new ' + what + ' could not be set up just now. Nothing was saved. Try again.');
+        } else if (/could not issue a free/i.test(m)) {
             alert('Could not start a new ' + what + ' just now.\n\n'
                 + 'Every code we tried was already in use. Try again \u2014 the next one '
                 + 'will almost certainly be free.');
@@ -5583,7 +5595,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function loadModeData(modeKey) {
         const isThisRound = String(modeKey) === String(currentMode);
-        return db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
+        // Timed, like every read on the way to a round (code-issuer.js
+        // readWithTimeout): a load that never answers rejects, so the caller can
+        // say so instead of leaving a copy that silently never arrives.
+        return readWithTimeout(db.ref(`events/${modeKey}`).once('value'), { what: 'round ' + String(modeKey).toUpperCase() }).then((snapshot) => {
             const data = snapshot.val() || {};
             // THE ROSTER IS REBUILT LAST, AND A FAILURE IS SAID OUT LOUD. Everything
             // between here and the roster rebuild is the settings restore; an
@@ -6684,7 +6699,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // its own (empty) record, which sets every control to its default and
         // adds the ONE blank row. The parse-time loadModeData(currentMode) that
         // used to run beside this raced it - see the note where it was removed.
-        db.ref(`events/${currentMode}`).once('value').then((snapshot) => {
+        //
+        // TIMED (code-issuer.js readWithTimeout). With the network cut this read
+        // never answered and the wizard sat on step 1 - fine for a brand-new code,
+        // wrong for an edit or a copy, which then look empty with nothing said. On
+        // a timeout: a copy is reported (its source was expected); a plain arrival
+        // cannot tell a new round from an unreachable one, so it logs and leaves
+        // the wizard as it is - Save & Start Round is the next thing to say so.
+        readWithTimeout(db.ref(`events/${currentMode}`).once('value'), { what: 'round ' + currentMode }).then((snapshot) => {
             const data = snapshot.val() || {};
             if (!data.players || data.players.length === 0) {
                 if (copyFromCode) {
@@ -6703,6 +6725,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // loadModeData fetches its own data asynchronously, so give it a moment to actually
                 // populate the fields before building the review screen from them.
                 setTimeout(() => goToWizardStep(wizardStepNumber('review')), 600);
+            }
+        }).catch((err) => {
+            if (copyFromCode) {
+                alert('\u26A0\uFE0F ROUND NOT COPIED\nThe round to copy (' + String(copyFromCode).toUpperCase()
+                    + ') could not be loaded just now. Nothing was saved. Go back and try again.');
+            } else {
+                console.warn('arrival read for ' + currentMode + ' did not complete:', err);
             }
         });
     }

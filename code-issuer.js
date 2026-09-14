@@ -39,6 +39,18 @@
 // navigating before it writes to pay for it. The read removes essentially all
 // of the real risk. Server-side issuance is the correct end state and belongs
 // with the Worker MONETIZATION.md already needs.
+//
+// A READ THAT NEVER ANSWERS IS A REJECTION (2026-09-14). Measured in Chrome with
+// the network cut at the browser: tapping Game Day left the tile on
+// "⏳ Starting..." at +0.3 s, +2 s, +5 s, +8 s and forever, because the
+// Realtime Database SDK neither resolves nor rejects a once('value') while the
+// socket is down - it queues it, and no caller can catch what never rejects.
+// Every existence check below now races the read against a timer
+// (opts.timeoutMs, default 8000). On timeout the issuer rejects with an Error
+// whose .code is 'timeout', so a caller can tell it from the exhausted-attempts
+// rejection and restore its control. navigator.onLine is deliberately NOT
+// consulted: it read true under that same offline emulation, and reads true on
+// a phone with a bar of signal and no throughput. The timer is the decision.
 // ============================================================================
 
 (function () {
@@ -108,6 +120,9 @@
     // reserved    optional Set for in-memory dedupe within one batch. The
     //             database cannot know about codes a batch has issued but not
     //             yet written, which is why trip.html has always needed it.
+    // timeoutMs   how long ONE existence check may take before the issuer gives
+    //             up and rejects with err.code === 'timeout'. Per attempt, not
+    //             per call: a slow-but-answering database is not a dead one.
     function issueUniqueCode(opts) {
         opts = opts || {};
         var db = opts.db;
@@ -115,6 +130,7 @@
         var generate = opts.generate || generateCode;
         var maxAttempts = opts.maxAttempts || 8;
         var reserved = opts.reserved || null;
+        var timeoutMs = opts.timeoutMs || 8000;
 
         if (ROOTS.indexOf(root) === -1) {
             return Promise.reject(new Error('unknown root "' + root
@@ -136,7 +152,8 @@
             // In-memory first: it costs nothing and the database would say this
             // one is free, because the batch has not written it yet.
             if (reserved && reserved.has(code)) return attempt();
-            return db.ref(root + '/' + code).once('value').then(function (snap) {
+            return readWithTimeout(db.ref(root + '/' + code).once('value'),
+                                   { timeoutMs: timeoutMs, what: 'the ' + root + ' code check' }).then(function (snap) {
                 if (snap && snap.exists()) return attempt();
                 if (reserved) reserved.add(code);
                 return code;
@@ -145,11 +162,41 @@
         return attempt();
     }
 
+    // THE RACE, SHARED. Any read that sits on the way to creating a round, a
+    // trip or a tournament goes through here - the source round a copy starts
+    // from, the course list the trip planner reads, the wizard's arrival load -
+    // not only the code check. Measured 2026-09-14: the copy button hung on
+    // "⏳ Checking…" forever because its source read sat AHEAD of the issuer and
+    // the issuer's timer was never reached. One helper, exported, so the next
+    // read on such a path does not grow its own copy of the race.
+    //
+    // The timer is cleared when the read wins so a fast answer leaves nothing
+    // ticking; when the timer wins, the read's eventual answer (if it ever
+    // comes) is dropped - the caller has already been told.
+    //
+    //   readWithTimeout(promise, { timeoutMs = 8000, what = 'the database read' })
+    //     -> the promise's value, or a rejection whose .code is 'timeout'
+    function readWithTimeout(readPromise, opts) {
+        opts = opts || {};
+        var timeoutMs = opts.timeoutMs || 8000;
+        var what = opts.what || 'the database read';
+        return new Promise(function (resolve, reject) {
+            var timer = setTimeout(function () {
+                var err = new Error(what + ' did not answer within ' + timeoutMs + 'ms - nothing was created');
+                err.code = 'timeout';
+                reject(err);
+            }, timeoutMs);
+            readPromise.then(function (v) { clearTimeout(timer); resolve(v); },
+                             function (e) { clearTimeout(timer); reject(e); });
+        });
+    }
+
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { issueUniqueCode: issueUniqueCode, generateCode: generateCode };
+        module.exports = { issueUniqueCode: issueUniqueCode, generateCode: generateCode, readWithTimeout: readWithTimeout };
     }
     if (typeof window !== 'undefined') {
         window.issueUniqueCode = issueUniqueCode;
         window.generateCode = generateCode;
+        window.readWithTimeout = readWithTimeout;
     }
 })();

@@ -524,6 +524,25 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v132: every read on the way to a round, trip or tournament is timed.
+//
+// v131 raced the code check; the probe then found "Start from a previous
+// round" still hung on "Checking..." forever, because its SOURCE read sat
+// ahead of the issuer. code-issuer.js now exports the one race (readWithTimeout)
+// and admin.html routes the copy's source read, the wizard's arrival load and
+// loadModeData through it; trip.html routes the planner's course read. An
+// installed device on v131 keeps the dead copy button and a planner that never
+// comes back.
+
+// Moved to v131: starting a round with no connection fails visibly.
+//
+// code-issuer.js (precached, SHARED_SHELL) now races every code-existence read
+// against a timer (8 s) and rejects with err.code 'timeout' when the database
+// never answers; admin.html, trip.html and tournament.html restore their
+// controls and say the round / trip / event was not created and to try again.
+// Measured before: a Game Day tap with no signal left the tile on "Starting..."
+// forever. An installed device on v130 keeps that hang.
+
 // Moved to v130: the tab bar shows all eight pages.
 //
 // index, leaderboard, settlement, skins, sidematches, stats. The bar was a
@@ -1246,7 +1265,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v130-tab-bar';
+const CACHE_VERSION = 'golfapp-v132-timed-reads';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
