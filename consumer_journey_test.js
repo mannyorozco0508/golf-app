@@ -63,7 +63,10 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
         // them. 1000 is the measurement plus headroom, not a number picked to pass -
         // the point is still "createRoom goes somewhere", and a createRoom that stopped
         // navigating would still fail.
-        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1000}window\.location\.href/,
+        // 1000 -> 1300 (2026-09-13): createRoom gained the copyFrom carry (the line
+        // and its three-line note); measured 1188 from the signature to the
+        // navigation, so 1300 is again the measurement plus headroom.
+        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1300}window\.location\.href/,
             'createRoom no longer goes anywhere');
     });
 

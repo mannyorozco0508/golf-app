@@ -106,22 +106,24 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
         assert.match(ADMIN, /loadModeData\(copyFromCode\)/);
     });
 
-    // WHAT IS BELOW THE TILES, now that the code row is back. The v68 finding still
-    // holds for the COPY-AN-OLD-ROUND field, which nobody used and which is still
-    // gone; and the shape finding holds too - what came back is one compact row, not
-    // the full-width field above a full-width button that competed with the tiles.
-    test('below the tiles there is Resume and exactly one input', () => {
+    // WHAT IS BELOW THE TILES, now that the code row is back. The shape finding
+    // holds - compact rows, not a full-width field above a full-width button
+    // competing with the tiles. RE-PINNED 2026-09-13 (v123): the copy-an-old-round
+    // field is BACK, deliberately, as a second compact row: it is the only place
+    // on this product that emits the copyFrom prefill (the trip select's copy had
+    // never survived the lobby). Two inputs now: the game code, and the code of a
+    // previous round to start from.
+    test('below the tiles there is Resume and exactly two compact code inputs', () => {
         // COMMENTS STRIPPED. The note explaining what stayed removed names
         // copyFrom=OLD, and an earlier version of this assertion matched that
         // sentence rather than any control - grading prose as though it were markup.
         const l = lobby().replace(/<!--[\s\S]*?-->/g, '');
         const afterWidgets = l.slice(l.indexOf('home-widgets'));
         const inputs = afterWidgets.match(/<input/g) || [];
-        assert.equal(inputs.length, 1,
+        assert.equal(inputs.length, 2,
             'the home screen asks for ' + inputs.length + ' things to be typed');
-        assert.match(afterWidgets, /id="join-code-input"/, 'and it is the game code');
-        assert.ok(!/copyFrom["'\s]*[:=]/.test(afterWidgets),
-            'the copy-an-old-round field is back, and it was never used');
+        assert.match(afterWidgets, /id="join-code-input"/, 'the game code');
+        assert.match(afterWidgets, /id="copy-code-input"/, 'and the previous round to start from');
         assert.ok(!/lobby-divider/.test(afterWidgets),
             'a divider survives with nothing to divide');
     });

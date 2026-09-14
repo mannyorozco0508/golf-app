@@ -454,9 +454,9 @@ html {
          admin.html?game=CODE, which lands on the organizer's Review step holding
          "Save & Start Round" - measured at four golfers and at nine. This opens the
          SCORECARD. See openRoundByCode().
-         The copy-an-old-round field that also sat here is still gone and still not
-         missed; the PREFILL it drove is untouched, so
-         admin.html?game=NEW&copyFrom=OLD keeps working from a link. -->
+         The copy-an-old-round field is BACK, below this row (#copy-code-row), as
+         the one place the prefill admin.html?game=NEW&copyFrom=OLD is emitted
+         from on this product; the prefill itself is untouched. -->
     <div id="join-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
         <input type="text" id="join-code-input" class="join-code-input" maxlength="48"
                placeholder="GAME CODE" aria-label="Game code or the link your organizer sent">
@@ -468,6 +468,19 @@ html {
          counts, so this sentence goes red if the gate ever moves. -->
     <p id="join-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
         Above four golfers a typed code is read-only — paste the link your organizer sent if you are keeping score.
+    </p>
+    <!-- STARTING FROM A PREVIOUS ROUND. The prefill (admin.html?game=NEW&copyFrom=OLD)
+         has always worked from a link; this is the field that emits it. The order
+         inside startFromPreviousRound is the point: check the source, MINT the new
+         code, then navigate with both params - the trip select used to send
+         ?trip=T&copyFrom=OLD to a lobby that minted a code and dropped copyFrom. -->
+    <div id="copy-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
+        <input type="text" id="copy-code-input" class="join-code-input" maxlength="48"
+               placeholder="PREVIOUS ROUND CODE" aria-label="The code of a round to copy the golfers and setup from">
+        <button class="btn-outline join-code-btn" id="copy-code-btn" onclick="startFromPreviousRound(this)">🔁 Start from it</button>
+    </div>
+    <p id="copy-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
+        Copies that round&rsquo;s golfers, handicaps, flights, groups, course and money setup into a new round. The old round is not changed.
     </p>
 </div>
 
@@ -3379,6 +3392,63 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const newCode = await issueUniqueCode({ db, root: 'events' });
             let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
             if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+            // CARRIED, NOT DROPPED: trip.html's copy select sends ?trip&copyFrom to
+            // this lobby, and the minted URL used to lose the copy. See the note
+            // above startFromPreviousRound for which params matter here.
+            if (copyFromCode) dest += `&copyFrom=${encodeURIComponent(copyFromCode)}`;
+            window.location.href = dest;
+        } catch (err) {
+            restore();
+            reportCodeIssueFailure(err, 'round');
+        }
+    }
+
+    // START FROM A PREVIOUS ROUND - the lobby field for the copyFrom prefill.
+    //
+    // WHICH PARAMS SURVIVE THE LOBBY. This page reads game, group, trip, copyFrom,
+    // eventType and fresh. On the minted round only trip and copyFrom mean
+    // anything (eventType is chosen by the tile); group and fresh are the lobby's
+    // own. createRoom now carries both; nothing else was being dropped.
+    //
+    // THREE STEPS, IN THIS ORDER. (1) The source is checked: it must exist and
+    // hold golfers, or nothing is minted and the organizer is told why - a round
+    // with no players is a code, not a roster. (2) The new code is issued,
+    // exactly as a tile does. (3) Navigate with BOTH params. Minting before
+    // checking would leave an empty round behind on a typo; navigating without
+    // ?game= would land back here and lose the copy (the trip select's history).
+    //
+    // The arrival guard is unchanged: the copy runs only when the NEW code has
+    // no players (:6580 region), so a mistyped source that names a live round
+    // cannot open that round as an edit - the new code is the one that opens.
+    function parseRoundCodeInput(el) {
+        const text = String((el && el.value) || '').trim();
+        const fromUrl = /[?&]game=([A-Za-z0-9]+)/.exec(text);
+        return String(fromUrl ? fromUrl[1] : text).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+    async function startFromPreviousRound(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const code = parseRoundCodeInput(document.getElementById('copy-code-input'));
+        if (code.length < 2) {
+            alert('\u26A0\uFE0F Enter the code of the round to start from.');
+            return;
+        }
+        const restore = setControlPending(pressedEl, '\u23F3 Checking\u2026');
+        try {
+            const snap = await db.ref('events/' + code).once('value');
+            const source = (snap && snap.exists && snap.exists()) ? (snap.val() || {}) : null;
+            if (!source) {
+                restore();
+                alert('\u26A0\uFE0F No round with the code ' + code + '. Nothing was started.');
+                return;
+            }
+            if (!Array.isArray(source.players) || source.players.length === 0) {
+                restore();
+                alert('\u26A0\uFE0F Round ' + code + ' has no golfers to copy. Nothing was started.');
+                return;
+            }
+            const newCode = await issueUniqueCode({ db, root: 'events' });
+            let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}&copyFrom=${code}`;
+            if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
             window.location.href = dest;
         } catch (err) {
             restore();
@@ -3420,7 +3490,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const el = document.getElementById('join-code-input');
         const text = String((el && el.value) || '').trim();
         const fromUrl = /[?&]game=([A-Za-z0-9]+)/.exec(text);
-        const code = String(fromUrl ? fromUrl[1] : text).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        // ONE PARSER for a typed code or a pasted link (parseRoundCodeInput), shared
+        // with the start-from-a-previous-round field below it.
+        const code = parseRoundCodeInput(el);
         if (code.length < 2) {
             alert('\u26A0\uFE0F Enter the game code your organizer sent.');
             return;

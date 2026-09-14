@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v123: start a new round from a previous one, from the lobby.
+//
+// admin.html: the prefill admin.html?game=NEW&copyFrom=OLD has always worked
+// from a link and nothing on the lobby emitted it since 2026-08-10; trip.html's
+// "copy from round" select sent it to a lobby that minted a code and dropped
+// it. Now: a "PREVIOUS ROUND CODE - Start from it" field checks the source
+// (exists, has golfers), mints the new code, then navigates with both params;
+// and the tile (createRoom) carries copyFrom onto the minted URL, so the trip
+// select works for the first time. The copy still runs only on a code with no
+// players. Nothing is written to the source round.
+//
+// An installed device on v122 has no way to start next week's round from
+// this week's without typing a URL.
+
 // Moved to v122: a re-save keeps what the wizard does not own; the leaderboard
 // ranks ties.
 //
@@ -1147,7 +1161,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v122-resave-and-positions';
+const CACHE_VERSION = 'golfapp-v123-copy-from-lobby';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
