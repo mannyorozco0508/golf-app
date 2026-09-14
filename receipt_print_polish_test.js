@@ -4,9 +4,11 @@
 // Two small things, both found by measuring the real print CSS and the real
 // rendered Receipt rather than guessing.
 //
-// 1. The "... More" menu is a <details> element that sits OUTSIDE .top-nav-bar,
+// 1. The "... More" menu was a <details> element that sat OUTSIDE .top-nav-bar,
 //    so hiding the nav bar never hid it. Left open when a golfer exported, a
-//    navigation menu printed into a payout document.
+//    navigation menu printed into a payout document. (2026-09-14: the menu is
+//    gone - all eight pages are pills in the bar - and the whole wrapper stays
+//    hidden in print.)
 //
 // 2. Money printed without thousands separators. "$15000" is not a width problem
 //    - it fits - but it is measurably harder to read correctly at a glance than
@@ -79,20 +81,19 @@ function duel(stake) {
 }
 
 // ---------------------------------------------------------------------------
-describe('THE MORE MENU DOES NOT PRINT', () => {
-    test('.nav-more is hidden in print', () => {
-        assert.match(PRINT_CSS, /\.nav-more/, 'the More menu must be hidden');
+describe('THE NAV BAR DOES NOT PRINT', () => {
+    // RE-PINNED 2026-09-14: the ⋯ More popover is gone (all eight pages are pills
+    // in the bar), so the print rule hides the whole nav wrapper and the bar; there
+    // is no .nav-more left to hide.
+    test('the whole nav wrapper is hidden, not just the bar', () => {
+        assert.match(PRINT_CSS, /\.app-nav-wrap/);
         const rule = PRINT_CSS.slice(PRINT_CSS.indexOf('.top-nav-bar'), PRINT_CSS.indexOf('.top-nav-bar') + 400);
         assert.match(rule, /display: none !important/);
     });
 
-    test('the whole nav wrapper is hidden, not just the bar', () => {
-        // .nav-more sits outside .top-nav-bar - hiding the bar alone left it printing.
-        assert.match(PRINT_CSS, /\.app-nav-wrap/);
-    });
-
-    test('the element it targets actually exists on the page', () => {
-        assert.match(ST, /<details class="nav-more"/, 'if this markup changes the rule must too');
+    test('the element it targets actually exists on the page, and the popover it used to target does not', () => {
+        assert.match(ST, /<div class="app-nav-wrap">/, 'if this markup changes the rule must too');
+        assert.ok(!/nav-more/.test(ST), 'no More menu anywhere on the page');
     });
 
     test('the other chrome is still hidden', () => {

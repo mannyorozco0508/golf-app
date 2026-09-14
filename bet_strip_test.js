@@ -499,47 +499,39 @@ describe('ACCEPTANCE — Match Play, $150, main plus seven presses stays compact
 
 const NAV_PAGES = ['index.html', 'leaderboard.html', 'skins.html', 'settlement.html', 'stats.html', 'sidematches.html'];
 
-describe('NAVIGATION — the More menu exposes every secondary destination', () => {
+// RE-PINNED 2026-09-14: the "⋯ More" popover is gone. All eight pages are pills
+// in one wrapping bar on every consumer page (nav_bar_test.js measures it in
+// Chrome at 390); this keeps the source-level guarantees that block used to
+// carry: every secondary destination reachable, every in-round destination a
+// .nav-link so it keeps the game code, Trip deliberately bare.
+describe('NAVIGATION — every secondary destination is a pill in the bar', () => {
     NAV_PAGES.forEach(page => {
         const html = fs.readFileSync(path.join(REPO_ROOT, page), 'utf8');
-        const menu = html.slice(html.indexOf('nav-more-menu'), html.indexOf('</details>'));
+        const bar = html.slice(html.indexOf('id="app-nav-bar"'), html.indexOf('</div>', html.indexOf('id="app-nav-bar"')));
 
-        test(`${page} lists Matches, Stats, Trip and Home inside the More menu`, () => {
+        test(`${page} lists Matches, Stats, Trip and Home in the bar itself`, () => {
             ['sidematches.html', 'stats.html', 'trip.html', 'admin.html'].forEach(dest => {
-                assert.ok(menu.includes(`href="${dest}"`), `${page}'s More menu is missing ${dest}`);
+                assert.ok(bar.includes(`href="${dest}"`), `${page}'s bar is missing ${dest}`);
             });
         });
 
-        test(`${page} keeps the More popover OUTSIDE the horizontally scrolling nav bar`, () => {
-            // This is the actual root cause of the clipped menu: an overflow-x:auto
-            // container clips absolutely-positioned descendants. The <details> must
-            // be a sibling of .top-nav-bar, inside .app-nav-wrap.
-            const navBarEnd = html.indexOf('</div>', html.indexOf('class="top-nav-bar"'));
-            const detailsStart = html.indexOf('<details class="nav-more"');
-            assert.ok(html.includes('class="app-nav-wrap"'), `${page} is missing the .app-nav-wrap positioning context`);
-            assert.ok(detailsStart > navBarEnd, `${page} still has the More menu nested inside the scrolling nav bar`);
+        test(`${page} has no More popover and no horizontal scroller`, () => {
+            assert.ok(!html.includes('nav-more'), `${page} still carries the More menu`);
+            const css = html.slice(html.indexOf('.top-nav-bar {'), html.indexOf('}', html.indexOf('.top-nav-bar {')));
+            assert.ok(!/overflow-x/.test(css) && /flex-wrap: wrap/.test(css), `${page}: the bar must wrap, not scroll`);
         });
 
-        test(`${page} never ships the More menu forced open`, () => {
-            assert.ok(!/nav-more"?\s+open/.test(html), `${page} has a hardcoded open attribute on the More menu`);
-        });
-
-        test(`${page} preserves the game code on every in-round More destination`, () => {
+        test(`${page} preserves the game code on every in-round destination`, () => {
             // ?game=CODE is applied at runtime to every .nav-link. Trip is deliberately
             // excluded — trip.html reads ?trip=, not ?game=, so a game code there would
             // be meaningless.
             ['sidematches.html', 'stats.html', 'admin.html'].forEach(dest => {
-                const anchor = menu.slice(menu.indexOf(`href="${dest}"`));
+                const anchor = bar.slice(bar.indexOf(`href="${dest}"`));
                 assert.ok(anchor.slice(0, 120).includes('nav-link'), `${page}: ${dest} would lose the game code`);
             });
+            const trip = bar.slice(bar.indexOf('href="trip.html"'));
+            assert.ok(!trip.slice(0, 60).includes('nav-link'), `${page}: Trip must stay bare`);
         });
-    });
-
-    test('the popover is constrained to the viewport so it cannot run off a 320px screen', () => {
-        const css = fs.readFileSync(path.join(REPO_ROOT, 'leaderboard.html'), 'utf8');
-        const rule = css.slice(css.indexOf('.nav-more-menu {'), css.indexOf('}', css.indexOf('.nav-more-menu {')));
-        assert.ok(rule.includes('max-width: calc(100vw'), 'the menu must be capped to the viewport width');
-        assert.ok(rule.includes('position: absolute'), 'the menu anchors to .app-nav-wrap');
     });
 });
 
@@ -671,35 +663,8 @@ describe('END-TO-END RENDER — the real production renderer, in a stubbed DOM',
     });
 });
 
-describe('NAVIGATION — the More menu is actually clickable', () => {
-    NAV_PAGES.forEach(page => {
-        const html = fs.readFileSync(path.join(REPO_ROOT, page), 'utf8');
-
-        test(`${page} has no full-screen overlay sitting on top of the menu links`, () => {
-            // REGRESSION: a ::before catcher on <summary> combined with z-index on that
-            // same <summary> put an invisible fixed-position layer ABOVE .nav-more-menu,
-            // because z-index on summary creates a stacking context its own pseudo-element
-            // is painted inside. Every link in the menu became untappable.
-            assert.ok(!/\.nav-more\[open\]\s*>\s*summary::before/.test(html),
-                `${page} still has the blocking ::before overlay`);
-            assert.ok(!/\.nav-more\[open\]\s*>\s*summary\s*\{[^}]*z-index/.test(html),
-                `${page} still puts a stacking context on summary`);
-        });
-
-        test(`${page} closes the menu with a real listener, not a CSS overlay`, () => {
-            assert.ok(html.includes(`details.nav-more[open]`),
-                `${page} has no outside-tap close handler`);
-            assert.ok(/removeAttribute\('open'\)/.test(html),
-                `${page} never actually closes the menu`);
-        });
-
-        test(`${page} keeps the menu itself above ordinary page content`, () => {
-            const rule = html.slice(html.indexOf('.nav-more-menu {'), html.indexOf('}', html.indexOf('.nav-more-menu {')));
-            const z = /z-index:\s*(\d+)/.exec(rule);
-            assert.ok(z && Number(z[1]) >= 100, 'the popover needs a z-index above normal content');
-        });
-    });
-});
+// The second NAVIGATION block ("the More menu is actually clickable") went with
+// the popover, 2026-09-14: there is no menu to open, close or stack above content.
 
 describe('SCORECARD — group scorekeeper links are reachable mid-round', () => {
     const idx = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');

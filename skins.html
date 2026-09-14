@@ -86,37 +86,25 @@
 
         /* Top Navigation Bar */
         /* ---- App navigation ----------------------------------------------------
-           The "More" popover used to be position:absolute INSIDE .top-nav-bar,
-           which is an overflow-x:auto container. An overflow container clips
-           absolutely-positioned descendants on BOTH axes, so the menu was being
-           sliced off at the nav bar's own bottom edge — only a few pixels of it
-           ever appeared. The fix is structural, not a z-index bump: the pills
-           scroll inside .top-nav-bar, but the <details> now lives OUTSIDE that
-           scroller in .app-nav-wrap, which has no overflow, so nothing can clip
-           the menu. .app-nav-wrap is also the positioning context, so the menu
-           anchors to the nav row rather than to the scrolling strip. */
+           ALL EIGHT PAGES, ALWAYS VISIBLE (2026-09-14). The bar used to be a
+           horizontal scroller of four pills beside a "⋯ More" popover holding the
+           other four. Measured at 390px: the strip had 255px for 455px of pills,
+           the scrollbar was hidden, so Scorecard showed, Leaderboard was clipped
+           and Bets and Results were entirely off screen with nothing hinting they
+           existed. Now the bar WRAPS: at phone width two rows of four, emoji plus
+           a short label at 12px with 8px side padding (row 1 measured ~303px, row 2
+           ~308px of the 334-342 available), one row on a wider screen. No More,
+           no overflow, nothing to swipe. The pills grow to fill their row so the
+           two rows read as a block. nav_bar_test.js measures it on every page. */
         .app-nav-wrap {
-            position: relative; display: flex; align-items: center; gap: 6px;
+            display: block;
             padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
         }
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+        .top-nav-item { flex: 1 1 auto; justify-content: center; padding: 8px 8px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
-        .nav-more { position: static; flex: 0 0 auto; }
-        .nav-more > summary { list-style: none; cursor: pointer; }
-        .nav-more > summary::-webkit-details-marker { display: none; }
-        .nav-more-menu {
-            position: absolute; top: calc(100% + 2px); right: 0; z-index: 400;
-            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
-            padding: 8px; display: flex; flex-direction: column; gap: 6px;
-            min-width: 190px; max-width: calc(100vw - 24px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.22);
-        }
-        /* 48px rows: comfortable thumb targets for someone standing on a tee box. */
-        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; min-height: 48px; justify-content: flex-start; padding: 12px 14px; font-size: 0.95rem; }
         /* No invisible overlay here. An earlier version put a full-screen ::before on
            <summary> to catch outside taps; because summary also carried a z-index it
            formed a stacking context, and the catcher ended up painted OVER the menu,
@@ -195,20 +183,15 @@ html {
     <!-- Top Navigation Bar -->
     <div class="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
+        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
         <a href="skins.html" class="top-nav-item active nav-link">💰 Bets</a>
         <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
-    </div>
-    <details class="nav-more" id="nav-more-menu-wrap">
-        <summary class="top-nav-item" aria-label="More pages">⋯ More</summary>
-        <div class="nav-more-menu">
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
         <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
         <a href="trip.html" class="top-nav-item">🚐 Trip</a>
         <a href="admin.html" class="top-nav-item nav-link">🏠 Home</a>
-        </div>
-    </details>
+    </div>
     </div>
 
     <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
@@ -848,15 +831,6 @@ html {
         container.innerHTML = html;
     }
 
-    // Close the "More" popover when a tap lands outside it. Native <details> already
-    // handles tapping the summary again, and navigating away closes it implicitly, so
-    // this only covers the tap-elsewhere case. Uses a plain listener rather than a CSS
-    // overlay: an overlay can block links but can never close anything.
-    document.addEventListener('click', function (e) {
-        document.querySelectorAll('details.nav-more[open]').forEach(function (d) {
-            if (!d.contains(e.target)) d.removeAttribute('open');
-        });
-    });
 </script>
 
 </body>

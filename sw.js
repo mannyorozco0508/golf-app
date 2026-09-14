@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v130: the tab bar shows all eight pages.
+//
+// index, leaderboard, settlement, skins, sidematches, stats. The bar was a
+// horizontal scroller of four pills beside a "⋯ More" popover holding the other
+// four; at 390px the strip had 255px for 455px of pills with the scrollbar
+// hidden, so Bets and Results were off screen with nothing hinting they existed.
+// The bar now wraps into two rows of four - emoji plus a short label (Card,
+// Board, Bets, Results / Matches, Stats, Trip, Home) - with no More and nothing
+// to swipe. An installed device on v129 keeps a scorecard whose Bets and Results
+// tabs cannot be seen without a swipe nobody is told about.
+
 // Moved to v129: the hole landing shows the heading and opens no keyboard.
 //
 // index.html, after a real round on v128. Next, Prev and the 1-18 jump now scroll
@@ -1235,7 +1246,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v129-hole-heading';
+const CACHE_VERSION = 'golfapp-v130-tab-bar';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

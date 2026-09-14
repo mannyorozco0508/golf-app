@@ -186,9 +186,12 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
 // ---------------------------------------------------------------------------
 describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
 
+    // 2026-09-14: the labels are the short ones that let all eight pills fit two
+    // rows at 390px (nav_bar_test.js) - Card and Board, not Scorecard and
+    // Leaderboard. The glyphs are unchanged.
     const NAV = [
-        ['index.html', '\u{1F4DD}', 'Scorecard'],
-        ['leaderboard.html', '\u{1F3C6}', 'Leaderboard'],
+        ['index.html', '\u{1F4DD}', 'Card'],
+        ['leaderboard.html', '\u{1F3C6}', 'Board'],
         ['skins.html', '\u{1F4B0}', 'Bets'],
         ['settlement.html', '\u{1F91D}', 'Results'],
         ['sidematches.html', '\u2694\ufe0f', 'Matches'],
@@ -197,13 +200,18 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
         ['admin.html', '\u{1F3E0}', 'Home'],
     ];
 
+    // admin.html keeps its own older copy of the bar (long labels, a More menu);
+    // the wave that shortened the labels left it alone by instruction.
+    const ADMIN_LABELS = { 'Card': 'Scorecard', 'Board': 'Leaderboard' };
     test('every page carries the same eight-item bar', () => {
         CONSUMER.forEach(f => {
             const src = read(f);
             if (!src.includes('top-nav-item')) return;
-            NAV.forEach(([, glyph, label]) =>
-                assert.ok(src.includes(glyph + ' ' + label),
-                    `${f}: nav is missing "${glyph} ${label}"`));
+            NAV.forEach(([, glyph, label]) => {
+                const want = (f === 'admin.html' && ADMIN_LABELS[label]) ? ADMIN_LABELS[label] : label;
+                assert.ok(src.includes(glyph + ' ' + want),
+                    `${f}: nav is missing "${glyph} ${want}"`);
+            });
         });
     });
 

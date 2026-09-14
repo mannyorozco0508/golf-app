@@ -282,15 +282,20 @@ describe('P2 - A MODAL CLOSES ON ONE PRESS (index.html)', () => {
         assert.equal(shown(sb, 'finish-round-modal-overlay'), false);
     });
 
-    test('ONE LAYER PER PRESS: modal above popover - the modal goes, the popover stays', () => {
+    test('ONE LAYER PER PRESS: modal above a popover - the modal goes, the popover stays', () => {
+        // RE-PINNED 2026-09-14: the consumer pages no longer carry a ⋯ More popover
+        // (all eight pages are pills in the bar). The ladder's generic popover step
+        // is kept and proven here on a synthetic <details class="nav-more" id> - the
+        // shape pwa-boot.js closes - mounted the way mini-dom finds elements.
         const sb = scorecard();
-        sb.document.getElementById('nav-more-menu-wrap').open = true;       // the golfer tapped ⋯ More
+        const d = sb.document.createElement('details'); d.className = 'nav-more'; d.id = 'synthetic-popover'; d.setAttribute('open', ''); d.open = true;
+        sb.document.__mount(d);
         tap(sb, read('index.html'), /onclick="(openHistoryModal\(\))"/);
         assert.equal(press(sb), 'modal');
         assert.equal(shown(sb, 'history-modal-overlay'), false);
-        assert.equal(sb.document.getElementById('nav-more-menu-wrap').open, true, 'the popover was closed by the same press');
+        assert.equal(d.open, true, 'the popover was closed by the same press');
         assert.equal(press(sb), 'popover');
-        assert.equal(sb.document.getElementById('nav-more-menu-wrap').open, false);
+        assert.equal(d.open, false);
     });
 
     test('ONE LAYER PER PRESS: two overlays showing - one press closes exactly one', () => {
@@ -334,14 +339,18 @@ describe('P1 - FINISH ROUND: a sub-state goes back to Review before the modal cl
 });
 
 // ============================================================================
-describe('P3 - THE ⋯ MORE POPOVER', () => {
+describe('P3 - THE POPOVER STEP, with no popover left on the consumer pages', () => {
+    // RE-PINNED 2026-09-14. The ⋯ More <details> is gone from every consumer page
+    // (nav_bar_test.js): the bar shows all eight pages. The ladder keeps its generic
+    // popover step for any <details class="nav-more" id> a page might carry, so a
+    // closed page is not a layer and a synthetic open one is closed by one press.
     ['settlement.html', 'skins.html', 'index.html', 'sidematches.html'].forEach(f => {
-        test(f + ': open popover closes; a closed one is not a layer', () => {
+        test(f + ': no popover in the markup; a synthetic open one is a layer, a closed one is not', () => {
+            assert.ok(!/nav-more/.test(read(f)), f + ' still carries the More menu');
             const sb = loadHtmlInlineScript(f, ['pwa-boot.js'], { search: '?game=' + CODE });
-            const d = sb.document.getElementById('nav-more-menu-wrap');
-            assert.equal(d.open, false, 'the popover starts open in the markup');
-            assert.equal(press(sb), 'none', 'a closed popover was treated as a layer');
-            d.open = true;
+            assert.equal(press(sb), 'none', 'nothing open on arrival');
+            const d = sb.document.createElement('details'); d.className = 'nav-more'; d.id = 'synthetic-popover'; d.setAttribute('open', ''); d.open = true;
+            sb.document.__mount(d);
             assert.equal(press(sb), 'popover');
             assert.equal(d.open, false);
         });
