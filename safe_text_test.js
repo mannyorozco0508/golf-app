@@ -260,7 +260,7 @@ describe('THE ATTRIBUTE CONTEXT IS CLOSED', () => {
 describe('NOTHING ELSE MOVED', () => {
     test('the scoring engines are untouched by this batch', () => {
         assert.match(read('money-engine.js'), /dotVal \* \(n \* units - totalUnits\)/);
-        assert.match(read('index.html'), /withNavAnchor\(renderHoleView\)/, 'Prev/Next anchor');
+        assert.match(read('index.html'), /renderHoleView\(\);\s*landOnHole\(\);/, 'Prev/Next landing (was the nav anchor until 2026-09-14)');
         assert.match(read('index.html'), /function renderDotsWidgetHtml/, 'Live Dots');
         assert.match(read('index.html'), /const TICKER_MOUNTS = \['live-ticker-mount', 'fc-ticker-mount'\]/);
         assert.match(read('index.html'), /class="cell-dots"/, 'score-box geometry');

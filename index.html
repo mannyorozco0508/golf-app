@@ -1928,14 +1928,9 @@ html {
         return name.trim().split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
-    // Scrolls to the hole card itself, skipping past the status panel above it. The old
-    // offset compensated for the sticky 1-18 strip, which no longer exists.
-    function scrollToHoleCard() {
-        const target = document.getElementById('hole-view-card');
-        if (!target) return;
-        const targetTop = target.getBoundingClientRect().top + window.pageYOffset;
-        window.scrollTo({ top: targetTop - 8, behavior: 'smooth' });
-    }
+    // scrollToHoleCard() lived here: a smooth scroll to the card's top, used by the
+    // 1-18 jump. Every Hole View navigation now lands through landOnHole() below
+    // goToAdjacentHole, so the jump and Prev/Next agree; the card-top landing is gone.
 
     // Flags any Side Match involving a player in the currently-viewed group, right on the Scorecard -
     // otherwise there's no way to know a Side Match is even running without a special trip to Matches.
@@ -2073,6 +2068,10 @@ html {
     let holePickerOpen = false;
 
     function toggleHolePicker() {
+        // The position button keeps a focused box focused through the tap (see the
+        // nav row's onmousedown), so the rebuild below would otherwise destroy a box
+        // holding an unsaved score. Commit it first.
+        commitPendingScore();
         holePickerOpen = !holePickerOpen;
         renderHoleView();
     }
@@ -2084,7 +2083,7 @@ html {
         const btns = sorted.map(h => {
             const played = (filteredPlayers || []).some(p => savedScores[`p${p.id}_h${h.hole}`] > 0);
             const here = h.hole === currentViewedHole;
-            return `<button type="button" class="hole-pick-btn${played ? ' played' : ''}${here ? ' here' : ''}" onclick="jumpToHole(${h.hole})">${h.hole}</button>`;
+            return `<button type="button" class="hole-pick-btn${played ? ' played' : ''}${here ? ' here' : ''}" onmousedown="event.preventDefault()" onclick="jumpToHole(${h.hole})">${h.hole}</button>`;
         }).join('');
         return `<div class="hole-picker">${btns}</div>`;
     }
@@ -2092,9 +2091,13 @@ html {
     function jumpToHole(holeNum) {
         holePickerOpen = false;
         if (currentViewMode === 'hole') {
+            // The same landing as Prev/Next, so the three navigations agree. The
+            // smooth scroll to the card's top that used to be here is gone: it raced
+            // the focus's own scroll and landed somewhere else.
+            commitPendingScore();
             currentViewedHole = holeNum;
             renderHoleView();
-            scrollToHoleCard();
+            landOnHole();
         } else {
             const row = document.getElementById(`hole-row-${holeNum}`);
             if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2111,55 +2114,84 @@ html {
     }
 
     // ------------------------------------------------------------------
-    // KEEP THE PREV/NEXT ROW WHERE THE THUMB LEFT IT.
+    // A CONSISTENT LANDING ON HOLE CHANGE (2026-09-14).
     //
-    // THE BUG. goToAdjacentHole() ended with scrollToHoleCard(), which scrolls to the
-    // TOP of the hole card. Holes are not the same height - a par 3 carries a KP
-    // banner, some holes have dots, matches, presses, longer names - so anchoring the
-    // CARD moved the BUTTONS. A golfer tapping Next four times had to chase the button
-    // up and down the screen between taps.
+    // WHAT WAS HERE. withNavAnchor(): measure the Prev/Next row, render, and one
+    // animation frame later scrollBy the difference so the row stayed where the
+    // thumb was. That kept the BUTTON still and let the SCORE BOXES land anywhere:
+    // measured on a phone, Next from the fourth golfer left the next hole's first
+    // box 3px from the top on an eight-golfer card and off screen with a banner.
+    // The golfer's job on this screen is to enter the next hole's scores, so the
+    // landing is now the boxes, and it is the same every time.
     //
-    // THE FIX IS GEOMETRY, NOT GUESSWORK. Measure where the nav row actually sits,
-    // re-render, measure again, scroll by the difference. Nothing is assumed about
-    // header height, KP banner height, name length or browser chrome, because nothing
-    // is assumed at all - the browser is asked both times. That is also why no case
-    // here mentions KP or the leaderboard: content that changes height is exactly what
-    // the measurement already accounts for.
+    // THE RULE. After every Hole View navigation - Next, Prev, and the 1-18 jump,
+    // all three - the page scrolls so the FIRST score box sits HOLE_LANDING_OFFSET
+    // px from the top of the viewport (an explicit scrollTo, direct, never smooth,
+    // never a nudge from wherever the page was), and then the first EMPTY box a
+    // golfer may write to is focused and selected. A hole whose golfers all have
+    // a score focuses NOTHING - no keyboard over a completed hole. Disabled boxes
+    // (a spectator, another group's rows) are skipped by the focus and ignored by
+    // nothing else: the scroll still lands the same.
     //
-    // FAIL OPEN, ALWAYS. If the row cannot be found, or the harness has no scroll API,
-    // navigation still happens. Anchoring is a comfort, never a precondition.
+    // THE FOCUS LIVES HERE, IN THE NAVIGATION HANDLERS, AND NOWHERE ELSE. Never in
+    // renderHoleView(), which also runs on every snapshot: a score arriving from
+    // another group would pop this device's keyboard. And it runs SYNCHRONOUSLY
+    // inside the tap's click, which is the only place iOS opens the keyboard for a
+    // programmatic focus - the same rule auto-advance depends on.
     //
-    // ONE COMPENSATION PER NAVIGATION. No scroll listener, no observer. Once the golfer
-    // scrolls after landing, the page is theirs.
-    function withNavAnchor(render) {
-        const navSel = '.hole-view-nav-row';
-        const before = (() => {
-            try {
-                const el = document.querySelector(navSel);
-                return el && el.getBoundingClientRect ? el.getBoundingClientRect().top : null;
-            } catch (e) { return null; }
-        })();
+    // FAIL OPEN. No card, no boxes, no scroll API: navigation still happens.
+    const HOLE_LANDING_OFFSET = 12;
 
-        render();
+    // THE TAP THAT WENT NOWHERE (fix 1). A score typed and not yet left - a lone
+    // "1", or a corrected number - is still focused when the golfer taps Next. The
+    // browser's mousedown moved focus to the button: the box blurred, change fired,
+    // saveScore wrote, the SDK raised 'value' synchronously, renderHoleView rebuilt
+    // the card - and the button under the finger was destroyed before mouseup, so
+    // NO CLICK fired and the hole did not change (measured in Chrome, 2026-09-14;
+    // the same render-under-an-in-flight-action shape auto-advance had).
+    //
+    // THE FIX: the box keeps focus THROUGH the tap (the nav buttons' onmousedown
+    // preventDefault stops the browser moving focus - the standard way to keep an
+    // iOS keyboard up under a toolbar tap), and the navigation handler commits the
+    // score itself, here, INSIDE the click. blur() fires change -> saveScore ->
+    // 'value' -> the rebuild, exactly as before, but the click has already been
+    // delivered, so nothing can swallow it. saveScore and the listener are
+    // untouched. Nothing pending: nothing happens.
+    function commitPendingScore() {
+        const a = document.activeElement;
+        if (!scoreBoxIdentity(a)) return false;
+        a.blur();
+        return true;
+    }
 
-        if (before === null) return;                      // nothing to anchor to
-        const settle = () => {
-            try {
-                const el = document.querySelector(navSel);
-                if (!el || !el.getBoundingClientRect) return;
-                const delta = el.getBoundingClientRect().top - before;
-                if (!delta) return;
-                // Direct, not animated: this is positional continuity, not a journey.
-                if (typeof window.scrollBy === 'function') window.scrollBy(0, delta);
-            } catch (e) { /* navigation already happened; anchoring is optional */ }
-        };
-        // After layout, not after a guessed delay. One frame, because the render path
-        // above is synchronous - stacked timers would only hide a real ordering bug.
-        if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(settle);
-        else settle();
+    function landOnHole() {
+        const card = document.getElementById('hole-view-card');
+        if (!card || typeof card.querySelectorAll !== 'function') return;
+        const boxes = Array.from(card.querySelectorAll('.score-input'));
+        const first = boxes[0];
+        if (!first) return;
+        // THE SCROLL: an absolute target, so the landing is identical whatever the
+        // golfer count, the banners above, or where the page was.
+        try {
+            if (first.getBoundingClientRect && typeof window.scrollTo === 'function') {
+                const y = first.getBoundingClientRect().top + (window.pageYOffset || 0) - HOLE_LANDING_OFFSET;
+                window.scrollTo(0, Math.max(0, y));
+            }
+        } catch (e) { /* the hole changed; the scroll is a comfort */ }
+        // THE FOCUS: the first EMPTY writable box, or nothing.
+        const empty = boxes.find(b => !b.disabled && !String(b.value === undefined || b.value === null ? '' : b.value).trim());
+        if (!empty) return;
+        // Announced by identity, as auto-advance does, so a rebuild raised while
+        // this focus() runs restores the same box instead of dropping to <body>.
+        pendingScoreFocus = scoreBoxIdentity(empty);
+        try { empty.focus(); if (typeof empty.select === 'function') empty.select(); }
+        catch (e) { /* a disabled or detached box: no keyboard, no harm */ }
+        finally { pendingScoreFocus = null; }
     }
 
     function goToAdjacentHole(delta) {
+        // First, whatever the golfer typed and did not leave (fix 1, above).
+        commitPendingScore();
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         if (courseData.length === 0) return;
         const holeNumbers = courseData.map(h => h.hole);
@@ -2169,7 +2201,8 @@ html {
         // Boundary behaviour unchanged: clamped, never wrapped.
         if (holeNumbers[idx] === currentViewedHole) return;
         currentViewedHole = holeNumbers[idx];
-        withNavAnchor(renderHoleView);
+        renderHoleView();
+        landOnHole();
     }
 
     // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
@@ -2240,11 +2273,15 @@ html {
         // Next button that went nowhere - at the exact moment they most wanted an answer.
         const nextBtnHtml = isLastHole
             ? `<button class="finish-round-nav-btn" onclick="openFinishRoundModal()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
-            : `<button class="hole-view-nav-btn" onclick="goToAdjacentHole(1)">Next ▶</button>`;
+            : `<button class="hole-view-nav-btn" onmousedown="event.preventDefault()" onclick="goToAdjacentHole(1)">Next ▶</button>`;
 
+        // onmousedown preventDefault on Prev, Next and the position button: a focused
+        // score box KEEPS focus through the tap, so the browser cannot blur it, fire
+        // change, save, and rebuild this row under the finger before the click lands
+        // (see commitPendingScore). The Finish Round button is left as it was.
         const navRowHtml = `<div class="hole-view-nav-row">
-            <button class="hole-view-nav-btn" onclick="goToAdjacentHole(-1)">◀ Prev</button>
-            <button type="button" class="hole-view-position hole-jump-open" onclick="toggleHolePicker()">${positionText} \u25BE</button>
+            <button class="hole-view-nav-btn" onmousedown="event.preventDefault()" onclick="goToAdjacentHole(-1)">◀ Prev</button>
+            <button type="button" class="hole-view-position hole-jump-open" onmousedown="event.preventDefault()" onclick="toggleHolePicker()">${positionText} \u25BE</button>
             ${nextBtnHtml}
         </div>`;
 

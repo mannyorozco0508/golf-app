@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v128: Hole View lands on the first score box, and Next never misses.
+//
+// index.html. Next, Prev and the 1-18 jump now scroll so the next hole's first
+// score box sits a fixed offset from the top and focus the first empty box, inside
+// the tap so iOS opens the keyboard; a completed hole focuses nothing. And a score
+// still focused when Next is tapped no longer swallows the tap (the button under
+// the finger was being rebuilt by the save before the click landed): the box keeps
+// focus through the mousedown and the handler commits it inside the click. An
+// installed device on v127 keeps a scorecard whose Next lands wherever the page
+// was and, after a lone "1", does nothing at all.
+
 // Moved to v127: the Receipt opens with a PAYOUTS block.
 //
 // settlement.html's Main Pool section now starts with who is owed what, by game
@@ -1214,7 +1225,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v127-receipt-payouts';
+const CACHE_VERSION = 'golfapp-v128-hole-landing';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -407,16 +407,19 @@ describe('ONE PRESENTER, AND THE LAYOUT HOLDS', () => {
 
 // ---------------------------------------------------------------------------
 describe('PART 3 IS NOT REOPENED', () => {
-    test('the nav anchor still measures geometry and knows nothing about Dots', () => {
-        const fn = IDX.slice(IDX.indexOf('function withNavAnchor'),
-            IDX.indexOf('function withNavAnchor') + 2600);
-        assert.match(fn, /getBoundingClientRect\(\)\.top - before/);
+    test('the hole landing measures the first score box and knows nothing about Dots', () => {
+        // RE-PINNED 2026-09-14: withNavAnchor (a measured nav-row delta) became
+        // landOnHole (an explicit scroll to the first score box). A taller Dots
+        // board above the boxes is simply part of the measured position.
+        const fn = IDX.slice(IDX.indexOf('function landOnHole'),
+            IDX.indexOf('\n    function ', IDX.indexOf('function landOnHole') + 30));
+        assert.match(fn, /first\.getBoundingClientRect\(\)\.top/);
         assert.ok(!/ld-row|ld-chips|renderDotsWidgetHtml|LIVE DOTS/.test(fn),
-            'a taller board is just a bigger delta — never a hardcoded offset');
+            'a taller board is just a different measurement — never a hardcoded offset');
         assert.ok(!/setTimeout/.test(fn));
     });
 
-    test('navigation still routes through the anchor', () => {
-        assert.match(IDX, /withNavAnchor\(renderHoleView\)/);
+    test('navigation still renders and lands', () => {
+        assert.match(IDX, /renderHoleView\(\);\s*landOnHole\(\);/);
     });
 });

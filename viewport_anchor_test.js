@@ -8,22 +8,23 @@
 // Two implementations that disagree about who is leading would be worse than no
 // second board at all.
 //
-// PART B. goToAdjacentHole() used to end in scrollToHoleCard(), anchoring the CARD.
-// Holes are not the same height - a par 3 carries a KP banner, some holes have dots,
-// matches, presses, longer names - so anchoring the card moved the BUTTONS, and a
-// golfer tapping Next repeatedly had to chase the button up and down the screen.
+// PART B. THE LANDING (re-pinned 2026-09-14). Hole navigation has had three scroll
+// rules: scrollToHoleCard() (the card's top - holes differ in height, so the
+// buttons moved), withNavAnchor() (keep the Prev/Next row where the thumb was - the
+// button stayed still and the SCORE BOXES landed anywhere: 3px from the top on an
+// eight-golfer card, off screen with a banner), and now landOnHole(): after Next,
+// Prev and the 1-18 jump the page scrolls so the FIRST score box sits
+// HOLE_LANDING_OFFSET px from the top - an explicit scrollTo, identical whatever
+// the golfer count, the banners, or where the page was - then the first EMPTY
+// writable box is focused and selected; a completed hole focuses nothing. The
+// focus lives in the navigation handlers only, never in renderHoleView.
 //
-// withNavAnchor() measures the nav row before the render, measures it again after
-// layout, and scrolls by the difference. No fixed offsets, no assumptions about
-// header or banner height, no timers. That is also why there are no KP-specific or
-// leaderboard-specific cases below: content that changes height is precisely what
-// the measurement already accounts for.
-//
-// THE HARNESS HAS NO LAYOUT. mini-dom returns no real geometry, so these tests
-// install the smallest deterministic stub that lets the REAL production helper run:
-// a scripted sequence of getBoundingClientRect().top values and a recorded scrollBy.
-// This proves the arithmetic and the call sequence. It does NOT prove pixels on a
-// phone, and nothing here should be read as claiming that.
+// THE HARNESS HAS NO LAYOUT. mini-dom returns no real geometry and parses no
+// innerHTML, so these tests install the smallest stub that lets the REAL helpers
+// run: a card whose querySelectorAll hands back scripted score boxes (rect top,
+// value, disabled), a recorded scrollTo and pageYOffset. This proves the
+// arithmetic, the focus choice and the call order. Pixels on a phone are proven
+// in hole_view_landing_test.js (Chrome), not here.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -131,185 +132,204 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The smallest stub that lets the real helper execute: scripted rect tops, a
-// recorded scrollBy, and a synchronous animation frame.
-function anchorHarness(tops) {
+// The smallest stub that lets the real helpers execute: scripted score boxes on
+// the card, a recorded scrollTo, a chosen pageYOffset, a counted render, and an
+// optionally focused box (to exercise commitPendingScore).
+function landingHarness(opts) {
+    const o = opts || {};
     const sb = loadHtmlInlineScript('index.html', DEPS);
     vm.runInContext(`
         currentMode = 'A';
         currentData = ${JSON.stringify(round())};
-        currentViewedHole = 5;
+        currentViewedHole = ${o.hole === undefined ? 5 : o.hole};
+        currentViewMode = 'hole';
         window.__scFilteredPlayers = currentData.players;
-        window.__tops = ${JSON.stringify(tops)};
-        window.__scrollBys = [];
-        window.__rafCalls = 0;
-        window.scrollBy = function (x, y) { window.__scrollBys.push(y); };
-        window.requestAnimationFrame = function (fn) { window.__rafCalls++; fn(); };
-        document.querySelector = function () {
-            if (!window.__tops.length) return null;
-            const top = window.__tops.shift();
-            return { getBoundingClientRect: function () { return { top: top }; } };
-        };
+        window.__log = [];
+        window.pageYOffset = ${o.pageYOffset === undefined ? 300 : o.pageYOffset};
+        ${o.noScrollTo ? 'window.scrollTo = undefined;' : "window.scrollTo = function (x, y) { window.__log.push('scrollTo:' + y); };"}
+        window.__boxes = (${JSON.stringify(o.boxes || [{ top: 500, value: '' }, { top: 560, value: '' }, { top: 620, value: '' }, { top: 680, value: '' }])}).map(function (b, i) {
+            return { classList: { contains: function (c) { return c === 'score-input'; } },
+                     getAttribute: function (k) { return k === 'data-player-id' ? String(101 + i) : String(currentViewedHole); },
+                     getBoundingClientRect: function () { return { top: b.top }; },
+                     value: b.value, disabled: !!b.disabled,
+                     focus: function () { window.__log.push('focus:' + (101 + i) + (pendingScoreFocus ? '/announced:' + pendingScoreFocus.playerId + '-' + pendingScoreFocus.hole : '/silent')); },
+                     select: function () { window.__log.push('select:' + (101 + i)); } };
+        });
+        document.getElementById('hole-view-card').querySelectorAll = function (sel) { return sel === '.score-input' ? window.__boxes.slice() : []; };
         window.__renders = 0;
-        renderHoleView = function () { window.__renders++; };
+        renderHoleView = function () { window.__renders++; window.__log.push('render'); };
+        ${o.focusedBox ? "Object.defineProperty(document, 'activeElement', { configurable: true, get: function () { return window.__pending; } }); window.__pending = { classList: { contains: function (c) { return c === 'score-input'; } }, getAttribute: function (k) { return k === 'data-player-id' ? '104' : '5'; }, blur: function () { window.__log.push('blur:104'); window.__pending = document.body; } };" : ''}
     `, sb);
     return sb;
 }
 const run = (sb, code) => vm.runInContext(code, sb);
 // Arrays built inside the vm realm have that realm's Array prototype, so
 // deepStrictEqual rejects them on identity even when the values match. Copied out.
-const bys = (sb) => Array.from(sb.window.__scrollBys);
+const log = (sb) => Array.from(sb.window.__log);
+const OFFSET = Number((IDX.match(/const HOLE_LANDING_OFFSET = (\d+);/) || [])[1]);
 
-describe('PART B — THE NAV ROW STAYS WHERE THE THUMB LEFT IT', () => {
-    test('Next: the row drifting DOWN is compensated downward by the delta', () => {
-        // Before 500, after 620 -> the row fell 120px, so scroll down 120 to restore it.
-        const sb = anchorHarness([500, 620]);
+describe('PART B — THE LANDING: the first box at the offset, the first empty box focused', () => {
+    test('the offset is a named constant', () => assert.ok(OFFSET > 0 && OFFSET < 60, 'HOLE_LANDING_OFFSET ' + OFFSET));
+
+    test('Next: render, then ONE explicit scrollTo to (box top + pageYOffset - offset), then focus + select of the first box', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '' }, { top: 560, value: '' }], pageYOffset: 300 });
         run(sb, `goToAdjacentHole(1);`);
-        assert.deepEqual(bys(sb), [120]);
+        assert.deepEqual(log(sb), ['render', 'scrollTo:' + (500 + 300 - OFFSET), 'focus:101/announced:101-6', 'select:101']);
         assert.equal(sb.window.__renders, 1, 'exactly one render');
     });
 
-    test('Prev: the row drifting UP is compensated upward', () => {
-        const sb = anchorHarness([500, 380]);
+    test('Prev: the same landing', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '' }], pageYOffset: 300 });
         run(sb, `goToAdjacentHole(-1);`);
-        assert.deepEqual(bys(sb), [-120]);
+        assert.deepEqual(log(sb), ['render', 'scrollTo:' + (500 + 300 - OFFSET), 'focus:101/announced:101-4', 'select:101']);
     });
 
-    test('NEGATIVE CONTROL — the delta is measured, never a fixed target', () => {
-        // Different geometry must produce a different correction, or a constant is hiding.
-        const a = anchorHarness([500, 620]); run(a, `goToAdjacentHole(1);`);
-        const b = anchorHarness([500, 545]); run(b, `goToAdjacentHole(1);`);
-        assert.notDeepEqual(bys(a), bys(b));
-        assert.deepEqual(bys(b), [45]);
+    test('the target is ABSOLUTE: the same box on the page lands at the same scrollTo from any starting offset', () => {
+        // Box at document y 800 seen from two different scroll positions.
+        const a = landingHarness({ boxes: [{ top: 500, value: '' }], pageYOffset: 300 }); run(a, `goToAdjacentHole(1);`);
+        const b = landingHarness({ boxes: [{ top: 100, value: '' }], pageYOffset: 700 }); run(b, `goToAdjacentHole(1);`);
+        assert.equal(log(a)[1], log(b)[1]);
+        assert.equal(log(a)[1], 'scrollTo:' + (800 - OFFSET));
     });
 
-    test('no movement means no scroll at all', () => {
-        const sb = anchorHarness([500, 500]);
+    test('NEGATIVE CONTROL — a box lower on the page lands lower (no constant hiding)', () => {
+        const a = landingHarness({ boxes: [{ top: 500, value: '' }], pageYOffset: 0 }); run(a, `goToAdjacentHole(1);`);
+        const b = landingHarness({ boxes: [{ top: 900, value: '' }], pageYOffset: 0 }); run(b, `goToAdjacentHole(1);`);
+        assert.notEqual(log(a)[1], log(b)[1]);
+    });
+
+    test('never scrolls to a negative position', () => {
+        const sb = landingHarness({ boxes: [{ top: 5, value: '' }], pageYOffset: 0 });
         run(sb, `goToAdjacentHole(1);`);
-        assert.deepEqual(bys(sb), [], 'a zero delta must not jiggle the page');
+        assert.equal(log(sb)[1], 'scrollTo:0');
     });
 
-    test('one navigation causes exactly one compensation', () => {
-        const sb = anchorHarness([500, 620, 620, 700, 700, 640]);
-        run(sb, `goToAdjacentHole(1); goToAdjacentHole(1); goToAdjacentHole(-1);`);
-        assert.equal(bys(sb).length, 3);
-        assert.equal(sb.window.__rafCalls, 3, 'one frame per navigation, no stacked timers');
+    test('the FIRST EMPTY box is focused, not the first box', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '4' }, { top: 560, value: '' }, { top: 620, value: '' }] });
+        run(sb, `goToAdjacentHole(1);`);
+        assert.deepEqual(log(sb).slice(2), ['focus:102/announced:102-6', 'select:102']);
+        assert.equal(log(sb)[1], 'scrollTo:' + (500 + 300 - OFFSET), 'the SCROLL still targets the first box');
     });
 
-    test('the measurement happens after layout, not after a guessed delay', () => {
-        const fn = IDX.slice(IDX.indexOf('function withNavAnchor'),
-            IDX.indexOf('function withNavAnchor') + 2600);
-        assert.match(fn, /requestAnimationFrame/, 'a frame, tied to layout');
-        assert.ok(!/setTimeout/.test(fn), 'no arbitrary timeout may stand in for layout');
+    test('a completed hole scrolls and focuses NOTHING', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '4' }, { top: 560, value: '5' }] });
+        run(sb, `goToAdjacentHole(1);`);
+        assert.deepEqual(log(sb), ['render', 'scrollTo:' + (500 + 300 - OFFSET)]);
     });
 
-    test('no fixed pixel target anywhere in the helper', () => {
-        const fn = IDX.slice(IDX.indexOf('function withNavAnchor'),
-            IDX.indexOf('function withNavAnchor') + 2600);
-        assert.ok(!/scrollTo\(/.test(fn), 'absolute positioning is what this replaced');
-        assert.match(fn, /getBoundingClientRect\(\)\.top - before/, 'the correction is a measured delta');
+    test('disabled boxes are skipped by the focus and still landed on by the scroll', () => {
+        const all = landingHarness({ boxes: [{ top: 500, value: '', disabled: true }, { top: 560, value: '', disabled: true }] });
+        run(all, `goToAdjacentHole(1);`);
+        assert.deepEqual(log(all), ['render', 'scrollTo:' + (500 + 300 - OFFSET)], 'a spectator: scroll, no focus');
+        const some = landingHarness({ boxes: [{ top: 500, value: '', disabled: true }, { top: 560, value: '' }] });
+        run(some, `goToAdjacentHole(1);`);
+        assert.deepEqual(log(some).slice(2), ['focus:102/announced:102-6', 'select:102']);
     });
 
-    test('variable content height needs no special cases', () => {
-        const fn = IDX.slice(IDX.indexOf('function withNavAnchor'),
-            IDX.indexOf('function withNavAnchor') + 2600);
-        assert.ok(!/kp-live|cell-dots|lw-grid|hole-view-header/.test(fn),
-            'a height-aware helper must not name the things that change height');
-        // A par-3-with-KP to par-4 transition is just a large delta.
-        const big = anchorHarness([300, 780]);
-        run(big, `goToAdjacentHole(1);`);
-        assert.deepEqual(bys(big), [480]);
+    test('a whitespace-only value counts as empty', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: ' ' }] });
+        run(sb, `goToAdjacentHole(1);`);
+        assert.match(log(sb)[2] || '', /^focus:101/);
+    });
+
+    test('the focus is announced by identity while it runs (pendingScoreFocus), and cleared after', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '' }] });
+        run(sb, `goToAdjacentHole(1); window.__after = pendingScoreFocus;`);
+        assert.match(log(sb)[2], /announced:101-6/);
+        assert.equal(sb.window.__after, null);
+    });
+
+    test('FIX 1: a score still focused is committed (blur) BEFORE the render, inside the same handler', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '' }], focusedBox: true });
+        run(sb, `goToAdjacentHole(1);`);
+        assert.deepEqual(log(sb).slice(0, 2), ['blur:104', 'render']);
+        assert.match(log(sb)[3], /^focus:101/);
+    });
+
+    test('the 1-18 jump lands exactly like Next, and closes the picker', () => {
+        const a = landingHarness({ boxes: [{ top: 500, value: '' }, { top: 560, value: '' }] }); run(a, `holePickerOpen = true; jumpToHole(9); window.__o = holePickerOpen; window.__h = currentViewedHole;`);
+        const b = landingHarness({ boxes: [{ top: 500, value: '' }, { top: 560, value: '' }] }); run(b, `goToAdjacentHole(1);`);
+        assert.equal(a.window.__h, 9); assert.equal(a.window.__o, false);
+        assert.deepEqual(log(a).map(x => x.replace(/-\d+$/, '')), log(b).map(x => x.replace(/-\d+$/, '')));
     });
 });
 
 describe('PART B — BOUNDARIES AND FAIL-OPEN', () => {
-    test('hole 18 Next does nothing — no render, no scroll, no wrap', () => {
-        const sb = anchorHarness([500, 620]);
-        run(sb, `currentViewedHole = 18; goToAdjacentHole(1); window.__h = currentViewedHole;`);
+    test('hole 18 Next does nothing — no render, no scroll, no focus, no wrap', () => {
+        const sb = landingHarness({ hole: 18 });
+        run(sb, `goToAdjacentHole(1); window.__h = currentViewedHole;`);
         assert.equal(sb.window.__h, 18, 'clamped, never wrapped to 1');
-        assert.deepEqual(bys(sb), []);
+        assert.deepEqual(log(sb), []);
         assert.equal(sb.window.__renders, 0);
     });
 
     test('hole 1 Prev does nothing', () => {
-        const sb = anchorHarness([500, 620]);
-        run(sb, `currentViewedHole = 1; goToAdjacentHole(-1); window.__h = currentViewedHole;`);
+        const sb = landingHarness({ hole: 1 });
+        run(sb, `goToAdjacentHole(-1); window.__h = currentViewedHole;`);
         assert.equal(sb.window.__h, 1);
-        assert.deepEqual(bys(sb), []);
+        assert.deepEqual(log(sb), []);
     });
 
-    test('a missing nav row fails open — navigation still happens', () => {
-        const sb = anchorHarness([]);   // querySelector returns null both times
+    test('a card with no boxes fails open — navigation still happens, nothing is scrolled or focused', () => {
+        const sb = landingHarness({ boxes: [] });
         run(sb, `goToAdjacentHole(1); window.__h = currentViewedHole;`);
         assert.equal(sb.window.__h, 6, 'the hole still changed');
-        assert.equal(sb.window.__renders, 1);
-        assert.deepEqual(bys(sb), []);
+        assert.deepEqual(log(sb), ['render']);
     });
 
-    test('a nav row that vanishes DURING the render fails open', () => {
-        // The row is measurable before the render and gone afterwards - the render
-        // replaced the DOM. The early return cannot help here, so this is the case
-        // that actually exercises the post-render guard.
-        const sb = anchorHarness([500]);   // present first, null second
+    test('a missing scroll API fails open — the focus still happens', () => {
+        const sb = landingHarness({ boxes: [{ top: 500, value: '' }], noScrollTo: true });
         run(sb, `goToAdjacentHole(1); window.__h = currentViewedHole;`);
-        assert.equal(sb.window.__h, 6, 'the hole still changed');
-        assert.equal(sb.window.__renders, 1);
-        assert.deepEqual(bys(sb), [], 'nothing to measure against, so nothing is scrolled');
-    });
-
-    test('a missing scroll API fails open', () => {
-        const sb = anchorHarness([500, 620]);
-        run(sb, `window.scrollBy = undefined; goToAdjacentHole(1); window.__h = currentViewedHole;`);
-        assert.equal(sb.window.__h, 6, 'anchoring is a comfort, never a precondition');
-        assert.equal(sb.window.__renders, 1);
-    });
-
-    test('no requestAnimationFrame still measures, synchronously', () => {
-        const sb = anchorHarness([500, 620]);
-        run(sb, `window.requestAnimationFrame = undefined; goToAdjacentHole(1);`);
-        assert.deepEqual(bys(sb), [120]);
+        assert.equal(sb.window.__h, 6, 'landing is a comfort, never a precondition');
+        assert.deepEqual(log(sb), ['render', 'focus:101/announced:101-6', 'select:101']);
     });
 });
 
-describe('PART B — ONLY NAVIGATION ANCHORS', () => {
-    const anchored = IDX.match(/withNavAnchor\(/g) || [];
-
-    test('the helper is called from exactly one place: hole navigation', () => {
-        assert.equal(anchored.length, 2, 'one definition, one call site');
-        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
-            IDX.indexOf('function goToAdjacentHole') + 700);
-        assert.match(fn, /withNavAnchor\(renderHoleView\)/);
+describe('PART B — ONLY NAVIGATION LANDS', () => {
+    test('landOnHole is called from exactly two places: Prev/Next and the jump', () => {
+        assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 2);
+        ['function goToAdjacentHole', 'function jumpToHole'].forEach(name => {
+            const at = IDX.indexOf(name);
+            assert.match(IDX.slice(at, at + 900), /renderHoleView\(\);\s*landOnHole\(\);/, name);
+        });
     });
 
-    test('score entry, dots, KP and presses do NOT anchor', () => {
+    test('renderHoleView never focuses and never lands (a snapshot must not pop the keyboard)', () => {
+        const at = IDX.indexOf('function renderHoleView(');
+        const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
+        assert.ok(fn.length > 5000, 'the renderer was found: ' + fn.length);
+        assert.ok(!/landOnHole|\.focus\(|pendingScoreFocus/.test(fn));
+    });
+
+    test('score entry, dots, KP and presses do NOT land', () => {
         ['function saveScore', 'function toggleDot', 'function saveDots', 'function pressMatchBet']
             .forEach(name => {
                 const at = IDX.indexOf(name);
                 if (at === -1) return;
-                assert.ok(!IDX.slice(at, at + 1500).includes('withNavAnchor'),
+                assert.ok(!IDX.slice(at, at + 1500).includes('landOnHole'),
                     `${name} must not fight the golfer's scroll position`);
             });
     });
 
-    test('switching between Hole View and Full Card does not anchor', () => {
+    test('switching between Hole View and Full Card does not land', () => {
         const at = IDX.indexOf('function setViewMode');
         assert.ok(at > -1);
-        assert.ok(!IDX.slice(at, at + 800).includes('withNavAnchor'),
-            'a view switch is not hole navigation');
+        const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30)).replace(/^\s*\/\/.*$/gm, '');
+        assert.ok(!fn.includes('landOnHole'), 'a view switch is not hole navigation');
     });
 
-    test('expanding the leaderboard does not anchor', () => {
+    test('expanding the leaderboard does not land', () => {
         ['function openLiveBoard', 'function closeLiveBoard'].forEach(name => {
             const at = IDX.indexOf(name);
             if (at === -1) return;
-            assert.ok(!IDX.slice(at, at + 600).includes('withNavAnchor'));
+            assert.ok(!IDX.slice(at, at + 600).includes('landOnHole'));
         });
     });
 
-    test('there is no persistent observer or scroll listener', () => {
-        const fn = IDX.slice(IDX.indexOf('function withNavAnchor'),
-            IDX.indexOf('function withNavAnchor') + 2600);
-        assert.ok(!/MutationObserver|addEventListener\('scroll'/.test(fn),
-            'one compensation per navigation - never a scroll trap');
+    test('there is no persistent observer, scroll listener, frame or timer in the landing', () => {
+        const at = IDX.indexOf('function landOnHole');
+        const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
+        assert.ok(!/MutationObserver|addEventListener\('scroll'|requestAnimationFrame|setTimeout|scrollBy|smooth/.test(fn),
+            'one explicit scroll per navigation - never a scroll trap, never a late nudge');
     });
 });

@@ -176,30 +176,24 @@ describe('HOLE NAVIGATION', () => {
         assert.equal(b.window.__h, 1);
     });
 
-    test('every hole change anchors the nav row instead of jumping to the card top', () => {
-        // REVERSED DELIBERATELY. Navigation used to end in scrollToHoleCard(), which
-        // anchors the CARD - and because holes differ in height, that moved the BUTTONS.
-        // A golfer tapping Next repeatedly had to chase the button up and down the
-        // screen. Navigation now routes through withNavAnchor(), which measures the nav
-        // row before and after and compensates by the difference.
+    test('every hole change renders, then LANDS on the first score box (2026-09-14)', () => {
+        // RE-PINNED. Navigation went scrollToHoleCard() (card top) -> withNavAnchor()
+        // (keep the nav row still) -> landOnHole(): an explicit scroll that puts the
+        // first score box HOLE_LANDING_OFFSET px from the top and focuses the first
+        // empty one. hole_view_landing_test.js measures it in Chrome; this only pins
+        // the call shape.
         const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
-            IDX.indexOf('function goToAdjacentHole') + 700);
-        assert.match(fn, /withNavAnchor\(renderHoleView\)/, 'navigation must go through the anchor');
-        assert.ok(!/scrollToHoleCard\(\)/.test(fn), 'the card-top jump is what caused the problem');
+            IDX.indexOf('function goToAdjacentHole') + 900);
+        assert.match(fn, /renderHoleView\(\);\s*landOnHole\(\);/, 'render, then land');
+        assert.ok(!/scrollToHoleCard\(\)|withNavAnchor\(/.test(fn), 'neither earlier scroll rule');
     });
 
-    test('the scroll targets the hole card, not the top of the page', () => {
-        const fn = IDX.slice(IDX.indexOf('function scrollToHoleCard'), IDX.indexOf('function scrollToHoleCard') + 400);
-        assert.ok(/getElementById\('hole-view-card'\)/.test(fn), 'must target the card');
-        assert.ok(/targetTop - 8/.test(fn), 'a small offset keeps the hole heading visible');
-        assert.ok(!/top: 0/.test(fn), 'scrolling to page top would lose the hole heading');
-    });
-
-    test('goToAdjacentHole still re-renders, now through the anchor', () => {
-        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
-            IDX.indexOf('function goToAdjacentHole') + 700);
-        assert.match(fn, /withNavAnchor\(renderHoleView\)/,
-            'the render still happens - it is simply wrapped so geometry can be measured around it');
+    test('the landing targets the first score box, not the card and not the page top', () => {
+        const at = IDX.indexOf('function landOnHole');
+        const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
+        assert.match(fn, /querySelectorAll\('\.score-input'\)/, 'must target the boxes');
+        assert.match(fn, /- HOLE_LANDING_OFFSET/, 'a small offset keeps the box off the edge');
+        assert.ok(!/scrollTo\(0, 0\)|top: 0/.test(fn), 'scrolling to page top would lose the hole');
     });
 
     test('navigating from deep in the page still lands on the new hole', () => {
@@ -211,14 +205,13 @@ describe('HOLE NAVIGATION', () => {
             window.__hv = document.getElementById('hole-view-card').innerHTML;
         `);
         assert.equal(sb.window.__h, 10);
-        // The viewport correction moved from scrollTo(card top) to a measured scrollBy
-        // delta inside withNavAnchor(). This harness stubs neither scrollBy nor
-        // requestAnimationFrame, so the anchor fails open here - which is itself the
-        // required behaviour: navigation must never depend on being able to scroll.
-        // The compensation itself is proven in viewport_anchor_test.js against a real
-        // geometry stub.
+        // The landing (landOnHole) scrolls to the first score box - but mini-dom does
+        // not parse innerHTML, so the card has no boxes here and the landing fails
+        // open: no scroll, navigation still happens, which is the required
+        // behaviour. The landing itself is measured in hole_view_landing_test.js
+        // (Chrome) and its arithmetic in viewport_anchor_test.js.
         assert.equal(sb.window.__scrolls.length, 0,
-            'no card-top jump; anchoring is measured elsewhere and must fail open here');
+            'no card-top jump; the landing fails open without boxes to land on');
         const h = sb.window.__hv;
         assert.ok(h.indexOf('hole-view-nav-row') > h.lastIndexOf('hv-player-row'),
             'and Prev/Next is still directly under the scores of the new hole');

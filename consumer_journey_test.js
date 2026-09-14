@@ -288,7 +288,7 @@ describe('NOTHING ELSE MOVED', () => {
 
     test('the closed scoring work survives', () => {
         const idx = read('index.html');
-        assert.match(idx, /withNavAnchor\(renderHoleView\)/, 'Prev/Next anchor');
+        assert.match(idx, /renderHoleView\(\);\s*landOnHole\(\);/, 'Prev/Next landing (was the nav anchor until 2026-09-14)');
         assert.match(idx, /function renderDotsWidgetHtml/, 'Live Dots');
         assert.match(idx, /const TICKER_MOUNTS = \['live-ticker-mount', 'fc-ticker-mount'\]/);
         assert.match(idx, /class="cell-dots"/, 'score-box geometry');
