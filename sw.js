@@ -524,6 +524,15 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v127: the Receipt opens with a PAYOUTS block.
+//
+// settlement.html's Main Pool section now starts with who is owed what, by game
+// in the order cash is handed out - Skins (per flight when the pool split),
+// Net Finish, KP - before the pot headers and the hole-by-hole proof. Every
+// figure is the engine's; nothing below the block moved. An installed device on
+// v126 keeps a settlement.html whose Receipt still opens with eighteen hole rows
+// per flight, so the person paying out scrolls past the proof to the answer.
+
 // Moved to v126: the Main Pool's skins bucket splits by flight.
 //
 // When flights are on and the round's skins scope is per flight, pool-engine.js
@@ -1205,7 +1214,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v126-pool-skins-per-flight';
+const CACHE_VERSION = 'golfapp-v127-receipt-payouts';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

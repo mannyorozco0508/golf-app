@@ -33,6 +33,15 @@
 //            header, hole rows and summary.
 //   live     every index surface, the leaderboard and settlement LIVE RESULTS
 //            carry FLIGHT A / FLIGHT B heads and the per-flight winners.
+//
+// RE-PINNED 2026-09-14, the RECEIPT PAYOUTS wave (settlement.html only). The
+// engine and the five live surfaces: UNCHANGED, sha for sha, all three
+// variants. settlement.receiptPool moved in all three because the Main Pool
+// section now OPENS with a PAYOUTS block (Skins / Net Finish / KP, who is owed
+// what) before the detail. The detail did not move: the section with the
+// block cut out is byte-identical to the previous capture - PREV_RECEIPT below
+// holds those shas and "the detail under the block" asserts it on every run,
+// so a change to the ledgers can never hide behind the block's own diff.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -141,6 +150,26 @@ Object.keys(VARIANTS).forEach(k => {
             assert.match(exp.html['settlement.receiptPool'], /Skins Pot/);
             assert.ok((exp.html['settlement.receiptPool'].match(/H\d+ /g) || []).length >= 18, 'every hole on the Receipt');
             Object.keys(exp.html).forEach(s => assert.match(exp.html[s], /SKINS|Skins/, s));
+        });
+    });
+});
+
+// The Receipt's Main Pool section BEFORE the payouts block, by sha (the v126
+// capture, 2026-09-14T01:20:20Z). The block is cut out of today's render and the
+// remainder must equal these exactly.
+const PREV_RECEIPT = {
+    off: 'df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30',
+    field: 'df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30',
+    flight: '214f6588ef7d4b9ac1d412718aea92985a61576f4cbd0e075e7c0feaf3a426d8'
+};
+describe('the detail under the payouts block is the pre-block Receipt, byte for byte', () => {
+    Object.keys(VARIANTS).forEach(k => {
+        test(k + ': cut the block out and the section is the previous capture', () => {
+            const html = FX.variants[k].html['settlement.receiptPool'];
+            const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
+            assert.ok(a > 0 && e > a, 'the block is in the section');
+            assert.ok(html.slice(a, e).length > 1000, 'and it is not empty: ' + html.slice(a, e).length);
+            assert.equal(sha(html.slice(0, a) + html.slice(e + tag.length)), PREV_RECEIPT[k]);
         });
     });
 });

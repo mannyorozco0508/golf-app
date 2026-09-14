@@ -213,6 +213,17 @@
            inside the row above them; only the un-indented rows add up to FINAL NET. */
         /* Tie explanation sits under the line it explains, quieter than it. */
         .nf-explain { font-size: 0.72rem; color: var(--text-muted); padding: 1px 0 1px 18px; }
+        /* THE PAYOUTS BLOCK at the top of the Main Pool: the answer before the proof.
+           One box, worked one game at a time; a game head, a flight head where the
+           pool split, then name / amount rows in the same ledger-row style as the
+           detail below so the two read as one document (and print as one). */
+        .pool-payouts { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px 2px 10px; margin-bottom: 14px; background: var(--subtle-bg); }
+        .pool-payouts .pp-title { font-size: 0.8rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 8px 2px; }
+        .pool-payouts .pp-game { padding-bottom: 4px; }
+        .pool-payouts .pp-game-head { font-size: 0.82rem; font-weight: bold; color: var(--text-main); margin: 6px 0 6px 2px; }
+        .pool-payouts .pp-flight-head { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 2px 0 4px 4px; }
+        .pool-payouts .pp-row { padding: 8px 12px; margin-bottom: 6px; }
+        .pool-payouts .pp-note { font-weight: normal; font-size: 0.85rem; color: var(--text-muted); padding: 8px 12px; margin-bottom: 6px; }
         .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
         .pl-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
         .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
@@ -277,6 +288,9 @@
             .settle-card { break-inside: avoid; page-break-inside: avoid; }
             /* One golfer's payout lines and their total belong together. */
             .pl-block { break-inside: avoid; page-break-inside: avoid; }
+            /* The payouts block is the page the cash is handed out from; one game's
+               list must not break across a sheet. */
+            .pool-payouts .pp-game { break-inside: avoid; page-break-inside: avoid; }
             .receipt-head { break-after: avoid; page-break-after: avoid; }
             /* The scorecard is the only section allowed its own page. */
             .receipt-card-wide { break-before: auto; page-break-inside: auto; }
@@ -1109,6 +1123,69 @@ html {
         return html;
     }
 
+    // ---- THE PAYOUTS BLOCK: the answer before the proof -----------------------
+    //
+    // The Main Pool section used to open with the pot headers and eighteen hole
+    // rows per flight, so the person handing out cash scrolled past the proof to
+    // reach the answer. This block sits first: grouped BY GAME in the order money
+    // is handed out - Skins, then Net Finish, then KP - and under each game only
+    // the golfers who are OWED money, name and amount, largest first. Skins per
+    // flight when the pool split it (r.skins.flights), one list otherwise; Net
+    // Finish and KP are never flighted. A golfer who wins under two games appears
+    // under both - the block is worked one game at a time, so there is
+    // deliberately NO per-golfer combined total anywhere in it. A game with
+    // nothing to pay says so in one line.
+    //
+    // EVERY FIGURE IS THE ENGINE'S, CONSUMED NOT COMPUTED. Skins: the pool's
+    // allocated line cents, summed per golfer - the same sum the Skins Summary in
+    // the detail below prints, so the two agree to the dollar by construction.
+    // Net Finish: r.net.lines[].cents as the engine allocated the place(s). KP:
+    // r.kp.lines[].cents on 'paid' lines, summed per golfer. A TIED net line is
+    // printed as ONE row naming the tied golfers with the engine's combined
+    // amount: the engine does not expose each golfer's share of a tie, and this
+    // block does not derive it - the Net Finish detail below explains the split.
+    function buildPoolPayoutsHtml(r, $) {
+        const row = (name, c) => `<div class="ledger-row pp-row"><span>${escapeHtml(name)}</span><span class="val-pos">${$(c)}</span></div>`;
+        const note = (t) => `<div class="ledger-row pp-note"><span>${t}</span><span></span></div>`;
+        // Lines -> [name, cents] per golfer, largest first, name to break a tie.
+        const byGolfer = (lines) => {
+            const acc = {}, order = [];
+            lines.forEach(l => { const k = String(l.winnerId); if (!(k in acc)) { acc[k] = { name: l.winnerName, cents: 0 }; order.push(k); } acc[k].cents += l.cents; });
+            return order.map(k => acc[k]).filter(x => x.cents > 0).sort((a, b) => b.cents - a.cents || a.name.localeCompare(b.name));
+        };
+        const group = (flight, rows, empty) => `<div class="pp-group"${flight ? ` data-flight="${flight}"` : ''}>`
+            + (flight ? `<div class="pp-flight-head">Flight ${flight}</div>` : '')
+            + (rows.length ? rows.join('') : note(empty))
+            + `</div><!-- /pp-group -->`;
+        const game = (head, groups) => `<div class="pp-game"><div class="pp-game-head">${head}</div>${groups.join('')}</div><!-- /pp-game -->`;
+        const games = [];
+
+        if (r.skins) {
+            const pots = r.skins.flights ? r.skins.flights : [{ flight: null, lines: r.skins.lines, golfers: r.participants.length }];
+            games.push(game('Skins', pots.map(pot => {
+                if (pot.golfers === 0) return group(pot.flight, [], 'Nobody in this flight — no pot');
+                return group(pot.flight, byGolfer(pot.lines).map(w => row(w.name, w.cents)), 'No skins won — nothing to pay');
+            })));
+        }
+        if (r.net) {
+            const rows = r.net.lines.map(l => row(l.names.join(' / '), l.cents));
+            const tied = r.net.lines.some(l => l.split);
+            games.push(game('Net Finish', [group(null, rows.length ? rows.concat(tied ? [note('A tied place is one row with the combined amount — the split is under Net Finish below')] : []) : [], 'No scores — nothing to pay')]));
+        }
+        if (r.kp) {
+            const paid = r.kp.lines.filter(l => l.state === 'paid');
+            let groups;
+            if ((r.kp.unresolvedCents || 0) > 0 && paid.length === 0) {
+                groups = [group(null, [], `KP not confirmed yet — ${$(r.kp.unresolvedCents)} pending`)];
+            } else {
+                groups = [group(null, byGolfer(paid).map(w => row(w.name, w.cents)), 'No KP winners — refunded to the field')];
+            }
+            games.push(game('KP', groups));
+        }
+        if (games.length === 0) return '';
+        return `<div class="pool-payouts"><div class="pp-title">💵 PAYOUTS — hand out in this order</div>${games.join('')}</div><!-- /pool-payouts -->`;
+    }
+
     function renderMoneyPoolSection(data, courseData, savedScores) {
         const mount = document.getElementById('money-pool-section');
         if (!mount) return;
@@ -1121,6 +1198,9 @@ html {
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
+        // THE ANSWER FIRST: who is owed what, by game. Everything below it is the
+        // proof, in the order it always was.
+        if (r.valid) html += buildPoolPayoutsHtml(r, $);
         // CANCELLED IS NOT A REFUND, and the Receipt has to say which it was. The
         // money did not come back to the field - the game was removed and the pot
         // was re-divided, which is why no golfer sees a KP line at all.
