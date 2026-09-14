@@ -1,7 +1,8 @@
 # Rattle Golf Consumer — v1.1 Monetization Spec
 
-Rewritten 2026-09-14, revised the same day after the round-code issuance
-investigation. Supersedes the 2026-09-09 version entirely.
+Rewritten 2026-09-14, revised twice the same day: after the round-code
+issuance investigation, then after the Firebase boot-path investigation.
+Supersedes the 2026-09-09 version entirely.
 Nothing in here is built. This is the plan, not a record.
 
 **No pricing work ships until iOS build 24 clears review.** See "Sequencing
@@ -185,8 +186,19 @@ read Marty's purchase. That was a real problem and a good solution to it.
 
 **It no longer applies.** Under this model, the only person who needs an
 entitlement check is the person creating the round, on their own device, where
-StoreKit is already authoritative. Joiners are never checked. The entire
-cross-device entitlement problem dissolves.
+StoreKit is already authoritative. The entire cross-device entitlement problem
+dissolves.
+
+**But "joiners are never checked" is a claim about the rule, not a free
+outcome.** An earlier draft of this spec said joiners are never checked and
+left it there. That was wrong, and it is worth stating plainly because it is
+the most expensive mistake available here. Scores are written to
+`events/<code>/scores` — the same node the gate sits on. A rule that requires
+`auth != null` for writes to `events/$eventCode` would refuse every golfer
+entering a score, and the promise that joining needs nothing breaks silently on
+a Monday with twelve people on the course.
+
+The rule has to separate **creating** a round from **participating** in one.
 
 ### What replaces it
 
@@ -245,6 +257,37 @@ pricing, and `ownerUid` fixes it and the trial gate in the same rule.
 **The wall is on creating a round, never on finishing one.** An owner keeps
 editing their own round forever, trial expired or not. Nobody loses a game in
 progress because a clock ran out.
+
+### The three cases the rule must distinguish
+
+**1. Creating a round** (`!data.exists()`) — requires `auth != null`, an
+`ownerUid` matching `auth.uid`, and either a live trial window or a valid pass.
+This is the gate.
+
+**2. Participating in an existing round** — scores, KPs, presses, side matches,
+everything a golfer does after arriving by link. **Stays unauthenticated,
+exactly as it works today.** No uid, no account, no token. This is not a
+concession; it is the product.
+
+**3. Legacy rounds with no `ownerUid`** — every round that exists before the
+gate ships. The rule must leave these on the old behaviour or live rounds break
+mid-game. Absence of `ownerUid` means legacy; require it only where
+`!data.exists()`.
+
+Getting case 2 wrong is worse than shipping no paywall at all.
+
+### The token race
+
+The database SDK connects with whatever token the auth component holds *at that
+moment*, and re-sends it when it changes. A write issued before a sign-in
+resolves is evaluated by the rules as `auth == null`.
+
+Today nothing cares, because no Consumer rule mentions `auth`. Once creation
+requires it, **Save & Start Round firing before the token lands gets refused** —
+on the first tee, with the group waiting.
+
+So the create path must await auth-ready rather than fire hopefully. Every
+other path must not await anything.
 
 ### The consumable/subscription split matters
 
@@ -305,6 +348,30 @@ Each step depends on the one before. Do not reorder.
 **1. Anonymous Auth** — sign in silently at boot on both surfaces. No UI, no
 sign-in screen, nothing a golfer sees. Everything below depends on `auth.uid`
 existing.
+
+**One shared file, not eleven inline blocks.** Every page today carries its own
+`firebaseConfig` literal and its own `initializeApp` — eleven copies, no shared
+init. Do not add a twelfth thing to ten pages. This project already carries four
+drifted copies of `calculateMatchEngine` and two coexisting match-play bases
+from exactly that pattern. Add `auth-boot.js` to `SHARED_SHELL`, move
+`firebase-auth-compat.js` there from `TOURNAMENT_SHELL`, and give each page one
+script tag. `native_bundle_freshness_test.js` will go red on the shell change —
+that is the guard working.
+
+**Fire-and-forget, never awaited at render.** Sign-in exposes a promise the
+create path can await. No other page waits for anything. A page that renders
+behind a pending network call is a page that shows nothing at a course with no
+signal.
+
+**Offline is an acceptable cost, and smaller than it looks.** `signInAnonymously`
+is an HTTPS call and fails offline with `auth/network-request-failed`; there is
+no cached way to create an anonymous user. But a signed-in user persists in the
+SDK's IndexedDB store, so only the *first ever* launch on a device is exposed —
+every later launch has a cached user and needs no network. And the app is
+already unusable cold-offline regardless: the compat database SDK has no disk
+cache, so a cold launch with no signal sits on "Connecting..." today, with or
+without auth. What works offline is a page that was already open. Auth does not
+change that story.
 
 **2. `database.rules.json`** — PROTECTED FILE, needs explicit per-file
 approval. The current rules are better than the old spec claimed: they validate
