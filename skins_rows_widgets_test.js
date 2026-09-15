@@ -211,12 +211,14 @@ describe('THE SEAM — where the rows come from, and the print block', () => {
     const at = src.indexOf('function buildSkinsPotRowsHtml(');
     const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
 
-    test('the rows are built from the engine\'s ledger; no tie row is emitted on a no-carry round', () => {
+    test('the rows are built from the engine\'s ledger through the shared builder (v138); no tie row is emitted', () => {
         assert.match(fn, /computeSkinsHoleLedger\(ledgerCfg, courseData, savedScores\)/);
-        assert.match(fn, /const label = `Hole \$\{row\.hole\}`;/, 'the label');
-        assert.match(fn, /if \(r\.skins\.carryOver\) carryRun\.push\(row\);\s*return;/, 'a tie is kept only to be carried');
+        // v138: the words and the run logic moved to live-skins.js; this page
+        // renders the rows it hands back and adds the dollars and its markup.
+        assert.match(fn, /buildSkinsLedgerRows\(L, basisLabel\)\.forEach\(row =>/, 'the shared builder');
+        assert.match(fn, /row\.collected \|\| ' — Skin'/, 'a plain win still says Skin');
         assert.doesNotMatch(fn, /No Skin<\/span>/, 'the tie row markup is gone from the source');
-        assert.match(fn, /carried to Hole/); assert.match(fn, /carried, not won/); assert.match(fn, /collects \$\{row\.unitsWon\} skins/);
+        assert.doesNotMatch(fn, /carried to Hole|carried, not won|collects /, 'no page-local copy of the sentences');
     });
 
     test('the v134 blocks and the print rules are as they were', () => {

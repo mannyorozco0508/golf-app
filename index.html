@@ -3449,53 +3449,25 @@ html {
 
         let ledgerHtml = '';
         if (liveSkinsOpen) {
-            // THE SAME RULES AS THE RECEIPT (v136/v137), the same wording. Only the
-            // holes that paid are rows; a no-carry tie pays nobody and rolls nothing
-            // forward, so it is not one. On a CARRY round the tied holes are part of
-            // the money: a run of them is one compact line, "carried to" the hole
-            // that collected - or, mid-round, the hole still waiting - and the
-            // collecting row says what it collected. WAITING rows stay: "waiting on
-            // Group 3" is live information, unlike a settled tie. Every hole is
-            // "Hole 7", never "H7". The Receipt's buildSkinsPotRowsHtml is the
-            // sentence this copies; live_skins_wording_test.js pins the two together.
+            // THE SAME ROWS AS THE RECEIPT AND THE BOARD, from the one builder in
+            // live-skins.js (buildSkinsLedgerRows): only the holes that paid, a carry
+            // round's tied holes as one run, "Hole 7" never "H7". This page adds
+            // what is its own: every waiting hole with the group(s) it waits on,
+            // "value pending" on a carry win whose worth an unresolved hole still
+            // decides, "— Skin" on a plain win, and its markup.
             const basisWord = basis.charAt(0) + basis.slice(1).toLowerCase();
-            const carryRun = [];
-            const rowsOut = [];
-            const holeSpan = list => list.length === 1
-                ? 'Hole ' + list[0].hole
-                : 'Holes ' + list[0].hole + '–' + list[list.length - 1].hole;
-            const flushCarryRun = into => {
-                if (carryRun.length === 0) return;
-                const tied = carryRun.length === 1 ? 'Tied at ' + basisWord + ' ' + carryRun[0].low : 'Tied';
-                const where = into ? 'carried to Hole ' + into : 'carried, not won';
-                rowsOut.push('<div class="ls-row ls-carry">' + holeSpan(carryRun) + ' — ' + tied + ' — ' + where + '</div>');
-                carryRun.length = 0;
-            };
-            L.holes.forEach(r => {
-                const n = 'Hole ' + r.hole;
-                if (!r.official) {
-                    flushCarryRun(r.hole);
-                    const gs = r.missingGroups;
+            const rowsOut = buildSkinsLedgerRows(L, basisWord).map(row => {
+                if (row.kind === 'waiting') {
+                    const gs = row.missingGroups;
                     const who = gs.length > 0 ? 'Group' + (gs.length > 1 ? 's ' : ' ') + gs.join(', ')
-                        : r.missing.length + ' to post';
-                    rowsOut.push('<div class="ls-row ls-wait">' + n + ' — Waiting on ' + esc(who) + '</div>');
-                    return;
+                        : row.missing.length + ' to post';
+                    return '<div class="ls-row ls-wait">' + row.label + ' — Waiting on ' + esc(who) + '</div>';
                 }
-                if (r.state === 'tie') {
-                    if (bundle.carryOver) carryRun.push(r);
-                    return;
-                }
-                let collected = '';
-                if (r.unitsWon !== null && r.unitsWon > 1) {
-                    const from = carryRun.length > 0 ? carryRun[0].hole : r.hole;
-                    collected = ' — collects ' + r.unitsWon + ' skins (Holes ' + from + '–' + r.hole + ')';
-                }
-                flushCarryRun(r.hole);
-                const pending = r.valueKnown ? '' : ' · value pending';
-                rowsOut.push('<div class="ls-row ls-skin">' + n + ' — ' + esc(r.winner.name) + ' — '
-                    + basisWord + ' ' + r.low + (collected || ' — Skin') + pending + '</div>');
+                if (row.kind === 'carry') return '<div class="ls-row ls-carry">' + row.text + '</div>';
+                const pending = row.valueKnown ? '' : ' · value pending';
+                return '<div class="ls-row ls-skin">' + row.label + ' — ' + esc(row.winner.name) + ' — '
+                    + row.score + (row.collected || ' — Skin') + pending + '</div>';
             });
-            flushCarryRun(null);
             if (rowsOut.length === 0) rowsOut.push('<div class="ls-row ls-none">No skins won yet.</div>');
             ledgerHtml = '<div class="ls-ledger">' + rowsOut.join('') + '</div>';
         }

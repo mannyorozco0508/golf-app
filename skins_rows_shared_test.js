@@ -1,0 +1,200 @@
+// ============================================================================
+// ONE SHARED BUILDER, THREE CONSUMERS (v138). The skins hole rows - which holes
+// are listed, how a carried run reads, what a collecting hole says it
+// collected, "Hole 7" - are built ONCE, by buildSkinsLedgerRows() in
+// live-skins.js, and rendered by settlement.html (the Receipt's Main Pool
+// block), index.html (the scorecard's live skins ledger) and leaderboard.html
+// (the live skins board). Each page keeps what is its own: markup, the
+// Receipt's dollars, the waiting-row rule and wording.
+//
+// WHAT GENUINELY DIFFERED between the three page-local copies before this
+// wave, and therefore stays per page:
+//   - the waiting rows: the Card lists every waiting hole, "Waiting on
+//     Group 1, 2" / "N to post"; the board lists the FIRST only, "Waiting for
+//     Group 1" / "Groups 1, 2" / names / "the field"; the Receipt (a preview
+//     only) lists them by golfer name / "N golfer(s)"
+//   - the plain-win suffix: the Receipt and the Card say "— Skin"; the board
+//     says nothing, and joins name and score with " · " not " — "
+//   - "· value pending" on a carry win whose worth an unresolved hole still
+//     decides: the Card only
+//   - the dollars: the Receipt only
+//   - the empty state: the Card's opened ledger and the board say "No skins
+//     won yet."; the Receipt's summary says "No skins were won."
+// Everything else - the run logic, the sentences, the label - is shared.
+//
+// THE PROOF, the way v136 and v137 did it: skins_rows_extract_prev.fixture.json
+// holds the tag-stripped text of all three surfaces on five rounds, captured
+// at d951a43 (v137) BEFORE the extraction. Today's text must equal it,
+// character for character, with ONE difference the wave makes deliberately
+// and states: on a carry round previewed MID-ROUND the Receipt used to say a
+// run before a waiting hole was "carried, not won"; the Card and board said
+// "carried to Hole 11" (the hole still waiting), which is the truth, and the
+// shared builder says that on all three. A finished round is unaffected.
+// ============================================================================
+
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const crypto = require('crypto');
+const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-script.js');
+const { makeCourseData } = require('./helpers/fixtures.js');
+const { wizardSavedRound } = require('./helpers/wizard-saved-round.js');
+
+const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+const sha = s => crypto.createHash('sha256').update(s).digest('hex');
+const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
+const CD = makeCourseData(18);
+const J = v => JSON.parse(JSON.stringify(v));
+
+// ---------------------------------------------------------------------------
+describe('THE BUILDER — live-skins.js buildSkinsLedgerRows', () => {
+    const LS = loadJsFile('live-skins.js');
+    const hole = (n, o) => Object.assign({ hole: n, official: true, state: 'skin', winner: { id: 1, name: 'Ann' }, low: 3, unitsWon: 1, valueKnown: true, missing: [], missingGroups: [] }, o);
+    const tie = n => hole(n, { state: 'tie', winner: null, low: 4, unitsWon: 0 });
+    const wait = (n, groups) => hole(n, { official: false, state: 'waiting', winner: null, low: null, unitsWon: null, valueKnown: false, missingGroups: groups || [2], missing: [{ id: 9, name: 'Zed', group: 2 }], requiredCount: 8, postedCount: 4 });
+
+    test('no carry: a tie is not a row; a win is "Hole N" with its score and no suffix', () => {
+        const rows = LS.buildSkinsLedgerRows({ carryOver: false, holes: [hole(1), tie(2), tie(3), hole(4, { low: 2 })] }, 'Gross');
+        assert.equal(JSON.stringify(rows.map(r => r.kind)), JSON.stringify(['skin', 'skin']));
+        assert.equal(rows[0].label, 'Hole 1'); assert.equal(rows[0].score, 'Gross 3'); assert.equal(rows[0].collected, '');
+        assert.equal(rows[1].label, 'Hole 4'); assert.equal(rows[1].score, 'Gross 2');
+    });
+
+    test('carry: a run is one row in the words, and the collecting row says what it collected', () => {
+        const rows = LS.buildSkinsLedgerRows({ carryOver: true, holes: [hole(1), tie(2), tie(3), tie(4), hole(5, { unitsWon: 4 }), tie(6), hole(7, { unitsWon: 2, low: 2 }), tie(8), tie(9)] }, 'Gross');
+        assert.equal(JSON.stringify(rows.map(r => r.kind)), JSON.stringify(['skin', 'carry', 'skin', 'carry', 'skin', 'carry']));
+        assert.equal(rows[1].text, 'Holes 2–4 — Tied — carried to Hole 5');
+        assert.equal(JSON.stringify(rows[1].holes), '[2,3,4]'); assert.equal(rows[1].into, 5);
+        assert.equal(rows[2].collected, ' — collects 4 skins (Holes 2–5)');
+        assert.equal(rows[3].text, 'Hole 6 — Tied at Gross 4 — carried to Hole 7', 'a single carried hole names its score');
+        assert.equal(rows[4].collected, ' — collects 2 skins (Holes 6–7)');
+        assert.equal(rows[5].text, 'Holes 8–9 — Tied — carried, not won'); assert.equal(rows[5].into, null);
+    });
+
+    test('mid-round: a run before a waiting hole is carried TO that hole, and the waiting row carries its data', () => {
+        const rows = LS.buildSkinsLedgerRows({ carryOver: true, holes: [hole(1), tie(2), tie(3), wait(4, [1, 3]), wait(5, [1, 3])] }, 'Net');
+        assert.equal(JSON.stringify(rows.map(r => r.kind)), JSON.stringify(['skin', 'carry', 'waiting', 'waiting']));
+        assert.equal(rows[1].text, 'Holes 2–3 — Tied — carried to Hole 4');
+        assert.equal(rows[2].label, 'Hole 4'); assert.equal(JSON.stringify(rows[2].missingGroups), '[1,3]'); assert.equal(rows[2].missing[0].name, 'Zed');
+        assert.equal(rows[2].requiredCount - rows[2].postedCount, 4);
+        assert.ok(!rows.some(r => /not won/.test(r.text || '')));
+    });
+
+    test('nothing won: no rows at all (the page says so in its own words); a ledger of nothing: no rows', () => {
+        assert.equal(LS.buildSkinsLedgerRows({ carryOver: false, holes: [tie(1), tie(2)] }, 'Gross').length, 0);
+        assert.equal(LS.buildSkinsLedgerRows(null, 'Gross').length, 0);
+    });
+
+    test('names come back raw - the page escapes them, because the page owns the markup', () => {
+        const rows = LS.buildSkinsLedgerRows({ carryOver: false, holes: [hole(1, { winner: { id: 1, name: "O'Brien <b>" } })] }, 'Gross');
+        assert.equal(rows[0].winner.name, "O'Brien <b>");
+        assert.ok(!('text' in rows[0]), 'a skin row is parts, not a sentence with a name baked in');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// The three surfaces, each page arriving the way it does: loaded with the link,
+// the round through its own value listener.
+function arrive(page, data, mounts, pre) {
+    const sb = loadHtmlInlineScript(page, [], { search: '?game=XTRACT' });
+    vm.runInContext(mounts.map(m => 'document.__mount(document.getElementById("' + m + '"));').join(''), sb);
+    const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/XTRACT');
+    assert.ok(h, page + ' registered its round listener');
+    h.cb({ val: () => J(data), exists: () => true });
+    if (pre) { vm.runInContext(pre, sb); h.cb({ val: () => J(data), exists: () => true }); }
+    return sb;
+}
+function surfaces(data) {
+    const st = arrive('settlement.html', data, ['money-pool-section']);
+    const ix = arrive('index.html', data, ['live-skins-mount', 'hole-view-card'], 'liveSkinsOpen = true;');
+    const lb = arrive('leaderboard.html', data, ['live-skins-mount']);
+    return {
+        receipt: strip(String(vm.runInContext("document.getElementById('money-pool-section').innerHTML", st))),
+        card: strip(String(vm.runInContext("document.getElementById('live-skins-mount').innerHTML", ix))),
+        board: strip(String(vm.runInContext("document.getElementById('live-skins-mount').innerHTML || ''", lb)))
+    };
+}
+function pool(flights, carry, birdies, thru) {
+    const r = wizardSavedRound({ code: 'XTRACT', courseData: CD, thru: thru || 18, overrides: { additionalGames: {}, flights: flights === undefined ? undefined : flights } });
+    if (flights === undefined) delete r.flights;
+    r.moneyPool.skins.carryOver = !!carry;
+    const byName = {}; r.players.forEach(p => { byName[p.name] = p.id; });
+    birdies.forEach(([name, h]) => { r.scores['p' + byName[name] + '_h' + h] = CD[h - 1].par - 1; });
+    return r;
+}
+const FLIGHT = { enabled: true, scopes: { skins: 'flight', birdies: 'field' } };
+const FOUR = [['Ann Alpha', 1], ['Cal Charlie', 5], ['Ned November', 7], ['Quy Quebec', 16]];
+const TEN = [['Ann Alpha', 1], ['Ben Bravo', 2], ['Max Mike', 2], ['Cal Charlie', 5], ['Ned November', 7], ['Dee Delta', 9], ['Oli Oscar', 11], ['Eli Echo', 13], ['Pat Papa', 13], ['Quy Quebec', 16]];
+const ROUNDS = {
+    'no-carry': () => pool(undefined, false, FOUR),
+    'carry': () => pool(undefined, true, FOUR),
+    'nothing-won': () => pool(undefined, false, []),
+    'flighted': () => pool(FLIGHT, false, TEN),
+    'carry-mid-round': () => pool(undefined, true, [['Ann Alpha', 1], ['Cal Charlie', 5]], 10)
+};
+
+describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-extraction text', () => {
+    const PREV = JSON.parse(read('skins_rows_extract_prev.fixture.json'));
+    test('the previous capture is pinned, so the proof cannot drift with the fixture', () => {
+        assert.equal(sha(PREV.rounds['flighted'].receipt), '1276c8f4467a1937c39574a88b602b692ed0b40cb3511a2e0ac6289a4adaab3c', 'the v136 Receipt text');
+        assert.equal(sha(PREV.rounds['carry'].card).slice(0, 8), 'e19a899d');
+        assert.equal(sha(PREV.rounds['nothing-won'].board).slice(0, 8), 'ea526901');
+        assert.match(PREV.rounds['carry'].receipt, /\|Holes 2–4 — Tied — carried to Hole 5\|Hole 5 — Cal Charlie — Gross 3 — collects 4 skins \(Holes 2–5\)\|\$49\|/);
+    });
+    ['no-carry', 'carry', 'nothing-won', 'flighted'].forEach(k => {
+        const now = surfaces(ROUNDS[k]());
+        ['receipt', 'card', 'board'].forEach(s => test(k + ' / ' + s + ': character for character', () => {
+            assert.equal(now[s], PREV.rounds[k][s]);
+            assert.ok(now[s].length > 40, 'not vacuous');
+        }));
+    });
+    test('carry-mid-round: the Card and the board are unchanged; the Receipt\'s one open run now reads as theirs did', () => {
+        const now = surfaces(ROUNDS['carry-mid-round']());
+        assert.equal(now.card, PREV.rounds['carry-mid-round'].card);
+        assert.equal(now.board, PREV.rounds['carry-mid-round'].board);
+        const before = PREV.rounds['carry-mid-round'].receipt;
+        assert.match(before, /\|Holes 6–10 — Tied — carried, not won\|Hole 11 — Waiting on/, 'what the Receipt said before');
+        assert.equal(now.receipt, before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on'),
+            'the ONE deliberate difference, and nothing else');
+        assert.match(now.card, /\|Holes 6–10 — Tied — carried to Hole 11\|/, 'the sentence the Card already used');
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('THE SEAM — called by all three, defined once', () => {
+    const PAGES = ['settlement.html', 'index.html', 'leaderboard.html'];
+    test('live-skins.js defines the builder and exports it', () => {
+        const src = read('live-skins.js');
+        assert.match(src, /\nfunction buildSkinsLedgerRows\(L, basis\) \{/);
+        assert.match(src, /module\.exports = \{ liveSkinsLedgerConfigs, liveSkinsLedgerEntries, buildSkinsLedgerRows \}/);
+        ['carried to Hole ', 'carried, not won', ' — collects ', ' skins (Holes ', "'Tied at ' + basis", "'Tied'", "'Hole ' + ", "'Holes ' + "].forEach(l =>
+            assert.ok(src.includes(l), 'the builder carries ' + JSON.stringify(l)));
+    });
+    PAGES.forEach(p => test(p + ' loads live-skins.js and calls buildSkinsLedgerRows; it defines no copy of the sentences', () => {
+        const src = read(p);
+        assert.match(src, /<script src="live-skins\.js"><\/script>/);
+        const inline = src.replace(/<script src=[^>]*><\/script>/g, '');
+        assert.match(inline, /buildSkinsLedgerRows\(L, basis(Label|Word)?\)/, 'the positive assertion: the builder is called');
+        assert.doesNotMatch(inline, /function buildSkinsLedgerRows/, 'and not shadowed');
+        ['carried to Hole', 'carried, not won', 'collects ', 'skins (Holes'].forEach(l =>
+            assert.ok(!inline.includes(l), p + ' still carries a copy of ' + JSON.stringify(l)));
+        assert.doesNotMatch(inline, /No Skin<\/(span|div)>/);
+    }));
+    test('what stays per page is per page: the waiting wording, the dollars, the suffix', () => {
+        assert.match(read('settlement.html'), /Waiting on \$\{who\}/);
+        assert.match(read('settlement.html'), /\$\(cents\)/);
+        assert.match(read('index.html'), /value pending/);
+        assert.match(read('leaderboard.html'), /Waiting for ' \+ esc\(who \|\| 'the field'\)/);
+        assert.match(read('leaderboard.html'), /row\.score \+ row\.collected/, 'the board adds no "— Skin"');
+        assert.match(read('settlement.html'), /row\.collected \|\| ' — Skin'/);
+        assert.match(read('index.html'), /row\.collected \|\| ' — Skin'/);
+    });
+    test('the engines were not touched', () => {
+        const h = f => sha(read(f)).slice(0, 8);
+        assert.equal(h('settlement-engine.js'), 'adc3cd9f');
+        assert.equal(h('pool-engine.js'), 'f4d7cdbb');
+        assert.equal(h('money-engine.js'), '3c960947');
+    });
+});

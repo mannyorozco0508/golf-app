@@ -369,8 +369,11 @@ describe('NO SECOND RESOLVER, NO DUPLICATE MATHS', () => {
         // is presentation. What must not appear is anything that DECIDES a skin.
         ['getStrokes(','parseHcp(','Math.min(','carryOver ?','officialThru =','.low =']
             .forEach(t => assert.ok(!f.includes(t), `the presenter must not resolve skins; found ${t}`));
-        assert.match(f, /r\.state === 'tie'/, 'it reads the ledger\u2019s verdict');
-        assert.match(f, /r\.official/, 'including whether the hole is official');
+        // v138: the hole rows come from buildSkinsLedgerRows() in live-skins.js,
+        // which reads the ledger's verdict (r.state / r.official); this page
+        // renders the rows it hands back and decides only which waiting row shows.
+        assert.match(f, /buildSkinsLedgerRows\(L, basis\)/, 'it reads the ledger\u2019s verdict through the shared builder');
+        assert.match(f, /row\.kind === 'waiting'/, 'including whether the hole is official');
     });
 
     test('leaderboard.html no longer carries duplicate handicap helpers', () => {

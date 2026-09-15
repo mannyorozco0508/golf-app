@@ -204,24 +204,17 @@ describe('CARD TAB — a panel where nothing has been won still says so', () => 
 });
 
 // ---------------------------------------------------------------------------
-describe('ONE WORDING — the three ledgers share the Receipt\'s sentences', () => {
-    const PAGES = ['settlement.html', 'index.html', 'leaderboard.html'];
-    const LITERALS = ["carried to Hole ", "carried, not won", "collects ", " skins (Holes ", "Tied at ", "'Tied'"];
-    PAGES.forEach(p => test(p + ' carries every literal, and no tie-row markup', () => {
-        const s = read(p);
-        LITERALS.forEach(l => assert.ok(s.includes(l), p + ' lost ' + JSON.stringify(l)));
-        assert.doesNotMatch(s, /No Skin<\/(span|div)>/, 'a tie row is no longer emitted');
-        assert.doesNotMatch(s, /\bH' \+ (r|l|L\.\w+)\.hole/, 'no H-prefixed hole label is built');
-    }));
+// v138: the literal pins that held the three copies together are gone with the
+// copies. The sentences live once, in live-skins.js (buildSkinsLedgerRows), and
+// skins_rows_shared_test.js proves each page calls it and none redefines them.
+describe('ONE WORDING — pinned in skins_rows_shared_test.js since v138; what stays here', () => {
     test('the live KP status says "Hole 3 ·"', () => {
         assert.match(read('index.html'), /'<div class="lnf-row"><span>Hole ' \+ l\.hole \+ ' \\u00B7 '/);
     });
-    test('engines and the Receipt untouched by this wave', () => {
+    test('engines untouched (settlement.html was fenced for v137 only; v138 routes it through the shared builder)', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('settlement.html'), 'f765041e');
         assert.equal(h('settlement-engine.js'), 'adc3cd9f');
         assert.equal(h('pool-engine.js'), 'f4d7cdbb');
         assert.equal(h('money-engine.js'), '3c960947');
-        assert.equal(h('live-skins.js'), '3906efd1');
     });
 });

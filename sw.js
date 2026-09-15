@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v138: the skins row wording lives once, in live-skins.js.
+//
+// buildSkinsLedgerRows() is the one builder of the hole-by-hole skins rows -
+// which holes are listed, how a carried run reads, what a collecting hole
+// says it collected - and settlement.html, index.html and leaderboard.html
+// render what it returns. No text moved on a finished round (proved by sha
+// against the v137 text on five rounds); a mid-round Receipt preview now says
+// an open run is "carried to" the waiting hole, as the Card and board already
+// did. An installed device on v137 keeps the three page-local copies.
+
 // Moved to v137: the Card and Board tabs' skins ledgers follow the Receipt.
 //
 // index.html (the live skins panel and the live KP status) and
@@ -1319,7 +1329,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v137-card-skins-rows';
+const CACHE_VERSION = 'golfapp-v138-skins-rows-shared';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

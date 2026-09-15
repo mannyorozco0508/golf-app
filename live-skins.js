@@ -120,6 +120,91 @@ function liveSkinsLedgerEntries(data, courseData, savedScores, opts) {
     return entries;
 }
 
+// ============================================================================
+// THE ROWS, IN WORDS. One builder for the three hole-by-hole ledgers - the
+// Receipt's Main Pool skins block (settlement.html), the scorecard's live
+// skins panel (index.html) and the leaderboard's board (leaderboard.html).
+//
+// WHY HERE. v136 taught the Receipt to list only the holes that paid and to
+// say what a carried run became; v137 taught the other two surfaces the same
+// sentences, as two more page-local copies, with a test pinning the literals
+// so they could not drift. Three copies of a money-explaining sentence is the
+// shape the four calculateMatchEngine copies had. This file already answers
+// "which config does each surface build its ledger from" for exactly these
+// three pages and is loaded by exactly them, so the words live beside it.
+//
+// WHAT IS SHARED: the run logic and the sentences.
+//   - only the holes that paid are rows; a no-carry tie pays nobody, rolls
+//     nothing forward, and is not a row
+//   - on a carry round a run of tied holes is ONE row, "carried to" the hole
+//     that collected - or, mid-round, the hole still waiting - and "carried,
+//     not won" only when no hole remains
+//   - the collecting row carries " — collects N skins (Holes a–b)"; a plain
+//     skin carries nothing (the page adds its own " — Skin" or not)
+//   - every hole is "Hole 7", a run "Holes 5–6"
+//   - waiting holes are rows too, with the data a page needs to say who is
+//     being waited on
+//
+// WHAT IS NOT: the markup, the dollars, the waiting-row rule and its wording.
+// The Card lists every waiting hole and names its groups, the board lists the
+// first only, the Receipt lists them by golfer name (a preview only) - each
+// page renders the rows this returns through its own template. Names are
+// returned raw; the PAGE escapes them, because the page owns the markup.
+//
+// L is one ledger from computeSkinsHoleLedger (bundle.gross or bundle.net):
+// its holes, in order, each official or not, tied or won, with unitsWon.
+// basis is the word the page prints for the scoring basis: 'Gross' or 'Net'.
+function buildSkinsLedgerRows(L, basis) {
+    const rows = [];
+    if (!L || !Array.isArray(L.holes)) return rows;
+    const carryOver = !!L.carryOver;
+    const run = [];   // consecutive tied holes, carry rounds only
+    const span = list => list.length === 1
+        ? 'Hole ' + list[0].hole
+        : 'Holes ' + list[0].hole + '–' + list[list.length - 1].hole;
+    const flush = into => {
+        if (run.length === 0) return;
+        const tied = run.length === 1 ? 'Tied at ' + basis + ' ' + run[0].low : 'Tied';
+        const where = into ? 'carried to Hole ' + into : 'carried, not won';
+        rows.push({
+            kind: 'carry',
+            holes: run.map(r => r.hole),
+            label: span(run),
+            into: into || null,
+            text: span(run) + ' — ' + tied + ' — ' + where
+        });
+        run.length = 0;
+    };
+    L.holes.forEach(r => {
+        if (!r.official) {
+            flush(r.hole);
+            rows.push({
+                kind: 'waiting', hole: r.hole, label: 'Hole ' + r.hole,
+                missing: r.missing || [], missingGroups: r.missingGroups || [],
+                requiredCount: r.requiredCount, postedCount: r.postedCount
+            });
+            return;
+        }
+        if (r.state === 'tie') {
+            if (carryOver) run.push(r);
+            return;
+        }
+        let collected = '';
+        if (r.unitsWon !== null && r.unitsWon !== undefined && r.unitsWon > 1) {
+            const from = run.length > 0 ? run[0].hole : r.hole;
+            collected = ' — collects ' + r.unitsWon + ' skins (Holes ' + from + '–' + r.hole + ')';
+        }
+        flush(r.hole);
+        rows.push({
+            kind: 'skin', hole: r.hole, label: 'Hole ' + r.hole,
+            winner: r.winner, low: r.low, score: basis + ' ' + r.low,
+            units: r.unitsWon, valueKnown: !!r.valueKnown, collected
+        });
+    });
+    flush(null);
+    return rows;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { liveSkinsLedgerConfigs, liveSkinsLedgerEntries };
+    module.exports = { liveSkinsLedgerConfigs, liveSkinsLedgerEntries, buildSkinsLedgerRows };
 }

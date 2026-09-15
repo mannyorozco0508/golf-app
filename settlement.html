@@ -1065,63 +1065,34 @@ html {
         const centsByHole = {};
         pot.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
 
-        // ONLY THE HOLES THAT PAID (2026-09-14). This used to print every hole in
-        // order - won, tied or waiting - so a no-carry round put thirteen
-        // "Tie at Gross 4 — No Skin" rows around five results, and the person
-        // reading the Receipt had to pick the money out of the noise. Now:
-        //
-        //   NO CARRY   a tied hole pays nobody and rolls nothing forward, so it is
-        //              not listed. Only holes with a skin, plus any hole still
-        //              waiting on a card (a mid-round preview only).
-        //   CARRY      a tie rolls its value onto the next hole, so the tied holes
-        //              ARE part of the money: a run of them is one compact line
-        //              ("Holes 5–6 — Tied — carried to Hole 7") and the hole that
-        //              collects says what it collected ("collects 3 skins (Holes
-        //              5–7)"). A run nobody collects is stated as such; the unwon
-        //              money row below carries the refund.
-        //
-        // The hole is written "Hole 7", not "H7": the Main Pool block is read by
-        // the person handing out cash, not by the app. Winner, score, skin count
-        // and dollars are untouched - the text of every winning row is pinned.
-        const carryRun = [];   // consecutive tied holes, carry rounds only
-        const holeSpan = (list) => list.length === 1
-            ? `Hole ${list[0].hole}`
-            : `Holes ${list[0].hole}–${list[list.length - 1].hole}`;
-        const flushCarryRun = (into) => {
-            if (carryRun.length === 0) return;
-            const where = into ? `carried to Hole ${into}` : 'carried, not won';
-            const tied = carryRun.length === 1 ? `Tied at ${basisLabel} ${carryRun[0].low}` : 'Tied';
-            html += `<div class="ledger-row skins-carry-row"><span>${holeSpan(carryRun)} — ${tied} — ${where}</span><span></span></div>`;
-            carryRun.length = 0;
-        };
-        L.holes.forEach(row => {
-            const label = `Hole ${row.hole}`;
-            if (!row.official) {
+        // ONLY THE HOLES THAT PAID (v136), IN THE SHARED WORDS (v138). The rows -
+        // which holes are listed, how a carried run reads, what a collecting hole
+        // says it collected - come from buildSkinsLedgerRows() in live-skins.js,
+        // the one builder the scorecard's live panel and the leaderboard's board
+        // read too, so the three cannot say different things about the same
+        // hole. This page adds what is its own: the dollars from the pool's
+        // allocated lines, "— Skin" on a plain win, the waiting row's wording
+        // (a mid-round preview only) and the Receipt's markup. The hole is
+        // written "Hole 7", not "H7" - this block is read by the person handing
+        // out cash.
+        buildSkinsLedgerRows(L, basisLabel).forEach(row => {
+            if (row.kind === 'waiting') {
                 // Only reachable on a Receipt previewed mid-round. A finished round
                 // has every card in, so none of these rows appear.
-                flushCarryRun(null);
                 const who = row.missing.length > 0
                     ? row.missing.map(m => m.name).join(', ')
                     : `${row.requiredCount - row.postedCount} golfer(s)`;
-                html += `<div class="ledger-row"><span>${label} — Waiting on ${who}</span><span></span></div>`;
+                html += `<div class="ledger-row"><span>${row.label} — Waiting on ${who}</span><span></span></div>`;
                 return;
             }
-            if (row.state === 'tie') {
-                if (r.skins.carryOver) carryRun.push(row);
+            if (row.kind === 'carry') {
+                html += `<div class="ledger-row skins-carry-row"><span>${row.text}</span><span></span></div>`;
                 return;
             }
             const cents = centsByHole[String(row.hole)];
-            let collected = '';
-            if (row.unitsWon > 1) {
-                // The carried holes are the run just flushed plus this one.
-                const from = carryRun.length > 0 ? carryRun[0].hole : row.hole;
-                collected = ` — collects ${row.unitsWon} skins (Holes ${from}–${row.hole})`;
-            }
-            flushCarryRun(row.hole);
-            html += `<div class="ledger-row"><span>${label} — ${escapeHtml(row.winner.name)} — ${basisLabel} ${row.low}${collected || ' — Skin'}</span>`
+            html += `<div class="ledger-row"><span>${row.label} — ${escapeHtml(row.winner.name)} — ${row.score}${row.collected || ' — Skin'}</span>`
                 + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
         });
-        flushCarryRun(null);
 
         // ---- SUMMARY BY GOLFER ---------------------------------------------
         // Skin COUNTS come from the ledger; DOLLARS come from the pool's allocation.
