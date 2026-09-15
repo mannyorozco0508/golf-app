@@ -6187,6 +6187,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return '🏆';
     }
 
+    // How long "Saving..." stands before the button admits the write has not
+    // been acknowledged. A live socket acks a round save well under a second
+    // (measured ~0.3 s; 2.5 s after a reconnect including the SDK's backoff), so
+    // three seconds never shows on a normal save and is short enough that a
+    // golfer watching the button is told the truth before they start tapping.
+    const SAVE_SLOW_MS = 3000;
+
     function saveSettings() {
 
         // THE BUTTON IS GIVEN BACK IN ONE PLACE, and that place is the finally at
@@ -6610,7 +6617,29 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // FROM HERE THE WRITE OWNS THE BUTTON. The finally must not put it back
             // while a save is genuinely in flight - "Saving..." is true at that point.
             handedOff = true;
-            db.ref(`events/${currentMode}`).update(payload).then(() => {
+            // A SAVE WITH NO SOCKET TELLS THE TRUTH (2026-09-14). Measured with the
+            // network cut: update() neither resolves nor rejects until a server
+            // response - the SDK buffers the put and has no client-side timeout -
+            // and this button sat on "Saving..." for as long as the page lived. But
+            // the write is NOT lost: with the page still open it landed 2.5 s after
+            // the network came back and everything below ran as normal; only a
+            // reload before that loses it (the queue is in memory). So:
+            //   TRACKED - the whole chain, the trips put included, goes through
+            //   GolfNet.track(), which puts a buffered save under the pill
+            //   ("Waiting to sync… keep this page open") and the beforeunload
+            //   guard, on the web and in the native shell - it was tracked by
+            //   nothing, so the native app lost a round on reload with no warning.
+            //   HONEST BUTTON - after SAVE_SLOW_MS the label says the true thing,
+            //   in pwa-boot's own words, and stays disabled: the write is in
+            //   flight and a second tap must not double-write. A fast ack never
+            //   shows it; a late ack still lands on Round Ready below.
+            //   NEVER "nothing was saved" here: the SDK still holds the promise.
+            //   NOT navigator.onLine: measured true throughout offline. The
+            //   threshold is a timer; the state is "not acked yet", not "offline".
+            const slowTimer = setTimeout(() => {
+                if (saveBtn) saveBtn.innerText = '\u23F3 Still saving \u2014 keep this page open.';
+            }, SAVE_SLOW_MS);
+            const saveChain = db.ref(`events/${currentMode}`).update(payload).then(() => {
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
@@ -6620,7 +6649,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                         addedAt: Date.now()
                     });
                 }
-            }).then(() => {
+            });
+            if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(saveChain);
+            saveChain.then(() => {
+                clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
                 if (creatingRyderCup) {
@@ -6639,6 +6671,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 }
                 showRoundReadyScreen(currentMode);
             }).catch((err) => { 
+                clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
                 alert(`Save error: ${err.message}`); 

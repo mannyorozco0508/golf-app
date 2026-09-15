@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v133: an offline Save & Start Round tells the truth.
+//
+// admin.html. Measured: with no socket the round write is buffered by the SDK,
+// lands seconds after the network returns and the page finishes normally - but
+// the button sat on "Saving..." with no explanation, the save was tracked by
+// nothing, and on native a reload lost the round with no warning. The save
+// chain (the round update and the trips put) now goes through GolfNet.track()
+// - the pill counts it and the beforeunload guard warns - and after 3 s the
+// button says "Still saving - keep this page open." An installed device on
+// v132 keeps the silent version.
+
 // Moved to v132: every read on the way to a round, trip or tournament is timed.
 //
 // v131 raced the code check; the probe then found "Start from a previous
@@ -1265,7 +1276,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v132-timed-reads';
+const CACHE_VERSION = 'golfapp-v133-honest-save';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
