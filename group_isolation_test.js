@@ -322,9 +322,14 @@ describe('FIREBASE RULES — what the server can and cannot enforce', () => {
         const v = rules.events.$eventCode.scores.$scoreKey['.validate'];
         assert.ok(/isNumber/.test(v), 'shape is validated');
         assert.ok(!/auth/.test(v), 'there is no identity to check against');
-        assert.equal(rules.events.$eventCode['.write'],
-            "newData.exists() || !data.hasChild('scores')",
-            'a round with scores in it cannot be deleted in one write. Writes are still\n             otherwise open - this is an accident guardrail, not authorization, and the\n             assertion below is the half that still says so.');
+        // Wave 2 (draft, 2026-09-15): CREATING a round is gated on an identified
+        // organizer; writes to an EXISTING round are exactly the old rule - a round
+        // with scores in it cannot be deleted in one write, and writes are still
+        // otherwise open. Participation is not authorization, and this is the
+        // half that still says so.
+        const w = rules.events.$eventCode['.write'];
+        assert.ok(w.endsWith("|| (data.exists() && (newData.exists() || !data.hasChild('scores')))"), 'the existing-round branch is the old rule verbatim: ' + w.slice(-90));
+        assert.match(w, /^\(!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'the gate is on creation only');
     });
 
     test('the shared course library is still protected', () => {

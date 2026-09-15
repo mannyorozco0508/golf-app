@@ -276,6 +276,34 @@ mid-game. Absence of `ownerUid` means legacy; require it only where
 
 Getting case 2 wrong is worse than shipping no paywall at all.
 
+### The rule as drafted (2026-09-15, DRAFT - deployed nowhere)
+
+`database.rules.json` now carries the shape above, held by `wave2_rules_test.js`
+(98 targaryen rows, 13 controls that each fire). Three things the file itself
+cannot say, because it is strict JSON and the rules grammar allows no comment
+keys, are recorded here and pinned by that test:
+
+**Two meanings of auth, kept apart.** On the consumer pages the organizer IS
+an anonymous user — auth-boot's uid is the identity — so the `events` `ownerUid`
+rule carries **no provider check**. On `tournament.html` an anonymous session is
+nobody, so the `tournaments` `ownerUid` rule **requires** a non-anonymous
+provider. They differ on exactly that clause, on purpose. Do not copy either
+pattern into the other and do not write a shared "is signed in" helper for both.
+
+**The uid is a learning gate, not the forever model.** It does not survive a
+reinstall, a new device, a cleared browser or a closed private window — each
+mints a fresh uid and a fresh 21-day window (measured 2026-09-15 on the real
+project: same uid across relaunches and offline; new uid after clearing storage,
+on another profile, and on each new private window). We know. Wave 4 keys
+entitlement on Apple's transaction identity, written to `organizers/<uid>/pass`
+by the Worker; the trial exists to learn who reaches the wall, nothing more.
+
+**A legacy round can never be claimed.** `ownerUid` can only be set while the
+round is being created (`!data.parent().exists()`), so a round from before the
+gate stays ownerless forever rather than becoming somebody's by a later write.
+(The `tournaments` rule does not have this guard; a signed-in email user can
+add `ownerUid` to a legacy tournament. Noted, not changed here.)
+
 ### The token race
 
 The database SDK connects with whatever token the auth component holds *at that

@@ -70,6 +70,16 @@
           "createdAt": 1
         }
       }
+    },
+    "organizers": {
+      "u-org": {
+        "firstSeenAt": 1,
+        "pass": {
+          "type": "season",
+          "expiresAt": 4102444800000,
+          "transactionId": "fixture"
+        }
+      }
     }
   },
   "users": {
@@ -79,6 +89,15 @@
     },
     "stranger": {
       "uid": "u-stranger"
+    },
+    "organizer-pass": {
+      "uid": "u-org",
+      "provider": "anonymous",
+      "token": {
+        "firebase": {
+          "sign_in_provider": "anonymous"
+        }
+      }
     }
   },
   "tests": {
@@ -121,15 +140,24 @@
         {
           "auth": "nobody",
           "data": "not-a-real-round"
-        }
-      ],
-      "canWrite": [
+        },
         {
           "auth": "nobody",
           "data": {
             "gameFormat": "stroke",
             "players": [],
             "courseData": []
+          }
+        }
+      ],
+      "canWrite": [
+        {
+          "auth": "organizer-pass",
+          "data": {
+            "gameFormat": "stroke",
+            "players": [],
+            "courseData": [],
+            "ownerUid": "u-org"
           }
         }
       ]
@@ -147,6 +175,17 @@
     },
     "events/NEWCODE": {
       "canWrite": [
+        {
+          "auth": "organizer-pass",
+          "data": {
+            "gameFormat": "stroke",
+            "players": [],
+            "courseData": [],
+            "ownerUid": "u-org"
+          }
+        }
+      ],
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": {

@@ -135,8 +135,14 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
         const clause = "auth.token.firebase.sign_in_provider !== 'anonymous' && ";
         assert.equal(rules.split(clause).length, 2, 'the clause appears exactly once');
         assert.match(rules, /"ownerUid": \{\s*"\.validate": "\(!data\.exists\(\) && auth != null && auth\.token\.firebase\.sign_in_provider !== 'anonymous' && newData\.val\(\) === auth\.uid\) \|\| \(data\.exists\(\) && newData\.val\(\) === data\.val\(\)\)"/);
-        // With that one string put back as it was, the file IS the committed one.
-        assert.equal(sha(rules.replace(clause, '')).slice(0, 8), '28fd0e7b', 'every other byte of database.rules.json is as it was at 6536216');
+        // The tournaments block is exactly what 075c7a4 committed. (Until the Wave 2
+        // draft this pinned the whole file's sha with the clause removed; the events
+        // and organizers rules have moved since, so the pin is on THIS block now -
+        // wave2_rules_test.js holds the same literal.)
+        const t = JSON.parse(rules).rules.tournaments;
+        assert.equal(JSON.stringify(t), JSON.stringify({ '$tourneyCode': { '.read': true, '.write': '!data.exists() || newData.exists()',
+            '.validate': "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
+            ownerUid: { '.validate': "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" } } }));
     });
 });
 

@@ -632,13 +632,18 @@ describe('PARITY — the two pages cannot drift apart', () => {
 // 12 (brief). SECURITY HONESTY
 // ---------------------------------------------------------------------------
 describe('SECURITY — what this does and does not claim', () => {
-    test('Firebase rules are UNCHANGED and still open by design', () => {
+    test('Firebase rules on an EXISTING round are unchanged and still open by design (Wave 2 gates creation only)', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
-        assert.equal(rules.events.$eventCode['.write'],
-            "newData.exists() || !data.hasChild('scores')",
-            'a round with scores in it cannot be deleted in one write. Writes are still\n             otherwise open - this is an accident guardrail, not authorization, and the\n             assertion below is the half that still says so.');
-        assert.ok(!/auth/.test(JSON.stringify(rules.events)),
-            'there is still no identity for the server to check against');
+        const w = rules.events.$eventCode['.write'];
+        assert.ok(w.endsWith("|| (data.exists() && (newData.exists() || !data.hasChild('scores')))"),
+            'a round with scores in it cannot be deleted in one write, and writes to an existing round are still otherwise open: ' + w.slice(-90));
+        // auth appears in the events block ONLY where a round is CREATED (the
+        // write's first branch) and where ownerUid is first set; a side match
+        // written into an existing round meets no identity check.
+        const ev = JSON.parse(JSON.stringify(rules.events.$eventCode));
+        delete ev['.write']; delete ev.ownerUid;
+        assert.ok(!/auth/.test(JSON.stringify(ev)), 'no identity to check against on participation');
+        assert.ok(!/auth/.test(w.slice(w.indexOf('|| (data.exists()'))), 'the existing-round branch names no auth');
     });
 
     test('this is client-side isolation, and the code says so', () => {

@@ -395,7 +395,13 @@ describe('NOTHING ELSE MOVED', () => {
             });
             return out;
         })(rules, '', []);
+        // Wave 2 (draft, 2026-09-15): the creation gate and the organizer node add
+        // four expressions - approved for drafting (wave2_rules_test.js holds them).
         assert.deepEqual(authSites.sort(), [
+            '/events/$eventCode/.write',
+            '/events/$eventCode/ownerUid/.validate',
+            '/organizers/$uid/.read',
+            '/organizers/$uid/firstSeenAt/.write',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
             '/tournaments/$tourneyCode/ownerUid/.validate'

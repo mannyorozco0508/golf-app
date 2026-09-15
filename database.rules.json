@@ -3,8 +3,11 @@
     "events": {
       "$eventCode": {
         ".read": true,
-        ".write": "newData.exists() || !data.hasChild('scores')",
-        ".validate": "newData.hasChildren() || newData.val() === null",
+        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && (newData.exists() || !data.hasChild('scores')))",
+        ".validate": "newData.val() === null || (newData.hasChildren() && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid')))",
+        "ownerUid": {
+          ".validate": "(!data.parent().exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
+        },
         "scores": {
           "$scoreKey": {
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 30 && $scoreKey.matches(/^p[0-9]+_h[0-9]+$/)"
@@ -72,6 +75,18 @@
         "$entryId": {
           ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
           ".validate": "newData.hasChildren(['name', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('createdAt').isNumber()"
+        }
+      }
+    },
+    "organizers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "firstSeenAt": {
+          ".write": "!data.exists() && auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber() && newData.val() <= now"
+        },
+        "pass": {
+          ".write": false
         }
       }
     },

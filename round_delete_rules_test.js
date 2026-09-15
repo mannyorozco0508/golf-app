@@ -117,8 +117,17 @@ const TABLE = [
       why: 'the single most common write in the app; a rule that touched it would be felt '
          + 'on every hole by every group',
       path: 'events/PLAYED/scores/p101_h3', data: 6 },
-    { id: 'W2', what: 'create a new round', verdict: 'allow', site: 'admin.html round save',
-      why: 'a rule that blocked creation would end the product',
+    // WAVE 2 (draft, 2026-09-15): creation is GATED - an identified organizer
+    // inside a trial window or holding a pass, with ownerUid = their own uid.
+    // Unauthenticated creation is refused (W2b); the organizer's creation is
+    // what this row now proves (W2). The gate is on creation only - every
+    // other row here is participation, and stays open.
+    { id: 'W2', what: 'create a new round as its organizer', verdict: 'allow', site: 'admin.html round save',
+      why: 'a rule that blocked an organizer with a pass would end the product',
+      auth: 'organizer-pass',
+      path: 'events/NEWCODE', data: { gameFormat: 'stroke', players: [], courseData: [], ownerUid: 'u-org' } },
+    { id: 'W2b', what: 'create a new round with no identity', verdict: 'refuse', site: 'a hand-typed ?game= URL',
+      why: 'the Wave 2 gate: no uid, no trial, no pass - no round',
       path: 'events/NEWCODE', data: { gameFormat: 'stroke', players: [], courseData: [] } },
     // DEFERRED - see the test.todo below. The row is kept because it is still
     // TRUE that removing a trip round pointer must be allowed; what changed is
@@ -163,10 +172,14 @@ function buildTestsData() {
         const key = row.path;
         const entry = tests[key] || {};
         const bucket = row.verdict === 'refuse' ? 'cannotWrite' : 'canWrite';
-        entry[bucket] = (entry[bucket] || []).concat([{ auth: 'nobody', data: row.data }]);
+        entry[bucket] = (entry[bucket] || []).concat([{ auth: row.auth || 'nobody', data: row.data }]);
         tests[key] = entry;
     });
-    return { tests, json: { root: ROOT, users: { nobody: null }, tests } };
+    // Wave 2: an organizer holding a pass (the trial path is time-relative and
+    // lives in wave2_rules_test.js; a static fixture cannot hold a live window).
+    const users = { nobody: null, 'organizer-pass': { uid: 'u-org', provider: 'anonymous', token: { firebase: { sign_in_provider: 'anonymous' } } } };
+    const root = Object.assign({}, ROOT, { organizers: { 'u-org': { firstSeenAt: 1, pass: { type: 'season', expiresAt: 4102444800000, transactionId: 'fixture' } } } });
+    return { tests, json: { root, users, tests } };
 }
 
 function runTargaryen(dataPath) {
@@ -188,7 +201,9 @@ describe('events/<code> — a played round cannot be deleted in one write', () =
         // everything - which here would break score entry for the whole app.
         const refuse = ACTIVE.filter((r) => r.verdict === 'refuse');
         const allow = ACTIVE.filter((r) => r.verdict === 'allow');
-        assert.equal(refuse.length, 1, 'exactly one scenario is refused: the scored-round delete');
+        // Wave 2 (draft): a second refusal - creation with no identity (W2b).
+        assert.equal(refuse.length, 2, 'exactly two scenarios are refused: the scored-round delete, and an unidentified creation');
+        assert.deepEqual(refuse.map(r => r.id).sort(), ['W2b', refuse.find(r => r.id !== 'W2b').id].sort());
         assert.ok(allow.length >= 14, `only ${allow.length} allow rows - the app has more than that to protect`);
         allow.forEach((r) => assert.ok(r.why && r.why.length > 15,
             `${r.id} is allowed on purpose and must say why, or a later reader will "fix" it`));

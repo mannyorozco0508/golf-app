@@ -683,7 +683,13 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // - an anonymous session restored from the shared origin could otherwise
         // own a tournament. One clause; tournament_anonymous_owner_test.js pins
         // that every other byte of the file is as it was.
-        'database.rules.json': 'a09d16814e07b997af3a1c1786b1b2ebbdaa9843a7376b9ded94bcee54b5ecc9',
+        // RE-PINNED 2026-09-15, WAVE 2 DRAFT (approved for drafting, NOT deployed):
+        // events/$eventCode gains ownerUid and a creation gate (an identified
+        // organizer inside a 21-day trial window or holding a pass); participation
+        // in an existing round is unchanged; organizers/<uid>/firstSeenAt is
+        // write-once and pass is unwritable by any client. wave2_rules_test.js
+        // holds 98 targaryen rows and 13 controls against it.
+        'database.rules.json': 'e0876b920aeeb89e111604f5d7c7f3f3c26667370894806a7f55098bf6263bd4',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
