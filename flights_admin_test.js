@@ -453,9 +453,10 @@ describe('6b THE PLAIN-ROW CONTROL SITS ON THE NAME\'S LINE: grid column 3, grid
 // controls, and tracks the flights switch and the bucket's mode live.
 // ---------------------------------------------------------------------------
 describe('6c THE MAIN POOL SKINS NOTE', () => {
-    const NOTE = 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+    // v143: the pool is the Weekly Game on every surface; the name is the only word that moved in these approved (v126) sentences.
+    const NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
     // The per-flight sentence, approved 2026-09-14 (COMMIT 2 paste), verbatim.
-    const SPLIT = 'With Skins per flight, the Main Pool\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+    const SPLIT = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
     const note = (sb) => run(sb, "(function () { var e = document.getElementById('mp-skins-flight-note'); return e.style.display === 'none' ? null : e.textContent; })()");
     const setMode = (sb, v) => run(sb, "document.getElementById('mp-skins-mode').value = " + JSON.stringify(v) + "; refreshFlightScopeNotes();");
 

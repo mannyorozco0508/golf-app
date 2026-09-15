@@ -1047,7 +1047,7 @@ html {
         <div class="wizard-step-title">👥 Players · <span class="wiz-step-n" id="wiz-n-players">Step 5</span></div>
         <div class="wizard-step-sub">Add everyone playing today and assign them to foursomes.</div>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-        ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Main Pool.
+        ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Weekly Game.
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <!-- FLIGHTS (A/B). Optional; OFF by default. A property of the roster, so it
@@ -1090,7 +1090,7 @@ html {
                 <input type="hidden" id="flights-scope-skins" value="flight">
                 <input type="hidden" id="flights-scope-birdies" value="flight">
             </div>
-            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer's A/B to move them. Any split is allowed. Side matches and the Main Pool never use flights.</p>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer's A/B to move them. Any split is allowed. Side matches and the Weekly Game never use flights.</p>
         </div>
     </div>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
@@ -1237,7 +1237,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-section-head">POOLS &amp; EXTRAS</div>
         <div class="extra-settings-box" style="display:block; border-color:#b8860b;">
             <label style="color:#b8860b; margin-bottom:4px; font-size:0.95rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Main Pool</strong>
+                <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Weekly Game</strong>
             </label>
             <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Everyone playing for money pays one buy-in. You choose what goes to KPs and net finishers; Skins gets the rest. Unwon money is paid back. Group bets stay separate.</p>
             <div id="mp-panel" style="display:none;">
@@ -2654,7 +2654,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <strong style="font-size:0.9rem; color:var(--brand-green);">\uD83E\uDD69 Skins</strong>
-                    <p id="mp-skins-note">Main Pool already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
+                    <p id="mp-skins-note">Weekly Game already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
                     <button type="button" onclick="removeSkinsInstance('${inst.id}')"
                         style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; min-height:44px;">Remove</button>
                 </div>
@@ -4798,8 +4798,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // describes behaviour is behaviour.
         const mpMode = document.getElementById('mp-skins-mode');
         const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
-        const ONE_POT_NOTE = 'Main Pool skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
-        const SPLIT_NOTE = 'With Skins per flight, the Main Pool\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+        const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+        const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
         note('mp-skins-flight-note', (on && poolSkinsOn)
             ? (skinsPer ? SPLIT_NOTE : ONE_POT_NOTE)
             : '');
@@ -6547,7 +6547,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (payload.moneyPool) {
                 const mpCheck = validateMoneyPool(payload, finalCourseData);
                 if (!mpCheck.valid) {
-                    alert('\u26A0\uFE0F Main Pool:\n' + mpCheck.errors.join('\n'));
+                    alert('\u26A0\uFE0F Weekly Game:\n' + mpCheck.errors.join('\n'));
                     return;
                 }
             }

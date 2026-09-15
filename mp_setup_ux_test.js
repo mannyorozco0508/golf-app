@@ -81,7 +81,7 @@ describe('GOLFER LANGUAGE, NOT SPEC LANGUAGE', () => {
     const text = () => visibleText(poolCardMarkup());
 
     test('section headings read plainly', () => {
-        assert.match(text(), /Main Pool/);
+        assert.match(text(), /Weekly Game/);   // v143: the wizard card says Weekly Game, as the Receipt does
         assert.match(text(), /Buy-in per player/);
         assert.match(text(), /KP Pool/);
         assert.match(text(), /Net Finish Pool/);

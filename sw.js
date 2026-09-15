@@ -524,6 +524,15 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v143: the Weekly Game is the Weekly Game everywhere it is named.
+//
+// admin.html (the wizard card's checkbox, the skins note, the two skins-scope
+// notes, the validation alert, the grouping and flights sentences) and
+// index.html (the Card tab's action banner, the KP setup alert) say "Weekly
+// Game" where they said "Main Pool", matching the Receipt since v142. The
+// stored key is still moneyPool; nothing but the words moved. An installed
+// device on v142 sets up a "Main Pool" and reads a "Weekly Game" receipt.
+
 // Moved to v142: the Results tab's pool reads WEEKLY GAME, pays a tie one golfer
 // at a time, and numbers the places.
 //
@@ -1371,7 +1380,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v142-weekly-game';
+const CACHE_VERSION = 'golfapp-v143-weekly-game-everywhere';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
