@@ -65,6 +65,9 @@ const SHARED_SHELL = [
     // bundle. Moved here from TOURNAMENT_SHELL: golfers now carry an anonymous
     // uid too (nothing gates on it yet).
     'auth-boot.js', 'firebase-auth-compat.js',
+    // THE ORGANIZER GATE (Wave 3): loaded by admin.html and trip.html after
+    // auth-boot.js on the way to every round they create.
+    'organizer-gate.js',
     'sw.js', 'manifest.json',
 ];
 

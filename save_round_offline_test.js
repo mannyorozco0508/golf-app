@@ -65,14 +65,20 @@ function pageReadyToSave(opts) {
         window.__updates = []; window.__sets = []; window.__setsResolve = {};
         window.crypto = { getRandomValues: function (a) { for (var i = 0; i < a.length; i++) a[i] = (i * 37) & 255; return a; } };
         db.ref = function (p) { return {
-            once: function () { return new Promise(function () {}); }, on: function () {},
+            // Wave 3: after a refusal organizer-gate reads organizers/<uid> back to
+            // decide whether the wall applies; here the read answers "no record",
+            // so the honest SDK message is what the golfer sees, at once.
+            once: function () { if (p.indexOf('organizers/') === 0) return Promise.resolve({ val: function () { return null; }, exists: function () { return false; } }); return new Promise(function () {}); }, on: function () {},
             push: function () { return { key: 'K1' }; },
             update: function (v) { window.__updates.push(p); return new Promise(function (res, rej) {
                 var o = ${JSON.stringify(o)};
                 if (o.ack !== undefined) setTimeout(res, o.ack);
                 else if (o.reject !== undefined) setTimeout(function () { rej(new Error('permission_denied')); }, o.reject);
             }); },
-            set: function (v) { window.__sets.push(p); return new Promise(function (res) { window.__setsResolve[p] = res; ${o.tripAck !== undefined ? 'setTimeout(res, ' + o.tripAck + ');' : ''} }); }
+            // Wave 3: the organizer gate writes organizers/<uid>/firstSeenAt before
+            // the round; that write acks at once here (it is not the write under
+            // measurement), so the chain reaches the round update as it did before.
+            set: function (v) { window.__sets.push(p); if (p.indexOf('organizers/') === 0) return Promise.resolve(); return new Promise(function (res) { window.__setsResolve[p] = res; ${o.tripAck !== undefined ? 'setTimeout(res, ' + o.tripAck + ');' : ''} }); }
         }; };
         ${o.native ? "document.documentElement.classList.add('is-native');" : ''}
         var key = Object.keys(coursePresets)[0];
@@ -97,6 +103,9 @@ describe('TRACKED: a buffered save is counted by the pill and the guard, on both
         const sb = pageReadyToSave({});
         assert.equal(sb.window.GolfNet.state().pending, 0, 'nothing pending before the tap');
         const s0 = save(sb);
+        // Wave 3: the round write follows the organizer gate (a token awaited, an
+        // acked organizer write) - a tick later, not in the same synchronous turn.
+        await wait(20);
         assert.equal(JSON.stringify(sb.window.__updates), JSON.stringify(['events/SAVE01']), 'the round write was issued');
         assert.equal(sb.window.GolfNet.state().pending, 1, 'the save is tracked');
         // The pill's wording for pending > 0 is pwa-boot's; boot() (which wires
@@ -129,7 +138,8 @@ describe('TRACKED: a buffered save is counted by the pill and the guard, on both
         const sb = pageReadyToSave({ trip: true, ack: 30 });
         save(sb);
         await wait(120);
-        assert.equal(JSON.stringify(sb.window.__sets), JSON.stringify(['trips/TRIP01/rounds/SAVE01']), 'the trips put followed the ack');
+        // Wave 3: the organizer write comes first, then the round, then the trips put.
+        assert.equal(JSON.stringify(sb.window.__sets), JSON.stringify(['organizers/anon-stub/firstSeenAt', 'trips/TRIP01/rounds/SAVE01']), 'the trips put followed the ack');
         assert.equal(sb.window.GolfNet.state().pending, 1, 'still pending: the round acked, the trips put has not');
         assert.equal(S(sb).text, '⏳ Saving...', 'and the button still says saving');
         vm.runInContext("window.__setsResolve['trips/TRIP01/rounds/SAVE01']()", sb);
@@ -140,7 +150,10 @@ describe('TRACKED: a buffered save is counted by the pill and the guard, on both
     test('the track wraps the promise the .then chain continues from (source pin)', () => {
         const at = ADMIN.indexOf('function saveSettings(');
         const fn = ADMIN.slice(at, ADMIN.indexOf('\n    function ', at + 30));
-        assert.match(fn, /const saveChain = db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\)\.then\(/);
+        // Wave 3: the chain now opens with the organizer gate (token, firstSeenAt,
+        // ownerUid) and continues into the SAME update(); the whole chain is what
+        // GolfNet tracks, so the buffered organizer write is under the pill too.
+        assert.match(fn, /const saveChain = window\.organizerGate\.ensureOrganizer\(db\)\.then\(\(uid\) => \{\s*window\.organizerGate\.stamp\(payload, uid\);\s*return db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\);\s*\}\)\.then\(/);
         assert.match(fn, /GolfNet\.track\(saveChain\)/);
         assert.match(fn, /saveChain\.then\(\(\) => \{/);
     });

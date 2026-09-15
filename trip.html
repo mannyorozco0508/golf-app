@@ -9,6 +9,7 @@
          creates window.authReady now, signs in after the parse, never blocks render.
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
+    <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -876,7 +877,15 @@ html {
                 updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
             });
 
-            return db.ref().update(updates).then(() => ({ tripCode, tripToken }));
+            // THE ORGANIZER GATE (Wave 3, organizer-gate.js): the token awaited,
+            // organizers/<uid>/firstSeenAt written first (write-once; a second
+            // press is refused and that is expected), and EVERY round in the batch
+            // stamped with ownerUid - the multi-path update is atomic, so one round
+            // without it would refuse the whole batch, the good rounds included.
+            return window.organizerGate.ensureOrganizer(db).then((uid) => {
+                Object.keys(updates).forEach((k) => { if (/^events\/[^/]+$/.test(k)) window.organizerGate.stamp(updates[k], uid); });
+                return db.ref().update(updates);
+            }).then(() => ({ tripCode, tripToken }));
         }).then(({ tripCode, tripToken }) => {
             window.location.href = `trip.html?trip=${tripCode}&organizer=${tripToken}`;
         }).catch(err => {
@@ -887,6 +896,14 @@ html {
             // cannot tell a dead socket from a slow one.
             if (err && err.code === 'timeout') {
                 alert('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
+                return;
+            }
+            // THE WALL, the same sentence the wizard shows, and only when the
+            // refusal is the gate (organizer-gate reads the uid's node back).
+            if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
+                window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
+                    alert(why === 'trial-ended' ? window.organizerGate.WALL : `Error building trip: ${err.message}`);
+                });
                 return;
             }
             alert(`Error building trip: ${err.message}`);

@@ -524,6 +524,19 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v147: the organizer path - a round has an owner, and the wall
+// speaks.
+//
+// admin.html and trip.html (both precached) load organizer-gate.js (new,
+// precached) after auth-boot.js. Every round they create now goes through it:
+// authReady awaited, organizers/<uid>/firstSeenAt written first (write-once),
+// ownerUid stamped on the round - every round of a trip planner batch - and
+// the same update() as before. When the rules refuse the create and the uid's
+// window has closed with no pass, the golfer reads the wall, not an SDK error.
+// Inside the window nothing changes on screen. An installed device on v146
+// would save rounds with no ownerUid and, once the Wave 2 rules are live, be
+// refused with "Save error: PERMISSION_DENIED" and no explanation.
+
 // Moved to v146: an anonymous user is not a tournament organizer.
 //
 // tournament.html only (plus database.rules.json, which is not cached).
@@ -1421,7 +1434,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v146-anonymous-is-not-an-organizer';
+const CACHE_VERSION = 'golfapp-v147-organizer-gate';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1520,6 +1533,10 @@ const SHELL_FILES = [
     // every single-quoted run, and a contraction becomes a shell file.
     './auth-boot.js',
     './firebase-auth-compat.js',
+    // THE ORGANIZER GATE (Wave 3, v147): admin.html and trip.html load it after
+    // auth-boot.js; it awaits the token, writes the organizer clock and stamps
+    // ownerUid on every round they create, and says the wall in words.
+    './organizer-gate.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png',

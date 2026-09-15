@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v146-anonymous-is-not-an-organizer';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v147-organizer-gate';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -373,7 +373,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it issues every round, trip and tournament code and
         // checks the code is free first. A cached shell without it cannot start
         // anything at all.
-        assert.equal(entries.length, 39);  // 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 40);  // 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 

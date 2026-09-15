@@ -91,14 +91,19 @@ function makeStubSandbox() {
                 on(ev, cb) {
                     if (typeof cb === 'function') captured.push({ path: p, event: ev, cb: cb });
                 },
-                once() { return Promise.resolve({ val() { return null; }, exists() { return false; } }); },
+                // A read answers from sandbox.__dbReads[path] when a test set one
+                // (organizer-gate reads organizers/<uid> back after a refusal), null otherwise.
+                once() { const v = (sandbox.__dbReads && Object.prototype.hasOwnProperty.call(sandbox.__dbReads, p)) ? sandbox.__dbReads[p] : null; return Promise.resolve({ val() { return v; }, exists() { return v !== null; } }); },
                 // WRITES ARE CAPTURED TOO, since the auth wave. A test about
                 // "nothing was written" or "ownerUid was written" needs to see
                 // the write, not trust that a function returned. Each entry is
                 // { path, op, value }; sandbox.__dbWrites holds them in order.
-                set(v) { writes.push({ path: p, op: 'set', value: v }); return Promise.resolve(); },
-                update(v) { writes.push({ path: p, op: 'update', value: v }); return Promise.resolve(); },
-                remove() { writes.push({ path: p, op: 'remove', value: null }); return Promise.resolve(); },
+                // A write is REFUSED when a test's sandbox.__dbRefuse(path, op, value)
+                // returns an error (the rules' PERMISSION_DENIED, for the Wave 3 gate
+                // and its wall); the attempt is still recorded, as the SDK would send it.
+                set(v) { writes.push({ path: p, op: 'set', value: v }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'set', v); return e ? Promise.reject(e) : Promise.resolve(); },
+                update(v) { writes.push({ path: p, op: 'update', value: v }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'update', v); return e ? Promise.reject(e) : Promise.resolve(); },
+                remove() { writes.push({ path: p, op: 'remove', value: null }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'remove', null); return e ? Promise.reject(e) : Promise.resolve(); },
                 push() { return ref; }
             };
             return ref;
@@ -130,7 +135,7 @@ function makeStubSandbox() {
                 clear: () => { mem.clear(); }
             };
         })(),
-        firebase: { initializeApp() {}, database() { return dbStub; }, auth() { return authStub; } },
+        firebase: { initializeApp() {}, database: Object.assign(() => dbStub, { ServerValue: { TIMESTAMP: { '.sv': 'timestamp' } } }), auth() { return authStub; } },
         db: dbStub,
         alert() {}, confirm() { return true; }, prompt() { return null; },
         URLSearchParams: URLSearchParams,

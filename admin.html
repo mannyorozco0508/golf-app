@@ -15,6 +15,7 @@
          creates window.authReady now, signs in after the parse, never blocks render.
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
+    <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -6643,7 +6644,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const slowTimer = setTimeout(() => {
                 if (saveBtn) saveBtn.innerText = '\u23F3 Still saving \u2014 keep this page open.';
             }, SAVE_SLOW_MS);
-            const saveChain = db.ref(`events/${currentMode}`).update(payload).then(() => {
+            // THE ORGANIZER GATE (Wave 3, organizer-gate.js), in the order the rules
+            // dictate: the token is awaited, organizers/<uid>/firstSeenAt is written
+            // (write-once - a second press is refused and that is expected), and the
+            // round carries ownerUid. Then the SAME update() as before - RTDB
+            // evaluates the merged newData, so the write's shape does not change.
+            // Inside the window nothing is shown; the gate is invisible until it
+            // refuses, and then the wall below says why in words.
+            const saveChain = window.organizerGate.ensureOrganizer(db).then((uid) => {
+                window.organizerGate.stamp(payload, uid);
+                return db.ref(`events/${currentMode}`).update(payload);
+            }).then(() => {
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
@@ -6678,6 +6689,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
+                // THE WALL. A refused round write is the gate only when this uid's
+                // window has closed and no pass is live - organizer-gate reads the
+                // uid's own node back to say so. Any other refusal keeps the honest
+                // SDK message, so the wall never explains a failure it did not cause.
+                if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
+                    window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
+                        alert(why === 'trial-ended' ? window.organizerGate.WALL : `Save error: ${err.message}`);
+                    });
+                    return;
+                }
                 alert(`Save error: ${err.message}`); 
             });
 
