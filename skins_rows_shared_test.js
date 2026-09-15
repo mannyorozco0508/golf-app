@@ -209,7 +209,7 @@ describe('THE SEAM — called by all three, defined once', () => {
     });
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('settlement-engine.js'), 'adc3cd9f');
+        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
         assert.equal(h('pool-engine.js'), 'd47a1e0a');
         assert.equal(h('money-engine.js'), '3c960947');

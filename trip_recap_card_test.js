@@ -155,7 +155,10 @@ describe('MONEY — AND THE CAVEAT TRAVELS WITH IT', () => {
         // The whole point: the caveat must not be the one thing that stays behind
         // on the screen when the card is shared.
         const b = recap({ confirmed: false }); b.open();
-        assert.match(b.text(), /Not final — some rounds still have unconfirmed results/);
+        // Re-pinned 2026-09-15 (trip money, "what is final"): the caveat now names
+        // the round and the reason, from the same holds the panel shows -
+        // trip_money_final_test.js pins the in-play and both-at-once shapes.
+        assert.match(b.text(), /Not final — KP results are still unconfirmed in Caledonia, True Blue\./);
     });
 
     test('an unsettled trip says so in the subtitle too', () => {

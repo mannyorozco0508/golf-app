@@ -265,7 +265,12 @@ describe('NO MONEY BEHAVIOUR CHANGED', () => {
 
     test('THE SETTLED GATE FROM THE PREVIOUS BATCH IS INTACT', () => {
         const f = fn();
-        assert.match(f, /rp\.settled === false/);
+        // Re-pinned 2026-09-15 (trip money, "what is final"): the settled question
+        // is now asked of settlement-engine.js computeRoundSettlement (which reads
+        // pool-engine's `settled` itself) - trip_money_final_test.js. The
+        // behaviour below is unchanged.
+        assert.match(f, /const settlement = computeRoundSettlement\(data, courseData, savedScores\);/);
+        assert.match(f, /if \(!settlement\.kpSettled\) \{/);
         assert.match(f, /unresolvedRounds/);
         const t = strip(boot({ rounds:[{ label:'Caledonia', confirmed:false }] }).money());
         assert.match(t, /Not Settled Yet/);

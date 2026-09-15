@@ -200,7 +200,15 @@ describe('NO NEW MONEY MATH', () => {
 
     test('the settled question is READ, not re-derived', () => {
         const f = fn();
-        assert.match(f, /rp\.settled === false/);
+        // Re-pinned 2026-09-15 (trip money, "what is final"): the read moved one
+        // layer down - settlement-engine.js computeRoundSettlement asks pool-engine
+        // (`rp.settled === false`) and the trip asks the engine. Still read, never
+        // re-derived, on either layer.
+        assert.match(f, /const settlement = computeRoundSettlement\(data, courseData, savedScores\);/);
+        const eng = read('settlement-engine.js');
+        const eAt = eng.indexOf('function computeRoundSettlement');
+        assert.ok(eAt > 0, 'the predicate is in the engine');
+        assert.match(eng.slice(eAt, eng.indexOf('\n    }\n', eAt)), /rp\.settled === false/);
         ['kpWinners','kpConfirmed &&','kpUnresolvedCents >','allocateWholeDollars(']
             .forEach(t => assert.ok(!f.includes(t), `must not re-derive settlement; found ${t}`));
     });
@@ -262,10 +270,13 @@ describe('THE PAGE CAN ACTUALLY RUN THE CHECK', () => {
     });
 
     test('an unreadable round is not silently claimed as settled', () => {
-        const src = read(PAGE);
-        const at = src.indexOf('function renderTripMoneySettlement');
-        const f = src.slice(at, src.indexOf('\n    function ', at + 10));
-        assert.match(f, /catch \(e\) \{[^}]*not claimed as settled/,
-            'the catch must say why it is safe');
+        // Re-pinned 2026-09-15: the try/catch around the pool read lives in
+        // settlement-engine.js computeRoundSettlement now, and a pool that throws
+        // leaves kpSettled false - so the trip is not called final over it.
+        const src = read('settlement-engine.js');
+        const at = src.indexOf('function computeRoundSettlement');
+        const f = src.slice(at, src.indexOf('\n    }\n', at));
+        assert.match(f, /catch \(e\) \{[^}]*not claimed settled either[^}]*kpSettled = false; \}/,
+            'the catch must say why it is safe, and leave the round unsettled');
     });
 });

@@ -1390,7 +1390,17 @@ html {
     let cachedCountedResults = [];    // only rounds still counting toward trip totals
     let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
     let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
-    let cachedTripSettled = true;     // false while any linked round still has unresolved money
+    let cachedTripSettled = true;     // false while any counted round is unfinished or has unresolved money
+    // WHAT MAKES THE TRIP NOT FINAL - the rounds, by name, so the card and the
+    // share text say the same thing the screen does. { inPlay:[{label,thru,
+    // playing,left,started}], kp:[{label,cents}] }.
+    let cachedTripHolds = { inPlay: [], kp: [] };
+    // THE TWO TOTALS. daily = each round's own rounded net added up (what a group
+    // that settled after every round actually paid); once = every bet netted
+    // across the trip first, rounded once (what a group settling at the end
+    // pays). agree = the two match for every golfer. Who Pays Who and the share
+    // text run from `once`.
+    let cachedTripTotals = { agree: true, daily: [], once: [] };
     let cachedAwards = {};         // trip awards — reused by the share recap
     let cachedPointsStandings = []; // points race standings — reused by the share recap and prize calculator
 
@@ -1832,6 +1842,18 @@ html {
         return escapeHtml(String(p.message || 'The golfers\u2019 names could not be checked.'));
     }
 
+    // THE WORDS FOR THE TWO TOTALS - written for somebody who has never heard
+    // "reconciled". One place, so the panel, the card and the share text agree.
+    const TRIP_TOTAL_DAILY_HEAD = 'Settled after each round';
+    const TRIP_TOTAL_ONCE_HEAD = 'Settled once at the end';
+    const TRIP_TOTALS_DIFFER_NOTE = '<b>Settled after each round</b> adds up what each day\u2019s Results page said, '
+        + 'so it is what you paid if you settled up every night. '
+        + '<b>Settled once at the end</b> nets every bet across the whole trip first and rounds to whole dollars once. '
+        + 'They differ because each day rounds to whole dollars on its own, and the odd dollar can land on the same golfer more than once. '
+        + 'Both are right \u2014 they are two different ways of settling up, and only your group knows which one it is doing.';
+    const TRIP_TOTALS_AGREE_NOTE = 'Whether you settled up after each round or settle once at the end, the numbers are the same.';
+    const TRIP_WHO_PAYS_WHO_NOTE = 'This list is for settling once at the end. If you settled up after each round there is nothing left to pay \u2014 see \u201CSettled after each round\u201D below.';
+
     function renderTripMoneySettlement() {
         const container = document.getElementById('trip-money-settlement');
         if (cachedRoundResults.length === 0) return;
@@ -1840,9 +1862,12 @@ html {
             return;
         }
 
-        const netByName = {}; // lowercased key -> { name, net }
+        const netByName = {};   // lowercased key -> { name, net }  - each round's ROUNDED net, added up
+        const exactByName = {}; // lowercased key -> { name, net }  - each round's EXACT net, added up
         const perRoundBreakdown = [];
-        const unresolvedRounds = [];   // linked rounds whose money is not settled yet
+        const unresolvedRounds = [];   // counted rounds with unresolved KP money
+        const inPlayRounds = [];       // counted rounds a golfer is still out on (or nobody has started)
+        let unresolvedDollars = 0;     // what the settle-once ledger must be short by
         const tripContributions = {};  // merged moving lines, for the relevance rule
 
         cachedCountedResults.forEach(({ label, data }) => {
@@ -1866,26 +1891,27 @@ html {
                 tripContributions[k].lines = tripContributions[k].lines.concat(combined.contributions[k].lines || []);
             });
 
-            // IS THIS ROUND'S MONEY ACTUALLY SETTLED?
+            // IS THIS ROUND'S MONEY ACTUALLY SETTLED? One predicate, in the engine
+            // (settlement-engine.js computeRoundSettlement), asked here, not re-derived.
             //
-            // A round with unresolved KP money has a ledger that deliberately sums to
-            // -kpUnresolvedCents rather than zero - that share is withheld until the
-            // organizer confirms or cancels it. Summing such a round into a trip
-            // inherits the imbalance, and the trip would then present a distorted
-            // total under the heading "Final". One unconfirmed KP on day one quietly
-            // skews the whole week's settlement, which is what everybody actually
-            // pays from.
-            //
-            // Canonical read only: pool-engine already decided this in Wave B, so the
-            // question is asked, not re-derived.
-            try {
-                if (typeof computeMoneyPool === 'function') {
-                    const rp = computeMoneyPool(data, courseData, savedScores);
-                    if (rp && rp.valid && rp.settled === false) {
-                        unresolvedRounds.push({ label, cents: rp.kpUnresolvedCents || 0 });
-                    }
-                }
-            } catch (e) { /* a round we cannot read is not claimed as settled either */ }
+            // Two things hold a round open. Unresolved KP money: the ledger deliberately
+            // sums to -kpUnresolvedCents until the organizer confirms or cancels the
+            // KP, and a trip that summed it would present a distorted total under the
+            // heading "Final". And a round STILL IN PLAY: a match scored thru 9 already
+            // pays match and skins as if the day were over. That money COUNTS - it is
+            // the group's running position and it is left in every total below - but
+            // the heading cannot say Final while a golfer is still out, and the round
+            // is named so the group knows which one to wait for. A round with no
+            // scores at all has not started, and holds the trip open the same way.
+            const settlement = computeRoundSettlement(data, courseData, savedScores);
+            if (!settlement.kpSettled) {
+                unresolvedRounds.push({ label, cents: settlement.kpUnresolvedCents || 0 });
+                unresolvedDollars += (settlement.kpUnresolvedCents || 0) / 100;
+            }
+            if (!settlement.finished) {
+                inPlayRounds.push({ label, started: settlement.started, thru: settlement.thru,
+                                    playing: settlement.playing, left: settlement.unfinished.length });
+            }
 
             // The main-format label is still useful context in the per-round breakdown,
             // but it no longer decides what money is counted.
@@ -1907,7 +1933,36 @@ html {
                 if (!netByName[key]) netByName[key] = { name: p.name, net: 0 };
                 netByName[key].net += (p.net || 0);
             });
+            // THE OTHER TOTAL. The engine hands back the unrounded ledger beside the
+            // rounded one; adding THAT up is what a group that nets the whole trip
+            // before anybody pays is actually owed.
+            Object.values(combined.exact || {}).forEach(v => {
+                if (Math.abs(v.net) <= 0.005) return;
+                const key = v.name.trim().toLowerCase();
+                if (!exactByName[key]) exactByName[key] = { name: v.name, net: 0 };
+                exactByName[key].net += (v.net || 0);
+            });
         });
+
+        // TWO TOTALS, BOTH TRUE. Each round rounds its nets to whole dollars and hands
+        // the odd dollar to somebody by a fixed tie-break, so a group that settled up
+        // after every round paid the sum of those rounded days - and the odd dollar
+        // can land on the same golfer three days running. A group that settles once
+        // at the end nets every bet first and rounds once. Over three identical
+        // days that is +$36 / +$39 against +$37.50 each: neither is wrong, they are
+        // different agreements, and the trip cannot know which one the group made.
+        // So both are shown and named. The reconciler is the engine's own
+        // (settlement-engine.js roundNetTotalsToWholeDollars), run once over the
+        // exact sum, short by exactly the KP money still withheld - the same call
+        // each round makes for itself.
+        const onceByName = {};
+        Object.keys(exactByName).forEach(k => { onceByName[k] = { name: exactByName[k].name, net: exactByName[k].net }; });
+        const onceRounded = roundNetTotalsToWholeDollars(onceByName, -unresolvedDollars);
+        const keys = Array.from(new Set(Object.keys(netByName).concat(Object.keys(onceRounded))));
+        const dailyList = keys.map(k => ({ name: (netByName[k] || onceRounded[k]).name, net: netByName[k] ? netByName[k].net : 0 }));
+        const onceList = keys.map(k => ({ name: (netByName[k] || onceRounded[k]).name, net: onceRounded[k] ? onceRounded[k].net : 0 }));
+        const totalsAgree = keys.every(k => Math.abs((netByName[k] ? netByName[k].net : 0) - (onceRounded[k] ? onceRounded[k].net : 0)) < 0.005);
+        cachedTripTotals = { agree: totalsAgree, daily: dailyList, once: onceList };
 
         // WHOLE DOLLARS, like the Receipt. Round nets are already whole in
         // whole-dollar mode, so "$40.00" was two decimal places of noise that made
@@ -1921,8 +1976,11 @@ html {
             return `<span class="val-even">$0</span>`;
         }
 
+        // WHO PAYS WHO is a settle-once question by definition: a group that paid
+        // after each round has nothing left to pay. So the list runs from the
+        // settle-once total, and says so where the two totals differ.
         const netTotals = {};
-        Object.values(netByName).forEach(v => { netTotals[v.name] = v.net; });
+        onceList.forEach(v => { netTotals[v.name] = v.net; });
         const transactions = simplifyDebts(netTotals);
         cachedMoneyTransactions = transactions;
 
@@ -1932,17 +1990,27 @@ html {
         // hiding it would be worse, since the group wants to see where the week stands -
         // but it is not called final while a linked round still has money hanging, and
         // the rounds responsible are named so somebody can go and resolve them.
-        const tripSettled = unresolvedRounds.length === 0;
+        const tripSettled = unresolvedRounds.length === 0 && inPlayRounds.length === 0;
         cachedTripSettled = tripSettled;
+        cachedTripHolds = { inPlay: inPlayRounds.slice(), kp: unresolvedRounds.slice() };
         if (!tripSettled) {
-            const pending = unresolvedRounds
-                .map(u => u.label + (u.cents ? ' ($' + Math.round(u.cents / 100) + ')' : ''))
-                .join(', ');
             html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
                 <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Not Settled Yet</div>
-                <div style="font-size:0.85rem; color:var(--warn-text); text-align:center;">
-                    KP results are still unconfirmed in: ${pending}.<br>
-                    These totals will change once those rounds are resolved.
+                <div style="font-size:0.85rem; color:var(--warn-text); text-align:center;">`;
+            // A ROUND STILL IN PLAY IS NAMED, AND ITS MONEY STILL COUNTS. The list
+            // below already has it in; this says which day everybody is waiting on.
+            inPlayRounds.forEach(r => {
+                html += r.started
+                    ? `Still in play: ${escapeHtml(r.label)} \u2014 thru ${r.thru}, ${r.left} golfer${r.left === 1 ? '' : 's'} still ${r.left === 1 ? 'has' : 'have'} holes left. Its money so far is counted below.<br>`
+                    : `Not started yet: ${escapeHtml(r.label)}.<br>`;
+            });
+            if (unresolvedRounds.length) {
+                const pending = unresolvedRounds
+                    .map(u => u.label + (u.cents ? ' ($' + Math.round(u.cents / 100) + ')' : ''))
+                    .join(', ');
+                html += `KP results are still unconfirmed in: ${pending}.<br>`;
+            }
+            html += `These totals will change once those rounds are ${inPlayRounds.length ? 'finished' : 'resolved'}.
                 </div></div>`;
         }
 
@@ -1971,17 +2039,33 @@ html {
             html += `<div class="settle-card"><div class="settle-header">${tripSettled
                 ? '🏁 Final "Who Pays Who"'
                 : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
+            if (!totalsAgree) {
+                html += `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0 0 6px;">${TRIP_WHO_PAYS_WHO_NOTE}</div>`;
+            }
             transactions.forEach(t => {
                 html += `<div class="ledger-row"><span>${t.from} \u2192 ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
             });
             html += `</div>`;
         }
 
-        if (idProblems.length === 0 && Object.keys(netByName).length > 0) {
+        if (idProblems.length === 0 && keys.length > 0) {
             html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
-            Object.values(netByName).sort((a, b) => b.net - a.net).forEach(v => {
-                html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span>${fmtMoney(v.net)}</span></div>`;
-            });
+            if (totalsAgree) {
+                // ONE NUMBER, and a sentence saying why there is only one.
+                onceList.slice().sort((a, b) => b.net - a.net).forEach(v => {
+                    html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span>${fmtMoney(v.net)}</span></div>`;
+                });
+                html += `<div style="font-size:0.72rem; color:var(--text-muted); text-align:center; padding:6px 0 0;">${TRIP_TOTALS_AGREE_NOTE}</div>`;
+            } else {
+                // BOTH, side by side, each column named in plain words.
+                html += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); font-weight:bold;"><span></span><span style="display:flex; gap:14px;"><span style="min-width:5.5em; text-align:right;">${TRIP_TOTAL_DAILY_HEAD}</span><span style="min-width:5.5em; text-align:right;">${TRIP_TOTAL_ONCE_HEAD}</span></span></div>`;
+                const byKey = {}; dailyList.forEach(v => { byKey[v.name.trim().toLowerCase()] = { name: v.name, daily: v.net, once: 0 }; });
+                onceList.forEach(v => { byKey[v.name.trim().toLowerCase()].once = v.net; });
+                Object.values(byKey).sort((a, b) => b.once - a.once).forEach(v => {
+                    html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span style="display:flex; gap:14px;"><span style="min-width:5.5em; text-align:right;">${fmtMoney(v.daily)}</span><span style="min-width:5.5em; text-align:right;">${fmtMoney(v.once)}</span></span></div>`;
+                });
+                html += `<div style="font-size:0.72rem; color:var(--text-muted); padding:8px 0 0; line-height:1.45;">${TRIP_TOTALS_DIFFER_NOTE}</div>`;
+            }
             html += `</div>`;
         }
 
@@ -2459,6 +2543,29 @@ html {
         if (el) el.style.display = 'none';
     }
 
+    // WHY THE TRIP IS NOT FINAL, in one sentence, from the same holds the panel
+    // named. Rounds still in play first (they are the ones somebody can go and
+    // finish), then unconfirmed KPs.
+    function tripNotFinalReason() {
+        const parts = [];
+        const inPlay = cachedTripHolds.inPlay || [];
+        const kp = cachedTripHolds.kp || [];
+        const started = inPlay.filter(r => r.started).map(r => r.label);
+        const notStarted = inPlay.filter(r => !r.started).map(r => r.label);
+        if (started.length) parts.push(started.join(', ') + (started.length === 1 ? ' is' : ' are') + ' still in play');
+        if (notStarted.length) parts.push(notStarted.join(', ') + (notStarted.length === 1 ? ' has' : ' have') + ' not started');
+        if (kp.length) parts.push('KP results are still unconfirmed in ' + kp.map(u => u.label).join(', '));
+        return parts.length ? parts.join('; ') + '.' : 'some rounds still have unconfirmed results.';
+    }
+    // THE TWO TOTALS IN PLAIN TEXT - the card and the clipboard get the same line.
+    function tripBothTotalsPlain() {
+        const fmt = v => (v > 0.005 ? '+$' : v < -0.005 ? '-$' : '$') + fmtAmt(Math.abs(v));   // the page's one amount rule
+        const row = list => list.slice().sort((a, b) => b.net - a.net).map(v => v.name + ' ' + fmt(v.net)).join(', ');
+        return 'Who Pays Who above is for settling once at the end (' + row(cachedTripTotals.once) + '). '
+             + 'If you settled up after each round, the days added up to: ' + row(cachedTripTotals.daily) + '. '
+             + 'The two differ because each day rounded to whole dollars on its own.';
+    }
+
     function renderTripRecapCard() {
         const mount = document.getElementById('trip-recap-card');
         if (!mount) return;
@@ -2528,8 +2635,11 @@ html {
                 html += '<div class="rc-detail">+ ' + (cachedMoneyTransactions.length - 6) + ' more</div>';
             }
         }
+        if (!cachedTripTotals.agree) {
+            html += '<div class="rc-detail">' + esc(tripBothTotalsPlain()) + '</div>';
+        }
         if (!cachedTripSettled) {
-            html += '<div class="rc-warn">\u26A0\uFE0F Not final \u2014 some rounds still have unconfirmed results.</div>';
+            html += '<div class="rc-warn">\u26A0\uFE0F Not final \u2014 ' + esc(tripNotFinalReason()) + '</div>';
         }
         // THE CARD IS THE IMAGE THAT GETS SCREENSHOTTED, and it was SILENT about
         // what the figure contains - neither the lie nor the truth. Same sentence
@@ -2650,11 +2760,15 @@ html {
         text += cachedTripSettled
             ? `\n💵 FINAL SETTLEMENT\n`
             : `\n💵 SETTLEMENT SO FAR — NOT FINAL\n`;
+        if (!cachedTripSettled) text += `${tripNotFinalReason()}\n`;
         if (cachedMoneyTransactions.length === 0) {
             text += `Everyone's settled up — no money changes hands.\n`;
         } else {
             cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
         }
+        // THE TWO TOTALS TRAVEL WITH THE PASTE, because the paste is what people
+        // settle from. Silent when they agree - there is nothing to choose.
+        if (!cachedTripTotals.agree) text += `${tripBothTotalsPlain()}\n`;
         // THE PASTE IS WHAT PEOPLE SETTLE FROM, and it said nothing at all about
         // what the figure contains. Same sentence, same builder. Raw, not escaped:
         // this goes on the clipboard, where an entity would paste literally.

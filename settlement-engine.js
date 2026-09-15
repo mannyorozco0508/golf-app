@@ -1747,3 +1747,51 @@
             net: complete ? gross - strokesSoFar : null,
         };
     }
+
+    // ========================================================================
+    // IS THIS ROUND SETTLED? One predicate, one place (trip money wave,
+    // 2026-09-15). Read by trip.html; the Receipt still decides its own
+    // "Final" from computeMoneyPool().settled alone (HANDOFF: its own paste).
+    //
+    // A round's money is FINAL when:
+    //   finished   every golfer who teed off (holesPlayed > 0) has a score on
+    //              every hole of the course - OR the organizer VERIFIED the
+    //              round (scoresVerified.verified === true), which is how a
+    //              picked-up ball or a golfer who left after nine is declared
+    //              deliberate: the app cannot tell "picked up on 12" from
+    //              "has not reached 12 yet", so an unverified card with blanks
+    //              is unfinished, and verification is the word that finishes
+    //              it. A roster name with no score at all never teed off and is
+    //              not waited for. A round with NO scores has not started.
+    //   kpSettled  computeMoneyPool().settled is not false (no unresolved KP
+    //              money - Wave B's canonical fact, read, not re-derived).
+    // Nothing here moves money: the ledger counts an unfinished round's money
+    // exactly as before. This decides one word, and names who is still out.
+    // ========================================================================
+    function computeRoundSettlement(data, courseData, savedScores) {
+        const holes = (courseData || []);
+        const players = ((data && data.players) || []);
+        const scores = savedScores || {};
+        const verified = !!(data && data.scoresVerified && data.scoresVerified.verified === true);
+        const totals = players.map(p => computePlayerRoundTotals(p, holes, scores));
+        const playing = totals.filter(t => t.holesPlayed > 0);
+        const unfinished = playing.filter(t => !t.complete)
+            .map(t => ({ id: t.id, name: t.name, holesPlayed: t.holesPlayed, holesRequired: t.holesRequired }));
+        const started = playing.length > 0;
+        const scored = holes.length > 0 && started && unfinished.length === 0;
+        const finished = verified || scored;
+        let kpSettled = true, kpUnresolvedCents = 0;
+        try {
+            if (typeof computeMoneyPool === 'function') {
+                const rp = computeMoneyPool(data, holes, scores);
+                if (rp && rp.valid && rp.settled === false) { kpSettled = false; kpUnresolvedCents = rp.kpUnresolvedCents || 0; }
+            }
+        } catch (e) { /* a pool that cannot be read is not claimed settled either */ kpSettled = false; }
+        const thru = playing.length ? Math.min.apply(null, playing.map(t => t.holesPlayed)) : 0;
+        return {
+            settled: finished && kpSettled,
+            finished, verified, scored, started,
+            playing: playing.length, unfinished, thru, holesRequired: holes.length,
+            kpSettled, kpUnresolvedCents
+        };
+    }

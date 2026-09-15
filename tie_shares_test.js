@@ -154,7 +154,7 @@ describe('THE SEAM', () => {
     test('the files, by sha: pool-engine.js moved for this one field; the other engines did not', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('pool-engine.js'), 'd47a1e0a');
-        assert.equal(h('settlement-engine.js'), 'adc3cd9f');
+        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');
     });

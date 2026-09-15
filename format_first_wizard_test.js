@@ -510,7 +510,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': 'adc3cd9f9ae5745ac4486e2ea9526b2c3a030ef8a4297e9ec26c4fb2f851b4b4',
+        'settlement-engine.js': '42923121fa01e0bda00ffb92aa5b5b728a27a2316920d2ba9c18355456a153dd',   // re-pinned 2026-09-15: computeRoundSettlement appended (trip money wave, approved per-file); no wager arithmetic changed - trip_money_final_test.js proves the behaviour
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's

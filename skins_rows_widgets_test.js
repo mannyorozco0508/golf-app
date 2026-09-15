@@ -249,7 +249,7 @@ describe('THE SEAM — where the rows come from, and the print block', () => {
         const h = f => sha(read(f)).slice(0, 8);
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
         assert.equal(h('pool-engine.js'), 'd47a1e0a');
-        assert.equal(h('settlement-engine.js'), 'adc3cd9f');
+        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
         assert.equal(h('live-skins.js'), sha(read('live-skins.js')).slice(0, 8));
         assert.equal(h('money-engine.js'), '3c960947');
     });

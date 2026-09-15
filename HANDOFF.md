@@ -928,6 +928,41 @@ layer down, in protected files, untouched:
     `card_scope_closed_test.js` pins their current text so the change is
     deliberate when it comes.
 
+- **DEFERRED 2026-09-15 (trip money, "what is final") — the Receipt does not read
+the settled predicate yet.** `settlement-engine.js computeRoundSettlement(data,
+courseData, savedScores)` is now the ONE answer to "is this round's money
+final": `finished` (every golfer who teed off has every hole scored, OR the
+organizer verified the round — `scoresVerified.verified === true` — which is how
+a picked-up ball or a golfer who left after nine is declared deliberate),
+`kpSettled` (pool-engine's `settled`, read not re-derived), `unfinished`
+(who is still out, with holes played), `started`, `thru`. `trip.html` reads it
+(`trip_money_final_test.js`); a round scored thru 9 is named on the trip as
+still in play, its money counted, the heading not "Final". **`settlement.html`
+still decides "Final" from `computeMoneyPool().settled` alone**, so a Receipt
+opened thru 9 says Final over a match that is not over. Its own paste: have it
+read `computeRoundSettlement`, same wording shape as the trip, prove the
+verified-thru-9 case says Final and the unverified one does not.
+  - **What "every golfer playing" means, measured.** A roster name with no score
+    never teed off and is not waited for (`playing` counts `holesPlayed > 0`).
+    A blank hole in the middle (`p104_h12` deleted) is `unfinished` 17/18 —
+    the app cannot tell "picked up on 12" from "not there yet", so verification
+    is the word for it. A round with no scores is `started:false`, held open as
+    "not started". Verification is SUFFICIENT, never necessary: a round with
+    every hole scored is finished without it.
+
+- **NOT IN THIS WAVE, recorded 2026-09-15 — cross-round identity on a trip is the
+normalised name only.** `renderTripMoneySettlement` (and the two totals it now
+shows) add up per-golfer nets keyed by `name.trim().toLowerCase()`
+(`normalisePlayerName`, `action-model.js`). What was found in the recon: two
+golfers with the same normalised name INSIDE one round block the whole trip
+total (the identity gate, `trip_one_gate_test.js`); a different "Mike" on
+another day merges silently into the first Mike's total, and "Mike D" on day 2
+is a third golfer. `ryder-cup.js` is points only and does not share the problem.
+Player ids are issued per round (`admin.html`), so there is no cross-round key
+to use today. The honest shape is a trip-level roster that maps each day's
+player id to one trip golfer, with the gate refusing a name that appears on
+the trip roster twice — a wave of its own, not a fix inside the money card.
+
 - **No monetization built. v1.1 is specced in `MONETIZATION.md` — read that before touching any of it.** One round stays free forever; a trip is paid. The **Trip Pass is $19.99, trip-scoped and consumable** — bought per trip, so Apple will not restore it, which is fine because the entitlement lives at `trips/<code>/entitlement/paid` rather than on the buyer's device. That is also what makes it exploitable today: **`database.rules.json` is step one and blocks everything else**, because right now any client can write that node, the repo is public and a trip code is six characters. Nothing can be sold until the rules are right. `database.rules.json` is a protected file and needs explicit per-file approval. Note that `MONETIZATION.md` is a plan, not a record — nothing in it exists
 
 ## Checks that live outside `npm test`

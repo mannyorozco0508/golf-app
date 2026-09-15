@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v148: the trip tells the truth about what is final.
+//
+// trip.html (precached) and settlement-engine.js (precached). The trip money
+// card now shows BOTH trip totals when they differ - "Settled after each
+// round" (each day's rounded Results added up) and "Settled once at the end"
+// (every bet netted first, rounded once) - and one number with a sentence
+// when they agree; Who Pays Who runs from the settle-once total and says so.
+// A counted round still in play is named ("Still in play: Day 2 - thru 9, 1
+// golfer still has holes left"), its money counted, and the heading is not
+// "Final" until every golfer who teed off has every hole scored or the
+// organizer verified the round. settlement-engine.js gained
+// computeRoundSettlement, the one predicate for that. An installed device on
+// v147 would call a trip Final over a match scored thru 9, and show one total
+// where two honest ones differ by a dollar or three.
+
 // Moved to v147: the organizer path - a round has an owner, and the wall
 // speaks.
 //
@@ -1434,7 +1449,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v147-organizer-gate';
+const CACHE_VERSION = 'golfapp-v148-trip-final-truth';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

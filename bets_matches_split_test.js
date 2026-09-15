@@ -484,7 +484,7 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         assert.equal(sha('bet-strip.js'), '43880a61');
         assert.equal(sha('money-engine.js'), '3c960947');
         assert.equal(sha('action-model.js'), 'ded86280');
-        assert.equal(sha('settlement-engine.js'), 'adc3cd9f');
+        assert.equal(sha('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
         assert.equal(sha('pool-engine.js'), 'd47a1e0a');
         assert.equal(sha('hole-events.js'), '6fd7f7ed');

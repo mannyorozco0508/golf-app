@@ -92,8 +92,15 @@ describe('THE PROOF - the old text with exactly one substitution IS the new text
         assert.equal(sha(read('trip_weekly_game_prev.fixture.json')).slice(0, 8), 'd325b8a5');
         ['money', 'recap', 'share'].forEach(k => assert.equal((PREV[k].match(/the Main Pool\./g) || []).length, 1, k + ' said Main Pool once'));
     });
-    ['money', 'recap', 'share'].forEach(k => test(k + ': today == old with "the Main Pool." -> "the Weekly Game.", nothing else', () => {
-        assert.equal(trip()[k], PREV[k].replace('the Main Pool.', 'the Weekly Game.'));
+    // Re-pinned 2026-09-15 (trip money, "what is final"): the money card gained
+    // ONE more deliberate line - the two trip totals agree on this trip, and the
+    // card says so under Net Across the Trip. trip_money_final_test.js holds the
+    // cb42f1d capture of the same trip and pins that sentence as the only change.
+    const AGREE = '|Whether you settled up after each round or settle once at the end, the numbers are the same.|Per-Round Breakdown|';
+    ['money', 'recap', 'share'].forEach(k => test(k + ': today == old with "the Main Pool." -> "the Weekly Game."' + (k === 'money' ? ' and the agree sentence' : '') + ', nothing else', () => {
+        let expected = PREV[k].replace('the Main Pool.', 'the Weekly Game.');
+        if (k === 'money') { assert.ok(expected.includes('|Per-Round Breakdown|')); expected = expected.replace('|Per-Round Breakdown|', AGREE); }
+        assert.equal(trip()[k], expected);
     }));
 });
 
