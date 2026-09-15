@@ -212,11 +212,19 @@ describe('ALL FOUR COPIES ARE ACTUALLY BEING COMPARED', () => {
         // it, but this says plainly which file drifted.
         const fs = require('fs'), path = require('path');
         const { REPO_ROOT } = require('./helpers/load-script.js');
-        NAMES.forEach(n => {
+        // sidematches.html has NO inline copy since the Bets/Matches split (v135):
+        // it loads money-engine.js and its realm's calculateMatchEngine above IS the
+        // canonical one. The source contract is checked on the files that still
+        // carry a copy, and the absence is pinned so the copy cannot quietly return.
+        NAMES.filter(n => n !== 'sidematches.html').forEach(n => {
             const src = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8');
             assert.match(src, /const segStake = m =>/, n + ' lost segStake');
             assert.match(src, /manualPress && manualPress\.stake !== undefined/,
                 n + ' no longer stores an explicit press stake');
         });
+        const sm = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
+        assert.ok(!/function calculateMatchEngine\s*\(/.test(sm.replace(/<script src=[^>]*><\/script>/g, '')),
+            'sidematches.html must not regrow an inline match engine');
+        assert.match(sm, /<script src="money-engine\.js">/);
     });
 });

@@ -97,7 +97,9 @@ describe('skins.html — STATE 1: Skins is the round-wide game', () => {
         assert.match(r.content, LEDGER, 'The round-wide ledger still belongs here.');
         // A bare settlement.html match would pass vacuously - the ledger already
         // carries a Receipt button - so the disclosure needs its own wording.
-        assert.match(r.content, /not shown here/i,
+        // v135 (Bets/Matches split): the other game now has a live status row under
+        // Round Games on this same page, and the disclosure says so.
+        assert.match(r.content, /under Round Games above/i,
             'The other Skins game must be disclosed in words, not merely linked.');
         assert.match(r.content, /1 other Skins game/i,
             'The disclosure must say how many, and be singular for one.');

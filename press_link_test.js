@@ -202,8 +202,10 @@ describe('THE RECEIVER FOCUSES, IT DOES NOT PRESS', () => {
     });
 
     test('every match card is anchored so the link can find it', () => {
-        assert.equal((SRC().match(/id="sm-card-\$\{matchId\}"/g) || []).length, 2,
-            'both the match-play and stroke-play cards');
+        // v135 (Bets/Matches split): one card builder serves every format, so the
+        // anchor appears once in the source and on every rendered card.
+        assert.equal((SRC().match(/id="sm-card-\$\{matchId\}"/g) || []).length, 1,
+            'the one card, anchored');
     });
 
     test('it scrolls to the wager and highlights it', () => {

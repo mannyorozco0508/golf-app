@@ -217,15 +217,24 @@ describe('MULTI-GROUP ACTION — every wager is explicit', () => {
         assert.equal(main, 0, 'a new multi-group round carries no implicit main money');
     });
 
-    test('all five wagers appear on the Action page', () => {
-        const sb = loadHtmlInlineScript('sidematches.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
-        vm.runInContext(`currentData = ${J(data)}; renderSideMatches();
-            window.__h = document.getElementById('sidematches-list').innerHTML;`, sb);
-        const h = sb.window.__h;
+    test('all five wagers appear on the Action pages', () => {
+        // SINCE v135 (Bets/Matches split): the four matches are built and removed on
+        // Matches, the scoped skins game is a status row on Bets, and Matches names
+        // it in its round-games line. Both bare-link pages, the round arriving
+        // through each page's own listener.
+        const open = page => {
+            const sb = loadHtmlInlineScript(page, [], { search: '?game=ABCD' });
+            sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/ABCD').cb({ val: () => data, exists: () => true });
+            return sb;
+        };
+        const h = open('sidematches.html').document.getElementById('sidematches-list').innerHTML;
         assert.equal((h.match(/Remove Match/g) || []).length, 4, 'four side matches');
-        assert.ok(/data-action-key="k1"/.test(h), 'and the scoped skins game');
-        assert.ok(!/data-action-key="main"/.test(h), 'with no phantom main wager');
+        assert.ok(/id="sm-round-games"[\s\S]*Skins/.test(h), 'and the scoped skins game is named');
+        const bets = open('skins.html');
+        const g = bets.document.getElementById('bets-games').innerHTML;
+        assert.ok(/data-game-key="k1"/.test(g), 'the scoped skins game has its row on Bets');
+        assert.ok(!/data-game-key="main"/.test(g), 'with no phantom main wager');
+        assert.equal((bets.document.getElementById('bets-matches').innerHTML.match(/class="bets-match"/g) || []).length, 4);
     });
 
     test('a cross-group wager keeps its start hole', () => {
@@ -299,12 +308,17 @@ describe('ONE-GROUP NON-REGRESSION', () => {
     });
 
     test('the one-group main wager is visible on Action, read-only', () => {
-        const sb = loadHtmlInlineScript('sidematches.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
-        vm.runInContext(`currentData = ${J({ gameFormat: 'nassau', nassauStake: 20, nassauScoring: 'net', nassauPressRule: 'none', players: P, courseData: CD, scores: S })};
-            renderSideMatches(); window.__h = document.getElementById('sidematches-list').innerHTML;`, sb);
-        assert.ok(/data-action-key="main"/.test(sb.window.__h));
-        assert.ok(/Created with the round/.test(sb.window.__h));
+        // SINCE v135: a status row on Bets with no control on it, and named on Matches.
+        const data = { gameFormat: 'nassau', nassauStake: 20, nassauScoring: 'net', nassauPressRule: 'none', players: P, courseData: CD, scores: S };
+        const open = page => {
+            const sb = loadHtmlInlineScript(page, [], { search: '?game=ABCD' });
+            sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/ABCD').cb({ val: () => data, exists: () => true });
+            return sb;
+        };
+        const g = open('skins.html').document.getElementById('bets-games').innerHTML;
+        assert.ok(/data-game-key="main"/.test(g));
+        assert.ok(!/onclick=|deleteSideMatch/.test(g), 'read-only');
+        assert.ok(/id="sm-round-games"[\s\S]*Nassau/.test(open('sidematches.html').document.getElementById('sidematches-list').innerHTML));
     });
 });
 

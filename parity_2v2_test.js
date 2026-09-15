@@ -246,14 +246,14 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
             'stats.html must load the canonical engine too, as of Batch 3');
         assert.deepEqual(PAGE_DEPS['stats.html'], ['action-model.js', 'settlement-engine.js']);
 
-        // Neither page loads money-engine.js. Both still define parseHcp/getStrokes
+        // stats.html does not load money-engine.js; it still defines parseHcp/getStrokes
         // inline, and the canonical engines bind to those at call time - byte-identical
-        // copies pinned by parity_test.js. Recorded so the arrangement is a decision
-        // rather than something rediscovered later.
-        ['sidematches.html', 'stats.html'].forEach(page => {
-            assert.ok(!loads(page, 'money-engine.js'),
-                page + ' deliberately does not load money-engine.js');
-        });
+        // copies pinned by parity_test.js. sidematches.html DOES load it since the
+        // Bets/Matches split (v135): its result line comes from bet-strip.js, which
+        // reads money-engine.js, and its inline calculateMatchEngine / nassauStakeConfig
+        // copies were removed so nothing shadows the file (bets_matches_split_test.js).
+        assert.ok(!loads('stats.html', 'money-engine.js'), 'stats.html deliberately does not load money-engine.js');
+        assert.ok(loads('sidematches.html', 'money-engine.js'), 'sidematches.html loads money-engine.js since v135');
     });
 
     test('without the canonical engine the page FAILS LOUDLY, it does not compute zero', () => {
@@ -265,23 +265,25 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
         // dependency and watching the render fail.
         // { only: true } - the harness now loads a page's real script tags by default,
         // so a realm deliberately missing the engine has to say so explicitly.
-        const crippled = loadHtmlInlineScript('sidematches.html', ['action-model.js'], { only: true });
+        // SINCE v135 the stroke engines are called from the Bets tab (skins.html),
+        // where the full card lives; the Matches card reads bet-strip.js rows. So
+        // the loud-failure guard is on skins.html, loaded with everything it
+        // declares EXCEPT settlement-engine.js.
+        const crippled = loadHtmlInlineScript('skins.html',
+            ['handicap.js', 'text-safe.js', 'action-model.js', 'grouping.js', 'money-engine.js', 'bet-strip.js'],
+            { only: true, search: '?game=TESTCD' });
         assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined',
             'without the script tag the page should have no engine at all');
-
-        vm.runInContext(
-            'currentMode = "TESTCD";' +
-            'currentData = ' + JSON.stringify({
-                players: FOURSOME, courseData: cd18, scores: lopsided2v2Scores(),
-                sideMatches: { m1: { format: 'stroke', scoring: 'gross',
-                    teamAIds: ['1', '2'], teamBIds: ['3', '4'], startHole: 1, createdAt: 1,
-                    holeStake: 0, overallStake: OVERALL_STAKE, overallMode: 'stroke',
-                    segment: 'full', tieRule: 'carry' } },
-            }) + ';' +
-            'lockedGroup = null; hasGroupLock = false;',
-            crippled
-        );
-        assert.throws(() => crippled.renderSideMatches(),
+        const handler = crippled.__dbHandlers.find(h => h.event === 'value');
+        const data = {
+            players: FOURSOME, courseData: cd18, scores: lopsided2v2Scores(),
+            sideMatches: { m1: { format: 'stroke', scoring: 'gross',
+                teamAIds: ['1', '2'], teamBIds: ['3', '4'], startHole: 1, createdAt: 1,
+                holeStake: 0, overallStake: OVERALL_STAKE, overallMode: 'stroke',
+                segment: 'full', tieRule: 'carry' } },
+        };
+        assert.throws(() => handler.cb({ val: () => data, exists: () => true }),
+            /calculate(Hole|Overall)BetEngine is not defined/,
             'a missing engine must break the card, not silently report no money');
     });
 
@@ -892,20 +894,24 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
 
 describe('RENDERED 2v2 CARD — both sides, and money that matches the Receipt', () => {
 
-    // A page realm with a whole round loaded, rendered through production.
+    // SINCE v135 the full card - segment rows, money, per-golfer shares - is drawn
+    // on the Bets tab (skins.html); the Matches tab keeps the header, one result
+    // line, the controls and the mini scorecard. Both pages are rendered through
+    // production the way a golfer arrives: the bare link, the round through the
+    // page's own value listener. `html` is the Bets card, `matches` the Matches card.
     function renderRound(players, sideMatch, scores) {
-        const sb = loadHtmlInlineScript('sidematches.html', PAGE_DEPS['sidematches.html']);
-        vm.runInContext(
-            'currentMode = "TESTCD";' +
-            'currentData = ' + JSON.stringify({
-                players: players, courseData: cd18, scores: scores,
-                sideMatches: { m1: sideMatch },
-            }) + ';' +
-            'lockedGroup = null; hasGroupLock = false;',
-            sb
-        );
-        sb.renderSideMatches();
-        return { sb, html: sb.document.getElementById('sidematches-list').innerHTML || '' };
+        const data = { players: players, courseData: cd18, scores: scores, sideMatches: { m1: sideMatch } };
+        const open = page => {
+            const sb = loadHtmlInlineScript(page, [], { search: '?game=TESTCD' });
+            sb.__dbHandlers.find(h => h.event === 'value' && h.path === 'events/TESTCD')
+                .cb({ val: () => data, exists: () => true });
+            return sb;
+        };
+        const bets = open('skins.html');
+        const sm = open('sidematches.html');
+        return { sb: bets,
+            html: bets.document.getElementById('bets-matches').innerHTML || '',
+            matches: sm.document.getElementById('sidematches-list').innerHTML || '' };
     }
 
     const SM_2V2 = {
@@ -919,9 +925,10 @@ describe('RENDERED 2v2 CARD — both sides, and money that matches the Receipt',
     test('the render actually ran and produced a card', () => {
         // Everything below reads this string. If the render silently no-oped, the
         // assertions would be searching an empty page and passing on absence.
-        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
-        assert.ok(html.length > 500, 'renderSideMatches() should have produced a card');
-        assert.match(html, /side-match-card/);
+        const { html, matches } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        assert.ok(html.length > 500, 'the Bets render should have produced a card');
+        assert.match(html, /bets-match/);
+        assert.match(matches, /side-match-card/);
     });
 
     test('renderSideMatches passes the WHOLE side to the engine', () => {
@@ -940,7 +947,7 @@ describe('RENDERED 2v2 CARD — both sides, and money that matches the Receipt',
 
     test('the header names BOTH golfers on BOTH sides', () => {
         const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
-        const header = html.match(/<div class="side-match-players">([^<]*)<\/div>/);
+        const header = html.match(/<span class="bets-match-players">([^<]*)<\/span>/);
         assert.ok(header, 'the card should have a players header');
         ['Ann', 'Abe', 'Ben', 'Bo'].forEach(name =>
             assert.ok(header[1].includes(name), 'the header should name ' + name + ', got: ' + header[1]));
@@ -986,8 +993,8 @@ describe('RENDERED 2v2 CARD — both sides, and money that matches the Receipt',
     test('all four golfers appear in the mini scorecard', () => {
         // Best ball means a partner's score can decide a hole, so a verify-scores card
         // showing two of the four cannot be used to check the money.
-        const { html } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
-        const card = html.slice(html.indexOf('sm-scorecard-body'));
+        const { matches } = renderRound(FOURSOME, SM_2V2, lopsided2v2Scores());
+        const card = matches.slice(matches.indexOf('sm-scorecard-body'));
         ['Ann', 'Abe', 'Ben', 'Bo'].forEach(name =>
             assert.ok(card.includes('sm-row-label">' + name),
                 name + ' should have a row in the mini scorecard'));

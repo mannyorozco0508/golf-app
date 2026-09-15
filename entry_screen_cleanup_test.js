@@ -232,8 +232,9 @@ describe('AN ORDINARY VISIT TO MATCHES LOSES NOTHING', () => {
     test('the heading is there, and names the round', () => {
         const sb = arrive(false);
         assert.equal(shown(sb, 'main-title'), true, 'an ordinary visit lost its heading');
+        // v135: the heading names the job ("Matches"), no longer the round.
         assert.match(run(sb, 'document.getElementById("main-title").textContent'),
-            /Side Matches/, 'the heading stopped saying what the page is');
+            /Matches/, 'the heading stopped saying what the page is');
     });
 
     test('the Bets pointer is there', () => {

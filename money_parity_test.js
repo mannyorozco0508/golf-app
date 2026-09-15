@@ -371,7 +371,11 @@ describe('THE DUPLICATE INVENTORY IS EXACTLY WHAT WE THINK IT IS', () => {
             'settlement-engine.js': ['calculateHoleBetEngine','calculateOverallBetEngine','calculateHiLoEngine'],
             'money-engine.js': ['calcDotsEngine','calcPointSettlement','calculateStrokePressSet','nassauStakeConfig'],
             'index.html': ['calcDotsEngine','calculateHiLoEngine','calculateStrokePressSet','calcPointSettlement','nassauStakeConfig'],
-            'sidematches.html': ['nassauStakeConfig'],
+            // v135 (Bets/Matches split) removed sidematches.html's nassauStakeConfig
+            // copy along with its calculateMatchEngine: the page now loads
+            // money-engine.js, and a copy that knew only the side-match shape would
+            // have shadowed the canonical one for bet-strip.js. Nothing left here.
+            'sidematches.html': [],
             // Batch 3 removed stats.html's two stroke engines. calcPointSettlement and
             // nassauStakeConfig are byte-identical money-engine duplicates that were
             // deliberately DEFERRED, so they must still be here.

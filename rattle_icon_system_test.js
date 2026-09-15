@@ -117,12 +117,14 @@ describe('THE BULLSEYE WAS REPLACED SEMANTICALLY, NOT SWEPT', () => {
 
     test('side-match Overall carries NO icon', () => {
         // Front, Back and Overall are three parts of one ⚔️ match. Giving one of them
-        // its own glyph is how the drift started.
-        const sm = read('sidematches.html');
+        // its own glyph is how the drift started. The row lives on the Bets tab since
+        // the Bets/Matches split (v135); the Matches card keeps the plain press button.
+        const sm = read('skins.html');
         assert.match(sm, /Overall \(\$\$\{sm\.overallStake\}\)/,
             'the label stands on its own');
         assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]\s*Overall \(/u.test(sm),
             'Overall must not have acquired a replacement icon');
+        assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]\s*Overall \(/u.test(read('sidematches.html')));
     });
 
     test('⭐ and 🔘 did not themselves become catch-alls', () => {

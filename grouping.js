@@ -102,3 +102,49 @@ function groupLinkNoteText(playerCount) {
           + 'and nobody else\u2019s.'
         : 'Scorekeeper link \u2014 send this to whoever is keeping the card.';
 }
+
+// Which group each golfer is in, keyed by id: { '101': 1, '102': 1, '105': 2 }.
+//
+// The same slicing computeGroupBoundaries hands out, folded into a lookup so a
+// wager's participants can be checked one id at a time. Ids are keyed as
+// strings because the two storage shapes disagree - teamAIds may hold numbers
+// or strings depending on which page wrote them - and a lookup that only matched
+// one of them would silently hide half the round's matches.
+function playerGroupMap(players, overrides) {
+    const list = players || [];
+    const map = {};
+    computeGroupBoundaries(list.length, overrides || {}).forEach(b => {
+        for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
+            if (list[i]) map[String(list[i].id)] = b.group;
+        }
+    });
+    return map;
+}
+
+// WHO MAY SEE A WAGER. One rule, consulted by the Bets tab and the Matches tab,
+// so a group can never be shown a match on one page and lose it on the other.
+//
+//   see(wager) = no ?group= on the link            (the bare link sees everything)
+//             || the wager names no participants   (round-wide: everybody's)
+//             || some participant is in this group (ours, or shared with us)
+//
+// DERIVED FROM PARTICIPANTS, NEVER FROM ownerGroup OR scope. Those two fields
+// are written by the Action form and by nothing else - an auto-paired slate
+// carries neither, and every round saved before they existed carries neither -
+// so a rule that read them would blank the Bets tab on exactly the rounds a
+// club day produces. teamAIds / teamBIds / participantIds are on every wager
+// the app has ever written, and a cross-group match resolves to "mine" for BOTH
+// groups in it by construction, which is what a cross-group match should do.
+//
+// participantIds: the wager's own list (teamAIds + teamBIds for a match, the
+//                 participantIds of a field game). Absent or empty means the
+//                 wager covers the whole money field.
+// lockedGroup:    the group number from ?group=, or null on the bare link.
+// groupOf:        playerGroupMap() for the round.
+function canLinkSeeWager(participantIds, lockedGroup, groupOf) {
+    if (lockedGroup === null || lockedGroup === undefined) return true;
+    const ids = (participantIds || []).map(String);
+    if (ids.length === 0) return true;
+    const map = groupOf || {};
+    return ids.some(id => String(map[id]) === String(lockedGroup));
+}

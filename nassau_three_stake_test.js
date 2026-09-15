@@ -341,11 +341,16 @@ describe('ALL FOUR COPIES AGREE', () => {
     test('each copy carries the three-stake contract', () => {
         const fs = require('fs'), path = require('path');
         const { REPO_ROOT } = require('./helpers/load-script.js');
-        NAMES.forEach(n => {
+        // sidematches.html has NO inline copy since the Bets/Matches split (v135):
+        // it loads money-engine.js, so its realm's engine above is the canonical one.
+        NAMES.filter(n => n !== 'sidematches.html').forEach(n => {
             const src = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8');
             assert.match(src, /const baseStakeFor = id =>/, n + ' lost baseStakeFor');
             assert.match(src, /const autoPressStakeFor = id =>/, n + ' lost autoPressStakeFor');
             assert.match(src, /manualPresses, stakeConfig\)/, n + ' lost the stakeConfig parameter');
         });
+        const sm = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
+        assert.ok(!/function calculateMatchEngine\s*\(/.test(sm.replace(/<script src=[^>]*><\/script>/g, '')),
+            'sidematches.html must not regrow an inline match engine');
     });
 });

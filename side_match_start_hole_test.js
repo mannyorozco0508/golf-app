@@ -342,7 +342,7 @@ describe('BACKWARD COMPATIBILITY', () => {
     });
 
     test('every consumer degrades safely if action-model has not loaded', () => {
-        ['settlement-engine.js', 'settlement.html', 'stats.html', 'sidematches.html'].forEach(f => {
+        ['settlement-engine.js', 'settlement.html', 'stats.html', 'sidematches.html', 'skins.html'].forEach(f => {
             const src = read(f);
             assert.ok(/typeof sideMatchHoles === 'function'/.test(src), `${f} has no fallback`);
             assert.ok(/h\.hole >= sm\.startHole/.test(src), `${f} has no inline fallback range`);
@@ -362,7 +362,11 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
         // identical assertion above still pins the scoped course.
         'settlement.html': ['calculateHoleBetEngine([p1, p2], smCourse'],
         'stats.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
-        'sidematches.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse']
+        // SINCE v135 (Bets/Matches split) the stroke engines are called from the Bets
+        // tab, skins.html, where the full card lives. sidematches.html still calls the
+        // match engine for press eligibility, over the scoped course.
+        'skins.html': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateOverallBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
+        'sidematches.html': ['calculateMatchEngine(virtualPlayers, smCourse']
     };
     Object.keys(files).forEach(f => {
         test(`${f} passes the scoped course to every side match engine`, () => {
@@ -379,7 +383,7 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
     // green while a page quietly dropped two of four golfers, which is exactly the
     // defect Batches 2 and 3 fixed. Both halves are checked now: the scoped course
     // reaches the engine, AND the complete sides do.
-    ['settlement-engine.js', 'stats.html', 'sidematches.html'].forEach(f => {
+    ['settlement-engine.js', 'stats.html', 'skins.html'].forEach(f => {
         test(`${f} passes the COMPLETE sides, not just the first golfer of each`, () => {
             const src = read(f);
             assert.match(src, /sideA: team[AB]?Players|sideA: teamAPlayers/,

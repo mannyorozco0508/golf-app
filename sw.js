@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v135: Bets and Matches split the jobs, scoped to the group.
+//
+// skins.html (Bets) now shows a group its OWN action - every match with one of
+// its golfers in it, the round games it is in, the round-wide games - with the
+// full live display that used to sit on the Matches tab, and its round-config
+// controls are read-only on a ?group= link. sidematches.html (Matches) is where
+// matches are built: one result line per card from bet-strip.js, the press and
+// remove controls, the mini scorecard; its two inline engine copies are gone
+// and it loads money-engine.js and bet-strip.js. grouping.js gained the one
+// visibility rule both tabs consult. An installed device on v134 keeps the old
+// Skins Tracker, an unscoped Matches list and the page-local engine.
+
 // Moved to v134: the Results page is sectioned so it can be read.
 //
 // settlement.html only, presentation only. The Main Pool card was 62 bare
@@ -1287,7 +1299,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v134-results-sections';
+const CACHE_VERSION = 'golfapp-v135-bets-matches-split';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

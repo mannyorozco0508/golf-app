@@ -15,6 +15,12 @@
 //
 // THE FIXTURE, everywhere: Marty vs Matt · Stroke · Gross · $10/hole + $200
 // overall · HP H6 $78 · HP H10 $125 · OP H12 $33 · OP H15 $200.
+//
+// RE-PINNED FOR THE BETS/MATCHES SPLIT (v135). The press LEDGER moved with the
+// rest of the live display to the Bets tab (skins.html, betsPage below); the
+// Matches tab (sidematches.html, actionPage) keeps the press controls and now
+// states the CURRENT $/hole rate on its card, from storage, so the golfer about
+// to press knows what they are pressing from.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -91,6 +97,19 @@ function actionPage(sideMatches, opts) {
     return sb.document.getElementById('sidematches-list').innerHTML || '';
 }
 
+// The Bets tab, reached the way a golfer reaches it: the page loads with the
+// link and the round arrives through the listener it registered.
+function betsPage(sideMatches, opts) {
+    const o = opts || {};
+    const players = o.players || P2;
+    const search = '?game=ABCD' + (o.group !== undefined && o.group !== null ? '&group=' + o.group : '');
+    const sb = loadHtmlInlineScript('skins.html', [], { search });
+    const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/ABCD');
+    h.cb({ val: () => ({ players, courseData: CD, gameFormat: 'stroke',
+        scores: o.scores || scoresThrough(players, 13), sideMatches }), exists: () => true });
+    return sb.document.getElementById('bets-matches').innerHTML || '';
+}
+
 // ---------------------------------------------------------------------------
 describe('SCORECARD — the AUTO-OPENED 1v1 card shows every press', () => {
     // Items 1-4: the exact card that hid the money. A 1v1 auto-opens; each of the
@@ -134,10 +153,10 @@ describe('SCORECARD — the AUTO-OPENED 1v1 card shows every press', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('ACTION PAGE — the stored press history, not just the current rate', () => {
+describe('BETS PAGE — the stored press history, not just the current rate', () => {
     // Item 6.
     test('all four presses render with start holes and stakes', () => {
-        const html = actionPage(LAUNCH());
+        const html = betsPage(LAUNCH());
         assert.match(html, /HP1 \u00B7 H6 \u00B7 \$78\/hole/);
         assert.match(html, /HP2 \u00B7 H10 \u00B7 \$125\/hole/);
         assert.match(html, /P1 \u00B7 H12 \u00B7 \$33/);
@@ -145,14 +164,20 @@ describe('ACTION PAGE — the stored press history, not just the current rate', 
     });
 
     test('the current rate still shows beside the history that produced it', () => {
-        const html = actionPage(LAUNCH());
+        const html = betsPage(LAUNCH());
         assert.match(html, /\$125\/hole/, 'the live rate the golfers are playing at');
         assert.match(html, /\$78\/hole/, 'and the press that preceded it');
     });
 
+    test('the MATCHES card states the current rate too, where the next press is made', () => {
+        const html = actionPage(LAUNCH());
+        assert.match(html, /\$125\/hole \(pressed from \$10\)/, 'the rate they are playing at, from storage');
+        assert.ok(!/HP1/.test(html), 'the ledger itself lives on Bets');
+    });
+
     test('a legacy overall press with no stake shows the original wager', () => {
         const sm = LAUNCH(); sm.m1.overallPresses = { c: { startHole: 12 } };
-        assert.match(actionPage(sm), /P1 \u00B7 H12 \u00B7 \$200/,
+        assert.match(betsPage(sm), /P1 \u00B7 H12 \u00B7 \$200/,
             'what it displays is what it settles at');
     });
 
@@ -169,6 +194,9 @@ describe('ACTION PAGE — the stored press history, not just the current rate', 
         assert.match(html, /Press/, 'the press row itself still renders');
         assert.match(html, /F \$50 \/ B \$50 \/ O \$50/,
             'the card header states the single stake on all three Nassau segments');
+        const bets = betsPage(sm);
+        assert.ok(!/HP\d/.test(bets), 'and on Bets too');
+        assert.match(bets, /F \$50 \/ B \$50 \/ O \$50/);
     });
 
     test('a NASSAU custom stake is live on the scorecard chips, open or closed', () => {
@@ -186,9 +214,10 @@ describe('RELOAD, CORRECTION, CROSS-GROUP', () => {
     test('RELOAD: both pages render all four from re-parsed persisted JSON', () => {
         const persisted = JSON.parse(JSON.stringify(LAUNCH()));
         ALL_FOUR(scorecard(persisted, { forceCollapsed: true }));
-        const ap = actionPage(JSON.parse(JSON.stringify(persisted)));
+        const ap = betsPage(JSON.parse(JSON.stringify(persisted)));
         assert.match(ap, /\$78\/hole/); assert.match(ap, /\$125\/hole/);
         assert.match(ap, /\$33/); assert.match(ap, /P2 \u00B7 H15 \u00B7 \$200/);
+        assert.match(actionPage(JSON.parse(JSON.stringify(persisted))), /\$125\/hole/, 'Matches states the current rate');
     });
 
     // Item 8: fixing a card moves results, never the press ledger.
@@ -196,8 +225,8 @@ describe('RELOAD, CORRECTION, CROSS-GROUP', () => {
         const wrong = scoresThrough(P2, 13);
         const fixed = Object.assign({}, wrong);
         for (let h = 1; h <= 13; h++) fixed[`p${A}_h${h}`] = 6;   // Marty's card was wrong
-        const before = actionPage(LAUNCH(), { scores: wrong });
-        const after = actionPage(LAUNCH(), { scores: fixed });
+        const before = betsPage(LAUNCH(), { scores: wrong });
+        const after = betsPage(LAUNCH(), { scores: fixed });
         [before, after].forEach(html => {
             assert.match(html, /HP1 \u00B7 H6 \u00B7 \$78\/hole/);
             assert.match(html, /P2 \u00B7 H15 \u00B7 \$200/);
@@ -215,10 +244,14 @@ describe('RELOAD, CORRECTION, CROSS-GROUP', () => {
                   scope: 'cross', teamAIds: [M], teamBIds: [S],
                   holePresses: { k: { fromHole: 6, newStake: 78 } } } }));
         [1, 2].forEach(g => {
-            const html = actionPage(persisted, { players: P12, group: g,
+            const html = betsPage(persisted, { players: P12, group: g,
                 scores: scoresThrough(P12, 13) });
             assert.match(html, /HP1 \u00B7 H6 \u00B7 \$78\/hole/, `Group ${g} sees the $78 live`);
+            assert.match(actionPage(persisted, { players: P12, group: g, scores: scoresThrough(P12, 13) }),
+                /showSideHolePressInput\('x1'/, `Group ${g} can press it from Matches`);
         });
+        // Group 3 has nobody in it: not on either tab.
+        assert.ok(!/bets-match-x1/.test(betsPage(persisted, { players: P12, group: 3, scores: scoresThrough(P12, 13) })));
     });
 
     test('an unrelated group still cannot manage it', () => {

@@ -627,12 +627,17 @@ describe('EVERY PRODUCTION COPY AGREES', () => {
 
     test('no production copy still carries the old singles-only gate', () => {
         // Search list over the files that USED to own a relative-handicap copy.
-        ['money-engine.js', 'index.html', 'sidematches.html', 'stats.html'].forEach(f => {
+        // sidematches.html left this list in v135 (Bets/Matches split): its inline
+        // engine copy is gone and it loads money-engine.js, so the realm comparisons
+        // above run against the canonical engine. The absence is pinned instead.
+        ['money-engine.js', 'index.html', 'stats.html'].forEach(f => {
             const src = read(f);
             assert.ok(!/const isSingles = scoringType === 'net' && t1Players\.length === 1/.test(src),
                 f + ' still gates the relative allocation to 1v1');
             assert.ok(/matchHandicapBaseline/.test(src), f + ' is missing the all-player baseline');
         });
+        assert.ok(!/function calculateMatchEngine\s*\(/.test(read('sidematches.html').replace(/<script src=[^>]*><\/script>/g, '')),
+            'sidematches.html must not regrow an inline match engine');
     });
 });
 
