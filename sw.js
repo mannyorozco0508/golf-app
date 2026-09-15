@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v145: the Card tab fails closed on a link whose group is not in
+// this round.
+//
+// index.html only. A ?group=N with no boundary - a stale link from a round
+// that had more groups, or a typo - used to fall back to the WHOLE FIELD under
+// a badge saying "Scorekeeper: Group N Only", and every scoped surface then
+// showed everyone. It now resolves to nobody: no card, no hole, no My Round,
+// no ticker, no recap, and one line saying the link's group is not in this
+// round. The readers that widened an empty scoped list read one helper
+// (scopedPlayers) that tells "no lock" from "a lock that matched nobody", and
+// the surfaces whose builders widen an empty list themselves (hole-events.js,
+// bet-strip.js, money-engine.js - untouched) are not asked. An installed
+// device on v144 still shows a stale group link the whole field.
+
 // Moved to v144: Wave A - three small fixes, no figure changes.
 //
 // pool-engine.js: a tied net place's line now carries {shares: [...]} in ids
@@ -1395,7 +1409,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v144-wave-a-three-fixes';
+const CACHE_VERSION = 'golfapp-v145-card-fails-closed';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

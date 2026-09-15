@@ -124,7 +124,8 @@ describe('WHEN THE SELECTOR APPEARS', () => {
             assert.equal(call('isRoundLevelMatchFormat(' + JSON.stringify(f) + ')'), true, f);
         });
         assert.match(RS, /const roundOwnsDots = isRoundLevelMatchFormat\(gameFormat\);/);
-        assert.match(RS, /const selectorApplies = !roundOwnsDots && hasOptions;/,
+        // Wave B: `&& !groupMissing` - a link whose group is not in this round has no golfers to contextualise (card_scope_closed_test.js).
+        assert.match(RS, /const selectorApplies = !roundOwnsDots && hasOptions && !groupMissing;/,
             'the selector is suppressed when the round already owns one match context');
     });
 
@@ -542,7 +543,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v144-wave-a-three-fixes';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v145-card-fails-closed';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });

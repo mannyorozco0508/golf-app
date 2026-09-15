@@ -88,7 +88,8 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
 
     test('group scoping is unchanged — the scorecard board stays group-scoped', () => {
         const fn = IDX.slice(IDX.indexOf('function liveStandings'), IDX.indexOf('function liveStandings') + 1800);
-        assert.match(fn, /window\.__scFilteredPlayers/,
+        // Wave B: read through scopedPlayers(), the helper over __scFilteredPlayers (card_scope_closed_test.js).
+        assert.match(fn, /scopedPlayers\(\)/,
             'a Group 1 link must not show Group 2 golfers in either scorecard view');
     });
 

@@ -783,6 +783,7 @@
            Red AND bold, never colour alone: this has to read on a phone in
            direct sun. min-height reserves the row so nothing shifts. */
         .save-state { min-height: 18px; text-align: center; font-size: 0.78rem; color: var(--text-muted); margin: 6px 0 10px 0; transition: opacity 0.2s; }
+        .group-missing-note { text-align: center; font-size: 0.85rem; font-weight: bold; color: var(--warn-text); background: var(--warn-bg); border: 2px solid var(--warn-border); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px 0; }
         .save-state.saving { color: var(--text-muted); }
         .save-state.saved { color: var(--brand-green); font-weight: bold; }
         .save-state.error { color: var(--accent-red); font-weight: bold; }
@@ -1318,6 +1319,10 @@ html {
          min-height reserves the row so the boxes do not jump under a thumb when
          the message appears or clears. -->
     <div class="save-state" id="save-state" role="status" aria-live="polite"></div>
+    <!-- A LINK WHOSE GROUP IS NOT IN THIS ROUND (Wave B). Written by
+         renderGroupMissingNote() from renderScorecard(); static and above both
+         view mounts for the same reason #save-state is. -->
+    <div class="group-missing-note" id="group-missing-note" role="alert" style="display:none;"></div>
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
@@ -1936,6 +1941,9 @@ html {
     function renderLandingSummary(filteredPlayers, allPlayers) {
         const box = document.getElementById('round-landing-summary');
         if (!box) return;
+        // A link whose group is not in this round: the note above the card says
+        // so; a welcome naming nobody and "no bets this round" would be false (Wave B).
+        if (scopeMissing()) { box.style.display = 'none'; return; }
         const dismissKey = `landingDismissed_${currentMode}`;
         if (localStorage.getItem(dismissKey) === '1') { box.style.display = 'none'; return; }
 
@@ -2226,6 +2234,15 @@ html {
         if (!container) return;
 
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        // FAIL CLOSED (Wave B). A link whose group is not in this round: the note
+        // above the card says so; no hole heading, no boxes, no Prev/Next - there is
+        // nobody to score and nowhere to go. The widgets still render, and each
+        // closes itself, so none of them can show the field by accident.
+        if (scopeMissing()) {
+            container.innerHTML = '';
+            renderCardWidgets();
+            return;
+        }
         if (courseData.length === 0) {
             // NOT emptyRoundMessage(). This fires on a DIFFERENT condition: a round
             // that exists, with players, whose course carries no hole data yet -
@@ -2432,6 +2449,13 @@ html {
         }
 
         container.innerHTML = html;
+        renderCardWidgets();
+    }
+
+    // The widgets under the hole card, in one list, so the closed path below and
+    // the open path above cannot drift apart. Each closes itself on a link whose
+    // group is not in this round (scopedPlayers() / scopeMissing()).
+    function renderCardWidgets() {
         renderWhoAmI();
         renderHoleRecap();
         renderLiveSkins();
@@ -2483,6 +2507,37 @@ html {
     // the group this link is responsible for. The DEFAULT IS UNCHANGED - every
     // existing caller passes nothing and keeps the scoped behaviour the product
     // rule requires; only the expanded board asks for the field.
+    // THE PLAYERS THIS LINK CAN SEE - one rule for every scoped surface (Wave B).
+    //
+    // renderScorecard() sets __scFilteredPlayers: the whole field with no lock (or
+    // "All Players"), the group's golfers on a group link, and EMPTY on a group
+    // link whose group this round does not have. Readers used to widen an empty
+    // list back to the whole field ("length > 0 ? filtered : players"), which is
+    // exactly the leak: an unknown group showed everyone. The distinction that
+    // matters is NOT SET (nothing rendered yet: the whole field is right) versus
+    // SET AND EMPTY (a lock that matched nobody: nobody is right). An array,
+    // whatever its length, is the answer.
+    function scopedPlayers() {
+        return Array.isArray(window.__scFilteredPlayers)
+            ? window.__scFilteredPlayers
+            : ((currentData && currentData.players) || []);
+    }
+    function scopeMissing() {
+        return window.__scGroupMissing === true;
+    }
+
+    // ONE LINE, above both views, so the golfer holding a stale link is told
+    // rather than shown an empty screen. Static markup like #save-state: the
+    // view mounts are rewritten on every snapshot and would wipe it.
+    function renderGroupMissingNote(missing, group, groupCount) {
+        const el = document.getElementById('group-missing-note');
+        if (!el) return;
+        if (!missing) { el.textContent = ''; el.style.display = 'none'; return; }
+        el.textContent = `\u26A0\uFE0F This link is for Group ${group}, but this round has ${groupCount} group${groupCount === 1 ? '' : 's'}. `
+            + 'No scores are shown \u2014 ask the organizer for a current link.';
+        el.style.display = 'block';
+    }
+
     function liveStandings(scope) {
         if (typeof computeNetToParStandings !== 'function') return [];
         // THE SCORECARD IS A WORKING VIEW FOR ONE FOURSOME.
@@ -2502,11 +2557,7 @@ html {
         // opponent there - but it does not add that golfer to these standings, which
         // represent the group being scored.
         const whole = (currentData && currentData.players) || [];
-        const players = (scope === 'field')
-            ? whole
-            : ((window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-                ? window.__scFilteredPlayers
-                : whole);
+        const players = (scope === 'field') ? whole : scopedPlayers();
         const courseData = (currentData && currentData.courseData) || [];
         const savedScores = (currentData && currentData.scores) || {};
         if (players.length === 0 || courseData.length === 0) return [];
@@ -2721,30 +2772,34 @@ html {
         const mount = TICKER_MOUNTS.map(id => document.getElementById(id)).find(Boolean);
         if (!mount) return;
         const board = renderLeaderWidgetHtml();
-        const skins = renderSkinsWidgetHtml();
+        const skins = scopeMissing() ? '' : renderSkinsWidgetHtml();
         // Scoped to the players this viewer can see - the same rule the scorecard's
         // side-bet callout already uses, so a group scorekeeper sees the bets in front
         // of them and a cross-group wager appears to both sides.
-        const lmVisible = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-            ? window.__scFilteredPlayers.map(p => String(p.id))
-            : (currentData.players || []).map(p => String(p.id));
-        const matches = buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
+        // FAIL CLOSED (Wave B). buildLiveMatchStates() treats an EMPTY visible list
+        // as unfiltered - everyone - so a link whose group is not in this round is
+        // not shown the match cards at all; and the whole-field widgets (skins, dots,
+        // points, Hi-Lo, Ryder) are held back too: that link is nobody's, not a
+        // spectator's. The leaderboard widget scopes itself through scopedPlayers().
+        const closed = scopeMissing();
+        const lmVisible = scopedPlayers().map(p => String(p.id));
+        const matches = closed ? '' : buildLiveMatchHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
         // Mutually exclusive with the match widget in practice: a round is scored
         // as a points game or a match format, not both, so this adds a card only
         // where one was missing entirely.
-        const points = buildLivePointsHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        const points = closed ? '' : buildLivePointsHtml(currentData, currentData.courseData || [], currentData.scores || {});
         // Hi-Lo is a primary format, so it is mutually exclusive with the points and
         // match cards - it adds a card only where the golfer previously had none.
-        const hilo = buildLiveHiLoHtml(currentData, currentData.courseData || [], currentData.scores || {});
+        const hilo = closed ? '' : buildLiveHiLoHtml(currentData, currentData.courseData || [], currentData.scores || {});
         // Scoped to the players this viewer can see, the same rule the match card uses.
-        const strokeBets = buildLiveStrokeBetHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
+        const strokeBets = closed ? '' : buildLiveStrokeBetHtml(currentData, currentData.courseData || [], currentData.scores || {}, lmVisible);
         // LIVE DOTS answers a different question from the to-par board above it, so it
         // is an additional card rather than a replacement. It rides the same grid, which
         // means Part 3's two mounts carry it with no extra plumbing.
-        const dotsBoard = renderDotsWidgetHtml();
+        const dotsBoard = closed ? '' : renderDotsWidgetHtml();
         // Ryder Cup rides the same grid and the same two mounts. Placed after the
         // to-par board so the golfer's own score stays first on the phone.
-        const ryder = (typeof renderRyderCupHtml === 'function') ? renderRyderCupHtml() : '';
+        const ryder = (!closed && typeof renderRyderCupHtml === 'function') ? renderRyderCupHtml() : '';
         const any = board || skins || matches || points || hilo || strokeBets || dotsBoard || ryder;
         const html = any ? '<div class="lw-grid">' + board + dotsBoard + ryder + skins + matches + points + hilo + strokeBets + '</div>' : '';
         // ONE PRESENTER, TWO MOUNTS. The markup is built once, above, from
@@ -2899,9 +2954,7 @@ html {
         const cfg = ryderCupConfig(res.cup);
         const sess = cfg.sessions && cfg.sessions[res.sessionId];
         if (!sess || sess.format !== 'foursomes') return null;
-        const visible = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-            ? window.__scFilteredPlayers.map(p => String(p.id))
-            : (currentData.players || []).map(p => String(p.id));
+        const visible = scopedPlayers().map(p => String(p.id));
         const mine = Object.keys(cfg.matches)
             .map(k => cfg.matches[k])
             .filter(m => (m.sessionId || 's1') === res.sessionId)
@@ -3264,7 +3317,7 @@ html {
         const body = document.getElementById('live-board-body');
         if (!body) return;
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        const rows = liveStandings(liveBoardScope);
+        const rows = scopeMissing() ? [] : liveStandings(liveBoardScope);
         // THE REAL FIELD, which is what "of N" has to mean for the footer to be
         // capable of reporting anything.
         const fieldSize = ((currentData && currentData.players) || []).length;
@@ -3369,6 +3422,9 @@ html {
         const mount = document.getElementById('live-skins-mount');
         if (!mount) return;
         mount.innerHTML = '';
+        // Whole-field by design, but a link whose group is not in this round is
+        // nobody's, not a spectator's: it shows the note above and nothing else (Wave B).
+        if (scopeMissing()) return;
 
         if (typeof computeSkinsHoleLedger !== 'function') return;
         const data = currentData || {};
@@ -3492,9 +3548,7 @@ html {
     function currentBetStripModel() {
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const savedScores = currentData.scores || {};
-        const scoped = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-            ? window.__scFilteredPlayers
-            : (currentData.players || []);
+        const scoped = scopedPlayers();
         try {
             return buildBetStrip(currentData, courseData, savedScores, scoped);
         } catch (e) {
@@ -3849,7 +3903,7 @@ html {
             return;
         }
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        const scoped = window.__scFilteredPlayers || currentData.players || [];
+        const scoped = scopedPlayers();
         const fresh = buildSideActionRows(currentData, courseData, currentData.scores || {}, scoped)
             .find(r => r.key === key);
         if (!fresh || !fresh.canPress) { closeSidePress(); alert('That match can no longer be pressed.'); return; }
@@ -4246,7 +4300,7 @@ html {
     function renderWhoAmI() {
         const mount = document.getElementById('whoami-mount');
         if (!mount) return;
-        const scoped = window.__scFilteredPlayers || currentData.players || [];
+        const scoped = scopedPlayers();
         // Asked once, only where it can actually help, and always skippable.
         if (resolvedMeId() || whoAmIDismissed || scoped.length < 2) { mount.innerHTML = ''; return; }
 
@@ -4269,8 +4323,12 @@ html {
     function renderHoleRecap() {
         const mount = document.getElementById('hole-recap-mount');
         if (!mount) return;
+        // FAIL CLOSED (Wave B). buildHoleEvents() treats an empty scoped list as
+        // "the whole field", so a link whose group is not in this round must not
+        // ask it at all: nobody's holes, no recap.
+        if (scopeMissing()) { mount.innerHTML = ''; return; }
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
-        const scoped = window.__scFilteredPlayers || currentData.players || [];
+        const scoped = scopedPlayers();
 
         let events = [];
         try {
@@ -4303,12 +4361,14 @@ html {
     function renderActionCenter() {
         const mount = document.getElementById('action-center-mount');
         if (!mount) return;
+        // FAIL CLOSED (Wave B). buildActionRows() treats an empty scoped list as
+        // "the whole field", so a link whose group is not in this round must not
+        // ask it: nobody's round, no My Round.
+        if (scopeMissing()) { mount.innerHTML = ''; return; }
 
         const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const savedScores = currentData.scores || {};
-        const scoped = (window.__scFilteredPlayers && window.__scFilteredPlayers.length > 0)
-            ? window.__scFilteredPlayers
-            : (currentData.players || []);
+        const scoped = scopedPlayers();
 
         let games = [], side = [], changedKeys = {};
         try {
@@ -6398,9 +6458,10 @@ html {
         if (players.length <= 4 || hasGroupLock) {
             const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
             const b = hasGroupLock ? boundaries.find(bd => bd.group === lockedGroup) : null;
-            const startIdx = b ? b.startIdx : 0;
-            const size = b ? b.size : players.length;
-            filteredPlayers = players.slice(startIdx, startIdx + size);
+            // FAIL CLOSED (Wave B): the same slice renderScorecard makes. A locked
+            // group this round does not have is nobody, not the whole field.
+            if (b) filteredPlayers = players.slice(b.startIdx, b.startIdx + b.size);
+            else filteredPlayers = hasGroupLock ? [] : players.slice(0);
         }
 
         let html = "";
@@ -7646,14 +7707,23 @@ html {
 
         renderGroupFilters(players.length);
 
+        // FAIL CLOSED (Wave B). A ?group=N this round does not have - a stale link
+        // from a round that had more groups, or a typo - used to fall back to
+        // startIdx 0 / size players.length: the WHOLE FIELD, under a badge saying
+        // "Scorekeeper: Group 7 Only", and every scoped surface on the page then
+        // saw everyone. An unknown group is NOBODY: the slice is empty, the flag
+        // below tells every reader that the emptiness is a lock that matched no
+        // one (not "no lock"), and the note above the card says so to the golfer.
         let filteredPlayers = players;
+        let groupMissing = false;
         if (selectedGroup !== "all") {
             const b = groupBoundaries.find(bd => bd.group === selectedGroup);
-            const startIdx = b ? b.startIdx : 0;
-            const size = b ? b.size : players.length;
-            filteredPlayers = players.slice(startIdx, startIdx + size);
+            if (b) filteredPlayers = players.slice(b.startIdx, b.startIdx + b.size);
+            else { filteredPlayers = []; groupMissing = true; }
         }
         window.__scFilteredPlayers = filteredPlayers;
+        window.__scGroupMissing = groupMissing;
+        renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
         renderLandingSummary(filteredPlayers, players);
 
 
@@ -7741,7 +7811,8 @@ html {
         const dotMatchOptions = eligibleDotMatches(currentData);
         const roundOwnsDots = isRoundLevelMatchFormat(gameFormat);
         const hasOptions = dotMatchOptions.length > 0;
-        const selectorApplies = !roundOwnsDots && hasOptions;
+        // A link whose group is not in this round has no golfers to contextualise (Wave B).
+        const selectorApplies = !roundOwnsDots && hasOptions && !groupMissing;
         // AUTO is offered only when every eligible match is independent of the others.
         const autoAvailable = selectorApplies && !dotMatchesOverlap(dotMatchOptions);
 
@@ -8172,6 +8243,10 @@ html {
             }
         });
 
+        // FAIL CLOSED (Wave B): no golfer columns means no card at all - not a
+        // course skeleton with eighteen empty rows under a note saying nothing is shown.
+        if (groupMissing) { tbody.innerHTML = ""; headRow.innerHTML = ""; }
+
         const titleEl = document.getElementById("ticker-title-label");
         const statusEl = document.getElementById("ticker-status-val");
         const payoutBox = document.getElementById("nassau-payout-container");
@@ -8528,7 +8603,11 @@ html {
                 scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
             });
 
-            if (maxThru === 0) {
+            if (groupMissing) {
+                // Nobody's scores: no prompt to enter them (Wave B).
+                titleEl.textContent = "";
+                statusEl.textContent = "";
+            } else if (maxThru === 0) {
                 statusEl.textContent = "Enter Hole 1 Scores Below...";
             } else {
                 statusEl.innerHTML = scoresList.join(' <span style="color:#a8dadc; margin: 0 4px;">|</span> ');

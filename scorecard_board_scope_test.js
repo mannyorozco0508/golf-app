@@ -255,7 +255,8 @@ describe('THE COMPACT CARD IS UNCHANGED — THE RULE STANDS', () => {
         const src = read('index.html');
         const at = src.indexOf('function liveStandings');
         const fn = src.slice(at, at + 1800);
-        assert.match(fn, /window\.__scFilteredPlayers/);
-        assert.match(fn, /currentData && currentData\.players/);
+        // Wave B: liveStandings reads the scoped set through scopedPlayers(), the one helper that tells "not set" (whole field) from "set and empty" (a lock that matched nobody) - card_scope_closed_test.js.
+        assert.match(fn, /scopedPlayers\(\)/);
+        assert.match(src.slice(src.indexOf('function scopedPlayers'), src.indexOf('function scopedPlayers') + 300), /currentData && currentData\.players/);
     });
 });

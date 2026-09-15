@@ -284,7 +284,8 @@ describe('SCOPE FOLLOWS THE ENGINE, NOT CONVENIENCE', () => {
 
     test('the to-par board keeps its group scoping — the two legitimately differ', () => {
         const fn = IDX.slice(IDX.indexOf('function liveStandings'), IDX.indexOf('function liveStandings') + 1800);
-        assert.match(fn, /window\.__scFilteredPlayers/);
+        // Wave B: liveStandings reads the scoped set through scopedPlayers(), the one helper that tells "not set" (whole field) from "set and empty" (a lock that matched nobody) - card_scope_closed_test.js.
+        assert.match(fn, /scopedPlayers\(\)/);
     });
 
     test('a second group\'s golfers appear, because Dots pays them too', () => {

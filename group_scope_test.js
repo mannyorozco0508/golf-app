@@ -66,9 +66,11 @@ function scorecard(d, lockedGroup) {
         currentData = ${JSON.stringify(d)};
         window.__scPlayerGroupMap = ${JSON.stringify(groupMap)};
         // What index.html derives from the lock: the players this link may score.
+        // Wave B: with no lock index.html derives the WHOLE FIELD; an empty list
+        // now means a lock that matched nobody, and is never widened.
         window.__scFilteredPlayers = ${lockedGroup
             ? `currentData.players.filter(function(p){ return p.group === ${lockedGroup}; })`
-            : '[]'};
+            : 'currentData.players.slice()'};
         renderLiveTicker();
     `, sb);
     const html = String(vm.runInContext(
@@ -142,10 +144,13 @@ describe('THE SCORECARD LEADERBOARD FOLLOWS THE GROUP LOCK', () => {
         const src = read('index.html');
         const at = src.indexOf('function liveStandings');
         const fn = src.slice(at, at + 1400);
-        assert.match(fn, /window\.__scFilteredPlayers/,
+        // Wave B: liveStandings reads the scoped set through scopedPlayers(), the one helper that tells "not set" (whole field) from "set and empty" (a lock that matched nobody) - card_scope_closed_test.js.
+        assert.match(fn, /scopedPlayers\(\)/,
             'the standings must read the canonical scoped set');
-        assert.match(fn, /currentData && currentData\.players/,
-            'and fall back to the whole field when there is no lock');
+        const helper = src.slice(src.indexOf('function scopedPlayers'), src.indexOf('function scopedPlayers') + 300);
+        assert.match(helper, /Array\.isArray\(window\.__scFilteredPlayers\)/);
+        assert.match(helper, /currentData && currentData\.players/,
+            'and fall back to the whole field only when nothing has been derived yet');
     });
 });
 
