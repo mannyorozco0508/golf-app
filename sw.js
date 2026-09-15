@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v140: the Board and Stats tabs scope their wager cards to the link.
+//
+// leaderboard.html's LIVE MATCHES & PRESSES and Stroke Bets cards, and
+// stats.html's Side Matches section, now apply the v135 rule (grouping.js
+// canLinkSeeWager, over each match's participants): a ?group=N link sees a
+// side match only if one of its golfers is in it, so the press link it used
+// to offer on another group's match is gone with the card. The bare link,
+// the standings, the skins ledger and the flight cards are unchanged. An
+// installed device on v139 keeps a Board that shows every group every match.
+
 // Moved to v139: Anonymous Auth at boot, one shared tag on every Consumer page.
 //
 // auth-boot.js (new, precached) is loaded by the nine Consumer pages directly
@@ -1338,7 +1348,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v139-auth-boot';
+const CACHE_VERSION = 'golfapp-v140-board-stats-scope';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

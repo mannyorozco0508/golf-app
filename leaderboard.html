@@ -384,6 +384,25 @@ html {
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
     let currentBoardData = {};
+    // WHICH GROUP HOLDS THIS LINK (v140). The same reading index.html, the Matches
+    // tab and the Bets tab make of ?group=N. It scopes WAGERS only: the standings,
+    // the skins ledger and the flight cards are the whole field by design and
+    // never read it.
+    const lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
+
+    // THE v135 RULE, on the Board's two wager cards. A group link sees a side
+    // match only if one of its golfers is in it; a cross-group match shows for
+    // both groups in it; the bare link sees everything. grouping.js's
+    // canLinkSeeWager is the one definition (Matches and Bets call the same
+    // function), applied to the wager's own participants - never ownerGroup.
+    // The round's own format (no wagerId) is everybody's.
+    function boardLinkMaySee(wagerId) {
+        if (!wagerId) return true;
+        const sm = ((currentBoardData || {}).sideMatches || {})[wagerId];
+        if (!sm) return true;
+        const groupOf = playerGroupMap((currentBoardData && currentBoardData.players) || [], (currentBoardData && currentBoardData.groupSizeOverrides) || {});
+        return canLinkSeeWager((sm.teamAIds || []).concat(sm.teamBIds || []), lockedGroup, groupOf);
+    }
     
     let activeView = "individual"; 
     let activeScoring = "net";
@@ -631,7 +650,13 @@ html {
     // payout is settlement's, and is not final mid-round.
     function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveStrokeBetStates !== 'function') return '';
-        const states = buildLiveStrokeBetStates(data, courseData, savedScores, visibleIds);
+        // Scoped to the link's group AFTER the engine builds every state over the
+        // whole field (visibleIds), so a group link sees only the bets its golfers
+        // are in and the bare link sees them all.
+        // (Every stroke-bet state IS a side match - the engine keys each by its
+        // sideMatches id - so the wagerId alone decides.)
+        const states = (buildLiveStrokeBetStates(data, courseData, savedScores, visibleIds) || [])
+            .filter(st => boardLinkMaySee(st.wagerId));
         if (!states || states.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
@@ -675,7 +700,12 @@ html {
         // EVERY wager visible to this viewer, not just the round format. A real
         // Nassau is created from Action and lives in sideMatches, so reading only
         // the round format left the supported path invisible on the scorecard.
-        const states = buildLiveMatchStates(data, courseData, savedScores, visibleIds);
+        // Scoped to the link's group AFTER the engine builds every state over the
+        // whole field (visibleIds). A match this link may not see is not a card,
+        // so its press link - which lands on a Matches tab where the card is
+        // hidden - is never offered either.
+        const states = (buildLiveMatchStates(data, courseData, savedScores, visibleIds) || [])
+            .filter(st => !st.isSideMatch || boardLinkMaySee(st.wagerId));
         if (!states || states.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
         // The stake is what DEFINES the bet, so it belongs on screen. Amounts only -
@@ -782,7 +812,8 @@ html {
     function renderLiveMatchesBoard() {
         const mount = document.getElementById('live-matches-mount');
         if (!mount) return;
-        // The leaderboard shows the whole field, so every wager is in scope.
+        // The engine is handed the whole field; buildLiveMatchHtml then keeps the
+        // wagers this link may see (boardLinkMaySee) - the v135 rule, since v140.
         mount.innerHTML = buildLiveMatchHtml(currentBoardData || {},
             (currentBoardData && currentBoardData.courseData) || [],
             (currentBoardData && currentBoardData.scores) || {},
