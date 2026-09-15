@@ -69,6 +69,15 @@
 // else did (the four index/leaderboard surfaces are sha-identical; the
 // tag-stripped text of liveResults is identical on every round, checked
 // against the previous fixture before this re-pin).
+//
+// RE-PINNED 2026-09-14, the CARD SKINS wave (index.html, leaderboard.html;
+// v137). Engine and the other surfaces: UNCHANGED, sha for sha, all three
+// rounds. index.liveMount and leaderboard.liveSkins moved in all three
+// because the hole-by-hole ledgers now list only the holes that paid (the
+// "No Skin" tie rows are gone: 11 / 25 / 25) and say "Hole 7", not "H7";
+// waiting rows stay. card_skins_wave_test.js holds the pre-change text
+// (card_skins_prev.fixture.json) and proves on every run that the old text
+// with the tie rows removed and H -> Hole IS today's text.
 // ============================================================================
 
 const { test, describe } = require('node:test');

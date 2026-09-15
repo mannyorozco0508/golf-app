@@ -622,6 +622,8 @@
         .ls-ledger { margin-top: 6px; border-top: 1px solid var(--border-faint); padding-top: 6px; max-height: 260px; overflow-y: auto; }
         .ls-row { font-size: 0.74rem; padding: 3px 0; line-height: 1.35; }
         .ls-tie { color: var(--text-muted); }
+        /* A run of tied holes on a carry round, in the Receipt's wording. */
+        .ls-carry { color: var(--text-muted); }
         .ls-wait { color: var(--warn-text); }
 
         .hole-view-nav-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 14px; margin-bottom: 4px; border-top: 1px solid var(--border-faint); }
@@ -3432,7 +3434,7 @@ html {
         }
 
         if (L.latest && L.latest.winner) {
-            body += '<div class="ls-latest">Latest: H' + L.latest.hole + ' \u2014 ' + esc(L.latest.winner.name) + '</div>';
+            body += '<div class="ls-latest">Latest: Hole ' + L.latest.hole + ' \u2014 ' + esc(L.latest.winner.name) + '</div>';
         }
 
         // WAITING is stated, never guessed past. Naming the group is what lets a
@@ -3442,30 +3444,60 @@ html {
             const who = gs.length === 1 ? 'Group ' + gs[0]
                 : gs.length > 1 ? 'Groups ' + gs.join(', ')
                 : (L.firstWaiting.missing.length + ' golfer' + (L.firstWaiting.missing.length === 1 ? '' : 's'));
-            body += '<div class="ls-waiting">H' + L.firstWaiting.hole + ' \u2014 Waiting on ' + esc(who) + '</div>';
+            body += '<div class="ls-waiting">Hole ' + L.firstWaiting.hole + ' \u2014 Waiting on ' + esc(who) + '</div>';
         }
 
         let ledgerHtml = '';
         if (liveSkinsOpen) {
-            ledgerHtml = '<div class="ls-ledger">' + L.holes.map(r => {
-                const n = 'H' + r.hole;
+            // THE SAME RULES AS THE RECEIPT (v136/v137), the same wording. Only the
+            // holes that paid are rows; a no-carry tie pays nobody and rolls nothing
+            // forward, so it is not one. On a CARRY round the tied holes are part of
+            // the money: a run of them is one compact line, "carried to" the hole
+            // that collected - or, mid-round, the hole still waiting - and the
+            // collecting row says what it collected. WAITING rows stay: "waiting on
+            // Group 3" is live information, unlike a settled tie. Every hole is
+            // "Hole 7", never "H7". The Receipt's buildSkinsPotRowsHtml is the
+            // sentence this copies; live_skins_wording_test.js pins the two together.
+            const basisWord = basis.charAt(0) + basis.slice(1).toLowerCase();
+            const carryRun = [];
+            const rowsOut = [];
+            const holeSpan = list => list.length === 1
+                ? 'Hole ' + list[0].hole
+                : 'Holes ' + list[0].hole + '–' + list[list.length - 1].hole;
+            const flushCarryRun = into => {
+                if (carryRun.length === 0) return;
+                const tied = carryRun.length === 1 ? 'Tied at ' + basisWord + ' ' + carryRun[0].low : 'Tied';
+                const where = into ? 'carried to Hole ' + into : 'carried, not won';
+                rowsOut.push('<div class="ls-row ls-carry">' + holeSpan(carryRun) + ' — ' + tied + ' — ' + where + '</div>');
+                carryRun.length = 0;
+            };
+            L.holes.forEach(r => {
+                const n = 'Hole ' + r.hole;
                 if (!r.official) {
+                    flushCarryRun(r.hole);
                     const gs = r.missingGroups;
                     const who = gs.length > 0 ? 'Group' + (gs.length > 1 ? 's ' : ' ') + gs.join(', ')
                         : r.missing.length + ' to post';
-                    return '<div class="ls-row ls-wait">' + n + ' \u2014 Waiting on ' + esc(who) + '</div>';
+                    rowsOut.push('<div class="ls-row ls-wait">' + n + ' — Waiting on ' + esc(who) + '</div>');
+                    return;
                 }
                 if (r.state === 'tie') {
-                    // The score is named so nobody has to reach for the paper card to
-                    // work out why a hole produced nothing.
-                    return '<div class="ls-row ls-tie">' + n + ' \u2014 Tie at ' + basis.charAt(0) + basis.slice(1).toLowerCase()
-                        + ' ' + r.low + ' \u2014 No Skin</div>';
+                    if (bundle.carryOver) carryRun.push(r);
+                    return;
                 }
-                const units = (r.unitsWon !== null && r.unitsWon > 1) ? ' (' + r.unitsWon + ' skins)' : '';
-                const pending = r.valueKnown ? '' : ' \u00B7 value pending';
-                return '<div class="ls-row ls-skin">' + n + ' \u2014 ' + esc(r.winner.name) + ' \u2014 '
-                    + basis.charAt(0) + basis.slice(1).toLowerCase() + ' ' + r.low + ' \u2014 Skin' + units + pending + '</div>';
-            }).join('') + '</div>';
+                let collected = '';
+                if (r.unitsWon !== null && r.unitsWon > 1) {
+                    const from = carryRun.length > 0 ? carryRun[0].hole : r.hole;
+                    collected = ' — collects ' + r.unitsWon + ' skins (Holes ' + from + '–' + r.hole + ')';
+                }
+                flushCarryRun(r.hole);
+                const pending = r.valueKnown ? '' : ' · value pending';
+                rowsOut.push('<div class="ls-row ls-skin">' + n + ' — ' + esc(r.winner.name) + ' — '
+                    + basisWord + ' ' + r.low + (collected || ' — Skin') + pending + '</div>');
+            });
+            flushCarryRun(null);
+            if (rowsOut.length === 0) rowsOut.push('<div class="ls-row ls-none">No skins won yet.</div>');
+            ledgerHtml = '<div class="ls-ledger">' + rowsOut.join('') + '</div>';
         }
 
         return { flight: entry.flight, top: head + body, ledger: ledgerHtml };
@@ -3973,7 +4005,7 @@ html {
         const $ = centsToMoney;
         let html = '<div class="lnf-head">\uD83D\uDCCD KP \u00B7 ' + $(r.kp.amountCents) + '</div>';
         r.kp.lines.forEach(l => {
-            html += '<div class="lnf-row"><span>H' + l.hole + ' \u00B7 '
+            html += '<div class="lnf-row"><span>Hole ' + l.hole + ' \u00B7 '
                 + (l.winnerName ? l.winnerName : '<span class="lnf-pending">Pending</span>')
                 + '</span><span class="lnf-amt">' + $(l.cents) + '</span></div>';
         });

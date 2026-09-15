@@ -68,12 +68,14 @@ function page(data, mode, chosen) {
 const namesIn = (html) => (html.match(/<td class="player-name">([A-Z][a-z]+)/g) || []).map(m => m.replace('<td class="player-name">', ''));
 
 describe('6.1 THE LIVE SKINS BOARD ON A FLIGHTED ROUND', () => {
-    test('renders one LIVE SKINS card per flight; hole 13 is "No Skin \u00B7 Tie" under A and Gus under B', () => {
+    test('renders one LIVE SKINS card per flight; hole 13 is not listed under A (a no-carry tie) and is Gus under B', () => {
         const r = page(round(P, ON));
         assert.equal((r.skins.match(/LIVE SKINS \u2014 FLIGHT [AB]/g) || []).length, 2);
         const a = r.skins.slice(r.skins.indexOf('FLIGHT A'), r.skins.indexOf('FLIGHT B'));
         const b = r.skins.slice(r.skins.indexOf('FLIGHT B'));
-        assert.match(a, /Hole 13 \u2014 No Skin \u00B7 Tie at Gross \d+/);
+        // v137 (card skins): a no-carry tie pays nobody and is not a row.
+        assert.ok(!/Hole 13 \u2014/.test(a), 'a tied hole is not listed under A');
+        assert.ok(!/No Skin/.test(a));
         assert.match(b, /Hole 13 \u2014 Gus \u00B7 Gross \d+/);
         assert.match(a, /Ann 2 \u00B7 Ben 1/);
     });

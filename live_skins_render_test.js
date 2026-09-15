@@ -108,7 +108,7 @@ describe('THE COMPACT CARD', () => {
     test('names the group a waiting hole is waiting on', () => {
         const b = boot({ thru: { 1: 14, 2: 14, 3: 13 } });
         b.render();
-        assert.match(b.html(), /H14 \u2014 Waiting on Group 3/);
+        assert.match(b.html(), /Hole 14 \u2014 Waiting on Group 3/);
     });
 
     test('shows skin counts, most first, and omits golfers with none', () => {
@@ -124,7 +124,7 @@ describe('THE COMPACT CARD', () => {
     test('names the most recent decided hole', () => {
         const b = boot({ holes: 4, spec: { p105_h3: 2 } });   // h3 is a par 3, so 3 would tie
         b.render();
-        assert.match(b.html(), /Latest: H3 \u2014 Ellis/);
+        assert.match(b.html(), /Latest: Hole 3 \u2014 Ellis/);
     });
 
     test('says so plainly when nothing has been won yet', () => {
@@ -151,29 +151,37 @@ describe('THE COMPACT CARD', () => {
 
 describe('THE EXPANDED LEDGER', () => {
 
-    test('every hole gets a row, and each row says which state it is in', () => {
+    // RE-PINNED 2026-09-14 (card skins, v137): the ledger lists the holes that
+    // PAID plus the waiting holes, in the Receipt's wording. A no-carry tie
+    // pays nobody and is not a row; a carry-round tie is part of the money and
+    // is shown as the run it belongs to.
+    test('a paid hole and a waiting hole get rows; a no-carry tie does not', () => {
         const b = boot({ holes: 4, thru: { 1: 4, 2: 4, 3: 3 }, spec: { p101_h1: 3, p105_h2: 3 } });
         b.run('liveSkinsOpen = true;');
         b.render();
         const h = b.html();
-        assert.match(h, /H1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
-        assert.match(h, /H3 \u2014 Tie at Net \d+ \u2014 No Skin/);
-        assert.match(h, /H4 \u2014 Waiting on Group 3/);
+        assert.match(h, /Hole 1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
+        assert.ok(!/Hole 3 \u2014/.test(h), 'hole 3 tied on a no-carry round: not a row');
+        assert.ok(!/No Skin/.test(h));
+        assert.match(h, /Hole 4 \u2014 Waiting on Group 3/);
+        assert.ok(!/\bH\d+ \u2014/.test(h), 'every label is "Hole N"');
     });
 
-    test('a tie names the score, so nobody reaches for the paper card', () => {
+    test('a no-carry round with nothing won says so instead of rendering an empty ledger', () => {
         const b = boot({ holes: 2 });
         b.run('liveSkinsOpen = true;');
         b.render();
-        assert.match(b.html(), /Tie at Net \d+ \u2014 No Skin/,
-            '"Tie" alone forces a golfer back to the scorecard to find out why.');
+        assert.match(b.html(), /ls-ledger/);
+        assert.match(b.html(), /No skins won yet\./);
+        assert.ok(!/No Skin/.test(b.html()));
     });
 
-    test('a carried hole shows how many skins it was worth', () => {
+    test('a carried hole shows what it collected, and the tied hole it collected from is the run line', () => {
         const b = boot({ holes: 3, carry: true, spec: { p101_h2: 3 } });
         b.run('liveSkinsOpen = true;');
         b.render();
-        assert.match(b.html(), /H2 \u2014 Avery \u2014 Net 3 \u2014 Skin \(2 skins\)/,
+        assert.match(b.html(), /Hole 1 \u2014 Tied at Net \d+ \u2014 carried to Hole 2/, 'the carried hole, in the Receipt\'s words');
+        assert.match(b.html(), /Hole 2 \u2014 Avery \u2014 Net 3 \u2014 collects 2 skins \(Holes 1\u20132\)/,
             'H1 tied and carried into H2.');
     });
 
@@ -186,7 +194,7 @@ describe('THE EXPANDED LEDGER', () => {
                liveSkinsOpen = true;`);
         b.render();
         const h = b.html();
-        assert.match(h, /H3 \u2014 Avery/, 'the winner is knowable');
+        assert.match(h, /Hole 3 \u2014 Avery/, 'the winner is knowable');
         assert.match(h, /value pending/, 'its value is not');
     });
 
@@ -209,8 +217,8 @@ describe('NEVER OVERSTATE — a waiting hole is never shown as decided', () => {
         b.render();
         const h = b.html();
         // Avery has the low score on H4, but group 3 has not played it.
-        assert.match(h, /H4 \u2014 Waiting on Group 3/);
-        assert.ok(!/H4 \u2014 Avery/.test(h), 'Showing a skin and then taking it away is worse than showing nothing.');
+        assert.match(h, /Hole 4 \u2014 Waiting on Group 3/);
+        assert.ok(!/Hole 4 \u2014 Avery/.test(h), 'Showing a skin and then taking it away is worse than showing nothing.');
         assert.match(h, /Official thru 3/);
     });
 
@@ -260,13 +268,13 @@ describe('SCORE CORRECTIONS — the card moves with the score', () => {
     test('a late group posting resolves the waiting hole', () => {
         const b = boot({ holes: 4, thru: { 1: 4, 2: 4, 3: 3 }, spec: { p101_h4: 2 } });
         b.render();
-        assert.match(b.html(), /H4 \u2014 Waiting on Group 3/);
+        assert.match(b.html(), /Hole 4 \u2014 Waiting on Group 3/);
 
         b.run(`[109,110,111,112].forEach(function (id) { currentData.scores['p' + id + '_h4'] = 4; });`);
         b.render();
         const h = b.html();
         assert.match(h, /Official thru 4/);
-        assert.match(h, /Latest: H4 \u2014 Avery/);
+        assert.match(h, /Latest: Hole 4 \u2014 Avery/);
         assert.ok(!/Waiting on/.test(h));
     });
 

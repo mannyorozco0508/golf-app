@@ -63,6 +63,13 @@
 // with its tie rows removed and H->Hole IS today's text, character for
 // character. PREV_RECEIPT_TEXT below is re-pinned to the new text; the v134
 // shas it replaced are recorded beside it.
+//
+// RE-PINNED 2026-09-14, the CARD SKINS wave (index.html, leaderboard.html;
+// v137): index.liveMount and leaderboard.liveSkins moved in all three
+// variants for the same reason the Receipt did in v136 - only the holes that
+// paid are rows, labelled "Hole N". Engine, index.widget, index.skinsWon and
+// settlement.receiptPool: UNCHANGED, sha for sha. card_skins_wave_test.js
+// proves the text difference is exactly the dropped tie rows and the label.
 // ============================================================================
 
 const { test, describe } = require('node:test');

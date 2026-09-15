@@ -200,6 +200,7 @@
         .ls-r { font-size: 0.82rem; padding: 3px 0; border-bottom: 1px solid var(--border-faint); }
         .ls-s { color: var(--text-main); font-weight: 600; }
         .ls-t { color: var(--text-secondary); }
+        .ls-c { color: var(--text-secondary); }
         .ls-w { color: var(--text-muted); font-style: italic; }
         .player-hcp { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px; }
         /* GROSS OVER NET, both readable. Stacked rather than columned so the player
@@ -849,30 +850,59 @@ html {
 
         // FULL HOLE NAMES. This is read next to a paper card, and the card says
         // "Hole 14", not "H14".
-        // COMPACT ON A PHONE. Every resolved hole is shown - a won skin must never be
-        // hidden - but only the FIRST waiting hole. Fourteen identical "Waiting for
-        // Groups 1, 2, 3" rows push the real results off the screen and tell nobody
-        // anything they did not already know from the one above.
+        // THE SAME RULES AS THE RECEIPT (v136/v137), the same wording. Only the
+        // holes that paid are rows; a no-carry tie pays nobody and rolls nothing
+        // forward, so it is not one. On a CARRY round the tied holes are part of
+        // the money: a run of them is one compact line, "carried to" the hole
+        // that collected - or, mid-round, the hole still waiting - and the
+        // collecting row says what it collected. The Receipt's
+        // buildSkinsPotRowsHtml is the sentence this copies; live_skins_wording_test.js
+        // pins the two together.
+        // COMPACT ON A PHONE: only the FIRST waiting hole is shown - fourteen
+        // identical "Waiting for Groups 1, 2, 3" rows push the results off the
+        // screen and tell nobody anything the one above did not.
         const firstWaitingHole = (L.firstWaiting && L.firstWaiting.hole) || null;
-        const visible = L.holes.filter(r => r.official || r.hole === firstWaitingHole);
-
-        html += '<div class="ls-rows">' + visible.map(r => {
+        const carryRun = [];
+        const rows = [];
+        const holeSpan = list => list.length === 1
+            ? 'Hole ' + list[0].hole
+            : 'Holes ' + list[0].hole + '–' + list[list.length - 1].hole;
+        const flushCarryRun = into => {
+            if (carryRun.length === 0) return;
+            const tied = carryRun.length === 1 ? 'Tied at ' + basis + ' ' + carryRun[0].low : 'Tied';
+            const where = into ? 'carried to Hole ' + into : 'carried, not won';
+            rows.push('<div class="ls-r ls-c">' + holeSpan(carryRun) + ' — ' + tied + ' — ' + where + '</div>');
+            carryRun.length = 0;
+        };
+        L.holes.forEach(r => {
             if (!r.official) {
+                if (r.hole !== firstWaitingHole) return;
+                flushCarryRun(r.hole);
                 const gs = r.missingGroups || [];
                 const who = gs.length === 1 ? 'Group ' + gs[0]
                     : gs.length > 1 ? 'Groups ' + gs.join(', ')
                     : (r.missing || []).map(m => m.name).join(', ');
-                return '<div class="ls-r ls-w">Hole ' + r.hole + ' \u2014 Waiting for ' + esc(who || 'the field') + '</div>';
+                rows.push('<div class="ls-r ls-w">Hole ' + r.hole + ' — Waiting for ' + esc(who || 'the field') + '</div>');
+                return;
             }
             if (r.state === 'tie') {
-                // Named so nobody has to reach for the card to see why a hole paid
-                // nothing - a tie is a result, not an absence of one.
-                return '<div class="ls-r ls-t">Hole ' + r.hole + ' \u2014 No Skin \u00B7 Tie at ' + basis + ' ' + r.low + '</div>';
+                if (bundle.carryOver) carryRun.push(r);
+                return;
             }
-            const units = (r.unitsWon !== null && r.unitsWon > 1) ? ' (' + r.unitsWon + ' skins)' : '';
-            return '<div class="ls-r ls-s">Hole ' + r.hole + ' \u2014 ' + esc(r.winner.name)
-                 + ' \u00B7 ' + basis + ' ' + r.low + units + '</div>';
-        }).join('') + '</div></div>';
+            let collected = '';
+            if (r.unitsWon !== null && r.unitsWon > 1) {
+                const from = carryRun.length > 0 ? carryRun[0].hole : r.hole;
+                collected = ' — collects ' + r.unitsWon + ' skins (Holes ' + from + '–' + r.hole + ')';
+            }
+            flushCarryRun(r.hole);
+            rows.push('<div class="ls-r ls-s">Hole ' + r.hole + ' — ' + esc(r.winner.name)
+                 + ' · ' + basis + ' ' + r.low + collected + '</div>');
+        });
+        // Holes after the first waiting one are not listed (compact), so a run
+        // still open at that point was already "carried to" the waiting hole.
+        flushCarryRun(null);
+        if (rows.length === 0) rows.push('<div class="ls-r ls-w">No skins won yet.</div>');
+        html += '<div class="ls-rows">' + rows.join('') + '</div></div>';
 
         return html;
     }

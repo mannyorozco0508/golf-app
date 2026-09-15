@@ -205,8 +205,11 @@ describe('index.html - the SKINS WON widget and the hole-by-hole modal, per flig
         const html = vm.runInContext("document.getElementById('live-skins-mount').innerHTML", sb);
         const a = html.slice(html.indexOf('<div class="ls-flight-label">Flight A'), html.indexOf('<div class="ls-flight-label">Flight B'));
         const b = html.slice(html.indexOf('<div class="ls-flight-label">Flight B'));
-        assert.match(a, /H13 \u2014 Tie at Gross \d+ \u2014 No Skin/);
-        assert.match(b, /H13 \u2014 Gus \u2014 Gross \d+ \u2014 Skin/);
+        // v137 (card skins): a no-carry tie is not a row - hole 13 is simply absent
+        // under A, and it is Gus's skin under B. The label reads "Hole 13".
+        assert.ok(!/Hole 13 \u2014/.test(a), 'a tied hole on a no-carry round is not listed under A');
+        assert.ok(!/No Skin/.test(a));
+        assert.match(b, /Hole 13 \u2014 Gus \u2014 Gross \d+ \u2014 Skin/);
         assert.match(html, /FLIGHT A \u00B7 GROSS SKINS \u00B7 \$32/);
         assert.match(html, /FLIGHT B \u00B7 GROSS SKINS \u00B7 \$32/);
     });

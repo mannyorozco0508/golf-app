@@ -138,16 +138,16 @@ describe('LIVE KP', () => {
     test('lists every KP hole with its allocated amount', () => {
         const t = strip(boot({ kpWinners: { h3:'101', h7:'105' } }).banner());
         assert.match(t, /KP · \$100/);
-        assert.match(t, /H3 · Avery/);
-        assert.match(t, /H7 · Ellis/);
+        assert.match(t, /Hole 3 · Avery/);
+        assert.match(t, /Hole 7 · Ellis/);
         assert.match(t, /\$25/);
     });
 
     test('unclaimed holes read Pending, not blank', () => {
         const t = strip(boot({ kpWinners: { h3:'101' } }).banner());
-        assert.match(t, /H7 · Pending/);
-        assert.match(t, /H12 · Pending/);
-        assert.match(t, /H16 · Pending/);
+        assert.match(t, /Hole 7 · Pending/);
+        assert.match(t, /Hole 12 · Pending/);
+        assert.match(t, /Hole 16 · Pending/);
     });
 
     test('an UNEVEN KP split shows the real allocation, not an assumed equal share', () => {
@@ -174,15 +174,15 @@ describe('DIFFERENT GROUP PACES', () => {
         const t = strip(b.banner());
         assert.match(t, /PROJECTED/, 'standings can still move');
         assert.match(t, /KP · \$100/, 'KP stays visible while groups are out');
-        assert.match(t, /H3 · Avery/);
-        assert.match(t, /H12 · Pending/);
+        assert.match(t, /Hole 3 · Avery/);
+        assert.match(t, /Hole 12 · Pending/);
     });
 
     test('posting the late scores updates the surfaces', () => {
         const b = boot({ thru: { 1:15, 2:14, 3:13 }, kpWinners: { h3:'101' } });
-        assert.match(strip(b.banner()), /H7 · Pending/);
+        assert.match(strip(b.banner()), /Hole 7 · Pending/);
         b.run(`currentData.kpWinners.h7 = '105';`);
-        assert.match(strip(b.banner()), /H7 · Ellis/);
+        assert.match(strip(b.banner()), /Hole 7 · Ellis/);
     });
 });
 
@@ -200,11 +200,11 @@ describe('SCORE CORRECTION', () => {
 
     test('changing a KP winner moves the KP line', () => {
         const b = boot({ kpWinners: { h3:'101' } });
-        assert.match(strip(b.banner()), /H3 · Avery/);
+        assert.match(strip(b.banner()), /Hole 3 · Avery/);
         b.run(`currentData.kpWinners.h3 = '102';`);
         const after = strip(b.banner());
-        assert.match(after, /H3 · Blake/);
-        assert.ok(!/H3 · Avery/.test(after));
+        assert.match(after, /Hole 3 · Blake/);
+        assert.ok(!/Hole 3 · Avery/.test(after));
     });
 });
 

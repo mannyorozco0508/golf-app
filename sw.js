@@ -524,6 +524,14 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v137: the Card and Board tabs' skins ledgers follow the Receipt.
+//
+// index.html (the live skins panel and the live KP status) and
+// leaderboard.html (the LIVE SKINS board): only the holes that paid are
+// rows, "Hole 7" not "H7", a carry round's tied holes in the Receipt's own
+// compact wording, waiting rows kept. No number, name or amount moved. An
+// installed device on v136 keeps the eighteen-row ledgers.
+
 // Moved to v136: skins rows that list only the holes that paid, and Hole View
 // widgets a cart can read.
 //
@@ -1311,7 +1319,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v136-skins-rows-widgets';
+const CACHE_VERSION = 'golfapp-v137-card-skins-rows';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

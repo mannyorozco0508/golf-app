@@ -227,8 +227,13 @@ describe('LIVE SKINS — WHO WON WHAT HOLE', () => {
         assert.ok(!/\bH1\b|\bH14\b/.test(t), 'this is read beside a paper card');
     });
 
-    test('a tie says No Skin and names the score', () => {
-        assert.match(board().text(), /Hole 3 — No Skin · Tie at Net 3/);
+    // RE-PINNED 2026-09-14 (card skins, v137): a no-carry tie pays nobody and is
+    // not a row - the Board lists the holes that paid plus the first waiting hole.
+    test('a no-carry tie is not listed; the won holes and the waiting hole are', () => {
+        const t = board().text();
+        assert.ok(!/Hole 3 —/.test(t), 'hole 3 tied: not a row');
+        assert.ok(!/No Skin/.test(t));
+        assert.match(t, /Hole 1 — Carp · Net 3/);
     });
 
     test('a waiting hole names who it is waiting for', () => {
@@ -265,7 +270,7 @@ describe('THE OFFICIAL-HOLE RULE IS CANONICAL', () => {
     test('earlier holes are untouched when a later one resolves', () => {
         const after = board({ thru:[6,5,5], tweak: sc => { sc['p109_h5'] = 3; } }).text();
         assert.match(after, /Hole 1 — Carp · Net 3/);
-        assert.match(after, /Hole 3 — No Skin · Tie at Net 3/);
+        assert.ok(!/Hole 3 —/.test(after), 'the tied hole stays unlisted');
     });
 
     test('only the FIRST waiting hole is listed', () => {
@@ -275,9 +280,10 @@ describe('THE OFFICIAL-HOLE RULE IS CANONICAL', () => {
         assert.equal((t.match(/Waiting for/g) || []).length, 1);
     });
 
-    test('but every RESOLVED hole is always shown', () => {
+    test('but every hole that PAID is always shown', () => {
         const t = board({ thru:[6,5,4] }).text();
-        [1,2,3,4].forEach(h => assert.match(t, new RegExp('Hole ' + h + ' —')));
+        [1,2].forEach(h => assert.match(t, new RegExp('Hole ' + h + ' —')));
+        [3,4].forEach(h => assert.ok(!new RegExp('Hole ' + h + ' —').test(t), 'hole ' + h + ' is a no-carry tie'));
     });
 });
 
@@ -287,16 +293,16 @@ describe('SCORE CORRECTIONS LEAVE NO STALE WINNER', () => {
         const won = board().text();
         assert.match(won, /Hole 1 — Carp · Net 3/);
         const tied = board({ tweak: sc => { sc['p101_h1'] = 3; } }).text();
-        assert.match(tied, /Hole 1 — No Skin · Tie at Net 3/);
+        assert.ok(!/Hole 1 —/.test(tied), 'a tied hole is no longer a row');
         assert.ok(!/Hole 1 — Carp · Net 3/.test(tied), 'the old winner must be gone');
     });
 
     test('tie becomes a winner', () => {
         const tied = board().text();
-        assert.match(tied, /Hole 3 — No Skin/);
+        assert.ok(!/Hole 3 —/.test(tied));
         const won = board({ tweak: sc => { sc['p101_h3'] = 4; } }).text();
         assert.match(won, /Hole 3 — Carp · Net 3/);
-        assert.ok(!/Hole 3 — No Skin/.test(won));
+        assert.ok(!/No Skin/.test(won));
     });
 
     test('winner A becomes winner B', () => {
