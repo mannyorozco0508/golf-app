@@ -34,6 +34,11 @@ yarn-error.log*
 dist/
 www/
 
+# ---- Test-run logs ---------------------------------------------------------
+# `npm test` keeps the TAP log of the last run and the last green total here
+# so tools/suite-check.js can tell "a file died" from "a test failed" (Wave C).
+test-runs/
+
 # ---- macOS -----------------------------------------------------------------
 .DS_Store
 .AppleDouble

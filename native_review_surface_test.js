@@ -154,6 +154,45 @@ const DB = {
 };
 
 // ---------------------------------------------------------------------------
+// THE READINESS GATE, in front of every driver (Wave C).
+//
+// THE RACE IT CLOSES. The lobby driver used to tap the logo the moment
+// .lobby-logo was visible - which is before window 'load', which is when
+// pwa-boot.js's boot adds html.is-native (markNativeShell, on the load event).
+// admin.html's guard is `if (isNativeApp()) return;` and isNativeApp() reads
+// that class, so taps before load hit an INERT guard and the panel opened; the
+// probe read the class 6 s later, when it was there, and reported "native
+// context proven" and "panel open" in the same breath. Under full-suite load
+// Chrome's load event lags and the race fired about one run in eight; at
+// concurrency 24 it fired on demand (Wave C's report). The picker and save
+// drivers started clicking on visibility too, and their native guards read
+// the same class.
+//
+// THE GATE: nothing is clicked, typed or ticked until document.readyState is
+// 'complete' on BOTH arms, and until html.is-native is present on the NATIVE
+// arm (the arm is read from window.Capacitor, which only NATIVE_PRESCRIPT
+// sets - the same thing pwa-boot reads). What it waited for is recorded in
+// window.__ready, which the probes return, so a test can assert the gate
+// fired rather than assume it. It does NOT add the class or touch the page.
+// ---------------------------------------------------------------------------
+function withReadyGate(driver) {
+    return `
+    (function () {
+      window.__ready = [];
+      var native = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+      var tries = 0;
+      var gate = setInterval(function () {
+        if (++tries > 500) { window.__ready.push('TIMEOUT: readyState ' + document.readyState + ', is-native ' + document.documentElement.classList.contains('is-native')); clearInterval(gate); return; }
+        if (document.readyState !== 'complete') return;
+        if (native && !document.documentElement.classList.contains('is-native')) return;
+        window.__ready.push('readyState complete' + (native ? ', html.is-native present' : ''));
+        clearInterval(gate);
+        ${driver}
+      }, 40);
+    })();`;
+}
+
+// ---------------------------------------------------------------------------
 // DRIVER 1a - THE LOBBY. Tap the logo five times.
 //
 // THIS IS A SEPARATE ARRIVAL FOR A MEASURED REASON. The first version of this
@@ -258,6 +297,7 @@ const LANDING_PROBE = `
   const text = (el) => ((el && (el.innerText || '')) || '').trim();
   return JSON.stringify({
     trace: window.__trace || [],
+    ready: window.__ready || [],
     isNativeClass: document.documentElement.classList.contains('is-native'),
     panelExists: !!panel,
     panelInlineDisplay: panel ? (panel.style.display || '') : null,
@@ -345,6 +385,7 @@ const SAVE_PROBE = `
   const text = (el) => ((el && (el.innerText || '')) || '').trim();
   return JSON.stringify({
     trace: window.__trace || [],
+    ready: window.__ready || [],
     isNativeClass: document.documentElement.classList.contains('is-native'),
     gcWrites: window.__gcWrites || [],
     // THE ROUND MUST STILL SAVE. Round Ready is the organizer-visible proof.
@@ -357,7 +398,7 @@ async function arrive(native, driver, probe, settleMs, query) {
     const r = await arriveCold({
         url: query === null ? fileUrl(PAGE) : fileUrl(PAGE, 'game=' + CODE),
         db: DB,
-        preScript: (native ? NATIVE_PRESCRIPT : '') + INSTRUMENT + driver,
+        preScript: (native ? NATIVE_PRESCRIPT : '') + INSTRUMENT + withReadyGate(driver),
         expression: probe,
         settleMs: settleMs
     });
@@ -409,6 +450,14 @@ describe('THE HARNESS REACHED THE PAGE, AND THE TWO CONTEXTS DIFFER', () => {
         assert.equal(S.webLobby.isNativeClass, false,
             'html.is-native is set in the WEB context. Every native guard would fire on the web '
             + 'product, which is the one thing this work must not do.');
+    });
+
+    test('every driver waited for the page to be READY before its first gesture: readyState complete on both arms, html.is-native on the native ones (Wave C)', () => {
+        [['nativeLobby', true], ['webLobby', false], ['nativePicker', true], ['webPicker', false], ['nativeSave', true], ['webSave', false]].forEach(([k, native]) => {
+            const r = S[k];
+            assert.deepEqual(r.ready, [native ? 'readyState complete, html.is-native present' : 'readyState complete'], k + ': ' + JSON.stringify(r.ready));
+            assert.ok(r.trace.length > 0, k + ' then made its gestures: ' + JSON.stringify(r.trace));
+        });
     });
 
     test('the drivers actually performed the gestures', () => {

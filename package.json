@@ -4,7 +4,8 @@
   "private": true,
   "description": "Test harness for GolfApp. The app itself is plain HTML/CSS/JS with no build step - this file exists only so `npm test` and the Node test runner work.",
   "scripts": {
-    "test": "node --test",
+    "test": "mkdir -p test-runs && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=test-runs/last.tap; node tools/suite-check.js test-runs/last.tap",
+    "test:check": "node tools/suite-check.js test-runs/last.tap",
     "mobile:sync": "node sync-mobile-web.js"
   },
   "devDependencies": {
