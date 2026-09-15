@@ -118,8 +118,11 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
         assert.ok(P.at < html.indexOf('Net Finish \u2014 $'), 'before the Net Finish header');
         assert.ok(P.at < html.indexOf('Skins Pot'), 'before the Skins Pot header');
         assert.ok(P.at < html.indexOf('Hole 1 \u2014'), 'before the first hole row');
-        assert.ok(html.indexOf('Main Pool \u2014 $460') < P.at, 'after the section header');
-        assert.match(P.block, /PAYOUTS/);
+        // v142: the section reads "Weekly Game" and the block has no title line -
+        // the game headings say what it is.
+        assert.ok(html.indexOf('Weekly Game \u2014 $460') < P.at, 'after the section header');
+        assert.doesNotMatch(P.block, /PAYOUTS|hand out/);
+        assert.match(P.block, /pp-game-head">Skins</);
     });
     test('grouped by game, in the order money is handed out: Skins, Net Finish, KP', () => {
         assert.deepEqual(P.games.map(g => g.game), ['Skins', 'Net Finish', 'KP']);
@@ -149,8 +152,9 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
     test('Net Finish is one list (never flighted): the engine\'s lines, name and amount', () => {
         const nf = P.games[1];
         assert.equal(nf.groups.length, 1); assert.equal(nf.groups[0].flight, null);
-        assert.deepEqual(nf.groups[0].rows, r.net.lines.map(l => [l.names.join(' / '), $(l.cents)]));
-        assert.deepEqual(nf.groups[0].rows, [['Rae Romeo', '$120'], ['Max Mike', '$80']]);
+        // v142: each row carries its place, one row per golfer.
+        assert.deepEqual(nf.groups[0].rows, r.net.lines.map(l => [l.place + ' \u00B7 ' + l.names[0], $(l.cents)]));
+        assert.deepEqual(nf.groups[0].rows, [['1 \u00B7 Rae Romeo', '$120'], ['2 \u00B7 Max Mike', '$80']]);
     });
     test('KP is unconfirmed on this round: ONE line saying so, no rows', () => {
         const kp = P.games[2];
@@ -163,15 +167,15 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
         const owedSkins = new Set(r.skins.lines.map(l => l.winnerName));
         const owedNet = new Set(r.net.lines.flatMap(l => l.names));
         P.games[0].groups.forEach(g => g.rows.forEach(x => { assert.ok(owedSkins.has(x[0]), x[0] + ' under Skins'); assert.ok(cents(x[1]) > 0); }));
-        P.games[1].groups[0].rows.forEach(x => { assert.ok(owedNet.has(x[0]), x[0] + ' under Net Finish'); assert.ok(cents(x[1]) > 0); });
+        P.games[1].groups[0].rows.forEach(x => { assert.ok(owedNet.has(x[0].replace(/^T?\d+ \u00B7 /, '')), x[0] + ' under Net Finish'); assert.ok(cents(x[1]) > 0); });
         // And the losers are not there: Wes Whiskey won nothing anywhere.
         assert.ok(!/Wes Whiskey/.test(P.block));
         assert.ok(r.perPlayerCents[String(data.players.find(p => p.name === 'Wes Whiskey').id)] < 0, 'Wes owes on the round');
     });
     test('a golfer who wins under two games appears under both - Max Mike: Skins (B) $21 and Net Finish $80 - and there is NO combined total', () => {
-        const under = (i) => P.games[i].groups.flatMap(g => g.rows).filter(x => x[0] === 'Max Mike');
+        const under = (i) => P.games[i].groups.flatMap(g => g.rows).filter(x => x[0].replace(/^T?\d+ \u00B7 /, '') === 'Max Mike');
         assert.deepEqual(under(0), [['Max Mike', '$21']]);
-        assert.deepEqual(under(1), [['Max Mike', '$80']]);
+        assert.deepEqual(under(1), [['2 \u00B7 Max Mike', '$80']]);
         assert.ok(!/\$101/.test(P.block), 'no $21 + $80 anywhere in the block');
         assert.ok(!/Total|TOTAL|total/.test(P.block), 'no total line of any kind');
     });
@@ -251,7 +255,7 @@ describe('A GAME WITH NO WINNERS is handled, not blank', () => {
     });
 });
 
-describe('A TIED NET PLACE: one row naming the tied golfers with the engine\'s combined amount - nothing derived', () => {
+describe('A TIED NET PLACE: one row PER GOLFER with that golfer\'s share, from the engine\'s own allocator (v142)', () => {
     // Rae and Max tie: give Max the same net as Rae by taking one stroke off him
     // nowhere and instead handing Rae one more. Simpler: read the standings and
     // craft the tie from the engine's own numbers.
@@ -264,17 +268,21 @@ describe('A TIED NET PLACE: one row naming the tied golfers with the engine\'s c
     const r = engine(data);
     const html = receipt(data);
     const P = parseBlock(html);
-    test('the engine now has one tied line for places 1-2 and the block prints it as one row with the combined $200', () => {
+    test('the engine has one tied line for places 1-2 ($200); the block prints two T1 rows of $100 that sum to it, and no note', () => {
         assert.equal(r.net.lines.length, 1); assert.equal(r.net.lines[0].ids.length, 2); assert.equal(r.net.lines[0].cents, 20000);
-        assert.deepEqual(P.games[1].groups[0].rows, [[r.net.lines[0].names.join(' / '), '$200']]);
-        assert.match(P.games[1].groups[0].note || '', /tie|split|Net Finish below/i, 'says the amount is shared and where the split is explained');
+        const rows = P.games[1].groups[0].rows;
+        assert.deepEqual(rows, r.net.lines[0].names.map(n => ['T1 \u00B7 ' + n, '$100']));
+        assert.equal(rows.reduce((a, x) => a + cents(x[1]), 0), 20000, 'the split rows sum to the group amount exactly');
+        assert.equal(P.games[1].groups[0].note, null, 'the "combined amount" note is gone with the combined row');
     });
 });
 
 describe('THE SEAM: the block consumes the engine and derives nothing; the PDF root contains it', () => {
     const src = read('settlement.html');
     const at = src.indexOf('function buildPoolPayoutsHtml(');
-    const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
+    // Comments stripped: the block's own commentary NAMES the allocators it must
+    // not call, and a prose mention is not a call.
+    const fn = src.slice(at, src.indexOf('\n    function ', at + 30)).replace(/\/\/[^\n]*/g, '');
     test('buildPoolPayoutsHtml exists, is called by renderMoneyPoolSection before any game section, and reads only r.*', () => {
         assert.ok(at > 0, 'no buildPoolPayoutsHtml');
         const render = src.slice(src.indexOf('function renderMoneyPoolSection('), src.indexOf('\n    function ', src.indexOf('function renderMoneyPoolSection(') + 30));
@@ -287,7 +295,14 @@ describe('THE SEAM: the block consumes the engine and derives nothing; the PDF r
             assert.ok(!fn.includes(bad), 'the block must not compute money: ' + bad));
         assert.ok(!/[\w)\]]\s*\/\s*[\w(]/.test(fn), 'no division of anything (a "/" between operands)');
         assert.ok(/\+= l\.cents/.test(fn), 'the only arithmetic is summing a golfer\'s engine lines');
-        assert.ok(!/ids\.length/.test(fn), 'no per-golfer split of a tie');
+        // v142: a tied place's per-golfer shares come from netTieShares, which calls
+        // the ENGINE's allocators (allocateWholeDollars / splitCentsEvenly) with the
+        // engine's inputs and does no arithmetic of its own beyond cents<->dollars.
+        assert.match(fn, /netTieShares\(l, r\)/, 'the split is read from netTieShares');
+        const shares = src.slice(src.indexOf('function netTieShares('), src.indexOf('\n    function ', src.indexOf('function netTieShares(') + 30));
+        assert.match(shares, /allocateWholeDollars\(l\.cents \/ 100, l\.ids\.map\(\(\) => 1\)\)\.map\(d => d \* 100\)/);
+        assert.match(shares, /splitCentsEvenly\(l\.cents, n\)/);
+        assert.ok(!/Math\.(round|floor|ceil)|toFixed/.test(shares), 'no rounding of its own');
     });
     test('the block is inside #money-pool-section, which printReceipt exports and the native PDF reads by innerText', () => {
         assert.match(src, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',/);
@@ -303,7 +318,7 @@ describe('THE SEAM: the block consumes the engine and derives nothing; the PDF r
 // row, and both must be present.
 const DATA = build();
 const DB = { events: { PAYOUT: DATA }, global_courses: {}, trips: {}, tournaments: {} };
-const PROBE = `(() => { const el = document.getElementById('money-pool-section'); const t = el ? el.innerText : ''; return JSON.stringify({ len: t.length, payouts: t.indexOf('PAYOUTS'), h1: t.search(/Hole 1 \\u2014/), skinsPot: t.indexOf('Skins Pot'), a23: (t.match(/\\$23/g) || []).length, flightA: t.indexOf('Flight A'), text: t.slice(0, 400) }); })()`;
+const PROBE = `(() => { const el = document.getElementById('money-pool-section'); const t = el ? el.innerText : ''; return JSON.stringify({ len: t.length, payouts: t.indexOf('Skins'), h1: t.search(/Hole 1 \\u2014/), skinsPot: t.indexOf('Skins Pot'), a23: (t.match(/\\$23/g) || []).length, flightA: t.indexOf('Flight A'), text: t.slice(0, 400) }); })()`;
 const C = {};
 before(async () => {
     const r = await arriveCold({ url: fileUrl('settlement.html', 'game=PAYOUT'), db: DB, settleMs: 4000, steps: [{ expression: PROBE }] });
@@ -312,7 +327,7 @@ before(async () => {
 describe('COLD CHROME: the exported text of the Main Pool section', () => {
     test('ran, and the section rendered', () => { assert.ok(C.r && !C.r.reason, 'did not run: ' + (C.r && C.r.reason)); assert.ok(C.r.len > 500, 'rendered text: ' + C.r.len); });
     test('PAYOUTS comes first, then the pot and hole detail - both in the text the PDF is built from', () => {
-        assert.ok(C.r.payouts >= 0, 'PAYOUTS in innerText');
+        assert.ok(C.r.payouts >= 0, 'the block\'s first game head in innerText');
         assert.ok(C.r.h1 > C.r.payouts, 'hole rows after the block'); assert.ok(C.r.skinsPot > C.r.payouts, 'Skins Pot after the block');
         assert.ok(C.r.a23 >= 10, '$23 appears in the block (5) and the ledger (5+): ' + C.r.a23);
     });

@@ -70,6 +70,13 @@
 // paid are rows, labelled "Hole N". Engine, index.widget, index.skinsWon and
 // settlement.receiptPool: UNCHANGED, sha for sha. card_skins_wave_test.js
 // proves the text difference is exactly the dropped tie rows and the label.
+//
+// RE-PINNED 2026-09-15, the WEEKLY GAME wave (settlement.html only, v142).
+// Engine and the five live surfaces: UNCHANGED, sha for sha. receiptPool moved
+// in all three because the section header reads "Weekly Game", the payouts
+// block lost its "hand out in this order" title, and each Net Finish payout
+// row carries its place ("1 · Rae Romeo", "2 · Max Mike"). weekly_game_test.js
+// holds the v141 text and proves those are the only differences.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -200,10 +207,14 @@ const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace
 // 99f5c4b80952e8bc08784ae8e51a186f239644057649667049ade0faabd01703. The tie
 // rows left and the label changed; skins_rows_widgets_test.js proves nothing
 // else did.
+// RE-PINNED 2026-09-15 (weekly game): the header rename sits inside the
+// block-cut text. The v136 shas were off/field
+// 01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5, flight
+// 334fa8edaf560725194ea4e81724e84a8594f5c6b7e69d1e668b9562588fccb4.
 const PREV_RECEIPT_TEXT = {
-    off: '01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5',
-    field: '01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5',
-    flight: '334fa8edaf560725194ea4e81724e84a8594f5c6b7e69d1e668b9562588fccb4'
+    off: '24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17',
+    field: '24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17',
+    flight: '92c5d2e9522ddc715f6ee7f1c7ed9270a995a4a847d67cd22e9c86aed91ca3bc'
 };
 describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
     Object.keys(VARIANTS).forEach(k => {

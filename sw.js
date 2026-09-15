@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v142: the Results tab's pool reads WEEKLY GAME, pays a tie one golfer
+// at a time, and numbers the places.
+//
+// settlement.html only, presentation only. The section header says Weekly
+// Game (the stored key is still moneyPool); the payouts block has no title
+// line; a tied net place is one row per golfer with that golfer's own share
+// (the engine's allocator, the engine's inputs - summing to the group amount
+// and matching the detail below); every net payout row carries its place,
+// 1 / 2 / T3 / T3, by the leaderboard's tie rule. A legacy-round tie detail
+// now prints the cents the engine paid (33.34/33.33/33.33) instead of "each".
+// An installed device on v141 keeps "Main Pool" and the combined tie row.
+
 // Moved to v141: the Results tab's Side Matches cards follow the link's group.
 //
 // settlement.html's per-match cards now apply the rule every other surface
@@ -1359,7 +1371,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v141-results-scope';
+const CACHE_VERSION = 'golfapp-v142-weekly-game';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

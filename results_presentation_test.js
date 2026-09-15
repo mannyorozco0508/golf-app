@@ -77,7 +77,7 @@ describe('THE BUY-IN IS NOWHERE ON SCREEN', () => {
 
     test('the Main Pool header shows the pot, not the per-head stake', () => {
         const t = strip(boot().pool());
-        assert.match(t, /Main Pool — \$480/);
+        assert.match(t, /Weekly Game — \$480/);   // v142: the Receipt says Weekly Game
         assert.ok(!/12 × \$40/.test(t), 'the per-head arithmetic must be gone');
         assert.ok(!/\(\d+ × \$\d+\)/.test(t), 'and no variant of it may return');
     });

@@ -143,10 +143,15 @@ describe('ONLY WAGERS MOVED — the standings, the skins ledger, the flight card
             assert.equal(strip(el('live-hilo-mount')), PREV[k].board.hilo);
         });
         test(k + ': Stats without its Side Matches card - character for character', () => {
+            // The Stats scorecard prints TODAY's date; the fixture holds the day it
+            // was captured. The date is the one segment allowed to differ (a harness
+            // fault of the first cut, found when the calendar rolled over mid-session).
+            const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
             const html = arrive('stats.html', search)('stats-content');
-            const now = strip(statsWithoutSideMatches(html));
-            const before = strip(statsWithoutSideMatches(PREV[k].stats.html));
+            const now = undate(strip(statsWithoutSideMatches(html)));
+            const before = undate(strip(statsWithoutSideMatches(PREV[k].stats.html)));
             assert.equal(now, before);
+            assert.notEqual(now, before.replace('<date>', ''), 'the date segment was actually there');
             assert.ok(now.length > 2000, 'not vacuous');
         });
     });

@@ -475,7 +475,7 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Main Pool/);
+        assert.match(html, /Weekly Game/);   // v142: the Receipt says Weekly Game
         assert.match(html, /Hole 3: Marty/);
         assert.match(html, /Hole 17: Steve/);
         assert.match(html, /1st: Marty[\s\S]*\$40/);

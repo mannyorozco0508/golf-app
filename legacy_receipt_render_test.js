@@ -263,7 +263,7 @@ describe('NOTHING IS INVENTED', () => {
             'the Receipt denied the bets it was about to print');
         // POSITIVE HALF. Without this the test is satisfied by a Receipt that
         // renders nothing at all, which is the other way to make a denial vanish.
-        assert.match(r.pool, /Main Pool/i, 'the Main Pool card must actually render');
+        assert.match(r.pool, /Weekly Game/i, 'the Weekly Game card must actually render');   // v142 rename
         assert.match(r.pool, /\$/, 'and it must carry money');
     });
 

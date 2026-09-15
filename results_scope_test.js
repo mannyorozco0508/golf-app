@@ -122,6 +122,22 @@ describe('THE SIDE MATCHES CARDS follow the rule', () => {
 });
 
 // ---------------------------------------------------------------------------
+
+// v142 (WEEKLY GAME): the Results tab's pool section renamed its header, dropped
+// the payouts block's title line and numbered the net payout rows. The captured
+// text predates that; these three substitutions are exactly that wave's change,
+// applied to the OLD text so this proof still holds character for character.
+const v142 = t => {
+    let out = t.replace('|🏆 Main Pool — ', '|🏆 Weekly Game — ').replace('|💵 PAYOUTS — hand out in this order', '');
+    const a = out.indexOf('|Net Finish|'), b = out.indexOf('|KP|', a);
+    if (a > -1 && b > a) {
+        const seg = out.slice(a + '|Net Finish|'.length, b).split('|').filter(Boolean);   // name, $amount, name, $amount ...
+        const rows = []; for (let i = 0; i + 1 < seg.length; i += 2) rows.push((i / 2 + 1) + ' · ' + seg[i] + '|' + seg[i + 1]);
+        out = out.slice(0, a) + '|Net Finish|' + rows.join('|') + out.slice(b);
+    }
+    return out;
+};
+
 describe('THE MONEY DID NOT MOVE — every unscoped section is the pre-change text, on every link', () => {
     const PREV = JSON.parse(read('results_scope_prev.fixture.json')).links;
     test('the previous capture is pinned, and it was unscoped: the same Side Matches text on every link', () => {
@@ -134,9 +150,12 @@ describe('THE MONEY DID NOT MOVE — every unscoped section is the pre-change te
     [['bare', BARE], ['group1', G1], ['group6', G6], ['group3', G3]].forEach(([k, search]) => {
         test(k + ': Main Pool, Final Results / Player Payouts / Who Pays Who, the scorecard, the other cards - character for character', () => {
             const el = arrive(search);
-            assert.equal(strip(el('money-pool-section')), PREV[k].mainPool);
-            assert.equal(strip(el('combined-settlement-summary')), PREV[k].summary);
-            assert.equal(strip(el('receipt-scorecard')), PREV[k].scorecard);
+            // The receipt head (in the summary) and the scorecard print TODAY's date;
+            // the fixture holds its capture day. That segment is the one allowed to differ.
+            const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
+            assert.equal(strip(el('money-pool-section')), v142(PREV[k].mainPool));
+            assert.equal(undate(strip(el('combined-settlement-summary'))), undate(PREV[k].summary));
+            assert.equal(undate(strip(el('receipt-scorecard'))), undate(PREV[k].scorecard));
             assert.equal(strip(withoutSideMatches(el('settle-content'))), PREV[k].contentWithoutSideMatches);
             assert.ok(PREV[k].summary.length > 2000 && PREV[k].mainPool.length > 500 && PREV[k].contentWithoutSideMatches.length > 300, 'not vacuous');
             assert.match(PREV[k].summary, /Who Pays Who/);

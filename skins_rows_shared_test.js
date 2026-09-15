@@ -135,6 +135,22 @@ const ROUNDS = {
     'carry-mid-round': () => pool(undefined, true, [['Ann Alpha', 1], ['Cal Charlie', 5]], 10)
 };
 
+
+// v142 (WEEKLY GAME): the Results tab's pool section renamed its header, dropped
+// the payouts block's title line and numbered the net payout rows. The captured
+// text predates that; these three substitutions are exactly that wave's change,
+// applied to the OLD text so this proof still holds character for character.
+const v142 = t => {
+    let out = t.replace('|🏆 Main Pool — ', '|🏆 Weekly Game — ').replace('|💵 PAYOUTS — hand out in this order', '');
+    const a = out.indexOf('|Net Finish|'), b = out.indexOf('|KP|', a);
+    if (a > -1 && b > a) {
+        const seg = out.slice(a + '|Net Finish|'.length, b).split('|').filter(Boolean);   // name, $amount, name, $amount ...
+        const rows = []; for (let i = 0; i + 1 < seg.length; i += 2) rows.push((i / 2 + 1) + ' · ' + seg[i] + '|' + seg[i + 1]);
+        out = out.slice(0, a) + '|Net Finish|' + rows.join('|') + out.slice(b);
+    }
+    return out;
+};
+
 describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-extraction text', () => {
     const PREV = JSON.parse(read('skins_rows_extract_prev.fixture.json'));
     test('the previous capture is pinned, so the proof cannot drift with the fixture', () => {
@@ -146,7 +162,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
     ['no-carry', 'carry', 'nothing-won', 'flighted'].forEach(k => {
         const now = surfaces(ROUNDS[k]());
         ['receipt', 'card', 'board'].forEach(s => test(k + ' / ' + s + ': character for character', () => {
-            assert.equal(now[s], PREV.rounds[k][s]);
+            assert.equal(now[s], s === 'receipt' ? v142(PREV.rounds[k][s]) : PREV.rounds[k][s]);
             assert.ok(now[s].length > 40, 'not vacuous');
         }));
     });
@@ -156,7 +172,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
         assert.equal(now.board, PREV.rounds['carry-mid-round'].board);
         const before = PREV.rounds['carry-mid-round'].receipt;
         assert.match(before, /\|Holes 6–10 — Tied — carried, not won\|Hole 11 — Waiting on/, 'what the Receipt said before');
-        assert.equal(now.receipt, before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on'),
+        assert.equal(now.receipt, v142(before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on')),
             'the ONE deliberate difference, and nothing else');
         assert.match(now.card, /\|Holes 6–10 — Tied — carried to Hole 11\|/, 'the sentence the Card already used');
     });

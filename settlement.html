@@ -39,7 +39,7 @@
 <!-- Grouping (v141): playerGroupMap / canLinkSeeWager, so the SIDE MATCHES cards
      show a group link only the matches its golfers are in - the same rule, the
      same function, as the Matches, Bets, Board and Stats tabs. The MONEY is never
-     scoped: Final Results, Player Payouts, Who Pays Who, the Main Pool and every
+     scoped: Final Results, Player Payouts, Who Pays Who, the Weekly Game and every
      total are computed from the full record and shown to every link. -->
 <script src="grouping.js"></script>
     <style>
@@ -239,7 +239,6 @@
            pool split, then name / amount rows in the same ledger-row style as the
            detail below so the two read as one document (and print as one). */
         .pool-payouts { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px 2px 10px; margin-bottom: 14px; background: var(--subtle-bg); }
-        .pool-payouts .pp-title { font-size: 0.8rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 8px 2px; }
         .pool-payouts .pp-game { padding-bottom: 4px; }
         .pool-payouts .pp-game-head { font-size: 0.82rem; font-weight: bold; color: var(--text-main); margin: 6px 0 6px 2px; }
         .pool-payouts .pp-flight-head { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 2px 0 4px 4px; }
@@ -1195,12 +1194,17 @@ html {
     // allocated line cents, summed per golfer - the same sum the Skins Summary in
     // the detail below prints, so the two agree to the dollar by construction.
     // Net Finish: r.net.lines[].cents as the engine allocated the place(s). KP:
-    // r.kp.lines[].cents on 'paid' lines, summed per golfer. A TIED net line is
-    // printed as ONE row naming the tied golfers with the engine's combined
-    // amount: the engine does not expose each golfer's share of a tie, and this
-    // block does not derive it - the Net Finish detail below explains the split.
+    // r.kp.lines[].cents on 'paid' lines, summed per golfer. Net Finish: ONE ROW
+    // PER GOLFER (v142) - a tied place is split into its golfers' own shares by
+    // netTieShares(), the engine's allocator with the engine's inputs, so a tied
+    // $100 reads Bobby $34 / Sammy $33 / Tommy $33, summing to the group amount
+    // exactly and matching both the Net Finish detail below and what the engine
+    // paid. Each net row carries its place, 1 / 2 / T3 / T3, by the leaderboard's
+    // rule: the engine's `place` is the players ahead plus one and a tie consumes
+    // the places it spans, so the label is T + place for a split line.
+    // The block has no title line: the game headings say what it is.
     function buildPoolPayoutsHtml(r, $) {
-        const row = (name, c) => `<div class="ledger-row pp-row"><span>${escapeHtml(name)}</span><span class="val-pos">${$(c)}</span></div>`;
+        const row = (name, c, label) => `<div class="ledger-row pp-row"><span>${label ? label + ' \u00B7 ' : ''}${escapeHtml(name)}</span><span class="val-pos">${$(c)}</span></div>`;
         const note = (t) => `<div class="ledger-row pp-note"><span>${t}</span><span></span></div>`;
         // Lines -> [name, cents] per golfer, largest first, name to break a tie.
         const byGolfer = (lines) => {
@@ -1223,9 +1227,13 @@ html {
             })));
         }
         if (r.net) {
-            const rows = r.net.lines.map(l => row(l.names.join(' / '), l.cents));
-            const tied = r.net.lines.some(l => l.split);
-            games.push(game('Net Finish', [group(null, rows.length ? rows.concat(tied ? [note('A tied place is one row with the combined amount — the split is under Net Finish below')] : []) : [], 'No scores — nothing to pay')]));
+            const rows = [];
+            r.net.lines.forEach(l => {
+                const shares = netTieShares(l, r);
+                const label = netPlaceLabel(l);
+                l.names.forEach((name, i) => rows.push(row(name, shares[i], label)));
+            });
+            games.push(game('Net Finish', [group(null, rows, 'No scores — nothing to pay')]));
         }
         if (r.kp) {
             const paid = r.kp.lines.filter(l => l.state === 'paid');
@@ -1238,7 +1246,37 @@ html {
             games.push(game('KP', groups));
         }
         if (games.length === 0) return '';
-        return `<div class="pool-payouts"><div class="pp-title">💵 PAYOUTS — hand out in this order</div>${games.join('')}</div><!-- /pool-payouts -->`;
+        return `<div class="pool-payouts">${games.join('')}</div><!-- /pool-payouts -->`;
+    }
+
+    // ---- A TIED NET PLACE, ONE GOLFER AT A TIME -------------------------------
+    //
+    // pool-engine.js pays each golfer of a tie their own share (:506-508) but
+    // exposes only the group line {ids, names, cents, split}. This is the ONE
+    // place on the page that reproduces the share, and it does so by calling the
+    // engine's own allocators with the engine's own inputs - never a second
+    // implementation of the split: allocateWholeDollars(groupDollars, one weight
+    // per golfer) on a whole-dollar round, splitCentsEvenly(groupCents, n) on a
+    // legacy round - so the shares are the cents the engine paid, in l.ids order,
+    // and they sum to l.cents exactly. Both the PAYOUTS block and the Net Finish
+    // detail read this, so the two cannot disagree. (The detail used to print a
+    // legacy tie as "$33.33 each"; the engine pays 33.34/33.33/33.33, and now the
+    // detail says so.)
+    function netTieShares(l, r) {
+        const n = (l.ids || []).length;
+        if (n <= 1) return [l.cents];
+        const wholeDollar = (typeof isWholeDollarRound === 'function') ? isWholeDollarRound(currentData) : (currentData && currentData.settlementMode === 'whole-dollar');
+        if (wholeDollar && typeof allocateWholeDollars === 'function') {
+            return allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100);
+        }
+        if (typeof splitCentsEvenly === 'function') return splitCentsEvenly(l.cents, n);
+        return l.ids.map(() => l.cents / n);
+    }
+
+    // The place label, the leaderboard's way: the engine's `place` is the players
+    // ahead plus one, and a split line spans the places it consumed - T + place.
+    function netPlaceLabel(l) {
+        return (l.split ? 'T' : '') + l.place;
     }
 
     function renderMoneyPoolSection(data, courseData, savedScores) {
@@ -1249,7 +1287,7 @@ html {
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
         let html = `<div class="settle-card" style="border:2px solid #b8860b;">
-            <div class="settle-header">\uD83C\uDFC6 Main Pool \u2014 ${$(r.totalPoolCents)}</div>`;
+            <div class="settle-header">\uD83C\uDFC6 Weekly Game \u2014 ${$(r.totalPoolCents)}</div>`;
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
         }
@@ -1346,9 +1384,8 @@ html {
                 // whole-dollar round an odd pot is deliberately uneven - $100 over three
                 // is $34/$33/$33 - so the actual amounts are printed rather than an
                 // average that would not add up.
-                const each = (typeof allocateWholeDollars === 'function' && data.settlementMode === 'whole-dollar')
-                    ? allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100)
-                    : l.ids.map(() => l.cents / l.ids.length);
+                // (v142) The same shares the PAYOUTS block prints, from netTieShares.
+                const each = netTieShares(l, r);
                 const same = each.every(c => c === each[0]);
                 html += `<div class="nf-explain">${same
                     ? `${$(each[0])} each`

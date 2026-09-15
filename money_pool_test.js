@@ -738,7 +738,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Main Pool \u2014 \$480/);
+        assert.match(html, /Weekly Game \u2014 \$480/);   // v142: the Receipt says Weekly Game
         // The per-head buy-in arithmetic was removed: the pot total is useful, what
         // each golfer paid in is not something the Receipt needs to state.
         assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');

@@ -83,6 +83,22 @@ function arrive(data) {
 const rows = h => (h.match(/<div class="ledger-row[^"]*"><span>Hole \d+ — [^<]*<\/span><span class="val-pos">[^<]*<\/span><\/div>/g) || []);
 const rowText = r => strip(r).split('|').filter(Boolean);
 
+
+// v142 (WEEKLY GAME): the Results tab's pool section renamed its header, dropped
+// the payouts block's title line and numbered the net payout rows. The captured
+// text predates that; these three substitutions are exactly that wave's change,
+// applied to the OLD text so this proof still holds character for character.
+const v142 = t => {
+    let out = t.replace('|🏆 Main Pool — ', '|🏆 Weekly Game — ').replace('|💵 PAYOUTS — hand out in this order', '');
+    const a = out.indexOf('|Net Finish|'), b = out.indexOf('|KP|', a);
+    if (a > -1 && b > a) {
+        const seg = out.slice(a + '|Net Finish|'.length, b).split('|').filter(Boolean);   // name, $amount, name, $amount ...
+        const rows = []; for (let i = 0; i + 1 < seg.length; i += 2) rows.push((i / 2 + 1) + ' · ' + seg[i] + '|' + seg[i + 1]);
+        out = out.slice(0, a) + '|Net Finish|' + rows.join('|') + out.slice(b);
+    }
+    return out;
+};
+
 // ---------------------------------------------------------------------------
 describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new text', () => {
     const PREV = JSON.parse(read('skins_rows_prev.fixture.json'));
@@ -92,9 +108,9 @@ describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new t
             const now = strip(arrive(VARIANTS[k]()).pool);
             const ties = (before.match(/No Skin/g) || []).length;
             assert.ok(ties >= 12, 'the old text had the tie rows: ' + ties);
-            const transformed = before
+            const transformed = v142(before
                 .replace(/\|H\d+ — Tie at (Gross|Net) \d+ — No Skin(?=\|)/g, '')
-                .replace(/\|H(\d+) — /g, '|Hole $1 — ');
+                .replace(/\|H(\d+) — /g, '|Hole $1 — '));
             assert.equal(now, transformed);
             assert.doesNotMatch(now, /No Skin/);
             assert.doesNotMatch(now, /\|H\d+ — /);
