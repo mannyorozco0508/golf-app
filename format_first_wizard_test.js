@@ -678,7 +678,12 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // registrations_rules_isolation_test.js proves the registrations rows are
         // refused by the block and not by the $other catch-all - they were green
         // before the block existed, which is why that file has to exist.
-        'database.rules.json': '28fd0e7b13dd76e0987c7d78e11efdddb9f4419a0b6df0bb9c7de822ca360c4c',
+        // RE-PINNED 2026-09-15 (approved, this change only): the ownerUid rule
+        // additionally requires auth.token.firebase.sign_in_provider !== 'anonymous'
+        // - an anonymous session restored from the shared origin could otherwise
+        // own a tournament. One clause; tournament_anonymous_owner_test.js pins
+        // that every other byte of the file is as it was.
+        'database.rules.json': 'a09d16814e07b997af3a1c1786b1b2ebbdaa9843a7376b9ded94bcee54b5ecc9',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };

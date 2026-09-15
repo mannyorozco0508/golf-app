@@ -195,10 +195,13 @@ describe('THE SEAM — one tag per page, the shell, and tournament.html left alo
         assert.match(s, /<script src="auth-boot\.js">/, 'a synchronous tag: authReady exists from parse time');
     }));
 
-    test('tournament.html is untouched: its own auth tag, no auth-boot', () => {
+    test('tournament.html keeps its own auth tag and loads no auth-boot tag', () => {
         const s = read('tournament.html');
         assert.match(s, /<script src="\.\/firebase-auth-compat\.js"><\/script>/);
-        assert.doesNotMatch(s, /auth-boot\.js/);
+        // The TAG is what is pinned. The page's own comment names auth-boot.js
+        // since 2026-09-15, when it learned that leaving the tag out never kept
+        // the anonymous user out (tournament_anonymous_owner_test.js).
+        assert.doesNotMatch(s, /<script[^>]*src="[^"]*auth-boot\.js"/);
         assert.match(s, /signInWithEmailAndPassword/);
     });
 

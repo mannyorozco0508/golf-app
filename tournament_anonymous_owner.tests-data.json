@@ -1,0 +1,44 @@
+{
+  "root": {
+    "tournaments": { "OWNED1": { "name": "Owned", "ownerUid": "u-org", "createdAt": 1 } },
+    "registrations": { "OWNED1": { "e1": { "name": "Ann", "createdAt": 1 } } }
+  },
+  "users": {
+    "nobody": null,
+    "anonymous": { "uid": "anon-uid-1", "provider": "anonymous", "token": { "firebase": { "sign_in_provider": "anonymous" } } },
+    "organizer": { "uid": "u-org", "provider": "password", "token": { "firebase": { "sign_in_provider": "password" } } },
+    "newcomer": { "uid": "u-new", "provider": "password", "token": { "firebase": { "sign_in_provider": "password" } } },
+    "google": { "uid": "u-goog", "provider": "google.com", "token": { "firebase": { "sign_in_provider": "google.com" } } }
+  },
+  "tests": {
+    "tournaments/NEW1": {
+      "cannotWrite": [
+        { "auth": "anonymous", "data": { "name": "Anon's event", "createdAt": 1, "ownerUid": "anon-uid-1" } },
+        { "auth": "anonymous", "data": { "name": "Steal", "createdAt": 1, "ownerUid": "u-org" } },
+        { "auth": "nobody", "data": { "name": "Nobody", "createdAt": 1, "ownerUid": "anon-uid-1" } },
+        { "auth": "nobody", "data": { "name": "Nobody", "createdAt": 1, "ownerUid": "u-org" } }
+      ],
+      "canWrite": [
+        { "auth": "newcomer", "data": { "name": "Email owner", "createdAt": 1, "ownerUid": "u-new" } },
+        { "auth": "google", "data": { "name": "Google owner", "createdAt": 1, "ownerUid": "u-goog" } },
+        { "auth": "nobody", "data": { "name": "Legacy, no owner", "createdAt": 1 } },
+        { "auth": "anonymous", "data": { "name": "Legacy by an anonymous code holder, no owner", "createdAt": 1 } }
+      ]
+    },
+    "tournaments/OWNED1/ownerUid": {
+      "cannotWrite": [
+        { "auth": "anonymous", "data": "anon-uid-1" },
+        { "auth": "organizer", "data": "u-new" },
+        { "auth": "nobody", "data": null }
+      ],
+      "canWrite": [ { "auth": "organizer", "data": "u-org" } ]
+    },
+    "tournaments/OWNED1/name": {
+      "canWrite": [ { "auth": "organizer", "data": "renamed by its owner" }, { "auth": "nobody", "data": "renamed by a code holder - the parent write is unchanged" } ]
+    },
+    "registrations/OWNED1": {
+      "canRead": [ "organizer" ],
+      "cannotRead": [ "anonymous", "nobody", "newcomer" ]
+    }
+  }
+}

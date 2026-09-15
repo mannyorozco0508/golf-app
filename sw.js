@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v146: an anonymous user is not a tournament organizer.
+//
+// tournament.html only (plus database.rules.json, which is not cached).
+// Firebase Auth persists per origin, not per page: the anonymous user
+// auth-boot.js creates on every consumer page was restored on tournament.html
+// too, where the sign-in panels hid, "Signed in as <uid>" appeared and the Save
+// gate passed. Its onAuthStateChanged now keeps a non-anonymous user or null,
+// so an anonymous session sees the page as a signed-out one does; the ownerUid
+// rule refuses an anonymous provider on the server. An installed device on
+// v145 still hides the sign-in form from an anonymous golfer and lets them
+// reach the Save gate - the rule then refuses the write.
+
 // Moved to v145: the Card tab fails closed on a link whose group is not in
 // this round.
 //
@@ -1409,7 +1421,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v145-card-fails-closed';
+const CACHE_VERSION = 'golfapp-v146-anonymous-is-not-an-organizer';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

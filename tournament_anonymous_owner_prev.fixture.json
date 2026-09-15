@@ -1,0 +1,258 @@
+{
+ "capturedAt": "6536216",
+ "arrivals": {
+  "organizer/owned/user-first": {
+   "signedInAs": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "signedInAsSetup": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "organizer/owned/record-first": {
+   "signedInAs": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "signedInAsSetup": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "organizer/legacy/user-first": {
+   "signedInAs": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "signedInAsSetup": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "organizer/legacy/record-first": {
+   "signedInAs": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "signedInAsSetup": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "stranger/owned/user-first": {
+   "signedInAs": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "signedInAsSetup": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": false,
+   "setupPanel": false,
+   "leaderboardTab": true
+  },
+  "stranger/owned/record-first": {
+   "signedInAs": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "signedInAsSetup": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": false,
+   "setupPanel": false,
+   "leaderboardTab": true
+  },
+  "stranger/legacy/user-first": {
+   "signedInAs": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "signedInAsSetup": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "stranger/legacy/record-first": {
+   "signedInAs": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "signedInAsSetup": "Signed in as other@example.com · Sign outSigned in as other@example.com · Sign out",
+   "panelManage": {
+    "display": "none",
+    "html": ""
+   },
+   "panelSetup": {
+    "display": "none",
+    "html": ""
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "nobody/owned/user-first": {
+   "signedInAs": "",
+   "signedInAsSetup": "",
+   "panelManage": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "panelSetup": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "setupTab": false,
+   "setupPanel": false,
+   "leaderboardTab": true
+  },
+  "nobody/owned/record-first": {
+   "signedInAs": "",
+   "signedInAsSetup": "",
+   "panelManage": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "panelSetup": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "setupTab": false,
+   "setupPanel": false,
+   "leaderboardTab": true
+  },
+  "nobody/legacy/user-first": {
+   "signedInAs": "",
+   "signedInAsSetup": "",
+   "panelManage": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "panelSetup": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  },
+  "nobody/legacy/record-first": {
+   "signedInAs": "",
+   "signedInAsSetup": "",
+   "panelManage": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "panelSetup": {
+    "display": "block",
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+   },
+   "setupTab": true,
+   "setupPanel": true,
+   "leaderboardTab": true
+  }
+ },
+ "saves": {
+  "organizer": {
+   "alerts": [],
+   "sets": [
+    {
+     "path": "tournaments/<code>",
+     "ownerUid": "u-org",
+     "name": "Created Scramble"
+    }
+   ],
+   "surface": {
+    "signedInAs": "Signed in as org@example.com · Sign out",
+    "signedInAsSetup": "Signed in as org@example.com · Sign out",
+    "panelManage": {
+     "display": "none",
+     "html": ""
+    },
+    "panelSetup": {
+     "display": "none",
+     "html": ""
+    },
+    "setupTab": true,
+    "setupPanel": true,
+    "leaderboardTab": true
+   }
+  },
+  "stranger": {
+   "alerts": [],
+   "sets": [
+    {
+     "path": "tournaments/<code>",
+     "ownerUid": "u-other",
+     "name": "Created Scramble"
+    }
+   ],
+   "surface": {
+    "signedInAs": "Signed in as other@example.com · Sign out",
+    "signedInAsSetup": "Signed in as other@example.com · Sign out",
+    "panelManage": {
+     "display": "none",
+     "html": ""
+    },
+    "panelSetup": {
+     "display": "none",
+     "html": ""
+    },
+    "setupTab": true,
+    "setupPanel": true,
+    "leaderboardTab": true
+   }
+  },
+  "nobody": {
+   "alerts": [
+    "Sign in to create a tournament. Organizers sign in; golfers never need to."
+   ],
+   "sets": [],
+   "surface": {
+    "signedInAs": "",
+    "signedInAsSetup": "",
+    "panelManage": {
+     "display": "block",
+     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    },
+    "panelSetup": {
+     "display": "block",
+     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    },
+    "setupTab": true,
+    "setupPanel": true,
+    "leaderboardTab": true
+   }
+  }
+ }
+}

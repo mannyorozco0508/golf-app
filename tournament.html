@@ -1338,8 +1338,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function signOutNow() { firebase.auth().signOut(); }
 
+    // AN ANONYMOUS USER IS NOBODY HERE. Firebase Auth persists per ORIGIN, not
+    // per page: a golfer who opened any scoring link on this site was signed in
+    // anonymously by auth-boot.js, and the SDK restores that user on this page
+    // too - leaving auth-boot out of this file never kept it out. Measured on
+    // 2026-09-15: the sign-in panels hid, #signed-in-as named a bare uid, the
+    // Save gate passed, and the only thing between that golfer and ownerUid was
+    // a missing course. So the ONE seam every organizer check reads - authUser -
+    // holds a non-anonymous user or null, and an anonymous session sees the page
+    // exactly as a signed-out one does. It is NOT signed out: that uid is the
+    // golfer's own identity on the consumer pages, and this page has no business
+    // destroying it. The rule in database.rules.json refuses an anonymous
+    // ownerUid on the server for the same reason.
     firebase.auth().onAuthStateChanged((user) => {
-        authUser = user || null;
+        authUser = (user && !user.isAnonymous) ? user : null;
         applyManageGate();
         renderSignedInAs();
     });
