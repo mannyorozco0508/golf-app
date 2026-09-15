@@ -485,7 +485,8 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         assert.equal(sha('money-engine.js'), '3c960947');
         assert.equal(sha('action-model.js'), 'ded86280');
         assert.equal(sha('settlement-engine.js'), 'adc3cd9f');
-        assert.equal(sha('pool-engine.js'), 'f4d7cdbb');
+        // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
+        assert.equal(sha('pool-engine.js'), 'd47a1e0a');
         assert.equal(sha('hole-events.js'), '6fd7f7ed');
         // settlement.html and index.html were fenced for the split wave only; the
         // skins-rows wave (v136) edits both. The engines stay pinned.

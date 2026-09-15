@@ -1,0 +1,1508 @@
+{
+ "capturedAt": "71b8f6d",
+ "rounds": {
+  "golden-off": {
+   "text": {
+    "money-pool-section": "| |🏆 Weekly Game — $460|Skins|Ann Alpha|$37|Cal Charlie|$37|Dee Delta|$37|Ned November|$37|Oli Oscar|$36|Quy Quebec|$36|Net Finish|1 · Rae Romeo|$120|2 · Max Mike|$80|KP|Ann Alpha|$10|Ben Bravo|$10|Eli Echo|$10|Ivy India|$10|📍 KP — $40|Hole 3: Ann Alpha|$10|Hole 7: Eli Echo|$10|Hole 12: Ivy India|$10|Hole 16: Ben Bravo|$10|🥇 Net Finish — $200|1st: Rae Romeo · net 48|$120|2nd: Max Mike · net 49|$80|🥩 Skins Pot — $220 (Gross skins, no carry)|Hole 1 — Ann Alpha — Gross 3 — Skin|$37|Hole 5 — Cal Charlie — Gross 3 — Skin|$37|Hole 7 — Ned November — Gross 2 — Skin|$37|Hole 9 — Dee Delta — Gross 3 — Skin|$37|Hole 11 — Oli Oscar — Gross 3 — Skin|$36|Hole 16 — Quy Quebec — Gross 2 — Skin|$36|Skins Summary|Ann Alpha — 1 skin|$37|Cal Charlie — 1 skin|$37|Dee Delta — 1 skin|$37|Ned November — 1 skin|$37|Oli Oscar — 1 skin|$36|Quy Quebec — 1 skin|$36|",
+    "combined-settlement-summary": "| |Tidewater| |<date>| |Stroke Play · Net · 23 golfers| |Sunday| |📄 Print / Save Receipt| |🏁 Final Results|Rae Romeo|+$100 NET|Max Mike|+$60 NET|Ann Alpha|+$27 NET|Cal Charlie|+$17 NET|Dee Delta|+$17 NET|Ned November|+$17 NET|Oli Oscar|+$16 NET|Quy Quebec|+$16 NET|Ben Bravo|-$10 NET|Eli Echo|-$10 NET|Ivy India|-$10 NET|Fay Foxtrot|-$20 NET|Gus Golf|-$20 NET|Hal Hotel|-$20 NET|Jon Juliet|-$20 NET|Kim Kilo|-$20 NET|Lee Lima|-$20 NET|Pat Papa|-$20 NET|Sal Sierra|-$20 NET|Tom Tango|-$20 NET|Uma Uniform|-$20 NET|Vic Victor|-$20 NET|Wes Whiskey|-$20 NET| |💰 Player Payouts| | What each golfer won from the pot. |Rae Romeo|Net Finish 1|+$120|TOTAL PAYOUT|+$120|Max Mike|Net Finish 2|+$80|TOTAL PAYOUT|+$80|Ann Alpha|KP H3|+$10|Gross Skins · 1 skin|+$37|TOTAL PAYOUT|+$47|Cal Charlie|Gross Skins · 1 skin|+$37|TOTAL PAYOUT|+$37|Dee Delta|Gross Skins · 1 skin|+$37|TOTAL PAYOUT|+$37|Ned November|Gross Skins · 1 skin|+$37|TOTAL PAYOUT|+$37|Oli Oscar|Gross Skins · 1 skin|+$36|TOTAL PAYOUT|+$36|Quy Quebec|Gross Skins · 1 skin|+$36|TOTAL PAYOUT|+$36|Ben Bravo|KP H16|+$10|TOTAL PAYOUT|+$10|Eli Echo|KP H7|+$10|TOTAL PAYOUT|+$10|Ivy India|KP H12|+$10|TOTAL PAYOUT|+$10|Fay Foxtrot|No payout|$0|TOTAL PAYOUT|$0|Gus Golf|No payout|$0|TOTAL PAYOUT|$0|Hal Hotel|No payout|$0|TOTAL PAYOUT|$0|Jon Juliet|No payout|$0|TOTAL PAYOUT|$0|Kim Kilo|No payout|$0|TOTAL PAYOUT|$0|Lee Lima|No payout|$0|TOTAL PAYOUT|$0|Pat Papa|No payout|$0|TOTAL PAYOUT|$0|Sal Sierra|No payout|$0|TOTAL PAYOUT|$0|Tom Tango|No payout|$0|TOTAL PAYOUT|$0|Uma Uniform|No payout|$0|TOTAL PAYOUT|$0|Vic Victor|No payout|$0|TOTAL PAYOUT|$0|Wes Whiskey|No payout|$0|TOTAL PAYOUT|$0|",
+    "settle-content": "",
+    "receipt-scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Ann Alpha|3|4|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|4|3|4|4|4|3|5|4|34|4|4|3|4|4|4|3|5|4|35|69|Ben Bravo|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|3|3|4|3|3|3|4|4|30|3|4|3|4|4|3|3|4|4|32|62|Cal Charlie|4|4|3|5|3|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|3|3|4|2|3|2|4|3|27|3|3|3|4|3|3|3|4|3|29|56|Dee Delta|4|4|3|5|4|4|3|5|3|35|4|4|3|5|4|4|3|5|4|36|71|net|4|4|3|4|4|3|3|5|3|33|4|4|3|4|4|3|3|5|4|34|67|Eli Echo|4|4|3|5|4|4|3|5|4|36|4|4|3|4|4|4|3|5|4|35|71|net|3|3|2|3|3|3|2|4|3|26|3|3|2|2|3|3|2|4|3|25|51|Fay Foxtrot|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|4|3|3|4|4|32|4|4|3|4|4|3|3|4|4|33|65|Gus Golf|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|3|3|3|4|3|30|3|4|3|4|3|3|3|4|4|31|61|Hal Hotel|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Ivy India|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|4|3|3|2|4|3|27|3|3|2|4|3|3|2|4|3|27|54|Jon Juliet|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|4|4|33|4|4|3|4|4|3|3|4|4|33|66|Kim Kilo|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|3|4|3|3|3|4|3|29|3|4|3|4|3|3|3|4|3|30|59|Lee Lima|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|5|4|34|4|4|3|4|4|4|3|5|4|35|69|Max Mike|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|2|2|3|3|2|2|4|3|24|3|3|2|3|3|2|2|4|3|25|49|Ned November|4|4|3|5|4|4|2|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|4|3|4|4|3|2|4|4|31|3|4|3|4|4|3|3|4|4|32|63|Oli Oscar|4|4|3|5|4|4|3|5|4|36|4|3|3|5|4|4|3|5|4|35|71|net|3|3|3|4|3|3|2|4|3|28|3|2|3|4|3|3|2|4|3|27|55|Pat Papa|4|4|3|5|4|4|3|5|4|36|4|4|3|4|4|4|3|5|4|35|71|net|4|4|3|4|4|4|3|5|4|35|4|4|3|4|4|4|3|5|4|35|70|Quy Quebec|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|2|5|4|35|71|net|3|4|3|4|3|3|3|4|4|31|3|4|3|4|3|3|2|4|4|30|61|Rae Romeo|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|3|3|2|2|3|3|24|3|3|2|3|3|2|2|3|3|24|48|Sal Sierra|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|4|4|33|4|4|3|4|4|3|3|5|4|34|67|Tom Tango|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|3|3|3|4|3|30|3|4|3|4|3|3|3|4|3|30|60|Uma Uniform|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|3|3|3|2|4|3|26|3|3|2|4|3|3|2|4|3|27|53|Vic Victor|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|3|4|3|3|3|4|3|29|3|3|3|4|3|3|3|4|3|29|58|Wes Whiskey|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|4|3|3|2|4|3|27|3|3|3|4|3|3|2|4|3|28|55| | | Birdie | Eagle or better |net rows show the score after handicap strokes| |"
+   },
+   "engine": {
+    "valid": true,
+    "errors": [],
+    "totalPoolCents": 46000,
+    "buyInCents": 2000,
+    "participants": [
+     {
+      "id": "101",
+      "name": "Ann Alpha"
+     },
+     {
+      "id": "102",
+      "name": "Ben Bravo"
+     },
+     {
+      "id": "103",
+      "name": "Cal Charlie"
+     },
+     {
+      "id": "104",
+      "name": "Dee Delta"
+     },
+     {
+      "id": "105",
+      "name": "Eli Echo"
+     },
+     {
+      "id": "106",
+      "name": "Fay Foxtrot"
+     },
+     {
+      "id": "107",
+      "name": "Gus Golf"
+     },
+     {
+      "id": "108",
+      "name": "Hal Hotel"
+     },
+     {
+      "id": "109",
+      "name": "Ivy India"
+     },
+     {
+      "id": "110",
+      "name": "Jon Juliet"
+     },
+     {
+      "id": "111",
+      "name": "Kim Kilo"
+     },
+     {
+      "id": "112",
+      "name": "Lee Lima"
+     },
+     {
+      "id": "113",
+      "name": "Max Mike"
+     },
+     {
+      "id": "114",
+      "name": "Ned November"
+     },
+     {
+      "id": "115",
+      "name": "Oli Oscar"
+     },
+     {
+      "id": "116",
+      "name": "Pat Papa"
+     },
+     {
+      "id": "117",
+      "name": "Quy Quebec"
+     },
+     {
+      "id": "118",
+      "name": "Rae Romeo"
+     },
+     {
+      "id": "119",
+      "name": "Sal Sierra"
+     },
+     {
+      "id": "120",
+      "name": "Tom Tango"
+     },
+     {
+      "id": "121",
+      "name": "Uma Uniform"
+     },
+     {
+      "id": "122",
+      "name": "Vic Victor"
+     },
+     {
+      "id": "123",
+      "name": "Wes Whiskey"
+     }
+    ],
+    "kp": {
+     "amountCents": 4000,
+     "perHoleCents": [
+      1000,
+      1000,
+      1000,
+      1000
+     ],
+     "lines": [
+      {
+       "hole": 3,
+       "winnerId": "101",
+       "winnerName": "Ann Alpha",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 7,
+       "winnerId": "105",
+       "winnerName": "Eli Echo",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 12,
+       "winnerId": "109",
+       "winnerName": "Ivy India",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 16,
+       "winnerId": "102",
+       "winnerName": "Ben Bravo",
+       "cents": 1000,
+       "state": "paid"
+      }
+     ],
+     "unclaimedCents": 0,
+     "unresolvedCents": 0,
+     "confirmed": true
+    },
+    "net": {
+     "amountCents": 20000,
+     "standings": [
+      {
+       "id": "118",
+       "name": "Rae Romeo",
+       "net": 48,
+       "played": 18
+      },
+      {
+       "id": "113",
+       "name": "Max Mike",
+       "net": 49,
+       "played": 18
+      },
+      {
+       "id": "105",
+       "name": "Eli Echo",
+       "net": 51,
+       "played": 18
+      },
+      {
+       "id": "121",
+       "name": "Uma Uniform",
+       "net": 53,
+       "played": 18
+      },
+      {
+       "id": "109",
+       "name": "Ivy India",
+       "net": 54,
+       "played": 18
+      },
+      {
+       "id": "115",
+       "name": "Oli Oscar",
+       "net": 55,
+       "played": 18
+      },
+      {
+       "id": "123",
+       "name": "Wes Whiskey",
+       "net": 55,
+       "played": 18
+      },
+      {
+       "id": "103",
+       "name": "Cal Charlie",
+       "net": 56,
+       "played": 18
+      },
+      {
+       "id": "122",
+       "name": "Vic Victor",
+       "net": 58,
+       "played": 18
+      },
+      {
+       "id": "111",
+       "name": "Kim Kilo",
+       "net": 59,
+       "played": 18
+      },
+      {
+       "id": "120",
+       "name": "Tom Tango",
+       "net": 60,
+       "played": 18
+      },
+      {
+       "id": "107",
+       "name": "Gus Golf",
+       "net": 61,
+       "played": 18
+      },
+      {
+       "id": "117",
+       "name": "Quy Quebec",
+       "net": 61,
+       "played": 18
+      },
+      {
+       "id": "102",
+       "name": "Ben Bravo",
+       "net": 62,
+       "played": 18
+      },
+      {
+       "id": "114",
+       "name": "Ned November",
+       "net": 63,
+       "played": 18
+      },
+      {
+       "id": "106",
+       "name": "Fay Foxtrot",
+       "net": 65,
+       "played": 18
+      },
+      {
+       "id": "110",
+       "name": "Jon Juliet",
+       "net": 66,
+       "played": 18
+      },
+      {
+       "id": "104",
+       "name": "Dee Delta",
+       "net": 67,
+       "played": 18
+      },
+      {
+       "id": "119",
+       "name": "Sal Sierra",
+       "net": 67,
+       "played": 18
+      },
+      {
+       "id": "101",
+       "name": "Ann Alpha",
+       "net": 69,
+       "played": 18
+      },
+      {
+       "id": "112",
+       "name": "Lee Lima",
+       "net": 69,
+       "played": 18
+      },
+      {
+       "id": "116",
+       "name": "Pat Papa",
+       "net": 70,
+       "played": 18
+      },
+      {
+       "id": "108",
+       "name": "Hal Hotel",
+       "net": 72,
+       "played": 18
+      }
+     ],
+     "lines": [
+      {
+       "place": 1,
+       "ids": [
+        "118"
+       ],
+       "names": [
+        "Rae Romeo"
+       ],
+       "net": 48,
+       "cents": 12000,
+       "split": false,
+       "pctShare": 60
+      },
+      {
+       "place": 2,
+       "ids": [
+        "113"
+       ],
+       "names": [
+        "Max Mike"
+       ],
+       "net": 49,
+       "cents": 8000,
+       "split": false,
+       "pctShare": 40
+      }
+     ],
+     "placeCents": [
+      12000,
+      8000
+     ],
+     "unpaidCents": 0
+    },
+    "skins": {
+     "amountCents": 22000,
+     "scoring": "gross",
+     "carryOver": false,
+     "lines": [
+      {
+       "hole": 1,
+       "winnerId": "101",
+       "winnerName": "Ann Alpha",
+       "units": 1,
+       "cents": 3700
+      },
+      {
+       "hole": 5,
+       "winnerId": "103",
+       "winnerName": "Cal Charlie",
+       "units": 1,
+       "cents": 3700
+      },
+      {
+       "hole": 7,
+       "winnerId": "114",
+       "winnerName": "Ned November",
+       "units": 1,
+       "cents": 3700
+      },
+      {
+       "hole": 9,
+       "winnerId": "104",
+       "winnerName": "Dee Delta",
+       "units": 1,
+       "cents": 3700
+      },
+      {
+       "hole": 11,
+       "winnerId": "115",
+       "winnerName": "Oli Oscar",
+       "units": 1,
+       "cents": 3600
+      },
+      {
+       "hole": 16,
+       "winnerId": "117",
+       "winnerName": "Quy Quebec",
+       "units": 1,
+       "cents": 3600
+      }
+     ],
+     "totalUnits": 6,
+     "pendingUnits": 0,
+     "unwonCents": 0
+    },
+    "refund": {
+     "cents": 0,
+     "perPlayerCents": {},
+     "reasons": []
+    },
+    "perPlayerCents": {
+     "101": 2700,
+     "102": -1000,
+     "103": 1700,
+     "104": 1700,
+     "105": -1000,
+     "106": -2000,
+     "107": -2000,
+     "108": -2000,
+     "109": -1000,
+     "110": -2000,
+     "111": -2000,
+     "112": -2000,
+     "113": 6000,
+     "114": 1700,
+     "115": 1600,
+     "116": -2000,
+     "117": 1600,
+     "118": 10000,
+     "119": -2000,
+     "120": -2000,
+     "121": -2000,
+     "122": -2000,
+     "123": -2000
+    },
+    "kpUnresolvedCents": 0,
+    "settled": true
+   }
+  },
+  "golden-flight": {
+   "text": {
+    "money-pool-section": "| |🏆 Weekly Game — $460|Skins|Flight A|Ann Alpha|$23|Ben Bravo|$23|Cal Charlie|$23|Dee Delta|$23|Eli Echo|$23|Flight B|Max Mike|$21|Ned November|$21|Oli Oscar|$21|Pat Papa|$21|Quy Quebec|$21|Net Finish|1 · Rae Romeo|$120|2 · Max Mike|$80|KP|Ann Alpha|$10|Ben Bravo|$10|Eli Echo|$10|Ivy India|$10|📍 KP — $40|Hole 3: Ann Alpha|$10|Hole 7: Eli Echo|$10|Hole 12: Ivy India|$10|Hole 16: Ben Bravo|$10|🥇 Net Finish — $200|1st: Rae Romeo · net 48|$120|2nd: Max Mike · net 49|$80|🥩 Skins Pot — $220 (Gross skins, no carry)|Split by flight, by headcount: Flight A $115 (12 golfers) · Flight B $105 (11 golfers)|Flight A — $115|Hole 1 — Ann Alpha — Gross 3 — Skin|$23|Hole 2 — Ben Bravo — Gross 3 — Skin|$23|Hole 5 — Cal Charlie — Gross 3 — Skin|$23|Hole 9 — Dee Delta — Gross 3 — Skin|$23|Hole 13 — Eli Echo — Gross 4 — Skin|$23|Skins Summary — Flight A|Ann Alpha — 1 skin|$23|Ben Bravo — 1 skin|$23|Cal Charlie — 1 skin|$23|Dee Delta — 1 skin|$23|Eli Echo — 1 skin|$23|Flight B — $105|Hole 2 — Max Mike — Gross 3 — Skin|$21|Hole 7 — Ned November — Gross 2 — Skin|$21|Hole 11 — Oli Oscar — Gross 3 — Skin|$21|Hole 13 — Pat Papa — Gross 4 — Skin|$21|Hole 16 — Quy Quebec — Gross 2 — Skin|$21|Skins Summary — Flight B|Max Mike — 1 skin|$21|Ned November — 1 skin|$21|Oli Oscar — 1 skin|$21|Pat Papa — 1 skin|$21|Quy Quebec — 1 skin|$21|",
+    "combined-settlement-summary": "| |Tidewater| |<date>| |Stroke Play · Net · 23 golfers| |Sunday| |📄 Print / Save Receipt| |🏁 Final Results|Rae Romeo|+$100 NET|Max Mike|+$81 NET|Ann Alpha|+$13 NET|Ben Bravo|+$13 NET|Eli Echo|+$13 NET|Cal Charlie|+$3 NET|Dee Delta|+$3 NET|Ned November|+$1 NET|Oli Oscar|+$1 NET|Pat Papa|+$1 NET|Quy Quebec|+$1 NET|Ivy India|-$10 NET|Fay Foxtrot|-$20 NET|Gus Golf|-$20 NET|Hal Hotel|-$20 NET|Jon Juliet|-$20 NET|Kim Kilo|-$20 NET|Lee Lima|-$20 NET|Sal Sierra|-$20 NET|Tom Tango|-$20 NET|Uma Uniform|-$20 NET|Vic Victor|-$20 NET|Wes Whiskey|-$20 NET| |💰 Player Payouts| | What each golfer won from the pot. |Rae Romeo|Net Finish 1|+$120|TOTAL PAYOUT|+$120|Max Mike|Net Finish 2|+$80|Gross Skins · 1 skin|+$21|TOTAL PAYOUT|+$101|Ann Alpha|KP H3|+$10|Gross Skins · 1 skin|+$23|TOTAL PAYOUT|+$33|Ben Bravo|KP H16|+$10|Gross Skins · 1 skin|+$23|TOTAL PAYOUT|+$33|Eli Echo|KP H7|+$10|Gross Skins · 1 skin|+$23|TOTAL PAYOUT|+$33|Cal Charlie|Gross Skins · 1 skin|+$23|TOTAL PAYOUT|+$23|Dee Delta|Gross Skins · 1 skin|+$23|TOTAL PAYOUT|+$23|Ned November|Gross Skins · 1 skin|+$21|TOTAL PAYOUT|+$21|Oli Oscar|Gross Skins · 1 skin|+$21|TOTAL PAYOUT|+$21|Pat Papa|Gross Skins · 1 skin|+$21|TOTAL PAYOUT|+$21|Quy Quebec|Gross Skins · 1 skin|+$21|TOTAL PAYOUT|+$21|Ivy India|KP H12|+$10|TOTAL PAYOUT|+$10|Fay Foxtrot|No payout|$0|TOTAL PAYOUT|$0|Gus Golf|No payout|$0|TOTAL PAYOUT|$0|Hal Hotel|No payout|$0|TOTAL PAYOUT|$0|Jon Juliet|No payout|$0|TOTAL PAYOUT|$0|Kim Kilo|No payout|$0|TOTAL PAYOUT|$0|Lee Lima|No payout|$0|TOTAL PAYOUT|$0|Sal Sierra|No payout|$0|TOTAL PAYOUT|$0|Tom Tango|No payout|$0|TOTAL PAYOUT|$0|Uma Uniform|No payout|$0|TOTAL PAYOUT|$0|Vic Victor|No payout|$0|TOTAL PAYOUT|$0|Wes Whiskey|No payout|$0|TOTAL PAYOUT|$0|",
+    "settle-content": "",
+    "receipt-scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Ann Alpha|3|4|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|4|3|4|4|4|3|5|4|34|4|4|3|4|4|4|3|5|4|35|69|Ben Bravo|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|3|3|4|3|3|3|4|4|30|3|4|3|4|4|3|3|4|4|32|62|Cal Charlie|4|4|3|5|3|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|3|3|4|2|3|2|4|3|27|3|3|3|4|3|3|3|4|3|29|56|Dee Delta|4|4|3|5|4|4|3|5|3|35|4|4|3|5|4|4|3|5|4|36|71|net|4|4|3|4|4|3|3|5|3|33|4|4|3|4|4|3|3|5|4|34|67|Eli Echo|4|4|3|5|4|4|3|5|4|36|4|4|3|4|4|4|3|5|4|35|71|net|3|3|2|3|3|3|2|4|3|26|3|3|2|2|3|3|2|4|3|25|51|Fay Foxtrot|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|4|3|3|4|4|32|4|4|3|4|4|3|3|4|4|33|65|Gus Golf|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|3|3|3|4|3|30|3|4|3|4|3|3|3|4|4|31|61|Hal Hotel|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Ivy India|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|4|3|3|2|4|3|27|3|3|2|4|3|3|2|4|3|27|54|Jon Juliet|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|4|4|33|4|4|3|4|4|3|3|4|4|33|66|Kim Kilo|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|3|4|3|3|3|4|3|29|3|4|3|4|3|3|3|4|3|30|59|Lee Lima|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|5|4|34|4|4|3|4|4|4|3|5|4|35|69|Max Mike|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|2|2|3|3|2|2|4|3|24|3|3|2|3|3|2|2|4|3|25|49|Ned November|4|4|3|5|4|4|2|5|4|35|4|4|3|5|4|4|3|5|4|36|71|net|3|4|3|4|4|3|2|4|4|31|3|4|3|4|4|3|3|4|4|32|63|Oli Oscar|4|4|3|5|4|4|3|5|4|36|4|3|3|5|4|4|3|5|4|35|71|net|3|3|3|4|3|3|2|4|3|28|3|2|3|4|3|3|2|4|3|27|55|Pat Papa|4|4|3|5|4|4|3|5|4|36|4|4|3|4|4|4|3|5|4|35|71|net|4|4|3|4|4|4|3|5|4|35|4|4|3|4|4|4|3|5|4|35|70|Quy Quebec|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|2|5|4|35|71|net|3|4|3|4|3|3|3|4|4|31|3|4|3|4|3|3|2|4|4|30|61|Rae Romeo|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|3|3|2|2|3|3|24|3|3|2|3|3|2|2|3|3|24|48|Sal Sierra|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|4|4|3|4|4|3|3|4|4|33|4|4|3|4|4|3|3|5|4|34|67|Tom Tango|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|4|3|4|3|3|3|4|3|30|3|4|3|4|3|3|3|4|3|30|60|Uma Uniform|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|3|3|3|2|4|3|26|3|3|2|4|3|3|2|4|3|27|53|Vic Victor|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|3|4|3|3|3|4|3|29|3|3|3|4|3|3|3|4|3|29|58|Wes Whiskey|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|net|3|3|2|4|3|3|2|4|3|27|3|3|3|4|3|3|2|4|3|28|55| | | Birdie | Eagle or better |net rows show the score after handicap strokes| |"
+   },
+   "engine": {
+    "valid": true,
+    "errors": [],
+    "totalPoolCents": 46000,
+    "buyInCents": 2000,
+    "participants": [
+     {
+      "id": "101",
+      "name": "Ann Alpha"
+     },
+     {
+      "id": "102",
+      "name": "Ben Bravo"
+     },
+     {
+      "id": "103",
+      "name": "Cal Charlie"
+     },
+     {
+      "id": "104",
+      "name": "Dee Delta"
+     },
+     {
+      "id": "105",
+      "name": "Eli Echo"
+     },
+     {
+      "id": "106",
+      "name": "Fay Foxtrot"
+     },
+     {
+      "id": "107",
+      "name": "Gus Golf"
+     },
+     {
+      "id": "108",
+      "name": "Hal Hotel"
+     },
+     {
+      "id": "109",
+      "name": "Ivy India"
+     },
+     {
+      "id": "110",
+      "name": "Jon Juliet"
+     },
+     {
+      "id": "111",
+      "name": "Kim Kilo"
+     },
+     {
+      "id": "112",
+      "name": "Lee Lima"
+     },
+     {
+      "id": "113",
+      "name": "Max Mike"
+     },
+     {
+      "id": "114",
+      "name": "Ned November"
+     },
+     {
+      "id": "115",
+      "name": "Oli Oscar"
+     },
+     {
+      "id": "116",
+      "name": "Pat Papa"
+     },
+     {
+      "id": "117",
+      "name": "Quy Quebec"
+     },
+     {
+      "id": "118",
+      "name": "Rae Romeo"
+     },
+     {
+      "id": "119",
+      "name": "Sal Sierra"
+     },
+     {
+      "id": "120",
+      "name": "Tom Tango"
+     },
+     {
+      "id": "121",
+      "name": "Uma Uniform"
+     },
+     {
+      "id": "122",
+      "name": "Vic Victor"
+     },
+     {
+      "id": "123",
+      "name": "Wes Whiskey"
+     }
+    ],
+    "kp": {
+     "amountCents": 4000,
+     "perHoleCents": [
+      1000,
+      1000,
+      1000,
+      1000
+     ],
+     "lines": [
+      {
+       "hole": 3,
+       "winnerId": "101",
+       "winnerName": "Ann Alpha",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 7,
+       "winnerId": "105",
+       "winnerName": "Eli Echo",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 12,
+       "winnerId": "109",
+       "winnerName": "Ivy India",
+       "cents": 1000,
+       "state": "paid"
+      },
+      {
+       "hole": 16,
+       "winnerId": "102",
+       "winnerName": "Ben Bravo",
+       "cents": 1000,
+       "state": "paid"
+      }
+     ],
+     "unclaimedCents": 0,
+     "unresolvedCents": 0,
+     "confirmed": true
+    },
+    "net": {
+     "amountCents": 20000,
+     "standings": [
+      {
+       "id": "118",
+       "name": "Rae Romeo",
+       "net": 48,
+       "played": 18
+      },
+      {
+       "id": "113",
+       "name": "Max Mike",
+       "net": 49,
+       "played": 18
+      },
+      {
+       "id": "105",
+       "name": "Eli Echo",
+       "net": 51,
+       "played": 18
+      },
+      {
+       "id": "121",
+       "name": "Uma Uniform",
+       "net": 53,
+       "played": 18
+      },
+      {
+       "id": "109",
+       "name": "Ivy India",
+       "net": 54,
+       "played": 18
+      },
+      {
+       "id": "115",
+       "name": "Oli Oscar",
+       "net": 55,
+       "played": 18
+      },
+      {
+       "id": "123",
+       "name": "Wes Whiskey",
+       "net": 55,
+       "played": 18
+      },
+      {
+       "id": "103",
+       "name": "Cal Charlie",
+       "net": 56,
+       "played": 18
+      },
+      {
+       "id": "122",
+       "name": "Vic Victor",
+       "net": 58,
+       "played": 18
+      },
+      {
+       "id": "111",
+       "name": "Kim Kilo",
+       "net": 59,
+       "played": 18
+      },
+      {
+       "id": "120",
+       "name": "Tom Tango",
+       "net": 60,
+       "played": 18
+      },
+      {
+       "id": "107",
+       "name": "Gus Golf",
+       "net": 61,
+       "played": 18
+      },
+      {
+       "id": "117",
+       "name": "Quy Quebec",
+       "net": 61,
+       "played": 18
+      },
+      {
+       "id": "102",
+       "name": "Ben Bravo",
+       "net": 62,
+       "played": 18
+      },
+      {
+       "id": "114",
+       "name": "Ned November",
+       "net": 63,
+       "played": 18
+      },
+      {
+       "id": "106",
+       "name": "Fay Foxtrot",
+       "net": 65,
+       "played": 18
+      },
+      {
+       "id": "110",
+       "name": "Jon Juliet",
+       "net": 66,
+       "played": 18
+      },
+      {
+       "id": "104",
+       "name": "Dee Delta",
+       "net": 67,
+       "played": 18
+      },
+      {
+       "id": "119",
+       "name": "Sal Sierra",
+       "net": 67,
+       "played": 18
+      },
+      {
+       "id": "101",
+       "name": "Ann Alpha",
+       "net": 69,
+       "played": 18
+      },
+      {
+       "id": "112",
+       "name": "Lee Lima",
+       "net": 69,
+       "played": 18
+      },
+      {
+       "id": "116",
+       "name": "Pat Papa",
+       "net": 70,
+       "played": 18
+      },
+      {
+       "id": "108",
+       "name": "Hal Hotel",
+       "net": 72,
+       "played": 18
+      }
+     ],
+     "lines": [
+      {
+       "place": 1,
+       "ids": [
+        "118"
+       ],
+       "names": [
+        "Rae Romeo"
+       ],
+       "net": 48,
+       "cents": 12000,
+       "split": false,
+       "pctShare": 60
+      },
+      {
+       "place": 2,
+       "ids": [
+        "113"
+       ],
+       "names": [
+        "Max Mike"
+       ],
+       "net": 49,
+       "cents": 8000,
+       "split": false,
+       "pctShare": 40
+      }
+     ],
+     "placeCents": [
+      12000,
+      8000
+     ],
+     "unpaidCents": 0
+    },
+    "skins": {
+     "amountCents": 22000,
+     "scoring": "gross",
+     "carryOver": false,
+     "lines": [
+      {
+       "hole": 1,
+       "winnerId": "101",
+       "winnerName": "Ann Alpha",
+       "units": 1,
+       "cents": 2300,
+       "flight": "A"
+      },
+      {
+       "hole": 2,
+       "winnerId": "102",
+       "winnerName": "Ben Bravo",
+       "units": 1,
+       "cents": 2300,
+       "flight": "A"
+      },
+      {
+       "hole": 5,
+       "winnerId": "103",
+       "winnerName": "Cal Charlie",
+       "units": 1,
+       "cents": 2300,
+       "flight": "A"
+      },
+      {
+       "hole": 9,
+       "winnerId": "104",
+       "winnerName": "Dee Delta",
+       "units": 1,
+       "cents": 2300,
+       "flight": "A"
+      },
+      {
+       "hole": 13,
+       "winnerId": "105",
+       "winnerName": "Eli Echo",
+       "units": 1,
+       "cents": 2300,
+       "flight": "A"
+      },
+      {
+       "hole": 2,
+       "winnerId": "113",
+       "winnerName": "Max Mike",
+       "units": 1,
+       "cents": 2100,
+       "flight": "B"
+      },
+      {
+       "hole": 7,
+       "winnerId": "114",
+       "winnerName": "Ned November",
+       "units": 1,
+       "cents": 2100,
+       "flight": "B"
+      },
+      {
+       "hole": 11,
+       "winnerId": "115",
+       "winnerName": "Oli Oscar",
+       "units": 1,
+       "cents": 2100,
+       "flight": "B"
+      },
+      {
+       "hole": 13,
+       "winnerId": "116",
+       "winnerName": "Pat Papa",
+       "units": 1,
+       "cents": 2100,
+       "flight": "B"
+      },
+      {
+       "hole": 16,
+       "winnerId": "117",
+       "winnerName": "Quy Quebec",
+       "units": 1,
+       "cents": 2100,
+       "flight": "B"
+      }
+     ],
+     "totalUnits": 10,
+     "pendingUnits": 0,
+     "unwonCents": 0,
+     "flights": [
+      {
+       "flight": "A",
+       "golfers": 12,
+       "amountCents": 11500,
+       "lines": [
+        {
+         "hole": 1,
+         "winnerId": "101",
+         "winnerName": "Ann Alpha",
+         "units": 1,
+         "cents": 2300,
+         "flight": "A"
+        },
+        {
+         "hole": 2,
+         "winnerId": "102",
+         "winnerName": "Ben Bravo",
+         "units": 1,
+         "cents": 2300,
+         "flight": "A"
+        },
+        {
+         "hole": 5,
+         "winnerId": "103",
+         "winnerName": "Cal Charlie",
+         "units": 1,
+         "cents": 2300,
+         "flight": "A"
+        },
+        {
+         "hole": 9,
+         "winnerId": "104",
+         "winnerName": "Dee Delta",
+         "units": 1,
+         "cents": 2300,
+         "flight": "A"
+        },
+        {
+         "hole": 13,
+         "winnerId": "105",
+         "winnerName": "Eli Echo",
+         "units": 1,
+         "cents": 2300,
+         "flight": "A"
+        }
+       ],
+       "totalUnits": 5,
+       "pendingUnits": 0,
+       "unwonCents": 0
+      },
+      {
+       "flight": "B",
+       "golfers": 11,
+       "amountCents": 10500,
+       "lines": [
+        {
+         "hole": 2,
+         "winnerId": "113",
+         "winnerName": "Max Mike",
+         "units": 1,
+         "cents": 2100,
+         "flight": "B"
+        },
+        {
+         "hole": 7,
+         "winnerId": "114",
+         "winnerName": "Ned November",
+         "units": 1,
+         "cents": 2100,
+         "flight": "B"
+        },
+        {
+         "hole": 11,
+         "winnerId": "115",
+         "winnerName": "Oli Oscar",
+         "units": 1,
+         "cents": 2100,
+         "flight": "B"
+        },
+        {
+         "hole": 13,
+         "winnerId": "116",
+         "winnerName": "Pat Papa",
+         "units": 1,
+         "cents": 2100,
+         "flight": "B"
+        },
+        {
+         "hole": 16,
+         "winnerId": "117",
+         "winnerName": "Quy Quebec",
+         "units": 1,
+         "cents": 2100,
+         "flight": "B"
+        }
+       ],
+       "totalUnits": 5,
+       "pendingUnits": 0,
+       "unwonCents": 0
+      }
+     ]
+    },
+    "refund": {
+     "cents": 0,
+     "perPlayerCents": {},
+     "reasons": []
+    },
+    "perPlayerCents": {
+     "101": 1300,
+     "102": 1300,
+     "103": 300,
+     "104": 300,
+     "105": 1300,
+     "106": -2000,
+     "107": -2000,
+     "108": -2000,
+     "109": -1000,
+     "110": -2000,
+     "111": -2000,
+     "112": -2000,
+     "113": 8100,
+     "114": 100,
+     "115": 100,
+     "116": 100,
+     "117": 100,
+     "118": 10000,
+     "119": -2000,
+     "120": -2000,
+     "121": -2000,
+     "122": -2000,
+     "123": -2000
+    },
+    "kpUnresolvedCents": 0,
+    "settled": true
+   }
+  },
+  "three-tied-first": {
+   "text": {
+    "money-pool-section": "| |🏆 Weekly Game — $160|Skins|Bobby Blue|$20|Sammy Sage|$20|Tommy Teal|$20|Net Finish|T1 · Bobby Blue|$34|T1 · Sammy Sage|$33|T1 · Tommy Teal|$33|🥇 Net Finish — $100|T1: Bobby Blue / Sammy Sage / Tommy Teal · net 71|$100|Positions 1–3 · $50 + $30 + $20 = $100|Bobby Blue $34 · Sammy Sage $33 · Tommy Teal $33|The tie consumed 3 paid places, so the next golfer finishes 4th.|🥩 Skins Pot — $60 (Gross skins, no carry)|Hole 2 — Bobby Blue — Gross 3 — Skin|$20|Hole 6 — Tommy Teal — Gross 3 — Skin|$20|Hole 11 — Sammy Sage — Gross 3 — Skin|$20|Skins Summary|Bobby Blue — 1 skin|$20|Sammy Sage — 1 skin|$20|Tommy Teal — 1 skin|$20|",
+    "combined-settlement-summary": "| |Golf Round| |<date>| |Stroke Play · 8 golfers| |Weekly| |📄 Print / Save Receipt| |🏁 Final Results|Bobby Blue|+$34 NET|Tommy Teal|+$33 NET|Sammy Sage|+$33 NET|Danny Dune|-$20 NET|Eddie Elm|-$20 NET|Frankie Fir|-$20 NET|Gerry Gold|-$20 NET|Harry Hill|-$20 NET| |💰 Player Payouts| | What each golfer won from the pot. |Bobby Blue|Net Finish T1|+$34|Gross Skins · 1 skin|+$20|TOTAL PAYOUT|+$54|Tommy Teal|Net Finish T1|+$33|Gross Skins · 1 skin|+$20|TOTAL PAYOUT|+$53|Sammy Sage|Net Finish T1|+$33|Gross Skins · 1 skin|+$20|TOTAL PAYOUT|+$53|Danny Dune|No payout|$0|TOTAL PAYOUT|$0|Eddie Elm|No payout|$0|TOTAL PAYOUT|$0|Frankie Fir|No payout|$0|TOTAL PAYOUT|$0|Gerry Gold|No payout|$0|TOTAL PAYOUT|$0|Harry Hill|No payout|$0|TOTAL PAYOUT|$0|",
+    "settle-content": "",
+    "receipt-scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Bobby Blue|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|Tommy Teal|4|4|3|5|4|3|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|Sammy Sage|4|4|3|5|4|4|3|5|4|36|4|3|3|5|4|4|3|5|4|35|71|Danny Dune|4|4|3|5|5|4|3|5|4|37|4|4|3|5|4|4|3|5|4|36|73|Eddie Elm|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Frankie Fir|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Gerry Gold|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Harry Hill|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72| | | Birdie | Eagle or better |"
+   },
+   "engine": {
+    "valid": true,
+    "errors": [],
+    "totalPoolCents": 16000,
+    "buyInCents": 2000,
+    "participants": [
+     {
+      "id": "101",
+      "name": "Bobby Blue"
+     },
+     {
+      "id": "102",
+      "name": "Tommy Teal"
+     },
+     {
+      "id": "103",
+      "name": "Sammy Sage"
+     },
+     {
+      "id": "104",
+      "name": "Danny Dune"
+     },
+     {
+      "id": "105",
+      "name": "Eddie Elm"
+     },
+     {
+      "id": "106",
+      "name": "Frankie Fir"
+     },
+     {
+      "id": "107",
+      "name": "Gerry Gold"
+     },
+     {
+      "id": "108",
+      "name": "Harry Hill"
+     }
+    ],
+    "kp": null,
+    "net": {
+     "amountCents": 10000,
+     "standings": [
+      {
+       "id": "101",
+       "name": "Bobby Blue",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "103",
+       "name": "Sammy Sage",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "102",
+       "name": "Tommy Teal",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "105",
+       "name": "Eddie Elm",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "106",
+       "name": "Frankie Fir",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "107",
+       "name": "Gerry Gold",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "108",
+       "name": "Harry Hill",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "104",
+       "name": "Danny Dune",
+       "net": 73,
+       "played": 18
+      }
+     ],
+     "lines": [
+      {
+       "place": 1,
+       "ids": [
+        "101",
+        "103",
+        "102"
+       ],
+       "names": [
+        "Bobby Blue",
+        "Sammy Sage",
+        "Tommy Teal"
+       ],
+       "net": 71,
+       "cents": 10000,
+       "split": true,
+       "pctShare": 100
+      }
+     ],
+     "placeCents": [
+      5000,
+      3000,
+      2000
+     ],
+     "unpaidCents": 0
+    },
+    "skins": {
+     "amountCents": 6000,
+     "scoring": "gross",
+     "carryOver": false,
+     "lines": [
+      {
+       "hole": 2,
+       "winnerId": "101",
+       "winnerName": "Bobby Blue",
+       "units": 1,
+       "cents": 2000
+      },
+      {
+       "hole": 6,
+       "winnerId": "102",
+       "winnerName": "Tommy Teal",
+       "units": 1,
+       "cents": 2000
+      },
+      {
+       "hole": 11,
+       "winnerId": "103",
+       "winnerName": "Sammy Sage",
+       "units": 1,
+       "cents": 2000
+      }
+     ],
+     "totalUnits": 3,
+     "pendingUnits": 0,
+     "unwonCents": 0
+    },
+    "refund": {
+     "cents": 0,
+     "perPlayerCents": {},
+     "reasons": []
+    },
+    "perPlayerCents": {
+     "101": 3400,
+     "102": 3300,
+     "103": 3300,
+     "104": -2000,
+     "105": -2000,
+     "106": -2000,
+     "107": -2000,
+     "108": -2000
+    },
+    "kpUnresolvedCents": 0,
+    "settled": true
+   }
+  },
+  "three-tied-legacy": {
+   "text": {
+    "money-pool-section": "| |🏆 Weekly Game — $160|Skins|Bobby Blue|$20|Sammy Sage|$20|Tommy Teal|$20|Net Finish|T1 · Bobby Blue|$33.34|T1 · Sammy Sage|$33.33|T1 · Tommy Teal|$33.33|🥇 Net Finish — $100|T1: Bobby Blue / Sammy Sage / Tommy Teal · net 71|$100|Positions 1–3 · $50 + $30 + $20 = $100|Bobby Blue $33.34 · Sammy Sage $33.33 · Tommy Teal $33.33|The tie consumed 3 paid places, so the next golfer finishes 4th.|🥩 Skins Pot — $60 (Gross skins, no carry)|Hole 2 — Bobby Blue — Gross 3 — Skin|$20|Hole 6 — Tommy Teal — Gross 3 — Skin|$20|Hole 11 — Sammy Sage — Gross 3 — Skin|$20|Skins Summary|Bobby Blue — 1 skin|$20|Sammy Sage — 1 skin|$20|Tommy Teal — 1 skin|$20|",
+    "combined-settlement-summary": "| |Golf Round| |<date>| |Stroke Play · 8 golfers| |Weekly| |📄 Print / Save Receipt| |🏁 Final Results|Bobby Blue|+$34 NET|Tommy Teal|+$33 NET|Sammy Sage|+$33 NET|Danny Dune|-$20 NET|Eddie Elm|-$20 NET|Frankie Fir|-$20 NET|Gerry Gold|-$20 NET|Harry Hill|-$20 NET| |💰 Player Payouts| | What each golfer won from the pot. |Bobby Blue|Net Finish T1|+$33.33|Gross Skins · 1 skin|+$20|Rounding to whole dollars|+$0.66|TOTAL PAYOUT|+$53.99|Tommy Teal|Net Finish T1|+$33.33|Gross Skins · 1 skin|+$20|TOTAL PAYOUT|+$53.33|Sammy Sage|Net Finish T1|+$33.33|Gross Skins · 1 skin|+$20|TOTAL PAYOUT|+$53.33|Danny Dune|No payout|$0|TOTAL PAYOUT|$0|Eddie Elm|No payout|$0|TOTAL PAYOUT|$0|Frankie Fir|No payout|$0|TOTAL PAYOUT|$0|Gerry Gold|No payout|$0|TOTAL PAYOUT|$0|Harry Hill|No payout|$0|TOTAL PAYOUT|$0|",
+    "settle-content": "",
+    "receipt-scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Bobby Blue|4|3|3|5|4|4|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|Tommy Teal|4|4|3|5|4|3|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|Sammy Sage|4|4|3|5|4|4|3|5|4|36|4|3|3|5|4|4|3|5|4|35|71|Danny Dune|4|4|3|5|5|4|3|5|4|37|4|4|3|5|4|4|3|5|4|36|73|Eddie Elm|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Frankie Fir|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Gerry Gold|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Harry Hill|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72| | | Birdie | Eagle or better |"
+   },
+   "engine": {
+    "valid": true,
+    "errors": [],
+    "totalPoolCents": 16000,
+    "buyInCents": 2000,
+    "participants": [
+     {
+      "id": "101",
+      "name": "Bobby Blue"
+     },
+     {
+      "id": "102",
+      "name": "Tommy Teal"
+     },
+     {
+      "id": "103",
+      "name": "Sammy Sage"
+     },
+     {
+      "id": "104",
+      "name": "Danny Dune"
+     },
+     {
+      "id": "105",
+      "name": "Eddie Elm"
+     },
+     {
+      "id": "106",
+      "name": "Frankie Fir"
+     },
+     {
+      "id": "107",
+      "name": "Gerry Gold"
+     },
+     {
+      "id": "108",
+      "name": "Harry Hill"
+     }
+    ],
+    "kp": null,
+    "net": {
+     "amountCents": 10000,
+     "standings": [
+      {
+       "id": "101",
+       "name": "Bobby Blue",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "103",
+       "name": "Sammy Sage",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "102",
+       "name": "Tommy Teal",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "105",
+       "name": "Eddie Elm",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "106",
+       "name": "Frankie Fir",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "107",
+       "name": "Gerry Gold",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "108",
+       "name": "Harry Hill",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "104",
+       "name": "Danny Dune",
+       "net": 73,
+       "played": 18
+      }
+     ],
+     "lines": [
+      {
+       "place": 1,
+       "ids": [
+        "101",
+        "103",
+        "102"
+       ],
+       "names": [
+        "Bobby Blue",
+        "Sammy Sage",
+        "Tommy Teal"
+       ],
+       "net": 71,
+       "cents": 10000,
+       "split": true,
+       "pctShare": 100
+      }
+     ],
+     "placeCents": [
+      5000,
+      3000,
+      2000
+     ],
+     "unpaidCents": 0
+    },
+    "skins": {
+     "amountCents": 6000,
+     "scoring": "gross",
+     "carryOver": false,
+     "lines": [
+      {
+       "hole": 2,
+       "winnerId": "101",
+       "winnerName": "Bobby Blue",
+       "units": 1,
+       "cents": 2000
+      },
+      {
+       "hole": 6,
+       "winnerId": "102",
+       "winnerName": "Tommy Teal",
+       "units": 1,
+       "cents": 2000
+      },
+      {
+       "hole": 11,
+       "winnerId": "103",
+       "winnerName": "Sammy Sage",
+       "units": 1,
+       "cents": 2000
+      }
+     ],
+     "totalUnits": 3,
+     "pendingUnits": 0,
+     "unwonCents": 0
+    },
+    "refund": {
+     "cents": 0,
+     "perPlayerCents": {},
+     "reasons": []
+    },
+    "perPlayerCents": {
+     "101": 3334,
+     "102": 3333,
+     "103": 3333,
+     "104": -2000,
+     "105": -2000,
+     "106": -2000,
+     "107": -2000,
+     "108": -2000
+    },
+    "kpUnresolvedCents": 0,
+    "settled": true
+   }
+  },
+  "two-tied-second": {
+   "text": {
+    "money-pool-section": "| |🏆 Weekly Game — $160|Skins|Bobby Blue|$30|Sammy Sage|$15|Tommy Teal|$15|Net Finish|1 · Bobby Blue|$50|T2 · Sammy Sage|$25|T2 · Tommy Teal|$25|🥇 Net Finish — $100|1st: Bobby Blue · net 70|$50|T2: Sammy Sage / Tommy Teal · net 71|$50|Positions 2–3 · $30 + $20 = $50|$25 each|The tie consumed 2 paid places, so the next golfer finishes 4th.|🥩 Skins Pot — $60 (Gross skins, no carry)|Hole 2 — Bobby Blue — Gross 3 — Skin|$15|Hole 6 — Tommy Teal — Gross 3 — Skin|$15|Hole 9 — Bobby Blue — Gross 3 — Skin|$15|Hole 11 — Sammy Sage — Gross 3 — Skin|$15|Skins Summary|Bobby Blue — 2 skins|$30|Sammy Sage — 1 skin|$15|Tommy Teal — 1 skin|$15|",
+    "combined-settlement-summary": "| |Golf Round| |<date>| |Stroke Play · 8 golfers| |Weekly| |📄 Print / Save Receipt| |🏁 Final Results|Bobby Blue|+$60 NET|Tommy Teal|+$20 NET|Sammy Sage|+$20 NET|Danny Dune|-$20 NET|Eddie Elm|-$20 NET|Frankie Fir|-$20 NET|Gerry Gold|-$20 NET|Harry Hill|-$20 NET| |💰 Player Payouts| | What each golfer won from the pot. |Bobby Blue|Net Finish 1|+$50|Gross Skins · 2 skins|+$30|TOTAL PAYOUT|+$80|Tommy Teal|Net Finish T2|+$25|Gross Skins · 1 skin|+$15|TOTAL PAYOUT|+$40|Sammy Sage|Net Finish T2|+$25|Gross Skins · 1 skin|+$15|TOTAL PAYOUT|+$40|Danny Dune|No payout|$0|TOTAL PAYOUT|$0|Eddie Elm|No payout|$0|TOTAL PAYOUT|$0|Frankie Fir|No payout|$0|TOTAL PAYOUT|$0|Gerry Gold|No payout|$0|TOTAL PAYOUT|$0|Harry Hill|No payout|$0|TOTAL PAYOUT|$0|",
+    "settle-content": "",
+    "receipt-scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Bobby Blue|4|3|3|5|4|4|3|5|3|34|4|4|3|5|4|4|3|5|4|36|70|Tommy Teal|4|4|3|5|4|3|3|5|4|35|4|4|3|5|4|4|3|5|4|36|71|Sammy Sage|4|4|3|5|4|4|3|5|4|36|4|3|3|5|4|4|3|5|4|35|71|Danny Dune|4|4|3|5|5|4|3|5|4|37|4|4|3|5|4|4|3|5|4|36|73|Eddie Elm|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Frankie Fir|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Gerry Gold|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Harry Hill|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72| | | Birdie | Eagle or better |"
+   },
+   "engine": {
+    "valid": true,
+    "errors": [],
+    "totalPoolCents": 16000,
+    "buyInCents": 2000,
+    "participants": [
+     {
+      "id": "101",
+      "name": "Bobby Blue"
+     },
+     {
+      "id": "102",
+      "name": "Tommy Teal"
+     },
+     {
+      "id": "103",
+      "name": "Sammy Sage"
+     },
+     {
+      "id": "104",
+      "name": "Danny Dune"
+     },
+     {
+      "id": "105",
+      "name": "Eddie Elm"
+     },
+     {
+      "id": "106",
+      "name": "Frankie Fir"
+     },
+     {
+      "id": "107",
+      "name": "Gerry Gold"
+     },
+     {
+      "id": "108",
+      "name": "Harry Hill"
+     }
+    ],
+    "kp": null,
+    "net": {
+     "amountCents": 10000,
+     "standings": [
+      {
+       "id": "101",
+       "name": "Bobby Blue",
+       "net": 70,
+       "played": 18
+      },
+      {
+       "id": "103",
+       "name": "Sammy Sage",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "102",
+       "name": "Tommy Teal",
+       "net": 71,
+       "played": 18
+      },
+      {
+       "id": "105",
+       "name": "Eddie Elm",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "106",
+       "name": "Frankie Fir",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "107",
+       "name": "Gerry Gold",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "108",
+       "name": "Harry Hill",
+       "net": 72,
+       "played": 18
+      },
+      {
+       "id": "104",
+       "name": "Danny Dune",
+       "net": 73,
+       "played": 18
+      }
+     ],
+     "lines": [
+      {
+       "place": 1,
+       "ids": [
+        "101"
+       ],
+       "names": [
+        "Bobby Blue"
+       ],
+       "net": 70,
+       "cents": 5000,
+       "split": false,
+       "pctShare": 50
+      },
+      {
+       "place": 2,
+       "ids": [
+        "103",
+        "102"
+       ],
+       "names": [
+        "Sammy Sage",
+        "Tommy Teal"
+       ],
+       "net": 71,
+       "cents": 5000,
+       "split": true,
+       "pctShare": 50
+      }
+     ],
+     "placeCents": [
+      5000,
+      3000,
+      2000
+     ],
+     "unpaidCents": 0
+    },
+    "skins": {
+     "amountCents": 6000,
+     "scoring": "gross",
+     "carryOver": false,
+     "lines": [
+      {
+       "hole": 2,
+       "winnerId": "101",
+       "winnerName": "Bobby Blue",
+       "units": 1,
+       "cents": 1500
+      },
+      {
+       "hole": 6,
+       "winnerId": "102",
+       "winnerName": "Tommy Teal",
+       "units": 1,
+       "cents": 1500
+      },
+      {
+       "hole": 9,
+       "winnerId": "101",
+       "winnerName": "Bobby Blue",
+       "units": 1,
+       "cents": 1500
+      },
+      {
+       "hole": 11,
+       "winnerId": "103",
+       "winnerName": "Sammy Sage",
+       "units": 1,
+       "cents": 1500
+      }
+     ],
+     "totalUnits": 4,
+     "pendingUnits": 0,
+     "unwonCents": 0
+    },
+    "refund": {
+     "cents": 0,
+     "perPlayerCents": {},
+     "reasons": []
+    },
+    "perPlayerCents": {
+     "101": 6000,
+     "102": 2000,
+     "103": 2000,
+     "104": -2000,
+     "105": -2000,
+     "106": -2000,
+     "107": -2000,
+     "108": -2000
+    },
+    "kpUnresolvedCents": 0,
+    "settled": true
+   }
+  }
+ }
+}

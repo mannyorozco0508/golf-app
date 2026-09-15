@@ -295,14 +295,13 @@ describe('THE SEAM: the block consumes the engine and derives nothing; the PDF r
             assert.ok(!fn.includes(bad), 'the block must not compute money: ' + bad));
         assert.ok(!/[\w)\]]\s*\/\s*[\w(]/.test(fn), 'no division of anything (a "/" between operands)');
         assert.ok(/\+= l\.cents/.test(fn), 'the only arithmetic is summing a golfer\'s engine lines');
-        // v142: a tied place's per-golfer shares come from netTieShares, which calls
-        // the ENGINE's allocators (allocateWholeDollars / splitCentsEvenly) with the
-        // engine's inputs and does no arithmetic of its own beyond cents<->dollars.
-        assert.match(fn, /netTieShares\(l, r\)/, 'the split is read from netTieShares');
+        // v142: a tied place's per-golfer shares come from netTieShares. Wave A
+        // fix 1: it READS l.shares, the array pool-engine.js paid the tie from and
+        // now puts on the line - no allocator call, no arithmetic at all.
+        assert.match(fn, /netTieShares\(l\)/, 'the split is read from netTieShares');
         const shares = src.slice(src.indexOf('function netTieShares('), src.indexOf('\n    function ', src.indexOf('function netTieShares(') + 30));
-        assert.match(shares, /allocateWholeDollars\(l\.cents \/ 100, l\.ids\.map\(\(\) => 1\)\)\.map\(d => d \* 100\)/);
-        assert.match(shares, /splitCentsEvenly\(l\.cents, n\)/);
-        assert.ok(!/Math\.(round|floor|ceil)|toFixed/.test(shares), 'no rounding of its own');
+        assert.match(shares, /l\.shares/);
+        assert.ok(!/allocateWholeDollars|splitCentsEvenly|isWholeDollarRound|Math\.(round|floor|ceil)|toFixed|\/ 100|\* 100/.test(shares), 'no allocation, no rounding, nothing of its own');
     });
     test('the block is inside #money-pool-section, which printReceipt exports and the native PDF reads by innerText', () => {
         assert.match(src, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',/);

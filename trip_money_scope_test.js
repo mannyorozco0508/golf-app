@@ -78,7 +78,7 @@ const PAGE = 'trip.html';
 // A money source is any thing that can put a dollar into a golfer's trip total.
 // Kept deliberately wider than TRIP_TOTAL_INCLUDES: the list is what the total
 // DOES contain, this is what a sentence might CLAIM about it.
-const MONEY_SOURCE = /main[- ]format|main game|main bet|side game|side match|press(es)?\b|birdie pool|\bKPs?\b|main pool|skins|nassau|wager|stakes?\b/i;
+const MONEY_SOURCE = /main[- ]format|main game|main bet|side game|side match|press(es)?\b|birdie pool|\bKPs?\b|main pool|weekly game|skins|nassau|wager|stakes?\b/i;
 
 // A scope verb asserts what is or is not counted. Stems, not conjugations, and
 // polarity-blind on purpose - see the header.
@@ -130,7 +130,7 @@ const MUST_STAY_CLEAN = [
 
 const TRUE_SENTENCE =
     'Includes the main game, side games, side matches and presses, the Birdie Pool, '
-    + 'KPs and the Main Pool.';
+    + 'KPs and the Weekly Game.';   // Wave A fix 2: the pool's category renamed
 
 describe('THE DEFINITION OF MONEY-SCOPE PROSE IS ITSELF TESTED', () => {
 

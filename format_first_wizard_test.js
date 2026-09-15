@@ -522,7 +522,12 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // remainder to A, pots sum to the bucket, per-flight zero-sum);
         // pool_flights_golden_test.js pins flights-off and scope-'field' byte
         // for byte against the pre-change capture.
-        'pool-engine.js': 'f4d7cdbbf6bee2ca68d34cf97e6dbb76145af456b0da97a11176f6e9c059df81',
+        // RE-PINNED, Wave A fix 1 (approved, this change only): each net line now
+        // carries {shares: [...]} in ids order - the array the engine paid the
+        // tie from, exposed so settlement.html reads it instead of reproducing
+        // it. Additive: tie_shares_test.js proves the result with `shares` removed
+        // deep-equals the v143 result on five rounds.
+        'pool-engine.js': 'd47a1e0a267478a3ccd3e729521136c82f2f4c06532bf085d87f9360e9688d57',
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:

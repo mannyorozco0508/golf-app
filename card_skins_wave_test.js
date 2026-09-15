@@ -214,7 +214,8 @@ describe('ONE WORDING — pinned in skins_rows_shared_test.js since v138; what s
     test('engines untouched (settlement.html was fenced for v137 only; v138 routes it through the shared builder)', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('settlement-engine.js'), 'adc3cd9f');
-        assert.equal(h('pool-engine.js'), 'f4d7cdbb');
+        // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
+        assert.equal(h('pool-engine.js'), 'd47a1e0a');
         assert.equal(h('money-engine.js'), '3c960947');
     });
 });

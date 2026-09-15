@@ -507,8 +507,12 @@ function computeMoneyPool(data, courseData, savedScores) {
                         : splitCentsEvenly(groupCents, span);
                     tied.forEach((s, j) => pay(s.id, shares[j]));
                     paid += groupCents;
+                    // THE SHARES GO ON THE LINE, in ids order - the same array the
+                    // golfers were just paid from, so a page that prints a tie one
+                    // golfer at a time reads them here instead of reproducing the
+                    // allocation. Additive: every other field is as it was.
                     lines.push({ place, ids: tied.map(s => s.id), names: tied.map(s => s.name),
-                                 net: tied[0].net, cents: groupCents, split: span > 1,
+                                 net: tied[0].net, cents: groupCents, split: span > 1, shares: shares.slice(),
                                  pctShare: amountCents > 0 ? (groupCents / amountCents) * 100 : 0 });
                 }
                 i += span;

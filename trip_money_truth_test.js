@@ -71,7 +71,10 @@ function covered(list, label, catalogLabels, mainLabels) {
     if (/^Side Match/.test(l)) return has(/side match/i);
     if (l === 'Birdie Pool') return has(/birdie/i);
     if (l === 'KP') return has(/\bKP/i);
-    if (l === 'Main Pool') return has(/main pool/i);
+    // The engine's ledger label is still MAIN_POOL_LEDGER_LABEL = 'Main Pool'
+    // (action-model.js); the golfer-facing category is 'the Weekly Game' (Wave A
+    // fix 2, after v142/v143 renamed the pool on every other surface).
+    if (l === 'Main Pool') return has(/weekly game/i);
     if (catalogLabels.indexOf(l) !== -1) return has(/side game/i);
     if (mainLabels.indexOf(l) !== -1) return has(/main game/i);
     return false;
@@ -149,6 +152,7 @@ describe('THE FOOTER SAYS WHAT IS IN THE TOTAL', () => {
 
     test('the fixed sources are covered', () => {
         const list = declaredList();
+        assert.ok(!list.some(x => /main pool/i.test(x)), 'the list no longer says Main Pool (Wave A fix 2)');
         ['Birdie Pool', 'KP', 'Main Pool', 'Side Match · A vs B']
             .forEach(l => assert.ok(covered(list, l, [], []),
                 'the footer does not cover "' + l + '"'));

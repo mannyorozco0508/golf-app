@@ -1196,7 +1196,7 @@ html {
     // Net Finish: r.net.lines[].cents as the engine allocated the place(s). KP:
     // r.kp.lines[].cents on 'paid' lines, summed per golfer. Net Finish: ONE ROW
     // PER GOLFER (v142) - a tied place is split into its golfers' own shares by
-    // netTieShares(), the engine's allocator with the engine's inputs, so a tied
+    // netTieShares(), which reads the shares the engine put on the line, so a tied
     // $100 reads Bobby $34 / Sammy $33 / Tommy $33, summing to the group amount
     // exactly and matching both the Net Finish detail below and what the engine
     // paid. Each net row carries its place, 1 / 2 / T3 / T3, by the leaderboard's
@@ -1229,7 +1229,7 @@ html {
         if (r.net) {
             const rows = [];
             r.net.lines.forEach(l => {
-                const shares = netTieShares(l, r);
+                const shares = netTieShares(l);
                 const label = netPlaceLabel(l);
                 l.names.forEach((name, i) => rows.push(row(name, shares[i], label)));
             });
@@ -1251,26 +1251,16 @@ html {
 
     // ---- A TIED NET PLACE, ONE GOLFER AT A TIME -------------------------------
     //
-    // pool-engine.js pays each golfer of a tie their own share (:506-508) but
-    // exposes only the group line {ids, names, cents, split}. This is the ONE
-    // place on the page that reproduces the share, and it does so by calling the
-    // engine's own allocators with the engine's own inputs - never a second
-    // implementation of the split: allocateWholeDollars(groupDollars, one weight
-    // per golfer) on a whole-dollar round, splitCentsEvenly(groupCents, n) on a
-    // legacy round - so the shares are the cents the engine paid, in l.ids order,
-    // and they sum to l.cents exactly. Both the PAYOUTS block and the Net Finish
-    // detail read this, so the two cannot disagree. (The detail used to print a
-    // legacy tie as "$33.33 each"; the engine pays 33.34/33.33/33.33, and now the
-    // detail says so.)
-    function netTieShares(l, r) {
-        const n = (l.ids || []).length;
-        if (n <= 1) return [l.cents];
-        const wholeDollar = (typeof isWholeDollarRound === 'function') ? isWholeDollarRound(currentData) : (currentData && currentData.settlementMode === 'whole-dollar');
-        if (wholeDollar && typeof allocateWholeDollars === 'function') {
-            return allocateWholeDollars(l.cents / 100, l.ids.map(() => 1)).map(d => d * 100);
-        }
-        if (typeof splitCentsEvenly === 'function') return splitCentsEvenly(l.cents, n);
-        return l.ids.map(() => l.cents / n);
+    // pool-engine.js pays each golfer of a tie their own share and puts those
+    // shares ON THE LINE - {shares: [...]} in l.ids order, the same array it paid
+    // from. This page reads them and computes nothing. (v142 reproduced the split
+    // here by calling the engine's allocators with the engine's inputs; that
+    // reproduction is gone - the engine is the one source.) Both the PAYOUTS
+    // block and the Net Finish detail read this, so the two cannot disagree, and
+    // a legacy tie prints the cents the engine paid (33.34/33.33/33.33), not
+    // "$33.33 each".
+    function netTieShares(l) {
+        return (l.shares || [l.cents]).slice();
     }
 
     // The place label, the leaderboard's way: the engine's `place` is the players
@@ -1380,12 +1370,12 @@ html {
                     + (parts.length > 1 ? ` \u00B7 ${parts.join(' + ')} = ${$(l.cents)}` : ` \u00B7 ${$(l.cents)}`)
                     + `</div>`;
 
-                // The per-golfer split, from the same allocator settlement used. In a
+                // The per-golfer split, the shares the engine put on the line. In a
                 // whole-dollar round an odd pot is deliberately uneven - $100 over three
                 // is $34/$33/$33 - so the actual amounts are printed rather than an
                 // average that would not add up.
                 // (v142) The same shares the PAYOUTS block prints, from netTieShares.
-                const each = netTieShares(l, r);
+                const each = netTieShares(l);
                 const same = each.every(c => c === each[0]);
                 html += `<div class="nf-explain">${same
                     ? `${$(each[0])} each`

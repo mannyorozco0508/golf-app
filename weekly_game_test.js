@@ -6,13 +6,13 @@
 //      moneyPool). Nothing rendered on the page says "Main Pool" any more.
 //   2. The payouts block has no title line ("hand out in this order" is gone);
 //      the block and its by-game grouping are as they were.
-//   3. A tied net place is one row PER GOLFER with that golfer's share. The
-//      obstacle was that pool-engine.js exposes the group line only; the share
-//      is reproduced by netTieShares(), which calls the engine's own allocators
-//      (allocateWholeDollars on a whole-dollar round, splitCentsEvenly on a
-//      legacy round) with the engine's own inputs - so the rows sum to the
-//      group amount exactly, match the Net Finish detail (which reads the same
-//      function), and match the cents the engine actually paid (perPlayerCents).
+//   3. A tied net place is one row PER GOLFER with that golfer's share. At v142
+//      pool-engine.js exposed the group line only, and netTieShares() reproduced
+//      the share by calling the engine's own allocators with the engine's own
+//      inputs. Since Wave A fix 1 the engine puts {shares} on the line and
+//      netTieShares() reads them (tie_shares_test.js) - the rows still sum to
+//      the group amount exactly, match the Net Finish detail (which reads the
+//      same function), and match the cents the engine actually paid.
 //   4. Every Net Finish payout row carries its place: 1, 2, T3, T3 - the
 //      engine's `place` (players ahead + 1; a tie consumes the places it
 //      spans) with a T on a split line, the leaderboard's rule.
@@ -208,17 +208,19 @@ describe('THE PROOF — the old text with exactly this wave\'s substitutions IS 
 
 // ---------------------------------------------------------------------------
 describe('THE SEAM', () => {
-    test('netTieShares calls the engine\'s allocators with the engine\'s inputs and both the block and the detail read it', () => {
+    // Wave A fix 1: netTieShares no longer calls the allocators - pool-engine.js
+    // puts the shares on the line and the page reads them (tie_shares_test.js).
+    test('netTieShares reads the shares the engine put on the line, and both the block and the detail read it', () => {
         const s = read('settlement.html');
         const fn = s.slice(s.indexOf('function netTieShares('), s.indexOf('\n    function ', s.indexOf('function netTieShares(') + 30));
-        assert.match(fn, /allocateWholeDollars\(l\.cents \/ 100, l\.ids\.map\(\(\) => 1\)\)\.map\(d => d \* 100\)/);
-        assert.match(fn, /splitCentsEvenly\(l\.cents, n\)/);
-        assert.match(fn, /isWholeDollarRound/, 'the same whole-dollar predicate the engine uses');
-        assert.equal((s.match(/= netTieShares\(l, r\)/g) || []).length, 2, 'the block and the detail');
+        assert.match(fn, /l\.shares/);
+        assert.ok(!/allocateWholeDollars|splitCentsEvenly|isWholeDollarRound/.test(fn), 'no allocator, no predicate of its own');
+        assert.equal((s.match(/= netTieShares\(l\)/g) || []).length, 2, 'the block and the detail');
     });
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('pool-engine.js'), 'f4d7cdbb');
+        // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
+        assert.equal(h('pool-engine.js'), 'd47a1e0a');
         assert.equal(h('settlement-engine.js'), 'adc3cd9f');
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');

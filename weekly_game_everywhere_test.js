@@ -16,8 +16,8 @@
 //   index.html  the Card tab's action banner "🏆 … · $480"
 //               the KP-cancel alert ("Adjust the … setup first")
 // Not in this wave, reported: trip.html's TRIP_TOTAL_INCLUDES category label
-// 'the Main Pool' (a sentence source for the trip money card) and HANDOFF.md
-// prose.
+// 'the Main Pool' (a sentence source for the trip money card) - renamed by
+// Wave A fix 2, trip_weekly_game_test.js - and HANDOFF.md prose.
 // ============================================================================
 
 const { describe, test } = require('node:test');
@@ -100,7 +100,10 @@ describe('THE RECEIPT AND THE SETUP AGREE ON THE NAME', () => {
         assert.match(rendered('admin.html'), /<strong>🏆 Weekly Game<\/strong>/);
     });
     test('what still says Main Pool is outside this wave, and named', () => {
-        assert.match(read('trip.html'), /'the Main Pool'/, 'trip.html\'s TRIP_TOTAL_INCLUDES - a follow-up');
+        // Wave A fix 2 renamed trip.html's TRIP_TOTAL_INCLUDES category
+        // (trip_weekly_game_test.js); HANDOFF.md's prose is still a follow-up.
+        assert.match(read('trip.html'), /'the Weekly Game'/, 'trip.html\'s TRIP_TOTAL_INCLUDES - done, Wave A fix 2');
+        assert.doesNotMatch(read('trip.html'), /'the Main Pool'/);
         assert.match(read('HANDOFF.md'), /The Main Pool's/, 'HANDOFF.md prose - a follow-up');
     });
 });

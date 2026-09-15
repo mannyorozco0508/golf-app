@@ -2255,13 +2255,15 @@ html {
         // card meant one picked-up ball on hole 12 left a group standing on 18 with a
         // Next button that went nowhere - at the exact moment they most wanted an answer.
         const nextBtnHtml = isLastHole
-            ? `<button class="finish-round-nav-btn" onclick="openFinishRoundModal()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
+            ? `<button class="finish-round-nav-btn" onmousedown="event.preventDefault()" onclick="openFinishRoundModal()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
             : `<button class="hole-view-nav-btn" onmousedown="event.preventDefault()" onclick="goToAdjacentHole(1)">Next ▶</button>`;
 
-        // onmousedown preventDefault on Prev, Next and the position button: a focused
-        // score box KEEPS focus through the tap, so the browser cannot blur it, fire
-        // change, save, and rebuild this row under the finger before the click lands
-        // (see commitPendingScore). The Finish Round button is left as it was.
+        // onmousedown preventDefault on Prev, Next, the position button and (Wave A)
+        // Finish Round: a focused score box KEEPS focus through the tap, so the
+        // browser cannot blur it, fire change, save, and rebuild this row under the
+        // finger before the click lands (see commitPendingScore). Finish Round had
+        // the same swallowed first tap on hole 18 - measured in Chrome, 2026-09-15:
+        // mousedown, no click, the modal stayed shut until the second tap.
         const navRowHtml = `<div class="hole-view-nav-row">
             <button class="hole-view-nav-btn" onmousedown="event.preventDefault()" onclick="goToAdjacentHole(-1)">◀ Prev</button>
             <button type="button" class="hole-view-position hole-jump-open" onmousedown="event.preventDefault()" onclick="toggleHolePicker()">${positionText} \u25BE</button>
@@ -6295,6 +6297,11 @@ html {
     }
 
     function openFinishRoundModal() {
+        // FIRST, whatever the golfer typed and did not leave (the same commit Prev
+        // and Next make, inside the click): the box blurs, change -> saveScore ->
+        // 'value' -> the rebuild happen here, before the review below reads the
+        // round - so the score it is about to count as missing is already saved.
+        commitPendingScore();
         // A REVIEW STARTS EMPTY. Staged corrections belong to one sitting; carrying
         // them into the next one would offer to save something the organizer typed
         // an hour ago and walked away from.

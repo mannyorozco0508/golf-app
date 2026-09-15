@@ -226,15 +226,17 @@ describe('NO AUTO-FOCUS, whatever the boxes hold', () => {
     });
 });
 
-describe('THE LAST HOLE is unaffected', () => {
+describe('THE LAST HOLE: the arrival unchanged; the Finish button now guarded (Wave A)', () => {
     test('ran', () => assert.ok(S.last && S.last.ok, S.last && S.last.reason));
     test('arrival lands on 18 (the only open hole); the nav ends in Finish, there is no Next', () => {
         const s = P(S.last, 0);
         assert.equal(s.hole, 'Hole 18'); assert.equal(s.nav.length, 3); assert.match(s.nav[2], /Finish/); assert.ok(!s.nav.some(t => /Next/.test(t)));
         assert.equal(s.active, 'BODY', 'arrival focuses nothing - out of this wave');
     });
-    test('the Finish button keeps its handler and its markup is not given the nav buttons\' mousedown guard', () => {
-        assert.match(IDX, /<button class="finish-round-nav-btn" onclick="openFinishRoundModal\(\)">/);
+    // Wave A fix 3: the Finish button HAS the guard now - it had the same
+    // swallowed first tap (finish_round_tap_test.js). Its handler is unchanged.
+    test('the Finish button keeps its handler, and (Wave A) carries the nav buttons\' mousedown guard', () => {
+        assert.match(IDX, /<button class="finish-round-nav-btn" onmousedown="event\.preventDefault\(\)" onclick="openFinishRoundModal\(\)">/);
     });
 });
 

@@ -524,6 +524,21 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v144: Wave A - three small fixes, no figure changes.
+//
+// pool-engine.js: a tied net place's line now carries {shares: [...]} in ids
+// order, the array the engine paid the tie from; settlement.html reads them
+// (netTieShares) instead of reproducing the split with the engine's allocators.
+// Every figure is unchanged and the Receipt renders character for character
+// what it rendered. trip.html: the trip money card's sentence says "the Weekly
+// Game" where it said "the Main Pool" (TRIP_TOTAL_INCLUDES). index.html: the
+// Finish Round button on hole 18 carries the same mousedown guard Prev/Next
+// got in v128 and openFinishRoundModal commits a pending score first, so the
+// first tap with a score still focused opens the modal instead of being
+// swallowed by the re-render. An installed device on v143 keeps a Finish
+// button whose first tap does nothing while a score is pending, a trip card
+// still saying Main Pool, and a Receipt that recomputes the split it prints.
+
 // Moved to v143: the Weekly Game is the Weekly Game everywhere it is named.
 //
 // admin.html (the wizard card's checkbox, the skins note, the two skins-scope
@@ -1380,7 +1395,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v143-weekly-game-everywhere';
+const CACHE_VERSION = 'golfapp-v144-wave-a-three-fixes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
