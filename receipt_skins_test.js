@@ -18,6 +18,14 @@
 // fieldParticipants(); the money pool's skins bucket takes neither, using
 // moneyPool.skins.scoring and moneyPoolParticipants(). Handing the ledger the raw
 // round would print a ledger for a different game than the money came from.
+//
+// RE-PINNED 2026-09-14 (skins rows, v136). The Receipt no longer prints EVERY
+// hole: a tied hole on a NO-CARRY round pays nobody and rolls nothing forward,
+// so it is not a row - thirteen "No Skin" rows had buried five results. What
+// this file guarded still holds where it matters: a tied hole on a CARRY round
+// is part of the money, and it is printed - as a compact "carried to Hole N"
+// line - with the collecting hole saying what it collected. Waiting rows still
+// appear on a mid-round preview. The label reads "Hole 1", not "H1".
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -78,31 +86,32 @@ function boot({ holes = 18, spec = {}, carry = false, scoring = 'net',
 
 // ============================================================================
 
-describe('THE RECEIPT PRINTS EVERY HOLE', () => {
+describe('THE RECEIPT PRINTS EVERY HOLE THAT PAID', () => {
 
-    test('all 18 holes appear once the round is complete', () => {
+    test('every winning hole appears once the round is complete, and only those (no carry)', () => {
         const b = boot({ spec: { p101_h1: 3, p102_h5: 3, p103_h9: 3 } });
         const h = b.html();
-        for (let i = 1; i <= 18; i++) {
-            assert.match(h, new RegExp('H' + i + ' \\u2014'), 'hole ' + i + ' is missing from the Receipt');
-        }
+        [1, 5, 9].forEach(i => assert.match(h, new RegExp('Hole ' + i + ' \\u2014'), 'hole ' + i + ' is missing from the Receipt'));
+        assert.equal((h.match(/Hole \d+ \u2014/g) || []).length, 3, 'three skins, three rows');
+        assert.ok(!/No Skin/.test(h), 'a no-carry tie pays nobody and is not a row');
+        assert.ok(!/\bH\d+ \u2014/.test(h), 'the label is "Hole N"');
     });
 
     test('a WON hole names the winner, the score and the word Skin', () => {
         const b = boot({ spec: { p101_h1: 3 } });
-        assert.match(b.html(), /H1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
+        assert.match(b.html(), /Hole 1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
     });
 
-    test('a TIED hole is printed, with the score, and says No Skin', () => {
-        // The whole point: this row did not exist before, so a tied hole simply
-        // vanished from the Receipt.
-        const b = boot({ spec: { p101_h1: 3 } });
-        assert.match(b.html(), /H2 \u2014 Tie at Net 4 \u2014 No Skin/);
-    });
-
-    test('a carried hole shows how many skins it was worth', () => {
+    test('a TIED hole on a CARRY round is printed as the run it belongs to', () => {
+        // On a carry round the tie is part of the money, so it is still on the
+        // Receipt - as the compact line for the run that rolled into the winner.
         const b = boot({ carry: true, spec: { p101_h2: 3 } });
-        assert.match(b.html(), /H2 \u2014 Avery \u2014 Net 3 \u2014 Skin \(2 skins\)/,
+        assert.match(b.html(), /Hole 1 \u2014 Tied at Net 4 \u2014 carried to Hole 2/);
+    });
+
+    test('a carried hole shows how many skins it collected, and from where', () => {
+        const b = boot({ carry: true, spec: { p101_h2: 3 } });
+        assert.match(b.html(), /Hole 2 \u2014 Avery \u2014 Net 3 \u2014 collects 2 skins \(Holes 1\u20132\)/,
             'H1 tied and carried into H2');
     });
 
@@ -112,7 +121,7 @@ describe('THE RECEIPT PRINTS EVERY HOLE', () => {
 
         const mid = boot({ thru: { 1: 14, 2: 14, 3: 13 }, spec: { p101_h1: 3 } });
         const h = mid.html();
-        assert.match(h, /H14 \u2014 Waiting on/, 'a previewed round must say which holes are unresolved');
+        assert.match(h, /Hole 14 \u2014 Waiting on/, 'a previewed round must say which holes are unresolved');
         assert.match(h, /Indigo/, 'and who it is waiting on');
     });
 });
@@ -124,7 +133,7 @@ describe('SCORING BASIS', () => {
         // wins outright; printing gross would show 4 and look like a tie.
         const hcps = [18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         const b = boot({ scoring: 'net', hcps });
-        assert.match(b.html(), /H1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
+        assert.match(b.html(), /Hole 1 \u2014 Avery \u2014 Net 3 \u2014 Skin/);
     });
 
     test('GROSS skins print the GROSS score and ignore strokes', () => {
@@ -132,7 +141,7 @@ describe('SCORING BASIS', () => {
         const b = boot({ scoring: 'gross', hcps, spec: { p102_h1: 3 } });
         const h = b.html();
         assert.match(h, /Gross skins/);
-        assert.match(h, /H1 \u2014 Blake \u2014 Gross 3 \u2014 Skin/,
+        assert.match(h, /Hole 1 \u2014 Blake \u2014 Gross 3 \u2014 Skin/,
             'on gross, Avery\'s stroke must not win the hole');
     });
 
@@ -151,7 +160,7 @@ describe('SCORING BASIS', () => {
         b.run(`renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`);
         const h = b.html();
         assert.match(h, /Gross skins, no carry/, 'the pool basis must win');
-        assert.match(h, /H1 \u2014 Blake \u2014 Gross 3/, 'and the rows must follow it');
+        assert.match(h, /Hole 1 \u2014 Blake \u2014 Gross 3/, 'and the rows must follow it');
         assert.ok(!/Net \d+ \u2014 Skin/.test(h), 'no net rows on a gross pool bucket');
     });
 });

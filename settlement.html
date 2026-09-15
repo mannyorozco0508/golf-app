@@ -211,6 +211,9 @@
         .pool-flight { border: 1px solid var(--border-mid); border-left: 5px solid var(--accent-teal); border-radius: 8px; padding: 8px 8px 2px 8px; margin: 8px 0 12px 0; background: var(--subtle-bg); }
         .pool-flight[data-flight="B"] { border-left-color: var(--brand-navy); }
         .pool-flight-head { font-size: 0.92rem; font-weight: bold; color: var(--text-main); padding: 2px 4px 6px 4px; margin-bottom: 6px; }
+        /* A run of tied holes on a carry round: part of the money, not a result
+           of its own, so it reads quieter than the hole that collected it. */
+        .skins-carry-row { font-weight: normal; font-size: 0.82rem; color: var(--text-muted); padding-top: 6px; padding-bottom: 6px; }
         /* LIVE RESULTS: a SKINS WON card is a different kind of thing from a
            standings card, so it does not share the standings chrome; and every
            per-flight card carries its flight as a left edge - A teal, B navy - so
@@ -1062,12 +1065,41 @@ html {
         const centsByHole = {};
         pot.lines.forEach(l => { centsByHole[String(l.hole)] = l.cents; });
 
-        // EVERY hole, in order - won, tied, or still waiting on a card.
+        // ONLY THE HOLES THAT PAID (2026-09-14). This used to print every hole in
+        // order - won, tied or waiting - so a no-carry round put thirteen
+        // "Tie at Gross 4 — No Skin" rows around five results, and the person
+        // reading the Receipt had to pick the money out of the noise. Now:
+        //
+        //   NO CARRY   a tied hole pays nobody and rolls nothing forward, so it is
+        //              not listed. Only holes with a skin, plus any hole still
+        //              waiting on a card (a mid-round preview only).
+        //   CARRY      a tie rolls its value onto the next hole, so the tied holes
+        //              ARE part of the money: a run of them is one compact line
+        //              ("Holes 5–6 — Tied — carried to Hole 7") and the hole that
+        //              collects says what it collected ("collects 3 skins (Holes
+        //              5–7)"). A run nobody collects is stated as such; the unwon
+        //              money row below carries the refund.
+        //
+        // The hole is written "Hole 7", not "H7": the Main Pool block is read by
+        // the person handing out cash, not by the app. Winner, score, skin count
+        // and dollars are untouched - the text of every winning row is pinned.
+        const carryRun = [];   // consecutive tied holes, carry rounds only
+        const holeSpan = (list) => list.length === 1
+            ? `Hole ${list[0].hole}`
+            : `Holes ${list[0].hole}–${list[list.length - 1].hole}`;
+        const flushCarryRun = (into) => {
+            if (carryRun.length === 0) return;
+            const where = into ? `carried to Hole ${into}` : 'carried, not won';
+            const tied = carryRun.length === 1 ? `Tied at ${basisLabel} ${carryRun[0].low}` : 'Tied';
+            html += `<div class="ledger-row skins-carry-row"><span>${holeSpan(carryRun)} — ${tied} — ${where}</span><span></span></div>`;
+            carryRun.length = 0;
+        };
         L.holes.forEach(row => {
-            const label = `H${row.hole}`;
+            const label = `Hole ${row.hole}`;
             if (!row.official) {
                 // Only reachable on a Receipt previewed mid-round. A finished round
                 // has every card in, so none of these rows appear.
+                flushCarryRun(null);
                 const who = row.missing.length > 0
                     ? row.missing.map(m => m.name).join(', ')
                     : `${row.requiredCount - row.postedCount} golfer(s)`;
@@ -1075,16 +1107,21 @@ html {
                 return;
             }
             if (row.state === 'tie') {
-                // The score is named, so a golfer can see WHY the hole paid nothing
-                // without reaching for the card.
-                html += `<div class="ledger-row"><span>${label} — Tie at ${basisLabel} ${row.low} — No Skin</span><span></span></div>`;
+                if (r.skins.carryOver) carryRun.push(row);
                 return;
             }
             const cents = centsByHole[String(row.hole)];
-            const units = row.unitsWon > 1 ? ` (${row.unitsWon} skins)` : '';
-            html += `<div class="ledger-row"><span>${label} — ${escapeHtml(row.winner.name)} — ${basisLabel} ${row.low} — Skin${units}</span>`
+            let collected = '';
+            if (row.unitsWon > 1) {
+                // The carried holes are the run just flushed plus this one.
+                const from = carryRun.length > 0 ? carryRun[0].hole : row.hole;
+                collected = ` — collects ${row.unitsWon} skins (Holes ${from}–${row.hole})`;
+            }
+            flushCarryRun(row.hole);
+            html += `<div class="ledger-row"><span>${label} — ${escapeHtml(row.winner.name)} — ${basisLabel} ${row.low}${collected || ' — Skin'}</span>`
                 + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
         });
+        flushCarryRun(null);
 
         // ---- SUMMARY BY GOLFER ---------------------------------------------
         // Skin COUNTS come from the ledger; DOLLARS come from the pool's allocation.

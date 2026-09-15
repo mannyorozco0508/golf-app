@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v136: skins rows that list only the holes that paid, and Hole View
+// widgets a cart can read.
+//
+// settlement.html: the Main Pool skins ledger lists the holes with a skin as
+// "Hole 7", no longer every hole as "H7" with a "Tie ... No Skin" row for each
+// tied hole; on a carry round a run of tied holes is one compact line and the
+// hole that collected says what it collected. index.html: the live dashboard
+// cards above the score boxes - leaderboard, dots, skins, matches - use
+// slightly larger type and darker secondary text; the hole heading still lands
+// first after Next. No number, name or amount moved. An installed device on
+// v135 keeps the eighteen-row ledger and the small type.
+
 // Moved to v135: Bets and Matches split the jobs, scoped to the group.
 //
 // skins.html (Bets) now shows a group its OWN action - every match with one of
@@ -1299,7 +1311,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v135-bets-matches-split';
+const CACHE_VERSION = 'golfapp-v136-skins-rows-widgets';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

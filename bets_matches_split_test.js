@@ -487,7 +487,7 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         assert.equal(sha('settlement-engine.js'), 'adc3cd9f');
         assert.equal(sha('pool-engine.js'), 'f4d7cdbb');
         assert.equal(sha('hole-events.js'), '6fd7f7ed');
-        assert.equal(sha('settlement.html'), '55d57330');
-        assert.equal(sha('index.html'), '85452f55');
+        // settlement.html and index.html were fenced for the split wave only; the
+        // skins-rows wave (v136) edits both. The engines stay pinned.
     });
 });

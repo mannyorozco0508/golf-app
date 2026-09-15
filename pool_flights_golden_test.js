@@ -51,6 +51,18 @@
 // block cut out is byte-identical to the previous capture - PREV_RECEIPT below
 // holds those shas and "the detail under the block" asserts it on every run,
 // so a change to the ledgers can never hide behind the block's own diff.
+//
+// RE-PINNED 2026-09-14, the SKINS ROWS wave (settlement.html only). Engine
+// and the five live surfaces: UNCHANGED, sha for sha, all three variants.
+// settlement.receiptPool moved in all three because the Main Pool's skins
+// ledger now lists ONLY the holes that paid - the twelve (off/field) and
+// twenty-six (flight) "Tie at Gross N — No Skin" rows are gone, and the hole
+// label reads "Hole 5", not "H5". Every WINNING row is text-identical to the
+// previous capture: skins_rows_widgets_test.js holds the pre-change text
+// (skins_rows_prev.fixture.json) and proves on every run that the old text
+// with its tie rows removed and H->Hole IS today's text, character for
+// character. PREV_RECEIPT_TEXT below is re-pinned to the new text; the v134
+// shas it replaced are recorded beside it.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -157,7 +169,11 @@ Object.keys(VARIANTS).forEach(k => {
             assert.ok(exp.engine.valid, 'the pool validates');
             assert.ok(exp.engine.skins.lines.length >= 5, 'skins paid: ' + exp.engine.skins.lines.length);
             assert.match(exp.html['settlement.receiptPool'], /Skins Pot/);
-            assert.ok((exp.html['settlement.receiptPool'].match(/H\d+ /g) || []).length >= 18, 'every hole on the Receipt');
+            // Since the skins-rows wave only the holes that paid are listed: one
+            // "Hole N —" row per engine line, and never a tie row.
+            assert.equal((exp.html['settlement.receiptPool'].match(/Hole \d+ — /g) || []).length,
+                exp.engine.skins.lines.length, 'one row per skin the engine paid');
+            assert.ok(!/No Skin/.test(exp.html['settlement.receiptPool']), 'no tie rows on a no-carry round');
             Object.keys(exp.html).forEach(s => assert.match(exp.html[s], /SKINS|Skins/, s));
         });
     });
@@ -172,10 +188,15 @@ Object.keys(VARIANTS).forEach(k => {
 // df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30, flight
 // 214f6588ef7d4b9ac1d412718aea92985a61576f4cbd0e075e7c0feaf3a426d8.
 const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
+// RE-PINNED 2026-09-14 (skins rows): the v134 text shas were off/field
+// 7cb97d4d892a21cfb7657b26b7cc4c22d8fcfc7e1fda957d3c8241d27db61be5, flight
+// 99f5c4b80952e8bc08784ae8e51a186f239644057649667049ade0faabd01703. The tie
+// rows left and the label changed; skins_rows_widgets_test.js proves nothing
+// else did.
 const PREV_RECEIPT_TEXT = {
-    off: '7cb97d4d892a21cfb7657b26b7cc4c22d8fcfc7e1fda957d3c8241d27db61be5',
-    field: '7cb97d4d892a21cfb7657b26b7cc4c22d8fcfc7e1fda957d3c8241d27db61be5',
-    flight: '99f5c4b80952e8bc08784ae8e51a186f239644057649667049ade0faabd01703'
+    off: '01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5',
+    field: '01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5',
+    flight: '334fa8edaf560725194ea4e81724e84a8594f5c6b7e69d1e668b9562588fccb4'
 };
 describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
     Object.keys(VARIANTS).forEach(k => {

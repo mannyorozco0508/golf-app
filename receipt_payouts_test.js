@@ -117,7 +117,7 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
         assert.ok(P.at < html.indexOf('KP \u2014 $'), 'before the KP header');
         assert.ok(P.at < html.indexOf('Net Finish \u2014 $'), 'before the Net Finish header');
         assert.ok(P.at < html.indexOf('Skins Pot'), 'before the Skins Pot header');
-        assert.ok(P.at < html.indexOf('H1 \u2014'), 'before the first hole row');
+        assert.ok(P.at < html.indexOf('Hole 1 \u2014'), 'before the first hole row');
         assert.ok(html.indexOf('Main Pool \u2014 $460') < P.at, 'after the section header');
         assert.match(P.block, /PAYOUTS/);
     });
@@ -181,7 +181,8 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
         // and this test pins the part that must not have changed.
         assert.match(P.detail, /Skins Pot \u2014 \$220 \(Gross skins, no carry\)/);
         assert.match(P.detail, /Split by flight, by headcount: Flight A \$115 \(12 golfers\) \u00B7 Flight B \$105 \(11 golfers\)/);
-        assert.equal((P.detail.match(/H\d+ \u2014/g) || []).length, 36, '18 hole rows per flight');
+        // v136 (skins rows): only the holes that paid are rows - five per flight here.
+        assert.equal((P.detail.match(/Hole \d+ \u2014/g) || []).length, 10, 'five winning-hole rows per flight');
         assert.equal((P.detail.match(/Skins Summary/g) || []).length, 2);
         assert.ok(!/pool-payouts|pp-row|PAYOUTS/.test(P.detail), 'nothing of the block leaks into the detail');
     });
@@ -302,7 +303,7 @@ describe('THE SEAM: the block consumes the engine and derives nothing; the PDF r
 // row, and both must be present.
 const DATA = build();
 const DB = { events: { PAYOUT: DATA }, global_courses: {}, trips: {}, tournaments: {} };
-const PROBE = `(() => { const el = document.getElementById('money-pool-section'); const t = el ? el.innerText : ''; return JSON.stringify({ len: t.length, payouts: t.indexOf('PAYOUTS'), h1: t.search(/H1 \\u2014/), skinsPot: t.indexOf('Skins Pot'), a23: (t.match(/\\$23/g) || []).length, flightA: t.indexOf('Flight A'), text: t.slice(0, 400) }); })()`;
+const PROBE = `(() => { const el = document.getElementById('money-pool-section'); const t = el ? el.innerText : ''; return JSON.stringify({ len: t.length, payouts: t.indexOf('PAYOUTS'), h1: t.search(/Hole 1 \\u2014/), skinsPot: t.indexOf('Skins Pot'), a23: (t.match(/\\$23/g) || []).length, flightA: t.indexOf('Flight A'), text: t.slice(0, 400) }); })()`;
 const C = {};
 before(async () => {
     const r = await arriveCold({ url: fileUrl('settlement.html', 'game=PAYOUT'), db: DB, settleMs: 4000, steps: [{ expression: PROBE }] });

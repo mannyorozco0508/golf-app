@@ -178,7 +178,8 @@ describe('2. THE SUMMARY AND THE HOLE LINE COUNT THE SAME THING', () => {
 
     test('THE REPORTED DEFECT: a 2-skin hole is not summarised as 1 skin', () => {
         const t = receipt();
-        const line = /\(2 skins\)/.test(t);
+        // v136 (skins rows): the hole line reads "collects 2 skins (Holes a–b)".
+        const line = /collects 2 skins/.test(t);
         assert.ok(line, 'the fixture no longer produces a two-unit hole: ' + t.slice(0, 200));
         assert.ok(!/Scott Bell — 1 skin/.test(t),
             'the summary still counts holes while the line counts skins: ' + t.slice(0, 400));

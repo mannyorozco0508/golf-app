@@ -879,13 +879,13 @@
         .ld-row:last-child { border-bottom: none; }
         .ld-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
         .ld-name {
-            font-size: 0.85rem; font-weight: bold; min-width: 0;
+            font-size: 0.95rem; font-weight: bold; min-width: 0;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .ld-total { font-size: 0.85rem; font-weight: bold; color: var(--accent-red); white-space: nowrap; flex: 0 0 auto; }
+        .ld-total { font-size: 0.95rem; font-weight: bold; color: var(--accent-red); white-space: nowrap; flex: 0 0 auto; }
         .ld-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .ld-chip {
-            font-size: 0.68rem; font-weight: bold; padding: 2px 7px; border-radius: 999px;
+            font-size: 0.76rem; font-weight: bold; padding: 2px 7px; border-radius: 999px;
             background: var(--bg-soft); color: var(--text-muted); white-space: nowrap;
         }
         .ld-chip.ld-kp { color: var(--brand-green); }
@@ -1039,21 +1039,21 @@
         .sb-lead { font-size: 0.78rem; font-weight: bold; margin-top: 2px; }
         .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-        .lm-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
-        .lm-sub { font-size: 0.6rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lm-title, .lm-card-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .lm-sub { font-size: 0.68rem; color: var(--text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .lm-seg { padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
         .lm-seg:last-child { border-bottom: none; }
         .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
-        .lm-seg-name { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-muted); width: 62px; flex-shrink: 0; }
-        .lm-seg-status { font-size: 0.9rem; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.8rem; }
+        .lm-seg-name { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-secondary); width: 62px; flex-shrink: 0; }
+        .lm-seg-status { font-size: 1rem; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.84rem; }
         .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 62px; }
-        .lm-press-tag { font-size: 0.6rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
-        .lm-stake { font-size: 0.72rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; margin-left: 6px; }
+        .lm-press-tag { font-size: 0.68rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .lm-stake { font-size: 0.8rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; margin-left: 6px; }
         .lm-divider { border-top: 1px solid var(--border-mid); margin: 6px 0; }
-        .lm-wager-head { font-size: 0.66rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
-        .lm-press-link { float: right; font-size: 0.68rem; font-weight: bold; color: var(--brand-navy); text-decoration: none; padding: 6px 8px; margin: -6px -4px 0 0; min-height: 44px; display: inline-flex; align-items: center; }
-        .lm-press-status { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+        .lm-wager-head { font-size: 0.74rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
+        .lm-press-link { float: right; font-size: 0.74rem; font-weight: bold; color: var(--brand-navy); text-decoration: none; padding: 6px 8px; margin: -6px -4px 0 0; min-height: 44px; display: inline-flex; align-items: center; }
+        .lm-press-status { font-size: 0.84rem; font-weight: 600; color: var(--text-secondary); }
         .lm-closed { opacity: 0.6; }
         /* LIVE DASHBOARD WIDGETS. Stacked on a phone, side by side once there is room.
            Bordered cards rather than loose text, so the top of the scorecard reads as
@@ -1061,20 +1061,21 @@
         .lw-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 6px 0 10px 0; }
         .lw-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
         .lw-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-        .lw-title { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; }
-        .lw-sub { font-size: 0.6rem; color: var(--text-muted); letter-spacing: 0.04em; flex: 1; white-space: nowrap; }
+        /* A title can never widen the page: it ellipsises before the card does. */
+        .lw-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .lw-sub { font-size: 0.68rem; color: var(--text-secondary); letter-spacing: 0.04em; flex: 1; white-space: nowrap; }
         .lw-more { background: none; border: none; color: var(--brand-green); font-size: 0.68rem; font-weight: bold; padding: 6px 2px; cursor: pointer; white-space: nowrap; min-height: 44px; }
         /* Five columns share the width evenly; no horizontal scrolling on the page. */
         .lw-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; text-align: center; }
         .lw-col { min-width: 0; }
-        .lw-pos { font-size: 0.6rem; font-weight: bold; color: var(--text-muted); }
-        .lw-name { font-size: 0.72rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .lw-par { font-size: 0.95rem; font-weight: bold; color: var(--brand-green); }
-        .lw-srow { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border-faint); }
-        .lw-sname { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .lw-scount { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
-        .lw-sholes { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; }
-        .lw-none { font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+        .lw-pos { font-size: 0.68rem; font-weight: bold; color: var(--text-secondary); }
+        .lw-name { font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lw-par { font-size: 1.1rem; font-weight: bold; color: var(--brand-green); }
+        .lw-srow { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
+        .lw-sname { flex: 1; min-width: 0; font-size: 0.86rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lw-scount { font-size: 0.82rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
+        .lw-sholes { font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; }
+        .lw-none { font-size: 0.82rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
         /* Which skins money a block is (a wager, or the Main Pool bucket) - shown
            only when the round holds more than one - and which flight, when the
            section is flighted. */
@@ -1105,7 +1106,7 @@
         /* Long partner pairs wrap instead of widening the card - the one way a
            360px phone gets a horizontal scrollbar. */
         .rc-card, .rc-card * { min-width:0; overflow-wrap:anywhere; }
-        .lw-foot { font-size: 0.6rem; color: var(--text-muted); margin-top: 5px; }
+        .lw-foot { font-size: 0.68rem; color: var(--text-muted); margin-top: 5px; }
         .lb-scope-row { display: flex; gap: 6px; margin-bottom: 10px; }
         .lb-scope-btn { flex: 1; min-height: 44px; border-radius: 8px; cursor: pointer;
             font-size: 0.8rem; font-weight: bold; border: 1px solid var(--border-mid);

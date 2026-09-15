@@ -56,10 +56,16 @@ function build(flights) {
 const VARIANTS = { off: () => build(undefined), field: () => build({ enabled: true, scopes: { skins: 'field', birdies: 'field' } }), flight: () => build({ enabled: true, scopes: { skins: 'flight', birdies: 'field' } }) };
 // The tag-stripped text of each surface BEFORE this wave (from the v133 golden
 // fixture). The markup may move; this may not.
+// RE-PINNED 2026-09-14 (skins rows, v136): receiptPool moved in all three
+// variants - the tie rows left the Main Pool skins ledger and "H5" became
+// "Hole 5" - and skins_rows_widgets_test.js proves that is the whole
+// difference. liveResults is untouched. The v134 receiptPool shas were
+// off/field 8d851e85a86b2aad160784411031081fcfdebd6f99f295e2774d13c148f4e557,
+// flight 21a797e7460c81cb83415171d7ddd6af9ce6c2960556ee9cb1363d8efdb9ad9e.
 const PREV_TEXT = {
-    off:    { receiptPool: '8d851e85a86b2aad160784411031081fcfdebd6f99f295e2774d13c148f4e557', liveResults: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff' },
-    field:  { receiptPool: '8d851e85a86b2aad160784411031081fcfdebd6f99f295e2774d13c148f4e557', liveResults: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311' },
-    flight: { receiptPool: '21a797e7460c81cb83415171d7ddd6af9ce6c2960556ee9cb1363d8efdb9ad9e', liveResults: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' }
+    off:    { receiptPool: '6c4d1a6a8e2fc768e2c4ab7061e8dd4a64e58fcfc171c91f4a1dae3391ac36fe', liveResults: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff' },
+    field:  { receiptPool: '6c4d1a6a8e2fc768e2c4ab7061e8dd4a64e58fcfc171c91f4a1dae3391ac36fe', liveResults: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311' },
+    flight: { receiptPool: '1276c8f4467a1937c39574a88b602b692ed0b40cb3511a2e0ac6289a4adaab3c', liveResults: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' }
 };
 function render(data) {
     const st = loadHtmlInlineScript('settlement.html');
@@ -102,13 +108,15 @@ describe('THE MAIN POOL CARD: a bordered block per game, a header that is a head
         assert.equal(count(seg(0), /Hole \d+: /g), 4, 'four KP holes in the KP block');
         assert.match(seg(1), /1st: Rae Romeo/); assert.match(seg(1), /2nd: Max Mike/);
         assert.match(seg(2), /Split by flight, by headcount/);
-        assert.equal(count(seg(2), /H\d+ —/g), 36, '36 hole rows inside the Skins Pot block');
-        assert.equal(count(seg(0) + seg(1), /H\d+ —/g), 0, 'and none outside it');
+        // Since the skins-rows wave (v136) only the holes that paid are rows:
+        // five per flight in this round, ten in the block, none outside it.
+        assert.equal(count(seg(2), /Hole \d+ —/g), 10, '10 winning-hole rows inside the Skins Pot block');
+        assert.equal(count(seg(0) + seg(1), /Hole \d+ —/g), 0, 'and none outside it');
     });
 });
 
 describe('THE SKINS POT: a bordered block per flight, its pot in the header', () => {
-    test('flight: two .pool-flight blocks, A then B, data-flight set, each holding 18 hole rows and its own summary', () => {
+    test('flight: two .pool-flight blocks, A then B, data-flight set, each holding its five winning-hole rows and its own summary', () => {
         const h = R.flight.pool;
         const fl = blocks(h, 'pool-flight ');
         assert.equal(fl.length, 2, 'flight blocks: ' + fl.length);
@@ -116,7 +124,7 @@ describe('THE SKINS POT: a bordered block per flight, its pot in the header', ()
         const heads = [...h.matchAll(/<div class="pool-flight-head">([^<]*)</g)].map(m => m[1].trim());
         assert.deepEqual(heads, ['Flight A — $115', 'Flight B — $105']);
         const segA = h.slice(fl[0].at, fl[1].at), segB = h.slice(fl[1].at, h.indexOf('</div><!-- /pool-game -->', fl[1].at));
-        assert.equal(count(segA, /H\d+ —/g), 18); assert.equal(count(segB, /H\d+ —/g), 18);
+        assert.equal(count(segA, /Hole \d+ —/g), 5); assert.equal(count(segB, /Hole \d+ —/g), 5);
         assert.match(segA, /Skins Summary — Flight A/); assert.match(segB, /Skins Summary — Flight B/);
         assert.ok(!/Skins Summary — Flight B/.test(segA), 'B\'s summary is not in A\'s block');
         assert.ok(!/<div class="ledger-row"[^>]*><span>Flight [AB] —/.test(h), 'the flight header is no longer a ledger row');
@@ -125,7 +133,7 @@ describe('THE SKINS POT: a bordered block per flight, its pot in the header', ()
         ['field', 'off'].forEach(k => {
             const h = R[k].pool;
             assert.equal(blocks(h, 'pool-flight ').length, 0, k);
-            assert.equal(count(h, /H\d+ —/g), 18, k);
+            assert.equal(count(h, /Hole \d+ —/g), 6, k);
             assert.ok(!/Split by flight/.test(h), k);
         });
     });
