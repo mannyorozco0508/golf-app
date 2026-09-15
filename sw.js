@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v141: the Results tab's Side Matches cards follow the link's group.
+//
+// settlement.html's per-match cards now apply the rule every other surface
+// uses (grouping.js canLinkSeeWager over each match's participants): a
+// ?group=N link sees the matches one of its golfers is in, the bare link
+// sees them all, and a group with none is told so. The MONEY is unscoped:
+// Final Results, Player Payouts, Who Pays Who, the Main Pool and the
+// scorecard are the full record on every link, proved character for
+// character. An installed device on v140 keeps a Receipt that lists every
+// group's matches to every link.
+
 // Moved to v140: the Board and Stats tabs scope their wager cards to the link.
 //
 // leaderboard.html's LIVE MATCHES & PRESSES and Stroke Bets cards, and
@@ -1348,7 +1359,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v140-board-stats-scope';
+const CACHE_VERSION = 'golfapp-v141-results-scope';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -182,12 +182,15 @@ describe('THE SEAM — one rule, from grouping.js, on both pages; Results untouc
         assert.equal((inline.match(/canLinkSeeWager\(/g) || []).length, 1, 'exactly one consumer on this page');
         assert.doesNotMatch(inline, /function canLinkSeeWager/);
     });
-    test('settlement.html is untouched by this wave and still lists every match', () => {
-        // The fence is that no scoping reached settlement.html: it reads no group
-        // and consults no rule; every side match still walks through its loop.
+    test('settlement.html: the MONEY is unscoped (v141 scoped its match cards; results_scope_test.js owns that)', () => {
+        // v140's fence was "no scoping reached settlement.html at all". v141
+        // overruled the Results decision for the Side Matches CARDS only; what
+        // this row still guards is that the money never reads the group.
         const s = read('settlement.html');
-        assert.doesNotMatch(s, /canLinkSeeWager|lockedGroup|hasGroupLock/);
-        assert.match(s, /const matchIds = Object\.keys\(sideMatches\);/, 'every match, unfiltered');
+        ['function renderCombinedSummary(', 'function renderMoneyPoolSection(', 'function buildPoolPayoutsHtml('].forEach(start => {
+            const at = s.indexOf(start); assert.ok(at > -1, start);
+            assert.doesNotMatch(s.slice(at, s.indexOf('\n    function ', at + 30)), /lockedGroup|canLinkSeeWager/, start + ' must not scope');
+        });
     });
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);

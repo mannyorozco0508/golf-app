@@ -36,6 +36,12 @@
 <script src="settlement-engine.js"></script>
 <script src="live-skins.js"></script>
 <script src="pool-engine.js"></script>
+<!-- Grouping (v141): playerGroupMap / canLinkSeeWager, so the SIDE MATCHES cards
+     show a group link only the matches its golfers are in - the same rule, the
+     same function, as the Matches, Bets, Board and Stats tabs. The MONEY is never
+     scoped: Final Results, Player Payouts, Who Pays Who, the Main Pool and every
+     total are computed from the full record and shown to every link. -->
+<script src="grouping.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -460,6 +466,8 @@ html {
 
     const urlParams = new URLSearchParams(window.location.search);
     let currentMode = urlParams.get('game');
+    // WHICH GROUP HOLDS THIS LINK (v141). It scopes the Side Matches CARDS only.
+    const lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
     let currentData = {};
 
     if (!currentMode) {
@@ -783,8 +791,30 @@ html {
             ? legacyMainAsSideMatch(data) : null;
         if (mainWager) sideMatches.__main = mainWager;
 
-        const matchIds = Object.keys(sideMatches);
-        if (matchIds.length === 0) return "";
+        // SCOPED TO THE LINK'S GROUP (v141), by the rule every other surface uses:
+        // grouping.js canLinkSeeWager over the match's participants. A group link
+        // sees the matches one of its golfers is in - a cross-group match shows to
+        // both groups in it - and the bare link sees them all. The round's own
+        // wager names the whole money field, so it is everybody's. The MONEY is
+        // not scoped: computeCombinedNetTotals below still folds every match into
+        // every total, so a golfer's Final Results line and Who Pays Who are the
+        // same on every link. A golfer only has match money from matches they are
+        // in, and those are always visible on their group's link - the total stays
+        // traceable to the cards under it.
+        const allIds = Object.keys(sideMatches);
+        if (allIds.length === 0) return "";
+        const groupOf = playerGroupMap(data.players || [], data.groupSizeOverrides || {});
+        const matchIds = allIds.filter(id => {
+            const sm = sideMatches[id] || {};
+            return canLinkSeeWager((sm.teamAIds || []).concat(sm.teamBIds || []), lockedGroup, groupOf);
+        });
+        if (matchIds.length === 0) {
+            // Matches exist; none of them are this group's. Say so rather than
+            // rendering an empty card - or nothing, which reads as "no matches".
+            return `<div class="settle-card"><div class="settle-header">⚔️ Side Matches</div>`
+                + `<div class="ledger-row" style="font-weight:normal; color:var(--text-muted);"><span>No matches with a Group ${lockedGroup} golfer in them. `
+                + `Every match is still counted in the totals above.</span><span></span></div></div>`;
+        }
 
         const players = data.players || [];
         // FINAL MONEY is what actually changes hands, so it prints whole dollars.
