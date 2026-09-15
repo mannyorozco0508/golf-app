@@ -903,6 +903,31 @@ needed; do not add a Nassau "format".
     `active_event_mode`, `eventName`, `gameFormat`, `courseData` — orphaned, nothing
     reads them, blocked by the `$other` rule. Left in place deliberately.
 
+- **DEFERRED 2026-09-15 (Wave B, v145) — three shared builders treat an EMPTY
+scoped list as "everyone".** The Card tab now fails closed on a `?group=N` the
+round does not have (`card_scope_closed_test.js`): the slice is `[]`, flagged as
+`__scGroupMissing`, and `scopedPlayers()` in `index.html` tells "no lock" (the
+whole field) from "a lock that matched nobody". But the same widening lives one
+layer down, in protected files, untouched:
+  - `hole-events.js :113` `buildHoleEvents` — `scopedPlayers.length > 0 ?
+    scopedPlayers : data.players`.
+  - `bet-strip.js :340` `buildActionRows` and `:1011` `buildSettledRows` — the
+    same expression.
+  - `money-engine.js :932` `buildLiveMatchStates` — an empty `visiblePlayerIds`
+    becomes `null`, which means unfiltered.
+  - **What holds it today.** `index.html` does not ask them when the link
+    identifies nobody: `renderHoleRecap` and `renderActionCenter` return with an
+    empty mount on `scopeMissing()`, and `renderLiveTicker` builds no match or
+    stroke-bet cards. Every one of those guards is a negative control in
+    `card_scope_closed_test.js` (each fires on its own).
+  - **What breaks it.** Any NEW caller in `index.html` (or another page) that
+    hands one of these builders an empty scoped list without a
+    `scopeMissing()` guard shows the whole field again. The honest fix is in the
+    builders: an empty array means nobody, and only `undefined` means "no scope
+    given". Three protected files, each needing its own per-file approval;
+    `card_scope_closed_test.js` pins their current text so the change is
+    deliberate when it comes.
+
 - **No monetization built. v1.1 is specced in `MONETIZATION.md` — read that before touching any of it.** One round stays free forever; a trip is paid. The **Trip Pass is $19.99, trip-scoped and consumable** — bought per trip, so Apple will not restore it, which is fine because the entitlement lives at `trips/<code>/entitlement/paid` rather than on the buyer's device. That is also what makes it exploitable today: **`database.rules.json` is step one and blocks everything else**, because right now any client can write that node, the repo is public and a trip code is six characters. Nothing can be sold until the rules are right. `database.rules.json` is a protected file and needs explicit per-file approval. Note that `MONETIZATION.md` is a plan, not a record — nothing in it exists
 
 ## Checks that live outside `npm test`
