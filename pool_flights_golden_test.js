@@ -34,6 +34,15 @@
 //   live     every index surface, the leaderboard and settlement LIVE RESULTS
 //            carry FLIGHT A / FLIGHT B heads and the per-flight winners.
 //
+// RE-PINNED 2026-09-14 (later), the RESULTS SECTIONING wave (settlement.html
+// only). Engine and the four index/leaderboard surfaces UNCHANGED sha for sha;
+// settlement.receiptPool and settlement.liveResults moved in all three variants
+// - wrappers only: each game in the Main Pool is a .pool-game block with a
+// .pool-game-head, each flight a .pool-flight block with its pot in a
+// .pool-flight-head; LIVE RESULTS skins cards carry .skins-card and per-flight
+// cards data-flight. The tag-stripped TEXT of both surfaces is identical to the
+// previous capture in every variant (receipt_sections_test.js pins it by sha).
+//
 // RE-PINNED 2026-09-14, the RECEIPT PAYOUTS wave (settlement.html only). The
 // engine and the five live surfaces: UNCHANGED, sha for sha, all three
 // variants. settlement.receiptPool moved in all three because the Main Pool
@@ -154,22 +163,28 @@ Object.keys(VARIANTS).forEach(k => {
     });
 });
 
-// The Receipt's Main Pool section BEFORE the payouts block, by sha (the v126
-// capture, 2026-09-14T01:20:20Z). The block is cut out of today's render and the
-// remainder must equal these exactly.
-const PREV_RECEIPT = {
-    off: 'df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30',
-    field: 'df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30',
-    flight: '214f6588ef7d4b9ac1d412718aea92985a61576f4cbd0e075e7c0feaf3a426d8'
+// The Receipt's Main Pool section BEFORE the payouts block. The block is cut out
+// of today's render and the remainder's TEXT - tags stripped, every number, name
+// and row in order - must equal these. RE-PINNED 2026-09-14 (the sectioning
+// wave): this used to be a byte sha of the markup; the game and flight wrappers
+// that wave added change the markup and not one character of the text, which
+// is what this guard is for. Previous byte shas, for the record: off/field
+// df5e371e13a19931b44dd257cc5361903b13d698d5ed0760e65c5efd977c7e30, flight
+// 214f6588ef7d4b9ac1d412718aea92985a61576f4cbd0e075e7c0feaf3a426d8.
+const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
+const PREV_RECEIPT_TEXT = {
+    off: '7cb97d4d892a21cfb7657b26b7cc4c22d8fcfc7e1fda957d3c8241d27db61be5',
+    field: '7cb97d4d892a21cfb7657b26b7cc4c22d8fcfc7e1fda957d3c8241d27db61be5',
+    flight: '99f5c4b80952e8bc08784ae8e51a186f239644057649667049ade0faabd01703'
 };
-describe('the detail under the payouts block is the pre-block Receipt, byte for byte', () => {
+describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
     Object.keys(VARIANTS).forEach(k => {
-        test(k + ': cut the block out and the section is the previous capture', () => {
+        test(k + ': cut the block out and the section\'s text is the previous capture', () => {
             const html = FX.variants[k].html['settlement.receiptPool'];
             const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
             assert.ok(a > 0 && e > a, 'the block is in the section');
             assert.ok(html.slice(a, e).length > 1000, 'and it is not empty: ' + html.slice(a, e).length);
-            assert.equal(sha(html.slice(0, a) + html.slice(e + tag.length)), PREV_RECEIPT[k]);
+            assert.equal(sha(stripTags(html.slice(0, a) + html.slice(e + tag.length))), PREV_RECEIPT_TEXT[k]);
         });
     });
 });

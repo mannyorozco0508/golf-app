@@ -524,6 +524,17 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v134: the Results page is sectioned so it can be read.
+//
+// settlement.html only, presentation only. The Main Pool card was 62 bare
+// ledger rows: now each game (KP, Net Finish, Skins Pot) is a bordered block with
+// a real header, each flight inside the Skins Pot is a bordered block with its
+// pot in the header, LIVE RESULTS skins cards are dashed and every per-flight
+// card carries its flight as a coloured edge, the mounts are separated by a
+// rule, and the print button appears once (top of the settled receipt) instead
+// of twice. Not one number, name or row moved - the text is pinned by sha. An
+// installed device on v133 keeps the undifferentiated stack.
+
 // Moved to v133: an offline Save & Start Round tells the truth.
 //
 // admin.html. Measured: with no socket the round write is buffered by the SDK,
@@ -1276,7 +1287,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v133-honest-save';
+const CACHE_VERSION = 'golfapp-v134-results-sections';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

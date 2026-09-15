@@ -62,6 +62,13 @@
 //                     A, Gus's skin in B. settlement: two SKINS WON cards.
 //                     The same pool on a scope-'field' round keeps the old
 //                     shape - live_skins_config_test's POOL_FIELD block.
+//
+// RE-PINNED 2026-09-14, the RESULTS SECTIONING wave (settlement.html only):
+// settlement.liveResults moved on all three rounds - the SKINS WON cards now
+// carry class "skins-card" and per-flight cards carry data-flight - and NOTHING
+// else did (the four index/leaderboard surfaces are sha-identical; the
+// tag-stripped text of liveResults is identical on every round, checked
+// against the previous fixture before this re-pin).
 // ============================================================================
 
 const { test, describe } = require('node:test');

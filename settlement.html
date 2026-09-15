@@ -201,6 +201,26 @@
            inside the row above them; only the un-indented rows add up to FINAL NET. */
         /* Tie explanation sits under the line it explains, quieter than it. */
         .nf-explain { font-size: 0.72rem; color: var(--text-muted); padding: 1px 0 1px 18px; }
+        /* THE MAIN POOL IS SECTIONED (2026-09-14). Each game (KP, Net Finish, Skins
+           Pot) is a bordered block with a header that reads as one; inside the
+           Skins Pot each flight is a bordered block with its pot in the header.
+           New classes, deliberately: .ledger-row is used by every other section and
+           is not restyled. Their print rules sit in the print block further down. */
+        .pool-game { border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 10px 4px 10px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .pool-game-head { font-size: 1rem; font-weight: bold; color: var(--brand-green); padding: 2px 4px 8px 4px; margin-bottom: 8px; border-bottom: 2px solid var(--accent-teal); }
+        .pool-flight { border: 1px solid var(--border-mid); border-left: 5px solid var(--accent-teal); border-radius: 8px; padding: 8px 8px 2px 8px; margin: 8px 0 12px 0; background: var(--subtle-bg); }
+        .pool-flight[data-flight="B"] { border-left-color: var(--brand-navy); }
+        .pool-flight-head { font-size: 0.92rem; font-weight: bold; color: var(--text-main); padding: 2px 4px 6px 4px; margin-bottom: 6px; }
+        /* LIVE RESULTS: a SKINS WON card is a different kind of thing from a
+           standings card, so it does not share the standings chrome; and every
+           per-flight card carries its flight as a left edge - A teal, B navy - so
+           the flight is a property of the card and not only words in its header. */
+        .skins-card { background: var(--bg-card); border-style: dashed; }
+        .settle-card[data-flight="A"] { border-left: 6px solid var(--accent-teal); }
+        .settle-card[data-flight="B"] { border-left: 6px solid var(--brand-navy); }
+        /* The three money mounts and the scorecard are separated by a rule - but
+           only when they hold something, so an empty mount draws no bare line. */
+        #combined-settlement-summary:not(:empty), #settle-content:not(:empty), #receipt-scorecard:not(:empty) { border-top: 3px solid var(--border-mid); margin-top: 22px; padding-top: 16px; }
         /* THE PAYOUTS BLOCK at the top of the Main Pool: the answer before the proof.
            One box, worked one game at a time; a game head, a flight head where the
            pool split, then name / amount rows in the same ledger-row style as the
@@ -280,6 +300,15 @@
             /* The payouts block is the page the cash is handed out from; one game's
                list must not break across a sheet. */
             .pool-payouts .pp-game { break-inside: avoid; page-break-inside: avoid; }
+            /* A game or flight header never ends a sheet with its rows on the next;
+               a flight block (18 rows and a summary) starts a new sheet rather than
+               split when the browser can manage it - a block taller than a sheet
+               still splits, which no rule can prevent. */
+            .pool-game-head, .pool-flight-head { break-after: avoid; page-break-after: avoid; }
+            .pool-flight { break-inside: avoid; page-break-inside: avoid; }
+            .pool-game, .pool-flight { border-color: #ccc; background: #fff; }
+            .skins-card { border-style: dashed; }
+            .settle-card[data-flight], .pool-flight { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .receipt-head { break-after: avoid; page-break-after: avoid; }
             /* The scorecard is the only section allowed its own page. */
             .receipt-card-wide { break-before: auto; page-break-inside: auto; }
@@ -938,8 +967,8 @@ html {
         // already said Carry Over / No Carry.
         const carryLabel = r.skins.carryOver ? 'carries' : 'no carry';
 
-        let html = `<div class="ledger-row" style="font-weight:bold;"><span>🥩 Skins Pot — ${$(r.skins.amountCents)} `
-            + `(${basisLabel} skins, ${carryLabel})</span><span></span></div>`;
+        let html = `<div class="pool-game-head">🥩 Skins Pot — ${$(r.skins.amountCents)} `
+            + `(${basisLabel} skins, ${carryLabel})</div>`;
 
         // A ROUND THAT NEVER SAID SAYS SO. An absent carry setting used to mean
         // "carry"; it now means "no carry", which is what a group that never
@@ -990,15 +1019,24 @@ html {
     // One pot's ledger: every hole in order, the summary by golfer, the unwon money.
     // The pool's participants are narrowed to the pot's golfers by flight tag
     // (playerFlight, the same rule pool-engine sliced by).
+    // EACH FLIGHT IS ITS OWN BLOCK (2026-09-14): a bordered .pool-flight carrying
+    // its pot in a .pool-flight-head, holding that flight's hole rows and summary.
+    // Flight A and Flight B used to be one run of identical rows with a single
+    // inline border-top between them. The rows themselves are unchanged.
     function buildSkinsPotLedgerHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel) {
+        const flighted = pot.flight !== null && pot.flight !== undefined;
+        const rows = buildSkinsPotRowsHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel);
+        if (!flighted) return rows;
+        return `<div class="pool-flight" data-flight="${pot.flight}"><div class="pool-flight-head">Flight ${pot.flight} — ${$(pot.amountCents)}</div>`
+            + rows + `</div><!-- /pool-flight -->`;
+    }
+
+    function buildSkinsPotRowsHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel) {
         let html = '';
         const flighted = pot.flight !== null && pot.flight !== undefined;
-        if (flighted) {
-            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Flight ${pot.flight} — ${$(pot.amountCents)}</span><span></span></div>`;
-            if (pot.golfers === 0) {
-                html += `<div class="ledger-row"><span>Nobody in this flight — no pot.</span><span></span></div>`;
-                return html;
-            }
+        if (flighted && pot.golfers === 0) {
+            html += `<div class="ledger-row"><span>Nobody in this flight — no pot.</span><span></span></div>`;
+            return html;
         }
         // r.participants carries id and name only; the tag lives on the round's
         // player record, so the flight is read from there by id.
@@ -1179,18 +1217,25 @@ html {
         // CANCELLED IS NOT A REFUND, and the Receipt has to say which it was. The
         // money did not come back to the field - the game was removed and the pot
         // was re-divided, which is why no golfer sees a KP line at all.
+        // EACH GAME IS ITS OWN BLOCK (2026-09-14). This card was 62 bare
+        // .ledger-rows: the KP / Net Finish / Skins Pot headers were the same
+        // element, same weight, as the hole rows under them, with no break between
+        // games. Now each game is a bordered .pool-game with a .pool-game-head that
+        // reads as a header. The header TEXT is unchanged - the money on this card
+        // is pinned by tag-stripped sha in receipt_sections_test.js.
         if (r.valid && r.kpCancelled && r.kpCancelled.cancelled) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 Cancelled</span><span></span></div>`;
+            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 Cancelled</div>`;
             html += `<div class="ledger-row"><span>Cancelled before settlement \u00B7 original allocation ${$(r.kpCancelled.originalCents)}</span>`
                  + `<span>moved to skins</span></div>`;
+            html += `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.kp) {
             // THREE STATES, NEVER TWO. A hole nobody has resolved is not "unclaimed" -
             // saying so is what let $100 of unentered KP print as refunds on a receipt
             // that called itself final. Distance appears only when somebody measured.
             const unresolvedKp = r.kp.unresolvedCents || 0;
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}`
-                + (unresolvedKp > 0 ? ' \u2014 NOT CONFIRMED' : '') + `</span><span></span></div>`;
+            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}`
+                + (unresolvedKp > 0 ? ' \u2014 NOT CONFIRMED' : '') + `</div>`;
             const leaders = (data.kpLeaders || {});
             r.kp.lines.forEach(l => {
                 const led = leaders['h' + l.hole];
@@ -1211,9 +1256,10 @@ html {
                 html += `<div class="ledger-row" style="color:var(--warn-text); font-weight:bold;">`
                     + `<span>\u26A0\uFE0F KP results not confirmed</span><span>${$(unresolvedKp)} pending</span></div>`;
             }
+            html += `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.net) {
-            html += `<div class="ledger-row" style="font-weight:bold;"><span>\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</span><span></span></div>`;
+            html += `<div class="pool-game pool-game-net"><div class="pool-game-head">\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</div>`;
             // A TIE IS EXPLAINED, NOT JUST MARKED.
             //
             // "(split)" was accurate and told a golfer nothing. The rule behind it is
@@ -1274,9 +1320,10 @@ html {
                 }
             });
             if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
+            html += `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.skins) {
-            html += buildSkinsReceiptSection(r, data, courseData, savedScores, $);
+            html += `<div class="pool-game pool-game-skins">` + buildSkinsReceiptSection(r, data, courseData, savedScores, $) + `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.refund.cents > 0) {
             html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
@@ -1503,13 +1550,15 @@ html {
             // PER FLIGHT: two lists, ranked within the flight, headed by it - the
             // same sectioning the leaderboard uses. One list, as always, otherwise.
             const groups = standingsFlighted
-                ? ['A', 'B'].map(f => ({ label: 'FLIGHT ' + f + ' \u2014 NET', players: (data.players || []).filter(p => playerFlight(p) === f) }))
-                : [{ label: 'OVERALL \u2014 NET', players: data.players || [] }];
+                ? ['A', 'B'].map(f => ({ label: 'FLIGHT ' + f + ' \u2014 NET', flight: f, players: (data.players || []).filter(p => playerFlight(p) === f) }))
+                : [{ label: 'OVERALL \u2014 NET', flight: null, players: data.players || [] }];
             groups.forEach(g => {
                 const rows = computeNetToParStandings(g.players, courseData, savedScores,
                     { basis: 'net' }).filter(r => r.started);
                 if (rows.length === 0) return;
-                html += '<div class="settle-card"><div class="settle-header">' + g.label + '</div>';
+                // THE FLIGHT IS ON THE CARD (data-flight), not only in its header -
+                // the CSS gives A and B their own edge, so the stack reads at a glance.
+                html += '<div class="settle-card"' + (g.flight ? ' data-flight="' + g.flight + '"' : '') + '><div class="settle-header">' + g.label + '</div>';
                 rows.slice(0, 5).forEach(r => {
                     html += '<div class="lr-row"><span class="lr-pos">' + r.positionLabel + '</span>'
                          + '<span class="lr-name">' + esc(r.name) + '</span>'
@@ -1532,7 +1581,9 @@ html {
             const winners = Object.values(byPlayer).sort((a, b) => b.holes.length - a.holes.length
                 || a.holes[0] - b.holes[0] || String(a.name).localeCompare(String(b.name)));
 
-            html += '<div class="settle-card"><div class="settle-header">\uD83E\uDD69 SKINS WON'
+            // A SKINS WON card is a different kind of thing from a standings card
+            // and no longer shares its chrome (.skins-card); its flight is on the card.
+            html += '<div class="settle-card skins-card"' + (entry.flighted ? ' data-flight="' + entry.flight + '"' : '') + '><div class="settle-header">\uD83E\uDD69 SKINS WON'
                  + (manySections ? ' \u2014 ' + esc(entry.section.label).toUpperCase() : '')
                  + (entry.flighted ? ' \u2014 FLIGHT ' + entry.flight : '') + '</div>';
             if (entry.flighted && LL.participants.length === 0) {
@@ -1621,6 +1672,12 @@ html {
         // holes nobody has played. Results earns its receipt when the round is over.
         if (!roundScoresComplete(data, courseData, savedScores)
             || !moneyIsSettled(data, courseData, savedScores)) {
+            // NO PRINT BUTTON WHILE THE ROUND IS LIVE. The Receipt belongs to the
+            // finished round (live_results_test: "Print / Save" is absent while
+            // live); the copy that used to sit at the very bottom of
+            // #settle-content on every branch - 2,300 px down on a flighted pool
+            // round - is gone (2026-09-14), so the settled branch's button at the
+            // top of the receipt is the one and only.
             container.innerHTML = buildLiveResultsHtml(data, courseData, savedScores);
             return;
         }
@@ -1786,7 +1843,6 @@ html {
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -1807,7 +1863,6 @@ html {
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -1838,7 +1893,6 @@ html {
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -1865,7 +1919,6 @@ html {
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -1893,7 +1946,6 @@ html {
                     ${unclaimedKpNoteHtml(data, courseData, savedScores)}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -1938,7 +1990,7 @@ html {
         if (gameFormat === 'stroke') {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
             if (sideHtml) {
-                container.innerHTML = sideHtml + `<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>`;
+                container.innerHTML = sideHtml;
             } else if (typeof computeMoneyPool === 'function' && computeMoneyPool(data, courseData, savedScores)) {
                 // THE DENIAL BELOW ASKED THE WRONG QUESTION. It fired on "no side
                 // games" and never looked at the Main Pool, so the ordinary pool
@@ -2009,7 +2061,6 @@ html {
                     <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
                 </div>
                 ${sideHtml}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -2022,7 +2073,6 @@ html {
                     <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
                 </div>
                 ${sideHtml}
-                <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
             `;
             return;
         }
@@ -2044,7 +2094,7 @@ html {
                     <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
                 </div>
                 ${sideHtml}
-                ${sideHtml ? '<button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>' : ''}
+                
             `;
             return;
         }
@@ -2101,8 +2151,6 @@ html {
         // Pays Who above, so nothing is lost.
         container.innerHTML = `
             ${sideHtml}
-
-            <button class="btn-primary" onclick="printReceipt()">📄 Print / Save Receipt</button>
         `;
     }
 </script>
