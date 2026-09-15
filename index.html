@@ -11,6 +11,10 @@
          boot() itself still waits for `load`, so nothing else moved. -->
     <script src="pwa-boot.js"></script>
     <script src="./firebase-app-compat.js"></script>
+    <!-- Anonymous Auth at boot (MONETIZATION.md step 1). One tag, fire-and-forget:
+         creates window.authReady now, signs in after the parse, never blocks render.
+         Loads the auth SDK itself, asynchronously, so no page waits for it. -->
+    <script src="auth-boot.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and this
          page carries inline copies of neither. Without this tag Final Money threw on

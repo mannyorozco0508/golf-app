@@ -484,12 +484,15 @@ describe('FIREBASE — one project, unchanged', () => {
             assert.equal(sha(path.join(outDir('consumer'), f)), src);
             assert.equal(sha(path.join(outDir('tournament'), f)), src);
         });
-        // The auth SDK is Tournament-only: byte-identical to source in that
-        // output, and ABSENT from Consumer, which has no page that loads it.
+        // The auth SDK was Tournament-only until v139 (Anonymous Auth at boot):
+        // auth-boot.js on every Consumer page now fetches it from beside itself,
+        // so it is SHARED and byte-identical to source in BOTH outputs, and so is
+        // auth-boot.js in the Consumer output.
         const auth = 'firebase-auth-compat.js';
         assert.equal(sha(path.join(outDir('tournament'), auth)), sha(path.join(REPO_ROOT, auth)));
-        assert.ok(!fs.existsSync(path.join(outDir('consumer'), auth)),
-            'firebase-auth-compat.js leaked into dist/consumer - no Consumer page loads it');
+        assert.equal(sha(path.join(outDir('consumer'), auth)), sha(path.join(REPO_ROOT, auth)),
+            'firebase-auth-compat.js must ship to Consumer: auth-boot.js loads it');
+        assert.equal(sha(path.join(outDir('consumer'), 'auth-boot.js')), sha(path.join(REPO_ROOT, 'auth-boot.js')));
     });
 
     test('the security rules were not touched by a deployment batch', () => {

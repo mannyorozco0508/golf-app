@@ -59,6 +59,12 @@ const SHARED_SHELL = [
     'product-links.js',
     'native-export.js',
     'firebase-app-compat.js', 'firebase-database-compat.js', 'pwa-boot.js',
+    // ANONYMOUS AUTH AT BOOT (MONETIZATION.md step 1, v139). auth-boot.js is the
+    // one tag every Consumer page loads; it fetches firebase-auth-compat.js
+    // itself, asynchronously, from beside it - so the SDK ships in the same
+    // bundle. Moved here from TOURNAMENT_SHELL: golfers now carry an anonymous
+    // uid too (nothing gates on it yet).
+    'auth-boot.js', 'firebase-auth-compat.js',
     'sw.js', 'manifest.json',
 ];
 
@@ -133,13 +139,9 @@ const TOURNAMENT_SHELL = [
     // deployment_build_test.js asserts this file is byte-identical to what
     // build-shell.js generates for the tournament output, so the two cannot drift.
     'tournament-manifest.json',
-    // THE AUTH SDK IS TOURNAMENT ONLY. Organizers sign in; golfers never do, and
-    // no Consumer page loads it. Declared here rather than SHARED so the
-    // Consumer native bundle and dist/consumer do not carry 132KB no page of
-    // theirs references - measured: as SHARED it shipped to iOS for nothing.
-    // The root sw.js still precaches it, because the combined root deployment
-    // serves tournament.html too.
-    'firebase-auth-compat.js',
+    // firebase-auth-compat.js WAS tournament-only here ("golfers never sign in").
+    // Since v139 golfers sign in anonymously at boot, so the SDK is SHARED and
+    // ships to every bundle; tournament.html still loads it with its own tag.
 ];
 
 // Exactly the production runtime files the app needs - no tests, no fallback/archive

@@ -56,6 +56,14 @@ function makeStubSandbox() {
             return () => {};
         },
         signInWithEmailAndPassword() { return Promise.reject(new Error('stub: sign-in is not simulated here')); },
+        // auth-boot.js (every Consumer page) signs in anonymously at boot. The stub
+        // resolves a fake user so the boot completes quietly in every page test; a
+        // test about failure swaps this for a rejecting one before the boot fires.
+        signInAnonymously() {
+            authState.user = { uid: 'anon-stub', isAnonymous: true };
+            authListeners.forEach((cb) => cb(authState.user));
+            return Promise.resolve({ user: authState.user });
+        },
         signOut() { authState.user = null; authListeners.forEach((cb) => cb(null)); return Promise.resolve(); }
     };
     const dbStub = {

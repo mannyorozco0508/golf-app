@@ -518,7 +518,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v138-skins-rows-shared';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v139-auth-boot';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -541,7 +541,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it is what issues a round/trip/tournament code and checks
         // the code is free before handing it out. A cached shell without it cannot
         // start anything at all.
-        assert.equal(entries.length, 38, 'the shell list gained or lost an entry');  // 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 39, 'the shell list gained or lost an entry');  // 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
          './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));

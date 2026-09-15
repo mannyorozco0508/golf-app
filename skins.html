@@ -8,6 +8,10 @@
     <meta name="theme-color" content="#0f4c3a">
     <script src="pwa-boot.js" defer></script>
     <script src="./firebase-app-compat.js"></script>
+    <!-- Anonymous Auth at boot (MONETIZATION.md step 1). One tag, fire-and-forget:
+         creates window.authReady now, signs in after the parse, never blocks render.
+         Loads the auth SDK itself, asynchronously, so no page waits for it. -->
+    <script src="auth-boot.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
          duplicated here and in four other places; this page now consumes the one

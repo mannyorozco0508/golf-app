@@ -524,6 +524,15 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v139: Anonymous Auth at boot, one shared tag on every Consumer page.
+//
+// auth-boot.js (new, precached) is loaded by the nine Consumer pages directly
+// after firebase-app-compat.js. It creates window.authReady at parse time,
+// then - after the parse, on a zero-delay timer - loads firebase-auth-compat.js
+// asynchronously and signs in anonymously (or restores the persisted user
+// with no network). Nothing awaits it yet; no rule and no screen changed. An
+// installed device on v138 keeps pages with no anonymous uid.
+
 // Moved to v138: the skins row wording lives once, in live-skins.js.
 //
 // buildSkinsLedgerRows() is the one builder of the hole-by-hole skins rows -
@@ -1329,7 +1338,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v138-skins-rows-shared';
+const CACHE_VERSION = 'golfapp-v139-auth-boot';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1419,12 +1428,14 @@ const SHELL_FILES = [
     // flips them over.
     './firebase-app-compat.js',
     './firebase-database-compat.js',
-    // The auth-compat build of the same 9.22.2 release. Loaded by tournament.html
-    // ONLY - the organizer console - never by the scorecard a golfer opens. It
-    // is precached so the first offline launch of the console does not throw
-    // before the page script runs; nothing calls the auth API yet.
+    // The auth-compat build of the same 9.22.2 release. Since v139 every
+    // Consumer page signs in anonymously at boot through auth-boot.js, which
+    // fetches this file asynchronously from beside itself - so both are
+    // precached, and a second offline launch restores the persisted user with
+    // no network. tournament.html loads the SDK with its own tag.
     // NO APOSTROPHES IN THIS BLOCK - three tests read this list by matching
     // every single-quoted run, and a contraction becomes a shell file.
+    './auth-boot.js',
     './firebase-auth-compat.js',
     './manifest.json',
     './icon-192.png',

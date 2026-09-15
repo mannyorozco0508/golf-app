@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Clean Scorecard</title>
     <script src="./firebase-app-compat.js"></script>
+    <!-- Anonymous Auth at boot (MONETIZATION.md step 1). One tag, fire-and-forget:
+         creates window.authReady now, signs in after the parse, never blocks render.
+         Loads the auth SDK itself, asynchronously, so no page waits for it. -->
+    <script src="auth-boot.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- sideMatchHoles lives here, so this page cannot drift from settlement on what a
          side match's hole range means. The inline fallback below still covers the case

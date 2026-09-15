@@ -311,19 +311,23 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
             assert.ok(filesToSync().includes(f),
                 f + ' must ship to www/app/ or the native app still fetches gstatic');
         });
-        // And NOT the auth SDK: the Consumer bundle has no page that loads it.
-        // filesToSync() above is the OLD three-list union; the bundle that ships
-        // is SHARED_SHELL.concat(CONSUMER_SHELL) (sync-mobile-web.js FILES_TO_SYNC),
-        // so read exactly those two lists for this assertion.
+        // AND the auth SDK, since v139: auth-boot.js on every Consumer page
+        // fetches firebase-auth-compat.js from beside itself, so both ship in
+        // the bundle that goes native - SHARED_SHELL.concat(CONSUMER_SHELL)
+        // (sync-mobile-web.js FILES_TO_SYNC); read exactly those two lists.
         const smw = read('sync-mobile-web.js');
         const declared = (name) => [...smw.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];'))[1]
             .matchAll(/'([^']+)'/g)].map(m => m[1]);
         const consumerBundle = declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL'));
         assert.ok(consumerBundle.length >= 30, 'sanity: the Consumer bundle list parsed');
-        assert.ok(!consumerBundle.includes('firebase-auth-compat.js'),
-            'firebase-auth-compat.js is in the Consumer native bundle, which never loads it');
-        assert.ok(declared('TOURNAMENT_SHELL').includes('firebase-auth-compat.js'),
+        assert.ok(consumerBundle.includes('firebase-auth-compat.js'),
+            'firebase-auth-compat.js must be in the Consumer native bundle: auth-boot.js loads it');
+        assert.ok(consumerBundle.includes('auth-boot.js'));
+        // The Tournament product takes SHARED_SHELL.concat(TOURNAMENT_SHELL), so
+        // the SDK reaches it from SHARED now; it must not be declared twice.
+        assert.ok(declared('SHARED_SHELL').concat(declared('TOURNAMENT_SHELL')).includes('firebase-auth-compat.js'),
             'firebase-auth-compat.js must ship with the Tournament product');
+        assert.ok(!declared('TOURNAMENT_SHELL').includes('firebase-auth-compat.js'), 'declared once, in SHARED');
     });
     test('the auth SDK is loaded by the organizer console ONLY - never by the scorecard a golfer opens', () => {
         // Golfers never authenticate; a link still scores. The scorecard page is

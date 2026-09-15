@@ -6,6 +6,10 @@
     <title>Live Leaderboard</title>
     <script src="product-links.js"></script>
 <script src="./firebase-app-compat.js"></script>
+<!-- Anonymous Auth at boot (MONETIZATION.md step 1). One tag, fire-and-forget:
+     creates window.authReady now, signs in after the parse, never blocks render.
+     Loads the auth SDK itself, asynchronously, so no page waits for it. -->
+<script src="auth-boot.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Live Skins consumes computeSkinsHoleLedger() from settlement-engine.js - the
          same canonical resolver the scorecard uses. money-engine.js and action-model.js
