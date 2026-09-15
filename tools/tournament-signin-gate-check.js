@@ -24,10 +24,17 @@
 //   exit 1   a divergence the JSON names
 //   exit 2   could not run. NOTHING PROVEN.
 //
-// What this does NOT prove: the signed-in states. The stub cannot sign in; the
-// owner-sees-the-tab and non-owner-does-not cases are mini-dom's, both arrival
-// orders, in the test file. And nothing here is about the database: the gate
-// is a page-side guardrail, and this measures the page.
+// THE TWO ARMS IT COULD NEVER MEASURE (2026-09-15): the harness now delivers
+// an anonymous user by default and takes an `auth` option, so this ALSO
+// arrives on the owned record
+//   - as the ANONYMOUS visitor every golfer on this origin is (auth-boot on
+//     the consumer pages, restored here by the SDK): must see the signed-out
+//     page - no Setup tab, sign-in panel on screen, no "Signed in as";
+//   - as the EMAIL organizer whose uid is the record's ownerUid: must see the
+//     organizer page - the Setup tab with a rect, "Signed in as", no panel.
+// The signed-out arm below is arrived with auth: 'signed-out' explicitly.
+// Nothing here is about the database: the gate is a page-side guardrail, and
+// this measures the page.
 // ============================================================================
 
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
@@ -83,8 +90,8 @@ const PROBE = `
   });
 })()`;
 
-async function look(code) {
-    const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code), db, expression: PROBE, settleMs: 7000 });
+async function look(code, auth) {
+    const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code), db, expression: PROBE, settleMs: 7000, auth: auth === undefined ? 'signed-out' : auth });
     if (!r.ok) return { ran: false, reason: r.reason };
     try { return { ran: true, ...JSON.parse(r.value) }; } catch (e) { return { ran: false, reason: 'non-JSON: ' + String(r.value).slice(0, 200) }; }
 }
@@ -94,9 +101,13 @@ async function look(code) {
     const owned = await look('OWNED1');
     const legacy = await look('LEGACY1');
     const ownedInd = await look('OWNEDI1');
+    const anon = await look('OWNED1', 'anonymous');
+    const organizer = await look('OWNED1', { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
     if (!owned.ran) bail('the owned record did not run: ' + owned.reason);
     if (!legacy.ran) bail('the legacy record did not run: ' + legacy.reason);
     if (!ownedInd.ran) bail('the owned individual record did not run: ' + ownedInd.reason);
+    if (!anon.ran) bail('the anonymous arm did not run: ' + anon.reason);
+    if (!organizer.ran) bail('the organizer arm did not run: ' + organizer.reason);
     if (!owned.board.visible || !legacy.board.visible) bail('a leaderboard rendered nothing, so tab visibility cannot be held against anything', { owned, legacy });
 
     const failures = [];
@@ -128,9 +139,22 @@ async function look(code) {
     if (!legacy.setupPanel.exists) failures.push('legacy: the Setup panel is gone');
     if (legacy.lockWords.length) failures.push('legacy: lock words on screen: ' + JSON.stringify(legacy.lockWords));
 
+    // ANONYMOUS visitor on the owned record: the signed-out page, exactly.
+    if (anon.setupTab.exists || anon.setupPanel.exists) failures.push('anonymous: the Setup tab or panel exists for an anonymous visitor - the hole 075c7a4 closed');
+    if (anon.signedInAs) failures.push('anonymous: "Signed in as" rendered for an anonymous visitor: ' + anon.signedInAs);
+    if (!anon.signInPanel) failures.push('anonymous: no sign-in panel on screen for an anonymous visitor');
+    if (!anon.leaderboardTab.visible || !/Eagles/.test(anon.board.names)) failures.push('anonymous: the leaderboard is not on screen');
+    if (anon.lockWords.length) failures.push('anonymous: lock words on screen: ' + JSON.stringify(anon.lockWords));
+    // EMAIL ORGANIZER (uid === ownerUid): the organizer page.
+    if (!organizer.setupTab.exists || !organizer.setupTab.visible) failures.push('organizer: the Setup tab is missing or has no rect for the owner');
+    if (!organizer.setupPanel.exists) failures.push('organizer: the Setup panel is gone for the owner');
+    if (!/Signed in as org@example\.com/.test(organizer.signedInAs)) failures.push('organizer: "Signed in as" does not name the owner: ' + organizer.signedInAs);
+    if (organizer.signInPanel) failures.push('organizer: the sign-in panel is still on screen for the owner');
+    if (organizer.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(organizer.lockWords));
+
     console.log(JSON.stringify({
         verdict: failures.length ? 'FAIL' : 'PASS', failures,
-        measured: { owned, legacy, ownedIndividual: ownedInd }
+        measured: { owned, legacy, ownedIndividual: ownedInd, anonymous: anon, organizer }
     }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch((e) => { console.log(JSON.stringify({ verdict: 'COULD NOT RUN', reason: String((e && e.message) || e) }, null, 2)); process.exit(2); });

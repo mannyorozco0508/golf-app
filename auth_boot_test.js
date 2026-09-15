@@ -67,7 +67,10 @@ describe('authReady — the promise every Consumer page exposes', () => {
     }));
 
     test('resolves to the uid when sign-in succeeds', async () => {
+        // A device with NO persisted user - the sign-in path. The harness defaults
+        // to an anonymous user since 2026-09-15, so this starts from nobody.
         const sb = arrive('index.html', s => {
+            s.__auth.setUser(null);
             s.firebase.auth().signInAnonymously = () => Promise.resolve({ user: { uid: 'anon-abc123', isAnonymous: true } });
         });
         const r = await settled(sb.authReady, 200);
@@ -75,6 +78,15 @@ describe('authReady — the promise every Consumer page exposes', () => {
         assert.equal(r.value, 'anon-abc123');
         assert.equal(sb.authBootState.status, 'signed-in');
         assert.equal(sb.authBootState.uid, 'anon-abc123');
+    });
+
+    test('THE HARNESS DEFAULT (2026-09-15): with nothing set, the page finds an anonymous user already there and authReady resolves to it without signInAnonymously', async () => {
+        let called = 0;
+        const sb = arrive('index.html', s => { s.firebase.auth().signInAnonymously = () => { called++; return Promise.resolve({ user: { uid: 'new' } }); }; });
+        const r = await settled(sb.authReady, 200);
+        assert.equal(r.state, 'resolved'); assert.equal(r.value, 'anon-stub');
+        assert.equal(called, 0, 'the persisted path, as on a returning device');
+        assert.equal(sb.firebase.auth().currentUser.isAnonymous, true);
     });
 
     test('a persisted user is used as-is; signInAnonymously is not called', async () => {
@@ -96,6 +108,7 @@ describe('authReady — the promise every Consumer page exposes', () => {
         try {
             const sb = arrive('index.html', s => {
                 s.console = Object.assign({}, console, { warn: (...a) => warns.push(a.join(' ')) });
+                s.__auth.setUser(null);   // no persisted user: the sign-in path
                 s.firebase.auth().signInAnonymously = () => Promise.reject(Object.assign(new Error('network'), { code: 'auth/network-request-failed' }));
             });
             const r = await settled(sb.authReady, 200);
@@ -127,6 +140,7 @@ describe('authReady — the promise every Consumer page exposes', () => {
     test('rejects when signInAnonymously itself throws synchronously', async () => {
         const sb = arrive('index.html', s => {
             s.console = Object.assign({}, console, { warn: () => {} });
+            s.__auth.setUser(null);   // no persisted user: the sign-in path
             s.firebase.auth().signInAnonymously = () => { throw Object.assign(new Error('boom'), { code: 'auth/operation-not-allowed' }); };
         });
         const r = await settled(sb.authReady, 200);
@@ -156,7 +170,7 @@ describe('FIRE AND FORGET — the page never waits', () => {
 
     test('the round renders BEFORE auth settles - authReady is still pending when the hole view is on screen', async () => {
         let resolveLater;
-        const sb = arrive('index.html', s => { s.firebase.auth().signInAnonymously = () => new Promise(r => { resolveLater = r; }); });
+        const sb = arrive('index.html', s => { s.__auth.setUser(null); s.firebase.auth().signInAnonymously = () => new Promise(r => { resolveLater = r; }); });
         vm.runInContext('document.__mount(document.getElementById("hole-view-card"));', sb);
         feed(sb);
         const html = String(vm.runInContext("document.getElementById('hole-view-card').innerHTML", sb));

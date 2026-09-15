@@ -52,9 +52,22 @@ function rpc(ws, id, method, params) {
 
 // A Firebase stand-in with a memory. Small on purpose: it implements what these
 // pages actually use, so it cannot drift into being a second Firebase.
-function statefulStub(dbJson) {
+// The `auth` option of a cold arrival / a journey, resolved to what the stand-in
+// injects. Default: an anonymous user, as auth-boot leaves every consumer page.
+function authSpec(auth) {
+    if (auth === undefined || auth === 'anonymous') return { mode: 'anonymous', user: { uid: 'anon-cold', isAnonymous: true, email: null } };
+    if (auth === null || auth === 'signed-out') return { mode: 'signed-out', user: null };
+    if (auth && typeof auth === 'object' && auth.uid) return { mode: 'user', user: Object.assign({ isAnonymous: false, email: null }, auth) };
+    throw new Error('auth option must be omitted, "anonymous", "signed-out", null, or { uid, email, isAnonymous }');
+}
+
+function statefulStub(dbJson, auth) {
+    const spec = authSpec(auth);
+    const authMode = JSON.stringify(spec.mode), authUser = JSON.stringify(spec.user);
     return `
     (function () {
+      var AUTH_MODE = ${authMode};   // 'anonymous' | 'signed-out' | 'user'
+      var AUTH_USER = ${authUser};   // the user onAuthStateChanged first emits, or null
       // STATE MUST SURVIVE A NAVIGATION THE PAGE STARTS ITSELF.
       //
       // Several real flows write and then immediately go somewhere:
@@ -161,14 +174,37 @@ function statefulStub(dbJson) {
         initializeApp: function () { return {}; },
         database: function () { return { ref: refFor }; },
         // auth(): the real SDK is blocked above, so a page that asks for it must
-        // find something. Signed out, always; a check that needs a signed-in
-        // organizer stubs onAuthStateChanged itself.
+        // find something - and since anonymous sign-in went live, what it finds
+        // in production is a USER. By default this is an anonymous one, the way
+        // auth-boot.js leaves every consumer page: currentUser set, isAnonymous
+        // true, onAuthStateChanged emitting it, signInAnonymously resolving it.
+        // The 'auth' option names the other two states: 'signed-out' (no user,
+        // and signInAnonymously REJECTS with the SDK's offline code, so the state
+        // is stable - a device with no session and no signal), or an email
+        // organizer { uid, email, isAnonymous: false } for tournament.html.
+        // Until 2026-09-15 this was signed out with no signInAnonymously at all,
+        // so authReady rejected on every cold arrival - a state no visitor is in.
         auth: function () {
+          var listeners = [];
+          function emit(u) { listeners.slice().forEach(function (cb) { try { cb(u); } catch (e) {} }); }
           return {
-            currentUser: null,
-            onAuthStateChanged: function (cb) { setTimeout(function () { cb(null); }, 0); return function () {}; },
-            signInWithEmailAndPassword: function () { return Promise.reject(new Error('stub: no auth in a cold check')); },
-            signOut: function () { return Promise.resolve(); }
+            get currentUser() { return AUTH_USER; },
+            onAuthStateChanged: function (cb) {
+              if (typeof cb === 'function') { listeners.push(cb); setTimeout(function () { cb(AUTH_USER); }, 0); }
+              return function () { listeners = listeners.filter(function (x) { return x !== cb; }); };
+            },
+            signInAnonymously: function () {
+              if (AUTH_USER) return Promise.resolve({ user: AUTH_USER });
+              if (AUTH_MODE === 'signed-out') {
+                var err = new Error('stub: signed out and staying so'); err.code = 'auth/network-request-failed';
+                return Promise.reject(err);
+              }
+              AUTH_USER = { uid: 'anon-cold', isAnonymous: true, email: null };
+              emit(AUTH_USER);
+              return Promise.resolve({ user: AUTH_USER });
+            },
+            signInWithEmailAndPassword: function () { return Promise.reject(new Error('stub: no email sign-in in a cold check')); },
+            signOut: function () { AUTH_USER = null; emit(null); return Promise.resolve(); }
           };
         },
         apps: []
@@ -314,7 +350,7 @@ async function openJourney(opts) {
             // would be silently ignored by the page.
             try { await evaluate("sessionStorage.removeItem('__journey_db')"); } catch (e) {}
             const r = await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
-                { source: statefulStub(JSON.stringify(db)) });
+                { source: statefulStub(JSON.stringify(db), o.auth) });
             injected = r.result && r.result.identifier;
             await rpc(ws, id++, 'Page.navigate', { url: url });
             await sleep(settleMs || 2200);

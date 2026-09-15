@@ -43,12 +43,17 @@ function makeStubSandbox() {
     const elementRegistry = documentStub.__registry;
     const captured = [];
     const writes = [];
-    // firebase.auth(), signed out by default. A page that asks for auth at load
-    // must find something, and the vendored SDK is skipped (VENDOR_SKIP). The
-    // listener the page registers is captured; sandbox.__auth.setUser(user)
-    // fires it with { uid, email } or null, the way onAuthStateChanged does.
+    // firebase.auth(). A page that asks for auth at load must find something,
+    // and the vendored SDK is skipped (VENDOR_SKIP). Since 2026-09-15 what it
+    // finds BY DEFAULT is an ANONYMOUS USER - the state auth-boot.js leaves
+    // every consumer page in now that anonymous sign-in is live; a signed-out
+    // default was a state no visitor is in. The listener the page registers is
+    // captured; sandbox.__auth.setUser(user) fires it with { uid, email,
+    // isAnonymous } or null, the way onAuthStateChanged does - that is the
+    // override for the other states (null = no session; an email organizer for
+    // tournament.html's gate; a test of the sign-in path itself starts from null).
     const authListeners = [];
-    const authState = { user: null };
+    const authState = { user: { uid: 'anon-stub', isAnonymous: true, email: null } };
     const authStub = {
         get currentUser() { return authState.user; },
         onAuthStateChanged(cb) {
@@ -60,8 +65,10 @@ function makeStubSandbox() {
         // resolves a fake user so the boot completes quietly in every page test; a
         // test about failure swaps this for a rejecting one before the boot fires.
         signInAnonymously() {
-            authState.user = { uid: 'anon-stub', isAnonymous: true };
-            authListeners.forEach((cb) => cb(authState.user));
+            if (!authState.user) {
+                authState.user = { uid: 'anon-stub', isAnonymous: true, email: null };
+                authListeners.forEach((cb) => cb(authState.user));
+            }
             return Promise.resolve({ user: authState.user });
         },
         signOut() { authState.user = null; authListeners.forEach((cb) => cb(null)); return Promise.resolve(); }
