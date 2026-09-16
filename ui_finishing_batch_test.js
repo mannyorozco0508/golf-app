@@ -160,6 +160,11 @@ describe('DARK MODE MUST NOT REACH PAPER', () => {
 
 describe('PRINT / SAVE PDF IS FINDABLE', () => {
 
+    // RE-PINNED 2026-09-16 (Send Results). The action was the second child of the
+    // summary, above Final Results. It is now the "📤 Send" pill in
+    // #receipt-actions on the title row - above the whole document, on the right
+    // of the title - so "at the top" is held on that mount and the summary must
+    // carry no button at all (v152: one button).
     test('there is an action at the TOP of the Receipt', () => {
         // Checked in the RENDERED document. Source order is meaningless here: the
         // words "Final Results" appear in comments long before the button's markup.
@@ -175,12 +180,14 @@ describe('PRINT / SAVE PDF IS FINDABLE', () => {
                                createdAt:1, teamAIds:['101'], teamBIds:['103'] } } })};
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
         const html = sb.document.getElementById('combined-settlement-summary').innerHTML;
-        // The top action is the same single export as the one at the bottom; both
-        // read "Print / Save Receipt" since the two competing labels were merged.
-        const btn = html.indexOf('Print / Save Receipt');
-        const results = html.indexOf('Final Results');
-        assert.notEqual(btn, -1, 'the action must render');
-        assert.ok(btn < results, 'it must come before the document, not after it');
+        const actions = sb.document.getElementById('receipt-actions').innerHTML;
+        assert.match(actions, /onclick="printReceipt\(\)"/, 'the action must render on the title row');
+        assert.match(actions.replace(/\\uD83D\\uDCE4/g, '📤'), /📤 Send<\/button>/);
+        assert.equal(html.indexOf('printReceipt'), -1, 'no second button inside the document');
+        assert.notEqual(html.indexOf('Final Results'), -1, 'the document rendered');
+        // The title row precedes every mount in the markup, so the pill is above the document.
+        const src = read('settlement.html');
+        assert.ok(src.indexOf('id="receipt-actions"') < src.indexOf('id="money-pool-section"'));
     });
 
     test('it uses the system print flow, not a second PDF renderer', () => {
@@ -195,6 +202,9 @@ describe('PRINT / SAVE PDF IS FINDABLE', () => {
     test('the button is hidden in the printed output', () => {
         assert.match(printBlock(read('settlement.html')), /\.btn-primary/,
             'a print button inside the PDF is a bug');
+        // 2026-09-16: the pill's mount is in the same print-hidden list.
+        assert.match(printBlock(read('settlement.html')), /\.receipt-actions/,
+            'the Send pill inside the PDF is the same bug');
     });
 
     test('printing consumes the same canonical Receipt DOM', () => {

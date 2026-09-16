@@ -171,6 +171,12 @@ describe('4. PLACE NUMBERS', () => {
 
 // ---------------------------------------------------------------------------
 describe('THE PROOF — the old text with exactly this wave\'s substitutions IS the new text; everything else identical', () => {
+// SEND RESULTS (2026-09-16): the export button left the summary for #receipt-actions
+// on the title row. The capture below still holds it as one cell,
+// "|📄 Print / Save Receipt|". That ONE cell is removed from the OLD text before
+// comparing - the fixture file is untouched, its sha still pins the capture, and a
+// second difference anywhere is still red. sendMove asserts the cell was there.
+const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
     const PREV = JSON.parse(read('weekly_game_prev.fixture.json')).rounds;
     test('the previous capture is pinned', () => {
         assert.equal(sha(PREV['golden-off'].pool).slice(0, 8), '097d5f75');
@@ -181,7 +187,7 @@ describe('THE PROOF — the old text with exactly this wave\'s substitutions IS 
     Object.keys(ROUNDS).forEach(k => {
         test(k + ': the other sections are character for character the same', () => {
             const el = arrive(ROUNDS[k]());
-            assert.equal(undate(el.text('combined-settlement-summary')), undate(PREV[k].summary));
+            assert.equal(undate(el.text('combined-settlement-summary')), sendMove(undate(PREV[k].summary)));
             assert.equal(el.text('settle-content'), PREV[k].content);
             assert.equal(undate(el.text('receipt-scorecard')), undate(PREV[k].scorecard));
         });

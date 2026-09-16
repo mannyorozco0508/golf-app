@@ -220,7 +220,9 @@ describe('3. ONE CANONICAL EXPORT', () => {
             .map(s => s.replace(/\\u[0-9A-Fa-f]{4}/g, '').replace(/[^\x20-\x7E]/g, '').trim()))];
         assert.equal(labels.length, 1,
             'two competing export buttons: ' + JSON.stringify(labels));
-        assert.match(labels[0], /Print \/ Save Receipt/);
+        // RE-PINNED 2026-09-16 (Send Results): the one label is "Send" (the glyph
+        // is stripped above, as it always was).
+        assert.equal(labels[0], 'Send');
     });
 
     test('the export carries a title block naming course, date and group', () => {

@@ -139,6 +139,12 @@ const v142 = t => {
 };
 
 describe('THE MONEY DID NOT MOVE — every unscoped section is the pre-change text, on every link', () => {
+// SEND RESULTS (2026-09-16): the export button left the summary for #receipt-actions
+// on the title row. The capture below still holds it as one cell,
+// "|📄 Print / Save Receipt|". That ONE cell is removed from the OLD text before
+// comparing - the fixture file is untouched, its sha still pins the capture, and a
+// second difference anywhere is still red. sendMove asserts the cell was there.
+const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
     const PREV = JSON.parse(read('results_scope_prev.fixture.json')).links;
     test('the previous capture is pinned, and it was unscoped: the same Side Matches text on every link', () => {
         assert.equal(sha(PREV.bare.summary).slice(0, 8), '0940e7f8');
@@ -154,7 +160,7 @@ describe('THE MONEY DID NOT MOVE — every unscoped section is the pre-change te
             // the fixture holds its capture day. That segment is the one allowed to differ.
             const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
             assert.equal(strip(el('money-pool-section')), v142(PREV[k].mainPool));
-            assert.equal(undate(strip(el('combined-settlement-summary'))), undate(PREV[k].summary));
+            assert.equal(undate(strip(el('combined-settlement-summary'))), sendMove(undate(PREV[k].summary)));
             assert.equal(undate(strip(el('receipt-scorecard'))), undate(PREV[k].scorecard));
             assert.equal(strip(withoutSideMatches(el('settle-content'))), PREV[k].contentWithoutSideMatches);
             assert.ok(PREV[k].summary.length > 2000 && PREV[k].mainPool.length > 500 && PREV[k].contentWithoutSideMatches.length > 300, 'not vacuous');

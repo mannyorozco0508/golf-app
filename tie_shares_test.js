@@ -106,6 +106,12 @@ describe('NO FIGURE CHANGED - the engine\'s result is the old result plus the fi
 });
 
 // ---------------------------------------------------------------------------
+// SEND RESULTS (2026-09-16): the export button left the summary for #receipt-actions
+// on the title row. The capture below still holds it as one cell,
+// "|📄 Print / Save Receipt|". That ONE cell is removed from the OLD text before
+// comparing - the fixture file is untouched, its sha still pins the capture, and a
+// second difference anywhere is still red. sendMove asserts the cell was there.
+const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
 describe('THE PAGE RENDERS CHARACTER FOR CHARACTER WHAT IT RENDERED', () => {
     Object.keys(ROUNDS).forEach(k => test(k + ': all four mounts equal the v143 text, no substitutions', () => {
         const el = arrive(ROUNDS[k]());
@@ -114,7 +120,7 @@ describe('THE PAGE RENDERS CHARACTER FOR CHARACTER WHAT IT RENDERED', () => {
             // matches, no birdie game); the other three must have been captured
             // with content, so an equality of two blanks cannot pass for a proof.
             if (m !== 'settle-content') assert.ok(PREV.rounds[k].text[m].length > 500, m + ' was captured with content');
-            assert.equal(el.text(m), PREV.rounds[k].text[m], m);
+            assert.equal(el.text(m), m === 'combined-settlement-summary' ? sendMove(PREV.rounds[k].text[m]) : PREV.rounds[k].text[m], m);
         });
     }));
     test('and the rows the page prints for a tie ARE the line\'s shares, read from the line (whole-dollar, legacy, second place)', () => {

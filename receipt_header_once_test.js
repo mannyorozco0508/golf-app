@@ -70,6 +70,8 @@ describe('THE SEAMS', () => {
     });
     test('the device check presses the real button and pins the header at line 0 only', () => {
         const t = read('tools/native-pdf-lines-check.js');
-        ['Print \\\\/ Save Receipt/.test(x.innerText)', 'btn.click()', "headerAt[0] !== 0", 'V151.lines.slice(0, 46).concat(V151.lines.slice(49))', "!r.rootIds.includes('combined-settlement-summary')"].forEach(s => assert.ok(t.includes(s), 'missing ' + s));
+        // RE-PINNED 2026-09-16 (Send Results): the tool finds the button by its
+        // printReceipt handler now, not by the label it no longer carries.
+        ["/printReceipt/.test(x.getAttribute('onclick') || '')", 'btn.click()', "headerAt[0] !== 0", 'V151.lines.slice(0, 46).concat(V151.lines.slice(49))', "!r.rootIds.includes('combined-settlement-summary')"].forEach(s => assert.ok(t.includes(s), 'missing ' + s));
     });
 });

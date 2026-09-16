@@ -1142,6 +1142,59 @@ setup-screen baseline is new this wave. The claims test's glyph rule is scoped t
 heading a LINKS section; a padlock in the hero would be caught only by the landing
 baseline, not by the claims rule — measured with a control, and worth knowing.
 
+## Send Results — the receipt's one button on the title row (2026-09-16)
+
+`settlement.html`'s export control is a small pill, **📤 Send**, in `#receipt-actions` —
+the right-hand cell of `.title-row`, level with `#main-title`. It was "📄 Print / Save Receipt",
+a full-width `.btn-primary` as the second child of the summary. `setReceiptAction(show)` is the
+only thing that renders it: cleared on entry to `renderCombinedSummary`, set at the end of the
+settled branch — so a live round (v149), an empty round and the duplicate-name refusal all leave
+the mount empty. Same `printReceipt()`, same five export roots, the pill outside every one of
+them. 0.7rem against the title's 1.4rem (measured 11.2px / 22.4px). `receipt_send_button_test.js`
+holds the screen to `receipt_send_prev.fixture.json` (54a15f2) plus exactly one substitution;
+`tools/receipt-send-check.js` measures the rects in Chrome.
+
+**The row on a phone: the pill drops under the title (option 3, 2026-09-16).** `.title-row` is
+`1fr auto 1fr` and the title is centred beside the pill only while each side cell can hold the
+pill: 282px of title + 2 × (67px pill + 8px gap) = 432px of content = a 488px viewport (56px of
+body + container padding). So `@media (max-width: 487px)` makes the row one column: the title
+alone, centred exactly where it always was (390: top 283, one line, offset 0), the pill beneath
+it right-aligned (390: 67×25 at 296..362, top 319 — the row is 61px tall instead of 30).
+`.receipt-actions:empty { display: none }` keeps a live round's empty mount from taking a row or
+a gap (measured: without it the live row grows 6px). Measured on both sides of the edge: 488px
+pill on the row, title centred; 487px pill below. The breakpoint is derived from the DEFAULT title
+"🤝 Settle (Weekend Round)"; a longer event name at a width just above 487 slides off centre
+rather than wraps (the pre-option-3 behaviour) — a container query would follow the real title
+width, and is the next step if that ever shows on a device. History that led here: "📤 Send
+Results" (110px) wrapped the title and shifted it 55px on a phone; "📤 Send" (67px) still wrapped
+it, 33px; option 3 removes the shift entirely.
+
+**The native hide rule is LIFTED (2026-09-16, part B) — and the share path has NOT yet run on a
+real iPhone.** From 98b4fc7 (2026-09-04) `settlement.html` carried `html.is-native
+[onclick*="printReceipt"] { display: none !important; }` — the Consumer 1.0 decision after four
+TestFlight builds where `window.print()` did nothing in WKWebView. `native-export.js` has since
+built a real PDF and handed it to the iOS share sheet (v151 readable lines, v152 the header once,
+v153 the mark), so the App Store app was the one place a golfer could not send a receipt. The rule
+is gone (the comment that replaced it says why); `native_print_hidden_test.js` now REFUSES its
+return for the receipt and keeps the trip itinerary's rule, which still ends in `window.print()`.
+Measured with the Capacitor stand-in in Chrome: the pill is `inline-block` and on screen under
+`html.is-native`; `tools/native-pdf-mark-check.js` presses it on the native arm and gets the PDF
+with the mark. EVERY proof is Chrome with a stand-in. The device test that decides whether this
+is real is written in `~/Desktop/rattle-send-results-part-b-20260916.txt` (what to build, tap,
+and see; what "does not work" looks like). Until Manny has run it on a device, treat the pill as
+reachable natively but the share path as UNPROVEN, and do not ship a build that relies on it
+without that run. Android: the same rule lift applies (pwa-boot sets `is-native` there too);
+`native-export.js` uses the same Filesystem + Share plugins, which the Android build links; equally
+unproven on a device.
+
+**Pre-existing tool failures, not this wave (identical against HEAD's page with HEAD's tools):**
+`tools/receipt-export-check.js` FAIL "no carry rule recorded: the receipt restates the money without
+saying it chose the rule itself"; `tools/receipt-denial-check.js` FAIL poolSectionStillRenders /
+sideGameRoundExports; `tools/native-pdf-lines-check.js` FAIL "143 vs 146" + "character stream
+differs at 9" — probably the date line (the v151 fixture was captured on a Tuesday; today's
+"Wednesday, September 16, 2026" is two characters longer), not proven. `tools/native-pdf-mark-check.js`
+PASS. All four re-pinned to find the button by its `printReceipt` handler, not its label.
+
 ## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
 
 Organizers sign in (Firebase Auth, email/password); golfers never do — a scoring

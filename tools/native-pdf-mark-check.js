@@ -7,7 +7,8 @@
 // holds (Route B, v153). Three things only a real page and a real PDF renderer
 // can prove, measured here:
 //
-//   THE IMAGE  the real "Print / Save Receipt" button, with the exporter's
+//   THE IMAGE  the real export button ("📤 Send" since 2026-09-16, found by
+//              its printReceipt handler, not its label), with the exporter's
 //              entry recorded, hands over roots that contain the decoded mark;
 //              _markFrom returns JPEG bytes (SOI FF D8, EOI FF D9), 256 x 256,
 //              read from the page's own element - the check counts network
@@ -40,7 +41,7 @@ const { linkedRounds } = require('../helpers/trip-weekly-rounds.js');
 const R = linkedRounds()[0].data;
 const PROBE = `(function(){ var captured = null; window.RattleExport.exportOrPrint = function (o) { captured = o; return Promise.resolve({ path: 'captured' }); };
   var reqBefore = performance.getEntriesByType('resource').filter(e => /logo-mark\\.png/.test(e.name)).length;
-  var btn = Array.from(document.querySelectorAll('button')).find(x => /Print \\/ Save Receipt/.test(x.innerText)); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
+  var btn = Array.from(document.querySelectorAll('button')).find(x => /printReceipt/.test(x.getAttribute('onclick') || '')); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
   if (!captured || !captured.roots) return JSON.stringify({ error: 'nothing captured' });
   var lines = RattleExport._linesFrom(captured.roots); var mark = RattleExport._markFrom(captured.roots);
   var withMark = RattleExport._buildPdf(captured.title, lines, mark); var without = RattleExport._buildPdf(captured.title, lines);

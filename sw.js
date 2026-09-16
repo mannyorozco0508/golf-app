@@ -1562,7 +1562,12 @@
 // weighted cards, the name / course / entry-fee fields restyled. Presentation
 // only: same ids, same handlers, same save. A device on v159 keeps the
 // trophy-and-title header and the emoji-on-white picker.
-const CACHE_VERSION = 'golfapp-v160-tournament-hero-band';
+// Moved to v161: the receipt's one button is "📤 Send", a small pill at the
+// right end of the title row (beneath the title on a phone), and the native
+// shell no longer hides it. settlement.html only: same printReceipt(), same export roots, still
+// absent while the round is live. A device on v160 keeps the full-width
+// "Print / Save Receipt" above the results, hidden in the native app.
+const CACHE_VERSION = 'golfapp-v161-send-results';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

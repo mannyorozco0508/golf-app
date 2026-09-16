@@ -107,6 +107,14 @@ const HEAD_NOTE = 'Final money appears once every card is in, or once the scores
 // ---------------------------------------------------------------------------
 // THE FINISHED CASE DID NOT MOVE
 // ---------------------------------------------------------------------------
+// SEND RESULTS (2026-09-16): the export button left the summary for #receipt-actions
+// on the title row. The capture below still holds it as one cell,
+// "|📄 Print / Save Receipt|". That ONE cell is removed from the OLD text before
+// comparing - the fixture file is untouched, its sha still pins the capture, and a
+// second difference anywhere is still red. sendMove asserts the cell was there.
+const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
+const sendMoved = m => Object.assign({}, m, { summary: sendMove(m.summary) });
+
 describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', () => {
     const prev = JSON.parse(read('receipt_final_prev.fixture.json'));
     const rounds = linkedRounds();
@@ -121,14 +129,14 @@ describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', 
         assert.match(strip0(r.sb.document.getElementById('combined-settlement-summary').innerHTML), new RegExp('\\|' + TODAY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\|'));
     });
     test('Caledonia (finished, KPs confirmed): all four mounts identical', () => {
-        assert.deepEqual(receipt(rounds[0].data).mounts0(), prev.caledonia);
+        assert.deepEqual(receipt(rounds[0].data).mounts0(), sendMoved(prev.caledonia));
     });
     test('True Blue (finished): all four mounts identical', () => {
-        assert.deepEqual(receipt(rounds[1].data).mounts0(), prev.trueBlue);
+        assert.deepEqual(receipt(rounds[1].data).mounts0(), sendMoved(prev.trueBlue));
     });
     test('Caledonia with scoresVerified set: identical to the unverified capture - verification adds no line to a finished receipt', () => {
         const d = Object.assign({}, rounds[0].data, { scoresVerified: { verified: true, verifiedAt: 1, verifiedBy: 'organizer' } });
-        assert.deepEqual(receipt(d).mounts0(), prev.caledoniaVerified);
+        assert.deepEqual(receipt(d).mounts0(), sendMoved(prev.caledoniaVerified));
         assert.deepEqual(prev.caledoniaVerified, prev.caledonia);
     });
 });
@@ -174,7 +182,10 @@ describe('THE SAME ROUND VERIFIED: a finished receipt, for the first time', () =
     test('verified with a blank hole: Final Results, Payouts, Who Pays Who, the Print button', () => {
         assert.equal(vBlank.isFinal(), true);
         const s = vBlank.summary();
-        ['📄 Print / Save Receipt', '🏁 Final Results', '💰 Player Payouts', '🤝 Who Pays Who'].forEach(t => assert.ok(s.includes(t), 'missing ' + t));
+        ['🏁 Final Results', '💰 Player Payouts', '🤝 Who Pays Who'].forEach(t => assert.ok(s.includes(t), 'missing ' + t));
+        // The button is on the title row now (2026-09-16), not in the summary.
+        assert.ok(!s.includes('Print / Save'), 'no button inside the summary');
+        assert.match(vBlank.sb.document.getElementById('receipt-actions').innerHTML.replace(/\\uD83D\\uDCE4/g, '📤'), /📤 Send<\/button>/);
         assert.ok(!/Still in play|LIVE RESULTS/.test(s));
     });
     test('the three money mounts are byte-identical to the fully scored round; only the scorecard shows the blank as a dash', () => {

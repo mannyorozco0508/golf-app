@@ -1,0 +1,17 @@
+{
+ "capturedAt": "54a15f2 (v160) - the Results screen before the Send Results wave; four mounts + the (then non-existent) receipt-actions mount, tags to |, date normalised to <today>",
+ "finished": {
+  "pool": "",
+  "summary": "| |Golf Round| |<today>| |Stroke Play · 4 golfers| |Weekend Round| |📄 Print / Save Receipt| |🏁 Final Results|Cal C|+$13 NET|Ann A|+$12 NET|Dee D|-$12 NET|Ben B|-$13 NET| |💰 Player Payouts| | What each golfer won from the pot. |Cal C|Side Match · Ann A/Cal C vs Ben B/Dee D|+$12.50|Rounding to whole dollars|+$0.50|TOTAL PAYOUT|+$13|Ann A|Side Match · Ann A/Cal C vs Ben B/Dee D|+$12.50|TOTAL PAYOUT|+$12.50|Dee D|Rounding to whole dollars|+$0.50|TOTAL PAYOUT|+$0.50|Ben B|No payout|$0|TOTAL PAYOUT|$0| |🤝 Who Pays Who|Ben B → Cal C|$13|Dee D → Ann A|$12|",
+  "settle": "|⚔️ Side Matches|Ann / Cal vs Ben / Dee|Match Play · Gross · 2v2 (best ball)|Original Bet|$25|Started Hole 1|Ann/Cal 5&3|Ann/Cal +$25|MATCH NET · Ann / Cal +$25 |($12.50 each)|",
+  "scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Ann A|4|4|2|5|4|3|3|5|3|33|4|4|2|5|4|3|3|5|3|33|66|Ben B|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Cal C|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|Dee D|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72| | | Birdie | Eagle or better |",
+  "actions": ""
+ },
+ "live": {
+  "pool": "",
+  "summary": "|🏆 LIVE RESULTS — THRU 9|Still in play — thru 9, 4 golfers still have holes left: Ann A (9 of 18), Ben B (9 of 18), Cal C (9 of 18), Dee D (9 of 18). Final money appears once every card is in, or once the scores are confirmed in Finish Round.|OVERALL — NET|1|Ann A|-3|T2|Ben B|E|T2|Cal C|E|T2|Dee D|E|View Full Leaderboard ›|",
+  "settle": "|⚔️ Side Matches|Ann / Cal vs Ben / Dee|Match Play · Gross · 2v2 (best ball)|Original Bet|$25|Started Hole 1|Ann/Cal 3 up|MATCH NET · Ann / Cal +$25 |($12.50 each)|",
+  "scorecard": "| |📋 Full Scorecard| |HOLE|1|2|3|4|5|6|7|8|9|OUT|10|11|12|13|14|15|16|17|18|IN|TOT|PAR|4|4|3|5|4|4|3|5|4|36|4|4|3|5|4|4|3|5|4|36|72|HCP|7|13|17|1|9|3|15|5|11|8|14|18|2|10|4|16|6|12|Ann A|4|4|2|5|4|3|3|5|3|33|–|–|–|–|–|–|–|–|–|–|33|Ben B|4|4|3|5|4|4|3|5|4|36|–|–|–|–|–|–|–|–|–|–|36|Cal C|4|4|3|5|4|4|3|5|4|36|–|–|–|–|–|–|–|–|–|–|36|Dee D|4|4|3|5|4|4|3|5|4|36|–|–|–|–|–|–|–|–|–|–|36| | | Birdie | Eagle or better |",
+  "actions": ""
+ }
+}

@@ -246,7 +246,7 @@ describe('LIVE KP — A STATUS LINE, NOT A LEDGER', () => {
 describe('LIVE MODE SHOWS NO MONEY AT ALL', () => {
 
     const banned = ['Player Payouts','Who Pays Who','Final Ledger','TOTAL PAYOUT',
-                    'Main Pool','Skins Pot','buy-in','Print / Save'];
+                    'Main Pool','Skins Pot','buy-in','Print / Save','📤 Send'];
 
     banned.forEach(w => {
         test(`"${w}" is absent while the round is live`, () => {
@@ -257,6 +257,13 @@ describe('LIVE MODE SHOWS NO MONEY AT ALL', () => {
 
     test('not a single dollar sign', () => {
         assert.ok(!/\$/.test(results(LIVE).html()));
+    });
+
+    // 2026-09-16: the export button lives in #receipt-actions on the title row
+    // now, outside the summary this suite reads - so its absence while live is
+    // asserted on that mount too, not only on the summary.
+    test('the Send pill is absent while the round is live - the actions mount is empty', () => {
+        assert.equal(results(LIVE).sb.document.getElementById('receipt-actions').innerHTML, '');
     });
 
     test('no full scorecard', () => {
@@ -295,9 +302,14 @@ describe('FINAL MODE KEEPS THE RECEIPT', () => {
     // RENAMED, NOT REMOVED. The Receipt carried two export buttons with different
     // names - "Print / Save PDF" at the top and "Print / Save Receipt" at the
     // bottom - which read as two different documents when there is only one. Both
-    // now say Print / Save Receipt.
+    // then said Print / Save Receipt.
+    // RE-PINNED 2026-09-16 (Send Results): the one button is now "📤 Send"
+    // and renders into #receipt-actions on the title row, not into the summary.
+    // The summary must carry NO button; the actions mount carries the one.
     test('the export returns', () => {
-        assert.match(results(FINAL).text(), /Print \/ Save Receipt/);
+        const sb = results(FINAL).sb;
+        assert.ok(!/printReceipt/.test(results(FINAL).html()), 'no export button inside the summary any more');
+        assert.equal(strip(sb.document.getElementById('receipt-actions').innerHTML), '📤 Send');
     });
 
     test('POOL-ONLY still suppresses Who Pays Who', () => {

@@ -44,13 +44,14 @@ const R = linkedRounds();
 const NAMES = ['Marty', 'Scott', 'Carp', 'Randy', 'Manny', 'Matt B', 'Lance', 'Kopp', 'Marcus', 'Rocco', 'Matt H', 'Jeremy'];
 
 const RECEIPT = `(function(){ var captured = null; window.RattleExport.exportOrPrint = function (o) { captured = o; return Promise.resolve({ path: 'captured' }); };
-  var btn = Array.from(document.querySelectorAll('button')).find(x => /Print \\/ Save Receipt/.test(x.innerText)); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
+  var btn = Array.from(document.querySelectorAll('button')).find(x => /printReceipt/.test(x.getAttribute('onclick') || '')); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
   if (!captured || !captured.roots) return JSON.stringify({ error: 'the button handed the exporter nothing' });
   var roots = captured.roots; var rootIds = roots.map(r => r.id || (r.className ? '.' + String(r.className).split(' ')[0] : r.tagName));
   var lines = RattleExport._linesFrom(roots); var pdf = RattleExport._buildPdf(captured.title, lines);
   var summary = document.getElementById('combined-settlement-summary'); var rt = RattleExport._renderedText ? RattleExport._renderedText(summary) : { live: null, text: '', drop: {} };
   var pages = pdf.split(/\\d+ 0 obj\\n<< \\/Length \\d+ >>\\nstream\\n/).slice(1).map(s => (s.split('endstream')[0].match(/\\) Tj/g) || []).length);
-  return JSON.stringify({ rootIds, lines, pdfBytes: pdf.length, pageRows: pages, live: rt.live, rawHasButton: /Print \\/ Save Receipt/.test(rt.text), dropKeys: Object.keys(rt.drop) }); })()`;
+  var actions = document.getElementById('receipt-actions'); var art = RattleExport._renderedText ? RattleExport._renderedText(actions) : { text: '', drop: {} };
+  return JSON.stringify({ rootIds, lines, pdfBytes: pdf.length, pageRows: pages, live: rt.live, rawHasButton: /Send<|Send Results|Print \\/ Save/.test(rt.text), dropKeys: Object.keys(rt.drop), buttonLabel: btn.innerText, actionsDropKeys: Object.keys(art.drop), actionsText: art.text, anyRootHasButton: roots.some(r => /printReceipt/.test(r.innerHTML || '')) }); })()`;
 const STUB = `window.__printed = 0; window.print = function(){ window.__printed++; };`;
 const TRIP_CLICK = `(function(){ var b = Array.from(document.querySelectorAll('button')).find(x => /Itinerary/.test(x.innerText)); if (!b) return 'no button'; b.click(); return 'clicked'; })()`;
 const TRIP_READ = `(function(){ var v = document.getElementById('trip-itinerary-print-view'); var rt = RattleExport._renderedText ? RattleExport._renderedText(v) : { live: null }; return JSON.stringify({ printed: window.__printed, classOn: document.body.classList.contains('printing-itinerary'), display: getComputedStyle(v).display, live: rt.live, lines: RattleExport._linesFrom([v]) }); })()`;
@@ -97,9 +98,20 @@ const names = ls => { const out = []; const re = new RegExp('(' + NAMES.map(n =>
     if (!/^HOLE  1  2  3/.test(r.lines.find(l => /^HOLE/.test(l)) || '')) problems.push('receipt: the scorecard row is not spaced');
     if (r.lines.some(l => /^\s+\S/.test(l))) problems.push('receipt: leading whitespace survives on ' + r.lines.filter(l => /^\s+\S/.test(l)).length + ' lines');
     if (!r.live) problems.push('receipt: the live read did not happen (clone fallback ran)');
-    if (!r.rawHasButton) problems.push('receipt: the button text was not in the rendered text at all - the exclusion was not exercised');
-    if (r.lines.some(l => /Print \/ Save/.test(l))) problems.push('receipt: a button row leaked into the PDF');
-    if (!r.dropKeys.some(k => /Print \/ Save Receipt/.test(k))) problems.push('receipt: the button text is not in the drop set: ' + JSON.stringify(r.dropKeys));
+    // RE-PINNED 2026-09-16 (Send Results). The button is no longer inside the
+    // summary - it is the "📤 Send" pill in #receipt-actions on the title
+    // row, outside every root. So: no button text in the summary's rendered text,
+    // no button in any root, no button row in the PDF. The BUTTON-drop mechanism
+    // of _renderedText is exercised on the actions mount itself instead, where the
+    // pill must land in the drop set and leave the text empty.
+    if (r.rawHasButton) problems.push('receipt: a button label is in the summary\'s rendered text - the pill is back inside the document');
+    if (r.anyRootHasButton) problems.push('receipt: an export root contains the export button');
+    if (r.lines.some(l => /Print \/ Save|Send Results|^📤 Send$/.test(l))) problems.push('receipt: a button row leaked into the PDF');
+    if (r.dropKeys.some(k => /Print \/ Save|Send/.test(k))) problems.push('receipt: the summary dropped a button - there should be none in it: ' + JSON.stringify(r.dropKeys));
+    if ((r.buttonLabel || '').trim() !== '📤 Send') problems.push('receipt: the pressed button reads ' + JSON.stringify(r.buttonLabel));
+    // _renderedText returns the raw text AND the set of BUTTON texts to drop; the
+    // line builder is what removes them. So the pill must be in the drop set.
+    if (!r.actionsDropKeys.some(k => /Send/.test(k))) problems.push('receipt: _renderedText did not mark the pill for dropping on the actions mount: ' + JSON.stringify(r.actionsDropKeys));
     if (r.pageRows.some(n => n > 54)) problems.push('receipt: a page holds more than 54 rows: ' + JSON.stringify(r.pageRows));
     // rows = title + blank + every line, plus one row per wrap of a line over 92 chars
     const long = r.lines.filter(l => l.length > 92).length, rows = r.pageRows.reduce((s, n) => s + n, 0);
