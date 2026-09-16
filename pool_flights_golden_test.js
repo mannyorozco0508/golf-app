@@ -91,6 +91,16 @@ const { makeCourseData } = require('./helpers/fixtures.js');
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const J = (v) => JSON.parse(JSON.stringify(v));
+// RE-PINNED 2026-09-15, the RECEIPT PREDICATE wave (settlement.html only,
+// v149): settlement.liveResults moved in all three variants and NOTHING else
+// did (engine blocks, index and leaderboard surfaces, settlement.receiptPool
+// sha-identical). This round is thru 18 with its KPs unconfirmed, so the live
+// head that read "LIVE RESULTS — THRU 18 / The round is still in play. Final
+// money appears once every card is in." - blaming golfers whose cards were
+// all in - now reads "RESULTS — NOT FINAL / Every card is in. KP results are
+// still unconfirmed — final money appears once they are confirmed or
+// cancelled." Text identical from char 96 on. Previous liveResults shas: off
+// c2404162e1f0e90f..., field 878f5337b8acb4db..., flight 43b41a98d6374aeb....
 const FIXTURE = path.join(__dirname, 'pool_flights_golden.fixture.json');
 const CD = makeCourseData(18);
 

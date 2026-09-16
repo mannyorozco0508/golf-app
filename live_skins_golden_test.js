@@ -78,6 +78,18 @@
 // waiting rows stay. card_skins_wave_test.js holds the pre-change text
 // (card_skins_prev.fixture.json) and proves on every run that the old text
 // with the tie rows removed and H -> Hole IS today's text.
+//
+// RE-PINNED 2026-09-15, the RECEIPT PREDICATE wave (settlement.html only,
+// v149). settlement.liveResults moved on all three rounds and NOTHING else did
+// (the four index/leaderboard surfaces and every engine block sha-identical).
+// The whole difference, tag-stripped, is the live head's note: "The round is
+// still in play. Final money appears once every card is in." became "Still in
+// play — thru 17, 8 golfers still have holes left: Ann (17 of 18), ... Fay
+// (17 of 18) + 2 more. Final money appears once every card is in, or once the
+// scores are confirmed in Finish Round." - the text is identical from char 96
+// to the end on every round. Previous liveResults shas: flat-main
+// aad55db43da003cd..., flighted-stacked and pool-only fd61f86b4b3fcccf....
+// receipt_final_test.js pins the head; nothing about skins changed.
 // ============================================================================
 
 const { test, describe } = require('node:test');

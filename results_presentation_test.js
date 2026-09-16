@@ -178,7 +178,11 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         const b = boot({ confirmed: false });
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), false);
         const t = strip(b.summary());
-        assert.match(t, /LIVE RESULTS/);
+        // Re-pinned 2026-09-15 (the Receipt predicate, v149): every card on this
+        // round is in, so the head no longer says the round is still in play; the
+        // KP-only hold has its own head (receipt_final_test.js pins the sentence).
+        assert.match(t, /RESULTS — NOT FINAL/);
+        assert.match(t, /Every card is in\. KP results are still unconfirmed/);
         assert.ok(!/Final Results/.test(t), 'money with $100 hanging is not final');
         assert.ok(!/Player Payouts/.test(t), 'and no payout document while it hangs');
     });
@@ -186,7 +190,7 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
     test('confirming moves the page from LIVE to FINAL', () => {
         const open = strip(boot({ confirmed: false }).summary());
         const done = strip(boot({ confirmed: true }).summary());
-        assert.match(open, /LIVE RESULTS/);
+        assert.match(open, /RESULTS — NOT FINAL/);   // re-pinned 2026-09-15, v149 (see above)
         assert.match(done, /Final Results/);
         assert.match(done, /Player Payouts/, 'the receipt returns once the money settles');
     });
@@ -199,12 +203,18 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
     });
 
     test('the heading READS the canonical state, it does not recompute it', () => {
+        // Re-pinned 2026-09-15 (the Receipt predicate, v149): the heading no
+        // longer asks pool-engine itself - the "⏳ Results — Not Final" branch
+        // that did was unreachable (the gate had already passed the same
+        // question) and is gone. The heading is a literal behind the gate, and
+        // the gate reads settlement-engine.js computeRoundSettlement.
         const src = read(PAGE);
         const at = src.indexOf('FINAL" IS A CLAIM');
         assert.notEqual(at, -1, 'the reasoning must stay with the code');
         const block = src.slice(at, at + 900);
-        assert.match(block, /rs\.settled === false/);
-        ['kpUnresolvedCents >','kpWinners','kpConfirmed &&']
+        assert.match(block, /never be chosen/);
+        assert.match(block, /🏁 Final Results/);
+        ['kpUnresolvedCents >','kpWinners','kpConfirmed &&','computeMoneyPool(','.settled === false']
             .forEach(t => assert.ok(!block.includes(t), `must not re-derive settlement; found ${t}`));
     });
 });

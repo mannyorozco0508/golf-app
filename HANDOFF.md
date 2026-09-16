@@ -937,11 +937,19 @@ a picked-up ball or a golfer who left after nine is declared deliberate),
 `kpSettled` (pool-engine's `settled`, read not re-derived), `unfinished`
 (who is still out, with holes played), `started`, `thru`. `trip.html` reads it
 (`trip_money_final_test.js`); a round scored thru 9 is named on the trip as
-still in play, its money counted, the heading not "Final". **`settlement.html`
-still decides "Final" from `computeMoneyPool().settled` alone**, so a Receipt
-opened thru 9 says Final over a match that is not over. Its own paste: have it
-read `computeRoundSettlement`, same wording shape as the trip, prove the
-verified-thru-9 case says Final and the unverified one does not.
+still in play, its money counted, the heading not "Final". **DONE the same
+day — `settlement.html` reads it too** (`receiptSettlement()`,
+`receipt_final_test.js`). The earlier version of this note said the Receipt
+"decided Final from `computeMoneyPool().settled` alone, so a Receipt opened
+thru 9 said Final" — that was FALSE, and measured false before the wave: the
+Receipt already required every roster card complete AND the pool settled, and
+short-circuited into LIVE RESULTS (a no-money golf summary,
+`live_results_test.js`) otherwise. What actually differed: it never read
+`scoresVerified` and waited for roster names that never played, so a round
+with a DNF card had no route to a Final receipt. Now the live head names who
+is out, a KP-only hold has its own head ("RESULTS — NOT FINAL"), the six
+per-game headings drop "Final" while the round is not final, and the live
+branch still carries no money — Manny's decision, kept.
   - **What "every golfer playing" means, measured.** A roster name with no score
     never teed off and is not waited for (`playing` counts `holesPlayed > 0`).
     A blank hole in the middle (`p104_h12` deleted) is `unfinished` 17/18 —

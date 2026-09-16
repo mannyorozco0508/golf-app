@@ -524,6 +524,20 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v149: the Receipt reads the same predicate as the trip.
+//
+// settlement.html (precached). The live/final gate now asks settlement-engine
+// .js computeRoundSettlement (v148's predicate) instead of its own two
+// questions, so a round the organizer verified with a picked-up ball or a
+// golfer who left after nine renders a FINAL receipt for the first time, and a
+// roster name that never teed off is not waited for. The live head names who
+// is still out ("Still in play — thru 9, 1 golfer still has holes left: Dee D
+// (9 of 18)"), a KP-only hold reads "RESULTS — NOT FINAL" instead of blaming
+// golfers whose cards are all in, and the six per-game headings drop "Final"
+// while the round is not final. No money moved into the live branch. An
+// installed device on v148 keeps a Receipt that can never finish a DNF round
+// and prints "Final Skins Settlement" under "still in play".
+
 // Moved to v148: the trip tells the truth about what is final.
 //
 // trip.html (precached) and settlement-engine.js (precached). The trip money
@@ -1449,7 +1463,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v148-trip-final-truth';
+const CACHE_VERSION = 'golfapp-v149-receipt-predicate';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

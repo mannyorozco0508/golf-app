@@ -97,7 +97,9 @@ describe('THE BULLSEYE WAS REPLACED SEMANTICALLY, NOT SWEPT', () => {
 
     test('Stableford is ⭐ everywhere it appears', () => {
         assert.match(ADMIN, /\u2b50 Stableford Points/u, 'setup label');
-        assert.match(SETTLE, /\u2b50 Final Stableford Settlement/u, 'settlement');
+        // Re-pinned 2026-09-15 (v149): the heading's Final word is decided at render
+        // (settleHeading), so the source carries the base label after the icon.
+        assert.match(SETTLE, /\u2b50 \$\{settleHeading\('Stableford Settlement'/u, 'settlement');
         assert.match(STATS, /\u2b50 Round Settlement \(Stableford\)/u, 'stats');
         assert.match(read('instructions.html'), /\u2b50 Net Stableford/u, 'instructions');
     });
@@ -111,7 +113,7 @@ describe('THE BULLSEYE WAS REPLACED SEMANTICALLY, NOT SWEPT', () => {
     });
 
     test('Dots settlement is 🔘 — it reads as a dot', () => {
-        assert.match(SETTLE, /\u{1F518} Final Dot Game Settlement/u);
+        assert.match(SETTLE, /\u{1F518} \$\{settleHeading\('Dot Game Settlement'/u);   // re-pinned 2026-09-15, v149
         assert.match(STATS, /\u{1F518} Round Settlement \(Dots\)/u);
     });
 
@@ -382,7 +384,7 @@ describe('TIER 2 — THE PERSONALITY WAS NOT STERILISED', () => {
 
     test('Hi-Lo says high/low instead of wearing a card suit', () => {
         assert.match(IDX, /\u2195\ufe0f HI-LO \(LOW BALL \/ HIGH BALL\)/u);
-        assert.match(SETTLE, /\u2195\ufe0f Final Hi-Lo Settlement/u);
+        assert.match(SETTLE, /\u2195\ufe0f \$\{settleHeading\('Hi-Lo Settlement'/u);   // re-pinned 2026-09-15, v149
     });
 
     test('head-to-head is ⚔️ everywhere', () => {

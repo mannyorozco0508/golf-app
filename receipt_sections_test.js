@@ -67,10 +67,20 @@ const VARIANTS = { off: () => build(undefined), field: () => build({ enabled: tr
 // net rows; weekly_game_test.js proves that is the whole difference. liveResults
 // untouched. The v136 receiptPool shas were off/field 6c4d1a6a8e2fc768e2c4ab7061e8dd4a64e58fcfc171c91f4a1dae3391ac36fe,
 // flight 1276c8f4467a1937c39574a88b602b692ed0b40cb3511a2e0ac6289a4adaab3c.
+// RE-PINNED 2026-09-15 (the Receipt predicate, v149): liveResults moved in all
+// three variants and receiptPool did not. The round is thru 18 with KPs
+// unconfirmed, so the live head "LIVE RESULTS — THRU 18 / The round is still
+// in play. Final money appears once every card is in." became "RESULTS — NOT
+// FINAL / Every card is in. KP results are still unconfirmed — final money
+// appears once they are confirmed or cancelled." (receipt_final_test.js). The
+// text is identical from char 96 on. The v148 liveResults shas were off
+// c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff, field
+// b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311, flight
+// 4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0.
 const PREV_TEXT = {
-    off:    { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff' },
-    field:  { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311' },
-    flight: { receiptPool: 'abc0fa8b98345cd26429fcf1611091196986149285fe42e0277191960701c6c3', liveResults: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' }
+    off:    { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: '83ef04da18864a3ae4181eb52045cdd278f319fbcba9598611c70e72bc457cde' },
+    field:  { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: 'c04d25b657b54f849ba0485ade3d88056a7631bf111e0a4a0ce91e6d780092f2' },
+    flight: { receiptPool: 'abc0fa8b98345cd26429fcf1611091196986149285fe42e0277191960701c6c3', liveResults: '2869f502b7658f73078158f2d35b04d92817a74138982c6e364a69c77b1d434f' }
 };
 function render(data) {
     const st = loadHtmlInlineScript('settlement.html');

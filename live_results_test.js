@@ -95,10 +95,14 @@ describe('LIVE MODE — A GOLF SUMMARY', () => {
         assert.match(results({ thru:[6,6,4] }).text(), /THRU 4/, 'the slowest group sets it');
     });
 
-    test('a round with every score in but KP unresolved is STILL live', () => {
+    test('a round with every score in but KP unresolved is STILL not final', () => {
         // settled === false, so the money is not final even though the golf is done.
+        // Re-pinned 2026-09-15 (v149): the head for this hold is RESULTS — NOT
+        // FINAL - "still in play" blamed golfers whose cards were all in. Still
+        // the live branch: no money, no receipt (receipt_final_test.js).
         const t = results({ thru:[18,18,18], confirmed:false }).text();
-        assert.match(t, /LIVE RESULTS/);
+        assert.match(t, /RESULTS — NOT FINAL/);
+        assert.ok(!/Final Results|Player Payouts/.test(t));
     });
 
     test('a round with holes missing is live even when settled === true', () => {
@@ -119,7 +123,12 @@ describe('LIVE STANDINGS — NET TO PAR', () => {
         const t = results(LIVE).text();
         assert.match(t, /OVERALL — NET/);
         assert.match(t, /1 Carp -2/);
-        const shown = NAMES.filter(n => t.includes(n));
+        // Re-pinned 2026-09-15 (the Receipt predicate, v149): the live head now
+        // names the golfers still out (up to six), so the count is taken on the
+        // STANDINGS block alone - the head is receipt_final_test.js's to pin.
+        const standings = t.slice(t.indexOf('OVERALL — NET'), t.indexOf('View Full Leaderboard'));
+        assert.ok(standings.length > 20, 'the standings block was sliced');
+        const shown = NAMES.filter(n => standings.includes(n));
         assert.ok(shown.length <= 6, 'a summary, not the whole field');
     });
 
@@ -334,21 +343,25 @@ describe('NO DUPLICATE MATH', () => {
             .forEach(t => assert.ok(!f.includes(t), `live Results must not calculate; found ${t}`));
     });
 
-    test('completion uses the existing per-golfer helper', () => {
+    // Re-pinned 2026-09-15 (the Receipt predicate, v149): the page's own two
+    // questions - roundScoresComplete() and moneyIsSettled() - are gone. Both
+    // are asked of settlement-engine.js computeRoundSettlement, the predicate
+    // the trip reads (receipt_final_test.js). What these two rows guarded still
+    // holds one layer down: completion comes from computePlayerRoundTotals and
+    // finality from pool-engine's `settled`, inside the engine's function.
+    test('completion and finality come from the engine\'s one predicate, not a page-local rule', () => {
         const src = read('settlement.html');
-        const at = src.indexOf('function roundScoresComplete');
-        const f = src.slice(at, src.indexOf('\n    function moneyIsSettled', at));
-        assert.match(f, /computePlayerRoundTotals\(p, holes, savedScores\)\.complete === true/);
-        assert.match(f, /players\.every/, 'every participant, not a sample');
-    });
-
-    test('finality reads pool-engine, it does not re-derive it', () => {
-        const src = read('settlement.html');
-        const at = src.indexOf('function moneyIsSettled');
-        const f = src.slice(at, src.indexOf('\n    function renderCombinedSummary', at));
-        assert.match(f, /r\.settled === false/);
+        const at = src.indexOf('function receiptSettlement');
+        const f = src.slice(at, src.indexOf('\n    function settleHeading', at));
+        assert.match(f, /return computeRoundSettlement\(data, courseData \|\| \[\], savedScores \|\| \{\}\);/);
+        assert.ok(!/function roundScoresComplete|function moneyIsSettled/.test(src), 'the page-local predicates are gone');
+        const eng = read('settlement-engine.js');
+        const eAt = eng.indexOf('function computeRoundSettlement');
+        const ef = eng.slice(eAt, eng.indexOf('\n    }\n', eAt));
+        assert.match(ef, /computePlayerRoundTotals\(p, holes, scores\)/);
+        assert.match(ef, /rp\.settled === false/);
         ['kpWinners','kpConfirmed &&','kpUnresolvedCents >']
-            .forEach(t => assert.ok(!f.includes(t), `must not re-derive settlement; found ${t}`));
+            .forEach(t => assert.ok(!ef.includes(t), `must not re-derive settlement; found ${t}`));
     });
 
     test('no engine learned about this split', () => {

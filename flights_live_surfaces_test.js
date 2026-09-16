@@ -254,7 +254,11 @@ describe('settlement.html - LIVE RESULTS and SKINS WON per flight; the pool stay
         const html = live(GOLD);
         assert.match(html, /OVERALL \u2014 NET/);
         assert.ok(!/FLIGHT [AB]/.test(html));
-        assert.ok(html.indexOf('Eli') < html.indexOf('Cal'), 'Eli leads net');
+        // Re-pinned 2026-09-15 (v149): the live head now lists golfers still out in
+        // roster order, so the order is read in the standings block alone.
+        const standings = html.slice(html.indexOf('OVERALL \u2014 NET'), html.indexOf('View Full Leaderboard'));
+        assert.ok(standings.length > 20, 'the standings block was sliced');
+        assert.ok(standings.indexOf('Eli') < standings.indexOf('Cal'), 'Eli leads net');
         assert.equal((html.match(/SKINS WON/g) || []).length, 1);
     });
     test('a flight of ZERO: B says nobody, A ranks its four', () => {

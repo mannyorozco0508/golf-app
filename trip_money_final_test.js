@@ -339,8 +339,9 @@ describe('THE SEAMS', () => {
         assert.match(fn, /roundNetTotalsToWholeDollars\(onceByName, -unresolvedDollars\)/);
         assert.match(fn, /onceList\.forEach\(v => \{ netTotals\[v\.name\] = v\.net; \}\);/, 'Who Pays Who runs from the settle-once total');
     });
-    test('the Receipt is untouched by this wave (it decides Final on its own until its own paste)', () => {
-        assert.ok(!/computeRoundSettlement/.test(read('settlement.html')));
-        assert.ok(/computeRoundSettlement/.test(read('HANDOFF.md')), 'HANDOFF names the predicate the Receipt should read');
+    test('the Receipt reads the same predicate now (its own paste, the same day - receipt_final_test.js)', () => {
+        // v148 pinned the Receipt as untouched; v149 wired it. Both read the engine.
+        assert.match(read('settlement.html'), /return computeRoundSettlement\(data, courseData \|\| \[\], savedScores \|\| \{\}\);/);
+        assert.ok(/computeRoundSettlement/.test(read('HANDOFF.md')), 'HANDOFF names the predicate');
     });
 });

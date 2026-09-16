@@ -1571,8 +1571,9 @@ html {
         return Math.floor(idx / 4) + 1;
     }
 
-    function buildLiveResultsHtml(data, courseData, savedScores) {
+    function buildLiveResultsHtml(data, courseData, savedScores, settlement) {
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const st = settlement || receiptSettlement(data, courseData, savedScores);
 
         // PER FLIGHT (Wave 2). The ledger's `flights` - one entry when the round is
         // not flighted - never its top level, which is null when it is. Each entry
@@ -1610,9 +1611,40 @@ html {
             thru = played.length ? Math.min.apply(null, played) : 0;
         }
 
+        // THE HEAD SAYS WHAT IS HOLDING THE ROUND OPEN, AND WHO. Three shapes:
+        //   golfers still out   "Still in play — thru 9, 1 golfer still has holes
+        //                       left: Dee D (9 of 18)." - up to six names, then
+        //                       "+ N more"; the trip's sentence and plural rule.
+        //   KP-only hold        every card is in, so "still in play" would blame
+        //                       golfers who have finished; the head says RESULTS —
+        //                       NOT FINAL and names the KPs.
+        //   not started         today's head, unchanged.
+        // Money stays OUT of this branch by design (see the block comment above):
+        // this names the hold, it does not price it.
+        const out = st.unfinished || [];
+        const holdGolfers = st.started && out.length > 0;
+        const holdKp = st.finished && !st.kpSettled;
+        let head, note;
+        if (holdGolfers) {
+            const names = out.slice(0, 6).map(u => esc(u.name) + ' (' + u.holesPlayed + ' of ' + u.holesRequired + ')').join(', ')
+                + (out.length > 6 ? ' + ' + (out.length - 6) + ' more' : '');
+            head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
+            note = 'Still in play' + (thru > 0 ? ' \u2014 thru ' + thru : '') + ', ' + out.length + ' golfer' + (out.length === 1 ? '' : 's')
+                + ' still ' + (out.length === 1 ? 'has' : 'have') + ' holes left: ' + names + '.'
+                + (!st.kpSettled ? ' KP results are still unconfirmed.' : '')
+                + (!st.kpSettled
+                    ? ' Final money appears once every card is in and the KPs are confirmed.'
+                    : ' Final money appears once every card is in, or once the scores are confirmed in Finish Round.');
+        } else if (holdKp) {
+            head = '\uD83C\uDFC6 RESULTS \u2014 NOT FINAL';
+            note = 'Every card is in. KP results are still unconfirmed \u2014 final money appears once they are confirmed or cancelled.';
+        } else {
+            head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
+            note = 'The round is still in play. Final money appears once every card is in.';
+        }
         let html = '<div class="settle-card live-head">'
-            + '<div class="settle-header">\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '') + '</div>'
-            + '<div class="live-note">The round is still in play. Final money appears once every card is in.</div>'
+            + '<div class="settle-header">' + head + '</div>'
+            + '<div class="live-note">' + note + '</div>'
             + '</div>';
 
         if (typeof computeNetToParStandings === 'function') {
@@ -1694,39 +1726,46 @@ html {
 
     // ---- IS THE ROUND ACTUALLY OVER? ----------------------------------------
     //
-    // TWO SEPARATE QUESTIONS, and Results needs both:
+    // ONE PREDICATE FOR THE WHOLE APP - computeRoundSettlement() in
+    // settlement-engine.js, the same one the trip reads (2026-09-15). It answers
+    // both questions the Receipt needs:
     //
-    //   scores complete  every participant has posted every hole.
-    //                    computePlayerRoundTotals() already answers this per golfer -
-    //                    the canonical helper from the Finish Round work - so this
-    //                    only asks it of everybody rather than inventing a new rule.
+    //   finished   every golfer who TEED OFF has every hole scored - OR the
+    //              organizer verified the round in Finish Round ("Scores Look
+    //              Right" writes scoresVerified). That is how a picked-up ball or
+    //              a golfer who left after nine gets declared deliberate: the app
+    //              cannot tell "picked up on 12" from "not there yet", so an
+    //              unverified blank keeps the round live, and verification is the
+    //              word that finishes it. A roster name with no score never teed
+    //              off and is not waited for.
+    //   kpSettled  pool-engine's `settled` - unresolved KP money confirmed or
+    //              cancelled - read, not re-derived.
     //
-    //   money settled    pool-engine's `settled`, which means unresolved KP money has
-    //                    been confirmed or cancelled.
+    // FINAL requires both. Before this the page asked its own two questions -
+    // every ROSTER golfer complete, and the pool settled - and never read
+    // scoresVerified, so a round with a DNF card stayed LIVE forever: there was
+    // no way to a Final receipt for a golfer who left after nine except typing
+    // scores that were not made. The trip meanwhile called that round finished.
+    // Now both surfaces ask the engine.
     //
-    // FINAL requires both. `settled` alone is not enough: a round five holes in with
-    // no KP money reports settled === true, and on that basis the page used to render
-    // the entire settlement document while the group was still on the front nine.
-    //
-    // A DNF/incomplete card keeps the round live until somebody resolves it through
-    // the Finish Round review - which is exactly the workflow built for that.
-    function roundScoresComplete(data, courseData, savedScores) {
-        const players = data.players || [];
-        const holes = courseData || [];
-        if (players.length === 0 || holes.length === 0) return false;
-        if (typeof computePlayerRoundTotals !== 'function') return false;
-        return players.every(p => {
-            try { return computePlayerRoundTotals(p, holes, savedScores).complete === true; }
-            catch (e) { return false; }
-        });
+    // The whole answer is kept, not just the flag: the live head names who is
+    // still out from `unfinished`, and says which hold is open.
+    function receiptSettlement(data, courseData, savedScores) {
+        if (typeof computeRoundSettlement !== 'function') {
+            // No engine, no claim: never call a round final on a page that cannot ask.
+            return { settled: false, finished: false, started: false, kpSettled: true, unfinished: [], playing: 0, thru: 0, holesRequired: (courseData || []).length };
+        }
+        try { return computeRoundSettlement(data, courseData || [], savedScores || {}); }
+        catch (e) { return { settled: false, finished: false, started: false, kpSettled: true, unfinished: [], playing: 0, thru: 0, holesRequired: (courseData || []).length }; }
     }
 
-    function moneyIsSettled(data, courseData, savedScores) {
-        if (typeof computeMoneyPool !== 'function') return true;
-        try {
-            const r = computeMoneyPool(data, courseData, savedScores);
-            return !(r && r.valid && r.settled === false);
-        } catch (e) { return true; }
+    // THE WORD ON A PER-GAME HEADING. "Final Skins Settlement (No Carry)" while
+    // the round is final - exactly as it always read - and "Skins Settlement —
+    // Not Final (No Carry)" while it is not. These cards render in BOTH modes
+    // (renderSettlement runs regardless of the live gate), and they used to say
+    // Final under a LIVE RESULTS head that said the round was still in play.
+    function settleHeading(base, suffix, final) {
+        return final ? 'Final ' + base + (suffix || '') : base + ' \u2014 Not Final' + (suffix || '');
     }
 
     function renderCombinedSummary(data, courseData, savedScores) {
@@ -1739,15 +1778,15 @@ html {
         // golfer wants to know who is leading, who has won a skin and what is still
         // outstanding - not a $480 accounting statement with pending-dollar rows for
         // holes nobody has played. Results earns its receipt when the round is over.
-        if (!roundScoresComplete(data, courseData, savedScores)
-            || !moneyIsSettled(data, courseData, savedScores)) {
+        const settlement = receiptSettlement(data, courseData, savedScores);
+        if (!settlement.settled) {
             // NO PRINT BUTTON WHILE THE ROUND IS LIVE. The Receipt belongs to the
             // finished round (live_results_test: "Print / Save" is absent while
             // live); the copy that used to sit at the very bottom of
             // #settle-content on every branch - 2,300 px down on a flighted pool
             // round - is gone (2026-09-14), so the settled branch's button at the
             // top of the receipt is the one and only.
-            container.innerHTML = buildLiveResultsHtml(data, courseData, savedScores);
+            container.innerHTML = buildLiveResultsHtml(data, courseData, savedScores, settlement);
             return;
         }
 
@@ -1817,20 +1856,14 @@ html {
         // different documents. There is only one, and this is it.
         html += `<button class="btn-primary" style="margin-bottom:12px;" onclick="printReceipt()">\uD83D\uDCC4 Print / Save Receipt</button>`;
 
+        // "FINAL" IS A CLAIM AND IT HAS TO BE EARNED - and it was earned at the
+        // gate above: this branch renders only when receiptSettlement() said
+        // settled. A "⏳ Results — Not Final" alternative used to sit here, re-asking
+        // computeMoneyPool with the same inputs the gate had already passed; it could
+        // never be chosen, and it was removed (2026-09-15) so nobody reads it as a
+        // second guard. The one guard is the gate.
         html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
-            <div class="settle-header">${(function () {
-                // "FINAL" IS A CLAIM AND IT HAS TO BE EARNED. A round with unresolved
-                // KP money is not settled - Wave B made that a canonical fact rather
-                // than a guess, so this reads it instead of re-deriving it. Nothing
-                // here decides anything about money; it decides one word.
-                try {
-                    if (typeof computeMoneyPool === 'function') {
-                        const rs = computeMoneyPool(data, courseData, savedScores);
-                        if (rs && rs.valid && rs.settled === false) return '⏳ Results — Not Final';
-                    }
-                } catch (e) { /* fall through to Final */ }
-                return '🏁 Final Results';
-            })()}</div>`;
+            <div class="settle-header">🏁 Final Results</div>`;
         sorted.forEach(t => {
             html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`;
         });
@@ -1891,6 +1924,9 @@ html {
         // everyone still scores normally regardless of this flag (team formats never show
         // this checkbox, so it's a no-op there and full teams stay intact).
         const moneyPlayers = players.filter(p => p.playingForMoney !== false);
+        // ONE WORD, DECIDED ONCE, for every heading below: the engine's predicate,
+        // the same answer the gate above and the trip read.
+        const isFinal = receiptSettlement(data, courseData, savedScores).settled;
 
         if (gameFormat === 'skins') {
             const skinsNet = computeSkinsSettlementNet(data, courseData, savedScores);
@@ -1908,7 +1944,7 @@ html {
             });
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">🥩 Final Skins Settlement (${carryOver ? 'Carry Over' : 'No Carry'})</div>
+                    <div class="settle-header">🥩 ${settleHeading('Skins Settlement', ` (${carryOver ? 'Carry Over' : 'No Carry'})`, isFinal)}</div>
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
@@ -1927,7 +1963,7 @@ html {
             const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">↕️ Final Hi-Lo Settlement</div>
+                    <div class="settle-header">↕️ ${settleHeading('Hi-Lo Settlement', '', isFinal)}</div>
                     ${pointsLine}
                     ${ledgerHtml}
                 </div>
@@ -1958,7 +1994,7 @@ html {
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">🐺 Final Wolf Settlement</div>
+                    <div class="settle-header">🐺 ${settleHeading('Wolf Settlement', '', isFinal)}</div>
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
@@ -1984,7 +2020,7 @@ html {
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">⭐ Final Stableford Settlement</div>
+                    <div class="settle-header">⭐ ${settleHeading('Stableford Settlement', '', isFinal)}</div>
                     ${ledgerHtml}
                 </div>
                 ${buildSideGamesHtml(data, courseData, savedScores)}
@@ -2010,7 +2046,7 @@ html {
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">🔘 Final Dot Game Settlement</div>
+                    <div class="settle-header">🔘 ${settleHeading('Dot Game Settlement', '', isFinal)}</div>
                     ${ledgerHtml}
                     ${unclaimedKpNoteHtml(data, courseData, savedScores)}
                 </div>
@@ -2082,7 +2118,7 @@ html {
             } else {
                 container.innerHTML = `
                     <div class="settle-card">
-                        <div class="settle-header">Final Ledger</div>
+                        <div class="settle-header">${settleHeading('Ledger', '', isFinal)}</div>
                         <div style="text-align: center; color: var(--text-muted); padding: 10px;">No money bets were set up for this round.</div>
                     </div>
                 `;
@@ -2100,7 +2136,7 @@ html {
             if (!pressSet) {
                 container.innerHTML = `
                     <div class="settle-card">
-                        <div class="settle-header">Final Ledger</div>
+                        <div class="settle-header">${settleHeading('Ledger', '', isFinal)}</div>
                         <div style="text-align: center; color: #555; padding: 10px;">Stroke Play 1v1 requires exactly 2 players.</div>
                     </div>
                     ${sideHtml}
@@ -2122,7 +2158,7 @@ html {
 
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">Final Ledger — 1v1 (Stroke Play)</div>
+                    <div class="settle-header">${settleHeading('Ledger', ' — 1v1 (Stroke Play)', isFinal)}</div>
                     <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${calc.p1.name} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${calc.p2.name} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
                     ${!calc.roundComplete ? `<div class="breakdown-item"><span style="color:#888;">Not yet final — thru ${calc.holesCompleted} of ${calc.totalHoles}.</span></div>` : ''}
                     ${pressBreakdownHtml}
@@ -2138,7 +2174,7 @@ html {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">Final Ledger</div>
+                    <div class="settle-header">${settleHeading('Ledger', '', isFinal)}</div>
                     <div style="text-align: center; color: #555; padding: 10px;">Settlement calculations are currently built for Match Play, Nassau, Dot, Wolf, and Stableford formats.</div>
                 </div>
                 ${sideHtml}
@@ -2159,7 +2195,7 @@ html {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
             container.innerHTML = `
                 <div class="settle-card">
-                    <div class="settle-header">Final Ledger</div>
+                    <div class="settle-header">${settleHeading('Ledger', '', isFinal)}</div>
                     <div style="text-align: center; color: #555; padding: 10px;">Waiting for players and scores to be entered...</div>
                 </div>
                 ${sideHtml}
