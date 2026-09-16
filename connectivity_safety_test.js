@@ -63,6 +63,9 @@ const MONEY_WRITE_SITES = [
     { file: 'skins.html', fn: 'saveBirdieConfig', anchor: 'birdieUnitVal: unitVal', what: 'dollars per birdie' },
     { file: 'skins.html', fn: 'saveSkinsConfig', anchor: 'skinsPotFormat: potFormat', what: 'skins pot format and buy-in' },
     { file: 'skins.html', fn: 'setSkinsCarryOver', anchor: 'skinsCarryOver`).set(val)', what: 'skins carry rule' },
+    // Not money, but the same failure: a registration queued on one bar is a golfer
+    // who thinks he is signed up. Guarded by requireOnlineForSignup (Wave 2b).
+    { file: 'tournament.html', fn: 'submitRegistration', anchor: 'registrations/${registerCode}/${entryId}`).set(payload)', what: 'the public signup', guard: 'requireOnlineForSignup' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -70,13 +73,17 @@ const MONEY_WRITE_SITES = [
 describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while offline', () => {
 
     test('every money page defines the guard, and defines it without depending on any other file', () => {
-        ['index.html', 'sidematches.html', 'skins.html'].forEach((f) => {
+        // Wave 2b (2026-09-16): tournament.html carries the same six lines as
+        // requireOnlineForSignup - a signup on one bar at a golf course is the
+        // normal condition, and the SDK queues a write it cannot send. Not money,
+        // so its own name; the same body, the same rule.
+        [['index.html', 'requireOnlineForMoney'], ['sidematches.html', 'requireOnlineForMoney'], ['skins.html', 'requireOnlineForMoney'], ['tournament.html', 'requireOnlineForSignup']].forEach(([f, fn]) => {
             const js = inlineJs(f);
-            assert.match(js, /function requireOnlineForMoney\(/, `${f} has no requireOnlineForMoney().`);
+            assert.match(js, new RegExp('function ' + fn + '\\('), `${f} has no ${fn}().`);
             // The guard must test navigator.onLine directly. Routing it through
             // window.GolfNet would mean a failed pwa-boot.js load silently
             // removes the money check.
-            const body = js.slice(js.indexOf('function requireOnlineForMoney('));
+            const body = js.slice(js.indexOf('function ' + fn + '('));
             const end = body.indexOf('\n    }');
             const fnBody = body.slice(0, end);
             assert.match(fnBody, /navigator\.onLine === false/, `${f}'s guard must read navigator.onLine directly.`);
@@ -100,7 +107,7 @@ describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while o
             const fnStart = js.lastIndexOf('function ', at);
             assert.notEqual(fnStart, -1, `Could not find the function enclosing the ${site.what} write.`);
             const before = js.slice(fnStart, at);
-            assert.match(before, /requireOnlineForMoney\(/, `${site.what} (${site.file}) is not guarded inside its own function. Offline this write buffers silently, produces neither a success nor a failure alert, and is lost on the next reload.`);
+            assert.match(before, new RegExp((site.guard || 'requireOnlineForMoney') + '\\('), `${site.what} (${site.file}) is not guarded inside its own function. Offline this write buffers silently, produces neither a success nor a failure alert, and is lost on the next reload.`);
         });
     });
 

@@ -32,8 +32,11 @@ const owned = {
     activeCourseKey: 'tidewater', courseData: course, entryFee: 0, teams,
     createdAt: 1, ownerUid: 'u-org', courseIndexSynthetic: false
 };
+// Wave 2b: a second owned event with switches set - shirt size OFF, hole
+// sponsorship ON - to measure that a switch moves the boxes on a real screen.
+const switched = Object.assign({}, owned, { name: 'Switched Scramble', registrationFields: { shirtSize: false, holeSponsorship: true } });
 const db = {
-    tournaments: { OWNED1: owned },
+    tournaments: { OWNED1: owned, SWITCH1: switched },
     registrations: {
         OWNED1: {
             // Wave 2a shape: the three required fields, the optionals the desk lists.
@@ -78,6 +81,8 @@ const OWNER_PROBE = `
     setupVisible: visible('#tab-btn-setup'),
     sectionVisible: visible('#registration-section'),
     listVisible: visible('#registration-list'),
+    switchesVisible: visible('#reg-field-shirtSize') && visible('#reg-field-holeSponsorship'),
+    switchesText: ((document.querySelector('.reg-fields') || {}).innerText || ''),
     section: section,
     manage: manage,
     lockWords: (manage.match(/\\b(Protected|Secure|Locked|Private)\\b/g) || [])
@@ -114,6 +119,7 @@ async function look(query, probe, auth) {
     };
     const pub = await look('register=OWNED1', PUBLIC_PROBE, 'anonymous');
     const owner = await look('tourney=OWNED1', OWNER_PROBE, { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
+    const switched = await look('register=SWITCH1', PUBLIC_PROBE, 'anonymous');
     const visitor = await look('tourney=OWNED1', PUBLIC_SIGNEDOUT_PROBE, 'signed-out');
     if (!pub.ran) bail('the public signup did not run: ' + pub.reason);
     if (!owner.ran) bail('the organizer list did not run: ' + owner.reason);
@@ -139,6 +145,13 @@ async function look(query, probe, auth) {
     if (pub.lockWords && pub.lockWords.length) failures.push('public: lock words on screen: ' + JSON.stringify(pub.lockWords));
 
     if (!owner.setupVisible) failures.push('organizer: Setup tab has no rect');
+    // Wave 2b: the switches are on the desk, and a switch moves the public form.
+    if (!owner.switchesVisible) failures.push('organizer: the "Ask golfers for" switches have no rect');
+    if (!/Ask golfers for/.test(owner.switchesText || '')) failures.push('organizer: the switches row is not in innerText');
+    if (!switched.ran) bail('the switched signup did not run: ' + switched.reason);
+    if (switched.shirtVisible) failures.push('switched: shirt size is OFF on this event and still has a rect');
+    if (!switched.sponsorVisible) failures.push('switched: hole sponsorship is ON on this event and has no rect');
+    if (!switched.dinnerVisible) failures.push('switched: dinner guests (default ON) lost its rect');
     if (!owner.sectionVisible) failures.push('organizer: the registration section has no rect');
     if (!/Fay Foxtrot/.test(owner.section)) failures.push('organizer: the registrant is not in innerText of the list');
     if (!/fay@example\.com/.test(owner.section) || !/555-0100/.test(owner.section)) failures.push('organizer: email and phone are not on the desk');

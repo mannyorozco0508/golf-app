@@ -494,6 +494,56 @@ a time.
 `tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
 (rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
 
+## Tournament registration Wave 2b — SILENCE IS THE FAILURE, AND THE SWITCHES
+
+Registration happens on phones at a golf course on one bar of cell data, and the
+compat SDK does not reject a `set()` it cannot send — it queues it and the promise
+never settles. A golfer tapped Sign up and saw nothing. Three things close that
+(`tournament_registration_2b_test.js`, 2026-09-16):
+
+- **`requireOnlineForSignup`** — the repo's six-line guard copied onto
+  `tournament.html`, exactly as `connectivity_safety_test.js` demands (reads
+  `navigator.onLine` directly, mentions no `GolfNet`; this page loads no
+  `pwa-boot.js` at all). Airplane mode / radio off: the tap alerts "SIGN-UP NOT
+  SENT … nothing was saved" and writes nothing. Its limit: one dead bar reads as
+  online. Hence the next two.
+- **The Firebase refusal is a sentence in `#reg-status`**, red and persistent, with
+  the SDK code in small type beneath for the organizer — never the SDK string in an
+  alert. Alerts stay for the golfer's own blanks, which retyping fixes.
+- **The write races a 10-second timer** (`REG_SEND_TIMEOUT_MS`). Unsettled: the
+  status says "Still sending… if this doesn't confirm in a moment, check your signal
+  and tap Sign up again." and the button re-enables. The entry id is minted ONCE per
+  form fill (`regPendingId`) and reused on every retry, so a queued write that lands
+  later and a second tap write the SAME entry — one registration, never two; the id is
+  released only on a confirmed success (the control that mints a fresh id per tap
+  shows two entries). When the queued write finally settles, the status flips to the
+  truth — confirmed, or the refusal. **The limit, named:** a page that was CLOSED
+  cannot be flipped. A golfer who saw "Still sending", locked the phone and walked to
+  the first tee may be registered without a screen that says so. The organizer's desk
+  is the truth; it lists every entry that landed.
+
+**The switches.** `tournaments/<code>/registrationFields` — five booleans, absent =
+default: `ghinOrHandicap`, `shirtSize`, `dinnerCount`, `teamPreference` ON;
+`holeSponsorship` (with `sponsorName`) OFF. Set from "Ask golfers for:" on the
+Registration section of Setup, one key per tap. They govern the FORM only: a
+switched-off box is hidden (set in code, on arrival), therefore not written,
+therefore never required; the three requireds have no switch; team preference is
+also gated by "is a team event". No rules change — the rules type every key
+regardless. **The desk shows whatever an entry carries:** an answer given before a
+switch went off stays listed. A field can end up half-answered; "N of M gave a shirt
+size" is 2c's line. `tournaments/<code>` is open to any client by design (the
+Setup gate is a guardrail, not a boundary — see the sign-in section), so the switch
+write's boundary is the same as every other tournament field's.
+
+**The switch write has NO online guard — deliberately, not missed.** `setRegistrationField`
+writes a tournament setting, not money, and `connectivity_safety_test.js` treats the
+guard as a MONEY-PAGE property so it cannot be diluted into a general habit that
+eventually gets applied everywhere and read nowhere. An organizer at a desk is not a
+golfer on a tee box: a switch tapped offline queues like every other Setup field on
+that page and lands when the desk reconnects. Do not add the guard here later thinking
+it was overlooked; if a setting ever needs it, the reasoning above is what has to change
+first.
+
 ## Tournament registration Wave 1 — HOW TO OPEN IT
 
 Public signup (any golfer, no sign-in):

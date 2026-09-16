@@ -1540,7 +1540,14 @@
 // approve carries fullName. A device on v156 keeps the Wave 1 form, whose
 // { name } write the live rules now REFUSE - so the bump is what stops a
 // cached page from offering a signup that cannot land.
-const CACHE_VERSION = 'golfapp-v157-registration-schema';
+// Moved to v158: tournament registration Wave 2b - silence is the failure.
+// tournament.html: an offline tap says so and writes nothing; a refused
+// signup is a sentence in the status line, not an SDK alert; the write races a
+// 10-second timer with one entry id per form fill, so "Still sending" never
+// becomes two entries and a late acknowledgement flips to confirmed. The
+// organizer's "Ask golfers for" switches decide which optional boxes the
+// form shows. A device on v157 keeps the form that could go silent.
+const CACHE_VERSION = 'golfapp-v158-signup-never-silent';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

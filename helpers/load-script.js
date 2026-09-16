@@ -101,8 +101,13 @@ function makeStubSandbox() {
                 // A write is REFUSED when a test's sandbox.__dbRefuse(path, op, value)
                 // returns an error (the rules' PERMISSION_DENIED, for the Wave 3 gate
                 // and its wall); the attempt is still recorded, as the SDK would send it.
-                set(v) { writes.push({ path: p, op: 'set', value: v }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'set', v); return e ? Promise.reject(e) : Promise.resolve(); },
-                update(v) { writes.push({ path: p, op: 'update', value: v }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'update', v); return e ? Promise.reject(e) : Promise.resolve(); },
+                // A write is HELD when a test's sandbox.__dbHold(path, op, value) returns
+                // a promise: the SDK queues a write it cannot send (one bar, a captive
+                // portal) and its promise settles only when the server answers - or
+                // never. The test decides when, which is how the signup's timeout race
+                // (Wave 2b) is measured rather than waited for.
+                set(v) { writes.push({ path: p, op: 'set', value: v }); const h = sandbox.__dbHold && sandbox.__dbHold(p, 'set', v); if (h) return h; const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'set', v); return e ? Promise.reject(e) : Promise.resolve(); },
+                update(v) { writes.push({ path: p, op: 'update', value: v }); const h = sandbox.__dbHold && sandbox.__dbHold(p, 'update', v); if (h) return h; const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'update', v); return e ? Promise.reject(e) : Promise.resolve(); },
                 remove() { writes.push({ path: p, op: 'remove', value: null }); const e = sandbox.__dbRefuse && sandbox.__dbRefuse(p, 'remove', null); return e ? Promise.reject(e) : Promise.resolve(); },
                 push() { return ref; }
             };

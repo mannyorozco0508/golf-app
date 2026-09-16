@@ -94,6 +94,12 @@
         .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
         .lobby-title { font-size: 1.7rem; color: var(--brand-navy); text-align: center; margin-bottom: 10px; font-weight: bold; }
         .lobby-sub { color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 20px; line-height: 1.4; }
+        /* The signup status line (Wave 2b): green for a confirmation, red and
+           PERSISTENT for a failure the golfer did not cause - a sentence they can
+           read twice and act on, never a modal that vanishes on one tap. */
+        #reg-status.reg-status-error { color: var(--accent-red); }
+        #reg-status.reg-status-pending { color: var(--text-muted); }
+        #reg-status .reg-status-code { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
@@ -1487,12 +1493,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 closed.textContent = 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
                 return;
             }
-            // GHIN / handicap is asked on every event (2a; 2b's toggle can turn it
-            // off). Team preference only where there are teams to prefer.
-            document.getElementById('reg-team-wrap').style.display = eventIsIndividual(data) ? 'none' : 'block';
-            // Hole sponsorship is OFF until 2b's per-event toggle turns it on; set in
-            // code, not only in markup, so the default is the page's decision.
-            document.getElementById('reg-sponsor-wrap').style.display = 'none';
+            // THE ORGANIZER'S SWITCHES (Wave 2b) decide which optional boxes are
+            // shown - tournaments/<code>/registrationFields, absent = defaults. A
+            // hidden box is not written and so never required; the rules type every
+            // key regardless. Team preference is ALSO gated by "is a team event".
+            // Set in code, not only in markup, so the default is the page's decision.
+            applyRegistrationFields(data);
         }).catch(() => {
             const form = document.getElementById('reg-form');
             const closed = document.getElementById('reg-closed');
@@ -1554,22 +1560,123 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return { payload: payload };
     }
 
+    // ---- THE ORGANIZER'S SWITCHES (Wave 2b) -------------------------------
+    // Five booleans under tournaments/<code>/registrationFields; absent means
+    // the default. They govern the FORM only: whether a box is shown, and so
+    // whether its key is written. The three requireds have no switch. The desk
+    // shows whatever an entry carries - a switch turned off later hides no
+    // answer a golfer already gave.
+    const REG_FIELD_DEFAULTS = { ghinOrHandicap: true, shirtSize: true, dinnerCount: true, teamPreference: true, holeSponsorship: false };
+    const REG_FIELD_WRAPS = { ghinOrHandicap: 'reg-handicap-wrap', shirtSize: 'reg-shirt-wrap', dinnerCount: 'reg-dinner-wrap', teamPreference: 'reg-team-wrap', holeSponsorship: 'reg-sponsor-wrap' };
+    const REG_FIELD_LABELS = { ghinOrHandicap: 'GHIN or handicap', shirtSize: 'Shirt size', dinnerCount: 'Dinner guests', teamPreference: 'Team preference', holeSponsorship: 'Hole sponsorship (+ sponsor name)' };
+    function regFieldOn(record, key) {
+        const f = record && record.registrationFields;
+        return (f && typeof f[key] === 'boolean') ? f[key] : REG_FIELD_DEFAULTS[key];
+    }
+    function applyRegistrationFields(record) {
+        Object.keys(REG_FIELD_WRAPS).forEach((key) => {
+            const wrap = document.getElementById(REG_FIELD_WRAPS[key]);
+            if (!wrap) return;
+            let on = regFieldOn(record, key);
+            if (key === 'teamPreference' && eventIsIndividual(record)) on = false;   // nothing to prefer
+            wrap.style.display = on ? 'block' : 'none';
+        });
+    }
+    // The desk's tap: one key, one write. The page gate is canManage(); the
+    // boundary is the rules (tournaments/<code> is open by design - HANDOFF).
+    function setRegistrationField(key, on) {
+        if (!currentCode || !canManage() || !(key in REG_FIELD_DEFAULTS)) return;
+        db.ref(`tournaments/${currentCode}/registrationFields/${key}`).set(!!on)
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function registrationFieldsHtml() {
+        return `<div class="reg-fields" style="font-size:0.82rem; margin:6px 0 10px;"><span style="color:var(--text-muted);">Ask golfers for:</span> `
+            + Object.keys(REG_FIELD_DEFAULTS).map((key) =>
+                `<label style="display:inline-block; margin:4px 10px 0 0; white-space:nowrap;"><input type="checkbox" id="reg-field-${key}"${regFieldOn(currentData, key) ? ' checked' : ''} onchange="setRegistrationField('${key}', this.checked)"> ${REG_FIELD_LABELS[key]}</label>`
+            ).join('') + `</div>`;
+    }
+
+    // ---- THE OFFLINE GUARD, the repo's own six lines -----------------------
+    // The same body as requireOnlineForMoney on the money pages, copied here on
+    // purpose (connectivity_safety_test.js): it reads navigator.onLine directly
+    // and depends on no other file, so a script that fails to load cannot
+    // silently remove it. This page does not load pwa-boot.js at all.
+    function requireOnlineForSignup(title, line) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            return false;
+        }
+        return true;
+    }
+
+    // ---- THE SIGNUP, WITH SILENCE MADE IMPOSSIBLE (Wave 2b) -----------------
+    //
+    // The compat SDK does not reject a write it cannot send - it QUEUES it and
+    // the promise sits unsettled. On one bar of cell at a golf course that is
+    // the normal condition, and it left a golfer looking at nothing. So:
+    //   - the write races a timer. Unsettled at REG_SEND_TIMEOUT_MS -> the
+    //     status line says so and the button comes back;
+    //   - the entry id is minted ONCE per form fill (regPendingId) and reused
+    //     on every retry: a queued write that lands later and a second tap
+    //     write the SAME entry - one registration, never two. It is released
+    //     only on a confirmed success;
+    //   - when the queued write finally settles - however late - the status
+    //     flips to the truth: confirmed, or the refusal sentence. Only a page
+    //     that was closed cannot be flipped; HANDOFF names that limit.
+    // A Firebase REFUSAL (the page thought the payload was fine, the rules
+    // said no) is a sentence the golfer can act on, in the status line, with
+    // the SDK code in small type for the organizer. Alerts are kept for the
+    // golfer's own blanks, which retyping fixes.
+    const REG_SEND_TIMEOUT_MS = 10000;
+    const REG_REFUSAL = "Sign-up didn't go through. The organizer's list may have closed, or this page may be out of date - reload and try once more, or text the organizer your name, email and phone.";
+    const REG_STILL_SENDING = "Still sending... if this doesn't confirm in a moment, check your signal and tap Sign up again.";
+    let regPendingId = null;      // one entry id per form fill
+    let regAttempt = 0;           // which tap the latest write belongs to
+    function setRegistrationStatus(kind, text, code) {
+        const status = document.getElementById('reg-status');
+        if (!status) return;
+        status.className = kind === 'error' ? 'reg-status-error' : (kind === 'pending' ? 'reg-status-pending' : '');
+        status.innerHTML = escReg(text) + (code ? `<span class="reg-status-code">(${escReg(code)})</span>` : '');
+    }
+    function showRegistrationRefusal(err) {
+        const code = (err && (err.code || (err.message && String(err.message).split(':')[0]))) || 'unknown';
+        setRegistrationStatus('error', REG_REFUSAL, String(code));
+    }
     function submitRegistration() {
         if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
             alert('This event is not taking signups.');
             return;
         }
+        if (!requireOnlineForSignup('SIGN-UP NOT SENT', 'Reconnect and tap Sign up again - nothing was saved.')) return;
         const built = buildRegistrationPayload();
         if (built.error) { alert(built.error); return; }
-        const entryId = mintId('e');
+        if (!regPendingId) regPendingId = mintId('e');
+        const entryId = regPendingId;
         const payload = built.payload;
-        const status = document.getElementById('reg-status');
-        if (status) status.textContent = '';
+        const button = document.getElementById('reg-submit');
+        const attempt = ++regAttempt;
+        if (button) button.disabled = true;
+        setRegistrationStatus('pending', 'Sending\u2026');
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled || attempt !== regAttempt) return;
+            if (button) button.disabled = false;
+            setRegistrationStatus('pending', REG_STILL_SENDING);
+        }, REG_SEND_TIMEOUT_MS);
         db.ref(`registrations/${registerCode}/${entryId}`).set(payload).then(() => {
-            ['reg-name', 'reg-email', 'reg-phone'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
-            if (status) status.textContent = 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.';
+            settled = true; clearTimeout(timer);
+            if (attempt !== regAttempt && regPendingId !== entryId) return;   // an older tap for an entry already confirmed
+            regPendingId = null;
+            ['reg-name', 'reg-email', 'reg-phone', 'reg-handicap', 'reg-dinner', 'reg-team-pref', 'reg-sponsor-name'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
+            const shirt = document.getElementById('reg-shirt'); if (shirt) shirt.value = '';
+            const box = document.getElementById('reg-sponsor'); if (box) box.checked = false;
+            if (button) button.disabled = false;
+            setRegistrationStatus('ok', 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.');
         }).catch((err) => {
-            alert((err && err.message) ? String(err.message) : 'Could not sign up just now.');
+            settled = true; clearTimeout(timer);
+            if (button) button.disabled = false;
+            if (regPendingId === null && attempt !== regAttempt) return;   // a later tap already confirmed this entry
+            showRegistrationRefusal(err);
         });
     }
 
@@ -1607,6 +1714,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const eventName = escReg((currentData && currentData.name) || 'Event');
             linkBox.innerHTML =
                 `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. Tick Paid when you have the cash, then approve them into the field.</p>`
+                + registrationFieldsHtml()
                 + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
                 + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">\ud83d\udce4 Share signup link</button>`;
         }
