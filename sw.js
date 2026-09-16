@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v155: the counted awards say how many rounds they came from.
+//
+// trip.html (precached). Most Birdies and Sandbagger of the Week carry the
+// rounds behind the number on a multi-round trip - "12 birdies over 4 rounds",
+// "3 birdies in 1 round", "Ann A (4 rounds) and Cal C (1 round) — 3 birdies
+// each" - on the panel, the recap card and the share text. The single-event
+// awards stay bare; a one-round trip carries no suffix. It changes no winner;
+// it says what the count is made of. An installed device on v154 shows the
+// bare counts.
+
 // Moved to v154: the trip awards tell the truth.
 //
 // trip.html (precached). A tie on any award names every golfer at the winning
@@ -1518,7 +1528,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v154-honest-awards';
+const CACHE_VERSION = 'golfapp-v155-rounds-played';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -2138,6 +2138,7 @@ html {
         const eagleCounts = {};      // key -> { name, count, hole, label }
         const sandbaggerTotals = {}; // key -> { name, netToPar, rounds }   (rounds with a handicap only)
         const noHandicap = {};       // key -> name, golfers with no handicap on any counted round
+        const playedRounds = {};     // key -> Set of round labels the golfer scored in
         const blowUps = [];          // every hole at diff >= 2: { name, label, hole, par, score, diff }
         const comebacks = [];        // every positive front-to-back: { name, label, frontGross, backGross, improvement }
         const bump = (bag, k, p, field) => {
@@ -2190,6 +2191,7 @@ html {
                     // qualifying hole is kept so a tie can name both golfers.
                     if (diff >= 2) blowUps.push({ name: p.name, label, hole: h.hole, par, score: gross, diff });
                 });
+                if (played) { if (!playedRounds[key]) playedRounds[key] = new Set(); playedRounds[key].add(label); }
                 if (played && !withHcp && !sandbaggerTotals[key]) noHandicap[key] = p.name;
 
                 if (frontHoles === 9 && backHoles === 9) {
@@ -2217,6 +2219,16 @@ html {
             const names = []; w.forEach(e => { if (!names.includes(e.name)) names.push(e.name); });
             return Object.assign({}, w[0], { name: joinNames(names), names, tied: names.length > 1, entries: w });
         };
+        // ROUNDS PLAYED BESIDE THE COUNTED AWARDS (2026-09-16). A count favours the
+        // golfer who played more days; the suffix does not change who wins, it says
+        // how many rounds the number came from - "12 birdies over 4 rounds", "3
+        // birdies in 1 round" - so a one-day golfer is visibly one day, not silently
+        // beaten. Most Birdies counts the rounds the golfer scored in; Sandbagger
+        // the rounds that carried a handicap for them (the ones its number is made
+        // of). Single-event awards - Eagle in every form, Blow-Up, Comeback - stay
+        // bare: one hole is one hole however many days someone played, and "2
+        // eagles over 4 rounds" reads as an excuse for a rare thing.
+        Object.keys(birdieCounts).forEach(k => { birdieCounts[k].rounds = playedRounds[k] ? playedRounds[k].size : 0; });
         const mostBirdies = tally(birdieCounts, e => e.count, e => e.count > 0);
         const mostEagles = tally(eagleCounts, e => e.count, e => e.count > 0);
         const blowUp = tally(Object.fromEntries(blowUps.map((e, i) => [i, e])), e => e.diff, e => e.diff >= 2);
@@ -2241,19 +2253,37 @@ html {
         // is worth saying out loud; the second is not an award screen at all.
         const scored = Object.keys(birdieCounts).length > 0
             || Object.keys(sandbaggerTotals).length > 0 || Object.keys(noHandicap).length > 0;
-        return { mostBirdies, mostEagles, blowUp, comeback, sandbagger, sandbaggerNote, leftOut, scored, inPlay: [] };
+        // On a one-round trip the suffix is noise - everybody played at most one.
+        [mostBirdies, sandbagger].forEach(a => { if (a) a.roundCount = results.length; });
+        return { mostBirdies, mostEagles, blowUp, comeback, sandbagger, sandbaggerNote, leftOut, scored, inPlay: [], roundCount: results.length };
     }
 
     // THE WORDS FOR A TIE, one place for the panel, the card and the text.
     //   "Ann A — 3 birdies" / "Ann A and Ben B — 3 birdies each" /
     //   "Ann A, Ben B and Cal C — 3 birdies each"; where each golfer's own
     //   hole or round matters, it rides in brackets after the name.
+    // The rounds suffix for a counted award: '' on a one-round trip; " over N
+    // rounds" / " in 1 round" when every named golfer played the same number;
+    // null when they differ - then each name carries its own count in brackets.
+    function roundsSuffix(a) {
+        if (!a || !(a.roundCount > 1) || !a.entries || !a.entries.length) return '';
+        const counts = a.entries.map(e => e.rounds || 0);
+        if (!counts.every(c => c === counts[0])) return null;
+        return counts[0] === 1 ? ' in 1 round' : ' over ' + counts[0] + ' rounds';
+    }
+    function roundsWord(n) { return n + (n === 1 ? ' round' : ' rounds'); }
+    // The name(s) for a counted award: the plain joined names, or - on a
+    // mixed-count tie - each with its rounds in brackets.
+    function countedNames(a, esc) {
+        if (roundsSuffix(a) === null) return joinNames(a.entries.map(e => esc(e.name) + ' (' + roundsWord(e.rounds || 0) + ')'));
+        return esc(a.name);
+    }
     function awardLine(a, kind, esc) {
         esc = esc || (t => t);
         if (!a) return '';
         const each = a.tied ? ' each' : '';
         const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
-        if (kind === 'birdies') return esc(a.name) + ' \u2014 ' + plural(a.count, 'birdie', 'birdies') + each;
+        if (kind === 'birdies') return countedNames(a, esc) + ' \u2014 ' + plural(a.count, 'birdie', 'birdies') + each + (roundsSuffix(a) || '');
         // One golfer, several qualifying holes or rounds: "…, and again …".
         const again = (fmt) => a.entries.length > 1 && !a.tied
             ? esc(a.name) + ' \u2014 ' + fmt(a.entries[0]) + ', and again ' + joinNames(a.entries.slice(1).map(fmt))
@@ -2272,7 +2302,7 @@ html {
             ? joinNames(a.entries.map(e => esc(e.name) + ' (' + e.frontGross + ' front, ' + e.backGross + ' back, ' + esc(String(e.label)) + ')')) + ' \u2014 ' + a.improvement + (a.improvement === 1 ? ' stroke' : ' strokes') + ' better on the back each'
             : (again(e => e.frontGross + ' on the front, ' + e.backGross + ' on the back (' + esc(String(e.label)) + ')')
                || esc(a.name) + ' \u2014 ' + a.frontGross + ' on the front, ' + a.backGross + ' on the back (' + esc(String(a.label)) + ')');
-        if (kind === 'sandbagger') return esc(a.name) + ' \u2014 ' + plural(Math.abs(a.netToPar), 'net stroke', 'net strokes') + ' under par' + (a.tied ? ' each' : ' for the trip');
+        if (kind === 'sandbagger') return countedNames(a, esc) + ' \u2014 ' + plural(Math.abs(a.netToPar), 'net stroke', 'net strokes') + ' under par' + (a.tied ? ' each' : (roundsSuffix(a) ? '' : ' for the trip')) + (roundsSuffix(a) || '');
         return esc(a.name);
     }
     // THE ROUNDS STILL IN PLAY, in the trip's own words (the money card's), for
@@ -2803,9 +2833,12 @@ html {
                      + '</span></div>';
             }
             if (a.mostBirdies) {
+                // "(12 over 4 rounds)", "(3 each over 4 rounds)"; a mixed-count tie puts
+                // each golfer's rounds beside the name instead.
                 html += '<div class="rc-award">\uD83D\uDC26<span><span class="rc-award-name">'
-                     + esc(a.mostBirdies.name) + '</span> \u00B7 Most Birdies ('
-                     + a.mostBirdies.count + (a.mostBirdies.tied ? ' each' : '') + ')</span></div>';
+                     + countedNames(a.mostBirdies, esc) + '</span> \u00B7 Most Birdies ('
+                     + a.mostBirdies.count + (roundsSuffix(a.mostBirdies) ? (a.mostBirdies.count === 1 ? ' birdie' : ' birdies') : '')   // "12 over 4 rounds" would read as twelve over par
+                     + (a.mostBirdies.tied ? ' each' : '') + (roundsSuffix(a.mostBirdies) || '') + ')</span></div>';
             }
             if (a.blowUp) {
                 html += '<div class="rc-award">\uD83D\uDCA5<span><span class="rc-award-name">'
@@ -2829,8 +2862,8 @@ html {
                 // THE NUMBER TRAVELS WITH THE ACCUSATION. The card used to print the
                 // name and the title and nothing behind it.
                 html += '<div class="rc-award">\uD83C\uDFAD<span><span class="rc-award-name">'
-                     + esc(a.sandbagger.name) + '</span> \u00B7 Sandbagger of the Week<br>'
-                     + '<span class="rc-detail">' + Math.abs(a.sandbagger.netToPar) + ' net stroke' + (Math.abs(a.sandbagger.netToPar) === 1 ? '' : 's') + ' under par' + (a.sandbagger.tied ? ' each' : '')
+                     + countedNames(a.sandbagger, esc) + '</span> \u00B7 Sandbagger of the Week<br>'
+                     + '<span class="rc-detail">' + Math.abs(a.sandbagger.netToPar) + ' net stroke' + (Math.abs(a.sandbagger.netToPar) === 1 ? '' : 's') + ' under par' + (a.sandbagger.tied ? ' each' : '') + (roundsSuffix(a.sandbagger) || '')
                      + (a.sandbaggerNote ? ' \u00B7 ' + esc(a.sandbaggerNote) : '') + '</span></span></div>';
             }
             html += '</div>';
@@ -2924,12 +2957,12 @@ html {
             text += `\n🏅 AWARDS\n`;
             if (a.inPlay && a.inPlay.length) text += `${awardsInPlaySentence(a.inPlay)}\n`;
             // Ties: the same line the panel prints, raw (this goes to the clipboard).
-            if (a.mostBirdies) text += a.mostBirdies.tied ? `🐦 Most Birdies: ${awardLine(a.mostBirdies, 'birdies')}\n` : `🐦 Most Birdies: ${a.mostBirdies.name} (${a.mostBirdies.count})\n`;
+            if (a.mostBirdies) text += a.mostBirdies.tied ? `🐦 Most Birdies: ${awardLine(a.mostBirdies, 'birdies')}\n` : `🐦 Most Birdies: ${a.mostBirdies.name} (${a.mostBirdies.count}${roundsSuffix(a.mostBirdies) ? (a.mostBirdies.count === 1 ? ' birdie' : ' birdies') + roundsSuffix(a.mostBirdies) : ''})\n`;
             if (a.mostEagles) text += a.mostEagles.tied ? `🦅 Eagle of the Trip: ${awardLine(a.mostEagles, 'eagles')}\n` : `🦅 Eagle of the Trip: ${a.mostEagles.name}${a.mostEagles.count === 1
                 ? `, Hole ${a.mostEagles.hole} on ${a.mostEagles.label}` : ` (${a.mostEagles.count})`}\n`;
             if (a.blowUp) text += (a.blowUp.tied || a.blowUp.entries.length > 1) ? `💥 Biggest Blow-Up: ${awardLine(a.blowUp, 'blowUp')}\n` : `💥 Biggest Blow-Up: ${a.blowUp.name}, Hole ${a.blowUp.hole} on ${a.blowUp.label} (shot ${a.blowUp.score} on a Par ${a.blowUp.par})\n`;
             if (a.comeback) text += (a.comeback.tied || a.comeback.entries.length > 1) ? `📈 Best Comeback: ${awardLine(a.comeback, 'comeback')}\n` : `📈 Best Comeback: ${a.comeback.name} on ${a.comeback.label} (${a.comeback.frontGross} front, ${a.comeback.backGross} back)\n`;
-            if (a.sandbagger) text += `🎭 Sandbagger of the Week: ${a.sandbagger.name} (${Math.abs(a.sandbagger.netToPar)} net stroke${Math.abs(a.sandbagger.netToPar) === 1 ? '' : 's'} under par${a.sandbagger.tied ? ' each' : ''})${a.sandbaggerNote ? ' \u2014 ' + a.sandbaggerNote : ''}\n`;
+            if (a.sandbagger) text += (a.sandbagger.tied ? `🎭 Sandbagger of the Week: ${awardLine(a.sandbagger, 'sandbagger')}` : `🎭 Sandbagger of the Week: ${a.sandbagger.name} (${Math.abs(a.sandbagger.netToPar)} net stroke${Math.abs(a.sandbagger.netToPar) === 1 ? '' : 's'} under par${roundsSuffix(a.sandbagger) || ''})`) + `${a.sandbaggerNote ? ' \u2014 ' + a.sandbaggerNote : ''}\n`;
         }
 
         // Unlike the card, pasted text carries a tappable link - so it does.

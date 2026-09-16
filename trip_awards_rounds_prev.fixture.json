@@ -1,0 +1,175 @@
+{
+ "capturedAt": "2f78cef",
+ "note": "trip.html awards at HEAD on helpers/trip-weekly-rounds.js two-round trip (Caledonia, True Blue; every golfer hcp present): the awards panel, the recap card and the share text, tag-stripped.",
+ "awards": "| |🐦 Most Birdies| |Marty, Scott, Randy and 8 more — 12 birdies each| | |🦅 Eagle of the Trip| |Marty — 2 eagles| | |💥 Biggest Blow-Up Hole| |Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue| | |📈 Best Comeback| |Carp — 42 on the front, 36 on the back (Caledonia)| | |🎭 Sandbagger of the Week| |Marty — 23 net strokes under par for the trip| |",
+ "recap": "|🧳 Myrtle Beach 2026|2 rounds|🏆 STANDINGS · NET|1|Marty|121|2|Scott|126|3|Randy|126|4|Manny|126|5|Matt B|126|+ 7 more|💵 FINAL SETTLEMENT|Randy → Marty|$74|Matt B → Marty|$74|Lance → Marty|$74|Kopp → Marty|$74|Rocco → Marty|$74|Matt H → Marty|$74|+ 5 more|Includes the main game, side games, side matches and presses, the Birdie Pool, KPs and the Weekly Game.|🏅 AWARDS|🦅|Marty| · Eagle of the Trip (2)|🐦|Marty, Scott, Randy and 8 more| · Most Birdies (12 each)|💥|Carp| · Biggest Blow-Up|Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|📈|Carp| · Best Comeback|42 front, 36 back · Caledonia|🎭|Marty| · Sandbagger of the Week|23 net strokes under par|",
+ "share": "🚐 Myrtle Beach 2026 — Trip Recap\n\n2 rounds\n\n🏆 STANDINGS (Net)\n1. Marty — 121\n2. Scott — 126\n3. Randy — 126\n4. Manny — 126\n5. Matt B — 126\n6. Lance — 126\n7. Kopp — 126\n8. Marcus — 126\n9. Rocco — 126\n10. Matt H — 126\n11. Jeremy — 126\n12. Carp — 137\n\n💵 FINAL SETTLEMENT\nRandy owes Marty $74\nMatt B owes Marty $74\nLance owes Marty $74\nKopp owes Marty $74\nRocco owes Marty $74\nMatt H owes Marty $74\nJeremy owes Marty $74\nCarp owes Marty $30\nScott owes Marty $24\nManny owes Marty $24\nMarcus owes Marty $24\nIncludes the main game, side games, side matches and presses, the Birdie Pool, KPs and the Weekly Game.\n\n🏅 AWARDS\n🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each\n🦅 Eagle of the Trip: Marty (2)\n💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue\n📈 Best Comeback: Carp on Caledonia (42 front, 36 back)\n🎭 Sandbagger of the Week: Marty (23 net strokes under par)\n",
+ "cachedAwards": {
+  "mostBirdies": {
+   "name": "Marty, Scott, Randy and 8 more",
+   "count": 12,
+   "netToPar": 0,
+   "names": [
+    "Marty",
+    "Scott",
+    "Randy",
+    "Manny",
+    "Matt B",
+    "Lance",
+    "Kopp",
+    "Marcus",
+    "Rocco",
+    "Matt H",
+    "Jeremy"
+   ],
+   "tied": true,
+   "entries": [
+    {
+     "name": "Marty",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Scott",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Randy",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Manny",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Matt B",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Lance",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Kopp",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Marcus",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Rocco",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Matt H",
+     "count": 12,
+     "netToPar": 0
+    },
+    {
+     "name": "Jeremy",
+     "count": 12,
+     "netToPar": 0
+    }
+   ]
+  },
+  "mostEagles": {
+   "name": "Marty",
+   "count": 2,
+   "netToPar": 0,
+   "hole": 2,
+   "label": "Caledonia",
+   "names": [
+    "Marty"
+   ],
+   "tied": false,
+   "entries": [
+    {
+     "name": "Marty",
+     "count": 2,
+     "netToPar": 0,
+     "hole": 2,
+     "label": "Caledonia"
+    }
+   ]
+  },
+  "blowUp": {
+   "name": "Carp",
+   "label": "Caledonia",
+   "hole": 5,
+   "par": 4,
+   "score": 9,
+   "diff": 5,
+   "names": [
+    "Carp"
+   ],
+   "tied": false,
+   "entries": [
+    {
+     "name": "Carp",
+     "label": "Caledonia",
+     "hole": 5,
+     "par": 4,
+     "score": 9,
+     "diff": 5
+    },
+    {
+     "name": "Carp",
+     "label": "True Blue",
+     "hole": 5,
+     "par": 4,
+     "score": 9,
+     "diff": 5
+    }
+   ]
+  },
+  "comeback": {
+   "name": "Carp",
+   "label": "Caledonia",
+   "frontGross": 42,
+   "backGross": 36,
+   "improvement": 6,
+   "names": [
+    "Carp"
+   ],
+   "tied": false,
+   "entries": [
+    {
+     "name": "Carp",
+     "label": "Caledonia",
+     "frontGross": 42,
+     "backGross": 36,
+     "improvement": 6
+    }
+   ]
+  },
+  "sandbagger": {
+   "name": "Marty",
+   "netToPar": -23,
+   "rounds": 2,
+   "names": [
+    "Marty"
+   ],
+   "tied": false,
+   "entries": [
+    {
+     "name": "Marty",
+     "netToPar": -23,
+     "rounds": 2
+    }
+   ]
+  },
+  "sandbaggerNote": "",
+  "leftOut": [],
+  "scored": true,
+  "inPlay": []
+ }
+}

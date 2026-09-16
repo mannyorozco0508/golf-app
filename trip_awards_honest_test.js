@@ -81,23 +81,27 @@ describe('THE BASELINE: the weekly trip at 261aa16, plus exactly the deliberate 
         const counts = {}; linkedRounds().forEach(r => r.data.players.forEach(p => { counts[p.name] = (counts[p.name] || 0) + r.data.courseData.filter(h => r.data.scores['p' + p.id + '_h' + h.hole] === h.par - 1).length; }));
         assert.equal(Object.values(counts).filter(c => c === 12).length, 11, 'eleven golfers really had twelve');
     });
+    // Re-pinned 2026-09-16 (rounds played, trip_awards_rounds_test.js): Most Birdies
+    // and Sandbagger carry the rounds their number came from on a multi-round trip.
     test('panel: the old text with three substitutions (the tie named, the blow-up said twice, nothing else)', () => {
         const expected = prev.awards
-            .replace('|Marty — 12 birdies|', '|Marty, Scott, Randy and 8 more — 12 birdies each|')
+            .replace('|Marty — 12 birdies|', '|Marty, Scott, Randy and 8 more — 12 birdies each over 2 rounds|')
+            .replace('|Marty — 23 net strokes under par for the trip|', '|Marty — 23 net strokes under par over 2 rounds|')
             .replace('|Carp — Hole 5 (Par 4, shot 9) on Caledonia|', '|Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|');
         assert.notEqual(expected, prev.awards); assert.equal(b.panel(), expected);
     });
     test('recap card: the tie, the blow-up twice, and the Sandbagger NUMBER - nothing else', () => {
         const expected = prev.recap
-            .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 each)|')
+            .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 birdies each over 2 rounds)|')
             .replace('|9 on a par 4 · Hole 5, Caledonia|', '|Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|')
-            .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par|');
+            .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par over 2 rounds|');
         assert.notEqual(expected, prev.recap); assert.equal(b.card(), expected);
     });
     test('share text: the tie and the blow-up twice - the number was already there', () => {
         const expected = prev.share
-            .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each')
-            .replace('💥 Biggest Blow-Up: Carp, Hole 5 on Caledonia (shot 9 on a Par 4)', '💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue');
+            .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each over 2 rounds')
+            .replace('💥 Biggest Blow-Up: Carp, Hole 5 on Caledonia (shot 9 on a Par 4)', '💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue')
+            .replace('(23 net strokes under par)', '(23 net strokes under par over 2 rounds)');
         assert.notEqual(expected, prev.share); assert.equal(b.share(), expected);
     });
 });
@@ -135,7 +139,7 @@ describe('1. TIES NAME BOTH - on every award, on all three surfaces', () => {
         assert.ok(tight(e.panel()).includes('|Ann A (Hole 4 on Day 1) and Ben B (Hole 13 on Day 1) — an eagle each|'), e.panel());
         assert.ok(tight(e.panel()).includes('|Ann A and Ben B — 11 net strokes under par each|'), e.panel());
         assert.ok(tight(e.card()).includes('|· Sandbagger of the Week|11 net strokes under par each|'));
-        assert.ok(e.share().includes('🎭 Sandbagger of the Week: Ann A and Ben B (11 net strokes under par each)'));
+        assert.ok(e.share().includes('🎭 Sandbagger of the Week: Ann A and Ben B — 11 net strokes under par each'));   // a tie in the text takes the panel's line (2026-09-16)
     });
     test('one golfer tied with himself is one golfer: "…, and again …"', () => {
         const c = boot([round('Day 1', ['Ann A', 'Ben B'], ['0', '0'], (i, h) => i === 0 && h.hole === 2 ? h.par + 3 : h.par), round('Day 2', ['Ann A', 'Ben B'], ['0', '0'], (i, h) => i === 0 && h.hole === 7 ? h.par + 3 : h.par)]);
@@ -194,12 +198,12 @@ describe('3. A ROUND STILL IN PLAY IS SAID SO', () => {
     const b = boot([round('Day 1', ['Ann A', 'Dee D'], ['0', '0'], (i, h) => i === 0 && h.hole === 3 ? h.par - 1 : h.par), round('Day 2', ['Ann A', 'Dee D'], ['0', '0'], (i, h) => i === 0 && h.hole === 5 ? h.par - 1 : h.par, 9)]);
     test('the panel leads with the round, in the trip\'s words; the birdie so far still counts', () => {
         assert.match(tight(b.panel()), /^\|⏳ So far — Day 2 is still in play\. Awards count what has been scored so far\.\|/);
-        assert.ok(tight(b.panel()).includes('|Ann A — 2 birdies|'), 'Day 2\'s birdie counts, as its money does');
+        assert.ok(tight(b.panel()).includes('|Ann A — 2 birdies over 2 rounds|'), 'Day 2\'s birdie counts, as its money does');   // + the rounds suffix (2026-09-16)
         assert.deepEqual(b.awards().inPlay, [{ label: 'Day 2', started: true, thru: 9, left: 2 }]);
     });
     test('the card and the share text say it too', () => {
         assert.ok(tight(b.card()).includes('|🏅 AWARDS|So far — Day 2 is still in play.|🐦|'), b.card());
-        assert.deepEqual(shareAwards(b.share()).slice(0, 3), ['🏅 AWARDS', 'So far — Day 2 is still in play.', '🐦 Most Birdies: Ann A (2)']);
+        assert.deepEqual(shareAwards(b.share()).slice(0, 3), ['🏅 AWARDS', 'So far — Day 2 is still in play.', '🐦 Most Birdies: Ann A (2 birdies over 2 rounds)']);
     });
     test('a round nobody has started: "has not started"; two rounds: both named', () => {
         const c = boot([round('Day 1', ['Ann A'], ['0'], (i, h) => h.hole === 3 ? h.par - 1 : h.par), round('Day 2', ['Ann A'], ['0'], par, 0), round('Day 3', ['Ann A'], ['0'], par, 12)]);

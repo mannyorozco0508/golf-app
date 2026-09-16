@@ -101,10 +101,11 @@ describe('THE PROOF - the old text with exactly one substitution IS the new text
     // in the text names the eleven-way birdie tie, says Carp's two 9s, and puts the
     // Sandbagger number on the card - trip_awards_honest_test.js holds those.
     const AWARDS_SUBS = s => s
-        .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 each)|')
+        .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 birdies each over 2 rounds)|')   // + rounds played, 2026-09-16
         .replace('|9 on a par 4 · Hole 5, Caledonia|', '|Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|')
-        .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par|')
-        .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each')
+        .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par over 2 rounds|')
+        .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each over 2 rounds')
+        .replace('🎭 Sandbagger of the Week: Marty (23 net strokes under par)', '🎭 Sandbagger of the Week: Marty (23 net strokes under par over 2 rounds)')
         .replace('💥 Biggest Blow-Up: Carp, Hole 5 on Caledonia (shot 9 on a Par 4)', '💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue');
     ['money', 'recap', 'share'].forEach(k => test(k + ': today == old with "the Main Pool." -> "the Weekly Game."' + (k === 'money' ? ' and the agree sentence' : ' and the awards substitutions') + ', nothing else', () => {
         let expected = PREV[k].replace('the Main Pool.', 'the Weekly Game.');
