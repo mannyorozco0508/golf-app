@@ -97,9 +97,19 @@ describe('THE PROOF - the old text with exactly one substitution IS the new text
     // card says so under Net Across the Trip. trip_money_final_test.js holds the
     // cb42f1d capture of the same trip and pins that sentence as the only change.
     const AGREE = '|Whether you settled up after each round or settle once at the end, the numbers are the same.|Per-Round Breakdown|';
-    ['money', 'recap', 'share'].forEach(k => test(k + ': today == old with "the Main Pool." -> "the Weekly Game."' + (k === 'money' ? ' and the agree sentence' : '') + ', nothing else', () => {
+    // Re-pinned 2026-09-15 (awards made honest): the AWARDS block on the card and
+    // in the text names the eleven-way birdie tie, says Carp's two 9s, and puts the
+    // Sandbagger number on the card - trip_awards_honest_test.js holds those.
+    const AWARDS_SUBS = s => s
+        .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 each)|')
+        .replace('|9 on a par 4 · Hole 5, Caledonia|', '|Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|')
+        .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par|')
+        .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each')
+        .replace('💥 Biggest Blow-Up: Carp, Hole 5 on Caledonia (shot 9 on a Par 4)', '💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue');
+    ['money', 'recap', 'share'].forEach(k => test(k + ': today == old with "the Main Pool." -> "the Weekly Game."' + (k === 'money' ? ' and the agree sentence' : ' and the awards substitutions') + ', nothing else', () => {
         let expected = PREV[k].replace('the Main Pool.', 'the Weekly Game.');
         if (k === 'money') { assert.ok(expected.includes('|Per-Round Breakdown|')); expected = expected.replace('|Per-Round Breakdown|', AGREE); }
+        else { const subbed = AWARDS_SUBS(expected); assert.notEqual(subbed, expected, k + ' carries the awards block'); expected = subbed; }
         assert.equal(trip()[k], expected);
     }));
 });

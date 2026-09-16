@@ -193,7 +193,9 @@ describe('AWARDS — ONLY WHAT WAS EARNED', () => {
         const t = b.text();
         assert.match(t, /Most Birdies/);
         assert.match(t, /Biggest Blow-Up/);
-        assert.match(t, /9 on a par 4 · Hole 5, Caledonia/, 'the story, not just the name');
+        // Re-pinned 2026-09-15 (awards made honest): Carp shot 9 on hole 5 on BOTH
+        // days of this fixture, and the card now says so instead of naming one day.
+        assert.match(t, /Hole 5 \(Par 4, shot 9\) on Caledonia, and again Hole 5 \(Par 4, shot 9\) on True Blue/, 'the story, not just the name');
     });
 
     test('the awards block is omitted entirely when none were earned', () => {

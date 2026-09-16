@@ -134,9 +134,20 @@ describe('THE BASELINE: the two-round weekly trip renders as it did at cb42f1d, 
         assert.notEqual(expected, prev.money, 'the substitution point exists in the fixture');
         assert.equal(b.money0(), expected);
     });
-    test('recap card and share text: byte-identical to cb42f1d (both totals agree, every round finished)', () => {
-        assert.equal(b.recap0(), prev.recap);
-        assert.equal(b.share(), prev.share);
+    // Re-pinned 2026-09-15 (awards made honest, trip_awards_honest_test.js): the
+    // AWARDS block of the card and the text changed in exactly three ways - the
+    // eleven-way birdie tie is named, Carp's two 9s are both said, the card's
+    // Sandbagger carries its number. The money blocks are untouched.
+    const AWARDS_SUBS = s => s
+        .replace('|Marty| · Most Birdies (12)|', '|Marty, Scott, Randy and 8 more| · Most Birdies (12 each)|')
+        .replace('|9 on a par 4 · Hole 5, Caledonia|', '|Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue|')
+        .replace('| · Sandbagger of the Week|', '| · Sandbagger of the Week|23 net strokes under par|')
+        .replace('🐦 Most Birdies: Marty (12)', '🐦 Most Birdies: Marty, Scott, Randy and 8 more — 12 birdies each')
+        .replace('💥 Biggest Blow-Up: Carp, Hole 5 on Caledonia (shot 9 on a Par 4)', '💥 Biggest Blow-Up: Carp — Hole 5 (Par 4, shot 9) on Caledonia, and again Hole 5 (Par 4, shot 9) on True Blue');
+    test('recap card and share text: cb42f1d\'s text with only the awards substitutions (both totals agree, every round finished)', () => {
+        assert.notEqual(AWARDS_SUBS(prev.recap), prev.recap); assert.notEqual(AWARDS_SUBS(prev.share), prev.share);
+        assert.equal(b.recap0(), AWARDS_SUBS(prev.recap));
+        assert.equal(b.share(), AWARDS_SUBS(prev.share));
         assert.equal(b.totals().agree, true);
         assert.equal(b.settled(), true);
     });

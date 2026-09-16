@@ -524,6 +524,19 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v154: the trip awards tell the truth.
+//
+// trip.html (precached). A tie on any award names every golfer at the winning
+// figure ("Ann A and Ben B — 3 birdies each"; four or more "… and N more") -
+// it used to hand the trophy to whoever the roster listed first, silently.
+// Sandbagger of the Week needs handicaps: a golfer's round counts only when
+// that round carries one for them, golfers with none are named as left out,
+// fewer than two eligible -> "not awarded" and a plain line why; with blank
+// handicaps it used to crown the best gross golfer. The recap card now
+// carries the Sandbagger's number. A round still in play is named on the
+// panel, the card and the share text ("So far — Day 2 is still in play."). An
+// installed device on v153 keeps the silent tie and the gross Sandbagger.
+
 // Moved to v153: the share-sheet PDF carries the mark.
 //
 // native-export.js (precached). The iOS PDF now opens with the brand mark -
@@ -1505,7 +1518,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v153-pdf-mark';
+const CACHE_VERSION = 'golfapp-v154-honest-awards';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
