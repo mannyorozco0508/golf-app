@@ -454,6 +454,67 @@ Playground checks; the deploy went out with the Wave 2 organizer rules and the l
 behaviour was proved against the real database on 2026-09-15 (the Monday test,
 the create gate, the claim refusals — see the organizer-gate notes).
 
+## tournaments/$code is world-writable — the scorecard link is one door of several (Option A, 2026-09-16)
+
+**The rule.** `database.rules.json` `tournaments/$tourneyCode` `.write` is
+`"!data.exists() || newData.exists()"`: any write that does not DELETE the tournament
+is accepted from anyone — signed out, no page — who knows the code. Scores, team names,
+rosters, the course card, a round's status, a whole-record PUT that keeps `ownerUid`.
+Refused: deleting the tournament, taking or changing `ownerUid`, and the
+`registrations/` node. The `&team=N` / `&group=GID` scorecard link is the VISIBLE corner
+of that: the team number is a URL parameter, nothing checks who holds it, and the page
+renders another team's card editable when the parameter is changed
+(`tools/tournament-team-link-check.js` measures 18 of 18 editable on team 7's link from
+team 1's) — but the same writes go through with `curl` and no page at all. Restricting
+the link would close one door on a house with no walls. The round app (`index.html`)
+has the same shape: `canWritePlayer` checks the write against the URL's group, not the
+URL against a person, and its organizer token is a bearer secret on a world-readable
+record.
+
+**What Option A did (this wave), and what it did not.** It stopped the app lying about
+the walls and gave the organizer a correction path that is not "open the team's link":
+
+- **"✏️ Correct a scorecard"** on the Setup tab — the one panel the page REMOVES from the
+  DOM for anyone but the signed-in owner. It writes the SAME path the team's link writes,
+  through `tournamentScorePath` and the three key builders in `tournament-engine.js`;
+  `tournament_score_editor_test.js` holds them in parity with the card's own `scorePath`
+  (which two suites pin by regex and which was left alone). It refuses SETUP and CLOSED
+  rounds as the card does. It is a CORRECTION tool and its copy says the links are how
+  scoring happens — an organizer keeping 140 players' cards from Setup would have a bad day.
+- **The padlocks came off** the link sections and the scorecard says "Anyone with this
+  link can score this card." A glyph is a claim too; `tournament_claims_test.js` now
+  counts a padlock heading a links section as one.
+  The rule also learned POLARITY: "Anyone who has a link can score that card" is a
+  person plus a capability and the rule as first drawn flagged it. It promises no
+  protection — it is the admission — so a claim now needs a restriction in the same
+  sentence (only, cannot, nobody…). The organizer copy is two sentences for exactly that
+  reason: joined by a dash, "only" and "anyone can" share a sentence and read as a
+  promise, and the test asserts the dash version IS caught. `tools/tournament-team-link-check.js`
+  carries the same three-part rule and is bound both ways now: an exclusivity claim over
+  an editable link fails it, and so does the admission over a link that stopped being
+  editable (measured this wave: team 7's link, 18 of 18 editable, PASS).
+- **Nothing about the database changed.** A code-holder can still write every score,
+  name and roster. Narrowing `tournaments/$code` so a code-holder may write scores and
+  nothing else is a RULES WAVE with a blast radius across every organizer write on
+  `tournament.html` (teams, rounds, flights, groups, course, payouts — all of them go
+  through the same open rule today) and it needs its own recon before it is drafted.
+
+**B and C were considered and not picked.** B — per-team keys in the link, checked by
+the rules: the keys are readable while they live on the record (`.read: true`), so they
+protect nothing until they move to an owner-only node the rule reads through `root`; and
+it changes the score storage path, which re-pins every score reader — engine, board,
+printed sheet, goldens. C — anonymous auth on the scorecard with a write-once team claim:
+it crosses the consumer/tournament shell boundary four tests hold (`auth-boot.js` is a
+consumer shell file), gives one uid two meanings on one origin (the consumer trial gate
+trusts the same anonymous uid), and breaks "my phone died" until a release path exists.
+Both leave names and rosters open anyway. Recorded so they are not re-derived.
+
+**Filed for the consumer copy pass:** `instructions.html` :125 heads the ROUND app's
+scorekeeper links with the same padlock — "🔒 Groups & Scorekeeper Links" — over links that
+lock nothing (the round app's group lock is the same URL-parameter shape). Out of this
+wave's tournament scope; the same category of claim; take it out with the next consumer
+copy pass and let `user_facing_copy_test.js` hold the sentence that replaces it.
+
 ## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
 
 Organizers sign in (Firebase Auth, email/password); golfers never do — a scoring

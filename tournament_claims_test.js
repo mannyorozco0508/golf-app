@@ -81,7 +81,39 @@ const fs = require('fs');
 const path = require('path');
 const { decodeEscapes } = require('./helpers/decode-escapes.js');
 
+// ============================================================================
+// OPTION A (2026-09-16) WIDENED THIS FILE IN THREE WAYS. Each is argued here
+// because each changes what the rule sees.
+//
+// 1. POLARITY. The rule as first drawn caught "person + capability verb". That
+//    shape cannot tell "They can only enter their own scores" (a promised
+//    protection, false) from "Anyone who has a link can score that card" (the
+//    admission that there is NO protection, true and measured: another team's
+//    link opens 18 of 18 editable inputs, tools/tournament-team-link-check.js).
+//    Option A put the second sentence on the page ON PURPOSE, and the rule
+//    flagged it. Exempting it through PROVEN_PROTECTIONS would have been a
+//    category error - that list is for PROTECTIONS that are measured, and this
+//    sentence promises none. So a protection claim now needs a third piece: a
+//    RESTRICTION in the sentence (only, cannot, nobody, prevented, ...). Every
+//    sentence in MUST_CATCH still carries one. A grant to anyone carries none.
+//    The lists below hold that line in both directions.
+//
+// 2. A GLYPH CAN CLAIM. "🔒 Team Scorecard Links" said, without a sentence,
+//    that the links were protected. A padlock heading a links section is
+//    counted as a protection claim - not a padlock anywhere ("🔒 Closed" is a
+//    round status the card enforces, and it is built at runtime besides), but
+//    a padlock ON THE SAME STRIPPED LINE as the word "link" or "links". The
+//    headings now read 📋. Put the padlock back and the sweep goes red.
+//
+// 3. THE CARD IS SCANNED TOO. tournament-scorecard.html is the page the link
+//    opens, and Option A gave it one static sentence - "Anyone with this link
+//    can score this card." - pinned byte-exact below because it is the only
+//    place the person HOLDING the link is told what they hold.
+// ============================================================================
+
 const PAGE = 'tournament.html';
+const CARD = 'tournament-scorecard.html';
+const LINK_TRUTH = 'Anyone with this link can score this card.';
 
 // Who a claim can be ABOUT. A protection sentence names a person or a group of
 // people; a description names an object.
@@ -98,6 +130,16 @@ const CAPABILITY = /\b(can|cannot|can't|could|able|unable|allowed|permitted|prev
 
 // Words that assert a protection with no person in the sentence at all.
 const ARTIFACT_PROTECTION = /\b(read-only|read only|locked|private|secure|protected|tamper|encrypted)\b/i;
+
+// The restriction a protection claim promises. "Anyone can score that card"
+// has a person and a capability and promises nothing; "They can ONLY enter
+// their own" promises the app stops them. Kept to words that narrow, so
+// "not" on its own does not turn every negated sentence into a claim.
+const RESTRICTION = /\b(only|cannot|can't|can not|unable|prevented|blocked|restricted|may not|must not|nobody|no one|never|not able|not allowed|not permitted)\b/i;
+
+// A padlock (🔒 🔐 🔏) on the same stripped line as "link"/"links".
+const PADLOCK = /[\u{1F512}\u{1F510}\u{1F50F}]/u;
+const LINKS = /\blinks?\b/i;
 
 // PROXIMITY, NOT CO-OCCURRENCE, AND THAT DISTINCTION IS LOAD-BEARING.
 //
@@ -127,7 +169,12 @@ function sentenceIsClaim(sentence) {
     const cap = CAPABILITY.exec(sentence);
     if (!cap) return false;
     const before = sentence.slice(Math.max(0, cap.index - NEAR), cap.index);
-    return PERSON.test(before);
+    return PERSON.test(before) && RESTRICTION.test(sentence);
+}
+
+// A padlock heading a links section is a claim with no sentence in it.
+function glyphClaims(line) {
+    return PADLOCK.test(line) && LINKS.test(line);
 }
 
 const isProtectionClaim = (line) => sentencesOf(line).some(sentenceIsClaim);
@@ -203,8 +250,8 @@ function unprovenClaims(line) {
     return sentencesOf(line).filter(sentenceIsClaim).filter((s) => !isProven(s));
 }
 
-function markupLines() {
-    const raw = decodeEscapes(fs.readFileSync(path.join(__dirname, PAGE), 'utf8'));
+function markupLines(page = PAGE) {
+    const raw = decodeEscapes(fs.readFileSync(path.join(__dirname, page), 'utf8'));
     return raw
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -222,13 +269,33 @@ const MUST_CATCH = [
     'Players are prevented from opening another card.',
     'Nobody else can see this link.',
     'This link is read-only.',
-    'Each team\'s card is locked to their own link.'
+    'Each team\'s card is locked to their own link.',
+    // Exclusivity written as a grant with a restrictor - still a promise.
+    'Only teams with the link can score this card.',
+    'Anyone can only score their own card.'
+];
+
+// Padlocks. The first two are the headings Option A removed, verbatim.
+const GLYPH_MUST_CATCH = [
+    '🔒 Team Scorecard Links',
+    '🔒 Group Scoring Links',
+    '🔐 Links'
+];
+const GLYPH_MUST_NOT_CATCH = [
+    '📋 Team Scorecard Links',
+    '📋 Group Scoring Links',
+    '🔒 Closed',                       // the round-status label: a status, not a links section
+    'Team Scorecard Links'
 ];
 
 const MUST_NOT_CATCH = [
     // The replacement, and the half of the original that was always true.
     'Each link opens that team\'s card and nothing else.',
     'Send each team only their own.',
+    // Option A's admissions. A person and a capability with NO restriction: the
+    // sentence says the app protects nothing, which is the measured truth.
+    'Send each team only their own. Anyone who has a link can score that card.',
+    LINK_TRUTH,
     // Real sentences from this page.
     'This course has no real stroke index, so net strokes can\'t be allocated. The round will score Gross.',
     // VERBATIM from the page, not paraphrased - the paraphrase is what hid the
@@ -276,6 +343,35 @@ describe('THE RULE KNOWS A PROTECTION CLAIM FROM A DESCRIPTION', () => {
         assert.ok(isProtectionClaim('This link is read-only.'),
             'an artifact-protection word needs no person');
     });
+
+    test('POLARITY: a grant to anyone promises nothing; the same words with "only" promise', () => {
+        assert.ok(!isProtectionClaim('Anyone who has a link can score that card.'),
+            'the admission that there is no protection was counted as a protection claim');
+        assert.ok(!isProtectionClaim(LINK_TRUTH),
+            'the card\'s own admission was counted as a protection claim');
+        assert.ok(isProtectionClaim('Anyone who has a link can only score that card.'),
+            'adding "only" turns the grant into a promise, and the rule must see it');
+        assert.ok(isProtectionClaim('Nobody without a link can score that card.'),
+            '"nobody" is a restriction and must be caught');
+        // The restriction must be in the SAME sentence. "Send each team only their
+        // own." carries "only" and no capability; the admission after it carries a
+        // capability and no restriction. As two sentences neither is a claim - and
+        // joined by a dash into ONE they would be, which is why the page copy is
+        // two sentences and the dash version is asserted caught here.
+        assert.equal(unprovenClaims(
+            'Send each team only their own. Anyone who has a link can score that card.').length, 0,
+            'the organizer line was flagged although neither sentence promises a protection');
+        assert.equal(unprovenClaims(
+            'Send each team only their own — anyone who has a link can score that card.').length, 1,
+            'joined into one sentence, "only" and "anyone can" together read as a promise and must be caught');
+    });
+
+    test('A GLYPH CAN CLAIM: a padlock heading a links section is a protection claim', () => {
+        GLYPH_MUST_CATCH.forEach((l) => assert.ok(glyphClaims(l),
+            'a padlock on a links heading walked past the rule: ' + l));
+        GLYPH_MUST_NOT_CATCH.forEach((l) => assert.ok(!glyphClaims(l),
+            'the glyph rule flagged something that is not a padlocked links section: ' + l));
+    });
 });
 
 describe('tournament.html PROMISES NO PROTECTION IT DOES NOT HAVE', () => {
@@ -298,6 +394,65 @@ describe('tournament.html PROMISES NO PROTECTION IT DOES NOT HAVE', () => {
             + '18 editable inputs, and tournaments/$tourneyCode is ".write": true. Either '
             + 'make the sentence true and add it to PROVEN_PROTECTIONS with the check that '
             + 'proves it, or change the sentence.\n  ' + offenders.join('\n  '));
+    });
+
+    test('no padlock heads a links section, on either page', () => {
+        [PAGE, CARD].forEach((page) => {
+            const offenders = markupLines(page).filter(glyphClaims);
+            assert.deepEqual(offenders, [],
+                `${page} heads a links section with a padlock. The glyph says the links are `
+                + 'protected; measured, a link pointed at another team opens 18 of 18 editable '
+                + 'inputs. Option A changed these headings to 📋 - a padlock here is a claim.\n  '
+                + offenders.join('\n  '));
+        });
+    });
+
+    test('the padlock rule is live against the real headings, not only the fixtures', () => {
+        // The positive assertion this sweep needs: the headings it polices exist,
+        // so an empty stripped page could not pass the sweep above.
+        const lines = markupLines();
+        assert.ok(lines.some((l) => /^📋 Team Scorecard Links$/.test(l)),
+            'the team-links heading is not "📋 Team Scorecard Links" - if it moved, move this');
+        assert.ok(lines.some((l) => /^📋 Group Scoring Links$/.test(l)),
+            'the group-links heading is not "📋 Group Scoring Links" - if it moved, move this');
+    });
+});
+
+describe('tournament-scorecard.html TELLS THE HOLDER WHAT THE LINK IS', () => {
+
+    test('the card\'s stripped markup is substantial', () => {
+        const lines = markupLines(CARD);
+        // The card is rendered at runtime; its STATIC markup is five lines
+        // (title, leaderboard link, the admission, the not-found heading and
+        // body). The floor is the count that makes the admission's presence a
+        // real assertion rather than a match against an empty page.
+        assert.ok(lines.length >= 5,
+            `only ${lines.length} markup lines survived stripping the card: ${JSON.stringify(lines)}`);
+        assert.ok(lines.some((l) => /^Tournament Scorecard$/.test(l)), 'the card title is not in the stripped markup');
+    });
+
+    test('the card carries the admission, byte-exact, in static markup', () => {
+        const lines = markupLines(CARD);
+        assert.ok(lines.includes(LINK_TRUTH),
+            `"${LINK_TRUTH}" is not a line of tournament-scorecard.html's markup. This is the `
+            + 'only sentence that tells the person holding a link what it authorises (nothing: '
+            + 'anyone with it can score). It is static so it is on the card before any script '
+            + 'runs and whether or not the round loads.');
+        // Comments stripped left to right, so a comment between the two divs
+        // does not count as distance.
+        const raw = fs.readFileSync(path.join(__dirname, CARD), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+        const at = raw.indexOf('id="scoring-for"');
+        assert.ok(at > 0, '#scoring-for is gone from the card');
+        const after = raw.slice(at, at + 400);
+        assert.ok(after.includes(LINK_TRUTH),
+            'the admission sits somewhere else than directly under "Scoring for", where the '
+            + 'holder reads whose card this is');
+    });
+
+    test('the card makes no protection claim the rule can see', () => {
+        const offenders = markupLines(CARD).filter((l) => unprovenClaims(l).length > 0);
+        assert.deepEqual(offenders, [],
+            'tournament-scorecard.html promises a protection nothing measures:\n  ' + offenders.join('\n  '));
     });
 });
 

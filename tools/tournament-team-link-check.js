@@ -109,10 +109,24 @@ async function look(page, query, probe) {
 // page-wide sweep lives in the unit test.
 const PERSON = /\b(they|he|she|you|anyone|everyone|nobody|no one|players?|golfers?|teams?|volunteers?)\b/i;
 const CAPABILITY = /\b(can|cannot|can't|could|able|unable|allowed|permitted|prevented|restricted)\b/i;
-function claimsExclusivity(sentence) {
+// POLARITY (Option A, 2026-09-16). "Anyone who has a link can score that card"
+// is person + capability and promises NOTHING - it is the admission this check
+// measured into the page. A claim of exclusivity also narrows: only, cannot,
+// nobody... Same three-part rule as tournament_claims_test.js.
+const RESTRICTION = /\b(only|cannot|can't|can not|unable|prevented|blocked|restricted|may not|must not|nobody|no one|never|not able|not allowed|not permitted)\b/i;
+function personBeforeCapability(sentence) {
     const cap = CAPABILITY.exec(sentence || '');
     if (!cap) return false;
     return PERSON.test(String(sentence).slice(Math.max(0, cap.index - 28), cap.index));
+}
+function claimsExclusivity(sentence) {
+    return personBeforeCapability(sentence) && RESTRICTION.test(sentence || '');
+}
+// The admission: a grant to anyone/everyone with no restriction. Bound the
+// other way below - if another team's link ever stops being editable, this
+// sentence becomes the lie.
+function grantsToAnyone(sentence) {
+    return personBeforeCapability(sentence) && /\b(anyone|everyone|anybody)\b/i.test(sentence || '') && !RESTRICTION.test(sentence || '');
 }
 
 (async () => {
@@ -143,6 +157,7 @@ function claimsExclusivity(sentence) {
     const failures = [];
     const sentences = String(org.linksBlurb).split(/(?<=[.;!?])\s+/).filter(Boolean);
     const claiming = sentences.filter(claimsExclusivity);
+    const granting = sentences.filter(grantsToAnyone);
 
     // ---- THE BINDING. Measured reach vs stated reach. ----
     if (other.editable > 0 && claiming.length > 0) {
@@ -151,6 +166,16 @@ function claimsExclusivity(sentence) {
             + `editable inputs on ${JSON.stringify(other.teamsNamed)}. Team 1's own link opened `
             + `${own.editable}. The sentence describes a protection the links do not have, and `
             + `it is read by the person deciding how carefully to send them.`);
+    }
+    if (other.editable === 0 && granting.length > 0) {
+        failures.push(`the organizer screen says anyone with a link can score - ${JSON.stringify(granting)} - `
+            + `while a link pointed at ANOTHER team opened ${other.editable} of ${other.inputs} editable `
+            + 'inputs. The admission has become the false sentence; re-measure and re-word.');
+    }
+    if (other.editable > 0 && granting.length === 0 && claiming.length === 0) {
+        failures.push('another team\'s link is editable and the organizer screen neither admits it nor '
+            + 'claims otherwise. The sentence "Anyone who has a link can score that card." is the '
+            + 'measured truth and is meant to be beside the links.');
     }
     if (other.editable === 0 && claiming.length === 0 && !other.refused) {
         failures.push('another team\'s link opened nothing AND the screen makes no claim - which '
@@ -166,7 +191,8 @@ function claimsExclusivity(sentence) {
             otherTeamLink: { editable: other.editable, of: other.inputs, teamsNamed: other.teamsNamed },
         },
         organizerBlurb: org.linksBlurb,
-        sentencesClaimingExclusivity: claiming
+        sentencesClaimingExclusivity: claiming,
+        sentencesGrantingToAnyone: granting
     }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch((e) => {

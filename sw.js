@@ -1547,7 +1547,15 @@
 // becomes two entries and a late acknowledgement flips to confirmed. The
 // organizer's "Ask golfers for" switches decide which optional boxes the
 // form shows. A device on v157 keeps the form that could go silent.
-const CACHE_VERSION = 'golfapp-v158-signup-never-silent';
+// Moved to v159: the scorecard link authorises nothing, and the page says so.
+// tournament.html: the links headings drop the padlock and say "Anyone who
+// has a link can score that card"; Setup gains "Correct a scorecard" behind
+// the owner's sign-in, writing the same score path the team's link writes.
+// tournament-scorecard.html: "Anyone with this link can score this card."
+// tournament-engine.js: the score-path builders both pages agree on. A device
+// on v158 keeps the padlocked headings that claim a protection the links do
+// not have.
+const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

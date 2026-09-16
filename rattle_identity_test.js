@@ -212,7 +212,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v158-signup-never-silent';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -530,9 +530,9 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v158-signup-never-silent';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v39-signup-never-silent'/,
+        assert.match(BUILD, /cacheName: 'tournament-v40-link-authorises-nothing'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
     });
 });

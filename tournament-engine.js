@@ -920,3 +920,21 @@ function ordinal(n) {
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+// ---------------------------------------------------------------------------
+// WHERE A SCORE LIVES, AND WHAT ITS KEY IS - one builder for both pages
+// (Option A, 2026-09-16). tournament-scorecard.html keeps its own scorePath,
+// pinned by two suites; the organizer's correction editor on tournament.html
+// writes through THESE, and tournament_score_editor_test.js holds the two in
+// parity for every key shape, single- and multi-round. Round identity lives
+// in the PATH, never in the key, so a cross-round write is structurally
+// impossible; the three key shapes are the ones already in production and
+// a rename would orphan recorded scores.
+function tournamentScorePath(code, roundId, suffix) {
+    return roundId
+        ? `tournaments/${code}/rounds/${roundId}/scores/${suffix}`
+        : `tournaments/${code}/scores/${suffix}`;
+}
+function teamHoleKey(teamNum, hole) { return `team${teamNum}_h${hole}`; }
+function teamPlayerHoleKey(teamNum, playerIdx, hole) { return `team${teamNum}_p${playerIdx}_h${hole}`; }
+function playerHoleKey(playerId, hole) { return `${playerId}_h${hole}`; }

@@ -489,6 +489,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="round-editor"></div>
         </div>
 
+        <!-- OPTION A (2026-09-16): the organizer's CORRECTION path. Until this
+             existed the team's own link was the organizer's only way to touch a
+             score. It lives on Setup because Setup is the one panel this page
+             REMOVES for anyone but the signed-in owner. It is not how scoring
+             happens - the links are - and its copy says so. -->
+        <div id="score-corrector"></div>
+
         <div id="player-field-section" style="display:none;">
             <hr class="section-divider">
             <h3>🏌️ Player Field</h3>
@@ -581,15 +588,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
 
         <hr class="section-divider">
-        <h3>🔒 Team Scorecard Links</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Tap 📤 to get a QR code or copy the link.</p>
+        <!-- No padlock. A glyph is a claim too: these links lock nothing - anyone
+             holding one can score that card (tournament_claims_test.js). -->
+        <h3>📋 Team Scorecard Links</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Anyone who has a link can score that card. Tap 📤 to get a QR code or copy the link.</p>
         <div id="team-links-list"></div>
         <!-- Individual mode: the group scoring links. The group EDITOR stays in
              Setup; only the links live here, so a signed-out visitor of an owned
              tournament can still send a group its card. -->
         <div id="group-links-block" style="display:none;">
-            <h3>🔒 Group Scoring Links</h3>
-            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. In a multi-round event every round has its own links.</p>
+            <h3>📋 Group Scoring Links</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. Send each group only their own. Anyone who has a link can score that card. In a multi-round event every round has its own links.</p>
             <div id="group-links-list"></div>
         </div>
     </div>
@@ -1700,6 +1709,123 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
+    }
+
+    // ---- THE ORGANIZER'S CORRECTION PATH (Option A, 2026-09-16) -------------
+    //
+    // tournaments/<code> is world-writable to anyone holding the code (HANDOFF:
+    // "one door of several"); the team link is one door and, until now, the
+    // organizer's only way to fix a score. This editor is the other way. It is a
+    // CORRECTION tool: the team and group links are how scoring happens, and an
+    // organizer keeping 140 players' cards from here would have a bad day.
+    //
+    // It writes the SAME path the team's link writes - through the pure builders
+    // in tournament-engine.js (tournamentScorePath + the three key shapes), which
+    // tournament_score_editor_test.js holds in parity with the card's own
+    // scorePath. The write itself is a second copy of the card's three lines:
+    // an empty box removes, a number sets, anything else is ignored. It refuses
+    // SETUP and CLOSED rounds exactly as the card does (roundStatus !== 'open').
+    let scRoundId = null;      // the round being corrected (multi-round only)
+    let scTarget = null;       // 'team:<num>' or 'group:<gid>'
+    function correctionView() {
+        if (!currentData) return null;
+        if (recordIsMultiRound()) return scRoundId ? roundView(currentData, scRoundId) : null;
+        return currentData;
+    }
+    function correctionStatus(view) {
+        if (!view) return 'setup';
+        return recordIsMultiRound() ? view.roundStatus : 'open';
+    }
+    function selectCorrectionRound(rid) { scRoundId = rid || null; scTarget = null; renderScoreCorrector(); }
+    function selectCorrectionTarget(t) { scTarget = t || null; renderScoreCorrector(); }
+    // The three writers. Each checks the gate and the round itself - the panel
+    // being removed for non-owners is the page's guardrail, not the writer's.
+    function correctionWrite(suffix, val) {
+        if (!currentCode || !canManage()) return;
+        const view = correctionView();
+        if (!view || correctionStatus(view) !== 'open') return;
+        const ref = db.ref(tournamentScorePath(currentCode, recordIsMultiRound() ? scRoundId : null, suffix));
+        const str = (val === undefined || val === null) ? '' : String(val).trim();
+        if (str === '') { ref.remove().catch((err) => alert(`Error: ${err.message}`)); return; }
+        const n = parseInt(str, 10);
+        if (!(n > 0)) return;   // not a score: nothing written, nothing removed
+        ref.set(n).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function correctTeamScore(teamNum, hole, val, rid) {
+        if (rid !== undefined) scRoundId = rid;
+        correctionWrite(teamHoleKey(teamNum, hole), val);
+    }
+    function correctTeamPlayerScore(teamNum, playerIdx, hole, val, rid) {
+        if (rid !== undefined) scRoundId = rid;
+        correctionWrite(teamPlayerHoleKey(teamNum, playerIdx, hole), val);
+    }
+    function correctPlayerScore(groupId, playerId, hole, val, rid) {
+        if (rid !== undefined) scRoundId = rid;
+        const view = correctionView();
+        const group = view && (view.scoringGroups || {})[groupId];
+        if (!group || (group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer - as the card
+        correctionWrite(playerHoleKey(playerId, hole), val);
+    }
+    function renderScoreCorrector() {
+        const mount = document.getElementById('score-corrector');
+        if (!mount) return;
+        if (!currentData || !currentCode || !canManage()) { mount.innerHTML = ''; return; }
+        const multi = recordIsMultiRound();
+        const individual = recordIsIndividual();
+        let html = `<hr class="section-divider"><h3>\u270F\uFE0F Correct a scorecard</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">The team and group links are how scoring happens. This is for fixing a score a card got wrong: pick the card, change the hole, and it saves as you type \u2014 to the same card the team\u2019s link writes.</p>`;
+        if (multi) {
+            const rids = Object.keys(currentData.rounds || {});
+            html += `<div class="form-group"><label for="sc-round">Round</label><select id="sc-round" onchange="selectCorrectionRound(this.value)"><option value="">Choose a round</option>`
+                + rids.map((rid) => `<option value="${escReg(rid)}"${rid === scRoundId ? ' selected' : ''}>${escReg((currentData.rounds[rid] || {}).name || rid)} \u2014 ${escReg(roundStatus(currentData.rounds[rid]))}</option>`).join('') + `</select></div>`;
+        }
+        const view = correctionView();
+        if (!view) { mount.innerHTML = html + `<div id="sc-target-wrap"></div><div id="sc-holes"></div>`; return; }
+        const targets = individual
+            ? Object.keys(view.scoringGroups || {}).map((gid) => ({ key: 'group:' + gid, label: (view.scoringGroups[gid] || {}).name || gid }))
+            : Object.keys(view.teams || {}).sort((a, b) => ((view.teams[a] || {}).num || 0) - ((view.teams[b] || {}).num || 0)).map((tid) => ({ key: 'team:' + view.teams[tid].num, label: view.teams[tid].name || ('Team ' + view.teams[tid].num) }));
+        html += `<div class="form-group" id="sc-target-wrap"><label for="sc-target">${individual ? 'Group' : 'Team'}</label><select id="sc-target" onchange="selectCorrectionTarget(this.value)"><option value="">Choose a ${individual ? 'group' : 'team'}</option>`
+            + targets.map((t) => `<option value="${escReg(t.key)}"${t.key === scTarget ? ' selected' : ''}>${escReg(t.label)}</option>`).join('') + `</select></div>`;
+        html += `<div id="sc-holes">${correctionHolesHtml(view, individual)}</div>`;
+        mount.innerHTML = html;
+    }
+    function correctionHolesHtml(view, individual) {
+        if (!scTarget) return '';
+        const status = correctionStatus(view);
+        const locked = status !== 'open';
+        const dis = locked ? ' disabled' : '';
+        const holes = (view.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const scores = view.scores || {};
+        const ridArg = recordIsMultiRound() ? `, '${escReg(scRoundId)}'` : '';
+        let html = '';
+        if (locked) {
+            html += `<p style="font-size:0.8rem; color:var(--accent-red);">This round is ${escReg(status)}. Open it above to correct a score \u2014 a ${escReg(status)} round takes no scores, here or on the cards.</p>`;
+        }
+        const box = (value, onchange) => `<input type="number" inputmode="numeric" min="1" style="width:56px;" value="${value || ''}" onchange="${onchange}"${dis}>`;
+        if (individual) {
+            const gid = scTarget.slice('group:'.length);
+            const group = (view.scoringGroups || {})[gid] || {};
+            const players = view.players || {};
+            (group.playerIds || []).filter((pid) => players[pid]).forEach((pid) => {
+                html += `<div style="font-weight:bold; margin-top:8px;">${escReg(players[pid].name || pid)}</div><div style="display:flex; flex-wrap:wrap; gap:6px;">`;
+                holes.forEach((h) => { html += `<label style="font-size:0.72rem;">${h.hole}<br>${box(scores[playerHoleKey(pid, h.hole)], `correctPlayerScore('${escReg(gid)}', '${escReg(pid)}', ${h.hole}, this.value${ridArg})`)}</label>`; });
+                html += `</div>`;
+            });
+            return html;
+        }
+        const num = parseInt(scTarget.slice('team:'.length), 10);
+        const team = (view.teams || {})[`team${num}`] || {};
+        if ((view.format || 'scramble') === 'scramble') {
+            html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">`;
+            holes.forEach((h) => { html += `<label style="font-size:0.72rem;">${h.hole}<br>${box(scores[teamHoleKey(num, h.hole)], `correctTeamScore(${num}, ${h.hole}, this.value${ridArg})`)}</label>`; });
+            return html + `</div>`;
+        }
+        (team.players || []).forEach((name, idx) => {
+            html += `<div style="font-weight:bold; margin-top:8px;">${escReg(name)}</div><div style="display:flex; flex-wrap:wrap; gap:6px;">`;
+            holes.forEach((h) => { html += `<label style="font-size:0.72rem;">${h.hole}<br>${box(scores[teamPlayerHoleKey(num, idx, h.hole)], `correctTeamPlayerScore(${num}, ${idx}, ${h.hole}, this.value${ridArg})`)}</label>`; });
+            html += `</div>`;
+        });
+        return html;
     }
 
     function renderRegistrationList() {
@@ -3162,6 +3288,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderFlights();
             renderPlayerField();
             renderScoringGroups();
+            renderScoreCorrector();
             // Team scorecard links belong to team events only.
             const teamLinksHeading = document.getElementById('team-links-list');
             if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
