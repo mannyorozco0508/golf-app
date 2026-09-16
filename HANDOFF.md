@@ -1236,7 +1236,11 @@ Run it after touching the Cup card, the pointer, `resolveRyderCupForRound` or
 `foursomes-entry-check.js` · `home-screen-check.js` · `id-binding-check.js` ·
 `nassau-stake-check.js` (a split-stake Nassau prices every segment) ·
 `orphan-match-check.js` (READ-ONLY, against live data) ·
-`receipt-identity-check.js` · `native-pdf-lines-check.js` (the share-sheet PDF's
+`receipt-identity-check.js` · `native-pdf-mark-check.js` (the share-sheet PDF
+carries the brand mark as a JPEG image object flattened on white from the
+page's own element - zero requests for the asset; PDFKit renders it and the
+mark box's corners are white, the R its own green) ·
+`native-pdf-lines-check.js` (the share-sheet PDF's
 lines read like the page - one per ledger row, the money in the same order as
 the v150 capture, no button text; the trip itinerary unchanged) ·
 `receipt-logo-check.js` (the brand mark is on the

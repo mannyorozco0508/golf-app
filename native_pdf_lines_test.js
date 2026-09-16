@@ -75,11 +75,14 @@ describe('THE SEAMS (source, comments stripped)', () => {
         assert.match(code, /return items\.join\('  '\);/);
         assert.match(code, /raw\.replace\(\/\\t\/g, '  '\)/);
     });
-    test('nothing about the PDF builder or its grid changed', () => {
+    test('the PDF grid did not change; the text origin is the margin unless the mark is on the page (v153)', () => {
+        // Re-pinned 2026-09-15 (the mark, v153): the origin expression gained the
+        // mark's offset on page 1 only; native_pdf_mark_test.js pins the no-mark
+        // output byte for byte, which is the stronger form of what this guarded.
         const at = code.indexOf('function buildPdf('); const fn = code.slice(at, code.indexOf('\n    function ', at + 30));
         assert.ok(fn.length > 1500, 'the builder was sliced');
         assert.match(code, /const LINES_PER_PAGE = Math\.floor\(\(PAGE_H - MARGIN \* 2\) \/ LEAD\);/);
-        assert.match(fn, /BT \/F1 ' \+ SIZE \+ ' Tf ' \+ LEAD \+ ' TL 1 0 0 1 '\s*\+ MARGIN \+ ' ' \+ \(PAGE_H - MARGIN\) \+ ' Tm/);
+        assert.match(fn, /BT \/F1 ' \+ SIZE \+ ' Tf ' \+ LEAD \+ ' TL 1 0 0 1 '\s*\+ MARGIN \+ ' ' \+ \(PAGE_H - MARGIN - \(marked \? MARK_PT \+ MARK_GAP : 0\)\) \+ ' Tm/);
     });
 });
 

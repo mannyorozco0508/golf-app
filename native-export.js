@@ -284,35 +284,115 @@
         return rows.length ? rows : [''];
     }
 
-    function buildPdf(title, lines) {
+    // ---- THE MARK ------------------------------------------------------------
+    //
+    // THE BRAND MARK ON THE FIRST PAGE, from the asset the page already holds:
+    // settlement.html's <img class="receipt-mark" src="logo-mark.png"> (v150,
+    // display:none on screen, precached by sw.js, in the native bundle), which the
+    // page loaded and decoded on arrival. Never a fetch, never a new Image() - a
+    // receipt shared at a course with no signal has it because the page has it.
+    //
+    // FLATTENED ON WHITE, AS A JPEG (Route B, 2026-09-15). logo-mark.png is RGBA,
+    // and under every transparent pixel the stored colour is BLACK: a PDF image
+    // object paints its samples as-is, so raw RGB with no soft mask prints the
+    // mark cut out of a black square (measured: the box's corners were 0,0,0).
+    // A soft mask would fix that at 33 KB and an async zlib step in a synchronous
+    // export path, for a page that is white anyway. So the pixels are drawn on a
+    // white-filled canvas - the same compositing the browser print does - and
+    // encoded as a JPEG, which every PDF viewer decodes natively (/DCTDecode).
+    // 256 px drawn at 48 pt is 384 dpi; +~14 KB on the file. atob() hands back the
+    // JPEG bytes as one char per byte, which is what the Latin-1 PDF string needs.
+    //
+    // FAIL SOFT, four ways: no element, an image not yet complete (or with no
+    // natural size), no canvas / no 2d context, a canvas that throws (a tainted
+    // one would) or that hands back anything but a JPEG -> null, and the PDF is
+    // the text PDF of before. Never a broken image object, never no PDF.
+    const MARK_PX = 256;          // the canvas, and the asset's own size
+    const MARK_PT = 48;           // the browser print's 64 CSS px at 72/96
+    const MARK_GAP = 6;           // the browser print's 6 px under the mark
+    const MARK_ROWS = Math.ceil((MARK_PT + MARK_GAP) / LEAD);   // 5 lines page 1 gives up
+    function markFrom(roots) {
+        try {
+            let img = null;
+            (roots || []).forEach(function (root) {
+                if (img || !root || typeof root.querySelector !== 'function') return;
+                const found = root.querySelector('img.receipt-mark');
+                if (found) img = found;
+            });
+            if (!img) return null;
+            if (!img.complete || !(img.naturalWidth > 0) || !(img.naturalHeight > 0)) return null;
+            if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+            const canvas = document.createElement('canvas');
+            if (!canvas || typeof canvas.getContext !== 'function') return null;
+            canvas.width = MARK_PX; canvas.height = MARK_PX;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, MARK_PX, MARK_PX);
+            ctx.drawImage(img, 0, 0, MARK_PX, MARK_PX);
+            const url = canvas.toDataURL('image/jpeg', 0.92);
+            const prefix = 'data:image/jpeg;base64,';
+            if (typeof url !== 'string' || url.indexOf(prefix) !== 0) return null;   // a PNG fallback would not be DCT
+            const data = atob(url.slice(prefix.length));
+            if (!data || data.length < 100 || data.charCodeAt(0) !== 0xFF || data.charCodeAt(1) !== 0xD8) return null;   // JPEG SOI
+            return { data: data, w: MARK_PX, h: MARK_PX };
+        } catch (e) {
+            report('mark skipped', e);
+            return null;
+        }
+    }
+    function validMark(mark) {
+        return !!(mark && typeof mark.data === 'string' && mark.data.length > 0 && mark.w > 0 && mark.h > 0);
+    }
+
+    // mark: { data: JPEG bytes as a Latin-1 string, w, h } or null. With null the
+    // output is byte for byte what it was before the mark existed.
+    function buildPdf(title, lines, mark) {
+        const hasMark = validMark(mark);
         const flat = [];
         flat.push(pdfSafe(title));
         flat.push('');
         (lines || []).forEach(function (l) { wrap(l).forEach(function (r) { flat.push(r); }); });
 
         const pages = [];
-        for (let i = 0; i < flat.length; i += LINES_PER_PAGE) {
-            pages.push(flat.slice(i, i + LINES_PER_PAGE));
+        const firstCap = hasMark ? LINES_PER_PAGE - MARK_ROWS : LINES_PER_PAGE;
+        for (let i = 0; i < flat.length; i += (i === 0 ? firstCap : LINES_PER_PAGE)) {
+            pages.push(flat.slice(i, i + (i === 0 ? firstCap : LINES_PER_PAGE)));
         }
         if (!pages.length) pages.push(['']);
 
-        // object 1 catalog, 2 pages, 3 font, then per page: page obj + content obj
+        // object 1 catalog, 2 pages, 3 font, [4 the mark], then per page: page obj + content obj
         const objects = [];
         const pageIds = [];
-        pages.forEach(function (_, i) { pageIds.push(4 + i * 2); });
+        const markId = hasMark ? 4 : 0;
+        const firstPageId = hasMark ? 5 : 4;
+        pages.forEach(function (_, i) { pageIds.push(firstPageId + i * 2); });
 
         objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
         objects[2] = '<< /Type /Pages /Kids [' + pageIds.map(function (id) { return id + ' 0 R'; }).join(' ')
             + '] /Count ' + pages.length + ' >>';
         objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+        if (hasMark) {
+            // The JPEG bytes go in verbatim; /Length is their byte count, and the
+            // Latin-1 string keeps one char per byte so the offsets below stay true.
+            objects[markId] = '<< /Type /XObject /Subtype /Image /Width ' + mark.w + ' /Height ' + mark.h
+                + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + mark.data.length + ' >>\nstream\n'
+                + mark.data + '\nendstream';
+        }
 
         pages.forEach(function (rows, i) {
-            const pageId = 4 + i * 2;
+            const pageId = firstPageId + i * 2;
             const contentId = pageId + 1;
+            const marked = hasMark && i === 0;
             objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PAGE_W + ' ' + PAGE_H + ']'
-                + ' /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
-            let stream = 'BT /F1 ' + SIZE + ' Tf ' + LEAD + ' TL 1 0 0 1 '
-                + MARGIN + ' ' + (PAGE_H - MARGIN) + ' Tm\n';
+                + ' /Resources << /Font << /F1 3 0 R >>' + (marked ? ' /XObject << /Im1 ' + markId + ' 0 R >>' : '') + ' >> /Contents ' + contentId + ' 0 R >>';
+            let stream = '';
+            if (marked) {
+                // Centred at the top margin, MARK_PT square; the text starts MARK_GAP below it.
+                stream += 'q ' + MARK_PT + ' 0 0 ' + MARK_PT + ' ' + ((PAGE_W - MARK_PT) / 2) + ' ' + (PAGE_H - MARGIN - MARK_PT) + ' cm /Im1 Do Q\n';
+            }
+            stream += 'BT /F1 ' + SIZE + ' Tf ' + LEAD + ' TL 1 0 0 1 '
+                + MARGIN + ' ' + (PAGE_H - MARGIN - (marked ? MARK_PT + MARK_GAP : 0)) + ' Tm\n';
             rows.forEach(function (r) { stream += '(' + pdfEscape(r) + ') Tj T*\n'; });
             stream += 'ET';
             objects[contentId] = '<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream';
@@ -433,7 +513,7 @@
         // the golfer with nothing on screen.
         let data;
         try {
-            data = toBase64(buildPdf(title, linesFrom(roots)));
+            data = toBase64(buildPdf(title, linesFrom(roots), markFrom(roots)));
         } catch (e) {
             return fail('native-build-failed',
                 'Could not build the PDF for this round. Nothing was saved.', e);
@@ -475,6 +555,7 @@
         exportOrPrint: exportOrPrint,
         _buildPdf: buildPdf,
         _linesFrom: linesFrom,
+        _markFrom: markFrom,
         _renderedText: renderedText,
         _pdfSafe: pdfSafe,
         _safeName: safeName

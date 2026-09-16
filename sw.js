@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v153: the share-sheet PDF carries the mark.
+//
+// native-export.js (precached). The iOS PDF now opens with the brand mark -
+// logo-mark.png, taken from the receipt page's own already-decoded element
+// (never fetched), flattened on white and embedded as a JPEG image object
+// 48 pt square, centred above the course name; the text starts 54 pt lower on
+// page 1 and that page holds five fewer lines. Every line, in the same order.
+// With no mark on the page the PDF is byte for byte what v152 wrote. An
+// installed device on v152 shares a PDF with no mark on it.
+
 // Moved to v152: the shared receipt's header prints once.
 //
 // settlement.html (precached). printReceipt's export roots named the header
@@ -1495,7 +1505,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v152-header-once';
+const CACHE_VERSION = 'golfapp-v153-pdf-mark';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -90,14 +90,21 @@ describe('THE ASSET: precached, shipped natively, sharp at print resolution', ()
     });
 });
 
-describe('THE NATIVE EXPORT: text only, unchanged - stated, not hidden', () => {
-    test('native-export.js reads innerText and writes a Helvetica-only PDF with no image object', () => {
+describe('THE NATIVE EXPORT: since v153 it carries the mark too - from this same element', () => {
+    // Re-pinned 2026-09-15 (the mark, v153): v150 stated the native PDF was text
+    // only and got nothing from the print-only <img>. native-export.js now reads
+    // that very element (img.receipt-mark, already decoded) and embeds it as a
+    // JPEG image object - native_pdf_mark_test.js and tools/native-pdf-mark-
+    // check.js hold that. What this row guards now: the mark it reads IS this
+    // page's element, and the text lines are still innerText-derived.
+    test('native-export.js reads innerText, writes Helvetica text, and takes its image from img.receipt-mark', () => {
         const ne = stripComments(read('native-export.js'));
         assert.match(ne, /clone\.innerText/);
         assert.match(ne, /BaseFont \/Helvetica/);
-        assert.ok(!/XObject|\/Image|addImage/.test(ne), 'no image path exists in the PDF builder');
+        assert.match(ne, /root\.querySelector\('img\.receipt-mark'\)/, 'the same element this page carries');
+        assert.match(ne, /\/Filter \/DCTDecode/);
     });
-    test('the export roots are read by id, and the header is one of them - so the mark is inside what is read, and still contributes nothing', () => {
+    test('the export roots are read by id, and the header is one of them - so the mark is inside what the exporter is handed', () => {
         assert.match(code, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',\s*'combined-settlement-summary', 'receipt-scorecard'\]/);
     });
     test('the device check exists and says what it measures', () => {
