@@ -17,6 +17,15 @@
 // window.print stubbed - the itinerary view is display:none on screen, so the
 // live read finds nothing and the clone path runs: byte-identical to before).
 //
+// THE HEADER ONCE (2026-09-15, v152): the receipt is read the way printReceipt
+// hands it to the exporter - window.RattleExport.exportOrPrint is replaced by a
+// recorder (the exporter's entry, not a page function) and the REAL "Print /
+// Save Receipt" button is pressed. At v151 that gave 146 lines with the course
+// / date / format header at lines 0-2 AND 46-48 (native_pdf_lines_v151.fixture
+// .json), because the roots named 'receipt-export-head' and the summary that
+// contains it. Now 143 lines, the header once, everything else the same, in
+// the same order.
+//
 //   node tools/native-pdf-lines-check.js
 //
 //   exit 0   PASS
@@ -30,14 +39,18 @@ const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 const { linkedRounds } = require('../helpers/trip-weekly-rounds.js');
 
 const PREV = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'native_pdf_lines_prev.fixture.json'), 'utf8'));
+const V151 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'native_pdf_lines_v151.fixture.json'), 'utf8'));
 const R = linkedRounds();
 const NAMES = ['Marty', 'Scott', 'Carp', 'Randy', 'Manny', 'Matt B', 'Lance', 'Kopp', 'Marcus', 'Rocco', 'Matt H', 'Jeremy'];
 
-const RECEIPT = `(function(){ var roots=['receipt-export-head','settle-content','money-pool-section','combined-settlement-summary','receipt-scorecard'].map(id=>document.getElementById(id)).filter(el=>el&&(el.innerText||'').trim().length>0);
-  var lines = RattleExport._linesFrom(roots); var pdf = RattleExport._buildPdf('Caledonia-Receipt', lines);
+const RECEIPT = `(function(){ var captured = null; window.RattleExport.exportOrPrint = function (o) { captured = o; return Promise.resolve({ path: 'captured' }); };
+  var btn = Array.from(document.querySelectorAll('button')).find(x => /Print \\/ Save Receipt/.test(x.innerText)); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
+  if (!captured || !captured.roots) return JSON.stringify({ error: 'the button handed the exporter nothing' });
+  var roots = captured.roots; var rootIds = roots.map(r => r.id || (r.className ? '.' + String(r.className).split(' ')[0] : r.tagName));
+  var lines = RattleExport._linesFrom(roots); var pdf = RattleExport._buildPdf(captured.title, lines);
   var summary = document.getElementById('combined-settlement-summary'); var rt = RattleExport._renderedText ? RattleExport._renderedText(summary) : { live: null, text: '', drop: {} };
   var pages = pdf.split(/\\d+ 0 obj\\n<< \\/Length \\d+ >>\\nstream\\n/).slice(1).map(s => (s.split('endstream')[0].match(/\\) Tj/g) || []).length);
-  return JSON.stringify({ lines, pdfBytes: pdf.length, pageRows: pages, live: rt.live, rawHasButton: /Print \\/ Save Receipt/.test(rt.text), dropKeys: Object.keys(rt.drop) }); })()`;
+  return JSON.stringify({ rootIds, lines, pdfBytes: pdf.length, pageRows: pages, live: rt.live, rawHasButton: /Print \\/ Save Receipt/.test(rt.text), dropKeys: Object.keys(rt.drop) }); })()`;
 const STUB = `window.__printed = 0; window.print = function(){ window.__printed++; };`;
 const TRIP_CLICK = `(function(){ var b = Array.from(document.querySelectorAll('button')).find(x => /Itinerary/.test(x.innerText)); if (!b) return 'no button'; b.click(); return 'clicked'; })()`;
 const TRIP_READ = `(function(){ var v = document.getElementById('trip-itinerary-print-view'); var rt = RattleExport._renderedText ? RattleExport._renderedText(v) : { live: null }; return JSON.stringify({ printed: window.__printed, classOn: document.body.classList.contains('printing-itinerary'), display: getComputedStyle(v).display, live: rt.live, lines: RattleExport._linesFrom([v]) }); })()`;
@@ -52,21 +65,31 @@ const names = ls => { const out = []; const re = new RegExp('(' + NAMES.map(n =>
     const a = await arriveCold({ url: fileUrl('settlement.html', 'game=RA'), db: { events: { RA: R[0].data } }, expression: RECEIPT, settleMs: 4000 });
     if (!a.ok) bail('settlement: ' + a.reason);
     const r = JSON.parse(a.value);
+    if (r.error) bail('settlement: ' + r.error);
     if (r.lines.length === 0) bail('the receipt rendered no lines - nothing was measured');
+    // THE HEADER ONCE. v151's lines are the same lines with 46-48 (the second
+    // header) removed; and the v150 stream is the same stream minus one header.
+    const HEAD3 = V151.lines.slice(0, 3);
+    const headerAt = r.lines.map((l, i) => l === HEAD3[0] ? i : -1).filter(i => i >= 0);
+    if (headerAt.length !== 1 || headerAt[0] !== 0) problems.push('receipt: the header appears at lines ' + JSON.stringify(headerAt) + ' (want [0])');
+    if (JSON.stringify(r.lines) !== JSON.stringify(V151.lines.slice(0, 46).concat(V151.lines.slice(49)))) problems.push('receipt: the lines are not v151\'s with lines 46-48 removed (' + r.lines.length + ' vs ' + V151.lines.length + ')');
+    if (!(r.rootIds[0] === 'receipt-export-head' && r.rootIds[1] === 'settle-content' && r.rootIds[2] === 'money-pool-section' && r.rootIds[r.rootIds.length - 1] === 'receipt-scorecard' && !r.rootIds.includes('combined-settlement-summary'))) problems.push('receipt: unexpected roots ' + JSON.stringify(r.rootIds));
     // The old read gives 26 lines on this round (one card per line); the live read gives 146.
     if (r.lines.length < 100) problems.push('receipt: only ' + r.lines.length + ' lines - the cards are run together again (the fixture, the old read, has ' + PREV.receipt.length + ')');
 
     // THE SAME CHARACTERS, IN THE SAME ORDER: whitespace removed, case folded (the
     // screen's text-transform uppercases headers), the two streams are identical.
-    if (squash(r.lines) !== squash(PREV.receipt)) {
-        let i = 0; const A = squash(PREV.receipt), B = squash(r.lines); while (A[i] === B[i]) i++;
-        problems.push('receipt: the character stream differs from the fixture at ' + i + ': before …' + A.slice(i - 20, i + 40) + ' | after …' + B.slice(i - 20, i + 40));
+    const H = squash(HEAD3); const A0 = squash(PREV.receipt); const j = A0.indexOf(H, H.length);
+    const EXPECTED = j < 0 ? A0 : A0.slice(0, j) + A0.slice(j + H.length);   // the v150 stream minus its second header
+    if (squash(r.lines) !== EXPECTED) {
+        let i = 0; const A = EXPECTED, B = squash(r.lines); while (A[i] === B[i]) i++;
+        problems.push('receipt: the character stream differs from the fixture (minus the duplicate header) at ' + i + ': before …' + A.slice(i - 20, i + 40) + ' | after …' + B.slice(i - 20, i + 40));
     }
     if (JSON.stringify(names(r.lines)) !== JSON.stringify(names(PREV.receipt))) problems.push('receipt: the name sequence moved');
     // Money: the fixture's glue corrupts its own tokens ("$701st"), so the money
     // sequence is held as the literal list read off the page.
     const m = money(r.lines);
-    let at = 0; const A = squash(PREV.receipt);
+    let at = 0; const A = EXPECTED;
     m.forEach(tok => { const j = A.indexOf(tok, at); if (j < 0) problems.push('receipt: amount ' + tok + ' is not in the old text after position ' + at); else at = j + tok.length; });
     if (m.length !== 85 || m[0] !== '$50' || m[m.length - 1] !== '$10') problems.push('receipt: money tokens ' + m.length + ' [' + m.slice(0, 3) + ' … ' + m.slice(-2) + ']');
     ['Marty  $310', 'T2 · Jeremy  $3', 'Marty  +$285 NET', 'TOTAL PAYOUT  +$375', 'Randy → Marty  $37', 'Original Bet  $50', 'Birdie  Eagle or better  net rows show the score after handicap strokes']
@@ -90,6 +113,6 @@ const names = ls => { const out = []; const re = new RegExp('(' + NAMES.map(n =>
     if (tr.display !== 'none' || tr.live !== false) problems.push('trip: the itinerary view is ' + tr.display + ' on screen and live=' + tr.live + ' - the fallback expectation changed');
     if (JSON.stringify(tr.lines) !== JSON.stringify(PREV.trip)) problems.push('trip: lines differ from the fixture (the clone fallback should be byte-identical)');
 
-    console.log(JSON.stringify({ result: problems.length ? 'FAIL' : 'PASS', problems, receipt: { lines: r.lines.length, pdfBytes: r.pdfBytes, pageRows: r.pageRows, before: { lines: PREV.receipt.length, pdfBytes: PREV.receiptPdfBytes } }, trip: { lines: tr.lines.length, display: tr.display, live: tr.live } }, null, 1));
+    console.log(JSON.stringify({ result: problems.length ? 'FAIL' : 'PASS', problems, receipt: { rootIds: r.rootIds, lines: r.lines.length, headerAt, pdfBytes: r.pdfBytes, pageRows: r.pageRows, v151: { lines: V151.lines.length, pdfBytes: V151.pdfBytes }, v150: { lines: PREV.receipt.length, pdfBytes: PREV.receiptPdfBytes } }, trip: { lines: tr.lines.length, display: tr.display, live: tr.live } }, null, 1));
     process.exit(problems.length ? 1 : 0);
 })().catch(e => bail(String(e && e.stack || e)));

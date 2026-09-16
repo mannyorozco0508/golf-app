@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v152: the shared receipt's header prints once.
+//
+// settlement.html (precached). printReceipt's export roots named the header
+// element AND the summary card that contains it, so the iOS PDF carried the
+// course / date / format twice (lines 0-2 and 46-48 of the v151 receipt).
+// The summary is now exported as its cards, minus the header and the print
+// button; the header stays first; the money's order is unchanged. Nothing on
+// screen or in the browser print moved. An installed device on v151 shares a
+// PDF with the header twice.
+
 // Moved to v151: the share-sheet PDF reads like the page.
 //
 // native-export.js (precached). The iOS PDF's lines came from innerText of a
@@ -1485,7 +1495,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v151-pdf-lines';
+const CACHE_VERSION = 'golfapp-v152-header-once';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

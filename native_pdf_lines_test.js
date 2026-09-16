@@ -164,6 +164,7 @@ describe('PAGINATION with many lines: nothing runs past the bottom margin', () =
 describe('THE DEVICE CHECK exists and measures what this file cannot', () => {
     test('tools/native-pdf-lines-check.js reads the fixture, compares the character stream, and checks the button and the trip', () => {
         const t = read('tools/native-pdf-lines-check.js');
-        ['native_pdf_lines_prev.fixture.json', 'squash(r.lines) !== squash(PREV.receipt)', 'a button row leaked', 'trip: lines differ from the fixture', "'Marty  $310'"].forEach(s => assert.ok(t.includes(s), 'missing ' + s));
+        // v152: the v150 stream is compared minus its duplicated header (EXPECTED), since the header now prints once.
+        ['native_pdf_lines_prev.fixture.json', 'squash(r.lines) !== EXPECTED', 'a button row leaked', 'trip: lines differ from the fixture', "'Marty  $310'"].forEach(s => assert.ok(t.includes(s), 'missing ' + s));
     });
 });

@@ -567,9 +567,26 @@ html {
         //
         // Listed in reading order, and empties are dropped so a round without a pool
         // does not export a blank heading.
+        //
+        // THE HEADER, ONCE (2026-09-15). buildReceiptHeader() renders INSIDE
+        // #combined-settlement-summary (the settled branch of renderCombinedSummary
+        // puts it first, then the print button, then the money), and
+        // 'receipt-export-head' is that same element - so the PDF printed the course,
+        // date and format twice: once as the first root and again inside the fourth.
+        // The first root stays: the header belongs at the top of the document, and
+        // the reading order below - side matches, the pool, the settlement - is the
+        // order the money has always been exported in. The summary is exported as
+        // its PARTS instead: its cards, minus the header (already the first root)
+        // and minus the print button (never exported). Same text, same order,
+        // three lines fewer. The screen is untouched - nothing here renders.
+        const summary = document.getElementById('combined-settlement-summary');
+        const summaryParts = summary
+            ? Array.from(summary.children).filter(el => el.id !== 'receipt-export-head' && el.tagName !== 'BUTTON')
+            : [];
         const roots = ['receipt-export-head', 'settle-content', 'money-pool-section',
                        'combined-settlement-summary', 'receipt-scorecard']
             .map(id => document.getElementById(id))
+            .flatMap(el => (el && el.id === 'combined-settlement-summary') ? summaryParts : [el])
             .filter(el => el && (el.innerText || '').trim().length > 0);
 
         return window.RattleExport.exportOrPrint({ title: title, roots: roots });
