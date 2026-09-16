@@ -97,10 +97,14 @@
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
-        input[type="text"], input[type="number"], select {
+        input[type="text"], input[type="number"], input[type="email"], select {
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
+        .reg-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--border-faint); }
+        .reg-row .reg-name { flex:1; min-width:8em; font-weight:bold; }
+        .reg-row .reg-meta { font-size:0.78rem; color:var(--text-muted); flex-basis:100%; }
+        .reg-row label { display:inline-flex; align-items:center; gap:6px; font-weight:normal; margin:0; }
 
         .custom-select-wrapper { position: relative; }
         .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
@@ -358,6 +362,34 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <button class="btn-outline" onclick="window.location.href='admin.html'">← Back to Home</button>
 </div>
 
+<div class="container" id="register-screen" style="display:none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo">📋</div>
+    <div class="lobby-title" id="reg-event-name">Sign up</div>
+    <p class="lobby-sub" id="reg-event-sub"></p>
+    <div id="reg-closed" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--border-mid); border-radius:10px; padding:14px; font-size:0.9rem;"></div>
+    <div id="reg-form">
+        <div class="form-group">
+            <label for="reg-name">Name</label>
+            <input type="text" id="reg-name" placeholder="Your name" maxlength="120" autocomplete="name">
+        </div>
+        <div class="form-group">
+            <label for="reg-contact">Email or phone (optional)</label>
+            <input type="text" id="reg-contact" placeholder="Email or phone" autocomplete="tel">
+        </div>
+        <div class="form-group" id="reg-handicap-wrap" style="display:none;">
+            <label for="reg-handicap">Handicap</label>
+            <input type="text" id="reg-handicap" placeholder="e.g. 12 or +2">
+        </div>
+        <div class="form-group" id="reg-team-wrap" style="display:none;">
+            <label for="reg-team-pref">Team preference (optional)</label>
+            <input type="text" id="reg-team-pref" placeholder="Team name if you have one">
+        </div>
+        <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
+        <p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>
+    </div>
+</div>
+
 <div class="container" id="manage-screen" style="display:none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
@@ -377,6 +409,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <h2 id="manage-t-name" style="text-align:center; font-size:1.3rem;"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
         <p style="text-align:center; color:var(--brand-navy); font-size:0.9rem; font-weight:bold; margin-top:4px;" id="manage-t-pool"></p>
+
+        <div id="registration-section" style="display:none;">
+            <hr class="section-divider">
+            <h3>📋 Registration</h3>
+            <div id="registration-link-row"></div>
+            <div id="registration-list"></div>
+        </div>
 
         <hr class="section-divider">
         <h3>🚀 Starting Holes</h3>
@@ -1172,8 +1211,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Shows the team's link as both a QR code (scan on the tee) and selectable text with a
     // real Copy button — no prompt() fallback, since that can silently fail on iOS home-screen
     // apps and would leave someone with literally no way to get the link.
-    function openShareModal(url, teamName) {
-        document.getElementById('share-modal-title').textContent = `${teamName} — Scorecard Link`;
+    function openShareModal(url, teamName, kind) {
+        const suffix = kind === 'register' ? 'Signup Link' : 'Scorecard Link';
+        document.getElementById('share-modal-title').textContent = `${teamName} — ${suffix}`;
         document.getElementById('share-link-text').textContent = url;
         document.getElementById('share-qr-box').innerHTML = '';
         new QRCode(document.getElementById('share-qr-box'), { text: url, width: 180, height: 180 });
@@ -1290,6 +1330,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             showTab('setup');
         }
         renderSignedInAs();
+        syncRegistrationListener();
+        renderRegistrationList();
     }
 
     // "Signed in as <email>" - a fact about the session, never a claim about
@@ -1355,6 +1397,251 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         applyManageGate();
         renderSignedInAs();
     });
+
+    // ---- REGISTRATION (Wave 1) -------------------------------------------
+    //
+    // Public golfers arrive on ?register=CODE and WRITE an entry under
+    // registrations/$code. The rules already allow that create for anyone,
+    // but only when the tournament has an ownerUid — otherwise the write is
+    // refused and nobody could read it. This page refuses first, with a
+    // sentence, so a legacy event does not look like it takes signups.
+    //
+    // The organizer list lives in Setup, so the manage gate takes it. Paid is
+    // cash/offline, ticked by the organizer. Approve copies the golfer into
+    // the existing players/ or teams/ writers; it does not touch scores.
+    let registerCode = null;
+    let registerEvent = null;
+    let registrationData = {};
+    let registrationBoundCode = null;
+    let registrationCb = null;
+
+    function eventIsIndividual(data) {
+        return !!(data && (data.scoringModel === PLAYER_MODEL || data.format === 'individual'));
+    }
+
+    function escReg(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function registrationSignupUrl() {
+        return shareBaseUrl() + 'tournament.html?register=' + encodeURIComponent(currentCode || registerCode || '');
+    }
+
+    function openRegisterScreen(code) {
+        registerCode = String(code || '').toUpperCase();
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('manage-screen').style.display = 'none';
+        document.getElementById('register-screen').style.display = 'block';
+        db.ref('tournaments/' + registerCode).once('value').then((snap) => {
+            const data = snap.val();
+            registerEvent = data;
+            const title = document.getElementById('reg-event-name');
+            const sub = document.getElementById('reg-event-sub');
+            const form = document.getElementById('reg-form');
+            const closed = document.getElementById('reg-closed');
+            if (!data) {
+                title.textContent = 'Tournament not found';
+                if (sub) sub.textContent = '';
+                form.style.display = 'none';
+                closed.style.display = 'block';
+                closed.textContent = 'No event matches that code.';
+                return;
+            }
+            title.textContent = data.name || 'Tournament';
+            if (sub) sub.textContent = [data.courseName, formatLabelFor(data.format)].filter(Boolean).join(' \u2022 ');
+            const taking = !!data.ownerUid;
+            form.style.display = taking ? 'block' : 'none';
+            closed.style.display = taking ? 'none' : 'block';
+            if (!taking) {
+                closed.textContent = 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
+                return;
+            }
+            document.getElementById('reg-handicap-wrap').style.display = eventIsIndividual(data) ? 'block' : 'none';
+            document.getElementById('reg-team-wrap').style.display = eventIsIndividual(data) ? 'none' : 'block';
+        }).catch(() => {
+            const form = document.getElementById('reg-form');
+            const closed = document.getElementById('reg-closed');
+            if (form) form.style.display = 'none';
+            if (closed) {
+                closed.style.display = 'block';
+                closed.textContent = 'This event is not taking signups.';
+            }
+        });
+    }
+
+    function submitRegistration() {
+        const name = ((document.getElementById('reg-name') || {}).value || '').trim();
+        if (!name) { alert('Give your name.'); return; }
+        if (name.length > 120) { alert('That name is too long.'); return; }
+        if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
+            alert('This event is not taking signups.');
+            return;
+        }
+        const entryId = mintId('e');
+        const payload = { name: name, createdAt: Date.now() };
+        const contact = ((document.getElementById('reg-contact') || {}).value || '').trim();
+        if (contact) payload.contact = contact;
+        const hcpWrap = document.getElementById('reg-handicap-wrap');
+        const hcpEl = document.getElementById('reg-handicap');
+        if (hcpWrap && hcpWrap.style.display !== 'none' && hcpEl && hcpEl.value.trim()) {
+            payload.handicap = hcpEl.value.trim();
+        }
+        const teamWrap = document.getElementById('reg-team-wrap');
+        const teamEl = document.getElementById('reg-team-pref');
+        if (teamWrap && teamWrap.style.display !== 'none' && teamEl && teamEl.value.trim()) {
+            payload.teamPreference = teamEl.value.trim();
+        }
+        const status = document.getElementById('reg-status');
+        if (status) status.textContent = '';
+        db.ref(`registrations/${registerCode}/${entryId}`).set(payload).then(() => {
+            const nameEl = document.getElementById('reg-name');
+            if (nameEl) nameEl.value = '';
+            if (status) status.textContent = 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.';
+        }).catch((err) => {
+            alert((err && err.message) ? String(err.message) : 'Could not sign up just now.');
+        });
+    }
+
+    function syncRegistrationListener() {
+        const wanted = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        if (wanted && registrationBoundCode === currentCode) return;
+        if (registrationBoundCode) {
+            try {
+                const prev = db.ref('registrations/' + registrationBoundCode);
+                if (prev && typeof prev.off === 'function' && registrationCb) prev.off('value', registrationCb);
+            } catch (e) { /* stub has no off */ }
+            registrationBoundCode = null;
+            registrationCb = null;
+        }
+        if (!wanted) { registrationData = {}; return; }
+        const code = currentCode;
+        registrationCb = (snap) => {
+            if (currentCode !== code) return;
+            registrationData = snap.val() || {};
+            renderRegistrationList();
+        };
+        db.ref('registrations/' + code).on('value', registrationCb);
+        registrationBoundCode = code;
+    }
+
+    function renderRegistrationList() {
+        const section = document.getElementById('registration-section');
+        if (!section) return;
+        const allowed = !!(currentData && currentData.ownerUid && canManage());
+        section.style.display = allowed ? 'block' : 'none';
+        if (!allowed) return;
+        const url = registrationSignupUrl();
+        const linkBox = document.getElementById('registration-link-row');
+        if (linkBox) {
+            const eventName = escReg((currentData && currentData.name) || 'Event');
+            linkBox.innerHTML =
+                `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. Tick Paid when you have the cash, then approve them into the field.</p>`
+                + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
+                + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">\ud83d\udce4 Share signup link</button>`;
+        }
+        const list = document.getElementById('registration-list');
+        if (!list) return;
+        const entries = Object.keys(registrationData || {}).sort((a, b) =>
+            ((registrationData[a] || {}).createdAt || 0) - ((registrationData[b] || {}).createdAt || 0));
+        if (entries.length === 0) {
+            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
+            return;
+        }
+        const teams = currentData.teams || {};
+        const teamOpts = Object.keys(teams).sort((a, b) => (teams[a].num || 0) - (teams[b].num || 0));
+        const individual = recordIsIndividual();
+        list.innerHTML = entries.map((id) => {
+            const e = registrationData[id] || {};
+            const inField = !!(e.approvedAt || e.playerId || e.teamNum);
+            const pref = String(e.teamPreference || '').trim();
+            const match = teamOpts.find((tid) => String(teams[tid].name || '').toLowerCase() === pref.toLowerCase());
+            const defaultDest = match ? String(teams[match].num) : 'new';
+            const dest = individual ? '' : `<select id="reg-dest-${escReg(id)}">`
+                + `<option value="new"${defaultDest === 'new' ? ' selected' : ''}>New team</option>`
+                + teamOpts.map((tid) => {
+                    const n = teams[tid].num;
+                    const label = teams[tid].name || ('Team ' + n);
+                    return `<option value="${n}"${String(n) === defaultDest ? ' selected' : ''}>${escReg(label)}</option>`;
+                }).join('')
+                + `</select>`;
+            const meta = [e.contact, e.handicap ? ('Hcp ' + e.handicap) : '', pref ? ('Prefers ' + pref) : '']
+                .filter(Boolean).map(escReg).join(' \u00b7 ');
+            const paid = e.paid ? ' checked' : '';
+            const approve = inField
+                ? `<span style="font-size:0.78rem; color:var(--text-muted);">In the field</span>`
+                : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
+            return `<div class="reg-row">`
+                + `<span class="reg-name">${escReg(e.name || '')}</span>`
+                + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
+                + dest
+                + approve
+                + (meta ? `<span class="reg-meta">${meta}</span>` : '')
+                + `</div>`;
+        }).join('');
+    }
+
+    function setRegistrationPaid(entryId, paid) {
+        if (!currentCode || !canManage()) return;
+        const patch = { paid: !!paid };
+        patch.paidAt = paid ? Date.now() : null;
+        db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    function approveRegistration(entryId) {
+        if (!currentCode || !canManage()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry || !String(entry.name || '').trim()) return;
+        if (entry.approvedAt || entry.playerId || entry.teamNum) return;
+        const name = String(entry.name).trim();
+        if (recordIsIndividual()) {
+            const pid = newPlayerId();
+            const rec = {
+                id: pid,
+                name: name,
+                handicap: String(entry.handicap || '').trim() || '0',
+                addedAt: Date.now()
+            };
+            db.ref(`tournaments/${currentCode}/players/${pid}`).set(rec).then(() =>
+                db.ref(`registrations/${currentCode}/${entryId}`).update({
+                    approvedAt: Date.now(), playerId: pid
+                })
+            ).catch((err) => alert(`Error: ${err.message}`));
+            return;
+        }
+        const destEl = document.getElementById('reg-dest-' + entryId);
+        let dest = destEl && destEl.value ? String(destEl.value) : '';
+        if (!dest) {
+            const pref = String(entry.teamPreference || '').trim().toLowerCase();
+            const teams = currentData.teams || {};
+            const hit = Object.keys(teams).find((tid) => String(teams[tid].name || '').toLowerCase() === pref);
+            dest = hit ? String(teams[hit].num) : 'new';
+        }
+        if (dest !== 'new') {
+            const t = (currentData.teams || {})['team' + dest];
+            if (t) {
+                const players = (t.players || []).concat([name]);
+                db.ref(`tournaments/${currentCode}/teams/team${t.num}/players`).set(players).then(() =>
+                    db.ref(`registrations/${currentCode}/${entryId}`).update({
+                        approvedAt: Date.now(), teamNum: t.num
+                    })
+                ).catch((err) => alert(`Error: ${err.message}`));
+                return;
+            }
+        }
+        const existing = currentData.teams || {};
+        const nextNum = Object.values(existing).reduce((max, t) => Math.max(max, t.num || 0), 0) + 1;
+        const teamName = String(entry.teamPreference || '').trim() || `Team ${nextNum}`;
+        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({
+            num: nextNum, name: teamName, players: [name], handicap: 0
+        }).then(() =>
+            db.ref(`registrations/${currentCode}/${entryId}`).update({
+                approvedAt: Date.now(), teamNum: nextNum
+            })
+        ).catch((err) => alert(`Error: ${err.message}`));
+    }
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
     // computeTournamentPayouts now live in tournament-engine.js so this page and
@@ -2707,8 +2994,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     const urlParams = new URLSearchParams(window.location.search);
     const tourneyParam = urlParams.get('tourney');
+    const registerParam = urlParams.get('register');
     tripLinkCode = urlParams.get('trip');
-    if (tourneyParam) {
+    if (registerParam) {
+        openRegisterScreen(registerParam.toUpperCase());
+    } else if (tourneyParam) {
         currentCode = tourneyParam.toUpperCase();
         loadTournament(currentCode);
     } else if (tripLinkCode) {

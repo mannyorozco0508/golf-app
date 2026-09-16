@@ -76,6 +76,8 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v37. Public signup (?register=CODE) and the organizer
+        // Registration list (cash/offline Paid, approve into the field).
         // Moved to v36. The icons changed in v35 and the manifest both tournament
         // pages link is new in v36 - a precached page whose manifest is not in the
         // same cache generation cannot be installed offline, and an installed
@@ -97,7 +99,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v36-its-own-manifest',
+        cacheName: 'tournament-v37-registration',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

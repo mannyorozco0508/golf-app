@@ -37,7 +37,7 @@ Consumer bundle: **31 files**, cache `consumer-v34-brand-mark`, `start_url: ./ad
 
 | File | Role |
 |---|---|
-| `tournament.html` | Organizer page — flights, teams, rounds, payouts |
+| `tournament.html` | Organizer page — flights, teams, rounds, payouts, registration (`?register=` public signup; Setup list for the owner) |
 | `tournament-scorecard.html` | Team scorecard, group links |
 | `tournament-engine.js` | Tournament scoring and payout engine |
 
