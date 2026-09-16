@@ -515,6 +515,633 @@ lock nothing (the round app's group lock is the same URL-parameter shape). Out o
 wave's tournament scope; the same category of claim; take it out with the next consumer
 copy pass and let `user_facing_copy_test.js` hold the sentence that replaces it.
 
+## Hosts and Firebase Authorized Domains (read-only recon, 2026-09-16)
+
+**Two products share one host.** `tournaments.rattlegolf.com` resolves to Cloudflare
+(172.67.176.70, 104.21.96.92) and serves THIS Pages deploy byte for byte — `/tournament`
+on it was 199450 bytes and `cmp`-identical to `golf-app-5a5.pages.dev/tournament` and to
+HEAD's `tournament.html` within an hour of the v159 push; its `/sw.js` carried the same
+`golfapp-v159-…` key. But `/` on that host is `index.html` — the Consumer round app. The
+hostname says Tournaments; the site under it is the whole repo. The tournament hero band
+(polish wave) is designed to read as the Tournaments PRODUCT — the wordmark is
+`Rattle / Tournaments`, parent brand first — and not as the site's identity. The
+Cloudflare dashboard binding itself was not read; the bytes and timing were.
+
+**Authorized Domains, as read on 2026-09-16 (public `getProjectConfig`, key-only):**
+`localhost, golfapp-9fb21.firebaseapp.com, golfapp-9fb21.web.app, golf-app-5a5.pages.dev,
+tournaments.rattlegolf.com, rattlegolf.com`. The earlier recon that morning read a list
+with `rattlegolf.app` on it and without the two rattlegolf.com hosts; Manny changed it by
+hand in the console the same day. Re-read before trusting either list.
+
+**The rattlegolf.app entry, framed correctly.** `rattlegolf.app` is UNREGISTERED — no A, no
+MX, nobody owns it (dig, 2026-09-16). An Authorized Domains entry for an unregistered
+domain is therefore not a live exposure; it is a BET that nobody registers it later and
+gets a pre-authorised origin for OAuth redirect flows against this project. Removed for
+that reason. (The first recon called it "an authorized domain a stranger owns"; that was
+wrong — nobody owns it.) The `.app` domain is being dropped from the project entirely;
+`support@rattlegolf.com` routes; `com.rattlegolf.app` is the iOS bundle id, a reverse-DNS
+string that needs no domain and stays.
+
+**Sign-in on the custom host works today, and why.** `tournament.html` signs in with
+`signInWithEmailAndPassword` only. Authorized Domains gate OAuth popup/redirect, email-link
+action URLs and reCAPTCHA — not the password REST call, which the API key alone gates.
+Measured: `accounts:signInWithPassword` with `Referer/Origin: https://tournaments.rattlegolf.com`
+and bogus credentials → `400 INVALID_LOGIN_CREDENTIALS` (the wrong-password answer, not a
+referrer block). Adding Google sign-in, a password-reset continue URL or email-link sign-in
+would have needed the domain listed first; it is listed now.
+
+## The tournament landing (polish wave, 2026-09-16) — PRESENTATION ONLY
+
+`/tournament` opens on a hero band: `assets/tournament-hero.svg` under a dark gradient,
+the wordmark **Rattle / Tournaments** and one line — "Live scoring + registration for
+charity, member-guest, and club events." Below it, in order: the organizer sign-in as a
+compact class-styled card (`.signin-card`; same ids, same sentence, same button, same
+`signInWithEmailAndPassword`), then the restyled name / course / entry-fee fields
+(`.setup-field`, a `# Rattle Golf — Project Handoff
+
+I'm building a golf scoring and betting app. I'm not a coder — an AI assistant writes the code, I review and commit it. I need you to get oriented before suggesting anything.
+
+## What it is
+
+A mobile-first PWA for golf groups who play a lot of side action, now also shipping as a native iOS app. The core promise: **one app tracks every bet, so nobody needs notes, spreadsheets or arguments after the round.**
+
+The defining user is my friend Marty and his Monday group. On any given Monday they might have a main Stroke Play game, a Nassau, multiple Match Play side bets, several presses at different amounts, two separate Skins games between different subsets of players, cross-group bets, and Birdie/KP/Dots — all at once.
+
+The other audience is buddy trips: Myrtle Beach in October, and eventually Bandon, Streamsong, Sand Valley.
+
+## Tech stack
+
+- **Vanilla HTML/CSS/JS. No frameworks, no build step.**
+- Firebase Realtime Database (compat 9.22.2), project `golfapp-9fb21`
+- Cloudflare Pages at `golf-app-5a5.pages.dev`, auto-deploys from GitHub on commit
+- Capacitor 8.5.1 wraps the web app for iOS. Bundle ID `com.rattlegolf.app`, webDir `www/app`
+- Repo: `mannyorozco0508/golf-app` (public)
+- Tests: Node's built-in runner (`npm test`), plus targaryen for the Firebase rules suite
+
+## How I work — THIS CHANGED, don't trust older instructions
+
+I used to edit only by pasting whole files into GitHub's web editor on an iPad, with no terminal and no way to run anything myself. **That is no longer true.** I now have a MacBook with:
+
+- the repo cloned at `~/golf-app`, with working `git push`
+- Node 24 / npm, so I can run `npm test` and paste you real results
+- Xcode 16.5, for archiving and uploading to TestFlight
+- the Firebase CLI via `npx firebase-tools`
+
+So you can give me terminal commands and I'll run them. For edits, a small surgical patch is fine — I prefer a Python heredoc that asserts the old text exists before replacing it, so it fails safely instead of half-applying. For anything large, still give me a complete file.
+
+I still can't read code well enough to catch a subtle mistake, so **verify your own work.** Pull a fresh tarball rather than trusting `raw.githubusercontent.com`, which serves stale copies:
+
+```
+curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads/main"
+```
+
+## Current state
+
+```
+6799 tests · 6797 passing · 0 failing · 2 todo   (2026-09-13, npm test, twice)
+```
+
+15 HTML pages plus ~20 shared JS modules. The money math lives in three canonical files:
+
+- `money-engine.js` — handicap allocation, match/stroke/wolf engines
+- `settlement-engine.js` — the single source of truth for "what did each golfer win or lose"
+- `action-model.js` — normalizes "what games are we playing" into one list
+
+**Duplication is intentional.** Several pages carry their own copies of the engines because there's no module system. Parity tests guard them. Never "helpfully" consolidate them.
+
+**The shell is at `CACHE_VERSION` v117** (Wave 2 flights, 2026-09-13 — v114 through v117 are one commit; v112/v113 are `7d24422`, skins wave 1; v106 was `47ee108`, 2026-09-12; v105 was `6d6b661` the same afternoon, v104 `048a302`). v105 and v106 are both the course picker — see "The API ceiling" under the proxy section. v104: `tournament.html` prints a pairings sheet — the one a starter holds at 6am — beside the results sheet, through one `printSheet(build)` trigger with two callers. Every team or group is a row, one golfer per line, sorted by starting hole on a shotgun with a blank hole first and `HOLE NOT SET` in the row, the missing-hole count at the top, a withdrawn golfer printed, flagged `WD` and left out of the golfer total, and an `UNASSIGNED` block in individual mode. `tournament_pairings_print_test.js` holds the multiset of printed names against the record; `tools/tournament-pairings-check.js` proves the print CSS on that sheet in Chrome. `sw.js`'s "Moved to v104" note is the record.
+
+## iOS / App Store status
+
+- Apple Developer account active, team `A2Z95T64UU` (Manuel Orozco, individual)
+- App Store Connect record exists: Rattle Golf, bundle `com.rattlegolf.app`, Apple ID 6808220335
+- **Build 8 was archived on 2026-09-06** carrying web v71. `CURRENT_PROJECT_VERSION = 8` in the project. Internal group "Beta Testers" with automatic distribution on
+- **DO NOT USE BUILD 9 — it cannot share a round.** Inside the iOS wrapper the page is served from `capacitor://localhost`, so every share URL built from the page's own location came out as `capacitor://localhost/index.html?game=CODE`, which nobody who receives it can open. That broke the invite link, the QR, every group scorekeeper link, the private organizer link, the follow link and the trip link at once. Fixed in v74; build 10 carries it
+- **The bundle is synced to v82. `CURRENT_PROJECT_VERSION` is 20, and builds 18, 19 and 20 have been cut — bump to 21 before the next archive.** The bundle state is verified by `native_bundle_freshness_test.js`, which hashes every shipped file against its repo twin — not by reading this sentence, which is the point. **Builds 14, 15, 16 and 17 shipped the BUILD 13 BUNDLE**: the sync was last run on 2026-09-07, and the four builds after it were archived from those same web assets. Build 17 was still running the three-copy save-button restore, so over-allocating the Main Pool alerted once and left Save & Start Round dead — the round had to be wiped and started over. Do not trust builds 14–17 for anything below. Build 13 is the one Marty's Monday game is played on: skins that do not carry unless somebody said so, and a receipt PDF that contains the money. Build 12 was the first that could join a Cup from day 2, share a round from a code, and refuse a trip recap it cannot attribute. v75 is the one that matters for sharing: on v74 and earlier a foursome could create, save and start a round with **nothing to send anybody** — the only share surface was a card on the setup screen offering a link before the round existed, and the Round Ready panel behind it rendered a sentence telling the organizer to read the round code aloud. v75 also stops the wizard silently deleting a configured Nassau when you tap Back, and makes the Review say what will actually be saved.
+- **v75 went into build 11, v74 into build 10.** It was previously synced to v73. v73 is the one that matters: before it, a Nassau set up as $10 front / $10 back / $20 overall settled every segment at $20, and because each auto-press inherits its segment's price the cascade multiplied it — $200 on a wager whose face value was $40. Any build before 9 overcharges every split-stake Nassau it settles
+- **Build 8 carried web v71, not v72 — and it happened again, for four builds running.** The native bundle is synced by hand, so it is a snapshot of whenever `node sync-mobile-web.js && npx cap sync ios` last ran — never automatically whatever `main` holds. This paragraph was written after the first time and did not prevent the second, because the failure is an omitted command and prose does not fail. `native_bundle_freshness_test.js` now does: it runs in `npm test`, hashes every declared file in `ios/App/App/public/` against the repo root, and says which of the two hops was skipped. A tree that has never been synced at all SKIPS with the reason printed — a missing bundle cannot ship, a stale one can. v72 (the setup page's link copy, the quiet End control, the back button on admin) is on the web and NOT in that build. Check `ios/App/App/public/sw.js` for what a build actually contains; do not infer it from the repo
+- Signing works via automatic signing. The long-running failure was that my team had **zero registered devices**, so Apple would not issue a development profile. Plugging in my iPhone and enabling Developer Mode fixed it. Nothing in `project.pbxproj` was ever wrong — don't go looking there
+- Export compliance answer is "None of the algorithms mentioned above" (HTTPS via the OS only)
+- **The support address is `support@rattlegolf.com`, live and verified.** Cloudflare Email Routing on `rattlegolf.com`, forwarding to Manny's Gmail, catch-all on. It went live 2026-09-09 and replaced the old `rattlegolf.app` address in `support.html`, `terms.html` and `privacy.html`
+- **Manny owns `rattlegolf.com`. He does NOT own `rattlegolf.app`.** Mail to the old address bounced or reached a stranger. (This file deliberately does not spell that address out in full: `HANDOFF.md` is scanned by the same repo-wide rule, and writing it here would re-create the failure the rule exists to catch.) `support_contact_test.js` refuses any email at `rattlegolf.app` repo-wide, and refuses the string in any form at all on the three golfer-facing pages
+- **`com.rattlegolf.app` is the permanent iOS bundle id and is NOT a domain reference.** A reverse-DNS bundle id requires no ownership, and it cannot change once the App Store Connect record exists. It appears in **8 files**: `capacitor.config.ts`, `ios/App/App.xcodeproj/project.pbxproj`, `native_packaging_test.js`, `rattle_identity_test.js`, `support_contact_test.js`, `native-ios-release-check.md`, `product-separation.md`, `HANDOFF.md`. Changing it would not rename the app — it would create a different one and orphan Apple ID 6808220335, the TestFlight builds and the reviews
+- Privacy policy live at `golf-app-5a5.pages.dev/privacy.html`, support at `/support.html`, terms at `/terms.html`. **Cloudflare serves clean URLs**: `/privacy.html` answers 308 and redirects to `/privacy`, which is 200. Both forms work; use whichever App Store Connect accepts. Verified served 2026-09-09, byte-identical to commit `1eb5c90`
+
+**Not done yet:** external TestFlight testers, the EU trader declaration (required or the app is pulled from the EU store), and the Paid Apps Agreement (required for any in-app purchase; needs banking and tax info).
+
+To ship a new build: `node sync-mobile-web.js && npx cap sync ios`, **then `npm test` — `native_bundle_freshness_test.js` is what proves the sync actually landed**, bump **Build** in Xcode (Version stays 1.0.0), Archive, Distribute → App Store Connect. Running the test after the archive proves nothing about the archive; run it before.
+
+## A test that reads `git ls-files` cannot see itself until it is committed
+
+`support_contact_test.js` forbids any email address at `rattlegolf.app`. To explain
+the defect it has to **write that address down**, and to name its own control it
+writes a second invented address at the same domain. It scans `git ls-files`, which
+lists **tracked** files — and while it was being written it was untracked, so it never
+scanned itself. (Neither address is spelled out in this file, for the same reason:
+`HANDOFF.md` is scanned by that rule too, and it caught two attempts to write them
+into this very paragraph.)
+
+It reported green on every run. Manny ran `npm test` green. Claude Code ran the full
+suite green. **Both runs were honest and both were blind to the same thing**, because
+the input set was defined by something neither of them changed until the commit. The
+moment `git add` tracked the file, `main` went red on the test's own documentation.
+
+**The rule.** When a check derives its input from repository state — `git ls-files`,
+a glob, a directory walk, a declared list — ask what that input set looks like *after*
+the commit, not just now. A test that is not yet in the set it scans has not been run.
+The cheapest way to find out is `git add -N` before the final run, so the file is
+listed without being staged for content.
+
+**And the second half: a green suite is not proof the suite saw the change.** This was
+caught by a tarball check *after* the push — refetching the branch and grepping the
+extracted files, which has no notion of tracked or untracked and simply reads what is
+there. That is why the deploy verification exists and why it is not redundant with
+`npm test`: they take different inputs, and the difference between them is exactly
+where this class of defect lives.
+
+## A removed control is not always safe to restore as it was
+
+**The home screen's game-code field went to the wrong screen for its whole life.**
+`joinRoom()` navigated to `admin.html?game=CODE`. Measured cold at four golfers and
+at nine, that lands on **wizard Step 7 — the organizer's Review — with "Save & Start
+Round" on screen.** Anyone who ever typed a code got the organizer's setup screen,
+holding the control that rewrites the round.
+
+Nobody reported it, because almost nobody typed a code: golfers arrive on a link.
+That is also why v68 could delete the field on good evidence without the defect ever
+surfacing. Restoring the control **as it was** would have restored the bug with it.
+
+v77 brings the field back under a new name, `openRoundByCode()`, pointing at
+`index.html` — the scorecard. The rule this leaves behind: when a removed control
+comes back, re-derive where it should go. The old destination is not evidence.
+
+## Things in the live database that look alarming and are not
+
+**`app_settings/beta_expiration` is dead data.** It currently reads
+`2026-08-31T00:00:00` — a date in the past — sitting in the production database
+where anyone poking around will find it and assume the app is about to stop
+working, or already has.
+
+**Nothing reads it.** Grepping the whole repo, the only other appearances are in
+`security-rules.tests-data.json`, which is fixture data for the rules suite. No
+page, engine or service worker consumes it. No beta expires, and moving the date
+would change nothing. It was checked in full on 2026-09-06 rather than guessed at.
+
+Leave it. It is recorded here so the next person spends no time on it.
+
+## Firebase security rules — DEPLOYED
+
+`database.rules.json` is live on `golfapp-9fb21-default-rtdb`.
+
+**How the rules actually reach the database — read this before deploying.** The
+Firebase CLI is **not installed** on this Mac: no `firebase` on the PATH, no
+`firebase-tools` in `package.json`. Every rules change has been published through
+the **Firebase console** (Realtime Database → Rules → paste → Publish), and the
+console is therefore the source of truth for what is live. A CLI deploy would
+overwrite the live ruleset wholesale from the repo file, which is only safe if the
+two are already identical. The command, for the record, is
+
+```
+npx firebase-tools deploy --only database --project golfapp-9fb21
+```
+
+(`npx` fetches it on demand — a cached copy sits in `~/.npm/_npx`, which is how
+the read-back on 2026-09-11 below worked — but nothing here depends on it.)
+
+What they do: a `$other` catch-all denies anything not explicitly listed, money fields must be numbers in [0, 100000], scores must be numbers 1–29 keyed `p{n}_h{n}`, `global_courses` entries can be created or updated but never deleted.
+
+What they don't: `events/$eventCode` is still `.read: true, .write: true`, so anyone with a game code can edit that round. That's inherent to having no accounts. Group-link read-only behavior is client-side only.
+
+**Deploying the rules immediately surfaced a latent bug** — `wolfLoneMult` and `wolfBlindMult` were written as strings while every other numeric field was `parseFloat`'d, so every round save was rejected with PERMISSION_DENIED. If a save starts failing after a rules change, look for a type mismatch first.
+
+### `global_courses` Tier-B — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-09
+
+Not "deployed and assumed working". Proven against
+`golfapp-9fb21-default-rtdb` over REST, unauthenticated, the way any client
+would reach it:
+
+- **All 16 forbidden shapes were refused by the server**, `HTTP 401
+  {"error":"Permission denied"}` — data as a string, data missing, name missing,
+  name empty, a 5,000-character name, par 99, par 0, par `"4"`, hcpIndex 0 and
+  99, hole 0 and 19, a one-hole card, a 40-hole card, a hole missing `par`, and
+  a scalar overwrite. Nothing landed: the probe path read back `null` after all
+  sixteen.
+- **A valid 18-hole write was still accepted**, `HTTP 200`, echoed back with 18
+  holes — including a real card (Caledonia's own par 3/4/5 data), so the rule is
+  not simply refusing everything.
+
+Both halves matter. Sixteen refusals alone would also be satisfied by rules that
+reject every course, which would break the "push to global database" flow.
+
+**The rules cannot be read back over REST *unauthenticated*.**
+`/.settings/rules.json` answers `401 Permission denied` without an admin token,
+so from a client's position "does deployed match the repo?" is answered
+*behaviourally* — the live server refuses exactly the 16 shapes targaryen
+refuses and accepts what it accepts — not by diffing JSON. That is the stronger
+check anyway: it tests the deployment, not a file.
+
+**With an admin token it CAN be read back**, and that turned out to matter:
+
+    npx firebase-tools database:get "/.settings/rules" \
+        --project golfapp-9fb21 --instance golfapp-9fb21-default-rtdb
+
+You are already logged in if you can deploy. This answers a question the
+behavioural check cannot: *is the thing running the exact file in the repo, or
+something close to it?* Used on 2026-09-11 it returned a ruleset byte-identical
+to `database.rules.json` — which is also what made it safe to fire a probe at
+`global_courses` that had to be refused. See below.
+
+### A course can be created but NEVER deleted by any client
+
+`.write` is `newData.exists()`, so every client-side delete route fails:
+`DELETE`, `PUT null`, and a parent `PATCH` with a null child all return
+`401 Permission denied`. That is the intended design — it is what stops a
+vandal wiping the shared course list — but it has a consequence worth knowing
+before you write anything:
+
+**Anything written to `global_courses` is permanent unless removed from the
+Firebase console**, which bypasses rules. There is no undo from the app, from a
+script, or from a test. Do not write probe or scratch data to this node.
+
+`tournament.html:1509` renders **every** `global_courses` key as an `<option>`
+in the round-course dropdown, so a stray key is visible in the Tournament
+product. Consumer is narrower: `admin.html:3325` lists only keys starting with
+`comm_`, so a non-`comm_` stray does not reach the Consumer picker.
+
+**Tier-B, what it added.** `global_courses/$courseId` now requires `name` and
+`data`, a non-empty `name` of at most 120 characters, exactly eighteen holes at
+indices `0`–`17`, and every hole to carry `hole` 1–18, `par` 3–6 and `hcpIndex`
+1–18. `.write` is unchanged at `newData.exists()`, so a course still cannot be
+deleted. **The eighteen is deliberate**: the only publishing path is
+`validateCourseGrid()` in `admin.html`, which builds exactly 18 rows, so a
+nine-hole course could never be published anyway. Changing that is a decision,
+not a patch.
+
+**What Tier-B deliberately does NOT stop, measured rather than assumed.**
+Replacing a real course with eighteen par-3s is *allowed*, and always will be —
+every field in that payload is individually valid, and RTDB rules validate
+fields, not truth. Uniqueness is not expressible either, so a duplicate
+`hcpIndex` passes; `hollywood_beach` in the live database already carries
+`hcpIndex` 9 on both hole 1 and hole 18, and today's `validateCourseGrid()`
+would refuse to re-save it. The real exposure — an anonymous client writing a
+well-formed lie — needs the Worker, not a rule.
+
+**`newData.isNumber()` on `par` fires on nothing today, and is not one of the
+ten guards.** Removing it changes the outcome in 0 of 4 cases: the string `"4"`,
+boolean `true`, `null` and a nested object are *all* already refused by the
+range comparison, because a type-mismatched comparison evaluates false in RTDB
+rules. It is kept to state the intent and to become the only guard if the range
+is ever loosened. Do not count it when counting what protects this node, and do
+not "prove" it with a control — it is inert on purpose. The same sentence could
+not be written into `database.rules.json` itself: seven test files `JSON.parse`
+that file, and a `//` comment makes it throw.
+
+### `gca_` provenance — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-11
+
+Until this date `$courseId` appeared **nowhere** in `global_courses/$courseId`'s
+validate. Any key at all could be created, as long as the record carried a name
+and eighteen holes. With the course importer live, that meant a record could be
+filed under `gca_abc12345` while the provider id inside it named a different
+course — into a node no client can delete. The clause appended:
+
+    (!$courseId.beginsWith('gca_') ||
+     $courseId === 'gca_' + newData.child('source/providerCourseId').val())
+
+The leading negation is the whole design: a key that does not begin `gca_`
+short-circuits to true and is **completely unconstrained**, which is what makes
+all 36 pre-existing keys safe by construction rather than by luck. All 36 were
+tested individually, not sampled — including `zz_scratch_probe`, which has no
+`source` node at all and still writes back cleanly.
+
+**Timing was the point.** Zero of the 36 live keys began `gca_`, so the rule
+landed at the only moment when a mistake in it could not break a course anyone
+was using. A week of imports later, that is no longer true.
+
+**What was PROVEN LIVE**, unauthenticated REST against
+`golfapp-9fb21-default-rtdb`, the way any client reaches it:
+
+- A `gca_probe001` record naming `providerCourseId: "wrongid99"` —
+  **`HTTP 401 {"error":"Permission denied"}`**.
+- A `gca_probe002` record with **no `source` node at all** — same refusal.
+- Neither landed. Both keys read back `null`, and the key list is still **36**,
+  none of them beginning `gca_`, identical to the committed snapshot plus
+  `zz_scratch_probe`.
+- The refusal is not a dead endpoint refusing everything: the same
+  unauthenticated curl shape wrote to `events/`, read it back, deleted it, and
+  confirmed `null`. `events/` was chosen for the control precisely because it is
+  the one node whose rules permit deletion, so the control leaves nothing.
+
+**What was NOT proven live, deliberately: the ACCEPT half.**
+
+There is **no way to prove it without permanent debris**, and this records why
+rather than leaving it to be re-discovered. Proving that a *matching* `gca_`
+write is accepted requires the write to succeed, and `.write` is
+`newData.exists()` — no client, script or test can then remove it. That is
+exactly how `zz_scratch_probe` came to exist. An unproven accept half is the
+better trade against a second undeletable row.
+
+How far it was raised without writing anything: the ruleset was **read back
+from the server** and `gca_provenance_rules_test.js` re-run against *that* text
+rather than against the repo file — 46/46, including the accept case and the
+merge case. So the expression proven by targaryen is known to be the expression
+the database is running. The residual gap is narrow and stated plainly: whether
+Firebase's own evaluator agrees with targaryen on the accept path. It agrees on
+the refuse path — targaryen refuses those two shapes and so did the server.
+
+**The debris-free confirmation arrives on its own.** The first genuine import
+creates a real `gca_` row as ordinary use. At that moment the accept half is
+proven for free, and so is the merge — check that a subsequent round publish
+onto that record still works. Do it then; do not manufacture it before.
+
+**The merge case was measured, not reasoned.** Firebase applies a multi-path
+update as writes to the children, and whether the parent `.validate` sees the
+merge was an open question, not an assumption. A `{name, data}` update onto an
+existing `gca_` record is accepted, so the round publish after an import still
+works.
+
+**The first version of that test passed 46 of 46 and was worth nothing.** Its
+verdict parser looked for a line shape targaryen does not print — targaryen
+emits an ANSI box-drawing table, not `✗ path` lines — so it returned an empty
+list every time and every assertion was true of nothing. It was caught by
+forcing the rule to an impossible value and watching the suite stay green. That
+impossible rule is now a permanent test in the file.
+
+**The provider quota was accidentally a brake on all of this.** At 35 requests
+a day, a runaway import could not do much damage. The account is on Pro at
+10,000 a day, so that brake is gone and this clause is what remains.
+
+**`global_courses` is enumerable by anyone.** `.read: true` sits on the parent
+and has since the file was created, so `GET /global_courses.json?shallow=true`
+returns the whole key list to an unauthenticated client. That is how the count
+of 36 above was taken. It is not a leak — the node is a shared public course
+list — but do not write anything here expecting it to be unlisted.
+
+### tournaments delete rule — DEPLOYED AND PROVEN ON THE LIVE DATABASE, 2026-09-12
+
+`tournaments/$tourneyCode` carried `".write": true` with a validate that admitted
+`null`, so anyone holding a code could delete a whole tournament in one write.
+Commit `279d9f8` changed the one line to
+
+    ".write": "!data.exists() || newData.exists()"
+
+— a write is allowed when the node does not yet exist (create) or when the new
+value is not null (rename, child write, child delete). The only write refused is
+the one that would leave the node absent. `.read` and `.validate` are untouched.
+
+**Written test-first.** Five targaryen rows were added to
+`security-rules.tests-data.json` before the rule moved: create `tournaments/NEWCODE`,
+rename `QRST`, write and delete `QRST/rounds/r1` (all `canWrite`), and delete `QRST`
+outright (`cannotWrite`). Run against the OLD rule the delete row was **red** —
+`write was allowed` — and the other four green, which is what proves the row measures
+something; against the new rule all 85 rows pass with no previously-green row
+flipped. Two file-level pins moved with it and say why: the frozen sha256 in
+`format_first_wizard_test.js` and the literal `.write` assertion in
+`deployment_build_test.js:443`. Neither is what guards the rule; the five rows are.
+
+**Published to the live database via the console on 2026-09-12** and verified by
+reading the rules back after a hard refresh. Not deployed from the CLI — see the
+note at the top of this section.
+
+### ownerUid and registrations — PUBLISHED (rules wave 2026-09-12; live since 2026-09-15; schema 2026-09-16)
+
+**Live.** This block reached production on 2026-09-15 with the Wave 2 organizer
+rules deploy (the whole file, read back JSON-equal). The heading above used to say
+"COMMITTED, NOT YET PUBLISHED" and was stale for a day. On 2026-09-16 Manny
+published the registration FIELD SCHEMA (below) to the Firebase console by hand
+from the repo file — sha 40f2ae74 — and the live read-back was byte-equal after
+the CLI's trailing newline, JSON-equal, three independent reads.
+
+**The schema is CLOSED.** `registrations/$code/$entryId` ends in
+`"$other": { ".validate": false }`: any key the rules do not name is refused. So
+EVERY future registration field is a `database.rules.json` change published by
+hand in the console, not a deploy — a form that starts sending a new key before
+the rule names it is refused by the database, not by the page. What the rule says
+(2a, 2026-09-16): a public create must carry `fullName`, `email`, `phone`,
+`createdAt` and may NOT carry the desk's `paid`, `paidAt`, `approvedAt`,
+`playerId`, `teamNum` (before this a golfer could sign up already paid and
+approved — targaryen against the old file accepted it); the owner may create or
+update with them; `ghinOrHandicap`, `shirtSize` (XS|S|M|L|XL|XXL|XXXL),
+`dinnerCount` (whole, 0..20), `teamPreference`, `holeSponsorship` (boolean),
+`sponsorName` are optional and typed. `security-rules.tests-data.json` holds 56
+registrations rows; `tournament_registration_2a_test.js` knocks each boundary out
+of a copy and shows the rows fire.
+
+**This node holds the first personal data this app has ever stored** — email and
+phone for every golfer in a field. Everything before it was scores and names.
+Read is owner-only; the form says what it collects; nothing else reads it.
+
+The 2026-09-12 diff (+13 / −1) added two things to `database.rules.json` and changed
+nothing else — `tournaments/$tourneyCode`'s `.write` is untouched (the `$entryId`
+`.validate` shown here is the Wave 1 shape, superseded by the schema above):
+
+    "tournaments": { "$tourneyCode": {
+        ".validate": "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
+        "ownerUid": { ".validate": "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" }
+    } },
+    "registrations": { "$code": {
+        ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
+        "$entryId": {
+            ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
+            ".validate": "newData.hasChildren(['name', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('createdAt').isNumber()"
+        }
+    } }
+
+**What is and is not a boundary.** Anyone holding a code can still write a
+tournament's teams, players, rounds and scores signed out — the Setup gate on
+`tournament.html` remains a guardrail. Two things are now boundaries: `ownerUid`
+(set once, by a signed-in client, to its own uid; never taken, changed or dropped —
+a whole-record PUT that omits it is refused, and so is a code collision onto another
+organizer's tournament, which before this wave silently overwrote it) and
+`registrations/$code` (owner-only read; create-only for anyone, but only under a
+tournament that HAS an owner, so a submission never lands where nobody can read it;
+owner may correct an entry; nobody deletes one). The rules do **not** require a
+tournament to have an `ownerUid` — a stale bundle still creates a legacy record.
+
+**Measured.** 31 rows added to `security-rules.tests-data.json` (116 total, 0
+failures; 85/85 pre-existing unchanged). Every write shape `tournament.html` and
+`tournament-scorecard.html` actually make was run against the real file through
+targaryen's JS API, including the one multi-location `update()` at the tournament
+node (`autoAssignShotgunHoles`): all allowed signed out on an owned record. The one
+new failure an organizer can meet: creating with a stale `authUser` (signed out in
+another tab) is refused with the SDK's `PERMISSION_DENIED` after the form is filled.
+Wave 1 of the registration UI now writes `registrations/` from
+`tournament.html?register=CODE` (create) and from the Setup tab (owner Paid /
+approve). A form on a LEGACY tournament is refused in the page before the write —
+the rules would refuse it too, and nobody could read it.
+
+**The registrations rows were green before the block existed.** `$other` already
+refused everything under `registrations/`, so seventeen negative rows proved nothing
+about the block. `registrations_rules_isolation_test.js` stubs the block permissive
+(`{".read": true, ".write": true}`) in a temp copy and requires all seventeen to go
+red, the three positive rows to stay green, the 96 rows outside `registrations/` to
+hold, and the clean file to be green. The count is read from the data file, not
+typed. Two old wave guards (`code_length_test.js`, `firebase_vendor_test.js`) asserted
+the rules never mention `auth`; both now assert `auth` appears in exactly the three
+expressions above and nowhere else.
+
+**Two clauses behaved differently from the plan under negative control, neither
+changed:**
+
+- Removing the child `ownerUid` `.validate` frees take-over and the two wrong-uid
+  rows, but NOT "nobody clears it". Removing the parent `.validate` clause frees the
+  PUT-dropping row AND the clear row. A child `.validate` is not evaluated when that
+  child is written null, so **the parent clause alone is what refuses clearing
+  ownerUid.**
+- Removing `auth != null &&` from the ownerUid validate moved no row: in targaryen
+  `newData.val() === auth.uid` evaluates false on a null auth by itself. The clause is
+  stated intent, kept as written; a second control (uid comparison relaxed) proved the
+  "nobody sets it" row is live.
+
+**Two UNKNOWNs — settle in the Rules Playground BEFORE the console publish, not
+after:**
+
+1. Whether the real engine evaluates the PARENT `.validate` on a child write.
+   targaryen does (that is what refuses "remove ownerUid"). If the real RTDB does
+   not, `remove(tournaments/X/ownerUid)` would go through, and the clear row is
+   guarded by nothing. Playground check: path `tournaments/<an owned code>/ownerUid`,
+   write `null`, unauthenticated — must say denied. Then the same as the owner's uid —
+   must also say denied.
+2. Whether the real engine treats `auth.uid` on a null auth as false (as targaryen
+   does) or as an evaluation error (also a refusal). Either way the write is refused;
+   the question is only whether the `auth != null` clause is doing anything.
+   Playground check: `tournaments/<a fresh code>/ownerUid`, write any string,
+   unauthenticated — must say denied.
+
+**Published (2026-09-15, then the schema on 2026-09-16).** The console is the deploy;
+the commit is the record. The two Playground UNKNOWNs above were not run as
+Playground checks; the deploy went out with the Wave 2 organizer rules and the live
+behaviour was proved against the real database on 2026-09-15 (the Monday test,
+the create gate, the claim refusals — see the organizer-gate notes).
+
+## tournaments/$code is world-writable — the scorecard link is one door of several (Option A, 2026-09-16)
+
+**The rule.** `database.rules.json` `tournaments/$tourneyCode` `.write` is
+`"!data.exists() || newData.exists()"`: any write that does not DELETE the tournament
+is accepted from anyone — signed out, no page — who knows the code. Scores, team names,
+rosters, the course card, a round's status, a whole-record PUT that keeps `ownerUid`.
+Refused: deleting the tournament, taking or changing `ownerUid`, and the
+`registrations/` node. The `&team=N` / `&group=GID` scorecard link is the VISIBLE corner
+of that: the team number is a URL parameter, nothing checks who holds it, and the page
+renders another team's card editable when the parameter is changed
+(`tools/tournament-team-link-check.js` measures 18 of 18 editable on team 7's link from
+team 1's) — but the same writes go through with `curl` and no page at all. Restricting
+the link would close one door on a house with no walls. The round app (`index.html`)
+has the same shape: `canWritePlayer` checks the write against the URL's group, not the
+URL against a person, and its organizer token is a bearer secret on a world-readable
+record.
+
+**What Option A did (this wave), and what it did not.** It stopped the app lying about
+the walls and gave the organizer a correction path that is not "open the team's link":
+
+- **"✏️ Correct a scorecard"** on the Setup tab — the one panel the page REMOVES from the
+  DOM for anyone but the signed-in owner. It writes the SAME path the team's link writes,
+  through `tournamentScorePath` and the three key builders in `tournament-engine.js`;
+  `tournament_score_editor_test.js` holds them in parity with the card's own `scorePath`
+  (which two suites pin by regex and which was left alone). It refuses SETUP and CLOSED
+  rounds as the card does. It is a CORRECTION tool and its copy says the links are how
+  scoring happens — an organizer keeping 140 players' cards from Setup would have a bad day.
+- **The padlocks came off** the link sections and the scorecard says "Anyone with this
+  link can score this card." A glyph is a claim too; `tournament_claims_test.js` now
+  counts a padlock heading a links section as one.
+  The rule also learned POLARITY: "Anyone who has a link can score that card" is a
+  person plus a capability and the rule as first drawn flagged it. It promises no
+  protection — it is the admission — so a claim now needs a restriction in the same
+  sentence (only, cannot, nobody…). The organizer copy is two sentences for exactly that
+  reason: joined by a dash, "only" and "anyone can" share a sentence and read as a
+  promise, and the test asserts the dash version IS caught. `tools/tournament-team-link-check.js`
+  carries the same three-part rule and is bound both ways now: an exclusivity claim over
+  an editable link fails it, and so does the admission over a link that stopped being
+  editable (measured this wave: team 7's link, 18 of 18 editable, PASS).
+- **Nothing about the database changed.** A code-holder can still write every score,
+  name and roster. Narrowing `tournaments/$code` so a code-holder may write scores and
+  nothing else is a RULES WAVE with a blast radius across every organizer write on
+  `tournament.html` (teams, rounds, flights, groups, course, payouts — all of them go
+  through the same open rule today) and it needs its own recon before it is drafted.
+
+**B and C were considered and not picked.** B — per-team keys in the link, checked by
+the rules: the keys are readable while they live on the record (`.read: true`), so they
+protect nothing until they move to an owner-only node the rule reads through `root`; and
+it changes the score storage path, which re-pins every score reader — engine, board,
+printed sheet, goldens. C — anonymous auth on the scorecard with a write-once team claim:
+it crosses the consumer/tournament shell boundary four tests hold (`auth-boot.js` is a
+consumer shell file), gives one uid two meanings on one origin (the consumer trial gate
+trusts the same anonymous uid), and breaks "my phone died" until a release path exists.
+Both leave names and rosters open anyway. Recorded so they are not re-derived.
+
+**Filed for the consumer copy pass:** `instructions.html` :125 heads the ROUND app's
+scorekeeper links with the same padlock — "🔒 Groups & Scorekeeper Links" — over links that
+lock nothing (the round app's group lock is the same URL-parameter shape). Out of this
+wave's tournament scope; the same category of claim; take it out with the next consumer
+copy pass and let `user_facing_copy_test.js` hold the sentence that replaces it.
+
+## Hosts and Firebase Authorized Domains (read-only recon, 2026-09-16)
+
+**Two products share one host.** `tournaments.rattlegolf.com` resolves to Cloudflare
+(172.67.176.70, 104.21.96.92) and serves THIS Pages deploy byte for byte — `/tournament`
+on it was 199450 bytes and `cmp`-identical to `golf-app-5a5.pages.dev/tournament` and to
+HEAD's `tournament.html` within an hour of the v159 push; its `/sw.js` carried the same
+`golfapp-v159-…` key. But `/` on that host is `index.html` — the Consumer round app. The
+hostname says Tournaments; the site under it is the whole repo. The tournament hero band
+(polish wave) is designed to read as the Tournaments PRODUCT — the wordmark is
+`Rattle / Tournaments`, parent brand first — and not as the site's identity. The
+Cloudflare dashboard binding itself was not read; the bytes and timing were.
+
+**Authorized Domains, as read on 2026-09-16 (public `getProjectConfig`, key-only):**
+`localhost, golfapp-9fb21.firebaseapp.com, golfapp-9fb21.web.app, golf-app-5a5.pages.dev,
+tournaments.rattlegolf.com, rattlegolf.com`. The earlier recon that morning read a list
+with `rattlegolf.app` on it and without the two rattlegolf.com hosts; Manny changed it by
+hand in the console the same day. Re-read before trusting either list.
+
+**The rattlegolf.app entry, framed correctly.** `rattlegolf.app` is UNREGISTERED — no A, no
+MX, nobody owns it (dig, 2026-09-16). An Authorized Domains entry for an unregistered
+domain is therefore not a live exposure; it is a BET that nobody registers it later and
+gets a pre-authorised origin for OAuth redirect flows against this project. Removed for
+that reason. (The first recon called it "an authorized domain a stranger owns"; that was
+wrong — nobody owns it.) The `.app` domain is being dropped from the project entirely;
+`support@rattlegolf.com` routes; `com.rattlegolf.app` is the iOS bundle id, a reverse-DNS
+string that needs no domain and stays.
+
+**Sign-in on the custom host works today, and why.** `tournament.html` signs in with
+`signInWithEmailAndPassword` only. Authorized Domains gate OAuth popup/redirect, email-link
+action URLs and reCAPTCHA — not the password REST call, which the API key alone gates.
+Measured: `accounts:signInWithPassword` with `Referer/Origin: https://tournaments.rattlegolf.com`
+and bogus credentials → `400 INVALID_LOGIN_CREDENTIALS` (the wrong-password answer, not a
+referrer block). Adding Google sign-in, a password-reset continue URL or email-link sign-in
+would have needed the domain listed first; it is listed now.
+
+ adornment on the fee) and the format picker as four weighted cards
+(one column under 480px, two above; scoped to `#main-format-picker` so the shamble-count
+cards and every other `.format-card` are untouched). Nothing the page DOES changed: every
+id, every inline handler, the save payload and the gate are the same, and
+`tournament_landing_polish_test.js` holds the setup screen's text to the pre-wave
+baseline (`tournament_landing_prev.fixture.json`, sha-pinned) plus exactly three
+deliberate substitutions. `tools/tournament-landing-check.js` measures the layout cold in
+Chrome at 390 and 768px, signed out and signed in, and taps the page's own buttons.
+
+**Why the wordmark says Rattle when the product is not called Rattle Golf.** The two
+products share `tournaments.rattlegolf.com`: `/` is the Consumer round app, `/tournament`
+is this. The band names WHICH product this page is — parent brand, then product — not what
+the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages" guard
+was /Rattle/ anywhere; it is narrowed to the Consumer product's NAME ("Rattle Golf") plus
+a pin that `tournament.html` says "Rattle" only inside the wordmark spans, and the
+scorecard and engine not at all. `build-shell.js` still says `appName: 'GolfApp
+Tournaments'` and `product-separation.md`'s "do not rename the Tournament product to
+Rattle Golf" still stands — this is a wordmark on one page, not a rename.
+
+**Swapping the hero image.** Drop the photograph in `assets/` and change the one `url()` in
+`.tourney-hero-art` (tournament.html's stylesheet). The overlay darkens whatever is there,
+so the photo need not be dark. The file is NOT in `TOURNAMENT_SHELL` and is not precached:
+`.tourney-hero-art` paints `#0f2f24` under it, so offline or before the image arrives the
+band is a plain dark green with the wordmark on it. Precaching it means adding a subdir to
+the shell copy in `build-shell.js`, which copies flat names today.
+
+**Two fixtures re-pinned, deliberately.** `tournament_anonymous_owner_prev.fixture.json`:
+the sign-in panel's tag structure changed (class-styled card); every string collapsed on
+`[\s|]+` is identical to the 6536216 capture — words, ids, display, alerts, sets. The
+setup-screen baseline is new this wave. The claims test's glyph rule is scoped to a padlock
+heading a LINKS section; a padlock in the hero would be caught only by the landing
+baseline, not by the claims rule — measured with a control, and worth knowing.
+
 ## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
 
 Organizers sign in (Firebase Auth, email/password); golfers never do — a scoring

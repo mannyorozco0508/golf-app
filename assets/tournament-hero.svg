@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640" role="img" aria-label="A fairway at dusk with a flagstick on the green">
+  <!-- PLACEHOLDER HERO for /tournament. Swap this file (or drop a JPG beside it and
+       change the one url() in tournament.html's .tourney-hero-art rule). The page
+       lays a dark overlay over whatever is here, so a photo does not need to be dark. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2a4a"/>
+      <stop offset="0.45" stop-color="#4a5f8a"/>
+      <stop offset="0.72" stop-color="#d98b5a"/>
+      <stop offset="1" stop-color="#f2c079"/>
+    </linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f4a3c"/>
+      <stop offset="1" stop-color="#1f3529"/>
+    </linearGradient>
+    <linearGradient id="fairway" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f8a4f"/>
+      <stop offset="1" stop-color="#1f5a30"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5fb36a"/>
+      <stop offset="1" stop-color="#2f7d3f"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff2c2"/>
+      <stop offset="0.6" stop-color="#f7c66b"/>
+      <stop offset="1" stop-color="#f7c66b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="640" fill="url(#sky)"/>
+  <circle cx="1180" cy="330" r="110" fill="url(#sun)"/>
+  <circle cx="1180" cy="330" r="58" fill="#ffe9a8"/>
+  <!-- distant tree line -->
+  <path d="M0 360 C 120 330, 220 345, 330 320 S 560 300, 700 330 S 980 360, 1120 335 S 1400 300, 1600 340 L1600 420 L0 420 Z" fill="url(#far)"/>
+  <!-- rolling fairway -->
+  <path d="M0 420 C 260 380, 520 400, 800 385 S 1300 360, 1600 400 L1600 640 L0 640 Z" fill="url(#fairway)"/>
+  <!-- mower stripes -->
+  <g fill="#ffffff" fill-opacity="0.05">
+    <path d="M0 640 L 180 405 L 260 402 L 120 640 Z"/>
+    <path d="M300 640 L 420 398 L 500 396 L 420 640 Z"/>
+    <path d="M620 640 L 680 392 L 760 390 L 740 640 Z"/>
+    <path d="M960 640 L 940 388 L 1020 386 L 1080 640 Z"/>
+    <path d="M1300 640 L 1200 386 L 1280 384 L 1420 640 Z"/>
+  </g>
+  <!-- the green -->
+  <ellipse cx="520" cy="500" rx="300" ry="70" fill="url(#green)"/>
+  <ellipse cx="520" cy="500" rx="300" ry="70" fill="none" stroke="#7ed48a" stroke-opacity="0.35" stroke-width="3"/>
+  <!-- bunker -->
+  <ellipse cx="860" cy="470" rx="70" ry="22" fill="#e8d3a3"/>
+  <!-- cup and flagstick -->
+  <ellipse cx="560" cy="492" rx="9" ry="3.5" fill="#123a1c"/>
+  <rect x="558" y="330" width="4" height="162" fill="#f4f4f4"/>
+  <path d="M562 330 L 640 352 L 562 374 Z" fill="#e63946"/>
+  <!-- tree silhouettes -->
+  <g fill="#14261b">
+    <path d="M120 405 C 60 395, 40 330, 90 300 C 70 250, 130 220, 160 250 C 210 220, 250 280, 220 315 C 260 340, 230 400, 180 405 Z"/>
+    <rect x="160" y="400" width="14" height="30"/>
+    <path d="M1440 395 C 1400 385, 1390 330, 1430 310 C 1420 270, 1470 250, 1490 280 C 1530 260, 1560 310, 1530 335 C 1560 355, 1530 395, 1490 395 Z"/>
+    <rect x="1476" y="392" width="12" height="26"/>
+  </g>
+</svg>

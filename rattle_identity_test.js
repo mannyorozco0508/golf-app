@@ -173,8 +173,25 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
     });
 
     test('the Tournament pages carry no Rattle Golf branding', () => {
+        // NARROWED 2026-09-16 (tournament landing polish). The guard was /Rattle/ -
+        // any occurrence. The landing now carries the wordmark "Rattle / Tournaments":
+        // parent brand, then product, as specified for tournaments.rattlegolf.com,
+        // where / is the Consumer app and /tournament is this one. That is not the
+        // rename this test exists to refuse - the product is not called Rattle Golf,
+        // build-shell.js still says appName 'GolfApp Tournaments', and the manifest
+        // still says GolfApp Tournaments. So the refusal is now the Consumer product's
+        // NAME, "Rattle Golf", plus the wordmark is pinned to the one place it lives:
+        // tournament.html carries "Rattle" only inside .tourney-wordmark's spans and
+        // the comment above them, and the other two files not at all.
         ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js']
+            .forEach(f => assert.ok(!/Rattle Golf/.test(read(f)), `${f} must not carry the Consumer product's name`));
+        ['tournament-scorecard.html', 'tournament-engine.js']
             .forEach(f => assert.ok(!/Rattle/.test(read(f)), `${f} must not carry Consumer branding`));
+        const t = read('tournament.html');
+        const outside = t.replace(/<!--[\s\S]*?-->/g, '').replace(/<div class="tourney-wordmark"[\s\S]*?<\/div>/, '').replace(/\.wm-rattle/g, '');
+        assert.ok(!/Rattle/.test(outside), 'tournament.html says Rattle somewhere other than the landing wordmark');
+        assert.match(t, /<span class="wm-rattle">Rattle<\/span><span class="wm-slash">\/<\/span><span class="wm-product">Tournaments<\/span>/,
+            'the wordmark is Rattle / Tournaments, in that order');
     });
 
     test('the two cache identities remain distinct', () => {
@@ -212,7 +229,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v160-tournament-hero-band';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -530,9 +547,9 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v160-tournament-hero-band';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v40-link-authorises-nothing'/,
+        assert.match(BUILD, /cacheName: 'tournament-v41-tournament-hero-band'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
     });
 });

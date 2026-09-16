@@ -93,7 +93,11 @@ describe('THE PAGE: an anonymous user sees what a signed-out user sees', () => {
 describe('THE PROOF: email users, strangers and nobody see the page they saw at 6536216, character for character', () => {
     test('the baseline is pinned', () => {
         assert.equal(PREV.capturedAt, '6536216');
-        assert.equal(sha(read('tournament_anonymous_owner_prev.fixture.json')).slice(0, 8), '06cdc32e');
+        // Re-pinned 2026-09-16 (polish wave): the sign-in panel is a class-styled card.
+        // Same words, same ids, same button - the only change in the captured surface
+        // is the tag structure inside the panel (10 panel strings, pipe runs only;
+        // measured with every string collapsed on [\s|]+ before re-capture: NONE differ).
+        assert.equal(sha(read('tournament_anonymous_owner_prev.fixture.json')).slice(0, 8), '7774ba3e');
         assert.equal(Object.keys(PREV.arrivals).length, 12); assert.equal(Object.keys(PREV.saves).length, 3);
         assert.match(PREV.arrivals['organizer/owned/user-first'].signedInAs, /Signed in as org@example\.com/, 'captured with content');
     });

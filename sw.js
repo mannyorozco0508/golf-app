@@ -1555,7 +1555,14 @@
 // tournament-engine.js: the score-path builders both pages agree on. A device
 // on v158 keeps the padlocked headings that claim a protection the links do
 // not have.
-const CACHE_VERSION = 'golfapp-v159-link-authorises-nothing';
+// Moved to v160: the tournament landing gets its hero band. tournament.html:
+// a Rattle / Tournaments band over local imagery (assets/tournament-hero.svg,
+// NOT precached - the band paints its own dark ground without it), the
+// organizer sign-in as a compact card below it, the format picker as four
+// weighted cards, the name / course / entry-fee fields restyled. Presentation
+// only: same ids, same handlers, same save. A device on v159 keeps the
+// trophy-and-title header and the emoji-on-white picker.
+const CACHE_VERSION = 'golfapp-v160-tournament-hero-band';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

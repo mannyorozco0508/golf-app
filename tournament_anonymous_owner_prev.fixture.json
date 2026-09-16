@@ -1,5 +1,6 @@
 {
  "capturedAt": "6536216",
+ "recapturedAt": "2026-09-16 polish wave (working tree on ad28d3f): the sign-in panel is a class-styled card - same words, ids and button; only the tag structure inside the panel moved (10 panel strings; collapsed on [\\s|]+ none differ)",
  "arrivals": {
   "organizer/owned/user-first": {
    "signedInAs": "Signed in as org@example.com · Sign outSigned in as org@example.com · Sign out",
@@ -126,11 +127,11 @@
    "signedInAsSetup": "",
    "panelManage": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "panelSetup": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "setupTab": false,
    "setupPanel": false,
@@ -141,11 +142,11 @@
    "signedInAsSetup": "",
    "panelManage": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "panelSetup": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "setupTab": false,
    "setupPanel": false,
@@ -156,11 +157,11 @@
    "signedInAsSetup": "",
    "panelManage": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "panelSetup": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "setupTab": true,
    "setupPanel": true,
@@ -171,11 +172,11 @@
    "signedInAsSetup": "",
    "panelManage": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "panelSetup": {
     "display": "block",
-    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+    "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
    },
    "setupTab": true,
    "setupPanel": true,
@@ -243,11 +244,11 @@
     "signedInAsSetup": "",
     "panelManage": {
      "display": "block",
-     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
     },
     "panelSetup": {
      "display": "block",
-     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | |Sign in| | |"
+     "html": "| |Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.| | | | |Sign in| | | |"
     },
     "setupTab": true,
     "setupPanel": true,
