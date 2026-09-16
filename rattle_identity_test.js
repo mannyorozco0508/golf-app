@@ -212,11 +212,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-<<<<<<< HEAD
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v155-rounds-played';/,
-=======
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v153-tournament-register';/,
->>>>>>> origin/cursor/tournament-registration-3e45
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v156-tournament-register';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -534,11 +530,7 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-<<<<<<< HEAD
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v155-rounds-played';/);
-=======
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v153-tournament-register';/);
->>>>>>> origin/cursor/tournament-registration-3e45
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v156-tournament-register';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
         assert.match(BUILD, /cacheName: 'tournament-v37-registration'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
