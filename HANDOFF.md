@@ -378,9 +378,10 @@ targaryen's JS API, including the one multi-location `update()` at the tournamen
 node (`autoAssignShotgunHoles`): all allowed signed out on an owned record. The one
 new failure an organizer can meet: creating with a stale `authUser` (signed out in
 another tab) is refused with the SDK's `PERMISSION_DENIED` after the form is filled.
-Nothing in the app writes `registrations/` yet; a future form on a LEGACY
-tournament will be refused until that tournament is re-created or a claim path
-exists — decide that before building the form.
+Wave 1 of the registration UI now writes `registrations/` from
+`tournament.html?register=CODE` (create) and from the Setup tab (owner Paid /
+approve). A form on a LEGACY tournament is refused in the page before the write —
+the rules would refuse it too, and nobody could read it.
 
 **The registrations rows were green before the block existed.** `$other` already
 refused everything under `registrations/`, so seventeen negative rows proved nothing
@@ -462,6 +463,35 @@ a time.
 
 `tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
 (rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
+
+## Tournament registration Wave 1 — HOW TO OPEN IT
+
+Public signup (any golfer, no sign-in):
+
+    tournament.html?register=CODE
+
+Organizer list, Paid (cash/offline), approve into the field — signed in as the
+owner whose uid is `ownerUid`:
+
+    tournament.html?tourney=CODE
+
+then the **Setup & Links** tab. The signup URL is on that section; Share hands
+out a QR the way team scorecard links already do.
+
+Create the tournament while signed in (email/password, not anonymous) so it has
+an `ownerUid`. A legacy event without one cannot receive signups: the rules
+refuse the write, and the page hides the form rather than looking like it takes
+them.
+
+This is **not** Consumer Season/Trip IAP and **not** Stripe. Paid is a checkbox
+the organizer ticks when they have the cash. Approve copies the golfer into the
+existing player field (individual) or a team (scramble / shamble / best ball)
+using the same record shape `addPlayerToField` / `saveNewTeam` already write.
+Scores are not touched.
+
+`tournament_registration_test.js` is the Node half (write path, payload, gate).
+`tools/tournament-register-check.js` is the Chrome half (the form has a rect on
+cold arrival; the owner sees the list without calling a renderer).
 
 **What v109 shipped broken, and why — two findings, not one.** The "Team
 Scorecard Links" block that moved to the Leaderboard tab was also the Setup tab's
@@ -1252,6 +1282,8 @@ crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-
 `tournament-pairings-check.js` (clicks the page's own Print Pairings button, then
 emulates print media: everything outside the sheet has a zero rect, every golfer is on
 it once, the HOLE NOT SET count matches) ·
+`tournament-register-check.js` (cold arrival on `?register=CODE` paints the signup
+form; the owner on `?tourney=CODE` sees the list without a renderer call) ·
 `tournament-payout-rank-seam-check.js` (the team the board shows first is the team paid
 `spotAmounts[0]`, and so on down the paid places — the seam no unit test covers) ·
 `flights-leaderboard-check.js` (a flighted round on the leaderboard and the admin

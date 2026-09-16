@@ -512,7 +512,7 @@ describe('DEPLOYMENT — two products, one Firebase project', () => {
 
     test('22b. the Firebase roots are unchanged', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
-        ['events', 'trips', 'tournaments', 'global_courses', 'app_settings'].forEach(root =>
+        ['events', 'trips', 'tournaments', 'registrations', 'global_courses', 'app_settings'].forEach(root =>
             assert.ok(root in rules, 'the ' + root + ' root must survive a product-boundary batch'));
     });
 });

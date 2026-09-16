@@ -1495,7 +1495,11 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v152-header-once';
+// Moved to v153: tournament.html gained public signup (?register=CODE) and the
+// organizer Registration list (cash/offline Paid, approve into the field).
+// An installed device on v152 has the organizer console with no way to collect
+// a name except typing it, and nothing writes registrations/.
+const CACHE_VERSION = 'golfapp-v153-tournament-register';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

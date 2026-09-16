@@ -969,6 +969,15 @@
             "name": "Ann Alpha-Corrected",
             "createdAt": 1
           }
+        },
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Ann Alpha",
+            "createdAt": 1,
+            "paid": true,
+            "paidAt": 2
+          }
         }
       ],
       "cannotWrite": [
@@ -988,6 +997,20 @@
           "data": {
             "name": "Ann2",
             "createdAt": 1
+          }
+        }
+      ]
+    },
+    "registrations/OWNED/e3": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Cal Charlie",
+            "createdAt": 3,
+            "contact": "555-0100",
+            "handicap": "12",
+            "teamPreference": "Eagles"
           }
         }
       ]
