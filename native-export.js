@@ -127,18 +127,108 @@
     // collapsed section or a print-hidden button does not silently end up in the
     // exported file. Buttons and nav are dropped explicitly for the same reason -
     // "Print / Save PDF" should not appear IN the PDF.
+    //
+    // FROM THE LIVE ROOT, NOT A CLONE (2026-09-15). This used to cloneNode the
+    // root, strip the buttons out of the clone and read the clone's innerText.
+    // A detached clone is not rendered, and the spec says innerText on an
+    // element that is not being rendered returns textContent - so every line
+    // break the layout would have given (one per ledger row, one per card
+    // heading) never happened, and the source's indentation survived. The
+    // share-sheet PDF read "Original Bet$50Started Hole 1Carp 2&0Carp +$50"
+    // from Build 13 on. The live root IS rendered, so its innerText is what the
+    // golfer sees, row by row. The buttons are still excluded - by their own
+    // rendered text, line for line, instead of by removing them from a copy.
+    //
+    // FAIL SOFT: if the live read is not possible (no innerText, a detached
+    // root, a throw), the clone path below runs exactly as it always did - a
+    // PDF with the old lines, never no PDF.
+    function cloneText(root) {
+        const clone = root.cloneNode(true);
+        clone.querySelectorAll('button, .nav-link, .btn-primary, .btn-outline, script, style')
+            .forEach(function (el) { el.parentNode && el.parentNode.removeChild(el); });
+        return (clone.innerText !== undefined && clone.innerText !== null)
+            ? clone.innerText
+            : (clone.textContent || '');
+    }
+    // ONE LINE PER ROW. innerText puts every flex item on its own line, and a
+    // ledger row IS a flex box with two items - "Marty" left, "$310" right - so
+    // the plain innerText of the root reads the name on one line and the money
+    // on the next. That is the page's layout misread, not the page. So the text
+    // is assembled from the live tree: a flex/grid box's items are joined onto
+    // one line, two spaces apart; a block's children go on their own lines; a
+    // table's rows keep innerText's tabs (turned into spaces below); anything
+    // not rendered contributes nothing. Every string still comes from innerText.
+    function isBlockish(display) {
+        return /^(block|flex|grid|table|table-row|table-row-group|table-header-group|table-footer-group|list-item|flow-root)$/.test(display);
+    }
+    function textOf(el, view) {
+        const cs = view.getComputedStyle(el);
+        if (cs.display === 'none') return '';
+        if (/^(flex|inline-flex|grid|inline-grid)$/.test(cs.display)) {
+            // Every child is an item - a bare text node in a flex box is an
+            // anonymous item too (the scorecard legend's "Birdie" is one).
+            const items = [];
+            el.childNodes.forEach(function (n) {
+                let t = '';
+                if (n.nodeType === 3) t = n.textContent;
+                else if (n.nodeType === 1) t = textOf(n, view);
+                t = String(t).replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
+                if (t) items.push(t);
+            });
+            return items.join('  ');
+        }
+        if (/^table/.test(cs.display)) return String(el.innerText || '');
+        let hasBlockChild = false;
+        for (let i = 0; i < el.children.length; i++) {
+            if (isBlockish(view.getComputedStyle(el.children[i]).display) || /flex|grid/.test(view.getComputedStyle(el.children[i]).display)) { hasBlockChild = true; break; }
+        }
+        if (!hasBlockChild) return String(el.innerText || '');
+        const parts = [];
+        let run = '';
+        const flush = function () { if (run.trim()) parts.push(run.trim()); run = ''; };
+        el.childNodes.forEach(function (n) {
+            if (n.nodeType === 3) { run += n.textContent; return; }
+            if (n.nodeType !== 1) return;
+            const d = view.getComputedStyle(n).display;
+            if (d === 'none') return;
+            if (isBlockish(d) || /flex|grid/.test(d)) { flush(); const t = textOf(n, view); if (t.trim()) parts.push(t); }
+            else run += String(n.innerText || '');
+        });
+        flush();
+        return parts.join('\n');
+    }
+    function renderedText(root) {
+        try {
+            if (root.isConnected === false) throw new Error('detached root');
+            const view = root.ownerDocument && root.ownerDocument.defaultView;
+            if (!view || typeof view.getComputedStyle !== 'function' || typeof root.innerText !== 'string') throw new Error('not rendered');
+            const drop = {};
+            root.querySelectorAll('button, .nav-link, .btn-primary, .btn-outline').forEach(function (el) {
+                String(el.innerText || '').split('\n').forEach(function (l) {
+                    const t = l.trim();
+                    if (t) drop[t] = true;
+                });
+            });
+            const text = textOf(root, view);
+            // A root the screen is not showing (display:none until a print class
+            // lands, as the trip itinerary is) reads as nothing here. Nothing is
+            // not a PDF; the clone path still reads it the way it always did.
+            if (!text.trim()) throw new Error('nothing rendered');
+            return { text: text, drop: drop, live: true };
+        } catch (e) {
+            return { text: cloneText(root), drop: {}, live: false };
+        }
+    }
     function linesFrom(roots) {
         const out = [];
         (roots || []).forEach(function (root) {
             if (!root) return;
-            const clone = root.cloneNode(true);
-            clone.querySelectorAll('button, .nav-link, .btn-primary, .btn-outline, script, style')
-                .forEach(function (el) { el.parentNode && el.parentNode.removeChild(el); });
-            const text = (clone.innerText !== undefined && clone.innerText !== null)
-                ? clone.innerText
-                : (clone.textContent || '');
-            String(text).split('\n').forEach(function (raw) {
-                const line = raw.replace(/\s+$/, '');
+            const read = renderedText(root);
+            String(read.text).split('\n').forEach(function (raw) {
+                // A table row arrives with tabs between its cells; pdfSafe would
+                // strip them and glue the cells. Two spaces keep the columns apart.
+                const line = raw.replace(/\t/g, '  ').replace(/\s+$/, '');
+                if (read.drop[line.trim()]) return;   // a button's own text
                 // Collapse runs of blank lines; a receipt has a lot of whitespace.
                 if (line.trim() === '' && out.length && out[out.length - 1] === '') return;
                 out.push(line);
@@ -385,6 +475,7 @@
         exportOrPrint: exportOrPrint,
         _buildPdf: buildPdf,
         _linesFrom: linesFrom,
+        _renderedText: renderedText,
         _pdfSafe: pdfSafe,
         _safeName: safeName
     };

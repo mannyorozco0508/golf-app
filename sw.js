@@ -524,6 +524,18 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v151: the share-sheet PDF reads like the page.
+//
+// native-export.js (precached). The iOS PDF's lines came from innerText of a
+// DETACHED clone of each export root - which the spec resolves to textContent
+// - so every card printed on one line with no separators ("Original
+// Bet$50Started Hole 1Carp 2&0Carp +$50") and headers kept the source's
+// indentation, from Build 13 on. The text is now assembled from the live
+// tree: one line per ledger row ("Marty  $310"), blocks on their own lines,
+// scorecard cells spaced, nothing that is not rendered; the same characters
+// in the same order, proved against the v150 capture. The clone read stays as
+// the fallback. An installed device on v150 keeps the run-together PDF.
+
 // Moved to v150: the brand mark on the printed receipt.
 //
 // settlement.html (precached). buildReceiptHeader carries logo-mark.png -
@@ -1473,7 +1485,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v150-receipt-mark';
+const CACHE_VERSION = 'golfapp-v151-pdf-lines';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
