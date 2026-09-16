@@ -524,6 +524,16 @@
 
 // Moved to v83: a score the server REFUSED no longer looks exactly like a saved one.
 
+// Moved to v150: the brand mark on the printed receipt.
+//
+// settlement.html (precached). buildReceiptHeader carries logo-mark.png -
+// the lobby's asset, already in this precache and the native bundle - as a
+// print-only <img>: display:none and 0 x 0 on screen (the page's spacing is
+// unchanged to the pixel, tools/receipt-logo-check.js), 64 x 64 centred above
+// the course name on paper and in a saved PDF. The native text PDF is
+// unchanged (innerText carries no image). An installed device on v149 prints
+// a receipt with no mark on it.
+
 // Moved to v149: the Receipt reads the same predicate as the trip.
 //
 // settlement.html (precached). The live/final gate now asks settlement-engine
@@ -1463,7 +1473,7 @@
 // so a scratch golfer reads "HCP 0" and a plus-2 reads "HCP +2" on every surface.
 // An installed PWA on v81 starts unnamed money rounds in silence and shows a column of
 // golfers who all read "Player".
-const CACHE_VERSION = 'golfapp-v149-receipt-predicate';
+const CACHE_VERSION = 'golfapp-v150-receipt-mark';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -1236,7 +1236,10 @@ Run it after touching the Cup card, the pointer, `resolveRyderCupForRound` or
 `foursomes-entry-check.js` · `home-screen-check.js` · `id-binding-check.js` ·
 `nassau-stake-check.js` (a split-stake Nassau prices every segment) ·
 `orphan-match-check.js` (READ-ONLY, against live data) ·
-`receipt-identity-check.js` · `round-setup-check.js` (the destructive control is
+`receipt-identity-check.js` · `receipt-logo-check.js` (the brand mark is on the
+printed receipt, display:none and 0 x 0 on screen, and the native text PDF gets
+nothing from it; `--baseline <file>` proves the screen did not move) ·
+`round-setup-check.js` (the destructive control is
 quieter than Save, the page has a way back, and **nothing that shares a round has
 crept back onto the setup screen**) · `round-share-check.js` · `ryder-arrival-check.js` ·
 `share-url-check.js` (every builder returns `https` from a non-web origin) ·

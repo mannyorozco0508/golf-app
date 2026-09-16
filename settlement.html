@@ -174,6 +174,14 @@
         .receipt-each { font-weight: normal; font-size: 0.78rem; color: var(--text-muted); }
 
         .receipt-head { text-align: center; margin-bottom: 14px; }
+        /* THE MARK, PRINT ONLY. The printed receipt is the one thing that leaves the
+           app - paper, a saved PDF, a group chat - so it carries the brand mark
+           (logo-mark.png, the lobby's own asset, precached by sw.js and shipped in
+           the native bundle - never a network fetch). On SCREEN it is display:none:
+           the element is in the header so the print path needs no second header,
+           and it takes no space, so nothing on the page moves. The size is set in
+           the print block below. */
+        .receipt-mark { display: none; }
         .receipt-head-course { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.04em; }
         .receipt-head-date { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
         .receipt-head-format { font-size: 0.8rem; color: var(--text-main); margin-top: 2px; }
@@ -322,6 +330,11 @@
             .skins-card { border-style: dashed; }
             .settle-card[data-flight], .pool-flight { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .receipt-head { break-after: avoid; page-break-after: avoid; }
+            /* 64 CSS px = 17 mm on paper: reads as a mark, does not dominate the sheet.
+               The asset is 256 px, 4x the CSS size and 1.28x what 300 dpi needs
+               (64 x 300/96 = 200 px), so it prints sharp - rattle_identity_test.js
+               holds that rule. Centred above the course name, 6 px clear of it. */
+            .receipt-mark { display: block; width: 64px; height: 64px; margin: 0 auto 6px auto; }
             /* The scorecard is the only section allowed its own page. */
             .receipt-card-wide { break-before: auto; page-break-inside: auto; }
             .receipt-card-scroll { overflow-x: visible; }
@@ -629,7 +642,13 @@ html {
         // two PDFs apart. The roster count and the round's own name close that.
         const who = (currentData && currentData.players || []).length;
         const label = (currentData && (currentData.eventName || currentData.roundDay)) || '';
-        return `<div class="receipt-head" id="receipt-export-head">
+        // THE MARK sits first in the header, adjacent to the opening tag on purpose:
+        // it is display:none on screen (print shows it), and an image contributes no
+        // text, so the header's tag-stripped text and innerText are what they were -
+        // receipt_final_prev.fixture.json still matches byte for byte. The native
+        // PDF (native-export.js) reads innerText, so it gets nothing from this line;
+        // that is stated in receipt_logo_test.js rather than hidden.
+        return `<div class="receipt-head" id="receipt-export-head"><img class="receipt-mark" src="logo-mark.png" alt="Rattle Golf" width="64" height="64">
             <div class="receipt-head-course">${course}</div>
             <div class="receipt-head-date">${date}</div>
             <div class="receipt-head-format">${sub}${who ? ' \u00B7 ' + who + ' golfer' + (who === 1 ? '' : 's') : ''}</div>
