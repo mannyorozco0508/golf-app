@@ -125,13 +125,19 @@ describe('PUBLIC SIGNUP — arrived via ?register=CODE, the way a golfer is sent
         assert.equal(displayOf(sb, 'reg-form'), 'block', 'the form is the default, not a closed message');
         assert.equal(sb.document.getElementById('reg-name').value, '',
             'the name box is empty until the golfer types — the default state');
-        assert.ok(sb.document.getElementById('reg-contact'), 'email/phone is offered the way the payer row already patterns it');
-        assert.match(read(PAGE).replace(/<script[\s\S]*?<\/script>/g, ''), /id="reg-contact"[^>]*placeholder="Email or phone"/,
-            'the contact box uses the same "Email or phone" pattern as the payer row');
+        // Wave 2a (2026-09-16): email and phone are their own REQUIRED boxes -
+        // the rules require them on every public create - and the Wave 1
+        // "Email or phone (optional)" box is gone. tournament_registration_2a_
+        // test.js holds the schema.
+        assert.ok(sb.document.getElementById('reg-email') && sb.document.getElementById('reg-phone'), 'email and phone are asked');
+        assert.ok(!/id="reg-contact"/.test(read(PAGE)), 'the optional contact box is gone (mini-dom vivifies ids, so the markup is asked)');
         assert.equal(displayOf(sb, 'reg-team-wrap'), 'block',
             'a team event must ask for a team preference');
-        assert.equal(displayOf(sb, 'reg-handicap-wrap'), 'none',
-            'a scramble does not need a personal handicap to sign up');
+        // 2a: GHIN / handicap is asked on every event (2b's toggle may hide it); on
+        // a scramble it is optional and stays on screen.
+        assert.notEqual(displayOf(sb, 'reg-handicap-wrap'), 'none',
+            'the GHIN / handicap box is offered on a team event too (optional)');
+        assert.equal(displayOf(sb, 'reg-sponsor-wrap'), 'none', 'hole sponsorship is OFF until 2b turns it on');
         const title = sb.document.getElementById('reg-event-name');
         assert.ok(title && /Signup Scramble/.test(title.textContent || title.innerHTML || ''),
             'the event name is on the signup page: ' + (title && (title.textContent || title.innerHTML)));
@@ -141,17 +147,19 @@ describe('PUBLIC SIGNUP — arrived via ?register=CODE, the way a golfer is sent
         const sb = arriveRegister(individualRecord());
         await settle();
         assert.equal(displayOf(sb, 'register-screen'), 'block');
-        assert.equal(displayOf(sb, 'reg-handicap-wrap'), 'block',
-            'net individual: a handicap is needed');
+        assert.notEqual(displayOf(sb, 'reg-handicap-wrap'), 'none',
+            'net individual: the GHIN / handicap box is on screen (2a: on every event)');
         assert.equal(displayOf(sb, 'reg-team-wrap'), 'none',
             'an individual event has no team to prefer');
     });
 
-    test('submit WRITES registrations/REG1/<id> with name + createdAt, and nothing on tournaments/', async () => {
+    test('submit WRITES registrations/REG1/<id> with fullName + email + phone + createdAt, and nothing on tournaments/', async () => {
         const sb = arriveRegister(teamRecord());
         await settle();
+        // Wave 2a shape: the three required fields; team preference when present.
         sb.document.getElementById('reg-name').value = 'Dee Delta';
-        sb.document.getElementById('reg-contact').value = 'dee@example.com';
+        sb.document.getElementById('reg-email').value = 'dee@example.com';
+        sb.document.getElementById('reg-phone').value = '555-0100';
         sb.document.getElementById('reg-team-pref').value = 'Eagles';
         const alerts = []; sb.alert = (m) => alerts.push(String(m));
         sb.submitRegistration();
@@ -159,10 +167,12 @@ describe('PUBLIC SIGNUP — arrived via ?register=CODE, the way a golfer is sent
         const writes = sb.__dbWrites.filter((w) => w.op === 'set');
         const reg = writes.filter((w) => /^registrations\/REG1\/[^/]+$/.test(w.path));
         assert.equal(reg.length, 1, 'exactly one registration create: ' + JSON.stringify(sb.__dbWrites));
-        assert.equal(reg[0].value.name, 'Dee Delta');
+        assert.equal(reg[0].value.fullName, 'Dee Delta');
         assert.equal(typeof reg[0].value.createdAt, 'number');
         assert.ok(reg[0].value.createdAt > 0, 'createdAt must be a timestamp, the field the rules require');
-        assert.equal(reg[0].value.contact, 'dee@example.com');
+        assert.equal(reg[0].value.email, 'dee@example.com');
+        assert.equal(reg[0].value.phone, '555-0100');
+        assert.ok(!('name' in reg[0].value) && !('contact' in reg[0].value), 'the Wave 1 keys are gone - the rules refuse them');
         assert.equal(reg[0].value.teamPreference, 'Eagles');
         assert.ok(reg[0].value.paid === undefined && reg[0].value.approvedAt === undefined,
             'a golfer must not be able to mark themselves paid or approved on create');
@@ -208,9 +218,11 @@ describe('PUBLIC SIGNUP — arrived via ?register=CODE, the way a golfer is sent
         // so it is not on the sandbox; the proof is the write going through
         // without a sign-in.
         sb.document.getElementById('reg-name').value = 'Ev Echo';
+        sb.document.getElementById('reg-email').value = 'ev@example.com';
+        sb.document.getElementById('reg-phone').value = '555-0199';
         sb.submitRegistration();
         await settle();
-        assert.ok(sb.__dbWrites.some((w) => /^registrations\/REG1\//.test(w.path) && w.value && w.value.name === 'Ev Echo'),
+        assert.ok(sb.__dbWrites.some((w) => /^registrations\/REG1\//.test(w.path) && w.value && w.value.fullName === 'Ev Echo'),
             'anonymous must not be treated as "signed out, therefore cannot sign up": ' + JSON.stringify(sb.__dbWrites));
     });
 
@@ -221,7 +233,9 @@ describe('PUBLIC SIGNUP — arrived via ?register=CODE, the way a golfer is sent
         assert.match(markup, /id="reg-name"/);
         assert.match(markup, /id="register-screen"/);
         assert.match(srcOf('submitRegistration'), /registrations\/\$\{/);
-        assert.match(srcOf('submitRegistration'), /createdAt/);
+        // 2a: the payload is built by buildRegistrationPayload, which the button's handler calls.
+        assert.match(srcOf('submitRegistration'), /buildRegistrationPayload\(\)/);
+        assert.match(srcOf('buildRegistrationPayload'), /createdAt: Date\.now\(\)/);
     });
 });
 

@@ -369,21 +369,50 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <p class="lobby-sub" id="reg-event-sub"></p>
     <div id="reg-closed" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--border-mid); border-radius:10px; padding:14px; font-size:0.9rem;"></div>
     <div id="reg-form">
+        <!-- WAVE 2a (2026-09-16): the field schema. fullName, email and phone are
+             REQUIRED - by this form and by database.rules.json (registrations/
+             $code/$entryId .validate on a public create). The rest is stored only
+             when present; the rules type each one and refuse any key not listed
+             ($other .validate false). This node is the first personal data the
+             app stores - email and phone for every golfer in a field. -->
         <div class="form-group">
-            <label for="reg-name">Name</label>
-            <input type="text" id="reg-name" placeholder="Your name" maxlength="120" autocomplete="name">
+            <label for="reg-name">Full name</label>
+            <input type="text" id="reg-name" placeholder="First and last name" maxlength="120" autocomplete="name">
         </div>
         <div class="form-group">
-            <label for="reg-contact">Email or phone (optional)</label>
-            <input type="text" id="reg-contact" placeholder="Email or phone" autocomplete="tel">
+            <label for="reg-email">Email</label>
+            <input type="email" id="reg-email" placeholder="you@example.com" maxlength="160" autocomplete="email" inputmode="email">
         </div>
-        <div class="form-group" id="reg-handicap-wrap" style="display:none;">
-            <label for="reg-handicap">Handicap</label>
-            <input type="text" id="reg-handicap" placeholder="e.g. 12 or +2">
+        <div class="form-group">
+            <label for="reg-phone">Phone</label>
+            <input type="tel" id="reg-phone" placeholder="Mobile number" maxlength="40" autocomplete="tel" inputmode="tel">
+        </div>
+        <div class="form-group" id="reg-handicap-wrap">
+            <label for="reg-handicap">GHIN number or handicap (optional)</label>
+            <input type="text" id="reg-handicap" placeholder="GHIN # or e.g. 12" maxlength="20">
+        </div>
+        <div class="form-group" id="reg-shirt-wrap">
+            <label for="reg-shirt">Shirt size (optional)</label>
+            <select id="reg-shirt">
+                <option value="">Skip</option>
+                <option value="XS">XS</option><option value="S">S</option><option value="M">M</option>
+                <option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option><option value="XXXL">XXXL</option>
+            </select>
+        </div>
+        <div class="form-group" id="reg-dinner-wrap">
+            <label for="reg-dinner">Dinner guests, including you (optional)</label>
+            <input type="number" id="reg-dinner" min="0" max="20" step="1" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group" id="reg-team-wrap" style="display:none;">
             <label for="reg-team-pref">Team preference (optional)</label>
-            <input type="text" id="reg-team-pref" placeholder="Team name if you have one">
+            <input type="text" id="reg-team-pref" placeholder="Team name if you have one" maxlength="120">
+        </div>
+        <!-- Hole sponsorship is OFF by default (Wave 2b's toggle turns it on per
+             event). Hidden here, so nothing is written; when shown, holeSponsorship
+             is written as true/false and sponsorName only when a name is typed. -->
+        <div class="form-group" id="reg-sponsor-wrap" style="display:none;">
+            <label><input type="checkbox" id="reg-sponsor"> I'd like to sponsor a hole</label>
+            <input type="text" id="reg-sponsor-name" placeholder="Sponsor name (optional)" maxlength="120" style="margin-top:6px;">
         </div>
         <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
         <p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>
@@ -1458,8 +1487,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 closed.textContent = 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
                 return;
             }
-            document.getElementById('reg-handicap-wrap').style.display = eventIsIndividual(data) ? 'block' : 'none';
+            // GHIN / handicap is asked on every event (2a; 2b's toggle can turn it
+            // off). Team preference only where there are teams to prefer.
             document.getElementById('reg-team-wrap').style.display = eventIsIndividual(data) ? 'none' : 'block';
+            // Hole sponsorship is OFF until 2b's per-event toggle turns it on; set in
+            // code, not only in markup, so the default is the page's decision.
+            document.getElementById('reg-sponsor-wrap').style.display = 'none';
         }).catch(() => {
             const form = document.getElementById('reg-form');
             const closed = document.getElementById('reg-closed');
@@ -1471,33 +1504,69 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
 
+    // THE SIGNUP PAYLOAD (Wave 2a). Exactly the keys database.rules.json permits
+    // under registrations/$code/$entryId, and nothing the desk owns (paid,
+    // paidAt, approvedAt, playerId, teamNum - the rules refuse a public create
+    // that carries them). An optional field is written only when its box is
+    // SHOWN and the golfer filled it; a box a toggle hides is never sent, so the
+    // rules can type it without requiring it.
+    const REG_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;   // the rules' own pattern
+    // Each optional box and the wrap that shows or hides it, by id - explicit,
+    // so a hidden box reads as empty without walking the DOM.
+    const REG_WRAP = { 'reg-handicap': 'reg-handicap-wrap', 'reg-shirt': 'reg-shirt-wrap', 'reg-dinner': 'reg-dinner-wrap',
+                       'reg-team-pref': 'reg-team-wrap', 'reg-sponsor-name': 'reg-sponsor-wrap' };
+    function regValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return '';
+        const wrap = REG_WRAP[id] ? document.getElementById(REG_WRAP[id]) : null;
+        if (wrap && wrap.style && wrap.style.display === 'none') return '';
+        return String(el.value || '').trim();
+    }
+    function buildRegistrationPayload() {
+        const fullName = regValue('reg-name');
+        const email = regValue('reg-email');
+        const phone = regValue('reg-phone');
+        if (!fullName) return { error: 'Give your full name.' };
+        if (fullName.length > 120) return { error: 'That name is too long.' };
+        if (!email || email.length < 5 || email.length > 160 || !REG_EMAIL.test(email)) return { error: 'Give an email address we can reach you at.' };
+        if (!phone || phone.length < 7) return { error: 'Give a phone number we can reach you at.' };
+        if (phone.length > 40) return { error: 'That phone number is too long.' };
+        const payload = { fullName: fullName, email: email, phone: phone, createdAt: Date.now() };
+        const ghin = regValue('reg-handicap');
+        if (ghin) { if (ghin.length > 20) return { error: 'GHIN or handicap: 20 characters at most.' }; payload.ghinOrHandicap = ghin; }
+        const shirt = regValue('reg-shirt');
+        if (shirt) payload.shirtSize = shirt;
+        const dinner = regValue('reg-dinner');
+        if (dinner !== '') {
+            const n = Number(dinner);
+            if (!Number.isInteger(n) || n < 0 || n > 20) return { error: 'Dinner guests: a whole number from 0 to 20.' };
+            payload.dinnerCount = n;
+        }
+        const team = regValue('reg-team-pref');
+        if (team) payload.teamPreference = team;
+        const sponsorWrap = document.getElementById('reg-sponsor-wrap');
+        if (sponsorWrap && sponsorWrap.style.display !== 'none') {
+            const box = document.getElementById('reg-sponsor');
+            payload.holeSponsorship = !!(box && box.checked);
+            const sponsorName = regValue('reg-sponsor-name');
+            if (sponsorName) payload.sponsorName = sponsorName;
+        }
+        return { payload: payload };
+    }
+
     function submitRegistration() {
-        const name = ((document.getElementById('reg-name') || {}).value || '').trim();
-        if (!name) { alert('Give your name.'); return; }
-        if (name.length > 120) { alert('That name is too long.'); return; }
         if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
             alert('This event is not taking signups.');
             return;
         }
+        const built = buildRegistrationPayload();
+        if (built.error) { alert(built.error); return; }
         const entryId = mintId('e');
-        const payload = { name: name, createdAt: Date.now() };
-        const contact = ((document.getElementById('reg-contact') || {}).value || '').trim();
-        if (contact) payload.contact = contact;
-        const hcpWrap = document.getElementById('reg-handicap-wrap');
-        const hcpEl = document.getElementById('reg-handicap');
-        if (hcpWrap && hcpWrap.style.display !== 'none' && hcpEl && hcpEl.value.trim()) {
-            payload.handicap = hcpEl.value.trim();
-        }
-        const teamWrap = document.getElementById('reg-team-wrap');
-        const teamEl = document.getElementById('reg-team-pref');
-        if (teamWrap && teamWrap.style.display !== 'none' && teamEl && teamEl.value.trim()) {
-            payload.teamPreference = teamEl.value.trim();
-        }
+        const payload = built.payload;
         const status = document.getElementById('reg-status');
         if (status) status.textContent = '';
         db.ref(`registrations/${registerCode}/${entryId}`).set(payload).then(() => {
-            const nameEl = document.getElementById('reg-name');
-            if (nameEl) nameEl.value = '';
+            ['reg-name', 'reg-email', 'reg-phone'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
             if (status) status.textContent = 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.';
         }).catch((err) => {
             alert((err && err.message) ? String(err.message) : 'Could not sign up just now.');
@@ -1566,14 +1635,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     return `<option value="${n}"${String(n) === defaultDest ? ' selected' : ''}>${escReg(label)}</option>`;
                 }).join('')
                 + `</select>`;
-            const meta = [e.contact, e.handicap ? ('Hcp ' + e.handicap) : '', pref ? ('Prefers ' + pref) : '']
+            // The 2a fields, in the order the form asks them. (Wave 1's contact /
+            // handicap keys are shown too if an entry ever carries them.)
+            const meta = [e.email, e.phone, e.contact,
+                          e.ghinOrHandicap ? ('GHIN/Hcp ' + e.ghinOrHandicap) : (e.handicap ? ('Hcp ' + e.handicap) : ''),
+                          e.shirtSize ? ('Shirt ' + e.shirtSize) : '',
+                          (e.dinnerCount !== undefined && e.dinnerCount !== null) ? ('Dinner ' + e.dinnerCount) : '',
+                          pref ? ('Prefers ' + pref) : '',
+                          e.holeSponsorship === true ? ('Hole sponsor' + (e.sponsorName ? ' \u2014 ' + e.sponsorName : '')) : '']
                 .filter(Boolean).map(escReg).join(' \u00b7 ');
             const paid = e.paid ? ' checked' : '';
             const approve = inField
                 ? `<span style="font-size:0.78rem; color:var(--text-muted);">In the field</span>`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
             return `<div class="reg-row">`
-                + `<span class="reg-name">${escReg(e.name || '')}</span>`
+                + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
                 + dest
                 + approve
@@ -1593,15 +1669,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function approveRegistration(entryId) {
         if (!currentCode || !canManage()) return;
         const entry = (registrationData || {})[entryId];
-        if (!entry || !String(entry.name || '').trim()) return;
+        const entryName = String((entry && (entry.fullName || entry.name)) || '').trim();
+        if (!entry || !entryName) return;
         if (entry.approvedAt || entry.playerId || entry.teamNum) return;
-        const name = String(entry.name).trim();
+        const name = entryName;
         if (recordIsIndividual()) {
             const pid = newPlayerId();
             const rec = {
                 id: pid,
                 name: name,
-                handicap: String(entry.handicap || '').trim() || '0',
+                // A GHIN number is not a handicap; only a number that reads as one is carried.
+                handicap: (function () { const raw = String(entry.ghinOrHandicap || entry.handicap || '').trim(); return /^\+?\d{1,2}(\.\d+)?$/.test(raw) ? raw : '0'; })(),
                 addedAt: Date.now()
             };
             db.ref(`tournaments/${currentCode}/players/${pid}`).set(rec).then(() =>

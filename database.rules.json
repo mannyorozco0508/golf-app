@@ -74,7 +74,55 @@
         ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
         "$entryId": {
           ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
-          ".validate": "newData.hasChildren(['name', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120 && newData.child('createdAt').isNumber()"
+          ".validate": "newData.hasChildren(['createdAt']) && newData.child('createdAt').isNumber() && (data.exists() || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()) || (newData.hasChildren(['fullName', 'email', 'phone']) && !newData.hasChild('paid') && !newData.hasChild('paidAt') && !newData.hasChild('approvedAt') && !newData.hasChild('playerId') && !newData.hasChild('teamNum')))",
+          "fullName": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+          },
+          "email": {
+            ".validate": "newData.isString() && newData.val().length >= 5 && newData.val().length <= 160 && newData.val().matches(/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/)"
+          },
+          "phone": {
+            ".validate": "newData.isString() && newData.val().length >= 7 && newData.val().length <= 40"
+          },
+          "ghinOrHandicap": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20"
+          },
+          "shirtSize": {
+            ".validate": "newData.isString() && newData.val().matches(/^(XS|S|M|L|XL|XXL|XXXL)$/)"
+          },
+          "dinnerCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20 && newData.val() % 1 === 0"
+          },
+          "teamPreference": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+          },
+          "holeSponsorship": {
+            ".validate": "newData.isBoolean()"
+          },
+          "sponsorName": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+          },
+          "paid": {
+            ".validate": "newData.isBoolean()"
+          },
+          "paidAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "approvedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "playerId": {
+            ".validate": "newData.isNumber() || newData.isString()"
+          },
+          "teamNum": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },

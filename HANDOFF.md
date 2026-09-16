@@ -343,10 +343,37 @@ flipped. Two file-level pins moved with it and say why: the frozen sha256 in
 reading the rules back after a hard refresh. Not deployed from the CLI — see the
 note at the top of this section.
 
-### ownerUid and registrations — COMMITTED, NOT YET PUBLISHED (rules wave, 2026-09-12)
+### ownerUid and registrations — PUBLISHED (rules wave 2026-09-12; live since 2026-09-15; schema 2026-09-16)
 
-The approved diff (+13 / −1) added two things to `database.rules.json` and changed
-nothing else — `tournaments/$tourneyCode`'s `.write` is untouched:
+**Live.** This block reached production on 2026-09-15 with the Wave 2 organizer
+rules deploy (the whole file, read back JSON-equal). The heading above used to say
+"COMMITTED, NOT YET PUBLISHED" and was stale for a day. On 2026-09-16 Manny
+published the registration FIELD SCHEMA (below) to the Firebase console by hand
+from the repo file — sha 40f2ae74 — and the live read-back was byte-equal after
+the CLI's trailing newline, JSON-equal, three independent reads.
+
+**The schema is CLOSED.** `registrations/$code/$entryId` ends in
+`"$other": { ".validate": false }`: any key the rules do not name is refused. So
+EVERY future registration field is a `database.rules.json` change published by
+hand in the console, not a deploy — a form that starts sending a new key before
+the rule names it is refused by the database, not by the page. What the rule says
+(2a, 2026-09-16): a public create must carry `fullName`, `email`, `phone`,
+`createdAt` and may NOT carry the desk's `paid`, `paidAt`, `approvedAt`,
+`playerId`, `teamNum` (before this a golfer could sign up already paid and
+approved — targaryen against the old file accepted it); the owner may create or
+update with them; `ghinOrHandicap`, `shirtSize` (XS|S|M|L|XL|XXL|XXXL),
+`dinnerCount` (whole, 0..20), `teamPreference`, `holeSponsorship` (boolean),
+`sponsorName` are optional and typed. `security-rules.tests-data.json` holds 56
+registrations rows; `tournament_registration_2a_test.js` knocks each boundary out
+of a copy and shows the rows fire.
+
+**This node holds the first personal data this app has ever stored** — email and
+phone for every golfer in a field. Everything before it was scores and names.
+Read is owner-only; the form says what it collects; nothing else reads it.
+
+The 2026-09-12 diff (+13 / −1) added two things to `database.rules.json` and changed
+nothing else — `tournaments/$tourneyCode`'s `.write` is untouched (the `$entryId`
+`.validate` shown here is the Wave 1 shape, superseded by the schema above):
 
     "tournaments": { "$tourneyCode": {
         ".validate": "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
@@ -421,8 +448,11 @@ after:**
    Playground check: `tournaments/<a fresh code>/ownerUid`, write any string,
    unauthenticated — must say denied.
 
-**Not published.** The console is the deploy; the commit is not. Publishing without
-the two checks above ships an assumption about the engine.
+**Published (2026-09-15, then the schema on 2026-09-16).** The console is the deploy;
+the commit is the record. The two Playground UNKNOWNs above were not run as
+Playground checks; the deploy went out with the Wave 2 organizer rules and the live
+behaviour was proved against the real database on 2026-09-15 (the Monday test,
+the create gate, the claim refusals — see the organizer-gate notes).
 
 ## Sign-in on tournament.html — A GUARDRAIL, NOT A BOUNDARY (auth wave, 2026-09-12)
 

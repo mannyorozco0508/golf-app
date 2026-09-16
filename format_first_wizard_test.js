@@ -689,7 +689,15 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // in an existing round is unchanged; organizers/<uid>/firstSeenAt is
         // write-once and pass is unwritable by any client. wave2_rules_test.js
         // holds 98 targaryen rows and 13 controls against it.
-        'database.rules.json': 'e0876b920aeeb89e111604f5d7c7f3f3c26667370894806a7f55098bf6263bd4',
+        // RE-PINNED 2026-09-16, TOURNAMENT REGISTRATION WAVE 2a (approved per-file,
+        // published to the Firebase console by hand, live read-back byte-equal):
+        // registrations/$code/$entryId gains the field schema - fullName, email,
+        // phone required on a public create; the desk's paid/approved fields
+        // forbidden on it; every optional typed; $other refused (the schema is
+        // CLOSED - a future field is a console publish, not a deploy). This node
+        // holds the first personal data the app stores. security-rules.tests-
+        // data.json holds 56 targaryen rows against it.
+        'database.rules.json': '40f2ae7402e2e796af684b5b06cb7c37f0e07b3b77285baceb685a3a12c3edcd',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };

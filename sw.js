@@ -1532,7 +1532,15 @@
 // (rounds-played). Public signup (?register=CODE) and the organizer Registration
 // list (cash/offline Paid, approve into the field). Higher than both branch
 // keys so installed devices on v153 or v155 drop the old shell.
-const CACHE_VERSION = 'golfapp-v156-tournament-register';
+// Moved to v157: tournament registration Wave 2a - the field schema. The
+// public signup (tournament.html?register=CODE) now asks full name, email and
+// phone (required by database.rules.json, published by hand 2026-09-16), GHIN
+// or handicap, shirt size, dinner guests, team preference; hole sponsorship is
+// in the markup, hidden until 2b's toggle. The desk lists the new fields and
+// approve carries fullName. A device on v156 keeps the Wave 1 form, whose
+// { name } write the live rules now REFUSE - so the bump is what stops a
+// cached page from offering a signup that cannot land.
+const CACHE_VERSION = 'golfapp-v157-registration-schema';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -36,7 +36,8 @@ const db = {
     tournaments: { OWNED1: owned },
     registrations: {
         OWNED1: {
-            e1: { name: 'Fay Foxtrot', createdAt: 10, contact: '555-0100', teamPreference: 'Hawks' }
+            // Wave 2a shape: the three required fields, the optionals the desk lists.
+            e1: { fullName: 'Fay Foxtrot', email: 'fay@example.com', phone: '555-0100', shirtSize: 'L', dinnerCount: 2, createdAt: 10, teamPreference: 'Hawks' }
         }
     },
     events: {}, trips: {}, global_courses: {}
@@ -52,6 +53,11 @@ const PUBLIC_PROBE = `
   return JSON.stringify({
     registerVisible: visible('#register-screen'),
     nameVisible: visible('#reg-name'),
+    emailVisible: visible('#reg-email'),
+    phoneVisible: visible('#reg-phone'),
+    shirtVisible: visible('#reg-shirt-wrap'),
+    dinnerVisible: visible('#reg-dinner-wrap'),
+    sponsorVisible: visible('#reg-sponsor-wrap'),
     submitVisible: visible('#reg-submit'),
     formVisible: visible('#reg-form'),
     teamVisible: visible('#reg-team-wrap'),
@@ -116,10 +122,17 @@ async function look(query, probe, auth) {
     const failures = [];
     if (!pub.registerVisible) failures.push('public: #register-screen has no rect');
     if (!pub.nameVisible) failures.push('public: the name box has no rect — the golfer cannot type');
+    // Wave 2a: email and phone are required boxes; GHIN/handicap, shirt and dinner
+    // are asked on every event; hole sponsorship is hidden until 2b's toggle.
+    if (!pub.emailVisible) failures.push('public: the email box has no rect');
+    if (!pub.phoneVisible) failures.push('public: the phone box has no rect');
+    if (!pub.shirtVisible) failures.push('public: the shirt size box has no rect');
+    if (!pub.dinnerVisible) failures.push('public: the dinner count box has no rect');
+    if (pub.sponsorVisible) failures.push('public: hole sponsorship is on screen before 2b turns it on');
     if (!pub.submitVisible) failures.push('public: Sign up has no rect');
     if (!pub.formVisible) failures.push('public: the form is not on screen');
     if (!pub.teamVisible) failures.push('public: team preference is hidden on a scramble');
-    if (pub.hcpVisible) failures.push('public: a scramble is asking for a personal handicap');
+    if (!pub.hcpVisible) failures.push('public: the GHIN / handicap box is hidden (2a asks it on every event, optional)');
     if (pub.setupVisible) failures.push('public: the create-tournament form is on screen behind signup');
     if (pub.manageVisible) failures.push('public: the organizer console is on screen behind signup');
     if (!/Signup Scramble/.test(pub.screen)) failures.push('public: the event name is not in innerText: ' + JSON.stringify(pub.screen).slice(0, 200));
@@ -128,6 +141,8 @@ async function look(query, probe, auth) {
     if (!owner.setupVisible) failures.push('organizer: Setup tab has no rect');
     if (!owner.sectionVisible) failures.push('organizer: the registration section has no rect');
     if (!/Fay Foxtrot/.test(owner.section)) failures.push('organizer: the registrant is not in innerText of the list');
+    if (!/fay@example\.com/.test(owner.section) || !/555-0100/.test(owner.section)) failures.push('organizer: email and phone are not on the desk');
+    if (!/Shirt L/.test(owner.section) || !/Dinner 2/.test(owner.section)) failures.push('organizer: the optionals are not on the desk');
     if (!/register=OWNED1/.test(owner.section)) failures.push('organizer: the signup link is not on screen');
     if (!/Paid/.test(owner.section)) failures.push('organizer: Paid is not labelled');
     if (owner.lockWords && owner.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(owner.lockWords));

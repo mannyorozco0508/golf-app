@@ -402,6 +402,10 @@ describe('NOTHING ELSE MOVED', () => {
             '/events/$eventCode/ownerUid/.validate',
             '/organizers/$uid/.read',
             '/organizers/$uid/firstSeenAt/.write',
+            // Wave 2a (2026-09-16, published to the console by hand): the entry's
+            // .validate names the owner so the desk may create a paid walk-up while a
+            // public create may not carry the desk's fields.
+            '/registrations/$code/$entryId/.validate',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
             '/tournaments/$tourneyCode/ownerUid/.validate'

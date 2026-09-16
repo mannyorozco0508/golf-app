@@ -66,7 +66,9 @@
     "registrations": {
       "OWNED": {
         "e1": {
-          "name": "Ann Alpha",
+          "fullName": "Ann Alpha",
+          "email": "ann@example.com",
+          "phone": "555-0001",
           "createdAt": 1
         }
       }
@@ -924,8 +926,10 @@
           "auth": "nobody",
           "data": {
             "e9": {
-              "name": "Zed",
-              "createdAt": 9
+              "fullName": "Bo Bravo",
+              "email": "bo@example.com",
+              "phone": "555-0100",
+              "createdAt": 2
             }
           }
         }
@@ -936,8 +940,75 @@
         {
           "auth": "nobody",
           "data": {
-            "name": "Bo Bravo",
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
             "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "ghinOrHandicap": "12.4",
+            "shirtSize": "XL",
+            "dinnerCount": 2,
+            "teamPreference": "Eagles",
+            "holeSponsorship": true
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "holeSponsorship": false
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "organizer",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "paid": true,
+            "paidAt": 3
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "holeSponsorship": true,
+            "sponsorName": "Orozco Roofing"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "sponsorName": "Orozco Roofing"
           }
         }
       ],
@@ -945,14 +1016,197 @@
         {
           "auth": "nobody",
           "data": {
-            "name": "Bo Bravo"
+            "fullName": "Bo",
+            "email": "bo@example.com",
+            "createdAt": 2
           }
         },
         {
           "auth": "nobody",
           "data": {
-            "name": "",
+            "fullName": "Bo",
+            "phone": "555-0100",
             "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo",
+            "email": "bo@example.com",
+            "phone": "555-0100"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "paid": true
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "approvedAt": 5
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "playerId": 7
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "teamNum": 1
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "not-an-email",
+            "phone": "555-0100",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "123",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "shirtSize": "Huge"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "dinnerCount": 2.5
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "dinnerCount": 99
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "holeSponsorship": "yes"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "venmo": "@bo"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Bo Bravo",
+            "createdAt": 2
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "paid": true
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "sponsorName": ""
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "sponsorName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Bo Bravo",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2,
+            "sponsorName": 42
           }
         }
       ]
@@ -966,17 +1220,32 @@
         {
           "auth": "organizer",
           "data": {
-            "name": "Ann Alpha-Corrected",
-            "createdAt": 1
+            "fullName": "Ann Alpha",
+            "email": "ann@example.com",
+            "phone": "555-0001",
+            "createdAt": 1,
+            "paid": true,
+            "paidAt": 2
           }
         },
         {
           "auth": "organizer",
           "data": {
-            "name": "Ann Alpha",
+            "fullName": "Ann Alpha",
+            "email": "ann@example.com",
+            "phone": "555-0001",
             "createdAt": 1,
-            "paid": true,
-            "paidAt": 2
+            "approvedAt": 3,
+            "playerId": 5
+          }
+        },
+        {
+          "auth": "organizer",
+          "data": {
+            "fullName": "Ann Alpha-Corrected",
+            "email": "ann@example.com",
+            "phone": "555-0001",
+            "createdAt": 1
           }
         }
       ],
@@ -984,20 +1253,45 @@
         {
           "auth": "nobody",
           "data": {
-            "name": "Ann2",
+            "fullName": "Ann Alpha",
+            "email": "ann@example.com",
+            "phone": "555-0001",
+            "createdAt": 1,
+            "paid": true
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "fullName": "Ann Alpha",
+            "email": "ann@example.com",
+            "phone": "555-0001",
+            "createdAt": 1,
+            "paid": true
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "fullName": "Ann Alpha",
+            "email": "ann@example.com",
+            "phone": "555-0001",
+            "createdAt": 1,
+            "approvedAt": 3
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "fullName": "Ann2",
+            "email": "ann@example.com",
+            "phone": "555-0001",
             "createdAt": 1
           }
         },
         {
           "auth": "nobody",
           "data": null
-        },
-        {
-          "auth": "stranger",
-          "data": {
-            "name": "Ann2",
-            "createdAt": 1
-          }
         }
       ]
     },
@@ -1006,11 +1300,10 @@
         {
           "auth": "nobody",
           "data": {
-            "name": "Cal Charlie",
-            "createdAt": 3,
-            "contact": "555-0100",
-            "handicap": "12",
-            "teamPreference": "Eagles"
+            "fullName": "Cal Charlie",
+            "email": "bo@example.com",
+            "phone": "555-0100",
+            "createdAt": 2
           }
         }
       ]
@@ -1030,6 +1323,42 @@
             "name": "Late Entry",
             "createdAt": 5
           }
+        }
+      ]
+    },
+    "registrations/OWNED/e1/paid": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": true
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": true
+        },
+        {
+          "auth": "stranger",
+          "data": true
+        }
+      ]
+    },
+    "registrations/OWNED/e1/approvedAt": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": 9
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 9
+        },
+        {
+          "auth": "stranger",
+          "data": 9
         }
       ]
     }
