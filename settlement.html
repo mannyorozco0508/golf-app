@@ -32,6 +32,11 @@
     <script src="text-safe.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
+    <!-- The scorecard rows live once, in scorecard-rows.js (2026-09-16): the
+         Full Scorecard below and the leaderboard's tap-a-name card draw from it.
+         Loaded after score-marks.js (rings), text-safe.js and money-engine.js
+         (net strokes), whose globals it reads. -->
+    <script src="scorecard-rows.js"></script>
 <script src="action-model.js"></script>
 <script src="settlement-engine.js"></script>
 <script src="live-skins.js"></script>
@@ -743,21 +748,6 @@ html {
             <div class="settle-header">\uD83D\uDCCB Full Scorecard</div>
             <div class="receipt-card-scroll"><table class="receipt-table">`;
 
-        // HOLE + PAR rows
-        const headRow = (label, vals, outVal, inVal, total) => {
-            let r = `<tr><th class="rt-name">${label}</th>`;
-            if (hasFront) { front.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasBack) r += `<th class="rt-sec">${outVal}</th>`; }
-            if (hasBack) { back.forEach(h => { r += `<th>${vals(h)}</th>`; }); if (hasFront) r += `<th class="rt-sec">${inVal}</th>`; }
-            return r + `<th class="rt-sec">${total}</th></tr>`;
-        };
-        const outPar = front.reduce((s, h) => s + (h.par || 0), 0);
-        const inPar = back.reduce((s, h) => s + (h.par || 0), 0);
-        html += headRow('HOLE', h => h.hole, 'OUT', 'IN', 'TOT');
-        html += headRow('PAR', h => h.par, outPar, inPar, outPar + inPar);
-        // STROKE INDEX. Without it a golfer cannot check a net score for
-        // themselves - which is the whole point of printing net at all.
-        html += headRow('HCP', h => (h.hcpIndex !== undefined && h.hcpIndex !== null) ? h.hcpIndex : '\u2013', '', '', '');
-
         // IS NET RELEVANT TO THIS ROUND?
         //
         // Printing a net row on a round nobody played net just doubles the height of
@@ -788,33 +778,16 @@ html {
             ? resolveSkinsMode(data) !== 'gross' : false;
         const netMatters = anyHcp && (poolNet || skinsNetMode || data.gameFormat === 'stableford');
 
-        players.forEach(p => {
-            const get = h => scores[`p${p.id}_h${h.hole}`] || null;
-            const sum = list => list.reduce((s, h) => s + (get(h) || 0), 0);
-            const o = sum(front), i = sum(back);
-            let r = `<tr><td class="rt-name">${escapeHtml(p.name)}</td>`;
-            if (hasFront) { front.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasBack) r += cell(o || '\u2013', 'rt-sec'); }
-            if (hasBack) { back.forEach(h => { r += cell(get(h) || '\u2013', markOf(get(h), h.par)); }); if (hasFront) r += cell(i || '\u2013', 'rt-sec'); }
-            r += cell((o + i) || '\u2013', 'rt-sec') + '</tr>';
-            html += r;
-
-            if (netMatters) {
-                // NET, from the CANONICAL handicap allocation - getStrokes/parseHcp in
-                // money-engine.js, the same pair the leaderboard, the skins ledger and
-                // every net wager already use. settlement.html does no handicap
-                // arithmetic of its own; a second implementation here is exactly how
-                // the Receipt would come to disagree with the money.
-                const strokes = h => (typeof getStrokes === 'function' && typeof parseHcp === 'function')
-                    ? getStrokes(h.hcpIndex, parseHcp(p.hcp)) : 0;
-                const netOf = h => { const g = get(h); return g === null ? null : g - strokes(h); };
-                const netSum = list => list.reduce((s, h) => s + (netOf(h) || 0), 0);
-                const no = netSum(front), ni = netSum(back);
-                let nr = `<tr class="rt-net"><td class="rt-name">net</td>`;
-                if (hasFront) { front.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasBack) nr += cell(no || '\u2013', 'rt-sec'); }
-                if (hasBack) { back.forEach(h => { nr += cell(netOf(h) === null ? '\u2013' : netOf(h)); }); if (hasFront) nr += cell(ni || '\u2013', 'rt-sec'); }
-                nr += cell((no + ni) || '\u2013', 'rt-sec') + '</tr>';
-                html += nr;
-            }
+        // THE ROWS LIVE ONCE (2026-09-16). HOLE / PAR / HCP, then per golfer the
+        // gross row with the rings and, when net matters, the net row from the
+        // canonical getStrokes/parseHcp - all from scorecard-rows.js, which the
+        // leaderboard's tap-a-name card reads too. This page decides WHETHER net
+        // matters (above) and keeps its own chrome; it no longer draws a cell.
+        // Byte for byte what this function rendered before the move:
+        // scorecard_rows_test.js holds eleven rounds to the captured output.
+        html += ScorecardRows.scorecardRowsHtml({
+            courseData: courseData, scores: scores, players: players,
+            showNet: netMatters, ringOf: markOf
         });
 
         html += `</table></div>

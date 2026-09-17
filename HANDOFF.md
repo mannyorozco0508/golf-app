@@ -615,6 +615,39 @@ setup-screen baseline is new this wave. The claims test's glyph rule is scoped t
 heading a LINKS section; a padlock in the hero would be caught only by the landing
 baseline, not by the claims rule — measured with a control, and worth knowing.
 
+## The scorecard rows live once — scorecard-rows.js (2026-09-16, wave 1 of tap-a-name)
+
+`scorecard-rows.js` (repo root, beside `score-marks.js` and `live-skins.js` — the shell
+lists and `build-shell.js` copy flat names, and every shared engine lives there) exports two
+functions, as `window.ScorecardRows` in the browser and `module.exports` under Node:
+
+- `scorecardCells({ courseData, scores, players, showNet, ringOf })` — the numbers and ring
+  classes per hole, split front / back with OUT / IN / TOT on every row, one golfer or many.
+  No markup. **The builder emits cells; the caller chooses the layout.**
+- `scorecardRowsHtml(opts)` — the Receipt's layout: one line of 18 in the `receipt-table`
+  classes (`rt-name`, `rt-sec`, `rt-net`).
+
+The Receipt (`settlement.html buildReceiptScorecard`) is the first caller: it still decides
+WHETHER net matters (handicaps + net pool + skins basis), keeps its chrome (the settle-card,
+"📋 Full Scorecard", the scroll wrapper, the legend) and asks the builder for the rows with
+`showNet: netMatters, ringOf: markOf` (the trimmed `scoreMarkClass` from score-marks.js).
+It no longer draws a cell. `scorecard_rows_prev.fixture.json` holds `#receipt-scorecard`'s
+innerHTML byte for byte for eleven rounds captured at 8d2eabf, before the file existed;
+`scorecard_rows_test.js` renders each against today's page — identical — and the four
+stripped-text baselines and the v151 PDF-lines fixture still pass. `helpers/scorecard-rounds.js`
+is the shared round set so the capture and the test cannot drift.
+
+What is deliberately NOT a caller: the Matches tab's mini scorecard (`sidematches.html
+buildSideMatchMiniScorecard`). It draws its own rings (`.sm-pcircle1/2`, not score-marks.js)
+and has no net row; converting it changes what it shows, which is its own decision. Net
+strokes come from the `getStrokes`/`parseHcp` globals exactly as the Receipt read them —
+money-engine.js exports nothing under Node, so a Node test that wants net installs the
+globals (the way a page has them); with them absent a golfer gets 0 strokes, as before.
+
+Wave 2 (the leaderboard's tap-a-name card) is the second caller: two stacked nines from
+`scorecardCells`, a second `<tr>` beside `boardRowHtml`, `data-player-id` on the row with the
+goldens re-pinned, open ids in a Set re-emitted at render, score-marks.js loaded on the board.
+
 ## Send Results — the receipt's one button on the title row (2026-09-16)
 
 `settlement.html`'s export control is a small pill, **📤 Send**, in `#receipt-actions` —

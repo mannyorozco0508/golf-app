@@ -1572,7 +1572,12 @@
 // course imported on Monday is offered on Wednesday instead of "No local
 // match" and a second, paid-for import. A device on v161 keeps a picker that
 // cannot see Legacy Golf Resort.
-const CACHE_VERSION = 'golfapp-v162-imports-in-the-picker';
+// Moved to v163: the scorecard rows live once. scorecard-rows.js joins the
+// shell - settlement.html's Full Scorecard draws its HOLE / PAR / HCP and
+// per-golfer rows from it (byte for byte what it drew before), and the
+// leaderboard's tap-a-name card is about to. A device on v162 has a
+// settlement.html that calls a file its cache does not hold.
+const CACHE_VERSION = 'golfapp-v163-scorecard-rows-live-once';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1626,6 +1631,7 @@ const SHELL_FILES = [
     // their print buttons; a cached shell without it would restore the dead button.
     './native-export.js',
     './score-marks.js',
+    './scorecard-rows.js',
     './text-safe.js',
     './money-engine.js',
     './settlement-engine.js',

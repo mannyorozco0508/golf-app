@@ -431,8 +431,15 @@ describe('THE RECEIPT — header and scorecard moved across', () => {
 
     test('the full scorecard survived the retirement', () => {
         const fn = st.slice(st.indexOf('function buildReceiptScorecard'), st.indexOf('function buildReceiptBlock'));
+        // RE-PINNED 2026-09-16 (scorecard-rows.js): the HOLE / PAR / OUT / IN / TOT
+        // rows are drawn by the shared builder now, which this function calls;
+        // the labels live in scorecard-rows.js. The caller still reads the round's
+        // players and scores and hands them over. scorecard_rows_test.js holds the
+        // rendered grid byte for byte to what this function drew before the move.
+        assert.match(fn, /ScorecardRows\.scorecardRowsHtml\(/, 'the grid is drawn by the shared builder');
+        const rows = fs.readFileSync(path.join(REPO_ROOT, 'scorecard-rows.js'), 'utf8');
         ['HOLE', 'PAR', 'OUT', 'IN', 'TOT'].forEach(h =>
-            assert.ok(fn.includes(h), `the score grid lost its ${h} row`));
+            assert.ok(rows.includes(`'${h}'`), `the score grid lost its ${h} row`));
         assert.ok(/data\.players/.test(fn) && /data\.scores/.test(fn));
     });
 
