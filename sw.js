@@ -1567,7 +1567,12 @@
 // shell no longer hides it. settlement.html only: same printReceipt(), same export roots, still
 // absent while the round is live. A device on v160 keeps the full-width
 // "Print / Save Receipt" above the results, hidden in the native app.
-const CACHE_VERSION = 'golfapp-v161-send-results';
+// Moved to v162: an imported course shows up in the picker. admin.html's
+// community list names gca_ keys (online imports) as well as comm_ keys, so a
+// course imported on Monday is offered on Wednesday instead of "No local
+// match" and a second, paid-for import. A device on v161 keeps a picker that
+// cannot see Legacy Golf Resort.
+const CACHE_VERSION = 'golfapp-v162-imports-in-the-picker';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

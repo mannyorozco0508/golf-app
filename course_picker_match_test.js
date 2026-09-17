@@ -141,6 +141,18 @@ describe('THE PAGE EXPOSES ONE MATCHER, AND BOTH FILTERS USE IT', () => {
             .replace(/\/\*[\s\S]*?\*\//g, ' ');
     }
 
+    // RE-PINNED 2026-09-16 (imported courses in the picker): the community half
+    // of the dropdown now lists gca_ keys (online imports) as well as comm_ keys,
+    // through the SAME courseNameMatches call - one predicate on the key, one
+    // matcher on the name. course_picker_imports_test.js drives the page.
+    test('the community half lists both prefixes and still asks courseNameMatches', () => {
+        const src = stripComments(fs.readFileSync(path.join(REPO_ROOT, PICKER_PAGE), 'utf8'));
+        const at = src.indexOf('k.startsWith("comm_") || k.startsWith("gca_")');
+        assert.ok(at > 0, 'the community filter no longer names both comm_ and gca_');
+        assert.match(src.slice(at, at + 400), /courseNameMatches\(filterText, globalCourses\[k\]\.name\)/,
+            'the community list must match names through courseNameMatches, whatever the key prefix');
+    });
+
     test('BOTH filter sites route through it - two entry points, one builder', () => {
         const src = stripComments(fs.readFileSync(path.join(REPO_ROOT, PICKER_PAGE), 'utf8'));
         // The directory filter and the global_courses filter are the same rule

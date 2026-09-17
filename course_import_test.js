@@ -151,6 +151,17 @@ describe('2. A NAME MATCH WRITES TO THE DIRECTORY KEY, AND THE PANEL SAYS SO', (
             + 'than create a second record for the same course. Got ' + k);
     });
 
+    // RE-PINNED 2026-09-16: a gca_ key is not only a stable write target - since
+    // this date the picker LISTS it (admin.html's community filter names comm_
+    // and gca_). Before, an import was written and never offered again; Legacy
+    // Golf Resort sat under gca_bwcdmzcy from 2026-09-14 unseen. The dropdown
+    // cases live in course_picker_imports_test.js; this pins the predicate.
+    test('a gca_ key is offered by the picker afterwards - the filter names both prefixes', () => {
+        const src = fs.readFileSync(path.join(REPO_ROOT, PAGE), 'utf8');
+        assert.ok(src.includes('Object.keys(globalCourses).filter(k => k.startsWith("comm_") || k.startsWith("gca_"))'),
+            'the community filter must list gca_ keys, or an import is written and never offered again');
+    });
+
     test('an existing global_courses name match wins too', () => {
         const keyFor = need('importedCourseKey');
         const existing = { some_existing_key: { name: 'Legacy Golf Resort', data: [] } };

@@ -4191,9 +4191,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // NATIVE NO-OP: community-mapped courses are written by other users, and
         // the iOS app does not show user-generated content from strangers. The
         // golfer's local directory is unaffected.
+        //
+        // TWO PREFIXES, ONE LIST (2026-09-16). comm_ is the hand-typed "+ Add as
+        // a new course" key; gca_ is an online import, keyed on the provider's
+        // id so four "Legacy Golf Club"s cannot collapse into one slug. The
+        // import wave wrote gca_ and this filter went on reading comm_ alone, so
+        // Legacy Golf Resort sat in global_courses from Monday 2026-09-14 08:13
+        // and was never offered - the golfer was told "No local match" and
+        // offered to buy the same import again. The record was always shared;
+        // this makes it reachable. course_picker_imports_test.js holds it.
+        // The native list stays empty for BOTH prefixes until that is decided
+        // on its own - an import from a course database is not a stranger's
+        // hand-typed card, but the review reply that hid the community list
+        // did not draw that line, and this wave does not draw it for it.
         const globalKeys = isNativeApp()
             ? []
-            : Object.keys(globalCourses).filter(k => k.startsWith("comm_"));
+            : Object.keys(globalCourses).filter(k => k.startsWith("comm_") || k.startsWith("gca_"));
         if (globalKeys.length > 0) {
             const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
             if (filteredGlobals.length > 0) {
