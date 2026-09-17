@@ -38,7 +38,6 @@ const RES = 'android/app/src/main/res/';
 const GRADLE = read('android/app/build.gradle');
 const MANIFEST = read('android/app/src/main/AndroidManifest.xml');
 const PLIST = read('ios/App/App/Info.plist');
-const PBX = read('ios/App/App.xcodeproj/project.pbxproj');
 const WEB_MANIFEST = JSON.parse(read('manifest.json'));
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
@@ -46,17 +45,19 @@ const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 // ---------------------------------------------------------------------------
 describe('VERSION', () => {
 
-    test('versionName is the iOS MARKETING_VERSION - two literals, held equal', () => {
-        // Versions are hardcoded per platform; nothing in the repo reads
-        // package.json's. So the Android literal is bound to the iOS one, and a
-        // bump on one side goes red until the other follows.
-        const ios = [...PBX.matchAll(/MARKETING_VERSION = ([0-9.]+);/g)].map(m => m[1]);
-        assert.ok(ios.length >= 1, 'the Xcode project declares no MARKETING_VERSION');
-        assert.equal(new Set(ios).size, 1, 'the Xcode project carries two different marketing versions');
+    test('versionName is Android\'s own literal, valid semver, pinned here', () => {
+        // DECISION 2026-09-17 (wave 5): the Android and iOS versions are allowed to
+        // DIVERGE. This test used to hold the Android versionName equal to the iOS
+        // MARKETING_VERSION, and went red the day iOS moved to 1.0.1 for App Store
+        // build 25 while Android had not shipped at all. The two stores have their
+        // own release cadence; binding the literals made every iOS bump a required
+        // Android edit for a platform with no release to make. So the Android
+        // literal is pinned on its own: a bump here is a deliberate edit of this
+        // line, and the shape is held to semver so a stray string cannot ship.
         const m = /versionName "([^"]+)"/.exec(GRADLE);
         assert.ok(m, 'build.gradle declares no versionName');
-        assert.equal(m[1], ios[0], 'Android versionName ' + m[1] + ' != iOS MARKETING_VERSION ' + ios[0]);
-        assert.equal(m[1], '1.0.0');
+        assert.match(m[1], /^[0-9]+\.[0-9]+\.[0-9]+$/, 'versionName must be MAJOR.MINOR.PATCH: ' + m[1]);
+        assert.equal(m[1], '1.0.0', 'Android ships 1.0.0; move this pin when Android moves');
     });
 
     test('versionCode is its own sequence and starts at 1', () => {

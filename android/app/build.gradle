@@ -24,8 +24,9 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode is Android's own sequence and starts at 1; the iOS build
-        // number (24) is a different counter. versionName is held equal to the
-        // iOS MARKETING_VERSION by android_release_test.js.
+        // number is a different counter. versionName is Android's own too
+        // (2026-09-17: the two stores may diverge) - android_release_test.js pins
+        // this literal and holds it to semver; move both together.
         versionCode 1
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
