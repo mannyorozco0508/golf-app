@@ -1353,7 +1353,47 @@ branch still carries no money — Manny's decision, kept.
     "not started". Verification is SUFFICIENT, never necessary: a round with
     every hole scored is finished without it.
 
-- **NOT IN THIS WAVE, recorded 2026-09-15 — cross-round identity on a trip is the
+- **DONE 2026-09-17 — trip identity, shape (b): ask on collision, show the roster.** A trip
+still keys golfers by normalised name, but now through ONE function, `tripGolferKey(roundCode,
+player)` in `trip.html`, which returns the mapping `trips/<code>/identity/<roundCode>/<playerId> =
+"g<n>"` when the organizer has answered a question and the name key otherwise. All six keyed
+surfaces — cumulative board, money ledger (both totals, who-pays-who), points race, awards, recap
+card, share text — go through it; the per-round breakdown still prints each day's own names. The
+rule is one node (`database.rules.json`: the round must be one of the trip's rounds, read through
+root; numeric player id; value `g<n>`), proved by targaryen with `trip_identity.tests-data.json`.
+**A trip with no identity node is byte-identical to before on all six surfaces**
+(`trip_identity_prev.fixture.json`, five trips captured at 1ef9b27; `trip_identity_test.js`).
+  - **The roster** ("👥 Golfers on This Trip", under the rounds list, its own mount `#trip-roster`)
+    lists every golfer with "in N of M rounds" ("in 1 round" on a one-round trip): listed, scored or
+    not, from the same counted-round set the money uses. It is the TELL for the case nothing can
+    detect — two different people typed with one exact name on different days — a golfer who played
+    once reading "in 2 of 2 rounds". The lines always come before the question cards.
+  - **The question** is asked only on a collision the recon found reliable: two keys equal once
+    punctuation is stripped ("matt b" / "matt b."), or a bare first name and a first+initial/surname
+    sharing the first token ("mike" / "mike h") when the two spellings never sit in one round (if they
+    do, they are two people by construction). Not handicap drift (Paul is 11/7/9/blank/14 in real
+    rounds). Wording: *"Same golfer? Mike (Day 1) and Mike H (Day 2) — the trip adds up money and
+    standings by name, so it needs to know whether that is one person typed two ways or two people.
+    [One golfer] [Two people]. Nothing is merged or split until you answer. You can change this
+    later."* A question, not an accusation. An answer writes one multi-path update to the identity
+    node; the trip listener re-renders everything. Answered pairs collapse to "Mike and Mike H are one
+    golfer. Change"; Change rewrites the same node the other way. Nothing merges or splits on its own.
+  - **Two people with one spelling** (the invisible case, split by the organizer) are labelled by their
+    rounds — "Mike (Day 1)", "Mike (Day 2)" — everywhere, because who-pays-who keys its names and a
+    golfer could not tell them apart otherwise.
+  - **The gate is untouched**: placeholders, within-round duplicates and impossible round counts still
+    refuse on names, mapping or not.
+  - **Why (b) and not (a)** (a roster on the trip with `rosterId` on every round's player): (b) changes
+    no round, needs no planner names step — the planner writes "Player N" placeholders from a count
+    and does not know the golfers — and a trip with no mapping is today's trip. (a) is where this ends
+    up eventually; it is a bigger bite and it would block on a planner change we do not need yet.
+  - Known: `nextTripGolferId` mints from the map the page currently holds; two answers before the
+    listener echoes the first would reuse an id. The listener echoes in the same tick on a live
+    connection; offline, GolfNet tracks the write and the second card is re-rendered from the echo.
+  - Chrome: `tools/trip-identity-check.js` — cold arrival on the two-Mikes trip, a real press of "One
+    golfer", the write captured, the record delivered back, the ledger going from two lines to one.
+
+- **Recorded 2026-09-15, superseded above — cross-round identity on a trip was the
 normalised name only.** `renderTripMoneySettlement` (and the two totals it now
 shows) add up per-golfer nets keyed by `name.trim().toLowerCase()`
 (`normalisePlayerName`, `action-model.js`). What was found in the recon: two

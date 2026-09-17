@@ -258,8 +258,15 @@ describe('4. ONE NAME RULE, NOT A FIFTH COPY', () => {
         const src = read('trip.html').replace(/\/\/.*$/gm, '');
         const at = src.indexOf('function computeTripAwards');
         const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
-        assert.match(fn, /normalisePlayerName\(/,
-            'awards still key on a raw or hand-lowered name');
+        // RE-PINNED 2026-09-17 (trip identity): the awards key through
+        // tripGolferKey - the one trip-wide key (the organizer's mapping, else
+        // normalisePlayerName) every keyed surface calls - rather than calling
+        // the normaliser themselves. tripGolferKey is where normalisePlayerName
+        // lives now; a hand-rolled lowercase here would still be red.
+        assert.match(fn, /tripGolferKey\(/, 'awards must key through the one trip-wide key');
+        const keyFn = src.slice(src.indexOf('function tripGolferKey'), src.indexOf('\n    function ', src.indexOf('function tripGolferKey') + 30));
+        assert.match(keyFn, /normalisePlayerName\(/, 'the trip key falls back to the shared normaliser');
+        assert.ok(!/\.toLowerCase\(\)/.test(fn), 'a hand-lowered name is still being used as a key in the awards');
         assert.ok(!/\[p\.name\]/.test(fn), 'a raw p.name is still being used as a key');
     });
 });

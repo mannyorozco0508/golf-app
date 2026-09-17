@@ -229,6 +229,18 @@
         .trip-section summary::-webkit-details-marker { display: none; }
         .trip-section summary::after { content: '▼'; font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s ease; margin-left: 10px; flex-shrink: 0; }
         .trip-section[open] summary::after { transform: rotate(180deg); }
+        .trip-roster-line { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .trip-roster-name { font-weight: bold; }
+        .trip-roster-count { color: var(--text-muted); font-size: 0.82rem; }
+        .trip-roster-empty { color: var(--text-muted); font-size: 0.85rem; padding: 6px 0; }
+        .trip-identity-card { margin-top: 12px; border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; background: var(--nassau-box-bg); }
+        .trip-identity-title { font-weight: bold; color: var(--brand-green); margin-bottom: 6px; }
+        .trip-identity-body { font-size: 0.88rem; line-height: 1.45; }
+        .trip-identity-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .trip-identity-actions .trip-identity-btn { margin: 0; flex: 1; padding: 10px; font-size: 0.9rem; }
+        .trip-identity-note { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .trip-identity-answered { font-size: 0.85rem; color: var(--text-muted); padding: 6px 0; }
+        .trip-identity-answered a { color: var(--brand-green); font-weight: bold; margin-left: 6px; }
         .trip-section-body { padding: 14px 16px; }
         .trip-section-sub { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px 0; }
 
@@ -378,6 +390,22 @@ html {
             <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
             <div id="rounds-list"></div>
             <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
+        </div>
+    </details>
+
+    <!-- GOLFERS ON THIS TRIP (2026-09-17). One line per golfer: the name and how
+         many of the trip's counted rounds they appear in. No data entry, no
+         mapping needed, on every trip. It is the TELL for the case nothing can
+         detect - two different people typed with one exact name on different
+         days merge into one balance, and the only visible sign is a golfer who
+         played once reading "in 2 of 2 rounds" beside his name. The lines come
+         FIRST; the questions below them (asked only when two spellings collide)
+         never push a line out of view. -->
+    <details class="trip-section" open>
+        <summary>👥 Golfers on This Trip</summary>
+        <div class="trip-section-body">
+            <div id="trip-roster"></div>
+            <div id="trip-identity-questions"></div>
         </div>
     </details>
 
@@ -1407,6 +1435,265 @@ html {
     // Fetches every linked round exactly once per refresh, then hands the same
     // results to the score leaderboard, money settlement, awards, and points race
     // renderers - avoids double-reading Firebase for four views of the same rounds.
+    // ---- TRIP IDENTITY (2026-09-17): the mapping, the one key, the roster --------
+    //
+    // A trip keys every golfer by normalised name (trim + lowercase). That merges
+    // two different people who share a name on different days and splits one
+    // person typed two ways. The fix that changes no round: a MAPPING TABLE on
+    // the trip record, trips/<code>/identity/<roundCode>/<playerId> = "g<n>",
+    // written only when the organizer answers a question, and read here by ONE
+    // function every keyed surface calls. No mapping -> exactly today's key, so
+    // a trip with no mapping is byte-identical to before this existed.
+    function tripIdentityMap() {
+        return (tripData && tripData.identity && typeof tripData.identity === 'object') ? tripData.identity : {};
+    }
+    function tripGolferKey(roundCode, player) {
+        const m = tripIdentityMap();
+        const mapped = m[roundCode] && player && player.id !== undefined ? m[roundCode][String(player.id)] : undefined;
+        if (typeof mapped === 'string' && /^g[0-9]+$/.test(mapped)) return mapped;
+        return (typeof normalisePlayerName === 'function')
+            ? normalisePlayerName(player ? player.name : '') : String((player && player.name) || '').trim().toLowerCase();
+    }
+    // The label a surface prints for a key: an unmapped key keeps the name the
+    // caller saw first (today's behaviour); a g-id prints the LONGEST spelling
+    // among the players mapped to it across the counted rounds.
+    function tripGolferLabel(key, fallbackName) {
+        if (!/^g[0-9]+$/.test(String(key))) return fallbackName;
+        const m = tripIdentityMap();
+        let best = '';
+        const mine = [];      // the rounds this golfer is in
+        const others = {};    // other g-ids -> their longest spelling
+        (cachedCountedResults || []).forEach(({ code, label, data }) => {
+            const byId = m[code] || {};
+            ((data || {}).players || []).forEach(p => {
+                const gid = byId[String(p.id)];
+                if (typeof gid !== 'string') return;
+                if (gid === key) {
+                    if (String(p.name || '').length > best.length) best = String(p.name);
+                    mine.push(label);
+                } else if (String(p.name || '').length > (others[gid] || '').length) {
+                    others[gid] = String(p.name || '');
+                }
+            });
+        });
+        if (!best) return fallbackName;
+        // TWO PEOPLE WITH ONE SPELLING - the organizer split them - must not print
+        // as one line each called "Mike": the who-pays-who list keys its names, and
+        // a golfer cannot tell the two apart. The rounds tell them apart.
+        const clash = Object.keys(others).some(g => (typeof normalisePlayerName === 'function' ? normalisePlayerName(others[g]) : others[g].trim().toLowerCase())
+            === (typeof normalisePlayerName === 'function' ? normalisePlayerName(best) : best.trim().toLowerCase()));
+        return clash && mine.length ? best + ' (' + mine.join(', ') + ')' : best;
+    }
+    // Within one round, names are unique (the gate refuses a duplicate), so a
+    // settlement row that carries only a name can be turned back into its
+    // player - the engines key their per-round rows by name.
+    function tripPlayerByName(data, name) {
+        const k = (typeof normalisePlayerName === 'function') ? normalisePlayerName(name) : String(name || '').trim().toLowerCase();
+        return ((data || {}).players || []).find(p => ((typeof normalisePlayerName === 'function') ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase()) === k) || { name: name };
+    }
+
+    // THE ROSTER: one line per golfer, name and how many of the counted rounds
+    // they appear in (listed, scored or not - a golfer with no scores is still
+    // on the trip). The counts come from the same round set the money uses.
+    function tripRosterLines(counted) {
+        const rounds = (counted || []).length;
+        const seen = {};
+        (counted || []).forEach(({ code, data }) => {
+            ((data || {}).players || []).forEach(p => {
+                const key = tripGolferKey(code, p);
+                if (!key) return;
+                if (!seen[key]) seen[key] = { key: key, name: tripGolferLabel(key, p.name), count: 0 };
+                seen[key].count += 1;
+            });
+        });
+        return Object.values(seen).sort((a, b) => (b.count - a.count) || String(a.name).localeCompare(String(b.name)))
+            .map(r => Object.assign(r, { rounds: rounds }));
+    }
+    function rosterCountText(count, rounds) {
+        // "in 1 round" on a one-round trip: "1 of 1" says nothing, and "2 of 1" is
+        // the gate's refusal, not a roster line.
+        if (rounds === 1) return 'in ' + count + ' round';
+        return 'in ' + count + ' of ' + rounds + ' rounds';
+    }
+    function renderTripRoster() {
+        const mount = document.getElementById('trip-roster');
+        if (!mount) return;
+        const counted = cachedCountedResults || [];
+        if (counted.length === 0) { mount.innerHTML = '<div class="trip-roster-empty">No rounds yet.</div>'; return; }
+        const lines = tripRosterLines(counted);
+        if (lines.length === 0) { mount.innerHTML = '<div class="trip-roster-empty">No golfers in the counted rounds yet.</div>'; return; }
+        mount.innerHTML = lines.map(r =>
+            '<div class="trip-roster-line"><span class="trip-roster-name">' + escapeHtml(r.name) + '</span>'
+            + '<span class="trip-roster-count">' + escapeHtml(rosterCountText(r.count, r.rounds)) + '</span></div>').join('');
+    }
+
+    // THE COLLISIONS - the only reasons the app asks. Over the counted rounds'
+    // UNMAPPED keys:
+    //   A  two keys equal once punctuation is stripped and spaces collapsed
+    //      ("matt b" / "matt b.")
+    //   B  a bare single-token key and a multi-token key sharing that first
+    //      token ("mike" / "mike h"), unless both spellings sit in ONE round -
+    //      then they are two people by construction and nothing is asked
+    // Not handicap drift (Paul is 11 / 7 / 9 / blank / 14 in real rounds). Not
+    // case (already one key). Keys the organizer has answered for are mapped
+    // and so never asked again. Nothing here merges or splits: it only asks.
+    function tripCollisionForm(a, b) {
+        const stripPunct = k => k.replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+        if (a === b) return null;
+        if (stripPunct(a) === stripPunct(b)) return 'punctuation';
+        const ta = a.split(' '), tb = b.split(' ');
+        if (ta[0] === tb[0] && (ta.length === 1) !== (tb.length === 1)) return 'first-name';
+        return null;
+    }
+    function tripNameCollisions(counted) {
+        const byKey = {};   // unmapped name key -> { name, rounds: [{ code, label, pid }] }
+        (counted || []).forEach(({ code, label, data }) => {
+            ((data || {}).players || []).forEach(p => {
+                const key = tripGolferKey(code, p);
+                if (!key || /^g[0-9]+$/.test(key)) return;
+                if (typeof isPlaceholderPlayerName === 'function' && isPlaceholderPlayerName(p.name)) return;
+                if (!byKey[key]) byKey[key] = { key: key, name: p.name, rounds: [] };
+                byKey[key].rounds.push({ code: code, label: label, pid: p.id });
+            });
+        });
+        const keys = Object.keys(byKey).sort();
+        const out = [];
+        for (let i = 0; i < keys.length; i++) {
+            for (let j = i + 1; j < keys.length; j++) {
+                const form = tripCollisionForm(keys[i], keys[j]);
+                if (!form) continue;
+                const A = byKey[keys[i]], B = byKey[keys[j]];
+                const together = A.rounds.some(ra => B.rounds.some(rb => rb.code === ra.code));
+                if (together) continue;   // both in one round: two people, no question
+                out.push({ form: form, a: A, b: B });
+            }
+        }
+        return out;
+    }
+    function tripRoundsPhrase(entries) {
+        return entries.map(r => r.label).join(', ');
+    }
+    // THE QUESTION. A question, not an accusation: a name typed two ways is all
+    // this is, and nothing moves until it is answered.
+    function renderTripIdentityQuestions() {
+        const mount = document.getElementById('trip-identity-questions');
+        if (!mount) return;
+        const counted = cachedCountedResults || [];
+        const asks = tripNameCollisions(counted);
+        const answered = tripAnsweredPairs(counted);
+        let html = '';
+        asks.forEach((q, i) => {
+            html += '<div class="trip-identity-card" data-collision="' + i + '">'
+                + '<div class="trip-identity-title">Same golfer?</div>'
+                + '<div class="trip-identity-body"><strong>' + escapeHtml(q.a.name) + '</strong> (' + escapeHtml(tripRoundsPhrase(q.a.rounds)) + ') and '
+                + '<strong>' + escapeHtml(q.b.name) + '</strong> (' + escapeHtml(tripRoundsPhrase(q.b.rounds)) + ') \u2014 the trip adds up money and standings by name, '
+                + 'so it needs to know whether that is one person typed two ways or two people.</div>'
+                + '<div class="trip-identity-actions">'
+                + '<button class="btn-outline trip-identity-btn" onclick="answerTripIdentity(' + i + ', \'one\')">One golfer</button>'
+                + '<button class="btn-outline trip-identity-btn" onclick="answerTripIdentity(' + i + ', \'two\')">Two people</button>'
+                + '</div>'
+                + '<div class="trip-identity-note">Nothing is merged or split until you answer. You can change this later.</div>'
+                + '</div>';
+        });
+        answered.forEach((a, i) => {
+            html += '<div class="trip-identity-answered"><span>' + escapeHtml(a.aName) + ' and ' + escapeHtml(a.bName)
+                + (a.same ? ' are one golfer.' : ' are two people.') + '</span> '
+                + '<a href="#" class="trip-identity-change" onclick="changeTripIdentity(' + i + '); return false;">Change</a></div>';
+        });
+        mount.innerHTML = html;
+        cachedCollisions = asks;
+        cachedAnswered = answered;
+    }
+    let cachedCollisions = [];
+    let cachedAnswered = [];
+    // The pairs already answered: two spellings that are mapped, shown as a line
+    // with "Change". Derived from the map so it is never a second record.
+    function tripAnsweredPairs(counted) {
+        const m = tripIdentityMap();
+        const spellingsByGid = {};   // gid -> { spellings: {key -> name}, players: [{code,pid}] }
+        const gidByKey = {};         // name key -> Set of gids it was mapped to
+        (counted || []).forEach(({ code, data }) => {
+            const byId = m[code] || {};
+            ((data || {}).players || []).forEach(p => {
+                const gid = byId[String(p.id)];
+                if (typeof gid !== 'string' || !/^g[0-9]+$/.test(gid)) return;
+                const key = (typeof normalisePlayerName === 'function') ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+                if (!spellingsByGid[gid]) spellingsByGid[gid] = { spellings: {}, players: [] };
+                spellingsByGid[gid].spellings[key] = p.name;
+                spellingsByGid[gid].players.push({ code: code, pid: p.id, key: key, name: p.name });
+                gidByKey[key] = gidByKey[key] || {};
+                gidByKey[key][gid] = true;
+            });
+        });
+        const pairs = [];
+        // "one golfer": a gid with two spellings
+        Object.keys(spellingsByGid).forEach(gid => {
+            const keys = Object.keys(spellingsByGid[gid].spellings).sort();
+            for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+                pairs.push({ same: true, aKey: keys[i], bKey: keys[j], aName: spellingsByGid[gid].spellings[keys[i]], bName: spellingsByGid[gid].spellings[keys[j]], gids: [gid] });
+            }
+        });
+        // "two people": two different gids whose spellings collide by form A/B
+        const gids = Object.keys(spellingsByGid).sort();
+        for (let i = 0; i < gids.length; i++) for (let j = i + 1; j < gids.length; j++) {
+            const ka = Object.keys(spellingsByGid[gids[i]].spellings), kb = Object.keys(spellingsByGid[gids[j]].spellings);
+            ka.forEach(a => kb.forEach(b => {
+                if (tripCollisionForm(a, b)) pairs.push({ same: false, aKey: a, bKey: b, aName: spellingsByGid[gids[i]].spellings[a], bName: spellingsByGid[gids[j]].spellings[b], gids: [gids[i], gids[j]] });
+            }));
+        }
+        return pairs;
+    }
+    function nextTripGolferId(extra) {
+        const m = tripIdentityMap();
+        let max = 0;
+        Object.keys(m).forEach(code => Object.keys(m[code] || {}).forEach(pid => {
+            const v = m[code][pid]; const n = /^g([0-9]+)$/.exec(String(v)); if (n) max = Math.max(max, parseInt(n[1], 10));
+        }));
+        (extra || []).forEach(v => { const n = /^g([0-9]+)$/.exec(String(v)); if (n) max = Math.max(max, parseInt(n[1], 10)); });
+        return 'g' + (max + 1);
+    }
+    // THE ANSWER WRITES THE MAP. One golfer: every player of either spelling, in
+    // every counted round, gets the same new g-id. Two people: each spelling its
+    // own g-id. One multi-path update; the trip listener re-renders every surface.
+    function answerTripIdentity(index, answer) {
+        const q = (cachedCollisions || [])[index];
+        if (!q || !currentTripCode) return;
+        const updates = {};
+        const gA = nextTripGolferId();
+        const gB = answer === 'one' ? gA : nextTripGolferId([gA]);
+        q.a.rounds.forEach(r => { updates[r.code + '/' + r.pid] = gA; });
+        q.b.rounds.forEach(r => { updates[r.code + '/' + r.pid] = gB; });
+        const ref = db.ref('trips/' + currentTripCode + '/identity');
+        const p = ref.update(updates);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        p.catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe answer was not recorded \u2014 try again.'));
+    }
+    // CHANGE: the same node, the other answer.
+    function changeTripIdentity(index) {
+        const a = (cachedAnswered || [])[index];
+        if (!a || !currentTripCode) return;
+        const counted = cachedCountedResults || [];
+        const updates = {};
+        if (a.same) {
+            // Split: the second spelling gets a fresh g-id, the first keeps its own.
+            const gNew = nextTripGolferId();
+            counted.forEach(({ code, data }) => ((data || {}).players || []).forEach(p => {
+                const key = (typeof normalisePlayerName === 'function') ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+                if (key === a.bKey && tripGolferKey(code, p) === a.gids[0]) updates[code + '/' + p.id] = gNew;
+            }));
+        } else {
+            // Join: the second spelling's players take the first's g-id.
+            counted.forEach(({ code, data }) => ((data || {}).players || []).forEach(p => {
+                const key = (typeof normalisePlayerName === 'function') ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+                if (key === a.bKey && tripGolferKey(code, p) === a.gids[1]) updates[code + '/' + p.id] = a.gids[0];
+            }));
+        }
+        if (Object.keys(updates).length === 0) return;
+        const p = db.ref('trips/' + currentTripCode + '/identity').update(updates);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        p.catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe change was not recorded \u2014 try again.'));
+    }
+
     function refreshTripComputations() {
         const scoreContainer = document.getElementById('trip-leaderboard');
         const moneyContainer = document.getElementById('trip-money-settlement');
@@ -1421,6 +1708,8 @@ html {
             awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the awards.</div>`;
             pointsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the points race.</div>`;
             document.getElementById('trip-placeholder-warning').style.display = 'none';
+            renderTripRoster();
+            renderTripIdentityQuestions();
             return;
         }
 
@@ -1442,6 +1731,8 @@ html {
                 // ONCE, BEFORE ANYTHING RENDERS. Every surface below reads the answer
                 // rather than asking the question again.
                 recomputeTripGate();
+                renderTripRoster();
+                renderTripIdentityQuestions();
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
                 renderTripAwards();
@@ -1556,7 +1847,7 @@ html {
 
         const playerTotals = {}; // name -> { gross, net, roundsPlayed }
 
-        cachedCountedResults.forEach(({ data }) => {
+        cachedCountedResults.forEach(({ code, data }) => {
             const courseData = data.courseData || [];
             const scores = data.scores || {};
             const players = data.players || [];
@@ -1572,8 +1863,8 @@ html {
                 });
                 if (holesPlayed === 0) return; // didn't actually play this round
                 const net = gross - strokesOff;
-                const key = p.name.trim().toLowerCase();
-                if (!playerTotals[key]) playerTotals[key] = { name: p.name, gross: 0, net: 0, roundsPlayed: 0 };
+                const key = tripGolferKey(code, p);
+                if (!playerTotals[key]) playerTotals[key] = { name: tripGolferLabel(key, p.name), gross: 0, net: 0, roundsPlayed: 0 };
                 playerTotals[key].gross += gross;
                 playerTotals[key].net += net;
                 playerTotals[key].roundsPlayed += 1;
@@ -1870,7 +2161,7 @@ html {
         let unresolvedDollars = 0;     // what the settle-once ledger must be short by
         const tripContributions = {};  // merged moving lines, for the relevance rule
 
-        cachedCountedResults.forEach(({ label, data }) => {
+        cachedCountedResults.forEach(({ code, label, data }) => {
             const courseData = data.courseData || [];
             const savedScores = data.scores || {};
             if (!data.players || data.players.length === 0) {
@@ -1928,9 +2219,12 @@ html {
                 splitNote: mainCalc.splitNote
             });
 
+            // KEYED BY THE TRIP GOLFER, not the name. The engine's per-round rows
+            // carry a name (unique within a round, by the gate); the player behind
+            // it is looked up so the mapping - if any - applies.
             rows.forEach(p => {
-                const key = p.name.trim().toLowerCase();
-                if (!netByName[key]) netByName[key] = { name: p.name, net: 0 };
+                const key = tripGolferKey(code, tripPlayerByName(data, p.name));
+                if (!netByName[key]) netByName[key] = { name: tripGolferLabel(key, p.name), net: 0 };
                 netByName[key].net += (p.net || 0);
             });
             // THE OTHER TOTAL. The engine hands back the unrounded ledger beside the
@@ -1938,8 +2232,8 @@ html {
             // before anybody pays is actually owed.
             Object.values(combined.exact || {}).forEach(v => {
                 if (Math.abs(v.net) <= 0.005) return;
-                const key = v.name.trim().toLowerCase();
-                if (!exactByName[key]) exactByName[key] = { name: v.name, net: 0 };
+                const key = tripGolferKey(code, tripPlayerByName(data, v.name));
+                if (!exactByName[key]) exactByName[key] = { name: tripGolferLabel(key, v.name), net: 0 };
                 exactByName[key].net += (v.net || 0);
             });
         });
@@ -1959,8 +2253,8 @@ html {
         Object.keys(exactByName).forEach(k => { onceByName[k] = { name: exactByName[k].name, net: exactByName[k].net }; });
         const onceRounded = roundNetTotalsToWholeDollars(onceByName, -unresolvedDollars);
         const keys = Array.from(new Set(Object.keys(netByName).concat(Object.keys(onceRounded))));
-        const dailyList = keys.map(k => ({ name: (netByName[k] || onceRounded[k]).name, net: netByName[k] ? netByName[k].net : 0 }));
-        const onceList = keys.map(k => ({ name: (netByName[k] || onceRounded[k]).name, net: onceRounded[k] ? onceRounded[k].net : 0 }));
+        const dailyList = keys.map(k => ({ key: k, name: (netByName[k] || onceRounded[k]).name, net: netByName[k] ? netByName[k].net : 0 }));
+        const onceList = keys.map(k => ({ key: k, name: (netByName[k] || onceRounded[k]).name, net: onceRounded[k] ? onceRounded[k].net : 0 }));
         const totalsAgree = keys.every(k => Math.abs((netByName[k] ? netByName[k].net : 0) - (onceRounded[k] ? onceRounded[k].net : 0)) < 0.005);
         cachedTripTotals = { agree: totalsAgree, daily: dailyList, once: onceList };
 
@@ -2059,8 +2353,9 @@ html {
             } else {
                 // BOTH, side by side, each column named in plain words.
                 html += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); font-weight:bold;"><span></span><span style="display:flex; gap:14px;"><span style="min-width:5.5em; text-align:right;">${TRIP_TOTAL_DAILY_HEAD}</span><span style="min-width:5.5em; text-align:right;">${TRIP_TOTAL_ONCE_HEAD}</span></span></div>`;
-                const byKey = {}; dailyList.forEach(v => { byKey[v.name.trim().toLowerCase()] = { name: v.name, daily: v.net, once: 0 }; });
-                onceList.forEach(v => { byKey[v.name.trim().toLowerCase()].once = v.net; });
+                // Joined by the trip golfer's KEY, not the label (two golfers can share a label).
+                const byKey = {}; dailyList.forEach(v => { byKey[v.key] = { name: v.name, daily: v.net, once: 0 }; });
+                onceList.forEach(v => { byKey[v.key].once = v.net; });
                 Object.values(byKey).sort((a, b) => b.once - a.once).forEach(v => {
                     html += `<div class="ledger-row"><span>${escapeHtml(v.name)}</span><span style="display:flex; gap:14px;"><span style="min-width:5.5em; text-align:right;">${fmtMoney(v.daily)}</span><span style="min-width:5.5em; text-align:right;">${fmtMoney(v.once)}</span></span></div>`;
                 });
@@ -2132,8 +2427,9 @@ html {
         return str !== '' && !isNaN(parseFloat(str.replace(/^\+/, '')));
     }
     function computeTripAwards(results) {
-        const nameKey = p => (typeof normalisePlayerName === 'function')
-            ? normalisePlayerName(p.name) : String(p.name || '').trim().toLowerCase();
+        // Keyed by the trip golfer (the mapping, else the normalised name).
+        let awardsRoundCode = null;
+        const nameKey = p => tripGolferKey(awardsRoundCode, p);
         const birdieCounts = {};     // key -> { name, count }
         const eagleCounts = {};      // key -> { name, count, hole, label }
         const sandbaggerTotals = {}; // key -> { name, netToPar, rounds }   (rounds with a handicap only)
@@ -2142,12 +2438,13 @@ html {
         const blowUps = [];          // every hole at diff >= 2: { name, label, hole, par, score, diff }
         const comebacks = [];        // every positive front-to-back: { name, label, frontGross, backGross, improvement }
         const bump = (bag, k, p, field) => {
-            if (!bag[k]) bag[k] = { name: p.name, count: 0, netToPar: 0 };
+            if (!bag[k]) bag[k] = { name: tripGolferLabel(k, p.name), count: 0, netToPar: 0 };
             bag[k][field] += 1;
             return bag[k];
         };
 
-        results.forEach(({ label, data }) => {
+        results.forEach(({ code, label, data }) => {
+            awardsRoundCode = code;
             const courseData = data.courseData || [];
             const scores = data.scores || {};
             const players = data.players || [];
@@ -2420,7 +2717,7 @@ html {
     function computeTripPointsRace(results) {
         const totals = {}; // lowercased name -> { name, points, roundsPlayed }
 
-        results.forEach(({ data }) => {
+        results.forEach(({ code, data }) => {
             const courseData = data.courseData || [];
             const scores = data.scores || {};
             const players = data.players || [];
@@ -2439,7 +2736,7 @@ html {
                         holesPlayed++;
                     }
                 });
-                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net });
+                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net, key: tripGolferKey(code, p) });
             });
 
             if (roundResults.length === 0) return; // nobody's finished this round yet
@@ -2456,8 +2753,8 @@ html {
                 for (let pos = i + 1; pos <= j + 1; pos++) pointsSum += (fieldSize - pos + 1);
                 const avgPoints = pointsSum / (j - i + 1);
                 for (let k = i; k <= j; k++) {
-                    const key = roundResults[k].name.trim().toLowerCase();
-                    if (!totals[key]) totals[key] = { name: roundResults[k].name, points: 0, roundsPlayed: 0 };
+                    const key = roundResults[k].key;
+                    if (!totals[key]) totals[key] = { name: tripGolferLabel(key, roundResults[k].name), points: 0, roundsPlayed: 0 };
                     totals[key].points += avgPoints;
                     totals[key].roundsPlayed += 1;
                 }

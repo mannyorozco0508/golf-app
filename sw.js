@@ -1582,7 +1582,12 @@
 // beneath their row - two stacked nines, net on the Receipt's terms - on a
 // tap of the name; settlement.html asks the shared netMattersOn. A device on
 // v164's predecessor keeps a board whose names do nothing when tapped.
-const CACHE_VERSION = 'golfapp-v164-tap-a-name';
+// Moved to v165: trip identity - the trip page shows every golfer with how
+// many rounds they are in, asks "Same golfer?" when two spellings collide,
+// and keys every total by the organizer's answer. trip.html only; a trip with
+// no answer renders exactly as before. A device on v164 keeps a trip page
+// that merges two Mikes without a word.
+const CACHE_VERSION = 'golfapp-v165-trip-identity';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

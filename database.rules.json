@@ -56,7 +56,15 @@
       "$tripCode": {
         ".read": true,
         ".write": "newData.exists() || !data.hasChild('rounds')",
-        ".validate": "newData.hasChildren() || newData.val() === null"
+        ".validate": "newData.hasChildren() || newData.val() === null",
+        "identity": {
+          "$roundCode": {
+            ".validate": "root.child('trips/' + $tripCode + '/rounds/' + $roundCode).exists()",
+            "$playerId": {
+              ".validate": "$playerId.matches(/^[0-9]+$/) && newData.isString() && newData.val().matches(/^g[0-9]+$/)"
+            }
+          }
+        }
       }
     },
     "tournaments": {

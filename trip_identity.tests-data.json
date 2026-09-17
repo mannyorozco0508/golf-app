@@ -1,0 +1,38 @@
+{
+  "root": {
+    "trips": {
+      "T1": { "name": "Myrtle", "createdAt": 1, "rounds": { "R0": { "label": "Day 1", "addedAt": 1 }, "R1": { "label": "Day 2", "addedAt": 2 } } }
+    }
+  },
+  "users": {
+    "nobody": null,
+    "anonymous": { "uid": "anon-uid-1", "provider": "anonymous", "token": { "firebase": { "sign_in_provider": "anonymous" } } }
+  },
+  "tests": {
+    "trips/T1/identity/R0/101": {
+      "canWrite": [
+        { "auth": "anonymous", "data": "g1" },
+        { "auth": "nobody", "data": "g12" }
+      ],
+      "cannotWrite": [
+        { "auth": "anonymous", "data": "mike" },
+        { "auth": "anonymous", "data": 7 },
+        { "auth": "anonymous", "data": "G1" },
+        { "auth": "anonymous", "data": "g" }
+      ]
+    },
+    "trips/T1/identity/R0/mike": {
+      "cannotWrite": [ { "auth": "anonymous", "data": "g1" } ]
+    },
+    "trips/T1/identity/ZZZZ/101": {
+      "cannotWrite": [ { "auth": "anonymous", "data": "g1" } ]
+    },
+    "trips/T1/identity": {
+      "canWrite": [ { "auth": "anonymous", "data": { "R0": { "101": "g1", "102": "g2" }, "R1": { "101": "g1" } } } ],
+      "cannotWrite": [ { "auth": "anonymous", "data": { "R0": { "101": "g1" }, "R9": { "101": "g1" } } } ]
+    },
+    "trips/T1/rounds/R2": {
+      "canWrite": [ { "auth": "anonymous", "data": { "label": "Day 3", "addedAt": 3 } } ]
+    }
+  }
+}

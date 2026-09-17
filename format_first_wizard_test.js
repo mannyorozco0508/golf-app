@@ -697,7 +697,12 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // CLOSED - a future field is a console publish, not a deploy). This node
         // holds the first personal data the app stores. security-rules.tests-
         // data.json holds 56 targaryen rows against it.
-        'database.rules.json': '40f2ae7402e2e796af684b5b06cb7c37f0e07b3b77285baceb685a3a12c3edcd',
+        // RE-PINNED 2026-09-17, TRIP IDENTITY (approved for this one node, NOT yet
+        // published): trips/$tripCode gains identity/$roundCode/$playerId - the
+        // round must be one of the trip's rounds (read through root), the player
+        // id numeric, the value "g<n>". Nothing else in the file moved.
+        // trip_identity_test.js holds 11 targaryen rows against it.
+        'database.rules.json': '171987dbbc828ac78ff5c570047e81137b37161d99b193b1434df84ea7470abc',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
