@@ -1587,7 +1587,13 @@
 // and keys every total by the organizer's answer. trip.html only; a trip with
 // no answer renders exactly as before. A device on v164 keeps a trip page
 // that merges two Mikes without a word.
-const CACHE_VERSION = 'golfapp-v165-trip-identity';
+// Moved to v166: the beta notice is gone. index.html no longer carries the
+// beta end date or the yellow "we're still polishing" bar that appeared,
+// permanently, once that date passed - the app is released (App Store 1.0.1,
+// 2026-09-15) and the sentence was no longer true. A device on v165 keeps a
+// scorecard that calls itself a beta on every open. (beta_notice_gone_test.js
+// scans every shipped file for the old names, this comment included.)
+const CACHE_VERSION = 'golfapp-v166-beta-notice-gone';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

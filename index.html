@@ -1480,28 +1480,6 @@ html {
 </div>
 
 <script>
-    // --- BETA NOTICE (non-blocking) ---
-    // This used to be a kill switch: past BETA_END_DATE it wiped document.body and
-    // threw, so the whole app - live scores, settlement, everything - disappeared the
-    // moment a hardcoded date rolled over. A date passing must never take a working
-    // round offline on the course, so the block is gone. The date now only drives a
-    // dismissible banner, and even that never prevents play.
-    const BETA_END_DATE = new Date("2026-09-01T00:00:00");
-    const betaPeriodEnded = new Date() > BETA_END_DATE;
-    function renderBetaNotice() {
-        if (!betaPeriodEnded) return;
-        if (localStorage.getItem('betaNoticeDismissed') === '1') return;
-        const bar = document.createElement('div');
-        bar.id = 'beta-notice-bar';
-        bar.style.cssText = 'background:#fff8e1; border:1px solid #e6c200; border-radius:8px; padding:8px 12px; margin:0 0 10px 0; font-size:0.78rem; color:#5c4600; display:flex; align-items:center; justify-content:space-between; gap:10px;';
-        bar.innerHTML = '<span>\u26F3 You\'re on a beta build \u2014 everything still works, we\'re just still polishing.</span>'
-            + '<button onclick="localStorage.setItem(\'betaNoticeDismissed\',\'1\'); this.parentElement.remove();" style="background:none; border:none; color:#5c4600; font-weight:bold; cursor:pointer; font-size:0.78rem;">\u2715</button>';
-        const host = document.querySelector('.container') || document.body;
-        host.insertBefore(bar, host.firstChild);
-    }
-    document.addEventListener('DOMContentLoaded', renderBetaNotice);
-    // ---------------------------------
-
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",

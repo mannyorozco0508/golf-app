@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
+const { decodeEscapes } = require('./helpers/decode-escapes.js');
 
 const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const engine = loadJsFile('money-engine.js');
@@ -11,9 +12,16 @@ const engine = loadJsFile('money-engine.js');
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // ---------------------------------------------------------------------------
-// FIX 1 — BETA GATE
+// FIX 1 — NO KILL SWITCH
 // ---------------------------------------------------------------------------
-describe('BETA GATE — a passing date must never take the app offline', () => {
+// The first test guards the ORIGINAL defect: a body wipe and a throw once a
+// hardcoded date passed. The three after it used to pin the dismissible notice
+// that replaced the kill switch; that notice was removed on 2026-09-17 (the app
+// is released - App Store 1.0.1 on 2026-09-15 - and "beta build" was no longer
+// true), so they now hold the inverse: none of it came back.
+// beta_notice_gone_test.js proves the same on a real arrival in Chrome with the
+// clock past the old date; this file is the source-level half.
+describe('NO KILL SWITCH — a passing date must never take the app offline', () => {
     const idx = read('index.html');
 
     test('REGRESSION: the app is not wiped and startup is not aborted when the date passes', () => {
@@ -25,24 +33,22 @@ describe('BETA GATE — a passing date must never take the app offline', () => {
             'the app still wipes its own body when the beta date passes');
     });
 
-    test('no throw sits between the beta check and Firebase initialisation', () => {
-        const betaIdx = idx.indexOf('BETA_END_DATE');
-        const fbIdx = idx.indexOf('const firebaseConfig');
-        assert.ok(betaIdx > -1 && fbIdx > betaIdx);
-        const between = idx.slice(betaIdx, fbIdx);
-        assert.ok(!/throw /.test(between), 'startup can still be aborted before Firebase connects');
+    test('no beta date is declared at all - BETA_END_DATE and betaPeriodEnded are gone', () => {
+        // Positive first: Firebase initialisation is still where it was, so the
+        // absences below are read from the right file.
+        assert.ok(idx.includes('const firebaseConfig = {'));
+        assert.ok(!idx.includes('BETA_END_DATE'), 'BETA_END_DATE is back');
+        assert.ok(!idx.includes('betaPeriodEnded'), 'betaPeriodEnded is back');
     });
 
-    test('the beta message survives as a dismissible, non-blocking notice', () => {
-        assert.ok(idx.includes('betaPeriodEnded'));
-        assert.ok(idx.includes('renderBetaNotice'));
-        assert.ok(idx.includes('betaNoticeDismissed'), 'the notice should be dismissible');
+    test('no beta notice is rendered - renderBetaNotice, its bar and its dismissal key are gone', () => {
+        assert.ok(!idx.includes('renderBetaNotice'), 'renderBetaNotice is back');
+        assert.ok(!idx.includes('beta-notice-bar'), 'the #beta-notice-bar id is back');
+        assert.ok(!idx.includes('betaNoticeDismissed'), 'the betaNoticeDismissed key is written or read again');
     });
 
-    test('the notice is additive — it never removes or replaces page content', () => {
-        const fn = idx.slice(idx.indexOf('function renderBetaNotice'), idx.indexOf('document.addEventListener(\'DOMContentLoaded\', renderBetaNotice)'));
-        assert.ok(/insertBefore/.test(fn), 'the notice should be inserted, not swapped in');
-        assert.ok(!/innerHTML\s*=/.test(fn.replace(/bar\.innerHTML/g, '')), 'the notice must not overwrite the page');
+    test('the sentence "beta build" is not in the page, escapes decoded', () => {
+        assert.ok(!/beta build/i.test(decodeEscapes(idx)), 'the page still calls itself a beta build');
     });
 });
 
