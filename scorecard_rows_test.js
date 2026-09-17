@@ -149,6 +149,51 @@ describe('THE BUILDER - cells for any layout', () => {
         const html = scorecardRowsHtml({ courseData: d.courseData, scores: d.scores, players: [{ id: 101, name: 'Ben <B>', hcp: '0' }], showNet: false, ringOf });
         assert.ok(html.includes('Ben &lt;B&gt;') && !html.includes('Ben <B>'));
     });
+    test('the stacked layout (wave 2): two tables, front with OUT, back with IN and TOT, 11 and 12 cells per row; a nine-hole course is one table with TOT', () => {
+        const { scorecardStackedHtml } = require('./scorecard-rows.js');
+        const html = scorecardStackedHtml({ courseData: d.courseData, scores: d.scores, players: [d.players[1]], showNet: true, ringOf });
+        assert.match(html, /^<div class="sc-stack"><table class="receipt-table sc-nine sc-front">/);
+        assert.equal((html.match(/<table/g) || []).length, 2);
+        const [front, back] = html.split('<table').slice(1);
+        assert.equal((front.split('<tr')[1].match(/<th/g) || []).length, 11, 'front: label + 9 + OUT');
+        assert.equal((back.split('<tr')[1].match(/<th/g) || []).length, 12, 'back: label + 9 + IN + TOT');
+        assert.match(front, /<th class="rt-sec">OUT<\/th><\/tr>/); assert.ok(!/>IN</.test(front) && !/>TOT</.test(front));
+        assert.match(back, /<th class="rt-sec">IN<\/th><th class="rt-sec">TOT<\/th><\/tr>/);
+        assert.equal((html.match(/<tr class="rt-net">/g) || []).length, 2, 'one net row per nine');
+        assert.ok(!/player-name/.test(html));
+        // The label is the FIRST name (the full name is on the board row above);
+        // a one-word name is the name; escaping still applies.
+        assert.equal((html.match(/<td class="rt-name">Ben<\/td>/g) || []).length, 2, 'the golfer\'s row is labelled "Ben" in each nine');
+        assert.ok(!/rt-name">Ben B</.test(html), 'not the full name');
+        const oneWord = scorecardStackedHtml({ courseData: d.courseData, scores: d.scores, players: [{ id: 101, name: 'Marty', hcp: '0' }], showNet: false, ringOf });
+        assert.equal((oneWord.match(/<td class="rt-name">Marty<\/td>/g) || []).length, 2);
+        const tagged = scorecardStackedHtml({ courseData: d.courseData, scores: d.scores, players: [{ id: 101, name: '<b>Bo</b> Bravo', hcp: '0' }], showNet: false, ringOf });
+        assert.ok(tagged.includes('<td class="rt-name">&lt;b&gt;Bo&lt;/b&gt;</td>') && !tagged.includes('<td class="rt-name"><b>'));
+        // The same numbers as the one-line layout (18 gross + OUT/IN/TOT, 18 net +
+        // OUT/IN/TOT), only the line breaks differ - so the same multiset;
+        // board_card_test.js compares the front-9 + OUT + back-9 + IN + TOT
+        // sequence cell for cell against the Receipt's row.
+        const one = scorecardRowsHtml({ courseData: d.courseData, scores: d.scores, players: [d.players[1]], showNet: true, ringOf });
+        const nums = h => [...h.matchAll(/<td(?: class="[^"]*")?>([^<]*)<\/td>/g)].map(m => m[1]);
+        const stackedNums = nums(html), lineNums = nums(one);
+        assert.equal(stackedNums.length, lineNums.length + 2, 'the stacked layout repeats the two label cells (name, net) once for the second nine: 2 extra cells, no extra number');
+        const first = d.players[1].name.split(' ')[0];
+        assert.deepEqual(stackedNums.filter(x => x !== 'net' && x !== first).sort(), lineNums.filter(x => x !== 'net' && x !== d.players[1].name).sort());
+        const nine = scorecardStackedHtml({ courseData: R.frontOnly.courseData, scores: R.frontOnly.scores, players: R.frontOnly.players, showNet: false, ringOf });
+        assert.equal((nine.match(/<table/g) || []).length, 1);
+        assert.ok(/<th class="rt-sec">TOT<\/th>/.test(nine) && !/>OUT</.test(nine) && !/>IN</.test(nine));
+    });
+
+    test('netMattersOn: the Receipt\'s rule - handicaps AND a net pool, net skins or stableford; not a gross pool, not no handicaps', () => {
+        const { netMattersOn } = require('./scorecard-rows.js');
+        assert.equal(netMattersOn(R.net), true, 'handicaps + net pool');
+        assert.equal(netMattersOn(R.twoVtwo), false, 'no handicaps, no pool');
+        assert.equal(netMattersOn(R.pool), true, 'the 12-golfer pool round: hcp 9 and a net pool');
+        assert.equal(netMattersOn(Object.assign({}, R.net, { moneyPool: { enabled: true, buyIn: 20, net: { amount: 0 }, skins: { mode: 'remainder', scoring: 'gross' } } })), false, 'gross skins only');
+        assert.equal(netMattersOn(Object.assign({}, R.net, { moneyPool: undefined, gameFormat: 'stableford' })), true, 'stableford with handicaps');
+        assert.equal(netMattersOn(Object.assign({}, R.net, { players: R.net.players.map(p => Object.assign({}, p, { hcp: '0' })) })), false, 'a net pool with nobody carrying a handicap');
+    });
+
     test('the one-line layout is the Receipt\'s: HOLE, PAR, HCP head rows then gross (and net) rows in receipt-table classes', () => {
         const html = scorecardRowsHtml({ courseData: d.courseData, scores: d.scores, players: d.players, showNet: true, ringOf });
         assert.match(html, /^<tr><th class="rt-name">HOLE<\/th>/);

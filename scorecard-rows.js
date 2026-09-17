@@ -20,6 +20,19 @@
 //                           (rt-name, rt-sec, rt-net). Byte for byte what the
 //                           Receipt rendered before the extraction -
 //                           scorecard_rows_test.js holds eleven rounds to it.
+//   scorecardStackedHtml(opts)
+//                           the board's layout (wave 2, 2026-09-16): TWO
+//                           STACKED NINES - 1-9 with OUT, then 10-18 with IN
+//                           and TOT - as two tables in the same classes, so a
+//                           phone shows the whole card without a sideways
+//                           swipe. A nine-hole course is one table with TOT.
+//                           The golfer's row is labelled with the FIRST name.
+//   netMattersOn(data)      the ONE answer to "does net matter on this round":
+//                           somebody has a handicap AND the money was decided
+//                           on net - a net pool, or net skins, or stableford.
+//                           Written by the Receipt, moved here so the board's
+//                           card shows net on exactly the same terms. Reads
+//                           parseHcp and resolveSkinsMode as globals.
 //
 // opts = { courseData, scores, players, showNet, ringOf }
 //   courseData  [{ hole, par, hcpIndex }]  any order, any subset of 1-18
@@ -132,7 +145,82 @@
         return html;
     }
 
-    const api = { scorecardCells: scorecardCells, scorecardRowsHtml: scorecardRowsHtml };
+    // DOES NET MATTER ON THIS ROUND? The Receipt's own rule, unchanged: printing
+    // a net row on a round nobody played net doubles the card for nothing;
+    // printing gross only on a round whose MONEY was decided on net forces
+    // golfers back to the paper card. resolveSkinsMode() answers "which basis
+    // WOULD skins use" and defaults to 'split', so it is only asked when a
+    // skins game exists at all - unguarded it made every handicapped round net.
+    function netMattersOn(data) {
+        const d = data || {};
+        const players = d.players || [];
+        const anyHcp = players.some(p => (typeof parseHcp === 'function' ? parseHcp(p.hcp) : Number(p.hcp) || 0) > 0);
+        const poolNet = !!(d.moneyPool && d.moneyPool.enabled
+            && ((d.moneyPool.net && Number(d.moneyPool.net.amount) > 0)
+                || (d.moneyPool.skins && d.moneyPool.skins.scoring !== 'gross')));
+        const hasSkinsGame = !!(
+            (d.additionalGames && d.additionalGames.skins)
+            || d.gameFormat === 'skins'
+            || (d.skinsBuyIn !== undefined && Number(d.skinsBuyIn) > 0)
+            || (d.moneyPool && d.moneyPool.skins
+                && d.moneyPool.skins.mode && d.moneyPool.skins.mode !== 'none')
+        );
+        const skinsNetMode = hasSkinsGame && (typeof resolveSkinsMode === 'function')
+            ? resolveSkinsMode(d) !== 'gross' : false;
+        return anyHcp && (poolNet || skinsNetMode || d.gameFormat === 'stableford');
+    }
+
+    // THE BOARD'S LAYOUT: two stacked nines. Same cells, same classes, same
+    // dash; the only thing that differs from the Receipt's line is where the
+    // line breaks. Each nine is its own <table class="receipt-table sc-nine">:
+    // the front carries OUT, the back carries IN and TOT; a course with one
+    // nine gets one table carrying TOT. No player-name cell anywhere in it.
+    // The row label is the golfer's FIRST name: the column is 57px on a phone
+    // and "Cal Cha..." read as a bug where "Cal" reads as a label - the full
+    // name is on the board row directly above. A one-word name is the name.
+    function firstNameOf(name) {
+        return String(name == null ? '' : name).trim().split(/\s+/)[0] || '';
+    }
+    function scorecardStackedHtml(opts) {
+        const c = scorecardCells(opts);
+        const cell = (v, cls) => `<td${cls ? ` class="${cls}"` : ''}>${v}</td>`;
+        const dashOr = v => (v === null || v === undefined) ? DASH : v;
+        const both = c.hasFront && c.hasBack;
+        // One nine: { holes: the header/golfer arrays for it, secs: [[label, headerKey], ...] }
+        const nines = [];
+        if (c.hasFront) nines.push({ side: 'front', secs: both ? [['OUT', 'out']] : [['TOT', 'tot']] });
+        if (c.hasBack) nines.push({ side: 'back', secs: both ? [['IN', 'in'], ['TOT', 'tot']] : [['TOT', 'tot']] });
+        let html = '<div class="sc-stack">';
+        nines.forEach(n => {
+            html += `<table class="receipt-table sc-nine sc-${n.side}">`;
+            const head = (label, vals, secOf) => {
+                let r = `<tr><th class="rt-name">${label}</th>`;
+                vals[n.side].forEach(v => { r += `<th>${v}</th>`; });
+                n.secs.forEach(([lab, key]) => { r += `<th class="rt-sec">${secOf(lab, key)}</th>`; });
+                return r + '</tr>';
+            };
+            html += head('HOLE', c.header.hole, lab => lab);
+            html += head('PAR', c.header.par, (lab, key) => c.header.par[key]);
+            html += head('HCP', c.header.hcp, () => '');
+            c.golfers.forEach(g => {
+                let r = `<tr><td class="rt-name">${esc(firstNameOf(g.name))}</td>`;
+                g.gross[n.side].forEach(x => { r += cell(dashOr(x.value), x.cls); });
+                n.secs.forEach(([lab, key]) => { r += cell(g.gross[key] || DASH, 'rt-sec'); });
+                html += r + '</tr>';
+                if (g.net) {
+                    let nr = `<tr class="rt-net"><td class="rt-name">net</td>`;
+                    g.net[n.side].forEach(x => { nr += cell(dashOr(x.value)); });
+                    n.secs.forEach(([lab, key]) => { nr += cell(g.net[key] || DASH, 'rt-sec'); });
+                    html += nr + '</tr>';
+                }
+            });
+            html += '</table>';
+        });
+        return html + '</div>';
+    }
+
+    const api = { scorecardCells: scorecardCells, scorecardRowsHtml: scorecardRowsHtml,
+                  scorecardStackedHtml: scorecardStackedHtml, netMattersOn: netMattersOn };
     if (typeof window !== 'undefined') window.ScorecardRows = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(this);

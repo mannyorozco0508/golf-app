@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v163-scorecard-rows-live-once';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v164-tap-a-name';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

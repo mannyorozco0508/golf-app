@@ -1577,7 +1577,12 @@
 // per-golfer rows from it (byte for byte what it drew before), and the
 // leaderboard's tap-a-name card is about to. A device on v162 has a
 // settlement.html that calls a file its cache does not hold.
-const CACHE_VERSION = 'golfapp-v163-scorecard-rows-live-once';
+// Moved to v164: tap a name on the leaderboard, see their card. leaderboard.html
+// loads score-marks.js and scorecard-rows.js and opens a golfer's scorecard
+// beneath their row - two stacked nines, net on the Receipt's terms - on a
+// tap of the name; settlement.html asks the shared netMattersOn. A device on
+// v164's predecessor keeps a board whose names do nothing when tapped.
+const CACHE_VERSION = 'golfapp-v164-tap-a-name';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

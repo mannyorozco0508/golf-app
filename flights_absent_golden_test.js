@@ -88,12 +88,22 @@ const VARIANTS = [
     ['flights: { enabled: false } PRESENT', () => Object.assign(round(), { flights: { enabled: false } })]
 ];
 
+// RE-PINNED 2026-09-16 (tap a name, see their card): every golfer row now
+// carries data-player-id="<id>" so the card can find its golfer by identity,
+// never by row index. The fixture is untouched; today's board is compared
+// with that one attribute stripped, so ONLY the attribute moved and every
+// byte of text, class and order is still held. A card is never open at
+// render unless tapped, so no card row is in these boards.
+const PID = / data-player-id="[^"]*"/g;
 function renderBoard(data, scoring, mode) {
     const sb = loadHtmlInlineScript('leaderboard.html');
     sb.__d = data;
     vm.runInContext(`currentMode = 'GOLD'; currentBoardData = __d; activeView = 'individual'; `
         + `activeScoring = '${scoring}'; groupViewMode = '${mode}'; renderBoard();`, sb);
-    return String(sb.document.getElementById('board-content').innerHTML || '');
+    const raw = String(sb.document.getElementById('board-content').innerHTML || '');
+    if (!PID.test(raw)) throw new Error('the board rows carry no data-player-id - the tap-a-name attribute is gone');
+    PID.lastIndex = 0;
+    return raw.replace(PID, '');
 }
 // Where two long strings first differ, with context - so a failure names the
 // cell, not just the hash.

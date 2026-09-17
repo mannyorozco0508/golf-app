@@ -27,6 +27,12 @@
     <script src="text-safe.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
+    <!-- TAP A NAME, SEE THEIR CARD (wave 2, 2026-09-16). score-marks.js owns the
+         birdie and eagle rings (shared with the Receipt and the scorekeeper);
+         scorecard-rows.js draws the card's rows - this page draws no cell. Both
+         after money-engine.js / action-model.js, whose globals they read. -->
+    <script src="score-marks.js"></script>
+    <script src="scorecard-rows.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="live-skins.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
@@ -155,6 +161,25 @@
         .board-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid var(--border-light); }
         .row-leader { background-color: var(--leader-bg); font-weight: bold; }
         .player-name { text-align: left; font-weight: bold; }
+        /* TAP A NAME, SEE THEIR CARD (2026-09-16). The name cell of a golfer's row
+           is the tap target (cursor + a small chevron drawn by CSS, so the row's
+           markup and its goldens carry nothing but the data-player-id). The card
+           is a second <tr> beneath the row: the Receipt's table classes, laid out
+           as TWO STACKED NINES so a phone shows the whole card without a sideways
+           swipe inside a vertically scrolling board. */
+        .board-table tr[data-player-id] td.player-name { cursor: pointer; position: relative; padding-right: 16px; }
+        .board-table tr[data-player-id] td.player-name::after { content: '\25BE'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.7em; }
+        .board-table tr[data-player-id]:has(+ tr.board-card-row) td.player-name::after { content: '\25B4'; }
+        .board-card-row td { padding: 4px 0 10px 0; background: var(--nav-bg); }
+        .sc-stack { display: flex; flex-direction: column; gap: 6px; }
+        .sc-stack .receipt-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.68rem; background: var(--bg-card); }
+        .sc-stack .receipt-table th, .sc-stack .receipt-table td { padding: 4px 1px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); font-size: 0.68rem; text-transform: none; }
+        .sc-stack .receipt-table th { background: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
+        .sc-stack .receipt-table .rt-name { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 6px; width: 15%; }
+        .sc-stack .receipt-table .rt-sec { background: var(--nassau-box-bg); font-weight: bold; }
+        .sc-stack .receipt-table tr.rt-net td { color: var(--text-muted); font-style: italic; }
+        .sc-stack .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
+        .sc-stack .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--accent-red), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--accent-red); border-radius: 50%; }
         /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
            through tabs during a real Nassau. Segments stack; presses indent under the
            segment they belong to so a press can never be mistaken for a base match. */
@@ -949,11 +974,16 @@ html {
         // rendered-board golden pins each byte for byte; the indent is a parameter
         // so ONE builder can still produce both.
         const ind = (opts && opts.indent) || '                    ';
+        // data-player-id (2026-09-16): the tap-a-name card finds the golfer by
+        // THIS, never by row index - a row's position moves with every score.
+        // The rendered-board goldens compare with the attribute stripped: only
+        // the attribute moved, the text is identical.
+        const pid = ` data-player-id="${escapeHtml(String(r.id))}"`;
         if (r.thru === 0) {
-            return `<tr><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
+            return `<tr${pid}><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
         }
         let posClass = idx === 0 ? 'row-leader' : '';
-        return `<tr class="${posClass}">
+        return `<tr class="${posClass}"${pid}>
 ${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
 ${ind}<td class="player-name">${escapeHtml(r.name)}${badge}<span class="player-hcp">HCP: ${r.hcp}</span></td>
 ${ind}${scoreCellHtml(r)}
@@ -961,6 +991,67 @@ ${ind}<td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
 ${ind}<td>${r.thru}</td>
 ${ind.slice(4)}</tr>`;
     }
+    // ---- TAP A NAME, SEE THEIR CARD (wave 2, 2026-09-16) --------------------
+    //
+    // openCards holds the ids whose card is open. The board re-renders on every
+    // snapshot and every toggle, so the card is RE-EMITTED at render from this
+    // set rather than inserted once - a card that was inserted into the DOM
+    // would vanish the moment the next score landed. Several may be open at
+    // once: comparing two golfers' cards is the thing a board is for, and a
+    // Set is what holds that; closing one never closes another.
+    //
+    // The card is a SECOND <tr>, emitted BESIDE boardRowHtml by the two table
+    // loops (flat, and the section cards) - never inside the row builder, and
+    // with no player-name cell in it, so flights_leaderboard_test's one-builder
+    // rule stands. The rows themselves come from scorecard-rows.js, laid out as
+    // two stacked nines; this page draws no cell.
+    //
+    // Net rows on the Receipt's terms: ScorecardRows.netMattersOn(round) - a
+    // handicap AND money decided on net. The board's own Net/Gross toggle is
+    // about how the STANDINGS are shown and does not add a net row: the card is
+    // the round's record, the same card the Receipt prints.
+    //
+    // A score is not a wager: the card renders on every link, no group check.
+    const openCards = new Set();
+    function toggleBoardCard(id) {
+        const key = String(id);
+        if (openCards.has(key)) openCards.delete(key); else openCards.add(key);
+        renderBoard();
+    }
+    function boardCardRowHtml(id) {
+        const key = String(id);
+        if (!openCards.has(key)) return '';
+        const data = currentBoardData || {};
+        const player = (data.players || []).find(p => String(p.id) === key);
+        if (!player || typeof ScorecardRows === 'undefined') return '';
+        const ringOf = (typeof scoreMarkClass === 'function') ? (s, par) => scoreMarkClass(s, par).trim() : () => '';
+        const card = ScorecardRows.scorecardStackedHtml({
+            courseData: data.courseData || [], scores: data.scores || {}, players: [player],
+            showNet: ScorecardRows.netMattersOn(data), ringOf: ringOf
+        });
+        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${card}</td></tr>`;
+    }
+    // ONE delegated listener: a tap on a golfer's name cell toggles their card.
+    // The match-play table has name cells too, on rows with no data-player-id;
+    // those are not golfers and nothing happens there.
+    (function wireBoardCards() {
+        const mount = document.getElementById('board-content');
+        if (!mount || typeof mount.addEventListener !== 'function') return;
+        mount.addEventListener('click', (e) => {
+            let el = e.target;
+            let cell = null;
+            while (el && el !== mount) {
+                if (!cell && el.tagName === 'TD' && /\bplayer-name\b/.test(el.className || '')) cell = el;
+                if (cell && el.tagName === 'TR') {
+                    const id = el.getAttribute && el.getAttribute('data-player-id');
+                    if (id) toggleBoardCard(id);
+                    return;
+                }
+                el = el.parentNode;
+            }
+        });
+    })();
+
     // A SECTION CARD: one group, or one flight. Ranked within the section.
     function boardSectionHtml(title, sectionResults, emptyText) {
         const maxThru = Math.max(0, ...sectionResults.map(r => r.thru));
@@ -978,6 +1069,7 @@ ${ind.slice(4)}</tr>`;
         const labels = boardPositionLabels(sectionResults);
         sortedGroup.forEach((r, idx) => {
             html += boardRowHtml(r, idx, { posStyle: 'width:30px;', indent: '                        ', label: labels[String(r.id)] });
+            html += boardCardRowHtml(r.id);   // beside the row, never inside it; '' unless open
         });
         html += `</tbody></table></div>`;
         return html;
@@ -1009,6 +1101,7 @@ ${ind.slice(4)}</tr>`;
         const labels = boardPositionLabels(results);
         sorted.forEach((r, idx) => {
             html += boardRowHtml(r, idx, Object.assign({ label: labels[String(r.id)] }, badges ? { badge: flightOf(r) } : {}));
+            html += boardCardRowHtml(r.id);   // beside the row, never inside it; '' unless open
         });
         html += `</tbody></table>`;
         html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;

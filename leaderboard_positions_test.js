@@ -52,7 +52,10 @@ function page(data, mode) {
     vm.runInContext(`currentMode = 'POS1'; currentBoardData = __d; activeView = 'individual'; activeScoring = 'net';`
         + (mode ? ` groupViewMode = '${mode}'; groupViewChosen = true;` : '')
         + ` document.__mount(document.getElementById('live-skins-mount')); renderBoard();`, sb);
-    return String(sb.document.getElementById('board-content').innerHTML || '');
+    // RE-PINNED 2026-09-16 (tap a name): rows carry data-player-id now; the
+    // fixture is untouched and compared with that one attribute stripped.
+    const raw = String(sb.document.getElementById('board-content').innerHTML || '');
+    return raw.replace(/ data-player-id="[^"]*"/g, '');
 }
 // [ [pos, name], ... ] in rendered order, per table.
 const rows = (html) => [...html.matchAll(/<td(?: style="width:30px;")?>([^<]*)<\/td>\s*<td class="player-name">([A-Z][a-z]+)/g)].map(m => [m[1], m[2]]);

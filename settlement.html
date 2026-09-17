@@ -748,35 +748,11 @@ html {
             <div class="settle-header">\uD83D\uDCCB Full Scorecard</div>
             <div class="receipt-card-scroll"><table class="receipt-table">`;
 
-        // IS NET RELEVANT TO THIS ROUND?
-        //
-        // Printing a net row on a round nobody played net just doubles the height of
-        // the card for no reason. Printing gross only on a round whose MONEY was
-        // decided on net is the failure this batch exists to fix - it forces golfers
-        // back to the paper card to compare handicap indexes and subtract strokes by
-        // hand. So it is asked, once, from the round's own configuration.
-        const anyHcp = players.some(p => (typeof parseHcp === 'function' ? parseHcp(p.hcp) : Number(p.hcp) || 0) > 0);
-        const poolNet = !!(data.moneyPool && data.moneyPool.enabled
-            && ((data.moneyPool.net && Number(data.moneyPool.net.amount) > 0)
-                || (data.moneyPool.skins && data.moneyPool.skins.scoring !== 'gross')));
-        // GUARDED ON A SKINS GAME EXISTING AT ALL.
-        //
-        // resolveSkinsMode() answers "which basis WOULD this round's skins use", and
-        // its documented default is 'split' - so on a round with no skins game
-        // whatsoever it still returns a non-gross answer. Reading it unguarded meant
-        // any handicapped round printed a net row per golfer, doubling the height of
-        // the scorecard on rounds where net decides nothing. Found by an acceptance
-        // test asserting the opposite case.
-        const hasSkinsGame = !!(
-            (data.additionalGames && data.additionalGames.skins)
-            || data.gameFormat === 'skins'
-            || (data.skinsBuyIn !== undefined && Number(data.skinsBuyIn) > 0)
-            || (data.moneyPool && data.moneyPool.skins
-                && data.moneyPool.skins.mode && data.moneyPool.skins.mode !== 'none')
-        );
-        const skinsNetMode = hasSkinsGame && (typeof resolveSkinsMode === 'function')
-            ? resolveSkinsMode(data) !== 'gross' : false;
-        const netMatters = anyHcp && (poolNet || skinsNetMode || data.gameFormat === 'stableford');
+        // IS NET RELEVANT TO THIS ROUND? One answer, in scorecard-rows.js
+        // (netMattersOn - the rule this page wrote: handicaps AND a net pool, net
+        // skins or stableford), so the board's tap-a-name card shows net on
+        // exactly the same terms as the Receipt. Wave 2, 2026-09-16.
+        const netMatters = ScorecardRows.netMattersOn(data);
 
         // THE ROWS LIVE ONCE (2026-09-16). HOLE / PAR / HCP, then per golfer the
         // gross row with the rings and, when net matters, the net row from the

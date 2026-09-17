@@ -644,9 +644,47 @@ strokes come from the `getStrokes`/`parseHcp` globals exactly as the Receipt rea
 money-engine.js exports nothing under Node, so a Node test that wants net installs the
 globals (the way a page has them); with them absent a golfer gets 0 strokes, as before.
 
-Wave 2 (the leaderboard's tap-a-name card) is the second caller: two stacked nines from
-`scorecardCells`, a second `<tr>` beside `boardRowHtml`, `data-player-id` on the row with the
-goldens re-pinned, open ids in a Set re-emitted at render, score-marks.js loaded on the board.
+**Wave 2 — tap a name on the leaderboard, see their card (2026-09-16).** `leaderboard.html`
+loads `score-marks.js` and `scorecard-rows.js`. Tapping a golfer's name cell opens their
+scorecard beneath their row; tapping again closes it. The shape, and why:
+
+- **A second `<tr class="board-card-row">` emitted BESIDE `boardRowHtml`** by the two table
+  loops (flat board, and the section cards that By Group and By Flight share), never inside
+  the row builder, with no `player-name` cell in it — `flights_leaderboard_test`'s one-builder
+  rule stands. The card is `ScorecardRows.scorecardStackedHtml(...)` verbatim — two stacked
+  nines (1–9 + OUT, then 10–18 + IN + TOT) as two `receipt-table` tables — the page draws no
+  cell. A sideways scroller was rejected: a horizontal swipe inside a vertically scrolling
+  board fights the page on iOS, and one golfer has no name column worth keeping sticky.
+- **`data-player-id` on every golfer row**, and ONE delegated click listener on
+  `#board-content` that walks up from the tapped name cell to the row and toggles that id.
+  Never by row index — a row's position moves with every score. The two rendered-board
+  goldens (`flights_absent_golden`, `leaderboard_positions_golden`) compare with that one
+  attribute stripped; the fixture files are untouched, so only the attribute moved and every
+  byte of text is still held. The match-play table has name cells on rows with no id, and
+  nothing happens there.
+- **Open ids in a `Set`, re-emitted at every render.** The board re-renders on every snapshot
+  and every toggle, so a card inserted once would vanish when the next score landed. Several
+  can be open at once — comparing two golfers' cards is what a board is for — and closing one
+  never closes another. Nothing opens itself, so the stripped-text baselines
+  (`board_stats_scope_prev`, `group_scope`) hold; a card open by default is asserted red.
+- **Net rows on the Receipt's terms:** `ScorecardRows.netMattersOn(round)` — somebody has a
+  handicap AND the money was decided on net (net pool, net skins, stableford). That rule was
+  the Receipt's own inline block; it moved to the shared file and the Receipt calls it (the
+  eleven-round byte-identity proof still holds). The board's Net/Gross toggle is about how
+  the STANDINGS are shown and does not add a net row: the card is the round's record, the
+  same card the Receipt prints, and a gross board with a net pool still shows net on the card.
+- **Visible on every link, no group check** — a score is not a wager (v140's line).
+- **Print:** leaderboard.html has no `@media print` at all, so an open card prints as it
+  shows. That is right: a golfer who prints the board with a card open asked for that card.
+- **Measured at 390 (`tools/board-card-check.js`, cold arrival, a real click on the name
+  cell):** card cell 332px wide; front table 11 cells per row with 28px hole cells, back
+  table 12 cells with 25px hole cells; 10.88px type; no number clipped; the label column is
+  57px and carries the golfer's FIRST name ("Cal"; the full name is on the row above) — a
+  first name longer than about nine characters ("Christopher", "Bartholomew") still
+  ellipsises there, and widening the column past 57px would push the back nine's hole cells
+  under 24px, so it stays; the card cell and the page do not scroll sideways; card height 241px with net rows;
+  the card survives a delivered snapshot and shows the new score; By Group and By Flight
+  through the page's own pills; a golfer with no scores opens a card of dashes.
 
 ## Send Results — the receipt's one button on the title row (2026-09-16)
 
