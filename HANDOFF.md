@@ -1392,6 +1392,17 @@ root; numeric player id; value `g<n>`), proved by targaryen with `trip_identity.
     connection; offline, GolfNet tracks the write and the second card is re-rendered from the echo.
   - Chrome: `tools/trip-identity-check.js` — cold arrival on the two-Mikes trip, a real press of "One
     golfer", the write captured, the record delivered back, the ledger going from two lines to one.
+  - **PUBLISHED 2026-09-17** (`firebase deploy --only database`, the same discipline as Wave 2): live
+    before = the 2026-09-16 registration-schema set (stripped sha8 40f2ae74, byte-equal to the pre-wave
+    repo file); the diff to the repo file was exactly this node; the before-set is saved outside git
+    at `~/.golfapp-rules-backup/before-identity/` with its own `firebase.json` — rollback:
+    `cd ~/.golfapp-rules-backup/before-identity && npx -y firebase-tools@14 deploy --only database
+    --project golfapp-9fb21 --non-interactive`. Read-back after: byte-equal to the repo file (171987db).
+    Proved live on a throwaway trip, unauthenticated: `identity/R0/101 = "g1"` accepted; `R0/mike`,
+    `R0/102 = 7`, `R9/101` (no such round) and `R0/103 = "mike"` each 401; a multi-path update with one
+    bad entry refused whole. Throwaway removed with the admin CLI and confirmed gone. Monday test on a
+    real old round (277Y, hole 1): an unauthenticated score write landed, was read back, and was put
+    back exactly; every score key equals the morning's dump.
 
 - **Recorded 2026-09-15, superseded above — cross-round identity on a trip was the
 normalised name only.** `renderTripMoneySettlement` (and the two totals it now
