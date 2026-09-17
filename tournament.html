@@ -103,7 +103,7 @@
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
-        input[type="text"], input[type="number"], input[type="email"], select {
+        input[type="text"], input[type="number"], input[type="email"], input[type="search"], select {
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
@@ -111,6 +111,15 @@
         .reg-row .reg-name { flex:1; min-width:8em; font-weight:bold; }
         .reg-row .reg-meta { font-size:0.78rem; color:var(--text-muted); flex-basis:100%; }
         .reg-row label { display:inline-flex; align-items:center; gap:6px; font-weight:normal; margin:0; }
+        /* The desk (2c): counts, chips, search. Sizes are the page's own - the
+           first counts line matches the tab pills, the rest matches .reg-meta. */
+        .reg-count-line { font-size:0.78rem; color:var(--text-muted); margin:2px 0; }
+        .reg-count-line.reg-count-main { font-size:0.85rem; font-weight:bold; color:var(--text-main); margin:0 0 4px 0; }
+        #registration-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 8px 0; }
+        .reg-chip { flex:0 0 auto; padding:6px 12px; background:var(--nav-bg); color:var(--brand-green); border:1px solid var(--border-mid); border-radius:16px; font-weight:bold; font-size:0.78rem; cursor:pointer; white-space:nowrap; margin:0; width:auto; }
+        .reg-chip.active { background:var(--brand-green); color:#ffffff; border-color:var(--brand-green); }
+        #registration-search { width:100%; box-sizing:border-box; margin:0 0 6px 0; -webkit-appearance:none; appearance:none; }
+        .reg-dup { display:inline-block; font-size:0.74rem; font-weight:bold; color:#8a5a00; background:#fff8e1; border:1px solid #e6c200; border-radius:6px; padding:2px 6px; }
 
         .custom-select-wrapper { position: relative; }
         .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
@@ -506,6 +515,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div class="top-nav-bar">
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
+        <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
     </div>
 
@@ -518,11 +528,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
         <p style="text-align:center; color:var(--brand-navy); font-size:0.9rem; font-weight:bold; margin-top:4px;" id="manage-t-pool"></p>
 
+        <!-- Registration CONFIGURATION lives here: the "Ask golfers for" switches,
+             the signup URL and Share. The desk itself - counts, filters, search
+             and the signup rows - is the Desk tab (#manage-tab-desk), its own
+             tab since 2c so 140 signups no longer sit on top of Starting Holes. -->
         <div id="registration-section" style="display:none;">
             <hr class="section-divider">
             <h3>📋 Registration</h3>
             <div id="registration-link-row"></div>
-            <div id="registration-list"></div>
         </div>
 
         <hr class="section-divider">
@@ -628,6 +641,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         <hr class="section-divider">
         <button class="btn-outline" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="window.location.href='tournament.html'">➕ Start a Different Tournament</button>
+    </div>
+
+    <!-- THE DESK (registration wave 2c). Owner-only, removed by the manage gate
+         with Setup. The search box is STATIC MARKUP on purpose: the rows and the
+         chips are rebuilt on every registrations snapshot, and a box rebuilt with
+         them would lose what the organizer typed the moment a signup landed.
+         renderRegistrationDesk() reads it and never writes it. -->
+    <div id="manage-tab-desk" style="display:none;">
+        <h3>📋 Desk</h3>
+        <p id="registration-desk-note" style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;"></p>
+        <div id="registration-counts"></div>
+        <div id="registration-chips"></div>
+        <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div id="registration-list"></div>
     </div>
 
     <div id="manage-tab-leaderboard" style="display:none;">
@@ -1378,18 +1405,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).catch(err => alert(`Error adding team: ${err.message}`));
     }
 
+    // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
+    // removes both for anyone who is not the owner of an owned tournament, and
+    // puts both back on sign-in. Leaderboard is always there.
+    const MANAGE_TABS = ['setup', 'desk', 'leaderboard'];
+    const GATED_TABS = ['setup', 'desk'];
     function showTab(tab) {
-        // The Setup tab may not exist: it is removed for anyone who is not the
-        // owner of an owned tournament (applyManageGate). Asking for it then
-        // lands on the leaderboard.
-        const setupPanel = document.getElementById('manage-tab-setup');
-        const setupBtn = document.getElementById('tab-btn-setup');
-        if (tab === 'setup' && !setupPanel) tab = 'leaderboard';
-        if (setupPanel) setupPanel.style.display = tab === 'setup' ? 'block' : 'none';
-        document.getElementById('manage-tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
-        if (setupBtn) setupBtn.classList.toggle('active', tab === 'setup');
-        document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
+        // A gated tab may not exist (applyManageGate). Asking for it then lands
+        // on the leaderboard.
+        if (!document.getElementById('manage-tab-' + tab)) tab = 'leaderboard';
+        MANAGE_TABS.forEach((k) => {
+            const panel = document.getElementById('manage-tab-' + k);
+            const btn = document.getElementById('tab-btn-' + k);
+            if (panel) panel.style.display = k === tab ? 'block' : 'none';
+            if (btn) btn.classList.toggle('active', k === tab);
+        });
         if (tab === 'leaderboard') renderLeaderboard();
+        if (tab === 'desk') renderRegistrationDesk();
     }
 
     // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
@@ -1411,7 +1443,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // signed out. The gate runs on BOTH the record's value handler and
     // onAuthStateChanged, because a browser delivers those in either order.
     let authUser = null;
-    let gateStash = null;   // the removed tab and panel, for re-insertion on sign-in
+    let gateStash = null;   // the removed tabs and panels (one entry per GATED_TABS), for re-insertion on sign-in
 
     function canManage() {
         const owner = currentData && currentData.ownerUid;
@@ -1426,24 +1458,34 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // and render a leaderboard of nothing.
         if (!currentCode || !currentData || Object.keys(currentData).length === 0) return;
         const allowed = canManage();
-        const tab = document.getElementById('tab-btn-setup');
-        const panel = document.getElementById('manage-tab-setup');
-        if (!allowed && (tab || panel)) {
-            // NOT hidden, NOT disabled: removed. A control that is not rendered
-            // cannot be tapped by mistake, and there is nothing to grey out.
-            gateStash = {
-                tab: tab, tabParent: tab && tab.parentNode, tabNext: tab && tab.nextSibling,
-                panel: panel, panelParent: panel && panel.parentNode, panelNext: panel && panel.nextSibling
-            };
-            if (tab) tab.remove();
-            if (panel) panel.remove();
+        const present = GATED_TABS.map((k) => ({ key: k, tab: document.getElementById('tab-btn-' + k), panel: document.getElementById('manage-tab-' + k) }));
+        if (!allowed && present.some((p) => p.tab || p.panel)) {
+            // NOT hidden, NOT disabled: removed - Setup and Desk together. A
+            // control that is not rendered cannot be tapped by mistake, and
+            // there is nothing to grey out.
+            gateStash = present.map((p) => ({
+                tab: p.tab, tabParent: p.tab && p.tab.parentNode, tabNext: p.tab && p.tab.nextSibling,
+                panel: p.panel, panelParent: p.panel && p.panel.parentNode, panelNext: p.panel && p.panel.nextSibling
+            }));
+            gateStash.forEach((s) => { if (s.tab) s.tab.remove(); if (s.panel) s.panel.remove(); });
             showTab('leaderboard');
         } else if (allowed && gateStash) {
-            // The owner signed in after the record arrived: put the tab back
-            // exactly where it was.
-            const s = gateStash; gateStash = null;
-            if (s.tab && s.tabParent) s.tabParent.insertBefore(s.tab, s.tabNext || null);
-            if (s.panel && s.panelParent) s.panelParent.insertBefore(s.panel, s.panelNext || null);
+            // The owner signed in after the record arrived: put each tab back
+            // exactly where it was. In REVERSE order, and each anchor checked
+            // against its parent: in a nav with no whitespace between the pills
+            // Setup's recorded next sibling IS the Desk pill, itself removed, and
+            // insertBefore on an anchor that is not a child throws NotFoundError.
+            // In THIS markup the anchor is the whitespace text node between the
+            // pills, which stays in the tree, so forward order also passes the
+            // Chrome check (measured 2026-09-17) - the guard is for the markup
+            // this page does not have yet, and tools/tournament-desk-check.js
+            // reads the order the pills come back in.
+            const stash = gateStash; gateStash = null;
+            const anchor = (node, parent) => (node && node.parentNode === parent) ? node : null;
+            stash.slice().reverse().forEach((s) => {
+                if (s.tab && s.tabParent) s.tabParent.insertBefore(s.tab, anchor(s.tabNext, s.tabParent));
+                if (s.panel && s.panelParent) s.panelParent.insertBefore(s.panel, anchor(s.panelNext, s.panelParent));
+            });
             showTab('setup');
         }
         renderSignedInAs();
@@ -1903,10 +1945,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return html;
     }
 
+    // ---- THE REGISTRATION DESK (waves 1, 2a, 2b, 2c) --------------------------
+    //
+    // Two hosts, one data source. Setup holds the CONFIGURATION (the "Ask golfers
+    // for" switches, the signup URL, Share). The Desk tab holds the OPERATION:
+    // counts, filter chips, the search box and the rows. Both re-render from
+    // registrationData on every registrations snapshot; the search box is the
+    // one thing that is never rewritten (static markup, read here, so a signup
+    // landing mid-search cannot wipe what the organizer typed).
+    //
+    // 2c is render-side only: nothing here writes a new key. Withdrawal, no-show,
+    // paid amount / method, notes and export each need a key the closed schema in
+    // database.rules.json does not name - a hand-published rules change - and wait
+    // until a real event says which are needed (HANDOFF, "Wave 2c").
     function renderRegistrationList() {
+        renderRegistrationSetupRow();
+        renderRegistrationDesk();
+    }
+
+    function registrationAllowed() {
+        return !!(currentData && currentData.ownerUid && canManage());
+    }
+
+    function renderRegistrationSetupRow() {
         const section = document.getElementById('registration-section');
         if (!section) return;
-        const allowed = !!(currentData && currentData.ownerUid && canManage());
+        const allowed = registrationAllowed();
         section.style.display = allowed ? 'block' : 'none';
         if (!allowed) return;
         const url = registrationSignupUrl();
@@ -1914,25 +1978,147 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (linkBox) {
             const eventName = escReg((currentData && currentData.name) || 'Event');
             linkBox.innerHTML =
-                `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. Tick Paid when you have the cash, then approve them into the field.</p>`
+                `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. The Desk tab is where you tick Paid and approve them into the field.</p>`
                 + registrationFieldsHtml()
                 + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
-                + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">\ud83d\udce4 Share signup link</button>`;
+                + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">📤 Share signup link</button>`;
         }
+    }
+
+    // The desk's own state. Never written anywhere: a filter is a way of looking.
+    let registrationFilter = 'all';   // all | unpaid | paid | approved | pending
+    const REG_FILTERS = [
+        { key: 'all', label: 'All', test: () => true },
+        { key: 'unpaid', label: 'Unpaid', test: (e) => e.paid !== true },
+        { key: 'paid', label: 'Paid', test: (e) => e.paid === true },
+        { key: 'approved', label: 'Approved', test: (e) => regInField(e) },
+        { key: 'pending', label: 'Not yet approved', test: (e) => !regInField(e) }
+    ];
+    // The one test for "in the field", shared by the row, the counts and the chips.
+    function regInField(e) { return !!(e && (e.approvedAt || e.playerId || e.teamNum)); }
+    function setRegistrationFilter(key) {
+        registrationFilter = REG_FILTERS.some((f) => f.key === key) ? key : 'all';
+        renderRegistrationDesk();
+    }
+    function registrationSearchText() {
+        const el = document.getElementById('registration-search');
+        return String((el && el.value) || '').trim().toLowerCase();
+    }
+
+    // Whole dollars with thousands separators; cents only when there are any.
+    function regDollars(n) {
+        const v = Number(n) || 0;
+        return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    // Every number the counts row shows, from registrationData and nothing else.
+    const REG_SHIRT_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];   // the rule's list, in its order
+    function registrationCounts(entries) {
+        const c = { signups: entries.length, paid: 0, inField: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
+        entries.forEach((e) => {
+            if (e.paid === true) c.paid++;
+            if (regInField(e)) c.inField++;
+            if (typeof e.dinnerCount === 'number' && isFinite(e.dinnerCount)) { c.dinnerGuests += e.dinnerCount; c.dinnerAnswered++; }
+            const size = String(e.shirtSize || '').trim().toUpperCase();
+            if (size) { c.shirts[size] = (c.shirts[size] || 0) + 1; c.shirtAnswered++; }
+        });
+        return c;
+    }
+    function registrationCountsHtml(c) {
+        const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+        const lines = [`<div class="reg-count-line reg-count-main">${plural(c.signups, 'signup', 'signups')} · ${c.paid} paid · ${c.inField} in the field</div>`];
+        if (c.dinnerAnswered > 0) lines.push(`<div class="reg-count-line">Dinner guests ${c.dinnerGuests} · ${c.dinnerAnswered} of ${c.signups} answered</div>`);
+        if (c.shirtAnswered > 0) {
+            const sizes = REG_SHIRT_ORDER.filter((k) => c.shirts[k]).map((k) => c.shirts[k] + ' ' + k);
+            Object.keys(c.shirts).filter((k) => REG_SHIRT_ORDER.indexOf(k) === -1).sort().forEach((k) => sizes.push(c.shirts[k] + ' ' + escReg(k)));
+            lines.push(`<div class="reg-count-line">Shirts ${sizes.join(' · ')}</div>`);
+            lines.push(`<div class="reg-count-line">${c.shirtAnswered} of ${c.signups} gave a shirt size</div>`);
+        }
+        // FEES. On an INDIVIDUAL event the fee is per golfer and a signup is a
+        // golfer, so N paid x fee is what was collected. On a TEAM event the fee
+        // is per TEAM ('Entry Fee per Team') and a signup is still a golfer: the
+        // desk does not know who is on whose team until they are approved, so
+        // there is NO total - the line gives the count, the fee and the reason,
+        // rather than a number that is wrong by the team size.
+        const fee = Number(currentData && currentData.entryFee) || 0;
+        if (fee > 0) {
+            if (recordIsIndividual()) lines.push(`<div class="reg-count-line">Fees collected ${regDollars(c.paid * fee)} · ${c.paid} paid × ${regDollars(fee)}</div>`);
+            else lines.push(`<div class="reg-count-line">${c.paid} paid golfers · ${regDollars(fee)} per team · teams form at approval</div>`);
+        }
+        return lines.join('');
+    }
+
+    // THE DUPLICATE FLAG. Same email (case-insensitive, trimmed) or same full name
+    // (case-insensitive, whitespace collapsed) as ANY other entry marks BOTH rows.
+    // Flag only: nothing is merged, hidden or written - two golfers really can
+    // share a name, and only the organizer at the desk can tell.
+    function registrationDuplicates(entries) {
+        const byEmail = {}, byName = {};
+        entries.forEach(([id, e]) => {
+            const em = String(e.email || '').trim().toLowerCase();
+            const nm = String(e.fullName || e.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            if (em) (byEmail[em] = byEmail[em] || []).push(id);
+            if (nm) (byName[nm] = byName[nm] || []).push(id);
+        });
+        const marks = {};
+        const flag = (groups, why) => Object.keys(groups).forEach((k) => { if (groups[k].length > 1) groups[k].forEach((id) => { (marks[id] = marks[id] || []).push(why); }); });
+        flag(byEmail, 'email'); flag(byName, 'name');
+        return marks;
+    }
+
+    function renderRegistrationDesk() {
+        const panel = document.getElementById('manage-tab-desk');
         const list = document.getElementById('registration-list');
-        if (!list) return;
-        const entries = Object.keys(registrationData || {}).sort((a, b) =>
-            ((registrationData[a] || {}).createdAt || 0) - ((registrationData[b] || {}).createdAt || 0));
-        if (entries.length === 0) {
+        const countsEl = document.getElementById('registration-counts');
+        const chipsEl = document.getElementById('registration-chips');
+        const note = document.getElementById('registration-desk-note');
+        const search = document.getElementById('registration-search');
+        if (!panel || !list) return;
+        // The search box is wired here, once, and only ever READ: typing re-renders
+        // the rows and the chips; nothing re-renders the box.
+        if (search && typeof search.oninput !== 'function') search.oninput = function () { renderRegistrationDesk(); };
+        if (!registrationAllowed()) {
+            // A legacy event (no ownerUid) has no signups to list - the rules
+            // refuse the create and nobody could read it - and the page says so
+            // in the same words the signup form uses.
+            if (note) note.textContent = (currentData && !currentData.ownerUid)
+                ? 'This event is not taking signups. Signups need an organizer account, and this event does not have one.'
+                : '';
+            if (countsEl) countsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = '';
+            list.innerHTML = '';
+            return;
+        }
+        if (note) note.textContent = 'Tick Paid when you have the cash, then approve golfers into the field.';
+        const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
+            .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
+        if (all.length === 0) {
+            if (countsEl) countsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = '';
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
             return;
         }
+        const entriesOnly = all.map((x) => x[1]);
+        if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
+        if (chipsEl) chipsEl.innerHTML = REG_FILTERS.map((f) => {
+            const n = entriesOnly.filter(f.test).length;
+            return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
+        }).join('');
+        const filter = REG_FILTERS.find((f) => f.key === registrationFilter) || REG_FILTERS[0];
+        const q = registrationSearchText();
+        const shown = all.filter(([, e]) => filter.test(e) && (!q
+            || String(e.fullName || e.name || '').toLowerCase().indexOf(q) !== -1
+            || String(e.email || '').toLowerCase().indexOf(q) !== -1));
+        if (shown.length === 0) {
+            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No one matches.</p>`;
+            return;
+        }
+        const dup = registrationDuplicates(all);
         const teams = currentData.teams || {};
         const teamOpts = Object.keys(teams).sort((a, b) => (teams[a].num || 0) - (teams[b].num || 0));
         const individual = recordIsIndividual();
-        list.innerHTML = entries.map((id) => {
-            const e = registrationData[id] || {};
-            const inField = !!(e.approvedAt || e.playerId || e.teamNum);
+        list.innerHTML = shown.map(([id, e]) => {
+            const inField = regInField(e);
             const pref = String(e.teamPreference || '').trim();
             const match = teamOpts.find((tid) => String(teams[tid].name || '').toLowerCase() === pref.toLowerCase());
             const defaultDest = match ? String(teams[match].num) : 'new';
@@ -1951,18 +2137,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                           e.shirtSize ? ('Shirt ' + e.shirtSize) : '',
                           (e.dinnerCount !== undefined && e.dinnerCount !== null) ? ('Dinner ' + e.dinnerCount) : '',
                           pref ? ('Prefers ' + pref) : '',
-                          e.holeSponsorship === true ? ('Hole sponsor' + (e.sponsorName ? ' \u2014 ' + e.sponsorName : '')) : '']
-                .filter(Boolean).map(escReg).join(' \u00b7 ');
+                          e.holeSponsorship === true ? ('Hole sponsor' + (e.sponsorName ? ' — ' + e.sponsorName : '')) : '']
+                .filter(Boolean).map(escReg).join(' · ');
+            const why = dup[id] ? (dup[id].length === 2 ? 'same email and name as another signup' : 'same ' + dup[id][0] + ' as another signup') : '';
+            const dupMark = why ? `<span class="reg-dup">⚠ Possible duplicate · ${why}</span>` : '';
             const paid = e.paid ? ' checked' : '';
             const approve = inField
                 ? `<span style="font-size:0.78rem; color:var(--text-muted);">In the field</span>`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
-            return `<div class="reg-row">`
+            return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
                 + dest
                 + approve
-                + (meta ? `<span class="reg-meta">${meta}</span>` : '')
+                + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
                 + `</div>`;
         }).join('');
     }

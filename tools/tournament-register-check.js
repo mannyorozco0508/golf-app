@@ -75,12 +75,19 @@ const PUBLIC_PROBE = `
 const OWNER_PROBE = `
 (() => {
   const visible = ${visible};
+  // 2c: the switches and the link are on Setup (#registration-section); the
+  // list is on the Desk tab. The owner arm reads Setup on arrival, then taps
+  // the Desk pill for real and reads the desk - two probes, one arrival.
   const section = (document.getElementById('registration-section') || {}).innerText || '';
+  const desk = (document.getElementById('manage-tab-desk') || {}).innerText || '';
   const manage = (document.getElementById('manage-screen') || {}).innerText || '';
   return JSON.stringify({
     setupVisible: visible('#tab-btn-setup'),
+    deskTabVisible: visible('#tab-btn-desk'),
     sectionVisible: visible('#registration-section'),
+    deskVisible: visible('#manage-tab-desk'),
     listVisible: visible('#registration-list'),
+    desk: desk,
     switchesVisible: visible('#reg-field-shirtSize') && visible('#reg-field-holeSponsorship'),
     switchesText: ((document.querySelector('.reg-fields') || {}).innerText || ''),
     section: section,
@@ -95,6 +102,7 @@ const PUBLIC_SIGNEDOUT_PROBE = `
   const manage = (document.getElementById('manage-screen') || {}).innerText || '';
   return JSON.stringify({
     sectionExists: !!document.getElementById('registration-section'),
+    deskExists: !!document.getElementById('manage-tab-desk') || !!document.getElementById('tab-btn-desk'),
     sectionVisible: visible('#registration-section'),
     fay: /Fay Foxtrot/.test(manage),
     registerLink: /register=OWNED1/.test(manage)
@@ -118,7 +126,12 @@ async function look(query, probe, auth) {
         process.exit(2);
     };
     const pub = await look('register=OWNED1', PUBLIC_PROBE, 'anonymous');
-    const owner = await look('tourney=OWNED1', OWNER_PROBE, { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
+    const ownerRun = await arriveCold({ url: fileUrl('tournament.html', 'tourney=OWNED1'), db, settleMs: 7000,
+        auth: { uid: 'u-org', email: 'org@example.com', isAnonymous: false },
+        steps: [{ expression: OWNER_PROBE }, { tap: '#tab-btn-desk' }, { sleep: 300 }, { expression: OWNER_PROBE }] });
+    const parse = (v) => { try { return { ran: true, ...JSON.parse(v) }; } catch (e) { return { ran: false, reason: 'non-JSON: ' + String(v).slice(0, 200) }; } };
+    const owner = ownerRun.ok ? parse(ownerRun.value[0]) : { ran: false, reason: ownerRun.reason };
+    const ownerDesk = ownerRun.ok ? parse(ownerRun.value[3]) : { ran: false, reason: ownerRun.reason };
     const switched = await look('register=SWITCH1', PUBLIC_PROBE, 'anonymous');
     const visitor = await look('tourney=OWNED1', PUBLIC_SIGNEDOUT_PROBE, 'signed-out');
     if (!pub.ran) bail('the public signup did not run: ' + pub.reason);
@@ -153,21 +166,27 @@ async function look(query, probe, auth) {
     if (!switched.sponsorVisible) failures.push('switched: hole sponsorship is ON on this event and has no rect');
     if (!switched.dinnerVisible) failures.push('switched: dinner guests (default ON) lost its rect');
     if (!owner.sectionVisible) failures.push('organizer: the registration section has no rect');
-    if (!/Fay Foxtrot/.test(owner.section)) failures.push('organizer: the registrant is not in innerText of the list');
-    if (!/fay@example\.com/.test(owner.section) || !/555-0100/.test(owner.section)) failures.push('organizer: email and phone are not on the desk');
-    if (!/Shirt L/.test(owner.section) || !/Dinner 2/.test(owner.section)) failures.push('organizer: the optionals are not on the desk');
     if (!/register=OWNED1/.test(owner.section)) failures.push('organizer: the signup link is not on screen');
-    if (!/Paid/.test(owner.section)) failures.push('organizer: Paid is not labelled');
+    if (!owner.deskTabVisible) failures.push('organizer: the Desk tab has no rect');
+    if (owner.deskVisible) failures.push('organizer: the Desk panel is on screen before its tab is tapped');
+    if (!ownerDesk.ran) failures.push('organizer: the desk probe did not run: ' + ownerDesk.reason);
+    if (!ownerDesk.deskVisible || !ownerDesk.listVisible) failures.push('organizer: after tapping Desk the panel or the list has no rect');
+    if (!/Fay Foxtrot/.test(ownerDesk.desk || '')) failures.push('organizer: the registrant is not in innerText of the desk');
+    if (!/fay@example\.com/.test(ownerDesk.desk || '') || !/555-0100/.test(ownerDesk.desk || '')) failures.push('organizer: email and phone are not on the desk');
+    if (!/Shirt L/.test(ownerDesk.desk || '') || !/Dinner 2/.test(ownerDesk.desk || '')) failures.push('organizer: the optionals are not on the desk');
+    if (!/Paid/.test(ownerDesk.desk || '')) failures.push('organizer: Paid is not labelled');
+    if (!/1 signup · 0 paid · 0 in the field/.test(ownerDesk.desk || '')) failures.push('organizer: the counts line is not on the desk: ' + String(ownerDesk.desk).slice(0, 120));
     if (owner.lockWords && owner.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(owner.lockWords));
 
     if (visitor.sectionExists) failures.push('signed-out: #registration-section still exists — it lives in Setup and must go with the gate');
+    if (visitor.deskExists) failures.push('signed-out: the Desk tab or panel still exists — it is gated with Setup (2c)');
     if (visitor.sectionVisible) failures.push('signed-out: the registration list has a rect');
     if (visitor.fay) failures.push('signed-out: a registrant name is on the public manage screen');
     if (visitor.registerLink) failures.push('signed-out: the signup admin link is on the public manage screen');
 
     console.log(JSON.stringify({
         verdict: failures.length ? 'FAIL' : 'PASS', failures,
-        measured: { public: pub, organizer: owner, signedOut: visitor }
+        measured: { public: pub, organizer: owner, organizerDesk: ownerDesk, signedOut: visitor }
     }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch((e) => {

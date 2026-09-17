@@ -71,6 +71,7 @@ function firebaseStub(dbJson, auth) {
       var DB = ${dbJson};
       var AUTH_MODE = ${authMode};   // 'anonymous' | 'signed-out' | 'user'
       var AUTH_USER = ${authUser};   // the user onAuthStateChanged first emits, or null
+      var AUTH_LISTENERS = [];
       function refFor(pathStr) {
         var parts = String(pathStr).split('/').filter(Boolean);
         function resolve() {
@@ -120,8 +121,15 @@ function firebaseStub(dbJson, auth) {
         // Until 2026-09-15 this was signed out with no signInAnonymously at all,
         // so authReady rejected on every cold arrival - a state no visitor is in.
         auth: function () {
-          var listeners = [];
+          // ONE listener list across every firebase.auth() call, as the SDK has
+          // one auth instance: a sign-in emitted here reaches every subscriber.
+          var listeners = AUTH_LISTENERS;
           function emit(u) { listeners.slice().forEach(function (cb) { try { cb(u); } catch (e) {} }); }
+          // The stub's door for "the owner signed in AFTER the record arrived" -
+          // the second of the two orders the manage gate must handle. A check
+          // arrives signed out, then calls window.__signInAs({ uid, email }) and
+          // reads what the page put back. Nothing the page defines is invoked.
+          window.__signInAs = function (u) { AUTH_USER = u || null; emit(AUTH_USER); return AUTH_USER ? 'signed in' : 'signed out'; };
           return {
             get currentUser() { return AUTH_USER; },
             onAuthStateChanged: function (cb) {
@@ -305,6 +313,26 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 if (step.sleep !== undefined) {
                     await new Promise(r => setTimeout(r, step.sleep));
                     value.push('slept ' + step.sleep);
+                    continue;
+                }
+                // { tap: selector, nth } - a REAL tap at the element's centre, the
+                // rect read at tap time so a step need not know coordinates in
+                // advance (a list rebuilt by a snapshot moves its rows). It scrolls
+                // the element into view first, as a thumb does, then sends the same
+                // Input.dispatchMouseEvent pair a { cdp } step would. querySelectorAll
+                // and getBoundingClientRect are the DOM's, not the page's: this still
+                // calls nothing the page defines. Pushes the point tapped, or a
+                // 'no element' line so a missed selector fails loudly downstream.
+                if (step.tap) {
+                    const find = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.tap)})[${step.nth || 0}]; if (!el) return null; el.scrollIntoView({ block: 'center' }); var r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width), h: Math.round(r.height) }; })()`;
+                    const f = await rpc(ws, id++, 'Runtime.evaluate', { expression: find, returnByValue: true });
+                    const pt = f.result && f.result.result && f.result.result.value;
+                    if (!pt || !(pt.w > 0 && pt.h > 0)) { value.push('no element: ' + step.tap + '[' + (step.nth || 0) + ']'); continue; }
+                    await new Promise(r => setTimeout(r, 60));
+                    for (const type of ['mousePressed', 'mouseReleased']) {
+                        await rpc(ws, id++, 'Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+                    }
+                    value.push('tapped ' + step.tap + '[' + (step.nth || 0) + '] at ' + pt.x + ',' + pt.y);
                     continue;
                 }
                 const r = await rpc(ws, id++, 'Runtime.evaluate',

@@ -76,6 +76,11 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v42. The registration desk is its own tab (2c): counts,
+        // filter chips, a search box and the duplicate flag on tournament.html;
+        // the switches and the signup link stay on Setup. A device on v41 keeps
+        // a Setup tab with 140 signups sitting on top of Starting Holes and no
+        // way to find one golfer.
         // Moved to v37. Public signup (?register=CODE) and the organizer
         // Registration list (cash/offline Paid, approve into the field).
         // Moved to v36. The icons changed in v35 and the manifest both tournament
@@ -99,7 +104,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v41-tournament-hero-band',
+        cacheName: 'tournament-v42-registration-desk',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

@@ -74,6 +74,8 @@ const PROBE = `
     setupTab: { exists: !!document.getElementById('tab-btn-setup'), visible: visible('#tab-btn-setup'),
                 active: !!(document.getElementById('tab-btn-setup') && document.getElementById('tab-btn-setup').classList.contains('active')) },
     setupPanel: { exists: !!document.getElementById('manage-tab-setup') },
+    deskTab: { exists: !!document.getElementById('tab-btn-desk'), visible: visible('#tab-btn-desk') },
+    deskPanel: { exists: !!document.getElementById('manage-tab-desk') },
     leaderboardTab: { visible: visible('#tab-btn-leaderboard') },
     board: { visible: visible('#leaderboard-list'), names: (document.getElementById('leaderboard-list') || {}).innerText || '' },
     printResults: !!(byText(/Print \\/ Send Results/) && byText(/Print \\/ Send Results/).getBoundingClientRect().height > 0),
@@ -115,6 +117,7 @@ async function look(code, auth) {
     if (owned.setupTab.exists) failures.push('owned: the Setup tab element still exists for a signed-out visitor');
     if (owned.setupTab.visible) failures.push('owned: the Setup tab has a rect for a signed-out visitor');
     if (owned.setupPanel.exists) failures.push('owned: the Setup panel still exists for a signed-out visitor');
+    if (owned.deskTab.exists || owned.deskPanel.exists) failures.push('owned: the Desk tab or panel still exists for a signed-out visitor (2c: gated with Setup)');
     if (!owned.leaderboardTab.visible) failures.push('owned: the Leaderboard tab has no rect');
     if (!/Eagles/.test(owned.board.names)) failures.push('owned: the board does not list the teams');
     if (!owned.printResults || !owned.printPairings) failures.push('owned: a print button has no rect signed out - printing must stay open');
@@ -130,6 +133,7 @@ async function look(code, auth) {
     if (owned.lockWords.length) failures.push('owned: lock words on screen: ' + JSON.stringify(owned.lockWords));
     // OWNED, INDIVIDUAL, signed out: the group links have rects, the editor does not exist
     if (ownedInd.setupTab.exists || ownedInd.setupPanel.exists) failures.push('owned individual: the Setup tab or panel still exists signed out');
+    if (ownedInd.deskTab.exists || ownedInd.deskPanel.exists) failures.push('owned individual: the Desk tab or panel still exists signed out');
     if (!ownedInd.groupLinks.visible || ownedInd.groupLinks.links.length < 2) failures.push('owned individual: the group scoring links are not on screen signed out: ' + JSON.stringify(ownedInd.groupLinks));
     if (!ownedInd.groupLinks.links.every(h => /tourney=OWNEDI1&group=g[12]$/.test(h))) failures.push('owned individual: a group link does not point at its group: ' + JSON.stringify(ownedInd.groupLinks.links));
     if (ownedInd.editorVisible) failures.push('owned individual: the group EDITOR has a rect signed out');
@@ -137,10 +141,12 @@ async function look(code, auth) {
     // LEGACY, signed out - exactly as before the wave
     if (!legacy.setupTab.exists || !legacy.setupTab.visible) failures.push('legacy: the Setup tab is missing or has no rect - the grandfather promise is broken');
     if (!legacy.setupPanel.exists) failures.push('legacy: the Setup panel is gone');
+    if (!legacy.deskTab.exists || !legacy.deskTab.visible) failures.push('legacy: the Desk tab is missing or has no rect - a legacy event keeps every manage tab');
     if (legacy.lockWords.length) failures.push('legacy: lock words on screen: ' + JSON.stringify(legacy.lockWords));
 
     // ANONYMOUS visitor on the owned record: the signed-out page, exactly.
     if (anon.setupTab.exists || anon.setupPanel.exists) failures.push('anonymous: the Setup tab or panel exists for an anonymous visitor - the hole 075c7a4 closed');
+    if (anon.deskTab.exists || anon.deskPanel.exists) failures.push('anonymous: the Desk tab or panel exists for an anonymous visitor');
     if (anon.signedInAs) failures.push('anonymous: "Signed in as" rendered for an anonymous visitor: ' + anon.signedInAs);
     if (!anon.signInPanel) failures.push('anonymous: no sign-in panel on screen for an anonymous visitor');
     if (!anon.leaderboardTab.visible || !/Eagles/.test(anon.board.names)) failures.push('anonymous: the leaderboard is not on screen');
@@ -148,6 +154,7 @@ async function look(code, auth) {
     // EMAIL ORGANIZER (uid === ownerUid): the organizer page.
     if (!organizer.setupTab.exists || !organizer.setupTab.visible) failures.push('organizer: the Setup tab is missing or has no rect for the owner');
     if (!organizer.setupPanel.exists) failures.push('organizer: the Setup panel is gone for the owner');
+    if (!organizer.deskTab.exists || !organizer.deskTab.visible || !organizer.deskPanel.exists) failures.push('organizer: the Desk tab has no rect or its panel is gone for the owner');
     if (!/Signed in as org@example\.com/.test(organizer.signedInAs)) failures.push('organizer: "Signed in as" does not name the owner: ' + organizer.signedInAs);
     if (organizer.signInPanel) failures.push('organizer: the sign-in panel is still on screen for the owner');
     if (organizer.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(organizer.lockWords));

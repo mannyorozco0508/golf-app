@@ -381,15 +381,22 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
             'already in the field: ' + JSON.stringify(w));
     });
 
-    test('the registration block lives inside the Setup panel, so the gate takes it', () => {
+    test('the switches and the signup link live in the Setup panel, the list in the Desk panel - and the gate takes both', () => {
+        // 2c (2026-09-17) moved the desk to its own tab. Setup keeps the
+        // configuration; the Desk panel sits between Setup and Leaderboard and
+        // is removed with Setup by applyManageGate (tournament_desk_2c_test.js).
         const src = read(PAGE);
         const a = src.indexOf('<div id="manage-tab-setup">');
+        const d = src.indexOf('<div id="manage-tab-desk"');
         const b = src.indexOf('<div id="manage-tab-leaderboard"');
-        assert.ok(a > 0 && b > a);
-        const setup = src.slice(a, b);
+        assert.ok(a > 0 && d > a && b > d, 'panels in order: setup, desk, leaderboard');
+        const setup = src.slice(a, d), desk = src.slice(d, b);
         assert.match(setup, /id="registration-section"/);
-        assert.match(setup, /id="registration-list"/);
-        assert.ok(!/id="registration-section"/.test(src.slice(b)), 'one list, in Setup');
+        assert.match(setup, /id="registration-link-row"/);
+        assert.doesNotMatch(setup, /id="registration-list"/, 'the list has left Setup');
+        assert.match(desk, /id="registration-list"/);
+        assert.ok(!/id="registration-section"|id="registration-list"/.test(src.slice(b)), 'one of each, nowhere else');
+        assert.match(src, /const GATED_TABS = \['setup', 'desk'\];/, 'the gate names both tabs');
     });
 });
 

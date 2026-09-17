@@ -549,7 +549,7 @@ describe('THE BRAND MARK ASSET', () => {
     test('the cache moved — the header changed and installed devices must see it', () => {
         assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v166-beta-notice-gone';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v41-tournament-hero-band'/,
+        assert.match(BUILD, /cacheName: 'tournament-v42-registration-desk'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
     });
 });

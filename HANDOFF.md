@@ -829,6 +829,86 @@ that page and lands when the desk reconnects. Do not add the guard here later th
 it was overlooked; if a setting ever needs it, the reasoning above is what has to change
 first.
 
+## Tournament registration Wave 2c — THE DESK IS ITS OWN TAB (2026-09-17)
+
+Scoped to event day. Render-side only: **no rules change, no new key.** Recon
+(`~/Desktop/rattle-recon-desk-20260917.txt`) measured 141 signups as a 21,240 px
+list sitting above Starting Holes and every other Setup control, with no count,
+no filter, no search and no duplicate handling. `tournament_desk_2c_test.js` is
+the Node half; `tools/tournament-desk-check.js` is the Chrome half — it PRESSES
+Paid and Approve on the 142-entry fixture (`helpers/registration-desk-fixture.js`)
+by real CDP taps and reads the rows back, and it delivers a registrations
+snapshot **mid-search** to prove the typed text survives.
+
+**The Desk tab.** `📋 Desk` sits between Setup and Leaderboard. Setup keeps the
+CONFIGURATION — the "Ask golfers for" switches, the signup URL, Share
+(`#registration-section`). The Desk holds the OPERATION — `#registration-counts`,
+`#registration-chips`, `#registration-search`, `#registration-list`. The manage
+gate takes both tabs from anyone who is not the owner: `GATED_TABS = ['setup',
+'desk']` in `applyManageGate`, one stash entry per tab, put back in reverse order
+with each anchor checked against its parent (in this markup the anchor is the
+whitespace text node between the pills, so forward order also works — measured;
+the guard is for a nav without whitespace). `showTab` walks `MANAGE_TABS` and
+lands on the leaderboard when a gated panel is absent. A legacy event (no
+`ownerUid`) keeps every tab; its Desk says "This event is not taking signups".
+
+**Counts** (`registrationCounts` / `registrationCountsHtml`, from
+`registrationData` and nothing else): `142 signups · 70 paid · 14 in the field`,
+then only for fields at least one entry carries: `Dinner guests N · A of M
+answered`, `Shirts 28 S · 29 M · 29 L · 28 XL` in the rule's order with zero sizes
+omitted, `A of M gave a shirt size`, and the fee line. **Fees on an individual
+event:** `Fees collected $7,000 · 70 paid × $100` — the fee is per golfer and a
+signup is a golfer. **Fees on a team event: NO total** — the fee is per TEAM
+(`Entry Fee per Team`; `poolTotal` multiplies by teams) and a signup is a golfer,
+so N paid × fee is wrong by the team size; the line reads `70 paid golfers ·
+$400 per team · teams form at approval` so the organizer has the count, the fee
+and the reason. `entryFee` 0 shows no fee line either way.
+
+**Filters and search.** Five chips with live counts — All, Unpaid, Paid,
+Approved, Not yet approved (`REG_FILTERS`, `setRegistrationFilter`) — and a
+name/email search (case-insensitive substring). **Both live OUTSIDE
+`#registration-list`.** The chips are rebuilt on every snapshot (their counts
+move); the search box is STATIC MARKUP that `renderRegistrationDesk` only ever
+reads — the rows and chips are rebuilt on every registrations snapshot, and a box
+rebuilt with them would lose what the organizer typed the moment a signup landed.
+The Chrome check types `g7@example`, delivers a snapshot with a new signup, and
+reads the box back; the mutant that re-creates the box (`search.outerHTML =
+search.outerHTML`) fails it with "MID-SEARCH SNAPSHOT WIPED THE BOX". Nothing
+here is written anywhere: a filter is a way of looking.
+
+**The duplicate flag.** Same email (case-insensitive, trimmed) or same full name
+(case-insensitive, whitespace collapsed) as any other entry marks BOTH rows —
+`⚠ Possible duplicate · same email as another signup`. Flag only: nothing merged,
+hidden or written; two golfers really can share a name.
+
+**NOT this wave, and why.** Withdrawal / no-show, paid amount and method,
+per-entry notes, and export each need a NEW KEY under `registrations/$code/
+$entryId`, whose schema is closed (`"$other": { ".validate": false }`) and whose
+`.write` forbids delete — a `database.rules.json` change on a protected,
+hand-published file. They wait until a real event tells us which are actually
+needed. (Export could be render-side, but what it exports is the same open
+question.)
+
+**Known gaps, named.** (1) No two-way link with the field — it is ONE-WAY: an approved entry
+records `playerId`/`teamNum`, but removing that golfer from the field later does
+not touch the entry — it still reads "In the field" and cannot be approved again.
+(2) No un-approve. (3) No walk-up entry from the desk: an unregistered golfer is
+added through the existing Setup controls and has no registration row, so the
+counts do not include them.
+
+**Cache.** `tournament.html` is TOURNAMENT_SHELL: `build-shell.js` cacheName
+`tournament-v42-registration-desk` (five pins), not `sw.js`.
+
+**Two records from the build, not fixes.** (1) The counts-width discrepancy: at
+390 px (326 px available inside body and container padding) a nowrap probe read
+the widest counts line — the team fee line — at 330 px, while the block height
+(101 px for 5 lines) says nothing wrapped. Unresolved. Cosmetic. (2)
+`hilo_live_test.js` was KILLED BY SIGSEGV on one full-suite run of six
+(2026-09-17, Node v24.20.0; the suite check reported "A FILE DIED WITHOUT RUNNING
+ITS TESTS", 41 results missing). Standalone it is 42/42, and the other five runs
+were green. Consumer-side, unrelated to this wave; named here so the next person
+who sees a file die without running does not rediscover it cold.
+
 ## Tournament registration Wave 1 — HOW TO OPEN IT
 
 Public signup (any golfer, no sign-in):

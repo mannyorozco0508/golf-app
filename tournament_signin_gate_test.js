@@ -81,6 +81,9 @@ const setupTab = (sb) => sb.document.getElementById('tab-btn-setup');
 const textOf = (el) => !el ? '' : (el.textContent || '') + el.children.map(textOf).join('');
 const setupPanel = (sb) => sb.document.getElementById('manage-tab-setup');
 const leaderboardTab = (sb) => sb.document.getElementById('tab-btn-leaderboard');
+// 2c: the Desk tab is the second gated tab - removed and restored with Setup.
+const deskTab = (sb) => sb.document.getElementById('tab-btn-desk');
+const deskPanel = (sb) => sb.document.getElementById('manage-tab-desk');
 
 // ===========================================================================
 describe('a) SIGNED OUT on an OWNED tournament: the Setup tab is not rendered; everything else is', () => {
@@ -90,6 +93,8 @@ describe('a) SIGNED OUT on an OWNED tournament: the Setup tab is not rendered; e
             const sb = arrive(OWNED(), null, order);
             assert.equal(setupTab(sb), null, 'tab-btn-setup must be removed, not hidden or disabled');
             assert.equal(setupPanel(sb), null, 'manage-tab-setup must be removed - its controls must not exist');
+            assert.equal(deskTab(sb), null, 'tab-btn-desk must be removed with Setup (2c)');
+            assert.equal(deskPanel(sb), null, 'manage-tab-desk must be removed - the signups must not exist on the page');
             assert.ok(leaderboardTab(sb), 'the Leaderboard tab stays');
         });
     });
@@ -123,9 +128,13 @@ describe('a) SIGNED OUT on an OWNED tournament: the Setup tab is not rendered; e
         // <div id="manage-tab-setup"> and the next top-level panel must not hold them.
         const src = read(PAGE);
         const a = src.indexOf('<div id="manage-tab-setup">');
+        // The Desk panel (2c) sits between Setup and Leaderboard and is gated
+        // too, so the slice runs to Leaderboard: everything in it vanishes
+        // for a visitor.
         const b = src.indexOf('<div id="manage-tab-leaderboard"');
         assert.ok(a > 0 && b > a, 'both manage panels exist');
         const setup = src.slice(a, b);
+        assert.match(setup, /id="manage-tab-desk"/, 'the Desk panel is inside the gated stretch');
         assert.ok(!/printTournamentResults\(\)|printTournamentPairings\(\)/.test(setup),
             'the print buttons are inside the Setup panel and vanish with it');
         assert.ok(!/id="team-links-list"/.test(setup),
@@ -230,6 +239,7 @@ describe('b) SIGNED IN AS THE OWNER: the Setup tab is present and its controls w
             const sb = arrive(OWNED(), ORGANIZER, order);
             assert.ok(setupTab(sb), 'tab-btn-setup must be present for the owner');
             assert.ok(setupPanel(sb), 'manage-tab-setup must be present for the owner');
+            assert.ok(deskTab(sb) && deskPanel(sb), 'the Desk tab and panel must be present for the owner (2c)');
         });
     });
 
