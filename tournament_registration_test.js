@@ -250,6 +250,10 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const link = html(sb, 'registration-link-row');
         assert.ok(link && /register=OWN1/.test(link),
             'the owner is handed the public URL without hunting for a query param: ' + link);
+        const before = html(sb, 'registration-list');
+        assert.ok(before && /loading signups/i.test(before),
+            'before the snapshot the desk does not pretend the field is empty: ' + before);
+        fireRegistrations(sb, 'OWN1', null);
         const list = html(sb, 'registration-list');
         assert.ok(list && /no signups yet/i.test(list),
             'an empty list is a sentence, not a blank box: ' + list);

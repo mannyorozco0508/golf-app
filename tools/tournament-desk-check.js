@@ -24,6 +24,10 @@
 //   - INDIV1 (individual, $100): the fees line carries the total; Approve mints
 //     a player record
 //   - signed out: no Desk tab, no Desk panel, no registrant on screen
+//   - CHECK-IN HARDEN: picking a team on e007 then delivering a snapshot keeps
+//     dest=1; typing a phone finds one row; a miss shows Clear search and a
+//     tap restores the list; after scrolling to the last row the toolbar is
+//     sticky at top 0
 //
 // EXIT 0 PASS, 1 FAIL, 2 could not run.
 // ============================================================================
@@ -72,6 +76,7 @@ const PROBE = `(function () {
     counts: T('registration-counts'), chips: T('registration-chips'), activeChip: (function () { var c = document.querySelector('.reg-chip.active'); return c ? c.innerText.trim() : null; })(),
     rows: rows.length, listRect: R(list), searchRect: R(search), searchValue: search ? search.value : null,
     searchOutsideList: !!(search && !search.closest('#registration-list')), chipsOutsideList: !!(document.getElementById('registration-chips') && !document.getElementById('registration-chips').closest('#registration-list')),
+    toolbarRect: R(document.getElementById('registration-desk-toolbar')), toolbarPos: (function () { var e = document.getElementById('registration-desk-toolbar'); return e ? getComputedStyle(e).position : null; })(),
     e001: row('e001'), first: rows[0] ? rows[0].getAttribute('data-entry-id') : null, last: rows.length ? rows[rows.length - 1].getAttribute('data-entry-id') : null,
     dupMarks: list ? list.querySelectorAll('.reg-dup').length : 0,
     writes: window.__writes.slice(), bodyHasRegistrant: /Ben Bsurname1/.test(document.body.innerText)
@@ -122,6 +127,8 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     if (!/Shirts 28 S · 29 M · 29 L · 28 XL/.test(desk.counts || '') || !/Dinner guests 106 · 107 of 142 answered/.test(desk.counts || '')) failures.push('desk: dinner/shirt lines: ' + desk.counts);
     if (!/All 142/.test(desk.chips || '') || !/Unpaid 72/.test(desk.chips || '') || !/Not yet approved 128/.test(desk.chips || '')) failures.push('desk: chips: ' + desk.chips);
     if (!desk.searchRect || desk.searchRect.h === 0) failures.push('desk: the search box has no rect');
+    if (desk.toolbarPos !== 'sticky') failures.push('desk: toolbar position is ' + desk.toolbarPos + ', wanted sticky');
+    if (!desk.toolbarRect || desk.toolbarRect.h === 0) failures.push('desk: the sticky toolbar has no rect');
     if (!desk.searchOutsideList || !desk.chipsOutsideList) failures.push('desk: search or chips are INSIDE #registration-list');
     if (desk.first !== 'e000' || desk.last !== 'e141') failures.push('desk: sort: first ' + desk.first + ' last ' + desk.last);
     if (desk.dupMarks !== 4) failures.push('desk: ' + desk.dupMarks + ' duplicate marks, wanted 4');
@@ -193,6 +200,35 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     if (after.setupDisplay !== 'block' || !after.deskPanel) failures.push('late sign-in: Setup not shown or Desk panel missing: ' + JSON.stringify(after));
     if (!lateDesk || lateDesk.rows !== TOTALS.entries || lateDesk.deskDisplay !== 'block') failures.push('late sign-in: the Desk does not list the field after sign-in: ' + JSON.stringify(lateDesk && [lateDesk.rows, lateDesk.deskDisplay]));
 
+    // ---- CHECK-IN HARDEN: dest harvest, phone search, miss is not a dead end, sticky ----
+    const destSnap = JSON.parse(JSON.stringify(TEAM_REGS));
+    destSnap.e200 = { fullName: 'Zed Extra', email: 'zed2@example.com', phone: '555-9200', createdAt: 7000 };
+    const harden = await arriveCold({ url: fileUrl('tournament.html', 'tourney=OWNED1'), db, auth: OWNER, viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 6000, steps: [
+        { tap: '#tab-btn-desk' }, { sleep: 250 },
+        { expression: `(function(){ var s = document.querySelector('#registration-list .reg-row[data-entry-id="e007"] select'); if (!s) return 'no select'; s.value = '1'; s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()` },
+        deliver(destSnap), { sleep: 250 },
+        { expression: `(function(){ var s = document.querySelector('#registration-list .reg-row[data-entry-id="e007"] select'); return s ? s.value : 'no select'; })()` },
+        { tap: '#registration-search' }, { cdp: { method: 'Input.insertText', params: { text: '555-1007' } } }, { sleep: 250 }, { expression: PROBE },
+        ...BACKSPACES, { sleep: 200 },
+        { tap: '#registration-search' }, { cdp: { method: 'Input.insertText', params: { text: 'zzz-nobody' } } }, { sleep: 250 },
+        { expression: `(function(){ var b = document.querySelector('.reg-clear-search'); var list = document.getElementById('registration-list'); return JSON.stringify({ btn: b ? b.innerText.replace(/\\s+/g,' ').trim() : null, text: list ? list.innerText.replace(/\\s+/g,' ').trim() : null, rows: list ? list.querySelectorAll('.reg-row').length : 0 }); })()` },
+        { tap: '.reg-clear-search' }, { sleep: 250 }, { expression: PROBE },
+        { expression: `(function(){ var last = document.querySelector('#registration-list .reg-row[data-entry-id="e141"]'); if (last) last.scrollIntoView(); var bar = document.getElementById('registration-desk-toolbar'); var r = bar.getBoundingClientRect(); var search = document.getElementById('registration-search').getBoundingClientRect(); return JSON.stringify({ pos: getComputedStyle(bar).position, top: Math.round(r.top), h: Math.round(r.height), searchH: Math.round(search.height), searchTop: Math.round(search.top) }); })()` }
+    ] });
+    if (!harden.ok) bail(harden.reason);
+    const hardenTaps = harden.value.filter(v => typeof v === 'string' && /^no element/.test(v));
+    if (hardenTaps.length) bail('harden: a tap found no element', hardenTaps);
+    const destBefore = harden.value[2], destAfter = harden.value[5], phoneProbe = J(harden, 9), miss = JSON.parse(harden.value[34] || 'null'), afterClear = J(harden, 37), stuck = JSON.parse(harden.value[38] || 'null');
+    if (destBefore !== '1') failures.push('dest: could not set e007 to team 1: ' + destBefore);
+    if (destAfter !== '1') failures.push('DEST SELECT RESET ON SNAPSHOT: wanted 1, got ' + destAfter);
+    if (!phoneProbe || phoneProbe.rows !== 1) failures.push('phone search: ' + (phoneProbe && phoneProbe.rows) + ' rows for 555-1007, wanted 1');
+    if (!miss || miss.rows !== 0 || !/No one matches/.test(miss.text || '')) failures.push('miss: ' + JSON.stringify(miss));
+    if (!miss || miss.btn !== 'Clear search') failures.push('miss: Clear search button text: ' + (miss && miss.btn));
+    if (!afterClear || afterClear.rows !== 143) failures.push('clear search: rows ' + (afterClear && afterClear.rows) + ', wanted 143 (fixture + e200)');
+    if (!stuck || stuck.pos !== 'sticky') failures.push('sticky: position ' + (stuck && stuck.pos));
+    if (!stuck || !(stuck.searchH > 0)) failures.push('sticky: search has no height after scroll: ' + JSON.stringify(stuck));
+    if (!stuck || stuck.top > 24) failures.push('sticky: toolbar top is ' + (stuck && stuck.top) + ' after scrolling to the last row, wanted near 0');
+
     const verdict = failures.length ? 'FAIL' : 'PASS';
     console.log(JSON.stringify({ verdict, failures, measured: {
         desk: { rows: desk.rows, listHeightPx: desk.listRect && desk.listRect.h, counts: desk.counts, chips: desk.chips, searchRect: desk.searchRect, dupMarks: desk.dupMarks },
@@ -201,7 +237,8 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
         paid: { write: paidWrite && paidWrite.value, unpaidRowsAfter: paidBack.rows, chipsAfter: paidBack.chips },
         individual: { counts: iDesk.counts, player: player && player.path },
         signedOut: { deskTab: out.deskTab, deskDisplay: out.deskDisplay },
-        lateSignIn: { before: before.order, after: after.order, rows: lateDesk && lateDesk.rows }
+        lateSignIn: { before: before.order, after: after.order, rows: lateDesk && lateDesk.rows },
+        harden: { destBefore, destAfter, phoneRows: phoneProbe && phoneProbe.rows, miss: miss && miss.btn, afterClear: afterClear && afterClear.rows, sticky: stuck }
     } }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch(e => { console.log(JSON.stringify({ verdict: 'COULD NOT RUN', reason: String(e && e.stack || e) }, null, 2)); process.exit(2); });

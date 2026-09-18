@@ -906,8 +906,25 @@ not touch the entry — it still reads "In the field" and cannot be approved aga
 added through the existing Setup controls and has no registration row, so the
 counts do not include them.
 
+**Check-in harden (still 2c, no new key).** What an organizer running this cold
+on a phone at Bojo was missing after the tab/counts/chips wave. (1) Before the
+first registrations snapshot the desk says **Loading signups**, not "No signups
+yet" — that sentence is the empty field after the snapshot. A search miss names
+the query and offers Clear search. (2) Search also matches phone, digits-only,
+the way someone recites a number. (3) `harvestRegistrationDests` reads every
+dest `<select>` before the list `innerHTML` is replaced, so a signup landing
+while the organizer has picked a team does not reset the destination — the same
+wipe the search box was pulled out of the list to avoid. Proved in Chrome;
+mini-dom keeps a `<select>` value across `innerHTML` and cannot catch this.
+(4) Paid and Approve race the signup's 10s timer ("Still sending...") and lock
+the row in flight, so a double-tap cannot mint two teams. (5) Counts, chips and
+search live in a **sticky** toolbar. Rows carry `data-state` unpaid/paid/field.
+Tap targets are 44px.
+
 **Cache.** `tournament.html` is TOURNAMENT_SHELL: `build-shell.js` cacheName
-`tournament-v42-registration-desk` (five pins), not `sw.js`.
+`tournament-v46-desk-checkin` (this harden) and `sw.js` `golfapp-v171-desk-checkin`
+because tournament.html is in the combined worker's shell list. v42 was the
+Desk tab itself; later waves moved the key on. The v42 Moved-to note stays.
 
 **Two records from the build, not fixes.** (1) The counts-width discrepancy: at
 390 px (326 px available inside body and container padding) a nowrap probe read
@@ -930,8 +947,8 @@ owner whose uid is `ownerUid`:
 
     tournament.html?tourney=CODE
 
-then the **Setup & Links** tab. The signup URL is on that section; Share hands
-out a QR the way team scorecard links already do.
+then the **Desk** tab. The signup URL and "Ask golfers for" switches stay on
+**Setup & Links**; Share hands out a QR the way team scorecard links already do.
 
 Create the tournament while signed in (email/password, not anonymous) so it has
 an `ownerUid`. A legacy event without one cannot receive signups: the rules
