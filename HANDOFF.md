@@ -542,15 +542,20 @@ copy pass and let `user_facing_copy_test.js` hold the sentence that replaces it.
 
 ## Hosts and Firebase Authorized Domains (read-only recon, 2026-09-16)
 
-**Two products share one host.** `tournaments.rattlegolf.com` resolves to Cloudflare
-(172.67.176.70, 104.21.96.92) and serves THIS Pages deploy byte for byte — `/tournament`
-on it was 199450 bytes and `cmp`-identical to `golf-app-5a5.pages.dev/tournament` and to
-HEAD's `tournament.html` within an hour of the v159 push; its `/sw.js` carried the same
-`golfapp-v159-…` key. But `/` on that host is `index.html` — the Consumer round app. The
-hostname says Tournaments; the site under it is the whole repo. The tournament hero band
-(polish wave) is designed to read as the Tournaments PRODUCT — parent brand mark
-plus the word Tournaments — and not as the site's identity. The
-Cloudflare dashboard binding itself was not read; the bytes and timing were.
+**Two products share one Pages project; the custom host is Tournaments-only at `/`.**
+`tournaments.rattlegolf.com` resolves to Cloudflare (172.67.176.70, 104.21.96.92) and
+serves THIS Pages deploy. `/tournament` is the Tournaments landing. `functions/index.js`
+is the Pages mapping for `/`: on that hostname (and `*.tournaments.rattlegolf.com`) it
+**302s `/` to `/tournament`**. Other hosts — `golf-app-5a5.pages.dev`, `rattlegolf.com`,
+localhost — call `next()` and still get `index.html` (Live Scorecard). The rest of the
+tree is still the whole repo (a golfer who types `/admin` on the custom host would still
+hit Consumer); the default document is what this Function changes. Cache keys were not
+bumped: the Function is not shell HTML, and `sw.js` is network-first, so an online visit
+reaches the 302 without a golfapp-v* bump. `tournament_host_root_test.js` drives
+`onRequest`; `tools/tournament-host-check.js` measures the routing through
+`wrangler pages dev`. The tournament hero band (polish wave) is designed to read as the
+Tournaments PRODUCT — parent brand mark plus the word Tournaments — and not as the
+site's identity.
 
 **Authorized Domains, as read on 2026-09-16 (public `getProjectConfig`, key-only):**
 `localhost, golfapp-9fb21.firebaseapp.com, golfapp-9fb21.web.app, golf-app-5a5.pages.dev,
@@ -595,9 +600,9 @@ deliberate substitutions. `tools/tournament-landing-check.js` measures the layou
 Chrome at 390 and 768px, signed out and signed in, and taps the page's own buttons.
 
 **Why the band shows Rattle when the product is not called Rattle Golf.** The two
-products share `tournaments.rattlegolf.com`: `/` is the Consumer round app, `/tournament`
-is this. The band names WHICH product this page is — parent brand mark, then product —
-not what the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages"
+products share one Pages project; `tournaments.rattlegolf.com/` now lands on this
+product (302 to `/tournament`). The band names WHICH product this page is — parent
+brand mark, then product — not what the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages"
 guard was /Rattle/ anywhere; it is narrowed to the Consumer product's NAME ("Rattle Golf")
 plus a pin that `tournament.html` says "Rattle" only inside the wordmark (the quiet
 label under the PNG) and the comment above it, and the scorecard and engine not at all.
