@@ -48,6 +48,10 @@ const SHARED_SHELL = [
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',
+    // course-import-rules.js: the pure half of online course search - what a
+    // valid card is, the canonical tee, every refusal sentence. admin.html and
+    // tournament.html both load it (2026-09-17); one builder, two entry points.
+    'course-import-rules.js',
     // code-issuer.js issues every round, trip and tournament code and checks it is
     // free before handing it out. admin.html, trip.html and tournament.html all
     // load it, so without it here the native bundle 404s and none of them can

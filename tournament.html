@@ -29,6 +29,10 @@
          golfer opens never loads this. No auth call exists on this page yet. -->
     <script src="./firebase-auth-compat.js"></script>
     <script src="course-data.js"></script>
+    <!-- The pure half of online course search, shared with admin.html: what a valid
+         card is, the canonical tee, every refusal sentence. Loaded before the inline
+         script; nothing below may re-declare its names. -->
+    <script src="course-import-rules.js"></script>
     <script src="code-issuer.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
     <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
@@ -129,6 +133,17 @@
         .custom-select-option { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; }
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
         .custom-select-group { background: var(--nav-bg); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
+        .custom-select-note { padding: 10px 12px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+        .course-online-result div:last-child { font-size: 0.74rem; color: var(--text-muted); }
+        /* The import confirm panel: the whole card, read-only, and a tee chooser. */
+        #course-import-confirm { border: 1px solid var(--brand-green); border-radius: 8px; padding: 12px; margin: 10px 0; font-size: 0.84rem; }
+        #course-import-tees { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .tee-chip { flex: 0 0 auto; padding: 6px 12px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-weight: bold; font-size: 0.78rem; cursor: pointer; white-space: nowrap; margin: 0; width: auto; }
+        .tee-chip.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        #course-import-card { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.74rem; text-align: center; }
+        #course-import-card th, #course-import-card td { border: 1px solid var(--border-faint); padding: 3px 0; }
+        #course-import-card th { background: var(--nav-bg); color: var(--text-muted); font-weight: bold; }
+        #course-import-card td:first-child, #course-import-card th:first-child { text-align: left; padding-left: 6px; font-weight: bold; }
 
         .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .format-card { border: 2px solid var(--border-mid); border-radius: 10px; padding: 12px; cursor: pointer; text-align: center; transition: all 0.15s ease; }
@@ -317,6 +332,8 @@
             <div class="custom-select-dropdown" id="course-dropdown"></div>
         </div>
         <input type="hidden" id="course-key">
+        <!-- The online import's confirm panel is built here (course search, 2026-09-17). -->
+        <div id="course-import-host"></div>
     </div>
 
     <div class="form-group setup-field">
@@ -749,12 +766,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
     });
 
-    // --- COURSE SELECTION (searches the full course directory, same as Home/Trip — not just
-    // courses someone's already mapped, so a first-time tournament setup isn't a dead end) ---
+    // --- COURSE SELECTION ---
+    //
+    // The picker searches the local directory (course-data.js) and, from three
+    // typed characters, offers the course proxy (functions/api/) on a TAP - the
+    // same row, the same two fetches and the same three outcome shapes as
+    // admin.html, written against this page's own elements. The rules the two
+    // pages must never disagree on load from course-import-rules.js.
+    //
+    // OPTION B (2026-09-17): what an organizer imports goes INTO THIS EVENT and
+    // nowhere else - activeCourseKey gca_<id>, the card inlined, and a copy under
+    // tournaments/<code>/importedCourses so a later round can pick it. This page
+    // writes NOTHING to global_courses. One bad card there serves every golfer
+    // forever and no client can delete it; here it serves one event its owner can
+    // re-save.
+    //
+    // THE SILENT FALLBACK IS GONE. 115 of 141 directory courses had no card
+    // anywhere in the repo, and each one used to become eighteen par-4s indexed
+    // 1..18 the moment it was picked - fiction on a leaderboard, flagged only for
+    // Net. A course with no card is now not selected; the row offers to fetch it.
     let globalCourses = {};
     let selectedCourseData = null;
     let selectedCourseName = "";
     let selectedCourseKey = "";
+    // The event's own imports, gca_<id> -> { name, data, source }, written with
+    // the record (importedCourses) so allCourses() can offer them per round.
+    let setupImportedCourses = {};
 
     db.ref('global_courses').on('value', (snap) => {
         globalCourses = snap.val() || {};
@@ -762,63 +799,309 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function openCourseDropdown() { filterCourseDropdown(document.getElementById('course-search-input').value); }
 
+    // Every row is a NODE. Provider strings - course names, cities - go through
+    // textContent and never through innerHTML (admin.html's rule, for the same
+    // reason: a name containing a tag is markup the moment it is interpolated).
+    function pickerRow(text, cls, onclick) {
+        const d = document.createElement('div');
+        d.className = cls || 'custom-select-option';
+        d.textContent = text;
+        if (onclick) d.onclick = onclick;
+        return d;
+    }
+    function pickerNote(text) { return pickerRow(text, 'custom-select-note', null); }
+    function pickerOnlineRow(query, label) {
+        const online = pickerRow(label, 'custom-select-option', null);
+        online.id = 'course-online-search-row';
+        online.onclick = () => { runTournamentOnlineSearch(query, online); };
+        return online;
+    }
+    function directoryHasName(typed) {
+        const t = String(typed || '').trim().toLowerCase();
+        return courseDirectory.some(g => g.items.some(item => item.name.toLowerCase().includes(t)));
+    }
+
     function filterCourseDropdown(filterText) {
         const dropdown = document.getElementById('course-dropdown');
-        const typed = filterText.trim().toLowerCase();
-
-        let html = '';
+        const typed = String(filterText || '').trim();
+        const q = typed.toLowerCase();
+        dropdown.innerHTML = '';
+        let any = false;
         courseDirectory.forEach(g => {
-            const matches = g.items.filter(item => item.name.toLowerCase().includes(typed));
+            const matches = g.items.filter(item => item.name.toLowerCase().includes(q));
             if (matches.length > 0) {
-                html += `<div class="custom-select-group">${g.group}</div>`;
-                matches.forEach(item => {
-                    const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    html += `<div class="custom-select-option" onclick="pickCourse('${item.id}', '${safeName}')">${item.name}</div>`;
-                });
+                any = true;
+                dropdown.appendChild(pickerRow(g.group, 'custom-select-group', null));
+                matches.forEach(item => dropdown.appendChild(pickerRow(item.name, 'custom-select-option', () => pickCourse(item.id, item.name))));
             }
         });
-        dropdown.innerHTML = html || `<div style="padding:12px; color:var(--text-muted); text-align:center; font-size:0.85rem;">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
+        if (!any) dropdown.appendChild(pickerNote(`No courses found for "${typed}".`));
+        // THE ONLINE ROW: appended LAST, only ever a row. Never fired by the
+        // keystroke that rendered it - a tap spends a request, and three
+        // characters is the proxy's own MIN_QUERY.
+        if (typed.length >= 3) dropdown.appendChild(pickerOnlineRow(typed, `🌐 Search online for "${typed}"`));
         dropdown.style.display = 'block';
     }
 
     function pickCourse(key, name) {
+        const card = resolveCourseCard(key);
+        if (!card) {
+            // NO CARD ANYWHERE. Not selected - the event would score on fiction.
+            // Offer the fetch, by the course's name, and say why.
+            selectedCourseKey = ""; selectedCourseName = ""; selectedCourseData = null; selectedCourseIsSynthetic = false;
+            document.getElementById('course-key').value = '';
+            const dropdown = document.getElementById('course-dropdown');
+            dropdown.innerHTML = '';
+            dropdown.appendChild(pickerNote(`No card for ${name} yet.`));
+            dropdown.appendChild(pickerOnlineRow(name, `🌐 Get the card for "${name}" online`));
+            dropdown.style.display = 'block';
+            return;
+        }
         selectedCourseKey = key;
         selectedCourseName = name;
-        const card = resolveCourseCard(key);
         selectedCourseData = card.data;
-        selectedCourseIsSynthetic = card.synthetic;
+        selectedCourseIsSynthetic = false;
         document.getElementById('course-search-input').value = selectedCourseName;
         document.getElementById('course-key').value = key;
         document.getElementById('course-dropdown').style.display = 'none';
+        removeCourseImportPanel();
     }
 
-    // Firebase's global_courses is the live source of truth for real hole data — falls back
-    // to the local seed set in course-data.js, then a flat placeholder if neither has it yet
-    // (matches the same fallback order used by the trip planner).
-    // A FABRICATED CARD CANNOT BE RECOGNISED BY LOOKING AT IT.
+    // ---- THE SEARCH. FIRED BY A TAP AND NOTHING ELSE. ----
+    let tournamentSearchInFlight = false;
+    let pendingCourseImport = null;   // { course, detail, tees: [{gender, tee}], pick }
+
+    // The honest sentence for the stuck case: the proxy refused AND the typed
+    // name is not in the local list. It does not say the course does not exist,
+    // does not offer to invent one, and names the only true ways forward. There
+    // is no grid on this page, so nothing here mentions typing a card.
+    function courseUnavailableAdvice(query) {
+        return `Couldn't check online just now, and "${query}" isn't in the built-in list. `
+             + `Try again in a moment. To start the event now, pick a course from the list — the event scores on that course's card.`;
+    }
+
+    async function runTournamentOnlineSearch(query, rowEl) {
+        if (tournamentSearchInFlight) return;   // a second tap must not spend a second request
+        tournamentSearchInFlight = true;
+        if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
+        let payload;
+        try {
+            const res = await fetch('/api/course-search?q=' + encodeURIComponent(query));
+            payload = await res.json();
+        } catch (e) {
+            payload = { status: 'unavailable', reason: 'network' };
+        }
+        tournamentSearchInFlight = false;
+        renderTournamentOnlineOutcome(payload, query);
+    }
+
+    function renderTournamentOnlineOutcome(payload, query) {
+        const dropdown = document.getElementById('course-dropdown');
+        dropdown.innerHTML = '';
+        // COULD NOT ASK. Never "no courses found"; the reason's own sentence, and
+        // when the local list has nothing for this name, the stuck sentence.
+        if (!payload || payload.status !== 'ok') {
+            const reason = (payload && payload.reason) || 'upstream_error';
+            dropdown.appendChild(pickerNote(courseImportMessage(reason)));
+            if (!directoryHasName(query)) dropdown.appendChild(pickerNote(courseUnavailableAdvice(query)));
+            dropdown.style.display = 'block';
+            return;
+        }
+        // ASKED, AND GENUINELY NOTHING - the one state where "nothing matched" is true.
+        if (!payload.courses || payload.courses.length === 0) {
+            dropdown.appendChild(pickerNote(`Nothing online matched "${query}".`));
+            dropdown.style.display = 'block';
+            return;
+        }
+        dropdown.appendChild(pickerRow('🌐 Found online', 'custom-select-group', null));
+        payload.courses.forEach(c => {
+            const L = c.location || {};
+            const teeCount = Object.keys(c.tees || {}).reduce((n, k) => n + (c.tees[k] || 0), 0);
+            const row = document.createElement('div');
+            row.className = 'custom-select-option course-online-result';
+            const title = document.createElement('div');
+            title.textContent = c.course_name || c.club_name || '';
+            const sub = document.createElement('div');
+            // City and state on every row: four courses are called Legacy Golf Club.
+            sub.textContent = (L.city || '?') + ', ' + (L.state || '?') + ' · ' + (teeCount ? teeCount + ' tee sets' : 'no tee data');
+            row.appendChild(title); row.appendChild(sub);
+            // NOTHING AUTO-SELECTS, not even one result.
+            row.onclick = () => { openTournamentCourseDetail(c); };
+            dropdown.appendChild(row);
+        });
+        if (payload.courses.length >= ONLINE_SEARCH_CEILING) {
+            dropdown.appendChild(pickerNote(`Only the first ${ONLINE_SEARCH_CEILING} are shown — the list stops there. `
+                + `If yours isn't here, try a narrower search: add the town, or the club's full name.`));
+        }
+        dropdown.style.display = 'block';
+    }
+
+    // ---- THE DETAIL. The second request is spent here, not before. ----
+    async function openTournamentCourseDetail(course) {
+        const dropdown = document.getElementById('course-dropdown');
+        const cname = course.course_name || course.club_name || '';
+        dropdown.innerHTML = '';
+        dropdown.appendChild(pickerNote('Fetching the card…'));
+        let payload;
+        try {
+            const res = await fetch('/api/course/' + encodeURIComponent(course.id));
+            payload = await res.json();
+        } catch (e) {
+            payload = { status: 'unavailable', reason: 'network' };
+        }
+        dropdown.innerHTML = '';
+        // Refused between search and detail: nothing selected, nothing written,
+        // the typed text stays in the box - the course's name there, with no
+        // card behind it, would look chosen.
+        if (!payload || payload.status !== 'ok' || !payload.course) {
+            const reason = (payload && payload.reason) || 'upstream_error';
+            dropdown.appendChild(pickerNote(`Couldn't fetch the card for ${cname}. ` + courseImportMessage(reason)));
+            dropdown.style.display = 'block';
+            return;
+        }
+        const detail = payload.course;
+        const tees = allTeeSets(detail);
+        const canonical = pickCanonicalTee(detail);
+        if (!canonical || tees.length === 0) {
+            dropdown.appendChild(pickerNote(`${detail.course_name || detail.club_name}: This course has no tee data from the provider.`));
+            dropdown.style.display = 'block';
+            return;
+        }
+        pendingCourseImport = { course: course, detail: detail, tees: tees,
+            pick: tees.findIndex(t => t.gender === canonical.gender && t.tee === canonical.tee) };
+        if (pendingCourseImport.pick < 0) pendingCourseImport.pick = 0;
+        dropdown.style.display = 'none';
+        renderCourseImportPanel();
+    }
+
+    function chooseImportTee(idx) {
+        if (!pendingCourseImport || !pendingCourseImport.tees[idx]) return;
+        pendingCourseImport.pick = idx;
+        renderCourseImportPanel();
+    }
+    function removeCourseImportPanel() {
+        // Array.from: in a browser `children` is an HTMLCollection with no find();
+        // helpers/mini-dom.js hands out an Array. Written for both.
+        const host = document.getElementById('course-import-host');
+        const old = host && Array.from(host.children || []).find(c => c.id === 'course-import-confirm');
+        if (old) host.removeChild(old);
+    }
+
+    // ---- THE CONFIRM. The whole card, read-only, and the tee chooser. ----
     //
-    // The fallback below is eighteen par-4s with stroke indexes 1..18 in hole
-    // order - which is structurally a PERFECTLY VALID allocation. It is the
-    // shape hasUsableStrokeIndex() checks for, so asking that function whether
-    // this card is real returns TRUE, courseIndexSynthetic was stored as false,
-    // and net was then allocated on an invented index. That is the exact outcome
-    // the whole guard exists to prevent, and it was invisible only because
-    // nobody could reach the Net radio to trigger it.
-    //
-    // So the fact is RECORDED WHERE IT HAPPENS rather than inferred later. This
-    // function is the only place that knows it fell through, and it now says so.
+    // admin.html stamps the 36 numbers into an editable grid and asks the golfer
+    // to check them against the card before saving. This page has no grid, so
+    // the panel SHOWS the card in full and offers the other tee sets - a
+    // member-guest played from the whites scored on the blues' index is a wrong
+    // leaderboard, and there is no grid here to fix it afterwards.
+    function renderCourseImportPanel() {
+        const host = document.getElementById('course-import-host');
+        if (!host || !pendingCourseImport) return;
+        removeCourseImportPanel();
+        const P = pendingCourseImport;
+        const detail = P.detail, L = detail.location || {};
+        const chosen = P.tees[P.pick];
+        const card = importCardOrRefuse(chosen.tee);
+        const cname = detail.course_name || detail.club_name || '';
+        const panel = document.createElement('div');
+        panel.id = 'course-import-confirm';
+        const line = (text, css) => { const d = document.createElement('div'); if (css) d.style.cssText = css; d.textContent = text; panel.appendChild(d); return d; };
+        const MUTED = 'color:var(--text-muted);';
+        line(cname, 'font-weight:700;');
+        if (L.address) line(L.address, MUTED);
+        const parTotal = card.ok ? card.data.reduce((a, h) => a + h.par, 0) : (chosen.tee.par_total || 0);
+        line('Par ' + parTotal + ' · ' + P.tees.length + ' tee sets', 'margin-top:6px;');
+        // The tee chooser: every set, canonical first among the men's.
+        const tees = document.createElement('div');
+        tees.id = 'course-import-tees';
+        P.tees.forEach((t, i) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'tee-chip' + (i === P.pick ? ' active' : '');
+            chip.textContent = t.tee.tee_name + ' ' + t.tee.course_rating + '/' + t.tee.slope_rating;
+            chip.onclick = () => { chooseImportTee(i); };
+            tees.appendChild(chip);
+        });
+        panel.appendChild(tees);
+        if (card.ok) {
+            // THE WHOLE CARD, two rows of nine. Numbers only, our own.
+            const table = document.createElement('table');
+            table.id = 'course-import-card';
+            let html = '';
+            [0, 9].forEach(off => {
+                const nine = card.data.slice(off, off + 9);
+                html += '<tr><th>Hole</th>' + nine.map(h => `<th>${h.hole}</th>`).join('') + '</tr>';
+                html += '<tr><td>Par</td>' + nine.map(h => `<td>${h.par}</td>`).join('') + '</tr>';
+                html += '<tr><td>SI</td>' + nine.map(h => `<td>${h.hcpIndex}</td>`).join('') + '</tr>';
+            });
+            table.innerHTML = html;
+            panel.appendChild(table);
+            line(`Par and stroke index came from this course's ${chosen.tee.tee_name} tees. This is the card the event will score on. `
+                + `It can't be edited on this page — if it's wrong, pick a different tee set or a different course.`, 'margin-top:6px; ' + MUTED + 'font-size:0.76rem;');
+        } else {
+            line(`${chosen.tee.tee_name}: ${card.reason} Pick another tee set.`, 'margin-top:6px; color:var(--accent-red);');
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'course-import-confirm-btn';
+        btn.className = 'btn-primary';
+        btn.style.cssText = 'margin-top:10px; width:100%;';
+        btn.textContent = `Use ${cname} — ${L.city || '?'}, ${L.state || '?'}`;
+        btn.disabled = !card.ok;
+        btn.onclick = () => { confirmCourseImport(); };
+        panel.appendChild(btn);
+        host.appendChild(panel);
+    }
+
+    // ---- THE SELECTION. Into the event only; nothing shared is written. ----
+    function confirmCourseImport() {
+        const P = pendingCourseImport;
+        if (!P) return;
+        const chosen = P.tees[P.pick];
+        const card = importCardOrRefuse(chosen.tee);
+        if (!card.ok) return;
+        const detail = P.detail;
+        const key = 'gca_' + detail.id;
+        const name = detail.course_name || detail.club_name || '';
+        setupImportedCourses[key] = {
+            name: name,
+            data: card.data,
+            source: { provider: 'golfcourseapi', providerCourseId: detail.id, siFrom: chosen.gender + '/' + chosen.tee.tee_name, importedAt: Date.now() }
+        };
+        selectedCourseKey = key;
+        selectedCourseName = name;
+        selectedCourseData = card.data;
+        selectedCourseIsSynthetic = false;
+        document.getElementById('course-search-input').value = name;
+        document.getElementById('course-key').value = key;
+        document.getElementById('course-dropdown').style.display = 'none';
+        pendingCourseImport = null;
+        removeCourseImportPanel();
+    }
+
+    // A card, or null. global_courses is the live source of truth for real hole
+    // data, then the local seed set in course-data.js, then this event's own
+    // imports. NOTHING IS FABRICATED: the old third branch returned eighteen
+    // par-4s indexed 1..18 - structurally a perfectly valid allocation that
+    // hasUsableStrokeIndex() could not tell from a real one - and every
+    // directory course without a card became that the moment it was picked.
+    // A course with no card is now null, and the picker says so.
     function resolveCourseCard(key) {
         if (globalCourses[key] && globalCourses[key].data) {
             return { data: globalCourses[key].data, synthetic: false };
         }
         if (coursePresets[key]) return { data: coursePresets[key].data, synthetic: false };
-        let fallback = [];
-        for (let h = 1; h <= 18; h++) fallback.push({ hole: h, par: 4, hcpIndex: h });
-        return { data: fallback, synthetic: true };
+        const own = eventImportedCourses()[key];
+        if (own && own.data) return { data: own.data, synthetic: false };
+        return null;
+    }
+    function eventImportedCourses() {
+        return Object.assign({}, (currentData && currentData.importedCourses) || {}, setupImportedCourses);
     }
 
     function resolveTournamentCourseData(key) {
-        return resolveCourseCard(key).data;
+        const card = resolveCourseCard(key);
+        return card ? card.data : null;
     }
 
     // TRUE when the selected card came from the fallback. Belt and braces with
@@ -828,6 +1111,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let selectedCourseIsSynthetic = false;
 
     document.addEventListener('click', (e) => {
+        // A ROW THAT REMOVED ITSELF IS STILL A TAP INSIDE THE PICKER. Tapping a
+        // directory course with no card rebuilds the dropdown inside the row's
+        // own onclick (the "No card ... yet" note and the fetch row), so by the
+        // time this handler runs the tapped row is detached, closest() finds no
+        // wrapper, and the note it just rendered was hidden in the same tick -
+        // measured in Chrome by tools/tournament-course-search-check.js. A
+        // detached target was inside the picker; leave the dropdown alone.
+        if (!e.target.isConnected) return;
         if (!e.target.closest('.custom-select-wrapper')) {
             const dd = document.getElementById('course-dropdown');
             if (dd) dd.style.display = 'none';
@@ -1169,6 +1460,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             createdAt: Date.now(),
             ownerUid: authUser.uid
         };
+        // The event's own online imports ride with the record so a later round
+        // can pick them (Option B). Absent when nothing was imported.
+        if (Object.keys(setupImportedCourses).length) payload.importedCourses = setupImportedCourses;
 
         if (isMultiRoundSetup) {
             // DECLARED, NEVER INFERRED - the same rule scoringModel follows. The
@@ -2617,12 +2911,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const out = {};
         Object.keys(coursePresets).forEach(k => { out[k] = coursePresets[k]; });
         Object.keys(globalCourses).forEach(k => { out[k] = globalCourses[k]; });
+        // This event's own imports (tournaments/<code>/importedCourses): an
+        // organizer who imported a course for round 1 must find it for round 2.
+        const own = eventImportedCourses();
+        Object.keys(own).forEach(k => { out[k] = own[k]; });
         return out;
     }
 
     function setRoundCourse(rid, key) {
         if (!key) return;
         const card = resolveCourseCard(key);
+        if (!card) { alert('\u26A0\uFE0F That course has no card yet, so the round cannot score on it.'); return; }
         const name = (allCourses()[key] || {}).name || key;
         db.ref(`tournaments/${currentCode}/rounds/${rid}`).update({
             activeCourseKey: key,

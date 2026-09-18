@@ -33,6 +33,7 @@
          every link between them breaking. -->
     <script src="product-links.js"></script>
     <script src="course-data.js"></script>
+    <script src="course-import-rules.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="settlement-engine.js"></script>
@@ -3695,68 +3696,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return `Use ${course.course_name || course.club_name} \\u2014 ${L.city || '?'}, ${L.state || '?'}`;
     }
 
-    // ---- EVERY REASON GETS ITS OWN SENTENCE ----
+    // ---- THE SENTENCES LIVE IN course-import-rules.js (shared with tournament.html) ----
     //
-    // NONE OF THEM SAYS "no courses found", and none implies the course does not
-    // exist. Every one means WE COULD NOT ASK. The local picker told a golfer a
-    // course was not there when it was, and then offered to add a duplicate; an
-    // online search that runs out of quota must not repeat it one layer up.
-    //
-    // query_too_short is the odd one out - nothing failed and nothing was spent -
-    // so it tells the golfer what to do instead of reporting a problem.
-    // The provider's hard ceiling on a search: at this many results the list
-    // may have been cut. Named here, next to the messages, because the sentence
-    // that quotes it must move with it.
-    const ONLINE_SEARCH_CEILING = 25;
-
-    const ONLINE_SEARCH_MESSAGES = {
-        query_too_short: 'Type a little more to search online.',
-        not_configured: "Online search isn't set up yet.",
-        bad_course_id: "That course link didn't work \\u2014 try searching again.",
-        rate_limited: "You've searched online a few times just now. Try again in a few minutes.",
-        daily_limit: "Online search has used up today's lookups. It works again tomorrow \\u2014 "
-                   + "you can still type the card in below.",
-        upstream_error: "Online search isn't answering right now.",
-        network: "Couldn't reach online search. Check your signal."
-    };
+    // ONLINE_SEARCH_MESSAGES, ONLINE_SEARCH_CEILING, importCardOrRefuse and
+    // pickCanonicalTee were declared here until 2026-09-17; they now load from
+    // course-import-rules.js so the two pages that search the proxy cannot
+    // disagree on what a valid card is or what a refusal says. This page keeps
+    // ONE sentence of its own: daily_limit also offers the manual path, because
+    // this page has a grid the golfer can type into and tournament.html does not.
     function onlineSearchMessage(reason) {
-        return ONLINE_SEARCH_MESSAGES[reason] || ONLINE_SEARCH_MESSAGES.upstream_error;
+        const base = courseImportMessage(reason);
+        return reason === 'daily_limit' ? base.replace(/\.$/, '') + ' \u2014 you can still type the card in below.' : base;
     }
 
-    // ---- THE CARD, VALIDATED BEFORE IT IS EVER SHOWN OR WRITTEN ----
-    //
-    // Same invariant validateCourseGrid enforces and the same one the Firebase
-    // rules enforce: par 3-6, stroke index a clean permutation of 1-18. About a
-    // tenth of provider records carry no tee data at all and nothing guarantees
-    // the rest are well formed, so a card that cannot satisfy it is refused here
-    // rather than written to a record no client can delete.
-    function importCardOrRefuse(tee) {
-        const holes = (tee && tee.holes) || [];
-        if (holes.length !== 18) {
-            return { ok: false, reason: 'This course has no complete 18-hole card from the provider.' };
-        }
-        const seen = {};
-        const data = [];
-        for (let i = 0; i < 18; i++) {
-            const par = Number(holes[i].par);
-            const si = Number(holes[i].handicap);
-            if (!(par >= 3 && par <= 6)) {
-                return { ok: false, reason: `Hole ${i + 1} has par ${par}, which is outside 3-6.` };
-            }
-            if (!(si >= 1 && si <= 18)) {
-                return { ok: false, reason: `Hole ${i + 1} has handicap ${si}, which is outside 1-18.` };
-            }
-            if (seen[si]) {
-                return { ok: false, reason: `Handicap ${si} is used on both hole ${seen[si]} and hole ${i + 1}.` };
-            }
-            seen[si] = i + 1;
-            data.push({ hole: i + 1, par: par, hcpIndex: si });
-        }
-        for (let n = 1; n <= 18; n++) {
-            if (!seen[n]) return { ok: false, reason: `Handicap ${n} is not used on any hole.` };
-        }
-        return { ok: true, data: data };
-    }
 
     // ---- THE RECORD ----
     //
@@ -3798,16 +3750,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         };
     }
 
-    // Picks the tee whose stroke index becomes canonical: the longest men's set,
-    // falling back to the longest women's. Recorded in source.siFrom either way.
-    function pickCanonicalTee(detail) {
-        const byYards = (arr) => (arr || []).slice().sort((a, b) => (b.total_yards || 0) - (a.total_yards || 0))[0];
-        const m = byYards((detail.tees || {}).male);
-        if (m) return { gender: 'male', tee: m };
-        const f = byYards((detail.tees || {}).female);
-        if (f) return { gender: 'female', tee: f };
-        return null;
-    }
 
     // ---- THE SEARCH. FIRED BY A TAP AND NOTHING ELSE. ----
     let onlineSearchInFlight = false;

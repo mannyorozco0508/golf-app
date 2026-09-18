@@ -1599,7 +1599,14 @@
 // build-shell.js's product key - it moved only the product key. A device
 // holding v166 kept serving the pre-2c tournament.html, with the signups on
 // top of Starting Holes and no Desk tab, until this.
-const CACHE_VERSION = 'golfapp-v167-desk-tab';
+// Moved to v168: online course search on tournament.html (Option B). The
+// shell gains course-import-rules.js - the pure import rules lifted out of
+// admin.html so both pages agree on what a valid card is - and admin.html
+// now calls it instead of declaring its own. tournament.html is in this
+// worker's shell list, so this key moves with build-shell.js's product key.
+// A device on v167 has an admin.html whose import rules its cache does not
+// hold, and a tournament setup screen that still fabricates a par-4 card.
+const CACHE_VERSION = 'golfapp-v168-course-search';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1669,6 +1676,7 @@ const SHELL_FILES = [
     // leaderboard.html and settlement.html all load it.
     './live-skins.js',
     './course-data.js',
+    './course-import-rules.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

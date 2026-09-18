@@ -423,7 +423,11 @@ describe('6. THE SEAMS', () => {
         ['two-way', 'un-approve', 'walk-up'].forEach(w => assert.match(s, new RegExp(w, 'i'), 'known gap missing: ' + w));
     });
 
-    test('tournament.html is TOURNAMENT_SHELL: build-shell.js moved its cacheName for this wave', () => {
-        assert.match(read('build-shell.js'), /cacheName: 'tournament-v42-registration-desk'/);
+    test('tournament.html is TOURNAMENT_SHELL: build-shell.js moved its cacheName for this wave, and has not moved back', () => {
+        // v42 was this wave's key; later tournament waves move it on (v43: course
+        // search). The Moved-to note for v42 stays in the file either way.
+        assert.match(read('build-shell.js'), /Moved to v42\. The registration desk is its own tab/);
+        const m = /cacheName: 'tournament-v(\d+)-/.exec(read('build-shell.js'));
+        assert.ok(m && Number(m[1]) >= 42, 'the tournament cache key is at or past v42: ' + (m && m[0]));
     });
 });

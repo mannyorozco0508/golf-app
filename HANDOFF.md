@@ -967,6 +967,82 @@ A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and
 
 **Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail, comfortably inside 10,000 a day. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
 
+## Tournament course search — Option B (2026-09-17)
+
+**Why this wave exists.** `courseDirectory` has 141 entries and `coursePresets`
+holds a card for 26 of them: **115 of 141 directory courses had no card anywhere
+in the repo**, and until this wave every one of them silently became a fabricated
+card — eighteen par-4s indexed 1..18 — the moment an organizer picked it on
+`tournament.html`'s setup screen (the old `resolveCourseCard` fallback): a
+structurally valid card that `hasUsableStrokeIndex` could not tell from a real
+one, flagged only for Net, scored on a leaderboard as fact. Online search plus removing the fallback turns
+most of the directory from a silent wrong answer into a working path.
+
+**The shape — Option B: search and import into the tournament record only.
+There is no global_courses write from this page.** One bad card there serves 140
+golfers on every page forever and no client can delete it; a card on an event
+serves one event its owner can re-save. Option A (lifting the Consumer's whole
+import into a shared module and writing from both pages) was ruled out: the
+Consumer's import code is bound to `admin.html`'s DOM by name, and a copy is how
+the Nassau duplicate shipped.
+
+**What is shared, and what is not.** The four PURE pieces that decide what a
+valid card is — `importCardOrRefuse`, `pickCanonicalTee`, `ONLINE_SEARCH_MESSAGES`
+(with `courseImportMessage`), `ONLINE_SEARCH_CEILING`, plus `allTeeSets` for the
+chooser — moved out of `admin.html` into **`course-import-rules.js`** (root,
+SHARED_SHELL, plain `var`/`function` declarations; a page must not re-declare
+them). `admin.html` calls them and keeps its own `onlineSearchMessage`, which
+appends "— you can still type the card in below." to `daily_limit` because that
+page has a grid; the shared sentence says nothing about typing.
+`course_import_rules_test.js` holds the module; `course_import_test.js` still
+reaches the same functions through `admin.html` by name, which is the proof the
+page loads them. A side effect of the lift: two of admin's sentences carried a
+double-escaped em dash (`\\u2014`, printed literally); the shared table prints
+the dash. `importConfirmLabel` in `admin.html` still has the same defect on its
+button label — **recorded, not fixed** (not this wave's file).
+
+**On `tournament.html`.** The picker rows are nodes (provider strings go
+through `textContent`, never `innerHTML`). From three typed characters the
+online row is appended LAST and fires only on a tap; one tap is one request; a
+second tap in flight spends nothing. Three outcome shapes, as on admin: could
+not ask (the reason's sentence — and when the typed name is not in the 141, the
+honest stuck sentence: *Couldn't check online just now, and "X" isn't in the
+built-in list. Try again in a moment. To start the event now, pick a course from
+the list — the event scores on that course's card.*), asked and none, found
+(city and state on every row, nothing auto-selects, the 25-cut note). A result
+tap spends the detail request; a refusal selects nothing and leaves the typed
+text in the box. **The confirm panel** shows the whole card read-only (two rows
+of nine), a **tee chooser** listing every tee set (canonical = longest men's,
+re-validated on each pick; a refused tee disables the button and says why), the
+source sentence, and a button naming the course and its city. Confirm inlines
+the card: `activeCourseKey = gca_<id>`, `courseData` the validated 18,
+`courseIndexSynthetic false`, and keeps the import on the event at
+**`tournaments/<code>/importedCourses/gca_<id>`** = `{ name, data, source }` so
+`allCourses()` offers it to a later round of a multi-round event (an organizer
+who imported a course for round 1 and could not pick it for round 2 would think
+the app lost it). **The silent fallback is gone**: `resolveCourseCard` returns
+`null` for a course with no card; `pickCourse` does not select it and offers
+`🌐 Get the card for "<name>" online`; `setRoundCourse` refuses with a sentence.
+No placeholder row — fiction that announces itself is still fiction on a
+leaderboard; if an offline clubhouse turns out to be real at a live event it
+gets added with evidence behind it.
+
+**Two defects the Chrome check found that mini-dom could not.** (1)
+`host.children.find` — an `HTMLCollection` has no `find`; mini-dom hands out an
+Array. `Array.from` now. (2) The document click handler closed the dropdown on
+a tap of a card-less directory row: the row rebuilt the dropdown inside its own
+onclick, so the handler saw a detached target and `closest()` found no wrapper.
+It now leaves the dropdown alone for a target that is no longer connected.
+
+**Tests.** `tournament_course_search_test.js` (mini-dom, the proxy as the
+sandbox's `fetch`) and `tools/tournament-course-search-check.js` (Chrome: real
+taps and keystrokes, `window.fetch` replaced for `/api` by a preScript that
+answers on a later task — a synchronous stub ran the outcome render inside the
+tap's own dispatch and reproduced a race no real fetch can). Two fixtures that
+picked `cameron` (no preset) now hand the page a card through its own
+`global_courses` listener. Both caches moved: `build-shell.js`
+`tournament-v43-course-search` and `sw.js` `golfapp-v168-course-search`.
+
 ## The course API proxy — configuring it in Cloudflare
 
 `functions/api/` holds a Pages Function that proxies GolfCourseAPI so the key is never in the browser. **The picker calls it** — `admin.html` fetches `/api/course-search` from the "Search online" row and `/api/course/<id>` from the confirm panel (`8dd55d5`, v99). This paragraph said "nothing in the app calls it yet" until 2026-09-12; that was stale by a wave.

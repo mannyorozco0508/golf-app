@@ -304,7 +304,13 @@ describe('e) and f) CREATING a tournament', () => {
     function fillSetup(sb) {
         const d = sb.document;
         d.getElementById('t-name').value = 'Created Scramble';
-        sb.pickCourse('cameron', 'Cameron');
+        // 2c/course search (2026-09-17): a course with no card anywhere is no longer
+    // selected - the silent par-4 fallback is gone - so the fixture hands the page
+    // a card for cameron the way one arrives: through its own global_courses
+    // listener. Nothing here calls a renderer.
+    sb.__dbHandlers.filter(h => h.event === 'value' && /global_courses$/.test(h.path)).forEach(h =>
+        h.cb({ val: () => ({ cameron: { name: 'Cameron', data: COURSE } }), exists: () => true }));
+    sb.pickCourse('cameron', 'Cameron');
         const list = d.getElementById('teams-list');
         d.body.appendChild(list);
         const card = d.createElement('div'); card.className = 'team-card';
