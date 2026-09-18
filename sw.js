@@ -1556,7 +1556,7 @@
 // on v158 keeps the padlocked headings that claim a protection the links do
 // not have.
 // Moved to v160: the tournament landing gets its hero band. tournament.html:
-// a Rattle / Tournaments band over local imagery (assets/tournament-hero.svg,
+// a parent-brand mark + Tournaments band over local imagery (assets/tournament-hero.svg,
 // NOT precached - the band paints its own dark ground without it), the
 // organizer sign-in as a compact card below it, the format picker as four
 // weighted cards, the name / course / entry-fee fields restyled. Presentation
@@ -1606,7 +1606,13 @@
 // worker's shell list, so this key moves with build-shell.js's product key.
 // A device on v167 has an admin.html whose import rules its cache does not
 // hold, and a tournament setup screen that still fabricates a par-4 card.
-const CACHE_VERSION = 'golfapp-v168-course-search';
+// Moved to v169: the tournament landing hero. tournament.html: logo-mark.png
+// (parent brand) with a quiet label under the mark and Tournaments on the
+// right, over brand-green fairway art (assets/tournament-hero.svg, still not
+// precached - the band paints its own dark ground without it). Presentation
+// only. A device on v168 keeps the uppercase text wordmark and the placeholder
+// sunset SVG.
+const CACHE_VERSION = 'golfapp-v169-tournament-hero';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

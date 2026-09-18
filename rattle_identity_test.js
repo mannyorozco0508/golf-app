@@ -173,16 +173,17 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
     });
 
     test('the Tournament pages carry no Rattle Golf branding', () => {
-        // NARROWED 2026-09-16 (tournament landing polish). The guard was /Rattle/ -
-        // any occurrence. The landing now carries the wordmark "Rattle / Tournaments":
-        // parent brand, then product, as specified for tournaments.rattlegolf.com,
-        // where / is the Consumer app and /tournament is this one. That is not the
-        // rename this test exists to refuse - the product is not called Rattle Golf,
-        // build-shell.js still says appName 'GolfApp Tournaments', and the manifest
-        // still says GolfApp Tournaments. So the refusal is now the Consumer product's
-        // NAME, "Rattle Golf", plus the wordmark is pinned to the one place it lives:
-        // tournament.html carries "Rattle" only inside .tourney-wordmark's spans and
-        // the comment above them, and the other two files not at all.
+        // NARROWED 2026-09-16 (tournament landing polish), then 2026-09-18 (mark
+        // lockup). The guard was /Rattle/ - any occurrence. The landing carries
+        // the parent brand as logo-mark.png with a quiet "Rattle" label under
+        // it, then the product name "Tournaments" to the right. That is not the
+        // rename this test exists to refuse - the product is not called Rattle
+        // Golf, build-shell.js still says appName 'GolfApp Tournaments', and the
+        // manifest still says GolfApp Tournaments. So the refusal is the
+        // Consumer product's NAME, "Rattle Golf", plus the word "Rattle" is
+        // pinned to the one place it lives: tournament.html carries it only
+        // inside .tourney-wordmark and the comment above it, and the other two
+        // files not at all.
         ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js']
             .forEach(f => assert.ok(!/Rattle Golf/.test(read(f)), `${f} must not carry the Consumer product's name`));
         ['tournament-scorecard.html', 'tournament-engine.js']
@@ -190,8 +191,17 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         const t = read('tournament.html');
         const outside = t.replace(/<!--[\s\S]*?-->/g, '').replace(/<div class="tourney-wordmark"[\s\S]*?<\/div>/, '').replace(/\.wm-rattle/g, '');
         assert.ok(!/Rattle/.test(outside), 'tournament.html says Rattle somewhere other than the landing wordmark');
-        assert.match(t, /<span class="wm-rattle">Rattle<\/span><span class="wm-slash">\/<\/span><span class="wm-product">Tournaments<\/span>/,
-            'the wordmark is Rattle / Tournaments, in that order');
+        assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/,
+            'the parent brand is the mark file, not a text stand-in');
+        assert.match(t, /<span class="wm-rattle">Rattle<\/span>/,
+            'a quiet Rattle label sits with the mark');
+        assert.match(t, /<span class="wm-product">Tournaments<\/span>/,
+            'Tournaments is the product word');
+        assert.ok(!/wm-slash/.test(t), 'the slash wordmark is gone');
+        const rattleRule = /\.tourney-wordmark \.wm-rattle\s*\{[^}]*\}/.exec(t);
+        assert.ok(rattleRule, 'no .wm-rattle rule');
+        assert.ok(!/text-transform:\s*uppercase/.test(rattleRule[0]),
+            'the quiet label must not be the old uppercase RATTLE');
     });
 
     test('the two cache identities remain distinct', () => {
@@ -229,7 +239,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v168-course-search';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v169-tournament-hero';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -538,18 +548,26 @@ describe('THE BRAND MARK ASSET', () => {
         assert.ok(read('sync-mobile-web.js').includes("'logo-mark.png'"), 'must ship natively');
     });
 
-    test('the mark is Consumer-only — Tournament has no use for it', () => {
+    test('the mark file stays Consumer-owned — Tournament may show it as parent brand, not take it', () => {
+        // Tournament.html references logo-mark.png in the landing hero as the
+        // PARENT brand. Ownership of the file stays with Consumer: SHARED is
+        // for infrastructure, and identity assets are the one thing two
+        // products must not share in the shell lists. Combined deploy still
+        // serves the file from the repo root; the Tournament dist does not
+        // copy it.
         const sync = read('sync-mobile-web.js');
         const shared = /const SHARED_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         assert.ok(!shared.includes('logo-mark.png'), 'not shared');
         assert.ok(!tournament.includes('logo-mark.png'), 'not Tournament');
+        assert.match(read('tournament.html'), /src="logo-mark\.png"/,
+            'the landing hero uses the parent brand mark');
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v168-course-search';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v169-tournament-hero';/);
         assert.match(BUILD, /cacheName: 'consumer-v45-no-native-print'/);
-        assert.match(BUILD, /cacheName: 'tournament-v43-course-search'/,
+        assert.match(BUILD, /cacheName: 'tournament-v44-hero-mark'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
     });
 });

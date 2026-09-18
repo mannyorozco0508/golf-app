@@ -76,6 +76,10 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v44. The landing hero uses the parent brand mark
+        // (logo-mark.png) with a quiet label under it and Tournaments on the
+        // right, on brand-green fairway art. Presentation only. A device on
+        // v43 keeps the uppercase text wordmark over the placeholder SVG.
         // Moved to v43. Online course search on the setup picker (Option B):
         // the online row, the two proxy fetches, the confirm panel with the
         // tee chooser, the card inlined into the event and kept at
@@ -110,7 +114,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v43-course-search',
+        cacheName: 'tournament-v44-hero-mark',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

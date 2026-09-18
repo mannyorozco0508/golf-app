@@ -458,8 +458,8 @@ describe('7. THE SEAMS', () => {
         assert.match(s, /eighteen par-4s indexed 1\.\.18/);
         assert.match(s, /no global_courses write/i);
     });
-    test('both caches moved: build-shell tournament-v43 and sw.js v168', () => {
-        assert.match(read('build-shell.js'), /cacheName: 'tournament-v43-course-search'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v168-course-search';/);
+    test('both caches moved: build-shell tournament-v44 and sw.js v169', () => {
+        assert.match(read('build-shell.js'), /cacheName: 'tournament-v44-hero-mark'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v169-tournament-hero';/);
     });
 });

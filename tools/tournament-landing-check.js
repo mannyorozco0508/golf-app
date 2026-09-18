@@ -39,13 +39,21 @@ const PROBE = `
   const picker = q('#main-format-picker');
   const cols = picker ? getComputedStyle(picker).gridTemplateColumns.trim().split(/\\s+/).filter(Boolean).length : null;
   const active = Array.from(document.querySelectorAll('#main-format-picker .format-card.active')).map((c) => c.id);
+  const mark = q('.wm-mark'), rattle = q('.wm-rattle'), product = q('.wm-product'), disc = q('.wm-disc');
   const bg = art ? getComputedStyle(art) : null;
+  const rattleStyle = rattle ? getComputedStyle(rattle) : null;
   return JSON.stringify({
     innerWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
     hero: r(hero), card: r(card),
     heroText: hero ? hero.innerText.replace(/\\s+/g, ' ').trim() : null,
-    wordmarkColor: q('.wm-product') ? getComputedStyle(q('.wm-product')).color : null,
+    wordmarkColor: product ? getComputedStyle(product).color : null,
+    markSrc: mark ? mark.getAttribute('src') : null,
+    mark: r(mark), rattleBox: r(rattle), productBox: r(product), discBox: r(disc),
+    rattleText: rattle ? rattle.innerText : null,
+    rattleTransform: rattleStyle ? rattleStyle.textTransform : null,
+    rattleSize: rattleStyle ? parseFloat(rattleStyle.fontSize) : null,
+    productSize: product ? parseFloat(getComputedStyle(product).fontSize) : null,
     artImage: bg ? bg.backgroundImage : null,
     artGround: bg ? bg.backgroundColor : null,
     panelVisible: vis(panel), panel: r(panel),
@@ -74,6 +82,22 @@ const IMAGE_READ = `
   return JSON.stringify({ url: h.url, decoded: !!(img && img.complete && img.naturalWidth > 0), w: img ? img.naturalWidth : 0, h: img ? img.naturalHeight : 0 });
 })()`;
 
+const MARK_START = `
+(() => {
+  const img = document.querySelector('.wm-mark');
+  window.__markImg = { src: img ? img.getAttribute('src') : null, img: null, decoded: false };
+  if (img) {
+    const probe = new Image();
+    probe.src = img.currentSrc || img.src;
+    window.__markImg.img = probe;
+  }
+  return 'started';
+})()`;
+const MARK_READ = `
+(() => {
+  const h = window.__markImg || {}; const img = h.img;
+  return JSON.stringify({ src: h.src, decoded: !!(img && img.complete && img.naturalWidth > 0), w: img ? img.naturalWidth : 0, h: img ? img.naturalHeight : 0 });
+})()`;
 const TAP_BESTBALL = `(() => { document.getElementById('fmt-bestball').click(); return 'tapped'; })()`;
 const TAP_TOGGLE = `(() => { document.querySelector('#tourney-hero .theme-toggle-btn').click(); return 'tapped'; })()`;
 
@@ -88,6 +112,9 @@ async function measure(width, auth) {
             { expression: IMAGE_START },
             { sleep: 600 },
             { expression: IMAGE_READ },
+            { expression: MARK_START },
+            { sleep: 600 },
+            { expression: MARK_READ },
             { expression: TAP_BESTBALL },
             { expression: PROBE },
             { expression: TAP_TOGGLE },
@@ -98,7 +125,9 @@ async function measure(width, auth) {
     if (!r.ok) return { ran: false, reason: r.reason };
     const v = r.value.map((x) => { try { return JSON.parse(x); } catch (e) { return x; } });
     // A sleep step collects a value too ("slept N"), so the indices count it.
-    return { ran: true, arrival: v[0], image: v[3], afterBestBall: v[5], afterToggle: v[7] };
+    // 0 probe, 1 IMAGE_START, 2 sleep, 3 IMAGE_READ, 4 MARK_START, 5 sleep, 6 MARK_READ,
+    // 7 TAP_BESTBALL, 8 probe, 9 TAP_TOGGLE, 10 probe
+    return { ran: true, arrival: v[0], image: v[3], mark: v[6], afterBestBall: v[8], afterToggle: v[10] };
 }
 
 (async () => {
@@ -118,8 +147,25 @@ async function measure(width, auth) {
         if (a.hero.height < 180) failures.push(`${label}: hero is ${a.hero.height}px tall - not a band`);
         if (Math.abs(a.hero.width - a.card.width) > 2) failures.push(`${label}: hero ${a.hero.width}px wide inside a ${a.card.width}px card - it should bleed to the card's edges`);
         if (a.scrollWidth > a.innerWidth) failures.push(`${label}: the page scrolls sideways (${a.scrollWidth} > ${a.innerWidth})`);
-        // innerText renders the wordmark as the small-caps RATTLE, hence /i.
-        if (!/Rattle\s*\/\s*Tournaments/i.test(a.heroText)) failures.push(`${label}: wordmark not on screen: ${JSON.stringify(a.heroText)}`);
+        // innerText is the quiet "Rattle" label plus "Tournaments", not the old slash wordmark.
+        if (!/\bRattle\b/.test(a.heroText || '')) failures.push(`${label}: quiet Rattle label not on screen: ${JSON.stringify(a.heroText)}`);
+        if (!/\bTournaments\b/.test(a.heroText || '')) failures.push(`${label}: Tournaments not on screen: ${JSON.stringify(a.heroText)}`);
+        if (/Rattle\s*\/\s*Tournaments/i.test(a.heroText || '')) failures.push(`${label}: the slash wordmark came back: ${JSON.stringify(a.heroText)}`);
+        if (a.rattleText !== 'Rattle') failures.push(`${label}: the quiet label is ${JSON.stringify(a.rattleText)}, wanted mixed-case Rattle`);
+        if (a.rattleTransform && a.rattleTransform !== 'none' && a.rattleTransform !== 'inherit') failures.push(`${label}: the quiet label is transformed (${a.rattleTransform}) - that is the old uppercase RATTLE`);
+        if (a.markSrc !== 'logo-mark.png') failures.push(`${label}: the mark src is ${JSON.stringify(a.markSrc)}, wanted logo-mark.png`);
+        if (!m.mark || m.mark.decoded !== true) failures.push(`${label}: logo-mark.png did not decode: ${JSON.stringify(m.mark)}`);
+        if (!a.discBox || !a.rattleBox || !a.productBox) {
+            failures.push(`${label}: lockup boxes missing disc=${!!a.discBox} rattle=${!!a.rattleBox} product=${!!a.productBox}`);
+        } else {
+            if (a.discBox.left >= a.productBox.left) failures.push(`${label}: the mark is not left of Tournaments (mark left ${a.discBox.left}, product left ${a.productBox.left})`);
+            if (a.rattleBox.top < a.discBox.bottom - 4) failures.push(`${label}: Rattle is not under the mark (rattle top ${a.rattleBox.top}, mark bottom ${a.discBox.bottom})`);
+            const markMid = a.discBox.left + a.discBox.width / 2;
+            const rattleMid = a.rattleBox.left + a.rattleBox.width / 2;
+            if (Math.abs(markMid - rattleMid) > 12) failures.push(`${label}: Rattle is not centred under the mark (mark mid ${markMid}, rattle mid ${rattleMid})`);
+            if (Math.abs(a.productBox.top + a.productBox.height / 2 - (a.discBox.top + a.discBox.height / 2)) > 20) failures.push(`${label}: Tournaments is not beside the mark (product mid-y ${a.productBox.top + a.productBox.height / 2}, mark mid-y ${a.discBox.top + a.discBox.height / 2})`);
+            if (!(a.rattleSize > 0 && a.productSize > a.rattleSize * 1.8)) failures.push(`${label}: Tournaments (${a.productSize}px) is not clearly larger than the quiet Rattle label (${a.rattleSize}px)`);
+        }
         if (!a.heroText.includes('Live scoring + registration for charity, member-guest, and club events.')) failures.push(`${label}: the hero line is not on screen`);
         if (!/tournament-hero/.test(a.artImage || '')) failures.push(`${label}: the art layer does not reference tournament-hero*: ${a.artImage}`);
         if (/https?:/.test(a.artImage || '')) failures.push(`${label}: the art layer hotlinks: ${a.artImage}`);
@@ -150,7 +196,7 @@ async function measure(width, auth) {
     console.log(JSON.stringify({
         verdict, failures,
         measured: {
-            phone: { hero: phone.arrival.hero, panelTop: phone.arrival.panel && phone.arrival.panel.top, columns: phone.arrival.pickerColumns, active: phone.arrival.active, afterBestBall: phone.afterBestBall.active, dark: phone.afterToggle.dark, image: phone.image, scroll: [phone.arrival.scrollWidth, phone.arrival.innerWidth] },
+            phone: { hero: phone.arrival.hero, panelTop: phone.arrival.panel && phone.arrival.panel.top, columns: phone.arrival.pickerColumns, active: phone.arrival.active, afterBestBall: phone.afterBestBall.active, dark: phone.afterToggle.dark, image: phone.image, mark: phone.mark, lockup: { disc: phone.arrival.discBox, rattle: phone.arrival.rattleBox, product: phone.arrival.productBox, rattleText: phone.arrival.rattleText }, scroll: [phone.arrival.scrollWidth, phone.arrival.innerWidth] },
             tablet: { hero: tablet.arrival.hero, panelTop: tablet.arrival.panel && tablet.arrival.panel.top, columns: tablet.arrival.pickerColumns, active: tablet.arrival.active, afterBestBall: tablet.afterBestBall.active, dark: tablet.afterToggle.dark, scroll: [tablet.arrival.scrollWidth, tablet.arrival.innerWidth] },
             owner: { panelVisible: o.panelVisible, signedInAs: o.signedInAs, hero: o.hero },
             heroText: phone.arrival.heroText

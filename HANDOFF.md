@@ -548,8 +548,8 @@ on it was 199450 bytes and `cmp`-identical to `golf-app-5a5.pages.dev/tournament
 HEAD's `tournament.html` within an hour of the v159 push; its `/sw.js` carried the same
 `golfapp-v159-…` key. But `/` on that host is `index.html` — the Consumer round app. The
 hostname says Tournaments; the site under it is the whole repo. The tournament hero band
-(polish wave) is designed to read as the Tournaments PRODUCT — the wordmark is
-`Rattle / Tournaments`, parent brand first — and not as the site's identity. The
+(polish wave) is designed to read as the Tournaments PRODUCT — parent brand mark
+plus the word Tournaments — and not as the site's identity. The
 Cloudflare dashboard binding itself was not read; the bytes and timing were.
 
 **Authorized Domains, as read on 2026-09-16 (public `getProjectConfig`, key-only):**
@@ -575,11 +575,14 @@ and bogus credentials → `400 INVALID_LOGIN_CREDENTIALS` (the wrong-password an
 referrer block). Adding Google sign-in, a password-reset continue URL or email-link sign-in
 would have needed the domain listed first; it is listed now.
 
-## The tournament landing (polish wave, 2026-09-16) — PRESENTATION ONLY
+## The tournament landing (polish wave, 2026-09-16; mark lockup 2026-09-18) — PRESENTATION ONLY
 
-`/tournament` opens on a hero band: `assets/tournament-hero.svg` under a dark gradient,
-the wordmark **Rattle / Tournaments** and one line — "Live scoring + registration for
-charity, member-guest, and club events." Below it, in order: the organizer sign-in as a
+`/tournament` opens on a hero band: `assets/tournament-hero.svg` (a brand-green
+fairway, not a photograph) under a dark gradient. The lockup is **logo-mark.png**
+on a cream disc at left, the quiet word **Rattle** directly under the mark, and
+**Tournaments** large on the right — parent brand as the PNG, product as the
+word. One line under that: "Live scoring + registration for charity,
+member-guest, and club events." Below it, in order: the organizer sign-in as a
 compact class-styled card (`.signin-card`; same ids, same sentence, same button, same
 `signInWithEmailAndPassword`), then the restyled name / course / entry-fee fields
 (`.setup-field`, a `$` adornment on the fee) and the format picker as four weighted cards
@@ -591,22 +594,24 @@ baseline (`tournament_landing_prev.fixture.json`, sha-pinned) plus exactly three
 deliberate substitutions. `tools/tournament-landing-check.js` measures the layout cold in
 Chrome at 390 and 768px, signed out and signed in, and taps the page's own buttons.
 
-**Why the wordmark says Rattle when the product is not called Rattle Golf.** The two
+**Why the band shows Rattle when the product is not called Rattle Golf.** The two
 products share `tournaments.rattlegolf.com`: `/` is the Consumer round app, `/tournament`
-is this. The band names WHICH product this page is — parent brand, then product — not what
-the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages" guard
-was /Rattle/ anywhere; it is narrowed to the Consumer product's NAME ("Rattle Golf") plus
-a pin that `tournament.html` says "Rattle" only inside the wordmark spans, and the
-scorecard and engine not at all. `build-shell.js` still says `appName: 'GolfApp
-Tournaments'` and `product-separation.md`'s "do not rename the Tournament product to
-Rattle Golf" still stands — this is a wordmark on one page, not a rename.
+is this. The band names WHICH product this page is — parent brand mark, then product —
+not what the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages"
+guard was /Rattle/ anywhere; it is narrowed to the Consumer product's NAME ("Rattle Golf")
+plus a pin that `tournament.html` says "Rattle" only inside the wordmark (the quiet
+label under the PNG) and the comment above it, and the scorecard and engine not at all.
+`build-shell.js` still says `appName: 'GolfApp Tournaments'` and `product-separation.md`'s
+"do not rename the Tournament product to Rattle Golf" still stands — this is a parent
+brand lockup on one page, not a rename. `logo-mark.png` stays in CONSUMER_SHELL; the
+hero references it from the combined origin.
 
-**Swapping the hero image.** Drop the photograph in `assets/` and change the one `url()` in
-`.tourney-hero-art` (tournament.html's stylesheet). The overlay darkens whatever is there,
-so the photo need not be dark. The file is NOT in `TOURNAMENT_SHELL` and is not precached:
-`.tourney-hero-art` paints `#0f2f24` under it, so offline or before the image arrives the
-band is a plain dark green with the wordmark on it. Precaching it means adding a subdir to
-the shell copy in `build-shell.js`, which copies flat names today.
+**The hero image.** `assets/tournament-hero.svg` is local brand-green fairway art.
+The overlay darkens whatever is there. The file is NOT in `TOURNAMENT_SHELL` and is
+not precached: `.tourney-hero-art` paints `#0f4c3a` under it, so offline or before
+the image arrives the band is a plain brand-green with the lockup on it. Precaching
+it means adding a subdir to the shell copy in `build-shell.js`, which copies flat
+names today.
 
 **Two fixtures re-pinned, deliberately.** `tournament_anonymous_owner_prev.fixture.json`:
 the sign-in panel's tag structure changed (class-styled card); every string collapsed on

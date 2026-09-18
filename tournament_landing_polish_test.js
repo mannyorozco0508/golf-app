@@ -2,7 +2,7 @@
 // THE TOURNAMENT LANDING POLISH IS PRESENTATION ONLY - PROVED, NOT PROMISED.
 //
 // The wave (2026-09-16) gives /tournament a hero band (imagery under a dark
-// overlay, the "Rattle / Tournaments" wordmark, one line of copy), moves the
+// overlay, the parent-brand mark + Tournaments lockup, one line of copy), moves the
 // organizer sign-in below it as a compact card, gives the format picker visual
 // weight and restyles the name / course / entry-fee fields. Nothing about what
 // the page DOES may change: same ids, same handlers, same save payload, same
@@ -64,7 +64,7 @@ const DELIBERATE = [
     {
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
-        to: '|Rattle|/|Tournaments|' + HERO_LINE + '|'
+        to: '|Rattle|Tournaments|' + HERO_LINE + '|'
     },
     {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
@@ -112,12 +112,23 @@ describe('THE HERO BAND', () => {
     const region = setupRegion(read(PAGE));
     const style = styleOf(read(PAGE));
 
-    test('exists, carries the wordmark as three parts in order and the one line, byte-exact', () => {
+    test('exists, carries the mark lockup in order and the one line, byte-exact', () => {
         const at = region.indexOf('id="tourney-hero"');
         assert.ok(at > 0, 'no #tourney-hero on the setup screen');
         const hero = region.slice(at, region.indexOf('id="signin-panel-setup"'));
-        assert.match(hero, />Rattle<\/span>\s*<span[^>]*>\/<\/span>\s*<span[^>]*>Tournaments<\/span>/,
-            'the wordmark must read Rattle / Tournaments - parent brand, then the product');
+        assert.match(hero, /<img class="wm-mark" src="logo-mark\.png" alt="" width="56" height="56">/,
+            'the parent brand is the mark file');
+        assert.match(hero, /<span class="wm-rattle">Rattle<\/span>/,
+            'a quiet Rattle label sits with the mark');
+        assert.match(hero, /<span class="wm-product">Tournaments<\/span>/,
+            'Tournaments is the product word on the right');
+        assert.ok(!/wm-slash/.test(hero), 'the slash wordmark must not return');
+        assert.ok(!/>RATTLE</.test(hero), 'the mark is the PNG, not uppercase text RATTLE');
+        const markAt = hero.indexOf('class="wm-mark"');
+        const rattleAt = hero.indexOf('class="wm-rattle"');
+        const productAt = hero.indexOf('class="wm-product"');
+        assert.ok(markAt > 0 && rattleAt > markAt && productAt > rattleAt,
+            'DOM order is mark, then Rattle, then Tournaments');
         assert.ok(hero.includes('>' + HERO_LINE + '<'), 'the hero line is not byte-exact');
         assert.ok(!/\\u[0-9a-fA-F]{4}/.test(hero), 'a \\uXXXX escape in raw markup prints literally');
     });
@@ -130,24 +141,42 @@ describe('THE HERO BAND', () => {
         assert.match(page, /class="lobby-title" id="reg-event-name"/, 'the register screen\'s header must be untouched');
     });
 
-    test('the imagery is a local placeholder under assets/tournament-hero*, never a hotlink', () => {
+    test('the imagery is local hero art under assets/tournament-hero*, never a hotlink', () => {
         const urls = [...style.matchAll(/url\((['"]?)([^'")]+)\1\)/g)].map((m) => m[2]);
         const hero = urls.filter((u) => /tournament-hero/.test(u));
         assert.ok(hero.length >= 1, 'the stylesheet references no tournament-hero image: ' + JSON.stringify(urls));
         hero.forEach((u) => {
             assert.match(u, /^assets\/tournament-hero[^/]*$/, 'the hero image must live under assets/ as tournament-hero*: ' + u);
             assert.ok(fs.existsSync(path.join(__dirname, u)), 'the referenced placeholder is missing: ' + u);
-            assert.ok(fs.statSync(path.join(__dirname, u)).size > 500, 'the placeholder is empty: ' + u);
+            assert.ok(fs.statSync(path.join(__dirname, u)).size > 500, 'the hero art is empty: ' + u);
         });
         assert.ok(!/url\((['"]?)https?:/.test(style), 'a stylesheet url() points at the network - no stock hotlinks');
         assert.ok(!/<img[^>]+src=(['"])https?:/.test(region), 'an <img> on the setup screen hotlinks');
     });
 
-    test('the band paints its own dark ground under the image, so an unfetched image is a plain band, not a hole', () => {
-        const rule = /\.tourney-hero-art\s*\{[^}]*\}/.exec(style);
-        assert.ok(rule, 'no .tourney-hero-art rule');
-        assert.match(rule[0], /background-color:\s*#[0-9a-fA-F]{3,8}/, 'the art layer needs a solid background-color fallback');
-        assert.match(rule[0], /background-image:\s*url\(/, 'the art layer carries the image');
+    test('the lockup CSS places the mark left, Rattle under it, Tournaments right, and does not uppercase the label', () => {
+        const wm = /\.tourney-wordmark\s*\{[^}]*\}/.exec(style);
+        assert.ok(wm, 'no .tourney-wordmark rule');
+        assert.match(wm[0], /display:\s*grid/, 'the lockup is a grid so the label sits under the mark');
+        const disc = /\.tourney-wordmark \.wm-disc\s*\{[^}]*\}/.exec(style);
+        assert.ok(disc, 'no .wm-disc rule');
+        assert.match(disc[0], /grid-column:\s*1/, 'the mark is in column 1');
+        assert.match(disc[0], /grid-row:\s*1/, 'the mark is in row 1');
+        assert.match(disc[0], /#F6F4EC/, 'the disc is cream so the forest-green R reads on the dark band');
+        const rattle = /\.tourney-wordmark \.wm-rattle\s*\{[^}]*\}/.exec(style);
+        assert.ok(rattle, 'no .wm-rattle rule');
+        assert.match(rattle[0], /grid-column:\s*1/, 'Rattle sits under the mark, same column');
+        assert.match(rattle[0], /grid-row:\s*2/, 'Rattle is row 2');
+        assert.ok(!/text-transform:\s*uppercase/.test(rattle[0]), 'the quiet label is not uppercase RATTLE');
+        const product = /\.tourney-wordmark \.wm-product\s*\{[^}]*\}/.exec(style);
+        assert.ok(product, 'no .wm-product rule');
+        assert.match(product[0], /grid-column:\s*2/, 'Tournaments is to the right of the mark');
+        assert.match(product[0], /grid-row:\s*1/, 'Tournaments shares the mark row');
+        const art = /\.tourney-hero-art\s*\{[^}]*\}/.exec(style);
+        assert.ok(art, 'no .tourney-hero-art rule');
+        assert.match(art[0], /#0f4c3a/, 'the fallback ground is brand-green');
+        assert.match(art[0], /background-color:\s*#[0-9a-fA-F]{3,8}/, 'the art layer needs a solid background-color fallback');
+        assert.match(art[0], /background-image:\s*url\(/, 'the art layer carries the image');
         assert.ok(/\.tourney-hero-shade\s*\{[^}]*(rgba\(|linear-gradient\()/.test(style), 'no dark overlay layer over the image');
     });
 
