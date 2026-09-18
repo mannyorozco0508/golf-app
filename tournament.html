@@ -98,16 +98,32 @@
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
-        .reg-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--border-faint); }
+        .reg-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 8px 10px 10px; border-bottom:1px solid var(--border-faint); border-left:4px solid transparent; }
         .reg-row .reg-name { flex:1; min-width:8em; font-weight:bold; }
         .reg-row .reg-meta { font-size:0.78rem; color:var(--text-muted); flex-basis:100%; }
         .reg-row label { display:inline-flex; align-items:center; gap:6px; font-weight:normal; margin:0; }
+        /* Check-in scan: unpaid / paid / in-the-field, readable at arm's length. */
+        .reg-row[data-state="unpaid"] { border-left-color: var(--warn-border); background: var(--warn-bg); }
+        .reg-row[data-state="paid"] { border-left-color: var(--accent-teal); }
+        .reg-row[data-state="field"] { border-left-color: var(--brand-green); background: var(--nassau-box-bg); }
+        .reg-row .reg-paid { min-height:44px; padding:8px 12px; border:1px solid var(--border-mid); border-radius:8px; background:var(--nav-bg); box-sizing:border-box; }
+        .reg-row .reg-paid input { width:18px; height:18px; margin:0; }
+        .reg-row .reg-approve { width:auto; min-height:44px; padding:8px 12px; font-size:0.85rem; margin:0; }
+        .reg-row select { width:auto; min-width:8em; flex:1 1 8em; min-height:44px; margin:0; }
+        .reg-row .reg-infield { font-size:0.78rem; color:var(--brand-green); font-weight:bold; }
+        .reg-row-status { flex-basis:100%; font-size:0.78rem; color:var(--text-muted); }
+        .reg-row-status.reg-row-status-error { color:var(--accent-red); }
+        .reg-empty { font-size:0.85rem; color:var(--text-muted); margin:12px 0 8px 0; }
+        .reg-clear-search { width:auto; margin:0 0 12px 0; }
         /* The desk (2c): counts, chips, search. Sizes are the page's own - the
-           first counts line matches the tab pills, the rest matches .reg-meta. */
+           first counts line matches the tab pills, the rest matches .reg-meta.
+           The toolbar STICKS so a 140-row list does not scroll the chips and
+           the search box off a phone. Search stays static markup inside it. */
+        #registration-desk-toolbar { position:sticky; top:0; z-index:8; background:var(--bg-card); padding:4px 0 10px 0; box-shadow:0 6px 8px -6px var(--shadow-color); }
         .reg-count-line { font-size:0.78rem; color:var(--text-muted); margin:2px 0; }
         .reg-count-line.reg-count-main { font-size:0.85rem; font-weight:bold; color:var(--text-main); margin:0 0 4px 0; }
         #registration-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 8px 0; }
-        .reg-chip { flex:0 0 auto; padding:6px 12px; background:var(--nav-bg); color:var(--brand-green); border:1px solid var(--border-mid); border-radius:16px; font-weight:bold; font-size:0.78rem; cursor:pointer; white-space:nowrap; margin:0; width:auto; }
+        .reg-chip { flex:0 0 auto; padding:6px 12px; background:var(--nav-bg); color:var(--brand-green); border:1px solid var(--border-mid); border-radius:16px; font-weight:bold; font-size:0.78rem; cursor:pointer; white-space:nowrap; margin:0; width:auto; min-height:36px; }
         .reg-chip.active { background:var(--brand-green); color:#ffffff; border-color:var(--brand-green); }
         #registration-search { width:100%; box-sizing:border-box; margin:0 0 6px 0; -webkit-appearance:none; appearance:none; }
         .reg-dup { display:inline-block; font-size:0.74rem; font-weight:bold; color:#8a5a00; background:#fff8e1; border:1px solid #e6c200; border-radius:6px; padding:2px 6px; }
@@ -661,9 +677,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="manage-tab-desk" style="display:none;">
         <h3>📋 Desk</h3>
         <p id="registration-desk-note" style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;"></p>
-        <div id="registration-counts"></div>
-        <div id="registration-chips"></div>
-        <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div id="registration-desk-toolbar">
+            <div id="registration-counts"></div>
+            <div id="registration-chips"></div>
+            <input type="search" id="registration-search" placeholder="Search a name, email or phone" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
         <div id="registration-list"></div>
     </div>
 
@@ -1853,6 +1871,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let registrationData = {};
     let registrationBoundCode = null;
     let registrationCb = null;
+    let registrationLoaded = false;   // first snapshot has arrived for this code
 
     function eventIsIndividual(data) {
         return !!(data && (data.scoringModel === PLAYER_MODEL || data.format === 'individual'));
@@ -2095,11 +2114,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             registrationBoundCode = null;
             registrationCb = null;
         }
-        if (!wanted) { registrationData = {}; return; }
+        if (!wanted) {
+            registrationData = {};
+            registrationLoaded = false;
+            registrationDest = {};
+            registrationBusy = {};
+            return;
+        }
         const code = currentCode;
+        registrationLoaded = false;
+        registrationDest = {};
+        registrationBusy = {};
         registrationCb = (snap) => {
             if (currentCode !== code) return;
             registrationData = snap.val() || {};
+            registrationLoaded = true;
             renderRegistrationList();
         };
         db.ref('registrations/' + code).on('value', registrationCb);
@@ -2265,6 +2294,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     // The desk's own state. Never written anywhere: a filter is a way of looking.
     let registrationFilter = 'all';   // all | unpaid | paid | approved | pending
+    let registrationDest = {};        // entryId -> dest value; survives a list rebuild
+    let registrationBusy = {};        // entryId -> { kind, want, attempt, status }
     const REG_FILTERS = [
         { key: 'all', label: 'All', test: () => true },
         { key: 'unpaid', label: 'Unpaid', test: (e) => e.paid !== true },
@@ -2281,6 +2312,60 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function registrationSearchText() {
         const el = document.getElementById('registration-search');
         return String((el && el.value) || '').trim().toLowerCase();
+    }
+    function clearRegistrationSearch() {
+        const el = document.getElementById('registration-search');
+        if (el) el.value = '';
+        renderRegistrationDesk();
+    }
+    function rememberRegistrationDest(entryId, value) {
+        registrationDest[entryId] = String(value);
+    }
+    // Harvest dest selects BEFORE the list innerHTML is replaced - the same
+    // class of wipe the search box was pulled out of the list to avoid. A real
+    // browser resets a rebuilt <select>; mini-dom keeps the old value, so this
+    // is proved in Chrome (tools/tournament-desk-check.js).
+    function harvestRegistrationDests() {
+        Object.keys(registrationData || {}).forEach((id) => {
+            const el = document.getElementById('reg-dest-' + id);
+            if (el && el.value) registrationDest[id] = String(el.value);
+        });
+    }
+    function regMatchesSearch(e, q) {
+        if (!q) return true;
+        const name = String(e.fullName || e.name || '').toLowerCase();
+        const email = String(e.email || '').toLowerCase();
+        const phoneRaw = String(e.phone || e.contact || '');
+        if (name.indexOf(q) !== -1 || email.indexOf(q) !== -1 || phoneRaw.toLowerCase().indexOf(q) !== -1) return true;
+        const qDigits = q.replace(/\D/g, '');
+        if (qDigits.length >= 3 && phoneRaw.replace(/\D/g, '').indexOf(qDigits) !== -1) return true;
+        return false;
+    }
+    function armDeskWrite(entryId, kind, extra) {
+        const attempt = Date.now();
+        registrationBusy[entryId] = Object.assign({
+            kind: kind, attempt: attempt,
+            status: kind === 'paid' ? 'Saving\u2026' : 'Approving\u2026'
+        }, extra || {});
+        renderRegistrationDesk();
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            const b = registrationBusy[entryId];
+            if (!b || b.attempt !== attempt) return;
+            b.status = 'Still sending... if this doesn\'t confirm in a moment, check your signal.';
+            renderRegistrationDesk();
+        }, REG_SEND_TIMEOUT_MS);
+        return {
+            attempt: attempt,
+            ok() { settled = true; clearTimeout(timer); },
+            fail(err) {
+                settled = true; clearTimeout(timer);
+                if (registrationBusy[entryId] && registrationBusy[entryId].attempt === attempt) delete registrationBusy[entryId];
+                renderRegistrationDesk();
+                if (err) alert('Error: ' + err.message);
+            }
+        };
     }
 
     // Whole dollars with thousands separators; cents only when there are any.
@@ -2368,27 +2453,36 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         if (note) note.textContent = 'Tick Paid when you have the cash, then approve golfers into the field.';
+        harvestRegistrationDests();
+        if (!registrationLoaded) {
+            if (countsEl) countsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = '';
+            list.innerHTML = `<p class="reg-empty">Loading signups\u2026</p>`;
+            return;
+        }
         const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         if (all.length === 0) {
             if (countsEl) countsEl.innerHTML = '';
             if (chipsEl) chipsEl.innerHTML = '';
-            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
+            list.innerHTML = `<p class="reg-empty">No signups yet. Share the signup link from Setup \u2014 golfers who sign up land here.</p>`;
             return;
         }
         const entriesOnly = all.map((x) => x[1]);
         if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
         if (chipsEl) chipsEl.innerHTML = REG_FILTERS.map((f) => {
             const n = entriesOnly.filter(f.test).length;
-            return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
+            return `<button type="button" class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
         }).join('');
         const filter = REG_FILTERS.find((f) => f.key === registrationFilter) || REG_FILTERS[0];
         const q = registrationSearchText();
-        const shown = all.filter(([, e]) => filter.test(e) && (!q
-            || String(e.fullName || e.name || '').toLowerCase().indexOf(q) !== -1
-            || String(e.email || '').toLowerCase().indexOf(q) !== -1));
+        const shown = all.filter(([, e]) => filter.test(e) && regMatchesSearch(e, q));
         if (shown.length === 0) {
-            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No one matches.</p>`;
+            const bits = [];
+            if (q) bits.push('\u201c' + escReg(q) + '\u201d');
+            if (filter.key !== 'all') bits.push('in ' + filter.label);
+            list.innerHTML = `<p class="reg-empty">No one matches${bits.length ? ' ' + bits.join(' ') : ''}.</p>`
+                + (q ? `<button type="button" class="btn-outline reg-clear-search" onclick="clearRegistrationSearch()">Clear search</button>` : '');
             return;
         }
         const dup = registrationDuplicates(all);
@@ -2397,15 +2491,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const individual = recordIsIndividual();
         list.innerHTML = shown.map(([id, e]) => {
             const inField = regInField(e);
+            if (inField && registrationBusy[id] && registrationBusy[id].kind === 'approve') delete registrationBusy[id];
+            const busy = registrationBusy[id];
+            if (busy && busy.kind === 'paid' && !!e.paid === !!busy.want) delete registrationBusy[id];
+            const liveBusy = registrationBusy[id];
+            const paidNow = (liveBusy && liveBusy.kind === 'paid') ? !!liveBusy.want : !!e.paid;
+            const state = inField ? 'field' : (paidNow ? 'paid' : 'unpaid');
             const pref = String(e.teamPreference || '').trim();
             const match = teamOpts.find((tid) => String(teams[tid].name || '').toLowerCase() === pref.toLowerCase());
             const defaultDest = match ? String(teams[match].num) : 'new';
-            const dest = individual ? '' : `<select id="reg-dest-${escReg(id)}">`
-                + `<option value="new"${defaultDest === 'new' ? ' selected' : ''}>New team</option>`
+            const destSelected = (registrationDest[id] !== undefined) ? String(registrationDest[id]) : defaultDest;
+            const dest = individual ? '' : `<select id="reg-dest-${escReg(id)}" onchange="rememberRegistrationDest('${escReg(id)}', this.value)">`
+                + `<option value="new"${destSelected === 'new' ? ' selected' : ''}>New team</option>`
                 + teamOpts.map((tid) => {
                     const n = teams[tid].num;
                     const label = teams[tid].name || ('Team ' + n);
-                    return `<option value="${n}"${String(n) === defaultDest ? ' selected' : ''}>${escReg(label)}</option>`;
+                    return `<option value="${n}"${String(n) === destSelected ? ' selected' : ''}>${escReg(label)}</option>`;
                 }).join('')
                 + `</select>`;
             // The 2a fields, in the order the form asks them. (Wave 1's contact /
@@ -2415,39 +2516,54 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                           e.shirtSize ? ('Shirt ' + e.shirtSize) : '',
                           (e.dinnerCount !== undefined && e.dinnerCount !== null) ? ('Dinner ' + e.dinnerCount) : '',
                           pref ? ('Prefers ' + pref) : '',
-                          e.holeSponsorship === true ? ('Hole sponsor' + (e.sponsorName ? ' — ' + e.sponsorName : '')) : '']
+                          e.holeSponsorship === true ? ('Hole sponsor' + (e.sponsorName ? ' \u2014 ' + e.sponsorName : '')) : '']
                 .filter(Boolean).map(escReg).join(' · ');
             const why = dup[id] ? (dup[id].length === 2 ? 'same email and name as another signup' : 'same ' + dup[id][0] + ' as another signup') : '';
             const dupMark = why ? `<span class="reg-dup">⚠ Possible duplicate · ${why}</span>` : '';
-            const paid = e.paid ? ' checked' : '';
+            const paid = paidNow ? ' checked' : '';
+            const paidDis = liveBusy ? ' disabled' : '';
             const approve = inField
-                ? `<span style="font-size:0.78rem; color:var(--text-muted);">In the field</span>`
-                : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
-            return `<div class="reg-row" data-entry-id="${escReg(id)}">`
+                ? `<span class="reg-infield">In the field</span>`
+                : (liveBusy && liveBusy.kind === 'approve'
+                    ? `<button type="button" class="btn-outline reg-approve" disabled>Approving\u2026</button>`
+                    : `<button type="button" class="btn-outline reg-approve" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`);
+            const status = (liveBusy && liveBusy.status)
+                ? `<span class="reg-row-status${liveBusy.error ? ' reg-row-status-error' : ''}">${escReg(liveBusy.status)}</span>`
+                : '';
+            return `<div class="reg-row" data-entry-id="${escReg(id)}" data-state="${state}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
-                + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
+                + `<label class="reg-paid"><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}${paidDis}> Paid</label>`
                 + dest
                 + approve
                 + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
+                + status
                 + `</div>`;
         }).join('');
     }
 
     function setRegistrationPaid(entryId, paid) {
         if (!currentCode || !canManage()) return;
-        const patch = { paid: !!paid };
-        patch.paidAt = paid ? Date.now() : null;
+        if (registrationBusy[entryId]) return;
+        const want = !!paid;
+        const watch = armDeskWrite(entryId, 'paid', { want: want });
+        const patch = { paid: want };
+        patch.paidAt = want ? Date.now() : null;
         db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
-            .catch((err) => alert(`Error: ${err.message}`));
+            .then(() => watch.ok())
+            .catch((err) => watch.fail(err));
     }
 
     function approveRegistration(entryId) {
         if (!currentCode || !canManage()) return;
+        if (registrationBusy[entryId]) return;
         const entry = (registrationData || {})[entryId];
         const entryName = String((entry && (entry.fullName || entry.name)) || '').trim();
         if (!entry || !entryName) return;
         if (entry.approvedAt || entry.playerId || entry.teamNum) return;
+        const destEl = document.getElementById('reg-dest-' + entryId);
+        if (destEl && destEl.value) registrationDest[entryId] = String(destEl.value);
         const name = entryName;
+        const watch = armDeskWrite(entryId, 'approve');
         if (recordIsIndividual()) {
             const pid = newPlayerId();
             const rec = {
@@ -2461,11 +2577,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 db.ref(`registrations/${currentCode}/${entryId}`).update({
                     approvedAt: Date.now(), playerId: pid
                 })
-            ).catch((err) => alert(`Error: ${err.message}`));
+            ).then(() => watch.ok()).catch((err) => watch.fail(err));
             return;
         }
-        const destEl = document.getElementById('reg-dest-' + entryId);
-        let dest = destEl && destEl.value ? String(destEl.value) : '';
+        let dest = registrationDest[entryId] || '';
         if (!dest) {
             const pref = String(entry.teamPreference || '').trim().toLowerCase();
             const teams = currentData.teams || {};
@@ -2480,7 +2595,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     db.ref(`registrations/${currentCode}/${entryId}`).update({
                         approvedAt: Date.now(), teamNum: t.num
                     })
-                ).catch((err) => alert(`Error: ${err.message}`));
+                ).then(() => watch.ok()).catch((err) => watch.fail(err));
                 return;
             }
         }
@@ -2493,7 +2608,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             db.ref(`registrations/${currentCode}/${entryId}`).update({
                 approvedAt: Date.now(), teamNum: nextNum
             })
-        ).catch((err) => alert(`Error: ${err.message}`));
+        ).then(() => watch.ok()).catch((err) => watch.fail(err));
     }
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and

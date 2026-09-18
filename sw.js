@@ -1617,7 +1617,11 @@
 // (assets/tournament-hero.svg, still not precached). Presentation only. A
 // device on v169-tournament-light keeps the uppercase text wordmark and the
 // placeholder sunset SVG.
-const CACHE_VERSION = 'golfapp-v170-tournament-hero';
+// Moved to v171: the registration desk check-in harden (sticky toolbar,
+// phone search, dest harvest, loading vs empty, Paid/Approve in-flight
+// lock). tournament.html is in this shell list. A device on v170 keeps a
+// desk that wipes a picked team when a signup lands and can double-approve.
+const CACHE_VERSION = 'golfapp-v171-desk-checkin';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -76,6 +76,11 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v46. Check-in harden on the registration desk: sticky
+        // toolbar, phone search, dest harvest, loading vs empty, Paid/Approve
+        // in-flight lock and the 10s still-sending timer. No new key. A
+        // device on v45 can filter and search but loses a picked team when a
+        // signup lands, and a double Approve can mint two teams.
         // Moved to v45. The landing hero uses the parent brand mark
         // (logo-mark.png) with a quiet label under it and Tournaments on the
         // right, on brand-green fairway art. Presentation only. A device on
@@ -120,7 +125,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v45-hero-mark',
+        cacheName: 'tournament-v46-desk-checkin',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

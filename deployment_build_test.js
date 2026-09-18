@@ -280,7 +280,7 @@ describe('PWA — two independent installable apps', () => {
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
         assert.match(c, /^consumer-v45-no-native-print$/);
-        assert.match(t, /^tournament-v45-hero-mark$/);
+        assert.match(t, /^tournament-v46-desk-checkin$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {

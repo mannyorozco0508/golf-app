@@ -22,8 +22,12 @@
 //      snapshot mid-search in Chrome and proves it).
 //   4. The duplicate flag: same email, or same fullName case-insensitively with
 //      whitespace collapsed, marks BOTH rows. Flag only - no merge, no hide.
+//   5. Check-in harden: Loading vs empty, phone search, Clear search on a miss,
+//      dest harvest so a snapshot does not reset a picked team, Paid/Approve
+//      in-flight lock + the 10s still-sending timer, sticky toolbar, 44px
+//      targets, data-state on rows. Still no new key.
 //
-// Sort stays createdAt ascending. Paid and Approve are unchanged.
+// Sort stays createdAt ascending.
 //
 // HARNESS. helpers/mini-dom.js: innerHTML is a string, so rows are counted by
 // their class in the markup; static attributes are not parsed, so the search
@@ -113,6 +117,8 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
         const setup = SRC.slice(setupA, deskA), desk = SRC.slice(deskA, lbA);
         // POSITIVE: each host holds what it should.
         assert.match(setup, /id="registration-link-row"/, 'the switches and signup link stay on Setup');
+        assert.match(desk, /id="registration-desk-toolbar"/, 'the sticky toolbar wraps counts, chips and search');
+        assert.match(SRC.slice(SRC.indexOf('<style>'), SRC.indexOf('</style>')), /#registration-desk-toolbar \{ position:sticky/, 'the toolbar is sticky in CSS, not only in a comment');
         assert.match(desk, /id="registration-counts"/);
         assert.match(desk, /id="registration-chips"/);
         assert.match(desk, /<input[^>]*id="registration-search"/);
@@ -126,8 +132,10 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
         const deskA = SRC.indexOf('<div id="manage-tab-desk"');
         const desk = SRC.slice(deskA, SRC.indexOf('<div id="manage-tab-leaderboard"'));
         const searchAt = desk.indexOf('id="registration-search"'), chipsAt = desk.indexOf('id="registration-chips"'), listAt = desk.indexOf('<div id="registration-list">');
-        assert.ok(searchAt > 0 && chipsAt > 0 && listAt > 0);
-        assert.ok(searchAt < listAt && chipsAt < listAt, 'search and chips precede the list, as siblings');
+        const barAt = desk.indexOf('id="registration-desk-toolbar"');
+        assert.ok(searchAt > 0 && chipsAt > 0 && listAt > 0 && barAt > 0);
+        assert.ok(barAt < searchAt && searchAt < listAt && chipsAt < listAt, 'toolbar holds search and chips, and precedes the list');
+        assert.ok(desk.indexOf('</div>', barAt) < listAt || searchAt < listAt, 'search is not inside the list');
         assert.match(desk, /<div id="registration-list"><\/div>/, 'the list is an empty host; everything inside it is rendered');
         // The one place the search box may be created is the markup.
         const scripts = SRC.replace(/<script>[\s\S]*?<\/script>/g, (m) => m);
@@ -312,9 +320,15 @@ describe('3. FILTERS AND SEARCH', () => {
         type(sb, 'G7@EXAMPLE');
         assert.equal(rows(sb), 1);
         assert.match(html(sb, 'registration-list'), /g7@example\.com/);
+        type(sb, '555-1007');
+        assert.equal(rows(sb), 1, 'search by the phone the golfer typed');
+        assert.match(html(sb, 'registration-list'), /data-entry-id="e007"/);
+        type(sb, '1007');
+        assert.equal(rows(sb), 1, 'digits-only phone search, the last four');
         type(sb, 'zzz-nobody');
         assert.equal(rows(sb), 0);
-        assert.match(strip(html(sb, 'registration-list')), /No one matches\./);
+        assert.match(strip(html(sb, 'registration-list')), /No one matches/);
+        assert.match(html(sb, 'registration-list'), /clearRegistrationSearch\(\)/, 'a miss is not a dead end: Clear search is wired');
         type(sb, '');
         assert.equal(rows(sb), 142);
     });
@@ -407,6 +421,73 @@ describe('5. PAID AND APPROVE STILL WORK FROM THE DESK', () => {
         const mark = sb.__dbWrites.find(x => x.path === 'registrations/DESK1/e001' && x.op === 'update');
         assert.ok(mark && mark.value.teamNum === 3 && mark.value.approvedAt);
     });
+
+    test('a second Approve tap while the first write is in flight writes nothing extra', async () => {
+        const sb = ownerWithEntries(teamRecord(), deskEntries('team'));
+        let resolveHold;
+        const held = new Promise((res) => { resolveHold = res; });
+        sb.__dbHold = (p, op) => { if (op === 'set' && /teams\/team3$/.test(p)) return held; };
+        sb.approveRegistration('e001');
+        const n = sb.__dbWrites.length;
+        sb.approveRegistration('e001');
+        assert.equal(sb.__dbWrites.length, n, 'the in-flight lock must swallow the second tap');
+        resolveHold();
+        await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+        const teams = sb.__dbWrites.filter(x => /^tournaments\/DESK1\/teams\/team3$/.test(x.path) && x.op === 'set');
+        assert.equal(teams.length, 1, 'one team, not two: ' + JSON.stringify(teams));
+    });
+
+    test('a Paid write that does not settle says so on the row', () => {
+        const sb = ownerWithEntries(teamRecord(), deskEntries('team'));
+        const timers = [];
+        sb.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+        sb.clearTimeout = () => {};
+        sb.__dbHold = (p) => (/registrations\/DESK1\/e001$/.test(p) ? new Promise(() => {}) : null);
+        sb.setRegistrationPaid('e001', true);
+        const t = timers.find(x => x.ms === 10000);
+        assert.ok(t, 'Paid must race the same 10s timer the signup uses');
+        t.fn();
+        assert.match(strip(html(sb, 'registration-list')), /Still sending/);
+        assert.equal(sb.__dbWrites.filter(x => x.path === 'registrations/DESK1/e001' && x.op === 'update').length, 1);
+    });
+});
+
+// ===========================================================================
+describe('7. CHECK-IN HARDENING — empty states, dest harvest, loading', () => {
+
+    test('before the first snapshot: Loading signups, not an empty field', () => {
+        const sb = arrive(teamRecord(), ORGANIZER);
+        assert.match(strip(html(sb, 'registration-list')), /Loading signups/);
+        assert.doesNotMatch(strip(html(sb, 'registration-list')), /No signups yet/);
+        fireRegistrations(sb, null);
+        assert.match(strip(html(sb, 'registration-list')), /No signups yet/);
+        assert.match(strip(html(sb, 'registration-list')), /Share the signup link from Setup/);
+    });
+
+    test('a miss offers Clear search on the list, wired; emptying the box also restores', () => {
+        const sb = ownerWithEntries(teamRecord(), deskEntries('team'));
+        type(sb, 'zzz-nobody');
+        assert.equal(rows(sb), 0);
+        const miss = html(sb, 'registration-list');
+        assert.match(miss, /onclick="clearRegistrationSearch\(\)"/, 'Clear search is the page\'s own handler, not a test hook');
+        assert.equal(typeof sb.clearRegistrationSearch, 'function');
+        type(sb, '');
+        assert.equal(el(sb, 'registration-search').value, '');
+        assert.equal(rows(sb), 142);
+    });
+
+    test('renderRegistrationDesk harvests dest selects before it rewrites the list', () => {
+        const at = SRC.indexOf('function renderRegistrationDesk');
+        const end = SRC.indexOf('\n    function ', at + 30);
+        const fn = SRC.slice(at, end > at ? end : at + 8000);
+        assert.match(fn, /harvestRegistrationDests\(\)/, 'the harvest must run');
+        const hAt = fn.indexOf('harvestRegistrationDests()');
+        assert.ok(hAt > 0);
+        assert.ok(fn.indexOf('data-entry-id') > hAt, 'row markup is assembled after harvest');
+        assert.ok(fn.indexOf('rememberRegistrationDest', hAt) > hAt, 'onchange on the dest select is wired in the rebuilt row');
+        assert.match(fn, /data-state="/, 'rows carry unpaid/paid/field for a cold scan');
+        assert.match(fn, /regMatchesSearch/, 'phone search is the same matcher as name/email');
+    });
 });
 
 // ===========================================================================
@@ -416,11 +497,14 @@ describe('6. THE SEAMS', () => {
         const h = read('HANDOFF.md');
         const at = h.indexOf('## Tournament registration Wave 2c');
         assert.ok(at > 0, 'no Wave 2c section');
-        const s = h.slice(at, at + 6000);
+        const s = h.slice(at, at + 9000);
         assert.match(s, /teams form at approval/);
         ['withdrawal', 'no-show', 'amount', 'method', 'notes', 'export'].forEach(w => assert.match(s, new RegExp(w, 'i'), 'not-this-wave item missing: ' + w));
         assert.match(s, /rules change/i);
         ['two-way', 'un-approve', 'walk-up'].forEach(w => assert.match(s, new RegExp(w, 'i'), 'known gap missing: ' + w));
+        assert.match(s, /Loading signups/);
+        assert.match(s, /harvest/i);
+        assert.match(s, /sticky/i);
     });
 
     test('tournament.html is TOURNAMENT_SHELL: build-shell.js moved its cacheName for this wave, and has not moved back', () => {
@@ -428,6 +512,6 @@ describe('6. THE SEAMS', () => {
         // search). The Moved-to note for v42 stays in the file either way.
         assert.match(read('build-shell.js'), /Moved to v42\. The registration desk is its own tab/);
         const m = /cacheName: 'tournament-v(\d+)-/.exec(read('build-shell.js'));
-        assert.ok(m && Number(m[1]) >= 42, 'the tournament cache key is at or past v42: ' + (m && m[0]));
+        assert.ok(m && Number(m[1]) >= 46, 'the tournament cache key is at or past v46 (check-in harden): ' + (m && m[0]));
     });
 });
