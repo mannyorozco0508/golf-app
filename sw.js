@@ -1593,7 +1593,13 @@
 // 2026-09-15) and the sentence was no longer true. A device on v165 keeps a
 // scorecard that calls itself a beta on every open. (beta_notice_gone_test.js
 // scans every shipped file for the old names, this comment included.)
-const CACHE_VERSION = 'golfapp-v166-beta-notice-gone';
+// Moved to v167: the Desk tab reaches installed devices. tournament.html is in
+// THIS worker's shell list (SHELL_FILES below), so the 2c wave (ec28098, the
+// registration desk as its own tab) needed this key to move as well as
+// build-shell.js's product key - it moved only the product key. A device
+// holding v166 kept serving the pre-2c tournament.html, with the signups on
+// top of Starting Holes and no Desk tab, until this.
+const CACHE_VERSION = 'golfapp-v167-desk-tab';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
