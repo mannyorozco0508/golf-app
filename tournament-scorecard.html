@@ -49,26 +49,9 @@
             --shadow-color: rgba(0,0,0,0.08);
             --nassau-box-bg: #eef6f2;
         }
-        html.dark-mode {
-            --bg-page: #14181a;
-            --bg-card: #1e2426;
-            --text-main: #e8ecec;
-            --text-muted: #9aa8a7;
-            --brand-green: #2f9e78;
-            --brand-navy: #4a7bb5;
-            --accent-teal: #3dbfae;
-            --accent-red: #ff6b76;
-            --border-light: #333c3e;
-            --border-mid: #3a4a45;
-            --border-faint: #2c3436;
-            --nav-bg: #223028;
-            --shadow-color: rgba(0,0,0,0.4);
-            --nassau-box-bg: #1a2b24;
-        }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
         .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
         h2 { color: var(--brand-green); margin-top: 0; }
-        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
         .top-nav-bar { display: flex; gap: 6px; margin-bottom: 14px; }
         .top-nav-item { flex: 1; padding: 10px; text-align: center; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
@@ -115,14 +98,12 @@
         .lb-thru { width: 56px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
         .lb-score { width: 60px; text-align: right; font-weight: bold; }
         .lb-row.leader { background: #fff8e1; }
-        html.dark-mode .lb-row.leader { background: #2b2712; }
         .lb-row.me { border: 2px solid var(--brand-green); border-radius: 6px; }
     </style>
 </head>
 <body>
 
 <div class="container" id="main-content" style="display:none;">
-    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
@@ -185,21 +166,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    function toggleTheme() {
-        const isDark = document.documentElement.classList.toggle('dark-mode');
-        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
-        document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
-            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-        });
-    }
-    if (localStorage.getItem('golfapp-theme') === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-    }
-    document.addEventListener('DOMContentLoaded', () => {
-        if (document.documentElement.classList.contains('dark-mode')) {
-            document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = '☀️ Light Mode'; });
-        }
-    });
+    // NO DARK MODE ON THIS PRODUCT (2026-09-18, Option B) - see tournament.html.
+    // This page never touches the browser's stored theme preference.
 
     function showTab(tab) {
         document.getElementById('tab-scorecard').style.display = tab === 'scorecard' ? 'block' : 'none';

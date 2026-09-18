@@ -76,6 +76,12 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v44. Dark mode is gone from both tournament pages (Option B):
+        // no toggle, no handler, no read of the Consumer app's stored
+        // preference, no dark palette. The three warning variables the net
+        // refusal and the paste-flagged block use are defined at last. A device
+        // on v43 keeps a page that goes dark on a Consumer golfer's setting with
+        // no way to change it there.
         // Moved to v43. Online course search on the setup picker (Option B):
         // the online row, the two proxy fetches, the confirm panel with the
         // tee chooser, the card inlined into the event and kept at
@@ -110,7 +116,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v43-course-search',
+        cacheName: 'tournament-v44-no-dark-mode',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

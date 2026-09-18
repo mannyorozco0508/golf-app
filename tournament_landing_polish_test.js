@@ -62,6 +62,16 @@ const styleOf = (html) => html.slice(html.indexOf('<style>'), html.indexOf('</st
 // once in the baseline; applying all three must give today's text.
 const DELIBERATE = [
     {
+        // FIRST, and it must stay first: the baseline's opening token is the
+        // toggle's label, and the trophy substitution below begins on the very
+        // next token - applied in this order, the trophy `from` is still intact
+        // when its turn comes. (Dark mode left the Tournament product on
+        // 2026-09-18, Option B: the shared golfapp-theme key decided it.)
+        why: 'the dark-mode toggle is gone from the setup screen',
+        from: '|\u{1F319} Dark Mode|',
+        to: '|'
+    },
+    {
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
         to: '|Rattle|/|Tournaments|' + HERO_LINE + '|'
@@ -151,14 +161,16 @@ describe('THE HERO BAND', () => {
         assert.ok(/\.tourney-hero-shade\s*\{[^}]*(rgba\(|linear-gradient\()/.test(style), 'no dark overlay layer over the image');
     });
 
-    test('the sign-in comes after the hero and before the first field; the dark-mode toggle lives in the band', () => {
+    test('the sign-in comes after the hero and before the first field; no dark-mode toggle anywhere on the screen (Option B, 2026-09-18)', () => {
         const i = (s) => { const k = region.indexOf(s); assert.ok(k >= 0, s + ' missing'); return k; };
         assert.ok(i('id="tourney-hero"') < i('id="signed-in-as-setup"'), 'the signed-in line must follow the hero');
         assert.ok(i('id="signed-in-as-setup"') < i('id="signin-panel-setup"'), 'then the sign-in panel');
         assert.ok(i('id="signin-panel-setup"') < i('id="t-name"'), 'then the first field');
         const hero = region.slice(i('id="tourney-hero"'), i('id="signed-in-as-setup"'));
-        assert.match(hero, /class="theme-toggle-btn[^"]*" onclick="toggleTheme\(\)"/, 'the toggle keeps its class and handler, inside the band');
-        assert.equal((region.match(/onclick="toggleTheme\(\)"/g) || []).length, 1, 'exactly one toggle on the setup screen');
+        // POSITIVE: the band is still the band.
+        assert.match(hero, /class="tourney-wordmark"/);
+        assert.doesNotMatch(hero, /theme-toggle-btn|toggleTheme/, 'the toggle is back in the band');
+        assert.equal((region.match(/onclick="toggleTheme\(\)"/g) || []).length, 0, 'no toggle on the setup screen');
     });
 });
 
@@ -316,15 +328,13 @@ describe('THE SIGN-IN behaves as before, in its new place', () => {
     });
 });
 
-describe('DARK MODE keeps working from the band', () => {
-    test('the toggle flips the html class and its own label', () => {
+describe('DARK MODE is gone from this page (Option B, 2026-09-18); the palette variables stay', () => {
+    test('toggleTheme is not defined on the loaded page and nothing sets the class', () => {
         const sb = loadHtmlInlineScript(PAGE);
         const html = sb.document.documentElement;
         assert.ok(!html.classList.contains('dark-mode'));
-        vm.runInContext('toggleTheme()', sb);
-        assert.ok(html.classList.contains('dark-mode'), 'dark-mode class must be set');
-        vm.runInContext('toggleTheme()', sb);
-        assert.ok(!html.classList.contains('dark-mode'), 'and cleared again');
+        assert.equal(typeof sb.toggleTheme, 'undefined', 'the toggle handler is back');
+        assert.throws(() => vm.runInContext('toggleTheme()', sb), /toggleTheme is not defined/);
     });
 
     test('the hero and the restyled controls use the theme variables or their own fixed dark palette - no hard-coded light colours on themed surfaces', () => {
@@ -335,7 +345,8 @@ describe('DARK MODE keeps working from the band', () => {
         const card = /\.signin-card\s*\{[^}]*\}/.exec(style);
         assert.ok(card, 'no .signin-card rule');
         assert.match(card[0], /var\(--/, 'the sign-in card must be themed through variables');
-        assert.ok(/html\.dark-mode #main-format-picker \.format-card|html\.dark-mode \.tourney-hero/.test(style) || !/#main-format-picker \.format-card\s*\{[^}]*#fff/.test(style),
-            'a light hard-coded colour on the picker with no dark override');
+        // There is no dark override any more, so the picker card must simply
+        // not hard-code a light colour: the variables are its only palette.
+        assert.ok(!/#main-format-picker \.format-card\s*\{[^}]*#fff/.test(style), 'a light hard-coded colour on the picker');
     });
 });

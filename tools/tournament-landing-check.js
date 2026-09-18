@@ -21,8 +21,11 @@
 //   then, through the page's own buttons (an expression may click a button;
 //   it calls no page function):
 //     - tapping 2-Man Best Ball leaves exactly one active card, Best Ball
-//     - tapping the toggle sets html.dark-mode, flips the label, and the hero
-//       type is still light on dark
+//     - (dark mode left the Tournament product on 2026-09-18, Option B): NO
+//       .theme-toggle-btn has a rect anywhere on the screen, and a device that
+//       holds golfapp-theme = 'dark' from the Consumer app still arrives LIGHT
+//       - the preScript seeds the key before the page runs, the only way a
+//       surviving load-time read could show itself; the wordmark stays white
 //   and signed in as an email organizer, at 390px:
 //     - the sign-in card is gone and "Signed in as" names them
 //
@@ -52,8 +55,9 @@ const PROBE = `
     signedInAs: (q('#signed-in-as-setup') || {}).innerText || '',
     pickerColumns: cols,
     active: active,
-    toggleLabel: (q('#tourney-hero .theme-toggle-btn') || {}).innerText || null,
+    toggleRects: Array.from(document.querySelectorAll('.theme-toggle-btn')).map((b) => r(b)).filter((x) => x && x.width > 0 && x.height > 0).length,
     dark: document.documentElement.classList.contains('dark-mode'),
+    storedTheme: (function () { try { return localStorage.getItem('golfapp-theme'); } catch (e) { return 'unreadable'; } })(),
     firstFieldTop: r(q('#t-name')) ? r(q('#t-name')).top : null
   });
 })()`;
@@ -75,7 +79,9 @@ const IMAGE_READ = `
 })()`;
 
 const TAP_BESTBALL = `(() => { document.getElementById('fmt-bestball').click(); return 'tapped'; })()`;
-const TAP_TOGGLE = `(() => { document.querySelector('#tourney-hero .theme-toggle-btn').click(); return 'tapped'; })()`;
+// The Consumer app's own preference, on the same device and origin. Seeded
+// before any page script runs. The page must neither honour it nor touch it.
+const SEED_DARK = `try { localStorage.setItem('golfapp-theme', 'dark'); } catch (e) {}`;
 
 const db = { tournaments: {}, global_courses: {} };
 
@@ -89,16 +95,15 @@ async function measure(width, auth) {
             { sleep: 600 },
             { expression: IMAGE_READ },
             { expression: TAP_BESTBALL },
-            { expression: PROBE },
-            { expression: TAP_TOGGLE },
             { expression: PROBE }
         ],
+        preScript: SEED_DARK,
         settleMs: 2500
     });
     if (!r.ok) return { ran: false, reason: r.reason };
     const v = r.value.map((x) => { try { return JSON.parse(x); } catch (e) { return x; } });
     // A sleep step collects a value too ("slept N"), so the indices count it.
-    return { ran: true, arrival: v[0], image: v[3], afterBestBall: v[5], afterToggle: v[7] };
+    return { ran: true, arrival: v[0], image: v[3], afterBestBall: v[5] };
 }
 
 (async () => {
@@ -132,11 +137,10 @@ async function measure(width, auth) {
         if (JSON.stringify(a.active) !== JSON.stringify(['fmt-scramble'])) failures.push(`${label}: on arrival the active cards are ${JSON.stringify(a.active)}, wanted Scramble alone`);
         const b = m.afterBestBall;
         if (JSON.stringify(b.active) !== JSON.stringify(['fmt-bestball'])) failures.push(`${label}: after tapping Best Ball the active cards are ${JSON.stringify(b.active)}`);
-        const t = m.afterToggle;
-        if (!t.dark) failures.push(`${label}: tapping the toggle did not set html.dark-mode`);
-        if (!/Light Mode/.test(t.toggleLabel || '')) failures.push(`${label}: the toggle label did not flip: ${t.toggleLabel}`);
-        if (t.wordmarkColor !== 'rgb(255, 255, 255)') failures.push(`${label}: in dark mode the wordmark is ${t.wordmarkColor}, wanted white on the dark band`);
-        if (a.wordmarkColor !== 'rgb(255, 255, 255)') failures.push(`${label}: in light mode the wordmark is ${a.wordmarkColor}, wanted white on the dark band`);
+        if (a.toggleRects !== 0) failures.push(`${label}: ${a.toggleRects} .theme-toggle-btn on screen - dark mode is gone from this product`);
+        if (a.dark) failures.push(`${label}: html.dark-mode is set on arrival with golfapp-theme = dark seeded - the load-time read is back`);
+        if (a.storedTheme !== 'dark') failures.push(`${label}: the seeded golfapp-theme is now ${JSON.stringify(a.storedTheme)} - the page touched the Consumer key`);
+        if (a.wordmarkColor !== 'rgb(255, 255, 255)') failures.push(`${label}: the wordmark is ${a.wordmarkColor}, wanted white on the dark band`);
     };
     common('phone 390', phone, 1);
     common('tablet 768', tablet, 2);
@@ -150,8 +154,8 @@ async function measure(width, auth) {
     console.log(JSON.stringify({
         verdict, failures,
         measured: {
-            phone: { hero: phone.arrival.hero, panelTop: phone.arrival.panel && phone.arrival.panel.top, columns: phone.arrival.pickerColumns, active: phone.arrival.active, afterBestBall: phone.afterBestBall.active, dark: phone.afterToggle.dark, image: phone.image, scroll: [phone.arrival.scrollWidth, phone.arrival.innerWidth] },
-            tablet: { hero: tablet.arrival.hero, panelTop: tablet.arrival.panel && tablet.arrival.panel.top, columns: tablet.arrival.pickerColumns, active: tablet.arrival.active, afterBestBall: tablet.afterBestBall.active, dark: tablet.afterToggle.dark, scroll: [tablet.arrival.scrollWidth, tablet.arrival.innerWidth] },
+            phone: { hero: phone.arrival.hero, panelTop: phone.arrival.panel && phone.arrival.panel.top, columns: phone.arrival.pickerColumns, active: phone.arrival.active, afterBestBall: phone.afterBestBall.active, darkOnArrival: phone.arrival.dark, storedTheme: phone.arrival.storedTheme, toggleRects: phone.arrival.toggleRects, image: phone.image, scroll: [phone.arrival.scrollWidth, phone.arrival.innerWidth] },
+            tablet: { hero: tablet.arrival.hero, panelTop: tablet.arrival.panel && tablet.arrival.panel.top, columns: tablet.arrival.pickerColumns, active: tablet.arrival.active, afterBestBall: tablet.afterBestBall.active, darkOnArrival: tablet.arrival.dark, storedTheme: tablet.arrival.storedTheme, toggleRects: tablet.arrival.toggleRects, scroll: [tablet.arrival.scrollWidth, tablet.arrival.innerWidth] },
             owner: { panelVisible: o.panelVisible, signedInAs: o.signedInAs, hero: o.hero },
             heroText: phone.arrival.heroText
         }

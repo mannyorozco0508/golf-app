@@ -1606,7 +1606,12 @@
 // worker's shell list, so this key moves with build-shell.js's product key.
 // A device on v167 has an admin.html whose import rules its cache does not
 // hold, and a tournament setup screen that still fabricates a par-4 card.
-const CACHE_VERSION = 'golfapp-v168-course-search';
+// Moved to v169: dark mode is gone from the Tournament product. tournament.html
+// and tournament-scorecard.html (both in this shell list) lose the toggle, the
+// handler, the load-time read of golfapp-theme and the dark palette; the
+// Consumer pages and their key are untouched. A device on v168 keeps
+// tournament pages that go dark on the round app's setting.
+const CACHE_VERSION = 'golfapp-v169-tournament-light';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

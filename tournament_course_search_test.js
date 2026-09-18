@@ -458,8 +458,14 @@ describe('7. THE SEAMS', () => {
         assert.match(s, /eighteen par-4s indexed 1\.\.18/);
         assert.match(s, /no global_courses write/i);
     });
-    test('both caches moved: build-shell tournament-v43 and sw.js v168', () => {
-        assert.match(read('build-shell.js'), /cacheName: 'tournament-v43-course-search'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v168-course-search';/);
+    test('both caches moved for this wave (v43 / v168) and have not moved back', () => {
+        // Later tournament waves move both keys on (v44 / v169: dark mode off);
+        // the Moved-to notes for this wave stay in both files either way.
+        assert.match(read('build-shell.js'), /Moved to v43\. Online course search on the setup picker/);
+        assert.match(read('sw.js'), /Moved to v168: online course search on tournament\.html/);
+        const t = /cacheName: 'tournament-v(\d+)-/.exec(read('build-shell.js'));
+        const c = /const CACHE_VERSION = 'golfapp-v(\d+)-/.exec(read('sw.js'));
+        assert.ok(t && Number(t[1]) >= 43, 'tournament key at or past v43: ' + (t && t[0]));
+        assert.ok(c && Number(c[1]) >= 168, 'consumer key at or past v168: ' + (c && c[0]));
     });
 });
