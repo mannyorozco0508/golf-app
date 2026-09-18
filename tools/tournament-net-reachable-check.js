@@ -288,8 +288,7 @@ if (require.main !== module) return;
         let last = null;
         for (const settleMs of [3200, 9000]) {
             const r = await arriveCold({ url: fileUrl('tournament.html', ''), db, expression, auth: OWNER,
-                preScript: 'window.alert=function(){};', settleMs,
-                blockUrls: ['*qrcode.min.js'] });
+                preScript: 'window.alert=function(){};', settleMs });
             if (r.ok) { try { return JSON.parse(r.value); } catch (e) { last = 'unreadable probe output'; continue; } }
             last = r.reason;
         }

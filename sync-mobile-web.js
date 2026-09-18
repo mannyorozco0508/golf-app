@@ -121,6 +121,12 @@ const CONSUMER_SHELL = [
 // small. Moving it would hand Consumer a screen it has no reason to own.
 const TOURNAMENT_SHELL = [
     'tournament.html', 'tournament-scorecard.html', 'tournament-engine.js',
+    // qrcode.min.js (qrcodejs 1.0.0, MIT): the QR library tournament.html draws
+    // the share modal, the inline codes and the tee sheet with. Vendored
+    // 2026-09-18 - it was a runtime CDN script, and without the CDN the share
+    // modal threw and never opened. TOURNAMENT, not SHARED: Consumer removed its
+    // own QR deliberately and must not carry this natively.
+    'qrcode.min.js',
     // The organizer product has its own mark now: the R and flag over a dark
     // green TOURNAMENTS banner. Three sizes ship - 512 and 192 for the manifest,
     // 180 for the apple-touch-icon both tournament pages now declare.

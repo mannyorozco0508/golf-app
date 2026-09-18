@@ -126,8 +126,7 @@ if (require.main !== module) return;
     // --- TEST 23 ------------------------------------------------------------
     const cold = await arriveCold({ url: fileUrl('tournament.html', ''),
         db: { tournaments: {}, trips: {}, global_courses: {} }, expression: PROBE_TOGGLE,
-        preScript: 'window.alert=function(){};', settleMs: 3200,
-        blockUrls: ['*qrcode.min.js'] });
+        preScript: 'window.alert=function(){};', settleMs: 3200 });
     if (!cold.ok) bail(cold.reason);
     const toggle = JSON.parse(cold.value);
 

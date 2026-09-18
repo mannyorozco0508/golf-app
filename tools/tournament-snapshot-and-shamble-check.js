@@ -177,8 +177,7 @@ const at = (board, name, toPar) =>
     };
     const run = async (code, expression) => {
         const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code),
-            db, expression, preScript: CAPTURE, settleMs: 4200,
-            blockUrls: ['*qrcode.min.js'] });
+            db, expression, preScript: CAPTURE, settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;

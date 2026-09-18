@@ -76,6 +76,11 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v47. QR codes for team scorecard links: qrcode.min.js joins
+        // TOURNAMENT (vendored; it was a runtime CDN script and without the
+        // CDN the share modal never opened), the modal opens without it, an
+        // inline code beside each Share, and a Print Tee Sheet. A device on
+        // v46 keeps a tournament.html that reaches for cdnjs.
         // Moved to v46. The tournaments rules are narrowed (a code-holder writes
         // scores and nothing else). tournament-scorecard.html says "not
         // accepting scores" on a PERMISSION_DENIED instead of blaming the
@@ -127,7 +132,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v46-narrowed-rules',
+        cacheName: 'tournament-v47-tee-qr',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

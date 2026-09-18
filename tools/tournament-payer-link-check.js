@@ -147,7 +147,7 @@ if (require.main !== module) return;
 
     const cold = async (page, query, expression) => {
         const r = await arriveCold({ url: fileUrl(page, query), db, expression,
-            preScript: CAPTURE, settleMs: 4200, blockUrls: ['*qrcode.min.js'] });
+            preScript: CAPTURE, settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;

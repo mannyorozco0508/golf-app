@@ -175,7 +175,7 @@ if (require.main !== module) return;
     const run = async (query) => {
         const r = await arriveCold({ url: fileUrl('tournament-scorecard.html', query),
             db, expression: PROBE, preScript: 'window.alert=function(){};',
-            settleMs: 4200, blockUrls: ['*qrcode.min.js'] });
+            settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;

@@ -22,7 +22,10 @@
          rattle_identity_test.js asserts these pages carry none of its branding,
          and that guard is worth more absolute than a comment is worth precise. -->
     <link rel="manifest" href="tournament-manifest.json">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- qrcodejs 1.0.0 (davidshimjs, MIT), VENDORED 2026-09-18. It was a runtime CDN
+         script until then; with the CDN unreachable the share modal threw and never
+         opened. Now a shell file like the Firebase SDKs (qrcode_vendor_test.js). -->
+    <script src="./qrcode.min.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- auth-compat, 9.22.2: the organizer console will sign in; the scorecard a
@@ -220,6 +223,21 @@
         .team-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; gap: 8px; }
         .team-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.82rem; }
         .team-link-row button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; }
+        /* The inline QR beside a public row's Share (2026-09-18): 64 px, white behind
+           it so the code reads in dark mode's absence too; the fallback is a word. */
+        .team-qr { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; background: #fff; border-radius: 6px; padding: 2px; font-size: 0.6rem; color: var(--text-muted); text-align: center; overflow: hidden; }
+        .team-qr canvas { display: none; }
+        .team-qr img { width: 60px; height: 60px; }
+        /* The tee sheet: a grid of cells, each at least 35 mm wide so a 37x37 code at M
+           is about 1 mm a module; a code is never split across a page. */
+        .tee-grid { display: flex; flex-wrap: wrap; gap: 6mm; }
+        .tee-cell { width: 42mm; page-break-inside: avoid; break-inside: avoid; border: 1px solid #bbb; border-radius: 3mm; padding: 3mm; text-align: center; box-sizing: border-box; }
+        .tee-name { font-weight: bold; font-size: 0.95rem; margin-bottom: 1mm; }
+        .tee-hole { font-size: 1.1rem; font-weight: bold; margin-bottom: 1mm; }
+        .tee-qr { display: flex; justify-content: center; min-height: 35mm; align-items: center; font-size: 0.7rem; color: #555; }
+        .tee-qr canvas { display: none; }
+        .tee-qr img { width: 35mm; height: 35mm; }
+        .tee-url { font-size: 0.55rem; color: #444; word-break: break-all; margin-top: 1mm; }
 
         .lb-row { display: flex; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .lb-pos { width: 28px; font-weight: bold; color: var(--text-muted); }
@@ -700,6 +718,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <hr class="section-divider">
         <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
         <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
+        <button class="btn-outline" onclick="printTournamentTeeSheet()">🖨️ Print Tee Sheet</button>
 
         <hr class="section-divider">
         <!-- No padlock. A glyph is a claim too: these links lock nothing - anyone
@@ -1535,10 +1554,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const hcpInput = editable
             ? `<input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">`
             : '';
+        // THE INLINE QR (public rows only, 2026-09-18): a small code beside the
+        // Share button so a team can scan straight off the organizer's screen.
+        // The box is drawn by renderTeamLinks after the rows land; the editable
+        // Setup card carries none - it is for editing, not for scanning.
+        const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}" data-url="${url}" data-fallback="QR unavailable"></span>`;
         return `<div class="team-link-row" style="flex-wrap:wrap;">
             <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
             <span style="display:flex; align-items:center; gap:6px;">
-                ${hcpInput}
+                ${hcpInput}${qrBox}
                 <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
             </span>
         </div>`;
@@ -1560,6 +1584,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const list = document.getElementById('team-links-list');
         if (!list) return;
         list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
+        // The inline codes, one per row, at M. Re-drawn on every snapshot with the
+        // rows; the URL is read back off the box so the code and the Share button
+        // beside it can never disagree about which team this is.
+        Array.from(list.querySelectorAll('.team-qr')).forEach((box) => {
+            drawQrInto(box, box.dataset.url, 64, qrLevelM());
+        });
     }
 
     // --- SHOTGUN STARTS (Tournament Mode only — never touches Round/Trip/Nassau/Skins) ---
@@ -1634,15 +1664,44 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         db.ref(`tournaments/${currentCode}/teams/team${teamNum}/handicap`).set(hcp);
     }
 
+    // ONE GUARDED DRAWER for every QR on this page: the share modal, the inline
+    // code beside each Share, the tee sheet's cells. Draws with the vendored
+    // qrcodejs when it is there and the draw succeeds; otherwise leaves a
+    // sentence, never an exception. openShareModal used to call `new QRCode`
+    // directly and, with the library unreachable (it was a CDN script until
+    // 2026-09-18), threw before the modal opened - no QR, no link, no Copy.
+    // With the library local this should never fall through, which is exactly
+    // why the fallback exists. `level` is a QRCode.CorrectLevel; the sheet and
+    // the inline code pass M (an 83-character team link is 37x37 modules at M,
+    // 49x49 at the default H - marginal on paper at small sizes).
+    // Error-correction M when the library is there (the level table lives on the
+    // library); undefined otherwise, and drawQrInto then falls through anyway.
+    function qrLevelM() { return (typeof QRCode === 'function' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.M : undefined; }
+
+    function drawQrInto(el, url, size, level) {
+        if (!el) return false;
+        el.innerHTML = '';
+        if (typeof QRCode !== 'function') { el.textContent = el.dataset.fallback || 'QR code unavailable \u2014 copy the link.'; return false; }
+        try {
+            const opts = { text: url, width: size, height: size };
+            if (level !== undefined) opts.correctLevel = level;
+            new QRCode(el, opts);
+            return true;
+        } catch (e) {
+            el.textContent = el.dataset.fallback || 'QR code unavailable \u2014 copy the link.';
+            return false;
+        }
+    }
+
     // Shows the team's link as both a QR code (scan on the tee) and selectable text with a
     // real Copy button — no prompt() fallback, since that can silently fail on iOS home-screen
-    // apps and would leave someone with literally no way to get the link.
+    // apps and would leave someone with literally no way to get the link. The modal OPENS
+    // whatever the QR does: the link and the Copy button never depend on the library.
     function openShareModal(url, teamName, kind) {
         const suffix = kind === 'register' ? 'Signup Link' : 'Scorecard Link';
         document.getElementById('share-modal-title').textContent = `${teamName} — ${suffix}`;
         document.getElementById('share-link-text').textContent = url;
-        document.getElementById('share-qr-box').innerHTML = '';
-        new QRCode(document.getElementById('share-qr-box'), { text: url, width: 180, height: 180 });
+        drawQrInto(document.getElementById('share-qr-box'), url, 180);
         document.getElementById('share-link-modal').classList.add('open');
     }
 
@@ -3814,6 +3873,47 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function printTournamentResults() { printSheet(buildResultsPrintView); }
     function printTournamentPairings() { printSheet(buildPairingsPrintView); }
+    function printTournamentTeeSheet() { printSheet(buildTeeSheetPrintView); }
+
+    // --- THE TEE SHEET (2026-09-18). A third builder through printSheet, not a
+    // second print mechanism. One cell per team: the name, the starting hole when
+    // the start is shotgun, the team's scorecard QR, and the URL in small type so
+    // a dead scanner can still be typed. Every cell reads its URL from the same
+    // builder the Share buttons use, and never from another team's. The QR is
+    // drawn at error-correction M into a cell of at least 35 mm: an 83-character
+    // team link is 37x37 modules at M (about 1 mm a module on this cell), 49x49
+    // at the library's default H, which is marginal on paper. TEAMS ONLY: an
+    // individual event's group links are a different grid (one per group, per
+    // round) and are not on this sheet.
+    function buildTeeSheetPrintView() {
+        const container = document.getElementById('tournament-print-view');
+        const data = currentData || {};
+        const teams = sortedTeams();
+        if (!teams.length) { alert('\u26A0\uFE0F No teams yet \u2014 there is nothing to put on a tee sheet.'); return false; }
+        const shotgun = data.startType === 'shotgun';
+        const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        let html = `<h2 style="margin:0 0 4px 0; font-size:1.3rem;">${esc(data.name || 'Tournament')}</h2>
+            <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>
+            <div class="tee-grid">`;
+        teams.forEach((t) => {
+            const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+            const teamName = t.name || `Team ${t.num}`;
+            const hole = shotgun
+                ? (t.startingHole ? `<div class="tee-hole">Hole ${esc(t.startingHole)}</div>` : `<div class="tee-hole" style="color:#b00020;">HOLE NOT SET</div>`)
+                : '';
+            html += `<div class="tee-cell">
+                <div class="tee-name">${esc(teamName)}</div>${hole}
+                <div class="tee-qr" data-url="${esc(url)}" data-fallback="QR code unavailable \u2014 open the link."></div>
+                <div class="tee-url">${esc(url)}</div>
+            </div>`;
+        });
+        html += `</div><p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
+        container.innerHTML = html;
+        Array.from(container.querySelectorAll('.tee-qr')).forEach((box) => {
+            drawQrInto(box, box.dataset.url, 132, qrLevelM());
+        });
+        return true;
+    }
 
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {

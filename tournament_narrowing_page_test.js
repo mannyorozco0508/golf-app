@@ -181,8 +181,13 @@ describe('3. THE SEAMS', () => {
         assert.match(s, /ab32b84928fc30cebe7ba8529d570a7a3d095c300c9b8ff0df310025e50f940b/, 'the live hash after publish');
         assert.match(s, /a9015b86aa6528758933392f4c6b49ade1d3d38e75ad134dfd337e08fede79f1/, 'the hash of the rules before');
     });
-    test('both caches moved: build-shell tournament-v46 and sw.js v171 (the hero PR had taken v45 / v170)', () => {
-        assert.match(read('build-shell.js'), /cacheName: 'tournament-v46-narrowed-rules'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v171-tournament-narrowing';/);
+    test('both caches moved for this wave (v46 / v171) and have not moved back', () => {
+        // Later tournament waves move both keys on; the Moved-to notes stay.
+        assert.match(read('build-shell.js'), /Moved to v46\. The tournaments rules are narrowed/);
+        assert.match(read('sw.js'), /Moved to v171: the tournaments rules are narrowed/);
+        const t = /cacheName: 'tournament-v(\d+)-/.exec(read('build-shell.js'));
+        const c = /const CACHE_VERSION = 'golfapp-v(\d+)-/.exec(read('sw.js'));
+        assert.ok(t && Number(t[1]) >= 46, 'tournament key at or past v46: ' + (t && t[0]));
+        assert.ok(c && Number(c[1]) >= 171, 'consumer key at or past v171: ' + (c && c[0]));
     });
 });

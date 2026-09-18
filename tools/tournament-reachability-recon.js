@@ -336,8 +336,7 @@ function bail(msg) {
     const seedFor = rec => 'document.__recJson = ' + JSON.stringify(JSON.stringify(rec)) + ';';
     const run = async (page, query, expression, rec) => {
         const r = await arriveCold({ url: fileUrl(page, query), db, expression,
-            preScript: CAPTURE + '\n' + seedFor(rec), settleMs: 4500,
-            blockUrls: ['*qrcode.min.js'] });
+            preScript: CAPTURE + '\n' + seedFor(rec), settleMs: 4500 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         if (g.fatal) bail(g.fatal);

@@ -40,6 +40,7 @@ Consumer bundle: **31 files**, cache `consumer-v34-brand-mark`, `start_url: ./ad
 | `tournament.html` | Organizer page — flights, teams, rounds, payouts, registration (`?register=` public signup; Setup list for the owner) |
 | `tournament-scorecard.html` | Team scorecard, group links |
 | `tournament-engine.js` | Tournament scoring and payout engine |
+| `qrcode.min.js` | qrcodejs 1.0.0 (MIT), vendored 2026-09-18 — the share-modal, inline and tee-sheet QR codes; Tournament only |
 
 Tournament bundle: **17 files**, cache `tournament-v32-consumer-ready`, `start_url: ./tournament.html`. Built by the same `build-shell.js`. **Not shipped in the Consumer native bundle** and must never be.
 

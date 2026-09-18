@@ -793,6 +793,76 @@ a time.
 `tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
 (rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
 
+## QR codes for team scorecard links — inline, on a tee sheet, and a library that is finally local (2026-09-18)
+
+**The finding that outranked the ask.** `tournament.html` drew its share-modal QR with
+qrcodejs 1.0.0 loaded **from cdnjs at runtime** — the one third-party script left in
+the product after Consumer removed its own QR (`round_ready_share_test.js`). Measured in
+Chrome with the CDN unreachable: a tap on a team's Share threw `QRCode is not defined`
+**and the share modal never opened** — no QR, no link, no Copy button. Live for an
+organizer on bad wifi, and no check had ever seen it because all fourteen tournament
+Chrome tools passed `blockUrls: ['*qrcode.min.js']`. A tee sheet printed the morning of
+an event with the CDN down would have been a page of blank squares. So the library came
+local before either surface was built.
+
+**Vendored.** `qrcode.min.js` at the repo root — qrcodejs 1.0.0 by davidshimjs,
+**MIT licence** (https://github.com/davidshimjs/qrcodejs), 19,927 bytes, sha256
+`c541ef06…`, byte-exact to cdnjs (`qrcode_vendor_test.js` pins bytes and hash the way
+`firebase_vendor_test.js` does). Listed in **TOURNAMENT_SHELL, not SHARED**: Consumer
+removed its QR deliberately and must not carry this natively. The places, re-derived
+from the tree: the file; `tournament.html`'s `<script src="./qrcode.min.js">`;
+`sync-mobile-web.js` TOURNAMENT_SHELL; `sw.js` SHELL_FILES (+ the four shell-count pins
+42 → 43); `build-shell.js` reads the list (no edit); `round_ready_share_test.js:84-86`
+inverted — it pinned the CDN by name "out of scope, deliberately"; the fourteen tools
+**no longer block it**, so the QR is measured in Chrome for the first time
+(`tools/tournament-tee-qr-check.js`).
+
+**The guard (D).** One drawer for every QR on the page, `drawQrInto(el, url, size,
+level)`: draws with the library when it is there and the draw succeeds; otherwise
+leaves a sentence ("QR code unavailable — copy the link." in the modal, "QR unavailable"
+on a row, "QR code unavailable — open the link." on the sheet) and never an exception.
+`openShareModal` opens the modal and shows the link and Copy whatever the QR did. With
+the library local this should never fire — which is why it exists. Chrome, library
+blocked: the modal opens, the link is there, Copy has a rect (310×54), the box carries
+the sentence; before this wave the same tap threw and the modal stayed closed.
+
+**The tee sheet.** A THIRD builder through `printSheet`, not a second mechanism:
+`printTournamentTeeSheet() { printSheet(buildTeeSheetPrintView); }`, a `🖨️ Print Tee
+Sheet` button beside Print Pairings. One `.tee-cell` per team (42 mm wide, `page-break-
+inside: avoid`): the team name, `Hole N` when the start is shotgun (`HOLE NOT SET` when
+a shotgun team has none; no hole line on tee times), the QR at **error-correction M**
+drawn 132 px = 35 mm, and the URL in small type under it so a dead scanner can still be
+typed. Every cell reads its URL from the same builder the Share buttons use. Why M and
+35 mm: an 83-character team link is a 37×37 code at M (~1 mm a module at 35 mm); at the
+library's default H it is 49×49 and marginal on paper at small sizes. Measured under
+print media in Chrome: the manage screen hidden, three cells 42 mm wide, each image
+132 px, each cell its own team's URL and nobody else's, `window.print` reached once.
+
+**The inline QR.** Each public row on the Leaderboard tab's Team Scorecard Links carries
+a 64 px `.team-qr` beside its Share (drawn by `renderTeamLinks` through the same guarded
+helper, at M, from a `data-url` on the box so the code and the button can never
+disagree). The Setup tab's editable cards carry none.
+
+**Groups are out of scope, and why.** An individual event's scoring links are
+per GROUP and, on a multi-round event, per group per round (`groupScorecardUrl`,
+`&group=<id>&round=<id>`, ~112 characters — a 41×41 code at L, larger at M). That is a
+different grid: rows of groups under a round heading, a code per round, and a golfer
+looking for the group they are in rather than the team they are on. It wants its own
+wave with its own sheet layout; nothing here draws a group QR.
+
+**Found while re-running the tournament tools, not fixed:** `tools/tournament-label-check.js`
+exits 2 ("THE FORMAT-LABEL CONTROL IS INERT - the scramble fixture does not read
+'Scramble' on the manage header") on HEAD before this wave as well as after it. It
+predates the wave (UNKNOWN when it last passed; likely the landing hero, which replaced
+the manage header's wording). Its own wave, the way the net-reachable check was.
+
+**Tests.** `qrcode_vendor_test.js` (the file, the lists, no blocker);
+`tournament_tee_qr_test.js` (the guard, the sheet's cells and URLs and holes, the inline
+boxes, the seams — mini-dom has no canvas, so every code there is the fallback sentence
+and the images are Chrome's); `tools/tournament-tee-qr-check.js` (above);
+`tournament_pairings_print_test.js` re-pinned to three callers of `printSheet`. Both
+caches: `build-shell.js` `tournament-v47-tee-qr`, `sw.js` `golfapp-v172-tee-qr`.
+
 ## tournaments/$code is narrowed — a code-holder writes scores and nothing else (2026-09-18)
 
 **The problem, established.** `tournaments/$tourneyCode .write` was

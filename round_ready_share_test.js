@@ -81,9 +81,15 @@ describe('THE SETUP SCREEN NO LONGER OFFERS A LINK', () => {
             'admin.html still fetches a third-party script at runtime');
     });
 
-    test('tournament.html keeps its own QR — out of scope, deliberately', () => {
-        assert.match(read('tournament.html'), /cdnjs\.cloudflare\.com.*qrcode/,
-            'the Tournament QR was removed too; that was not this change');
+    test('tournament.html keeps its own QR - and since 2026-09-18 draws it from a VENDORED copy, not the CDN', () => {
+        // This pinned the CDN script by name ("out of scope, deliberately") so the
+        // Consumer clean-up could not be mistaken for a Tournament change. The QR
+        // stayed; the CDN went: with cdnjs unreachable the share modal threw and
+        // never opened (measured). qrcode_vendor_test.js holds the local copy.
+        const t = read('tournament.html');
+        assert.match(t, /<script src="\.\/qrcode\.min\.js"><\/script>/, 'the Tournament QR library must be the local file');
+        assert.ok(!/cdnjs\.cloudflare\.com/.test(t), 'tournament.html fetches a third-party script at runtime again');
+        assert.match(t, /function openShareModal\(/, 'the Tournament QR was removed too; that was not this change');
     });
 
     test('the group scorekeeper box left the setup screen as well', () => {

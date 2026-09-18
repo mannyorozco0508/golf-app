@@ -129,8 +129,7 @@ if (require.main !== module) return;
 
     const cold = async (code, expression) => {
         const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code),
-            db, expression, preScript: CAPTURE, settleMs: 4200,
-            blockUrls: ['*qrcode.min.js'] });
+            db, expression, preScript: CAPTURE, settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;
@@ -150,8 +149,7 @@ if (require.main !== module) return;
       })()`;
     const r = await arriveCold({
         url: fileUrl('tournament-scorecard.html', 'tourney=EV&group=' + gross.groupId),
-        db, expression: cardProbe, preScript: CAPTURE, settleMs: 4200,
-        blockUrls: ['*qrcode.min.js'] });
+        db, expression: cardProbe, preScript: CAPTURE, settleMs: 4200 });
     if (!r.ok) bail(r.reason);
     const card = JSON.parse(r.value);
 

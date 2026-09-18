@@ -519,7 +519,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v171-tournament-narrowing';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v172-tee-qr';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -542,7 +542,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it is what issues a round/trip/tournament code and checks
         // the code is free before handing it out. A cached shell without it cannot
         // start anything at all.
-        assert.equal(entries.length, 42, 'the shell list gained or lost an entry');  // 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147: admin and trip load it on every create); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 43, 'the shell list gained or lost an entry');  // 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147: admin and trip load it on every create); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
          './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));

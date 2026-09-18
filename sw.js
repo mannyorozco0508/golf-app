@@ -1621,7 +1621,12 @@
 // (in this shell list) move with them - the scorecard's refusal sentence and
 // the no-owner line on the console. A device on v170 keeps a scorecard that
 // blames the signal for a permission refusal.
-const CACHE_VERSION = 'golfapp-v171-tournament-narrowing';
+// Moved to v172: QR codes for team scorecard links. qrcode.min.js joins the
+// shell (the Tournament QR library, vendored - it was a runtime CDN script) and
+// tournament.html gains the guard, the inline codes and the tee sheet. A
+// device on v171 keeps a page that reaches for cdnjs and a modal that never
+// opens without it.
+const CACHE_VERSION = 'golfapp-v172-tee-qr';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1696,6 +1701,7 @@ const SHELL_FILES = [
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.
     './tournament-engine.js',
+    './qrcode.min.js',
     './pwa-boot.js',
     // THE FIREBASE SDK, SERVED FROM THIS ORIGIN.
     //

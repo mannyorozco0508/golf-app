@@ -692,8 +692,7 @@ if (require.main !== module) return;
 
     const runWithPre = async (expression, extraPre) => {
         const r = await arriveCold({ url: url, db: db, expression: expression,
-            preScript: CAPTURE + '\n' + seed + '\n' + extraPre, settleMs: 6000,
-            blockUrls: ['*qrcode.min.js'] });
+            preScript: CAPTURE + '\n' + seed + '\n' + extraPre, settleMs: 6000 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         if (g.fatal) bail(g.fatal);
@@ -702,8 +701,7 @@ if (require.main !== module) return;
 
     const run = async (expression) => {
         const r = await arriveCold({ url: url, db: db, expression: expression,
-            preScript: CAPTURE + '\n' + seed, settleMs: 6000,
-            blockUrls: ['*qrcode.min.js'] });
+            preScript: CAPTURE + '\n' + seed, settleMs: 6000 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         if (g.fatal) bail(g.fatal);

@@ -43,7 +43,7 @@
 //   buildPairingsPrintView() writes #tournament-print-view. Each golfer is one
 //   <li>: `<li>Name</li>`, or `<li>Name <span class="wd">WD</span></li>`.
 //   printSheet(build) is the ONE trigger; printTournamentResults() and
-//   printTournamentPairings() are its two callers.
+//   printTournamentPairings() are its callers (printTournamentTeeSheet() joined 2026-09-18).
 //
 // NEGATIVE CONTROLS run this file against a temp copy of tournament.html with
 // one defect injected (TPP_PAGE=<path>); see the report for the six controls
@@ -162,7 +162,7 @@ describe('THE HARNESS REACHED THE SHEET', () => {
         assert.equal(sb.document.getElementById('manage-t-name').textContent, '🏆 Member Guest');
     });
 
-    test('the button names a trigger, and the trigger is printSheet with two callers', () => {
+    test('the button names a trigger, and the trigger is printSheet - three callers since the tee sheet (2026-09-18), still one window.print', () => {
         const src = source();
         assert.equal(pairingsTrigger(), 'printTournamentPairings');
         assert.match(src, /onclick="printTournamentResults\(\)"/, 'the results button must still exist');
@@ -171,6 +171,7 @@ describe('THE HARNESS REACHED THE SHEET', () => {
         assert.match(src, /function printSheet\(build\)/);
         assert.match(src, /function printTournamentResults\(\)\s*\{\s*printSheet\(buildResultsPrintView\);\s*\}/);
         assert.match(src, /function printTournamentPairings\(\)\s*\{\s*printSheet\(buildPairingsPrintView\);\s*\}/);
+        assert.match(src, /function printTournamentTeeSheet\(\)\s*\{\s*printSheet\(buildTeeSheetPrintView\);\s*\}/, 'the tee sheet is the third builder through the same trigger');
         assert.equal(count(src, 'window.print()'), 1, 'window.print is called from exactly one place');
     });
 
