@@ -149,6 +149,12 @@ describe('THE HERO BAND', () => {
             assert.match(u, /^assets\/tournament-hero[^/]*$/, 'the hero image must live under assets/ as tournament-hero*: ' + u);
             assert.ok(fs.existsSync(path.join(__dirname, u)), 'the referenced placeholder is missing: ' + u);
             assert.ok(fs.statSync(path.join(__dirname, u)).size > 500, 'the hero art is empty: ' + u);
+            const xml = fs.readFileSync(path.join(__dirname, u), 'utf8');
+            assert.match(xml, /^<svg[\s>]/, 'the hero art must be an SVG: ' + u);
+            [...xml.matchAll(/<!--([\s\S]*?)-->/g)].forEach((m) => {
+                assert.ok(!m[1].includes('--'),
+                    'an XML comment cannot contain -- or Chrome will not decode the SVG: ' + m[1].slice(0, 80));
+            });
         });
         assert.ok(!/url\((['"]?)https?:/.test(style), 'a stylesheet url() points at the network - no stock hotlinks');
         assert.ok(!/<img[^>]+src=(['"])https?:/.test(region), 'an <img> on the setup screen hotlinks');

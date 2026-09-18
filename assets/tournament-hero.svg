@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640" role="img" aria-label="">
   <!-- Brand-green fairway band for /tournament. Abstract, no people, no
-       photograph of a real course. Palette is --brand-green #0f4c3a and
+       photograph of a real course. Palette is brand-green #0f4c3a and
        neighbours, so a missing overlay still reads as the same product. -->
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
