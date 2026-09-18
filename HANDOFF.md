@@ -1027,14 +1027,40 @@ now, not 13 (the floor is 10). Both caches: `build-shell.js`
 the repo. A phone set to dark rendered these pages light before this wave
 unless the key said otherwise; now it renders them light regardless.
 
-**Found while running the tournament tools, not fixed:**
-`tools/tournament-net-reachable-check.js` exits 2 ("NOTHING WAS PROVEN") — at
-ffbbad4 with "TEST 19 net run: saveTournament wrote no tournament" and at
-a2a74f3 / this wave with "the course dropdown did not offer the fixture
-courses - Test 20 measured nothing". It predates both this wave and course
-search; UNKNOWN when it last passed (it drives the setup screen without the
-sign-in the gate has required since 2026-09-15, and seeds courses through a
-fixture the picker no longer lists that way). Its own wave.
+**`tools/tournament-net-reachable-check.js` — repaired and wired into the suite
+(2026-09-18).** It is the only check that can see "correct and unreachable":
+`#individual-setup-note`, the one Gross/Net control in the product, once sat
+`display:block` inside a hidden ancestor, and mini-dom has no layout. The tool
+taps the format cards in Chrome and reads rects (TEST 18), builds a Net event
+through the page's own controls — sign-in, save, handicaps on the Player Field,
+a scoring group, the golfer's card, the organizer's board — and compares the
+board to arithmetic done by hand (TEST 19: Bogey E / Cal +9 / Ace +18, gross all
++18, the two boards must differ), and checks the refusal on a card with no
+usable index (TEST 20/20b). It rotted twice and nothing noticed: the organizer
+sign-in gate (2026-09-12) refused its save because the journey was opened
+without `auth`; course search (2026-09-17) made the picker rows nodes and it
+matched an `onclick` attribute. Six days and one day, because no test ran it.
+Three repairs: `auth: OWNER` on the journey, rows found by their text, and the
+"no card" premise (Mint Valley fell through to a fabricated 1..18) replaced by a
+`global_courses` fixture card with hcpIndex 1 on every hole — the refusal path
+the product kept once the fallback went. **`tournament_net_reachable_test.js`
+now spawns it on every `npm test`** (~55 s standalone, in parallel with the
+rest) and turns its exit contract into assertions: exit 2 — "NOTHING WAS
+PROVEN", the state it sat in for six days — is a failure quoting the bail,
+never a pass. Controls measured: hide the panel on Individual → TEST 18 red and
+19 skipped-as-failure; make the Net radio decorative → TEST 19 red (the one it
+exists for); remove the refusal → TEST 20 red; drop the auth option → exit 2,
+reported as `COULD NOT RUN: … saveTournament wrote no tournament`.
+**Two load faults found by running it inside the suite, both fixed in the tool:**
+on macOS `process.stdout` to a pipe is asynchronous, so `console.log(report);
+process.exit()` once handed the runner an empty stdout (exit 0, no JSON) — the
+report and the bail are now written with a callback that exits after the bytes
+are out; and a fixed 2.6 s settle after `goto()` was once not enough with a
+dozen Chromes sharing the CPU (`#course-search-input` null, the tool crashed) —
+each navigation now waits for the element the next step needs (`settled()`, DOM
+reads only, 20 s cap), the cold probes retry once at 9 s, and a crash before a
+verdict is an exit-2 bail rather than a stack. After those: 4 of 4 full-suite
+runs green; the wrapper adds ~56 s to a file that runs in parallel with the rest.
 
 ## Tournament course search — Option B (2026-09-17)
 

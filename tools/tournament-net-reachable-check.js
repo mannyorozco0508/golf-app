@@ -26,6 +26,9 @@
 //   - the warning must NOT appear on a real-index course
 //
 //   node tools/tournament-net-reachable-check.js
+//   (tournament_net_reachable_test.js runs it inside `npm test` and fails on
+//   anything but exit 0 - two breaks went unnoticed for six days and one day
+//   while nothing ran it)
 //
 //   exit 0   an organizer can set up a net event and it scores net
 //   exit 1   a divergence the JSON names
@@ -35,11 +38,22 @@
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 const { openJourney, fileUrl: journeyUrl } = require('./lib/journey.js');
 
-// coursePresets carries a genuine stroke index; anything in the directory
-// WITHOUT a preset falls through to the fabricated 1..18, which is what
-// courseIndexSynthetic records and what net is refused on.
+// coursePresets carries a genuine stroke index for True Blue. The "no usable
+// index" course is Mint Valley (in the directory, no preset) handed a
+// global_courses card whose hcpIndex is 1 on every hole: a REAL card with an
+// unusable index, which hasUsableStrokeIndex() refuses and courseIndexSynthetic
+// records. (Until 2026-09-17 this fixture needed no card at all - a card-less
+// pick fell through to a fabricated 1..18. Course search removed that fallback:
+// a course with no card is not selected any more, so the refusal path the
+// product KEPT is the broken-index one, and that is what is seeded here.)
 const REAL_COURSE = { id: 'trueblue', name: 'True Blue Golf Club' };
 const SYNTHETIC_COURSE = { id: 'swwa_mintvalley', name: 'Mint Valley Golf Course' };
+const BROKEN_INDEX_CARD = { name: SYNTHETIC_COURSE.name, data: [...Array(18)].map((_, i) => ({ hole: i + 1, par: 4, hcpIndex: 1 })) };
+const FIXTURE_DB = () => ({ tournaments: {}, trips: {}, global_courses: { [SYNTHETIC_COURSE.id]: BROKEN_INDEX_CARD } });
+// The setup screen refuses to create an event for anyone not signed in (the
+// organizer gate, 2026-09-12). The journey signs in as an email organizer;
+// without this the save is refused before it writes and TEST 19 has nothing.
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 
 // Three golfers, all round 90 on a par-72 with a 1..18 index.
 //   Ace   hcp 0    0 strokes -> 90 -> +18
@@ -96,8 +110,11 @@ const probeWarning = (courseId, courseName) => `
   const search = document.getElementById('course-search-input');
   search.value = ${JSON.stringify('')} + '${courseName}';
   search.dispatchEvent(new Event('input', { bubbles: true }));
+  // BY THE NAME ON THE ROW, the way an organizer reads it. The rows are nodes
+  // with an onclick property (course search, 2026-09-17), not markup with an
+  // onclick attribute, so an attribute match finds nothing.
   const opt = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-      .find(o => (o.getAttribute('onclick') || '').indexOf("'${courseId}'") !== -1);
+      .find(o => (o.textContent || '').trim() === '${courseName}');
   out.courseOptionFound = !!opt;
   if (opt) opt.click();
   out.courseChosen = document.getElementById('course-key').value;
@@ -118,9 +135,10 @@ const probeWarning = (courseId, courseName) => `
 })()`;
 
 function bail(msg) {
-    console.error('tournament-net-reachable-check: ' + msg);
-    console.error('exit 2 means NOTHING WAS PROVEN - this is not a pass.');
-    process.exit(2);
+    // Written with a callback for the same reason the report is (see the end
+    // of the file): the parent must receive the sentence before the exit.
+    process.stderr.write('tournament-net-reachable-check: ' + msg + '\n'
+        + 'exit 2 means NOTHING WAS PROVEN - this is not a pass.\n', () => process.exit(2));
 }
 
 // --- TEST 19: build the event by pressing the page's own controls ----------
@@ -131,12 +149,28 @@ function bail(msg) {
 // and each step has to see the last one. Its stub persists writes and re-fires
 // listeners, which is what a real database does and what the read-only stub
 // deliberately does not.
+// A page is "there" when the element the next step needs has arrived, not
+// when a fixed number of milliseconds has passed. goto()'s settle is a floor;
+// inside `npm test` a dozen Chromes share the CPU and 2.6 s was once not enough
+// (measured 2026-09-18: course-search-input null after the settle, the tool
+// crashed, the suite test went red). Polls the DOM only - reads, never calls.
+async function settled(j, selector, label, maxMs) {
+    const deadline = Date.now() + (maxMs || 20000);
+    while (Date.now() < deadline) {
+        const there = await j.evaluate(`!!document.querySelector(${JSON.stringify(selector)})`);
+        if (there) return;
+        await new Promise((r) => setTimeout(r, 200));
+    }
+    throw new Error(label + ': ' + selector + ' never appeared within ' + (maxMs || 20000) + ' ms');
+}
+
 async function buildEventThroughTheUI(mode, course) {
     const COURSE = course || REAL_COURSE;
-    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} } });
+    const j = await openJourney({ db: FIXTURE_DB(), auth: OWNER });
     const writes = [];
     try {
         await j.goto(journeyUrl('tournament.html', ''), 2600);
+        await settled(j, '#course-search-input', 'setup screen');
 
         await j.click('#fmt-individual', null, { settleMs: 300 });
         await j.evaluate(`(() => {
@@ -144,7 +178,7 @@ async function buildEventThroughTheUI(mode, course) {
             s.value = ${JSON.stringify(COURSE.name)};
             s.dispatchEvent(new Event('input', { bubbles: true }));
             const o = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-                .find(x => (x.getAttribute('onclick') || '').indexOf("'${COURSE.id}'") !== -1);
+                .find(x => (x.textContent || '').trim() === ${JSON.stringify(COURSE.name)});
             if (o) o.click();
             return !!o;
         })()`);
@@ -175,6 +209,7 @@ async function buildEventThroughTheUI(mode, course) {
         // The handicaps. The setup screen stores every golfer at 0, so these are
         // set on the Player Field, through its own inputs.
         await j.goto(journeyUrl('tournament.html', 'tourney=' + code), 2600);
+        await settled(j, '#player-field-list .fa-row', 'player field');
         await j.evaluate(`(() => {
             const want = { Ace: '0', Bogey: '18', Cal: '9' };
             const rows = Array.from(document.querySelectorAll('#player-field-list .fa-row'));
@@ -207,6 +242,7 @@ async function buildEventThroughTheUI(mode, course) {
 
         // Score every golfer at 5 a hole, on the golfer's own card.
         await j.goto(journeyUrl('tournament-scorecard.html', 'tourney=' + code + '&group=' + gid), 2600);
+        await settled(j, '#holes-list input', 'scorecard');
         await j.evaluate(`(async () => {
             const inputs = Array.from(document.querySelectorAll('#holes-list input'));
             for (const el of inputs) {
@@ -218,6 +254,7 @@ async function buildEventThroughTheUI(mode, course) {
 
         // And read the organizer's board.
         await j.goto(journeyUrl('tournament.html', 'tourney=' + code), 2600);
+        await settled(j, '#leaderboard-list .lb-row', 'leaderboard');
         const board = await j.evaluate(`
             Array.from(document.querySelectorAll('#leaderboard-list .lb-row')).slice(1)
                 .map(r => (r.innerText || '').replace(/\\s+/g, ' ').trim())`);
@@ -243,14 +280,20 @@ module.exports = { PROBE_REVEAL: PROBE_REVEAL, probeWarning: probeWarning,
 if (require.main !== module) return;
 
 (async () => {
-    const db = { tournaments: {}, trips: {}, global_courses: {} };
+    const db = FIXTURE_DB();
+    // A cold arrival's probe runs once, after a fixed settle. Under `npm test`
+    // a dozen Chromes share the CPU, so a page that is not painted at 3.2 s is
+    // given one more try at 9 s before the run is declared unprovable.
     const cold = async (expression) => {
-        const r = await arriveCold({ url: fileUrl('tournament.html', ''), db, expression,
-            preScript: 'window.alert=function(){};', settleMs: 3200,
-            blockUrls: ['*qrcode.min.js'] });
-        if (!r.ok) bail(r.reason);
-        let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
-        return g;
+        let last = null;
+        for (const settleMs of [3200, 9000]) {
+            const r = await arriveCold({ url: fileUrl('tournament.html', ''), db, expression, auth: OWNER,
+                preScript: 'window.alert=function(){};', settleMs,
+                blockUrls: ['*qrcode.min.js'] });
+            if (r.ok) { try { return JSON.parse(r.value); } catch (e) { last = 'unreadable probe output'; continue; } }
+            last = r.reason;
+        }
+        bail(last);
     };
 
     const reveal = await cold(PROBE_REVEAL);
@@ -315,11 +358,13 @@ if (require.main !== module) return;
         Object.keys(t19).forEach(k => { if (!t19[k]) problems.push('TEST 19 ' + k + ': FAILED'); });
         netRun.assertions = t19;
 
-        // TEST 20b - WHAT GETS STORED when Net is chosen on an unmapped course.
-        // The warning above is the sentence; this is the money. A fabricated
-        // 1..18 index is structurally indistinguishable from a real one, so the
-        // fact has to be recorded where the fallback happens or the event scores
-        // net on invented data with the record claiming the card is genuine.
+        // TEST 20b - WHAT GETS STORED when Net is chosen on a course whose card
+        // has no usable stroke index. The warning above is the sentence; this is
+        // the money. The record must say the index is not genuine
+        // (courseIndexSynthetic) and the event must score gross, or it scores
+        // net on an index that allocates nothing honestly with the record
+        // claiming the card is fine. (This used to test the fabricated 1..18
+        // fallback; that path is gone since course search - see the fixture.)
         synthRun = await buildEventThroughTheUI('net', SYNTHETIC_COURSE);
         if (synthRun.fatal) bail('TEST 20b: ' + synthRun.fatal);
         const t20b = {
@@ -373,6 +418,10 @@ if (require.main !== module) return;
         problems: problems,
         verdict: problems.length ? 'FAIL' : 'PASS',
     };
-    console.log(JSON.stringify(report, null, 2));
-    process.exit(problems.length ? 1 : 0);
-})();
+    // FLUSH, THEN EXIT. On macOS a pipe is asynchronous for process.stdout, so
+    // console.log() followed by process.exit() can drop the tail of the report
+    // when the parent is a test runner reading it through a pipe - measured
+    // once inside `npm test` (2026-09-18): exit 0, empty stdout. The callback
+    // form exits only after the bytes are out.
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n', () => process.exit(problems.length ? 1 : 0));
+})().catch((e) => bail('crashed before a verdict: ' + String(e && e.message || e)));
