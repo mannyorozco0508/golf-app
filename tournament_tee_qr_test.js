@@ -156,27 +156,55 @@ describe('2. THE TEE SHEET: a third builder through printSheet', () => {
         assert.ok(alerts.some((m) => /no teams/i.test(m)), JSON.stringify(alerts));
     });
 
-    test('the QR in a cell is drawn at error-correction M into a cell at least 35 mm wide (source)', () => {
+    test('the QR in a cell is a SYNCHRONOUSLY PAINTED CANVAS the page owns, appended after innerHTML at error-correction M - never the async draw, never a data URI (source)', () => {
+        // FIX C' (2026-09-18): the first version drew into the live cells with the
+        // library, whose <img> src lands asynchronously; printSheet called
+        // window.print() in the same task and the paper got blank cells. A data
+        // URI <img> does not fix it: Chrome pauses the page for the print dialog
+        // and defers the posted data-URL load with it (HANDOFF has the Chromium
+        // file:line trail). Only pixels already painted at the call reach the
+        // paper, so the builder asks qrBitmap() for a canvas of its own -
+        // drawImage from the library's scratch canvas, synchronously - and
+        // APPENDS it to the cell after innerHTML (a canvas serialised through
+        // innerHTML or cloneNode loses its bitmap).
         const at = SRC.indexOf('function buildTeeSheetPrintView(');
         const fn = SRC.slice(at, SRC.indexOf('\n    function ', at + 30));
         assert.ok(fn.length > 200, 'the builder exists');
-        assert.match(fn, /drawQrInto\([^)]*qrLevelM\(\)\)/, 'M, explicitly - not the library default H');
+        assert.match(fn, /qrBitmap\(url, 132, qrLevelM\(\)\)/, 'a synchronous bitmap at M');
+        assert.doesNotMatch(fn, /drawQrInto\(|new QRCode\(|qrDataUri\(|toDataURL/, 'the builder must not draw into the sheet after the fact, nor go through a data URI');
+        assert.doesNotMatch(fn, /<img|<canvas/, 'no image element is serialised into the markup');
+        assert.match(fn, /box\.appendChild\(bitmap\)/, 'the painted canvas is appended, after innerHTML');
+        assert.ok(fn.indexOf('container.innerHTML = html') < fn.indexOf('box.appendChild(bitmap)'), 'appended AFTER innerHTML');
+        const q = SRC.indexOf('function qrBitmap(url, size, level)');
+        assert.ok(q > 0, 'qrBitmap exists');
+        const qf = SRC.slice(q, SRC.indexOf('\n    }', q));
+        assert.match(qf, /new QRCode\(scratch, opts\)/, 'the library draws into a scratch element');
+        assert.match(qf, /own\.getContext\('2d'\)\.drawImage\(drawn, 0, 0\)/, 'the pixels are copied into a canvas the page owns - no library reference, so its later display flip touches nothing on the sheet');
+        assert.match(qf, /own\.className = 'tee-qr-bitmap'/);
+        assert.doesNotMatch(qf, /toDataURL/, 'no data URI on the print path');
         assert.match(SRC, /function qrLevelM\(\) \{ return [^}]*QRCode\.CorrectLevel\.M/, 'qrLevelM is M');
         assert.match(fn, /class="tee-cell"/);
         assert.match(SRC, /\.tee-cell\s*\{[^}]*width:\s*(3[5-9]|[4-9][0-9])mm/, 'a cell of at least 35 mm');
+        assert.match(SRC, /\.tee-qr-bitmap\s*\{[^}]*width:\s*35mm/, 'the bitmap prints at 35 mm');
         assert.match(SRC, /\.tee-cell\s*\{[^}]*page-break-inside:\s*avoid/, 'a code is never split across pages');
+        assert.doesNotMatch(SRC, /\.tee-qr canvas\s*\{/, 'the rule that hid the canvas must not come back');
+        assert.doesNotMatch(SRC, /tee-qr-img|qrDataUri/, 'fix C (the data-URI img) is gone, not left beside the canvas');
     });
 
-    test('every cell carries the fallback sentence for the drawer (the drawn image itself is Chrome\'s to prove)', () => {
+    test('qrBitmap: null without the library, null when the draw throws, and the builder falls back to the sentence in the MARKUP with no canvas', () => {
         const sb = arrive(record(), ORGANIZER);
-        sb.print = () => {}; sb.addEventListener = () => {};
-        sb.printTournamentTeeSheet();
-        // mini-dom does not parse innerHTML into children, so querySelectorAll('.tee-qr')
-        // finds nothing here and the drawer never runs on the sheet: the image and the
-        // fallback on screen are proven in Chrome (tools/tournament-tee-qr-check.js).
-        // What this proves: the builder's markup carries the fallback text on every cell.
-        const sheet = html(sb, 'tournament-print-view');
-        assert.equal(count(sheet, /data-fallback="QR code unavailable — open the link\."/g), 3);
+        sb.QRCode = undefined;
+        assert.equal(sb.qrBitmap('https://x.test/?tourney=TEEQR&team=1', 132, undefined), null);
+        const sb2 = arrive(record(), ORGANIZER);
+        assert.equal(typeof sb2.QRCode, 'function');
+        // mini-dom has no canvas: the library's draw throws inside qrBitmap and it answers null.
+        assert.equal(sb2.qrBitmap('https://x.test/?tourney=TEEQR&team=1', 132, sb2.qrLevelM()), null);
+        sb2.print = () => {}; sb2.addEventListener = () => {};
+        sb2.printTournamentTeeSheet();
+        const sheet = html(sb2, 'tournament-print-view');
+        assert.equal(count(sheet, /QR code unavailable — open the link\./g), 3, 'the sentence is in every cell\'s markup');
+        assert.equal(count(sheet, /<canvas|<img/g), 0, 'no image element when there is no bitmap');
+        assert.equal(count(sheet, /class="tee-qr" data-team="[123]"/g), 3, 'each cell is keyed to its team for the append');
     });
 });
 
@@ -214,8 +242,15 @@ describe('4. THE SEAMS', () => {
         assert.match(s, /CorrectLevel\.M|error.correction M/i);
         assert.match(s, /group/i); assert.match(s, /different grid/i);
     });
-    test('both caches moved: build-shell tournament-v47 and sw.js v172', () => {
-        assert.match(read('build-shell.js'), /cacheName: 'tournament-v47-tee-qr'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v172-tee-qr';/);
+    test('both caches moved for the tee-QR wave (v47 / v172) and again for the canvas fix (v48 / v173), and have not moved back', () => {
+        // Later tournament waves move both keys on; the Moved-to notes stay.
+        assert.match(read('build-shell.js'), /Moved to v47\. QR codes for team scorecard links/);
+        assert.match(read('build-shell.js'), /Moved to v48\. The tee sheet's QR is a canvas/);
+        assert.match(read('sw.js'), /Moved to v172: QR codes for team scorecard links/);
+        assert.match(read('sw.js'), /Moved to v173: the tee sheet's QR is a canvas/);
+        const t = /cacheName: 'tournament-v(\d+)-/.exec(read('build-shell.js'));
+        const c = /const CACHE_VERSION = 'golfapp-v(\d+)-/.exec(read('sw.js'));
+        assert.ok(t && Number(t[1]) >= 48, 'tournament key at or past v48: ' + (t && t[0]));
+        assert.ok(c && Number(c[1]) >= 173, 'consumer key at or past v173: ' + (c && c[0]));
     });
 });

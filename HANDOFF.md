@@ -837,6 +837,8 @@ typed. Every cell reads its URL from the same builder the Share buttons use. Why
 library's default H it is 49×49 and marginal on paper at small sizes. Measured under
 print media in Chrome: the manage screen hidden, three cells 42 mm wide, each image
 132 px, each cell its own team's URL and nobody else's, `window.print` reached once.
+**That measurement was taken 800 ms after the tap and the paper was blank — see the
+next section; the sheet's code is now a canvas the page paints itself.**
 
 **The inline QR.** Each public row on the Leaderboard tab's Team Scorecard Links carries
 a 64 px `.team-qr` beside its Share (drawn by `renderTeamLinks` through the same guarded
@@ -862,6 +864,112 @@ boxes, the seams — mini-dom has no canvas, so every code there is the fallback
 and the images are Chrome's); `tools/tournament-tee-qr-check.js` (above);
 `tournament_pairings_print_test.js` re-pinned to three callers of `printSheet`. Both
 caches: `build-shell.js` `tournament-v47-tee-qr`, `sw.js` `golfapp-v172-tee-qr`.
+
+## The tee sheet printed blank QR cells — print is a snapshot, and Chrome pauses the page for it (2026-09-18)
+
+**What Manny saw.** The tee sheet from the section above, printed from Chrome's real
+dialog the same day it shipped: every QR cell blank, name and URL present. The check
+had passed. It measured the sheet **800 ms after the tap**, under emulated print media,
+and at 800 ms every cell had a drawn `<img>`. Print is a **snapshot at
+`window.print()`**, and at that instant (measured with a stubbed `window.print` that
+captures the cells as it is called): `img` src length 0, display none, naturalWidth 0;
+the library's `<canvas>` 132 px wide and hidden by the wave's own screen CSS
+(`.tee-qr canvas { display: none; }`, which applied in every medium). qrcodejs draws
+its canvas synchronously and sets the `<img>` src **asynchronously**, after a probe
+image's onload; `printSheet` printed in the same task.
+
+**The fix that would not have worked, and why — the Chromium trail.** The first
+chosen fix (C) built the PNG data URI synchronously in the builder and put
+`<img src="data:…">` in the cell's markup. Measured in Chrome
+(scratch `sync-img-probe.js`, 2026-09-18): an `<img>` given a data URI has
+**naturalWidth 0 and complete false in the task that sets it**, whether by innerHTML,
+`new Image()`, or the same URI a second time; 132 fifty ms later. And the paper would
+not have had it either. Chromium main, read 2026-09-18:
+
+- `third_party/blink/renderer/core/page/chrome_client.cc:277-282`,
+  `ChromeClient::Print()`: *"Suspend pages in case the client method runs a new event
+  loop that would otherwise cause the load to continue while we're in the middle of
+  executing JavaScript."* — **`ScopedPagePauser pauser;`** around `PrintDelegate(frame)`.
+- `third_party/blink/renderer/core/frame/local_frame.cc:3476-3484`
+  `GetLoaderFreezeMode()`: paused → `LoaderFreezeMode::kStrict`;
+  `SetContextPaused()`: `Fetcher()->SetDefersLoading(GetLoaderFreezeMode())`,
+  `Loader().SetDefersLoading(...)`, `GetFrameScheduler()->SetPaused(is_paused)`.
+- `third_party/blink/renderer/platform/loader/fetch/resource_loader.cc:1308-1315`
+  `RequestAsynchronously()`: *"Handle DataURL in another task instead of using
+  |loader_|."* — a data-URL image load is a **posted task**; `:1453-1459`
+  `HandleDataUrl()`: `if (freeze_mode_ != LoaderFreezeMode::kNone) {
+  defers_handling_data_url_ = true; return; }`.
+- `components/printing/renderer/print_render_frame_helper.cc:2798-2811`, the
+  scripted preview: *"SetupScriptedPrintPreview() blocks this call and JS by running a
+  nested run loop"* — `base::RunLoop loop{kNestableTasksAllowed}; … loop.Run();` —
+  **inside the pauser's scope**. The preview is rendered while the page is paused.
+
+Read together: `window.print()` pauses the page before the data-URL task runs, the
+fetcher is frozen, the load defers itself, and the preview lays out an `<img>` with no
+image. That is also exactly why the shipped sheet was blank while the DOM was fine 3 ms
+later — the probe's onload was frozen too. **Only pixels already painted at the call
+reach the paper: a `<canvas>` bitmap.** The next person reaching for a data URI in a
+print path needs this paragraph.
+
+**The fix (C′).** `qrBitmap(url, size, level)` in `tournament.html`: draws with the
+library into a scratch element it never attaches (the library keeps a reference to
+*its* canvas and flips its display after the probe onload — that scratch element is
+what it flips), then `drawImage` copies the pixels into a **canvas the page owns**, no
+library reference, class `tee-qr-bitmap` (35 mm). `buildTeeSheetPrintView` paints every
+bitmap before the markup, writes an empty `.tee-qr[data-team]` per cell (or the fallback
+sentence and no canvas when `qrBitmap` returns null — no library, or a throw), sets
+innerHTML, then **appends** each bitmap to its cell: a canvas serialised through
+innerHTML or `cloneNode` comes back empty (measured: a moved canvas keeps 8,584 dark px
+of 17,424; a clone has none). The sheet is print-only, so it carries one copy of the
+pixels — no data-URI `<img>` beside the canvas. `printSheet` is unchanged and still
+synchronous; the modal (180) and the inline rows (64) still use `drawQrInto` on the
+async path, which is fine on screen. `.tee-qr canvas { display: none; }` is gone.
+
+**The check, rewritten to measure the instant.** `tools/tournament-tee-qr-check.js`'s
+stubbed `window.print` captures each cell **as it is called** — canvas presence, width,
+own computed display up the ancestor chain to the view (exclusive: the view itself is
+`display:none` under screen media and only print media shows it), the canvas's
+`toDataURL`, img src length and naturalWidth — and asserts per cell at least one shown
+element with pixels at that instant; the print-media pass proves the manage screen
+hidden and the rects (canvas 132 px ≥ 35 mm) against that same snapshot, and each cell's
+**bitmap** (`toDataURL`, not a src attribute) is byte-equal to one the probe draws
+itself from the cell's printed URL; the sheet may not change between `print()` and the
+probe. The same at-print capture runs on the pairings and results sheets (no images;
+vacuous, and already there). Controls, each red by name, page restored by sha: the
+canvas rule reintroduced → "NO VISIBLE PIXELS AT THE PRINT INSTANT" ×3 (canvasShown
+false); HEAD's async img path restored as the only pixels → the same ×3 (imgSrcLen 0,
+canvas hidden); cells 1 and 2 swapped bitmaps → "CELL 1'S/2'S BITMAP DOES NOT ENCODE ITS
+OWN URL". Green on C′: at print, canvas 132 shown, bitmaps 3,822 / 3,806 / 3,746 chars,
+`encodesOwnUrl` ×3. `tournament_tee_qr_test.js` pins the mechanism in source
+(qrBitmap at M, drawImage into an own canvas, appended after innerHTML, no
+`toDataURL`/`<img>`/`<canvas>` in the builder, the hiding rule absent) and drives the
+no-bitmap fallback through `printTournamentTeeSheet` in mini-dom (no canvas there).
+Both caches: `build-shell.js` `tournament-v48-tee-qr-canvas`, `sw.js`
+`golfapp-v173-tee-qr-canvas`.
+
+**Four harness faults in four waves — the pattern is the point.** Each one a green run
+that was not, or a red run that was not:
+
+1. **stdout to a pipe is asynchronous on macOS** (net-reachable wave): `console.log(report);
+   process.exit()` handed the runner an empty stdout — exit 0, no JSON. A report lost
+   between the log and the exit. Fix: write with a callback that exits after the bytes
+   are out (`tools/tournament-net-reachable-check.js`; the tee-QR check now does the same).
+2. **targaryen through a pipe truncates at 33,214 bytes** (narrowing wave): a
+   zero-failure run read as three red suites, because the summary line the parser
+   needs is at the end. Fix: `helpers/targaryen-run.js`, stdout to a file.
+3. **A Chrome check measuring 800 ms after the tap when print is a snapshot** (tee-QR
+   wave): the sheet it measured was one the user never sees. Fix: the stubbed
+   `window.print` captures at the instant; nothing after it counts.
+4. **A recon scoping an acceptance criterion its own recommended fix could not
+   satisfy** (this wave): the recon wrote "an img with a data: src and naturalWidth > 0
+   at the instant" as the bar and recommended the data-URI fix — a bar Chrome cannot
+   reach in the same task, for a fix the print pause would have blanked anyway. Fix:
+   measure the criterion against the candidate before recommending it; here that
+   measurement (`sync-img-probe.js`) took four minutes and changed the fix.
+
+The common shape: the harness said what it was told to look for, and nobody had
+checked that the thing it looked for was the thing the user gets. When a check is
+written, ask what moment or byte the user actually receives, and measure that one.
 
 ## tournaments/$code is narrowed — a code-holder writes scores and nothing else (2026-09-18)
 

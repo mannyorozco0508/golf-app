@@ -244,7 +244,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // installed device keeps serving the old mark and a page whose head has
         // no manifest link in it at all.
         const block = BUILD.slice(BUILD.indexOf('tournament: {'));
-        assert.match(block, /cacheName: 'tournament-v47-tee-qr'/);
+        assert.match(block, /cacheName: 'tournament-v48-tee-qr-canvas'/);
     });
 
     // Minimal PNG corner reader — same approach as rattle_identity_test.js, kept

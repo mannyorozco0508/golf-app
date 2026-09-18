@@ -76,6 +76,9 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v48. The tee sheet's QR is a canvas the page paints itself
+        // and appends; a device on v47 keeps a tee sheet that prints blank QR
+        // cells (the library's async <img> was still empty at window.print()).
         // Moved to v47. QR codes for team scorecard links: qrcode.min.js joins
         // TOURNAMENT (vendored; it was a runtime CDN script and without the
         // CDN the share modal never opened), the modal opens without it, an
@@ -132,7 +135,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v47-tee-qr',
+        cacheName: 'tournament-v48-tee-qr-canvas',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

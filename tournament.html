@@ -235,8 +235,7 @@
         .tee-name { font-weight: bold; font-size: 0.95rem; margin-bottom: 1mm; }
         .tee-hole { font-size: 1.1rem; font-weight: bold; margin-bottom: 1mm; }
         .tee-qr { display: flex; justify-content: center; min-height: 35mm; align-items: center; font-size: 0.7rem; color: #555; }
-        .tee-qr canvas { display: none; }
-        .tee-qr img { width: 35mm; height: 35mm; }
+        .tee-qr-bitmap { width: 35mm; height: 35mm; display: block; }
         .tee-url { font-size: 0.55rem; color: #444; word-break: break-all; margin-top: 1mm; }
 
         .lb-row { display: flex; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
@@ -1677,6 +1676,37 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Error-correction M when the library is there (the level table lives on the
     // library); undefined otherwise, and drawQrInto then falls through anyway.
     function qrLevelM() { return (typeof QRCode === 'function' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.M : undefined; }
+
+    // A BITMAP for the printed tee sheet, painted SYNCHRONOUSLY into a canvas
+    // the page owns. Print is a snapshot at the print call, and Chrome pauses
+    // the page for the dialog (ScopedPagePauser in ChromeClient::Print): every
+    // load still pending at the call - the library's async <img> src, and a
+    // data-URI <img> set in the same task, which is a posted load Chrome
+    // defers under the pause - stays pending until the dialog closes. The
+    // first tee sheet printed blank cells because of it (2026-09-18; the
+    // Chromium file:line trail is in HANDOFF). Only pixels already painted at
+    // the call reach the paper, so: draw with the library into a scratch
+    // element it can keep flipping to itself, copy the pixels into a canvas of
+    // our own with no library reference, and hand THAT to the builder. null
+    // without the library or when the draw throws - the builder then writes
+    // the fallback sentence. A canvas must be appended, never serialised:
+    // innerHTML and cloneNode lose the bitmap.
+    function qrBitmap(url, size, level) {
+        if (typeof QRCode !== 'function') return null;
+        try {
+            const scratch = document.createElement('div');
+            const opts = { text: url, width: size, height: size };
+            if (level !== undefined) opts.correctLevel = level;
+            new QRCode(scratch, opts);
+            const drawn = scratch.querySelector('canvas');
+            if (!drawn || !(drawn.width > 0)) return null;
+            const own = document.createElement('canvas');
+            own.width = drawn.width; own.height = drawn.height;
+            own.className = 'tee-qr-bitmap';
+            own.getContext('2d').drawImage(drawn, 0, 0);
+            return own;
+        } catch (e) { return null; }
+    }
 
     function drawQrInto(el, url, size, level) {
         if (!el) return false;
@@ -3895,22 +3925,29 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         let html = `<h2 style="margin:0 0 4px 0; font-size:1.3rem;">${esc(data.name || 'Tournament')}</h2>
             <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>
             <div class="tee-grid">`;
+        const bitmaps = [];
         teams.forEach((t) => {
             const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
             const teamName = t.name || `Team ${t.num}`;
             const hole = shotgun
                 ? (t.startingHole ? `<div class="tee-hole">Hole ${esc(t.startingHole)}</div>` : `<div class="tee-hole" style="color:#b00020;">HOLE NOT SET</div>`)
                 : '';
+            // The bitmap is painted before the cell exists; the cell is appended
+            // to (never serialised) after innerHTML, so the print snapshot has
+            // the pixels. No bitmap: the sentence is in the markup, no canvas.
+            const bitmap = qrBitmap(url, 132, qrLevelM());
+            if (bitmap) bitmaps.push({ num: t.num, bitmap });
             html += `<div class="tee-cell">
                 <div class="tee-name">${esc(teamName)}</div>${hole}
-                <div class="tee-qr" data-url="${esc(url)}" data-fallback="QR code unavailable \u2014 open the link."></div>
+                <div class="tee-qr" data-team="${esc(t.num)}">${bitmap ? '' : 'QR code unavailable \u2014 open the link.'}</div>
                 <div class="tee-url">${esc(url)}</div>
             </div>`;
         });
         html += `</div><p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
         container.innerHTML = html;
-        Array.from(container.querySelectorAll('.tee-qr')).forEach((box) => {
-            drawQrInto(box, box.dataset.url, 132, qrLevelM());
+        bitmaps.forEach(({ num, bitmap }) => {
+            const box = container.querySelector(`.tee-qr[data-team="${num}"]`);
+            if (box) box.appendChild(bitmap);
         });
         return true;
     }

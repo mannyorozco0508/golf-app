@@ -1626,7 +1626,10 @@
 // tournament.html gains the guard, the inline codes and the tee sheet. A
 // device on v171 keeps a page that reaches for cdnjs and a modal that never
 // opens without it.
-const CACHE_VERSION = 'golfapp-v172-tee-qr';
+// Moved to v173: the tee sheet's QR is a canvas tournament.html paints itself
+// and appends before printing. A device on v172 keeps a tee sheet that prints
+// blank QR cells - the library's async <img> was still empty at window.print().
+const CACHE_VERSION = 'golfapp-v173-tee-qr-canvas';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
