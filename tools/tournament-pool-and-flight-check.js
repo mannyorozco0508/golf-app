@@ -14,6 +14,16 @@
 // TEST 17  THE POOL. entryFee x team count, so a $300 entry fee on a
 //          three-golfer field is a $0 pool, every payout is $0.00, and the
 //          organizer is told "No entry fee set for this tournament".
+// TEST 18  THE CALCULATOR AT ZERO (2026-09-18). With entryFee 0 and three
+//          scored teams the results list used to print three "$0.00" rows - a
+//          finished-looking table for a pool that does not exist - and with a
+//          pool the same for every rank past the paid spots (payouts.js returns
+//          every rank; the page printed them all). Now a PAGE filter drops
+//          amount-0 rows and three sentences are each reachable: untyped ->
+//          "Enter spot amounts above to see payouts."; typed and reached ->
+//          rows with money only; typed and nobody reaches -> "No paid spots
+//          reached yet." (which had never rendered before). Measured by typing
+//          into the real inputs, as an organizer running a separate pool does.
 //
 // EVERY ASSERTION HAS A CONTROL, AND THE CONTROLS ARE THE POINT:
 //   - a TEAM fixture must behave identically before and after, or the fix has
@@ -54,12 +64,12 @@ function individualField() {
     const groups = {};
     const g = F.scoringGroup('Group 1', field.ids, 1);
     groups[g.id] = g;
-    return F.eventRecord({
+    return Object.assign(F.eventRecord({
         name: 'Club Championship', format: 'individual', scoringMode: 'gross',
         courseName: 'True Blue', activeCourseKey: 't', courseData: COURSE,
         entryFee: 300, players: field.players, scoringGroups: groups,
         flights: FLIGHTS, scores: scores,
-    });
+    }), { ownerUid: 'u-org' });   // owned: the Setup tab exists only for an owner since the narrowing
 }
 
 function teamField() {
@@ -69,12 +79,57 @@ function teamField() {
             players: ['A' + n, 'B' + n], flightId: USED_FLIGHT.id };
         for (let h = 1; h <= 18; h++) scores['team' + n + '_h' + h] = 3 + n;
     }
-    return F.eventRecord({
+    return Object.assign(F.eventRecord({
         name: 'Benefit Scramble', format: 'scramble', courseName: 'Caledonia',
         activeCourseKey: 'c', courseData: COURSE, entryFee: 300,
         teams: teams, flights: FLIGHTS, scores: scores,
-    });
+    }), { ownerUid: 'u-org' });
 }
+
+// A fee-0 scramble, three teams with scores, for TEST 18.
+function zeroFeeField() {
+    const teams = {}, scores = {};
+    for (let n = 1; n <= 3; n++) {
+        teams['team' + n] = { num: n, name: 'Team ' + n, handicap: 0, players: ['A' + n, 'B' + n] };
+        for (let h = 1; h <= 18; h++) scores['team' + n + '_h' + h] = 3 + n;
+    }
+    return Object.assign(F.eventRecord({
+        name: 'Separate Pool Scramble', format: 'scramble', courseName: 'Caledonia',
+        activeCourseKey: 'c', courseData: COURSE, entryFee: 0,
+        teams: teams, scores: scores,
+    }), { ownerUid: 'u-org' });
+}
+
+// TEST 18's probe: the calculator at fee 0, driven through its own inputs.
+const PROBE_ZERO = `
+(() => {
+  const t = id => { const e = document.getElementById(id);
+      return e ? (e.innerText || '').replace(/\\s+/g, ' ').trim() : null; };
+  const rows = () => document.querySelectorAll('#payout-results .ledger-row').length;
+  const zeros = () => ((t('payout-results') || '').match(/\\$0\\.00/g) || []).length;
+  const out = {};
+  const tab = document.getElementById('tab-btn-leaderboard');
+  if (tab) tab.click();
+  out.subLine = t('payout-pool-sub');
+  out.headerPool = t('manage-t-pool');
+  out.untyped = { text: t('payout-results'), rows: rows(), zeros: zeros() };
+  const spotsInput = document.getElementById('payout-spots-input');
+  const type = (el, v) => { el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); };
+  const spot = i => document.getElementById('payout-spot-' + i);
+  // 3 spots, $50 on first: one row, the leader, no $0.00 rows.
+  type(spotsInput, 3); type(spot(0), 50);
+  out.firstOnly = { text: t('payout-results'), rows: rows(), zeros: zeros() };
+  // $50 on second only: one row, the runner-up.
+  type(spot(0), 0); type(spot(1), 50);
+  out.secondOnly = { text: t('payout-results'), rows: rows(), zeros: zeros() };
+  // 4 spots, money only on the 4th: three scored teams, nobody reaches it.
+  type(spotsInput, 4); type(spot(0), 0); type(spot(1), 0); type(spot(2), 0); type(spot(3), 50);
+  out.nobodyReaches = { text: t('payout-results'), rows: rows(), zeros: zeros() };
+  // back to nothing typed: the sentence again.
+  type(spot(3), 0);
+  out.clearedAgain = { text: t('payout-results'), rows: rows(), zeros: zeros() };
+  return JSON.stringify(out);
+})()`;
 
 const CAPTURE = `
 (function () {
@@ -166,19 +221,29 @@ function bail(msg) {
 }
 
 // EXPORTED so the SAME fixtures and probes run on a second engine.
-module.exports = { individualField: individualField, teamField: teamField,
-    CAPTURE: CAPTURE, PROBE_FLIGHT: PROBE_FLIGHT, PROBE_POOL: PROBE_POOL };
+module.exports = { individualField: individualField, teamField: teamField, zeroFeeField: zeroFeeField,
+    CAPTURE: CAPTURE, PROBE_FLIGHT: PROBE_FLIGHT, PROBE_POOL: PROBE_POOL, PROBE_ZERO: PROBE_ZERO };
 
 if (require.main !== module) return;
 
 (async () => {
     const IND = individualField();
     const TEAM = teamField();
-    const db = { tournaments: { IND, TEAM }, trips: {} };
+    const ZERO = zeroFeeField();
+    const db = { tournaments: { IND, TEAM, ZERO }, trips: {} };
 
+    // THE OWNER ARRIVES (repaired 2026-09-18): since the sign-in gate the Setup
+    // tab - and the flights list this tool measures - is removed for a signed-out
+    // arrival - and for ANY arrival on a record with no ownerUid, which is what
+    // tools/lib/tournament-fixtures.js eventRecord() builds. Every arrival here
+    // was signed out on an ownerless record, so the tool bailed with "the
+    // flights list did not render" on every run since the narrowing (dab91d8).
+    // It is not in npm test. The three records now carry ownerUid 'u-org' and
+    // the organizer account arrives.
+    const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
     const run = async (code, expression) => {
         const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code),
-            db, expression, preScript: CAPTURE, settleMs: 4200 });
+            db, auth: OWNER, expression, preScript: CAPTURE, settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;
@@ -188,6 +253,7 @@ if (require.main !== module) return;
     const flTEAM = await run('TEAM', PROBE_FLIGHT);
     const poolIND = await run('IND', PROBE_POOL);
     const poolTEAM = await run('TEAM', PROBE_POOL);
+    const zero = await run('ZERO', PROBE_ZERO);
 
     // --- CONTROLS, CHECKED BEFORE ANY FINDING IS BELIEVED -------------------
     if (flIND.usedFlight.missing || flTEAM.usedFlight.missing) {
@@ -249,6 +315,30 @@ if (require.main !== module) return;
     };
     Object.keys(t17).forEach(k => { if (!t17[k]) problems.push('TEST 17 ' + k + ': FAILED'); });
 
+    // --- TEST 18 ------------------------------------------------------------
+    // CONTROL: the calculator must produce a money row when money is typed, or
+    // "no $0.00 rows" is just a blank list.
+    if (!zero.firstOnly || zero.firstOnly.rows !== 1 || !/\$50\.00/.test(zero.firstOnly.text || '')) {
+        bail('TEST 18 CONTROL FAILED - typing $50 on 1st did not produce one $50.00 row: ' + JSON.stringify(zero.firstOnly));
+    }
+    const t18 = {
+        headerPoolHidden: !zero.headerPool,
+        subLine_saysNoFee: /No entry fee set/.test(zero.subLine || ''),
+        untyped_noRows: zero.untyped.rows === 0,
+        untyped_noZeroDollarRows: zero.untyped.zeros === 0,
+        untyped_saysEnterAmounts: /Enter spot amounts above to see payouts\./.test(zero.untyped.text || ''),
+        firstOnly_oneRow_leader: zero.firstOnly.rows === 1 && /1st — Team 1/.test(zero.firstOnly.text || ''),
+        firstOnly_noZeroDollarRows: zero.firstOnly.zeros === 0,
+        secondOnly_oneRow_runnerUp: zero.secondOnly.rows === 1 && /2nd — Team 2/.test(zero.secondOnly.text || '') && zero.secondOnly.zeros === 0,
+        nobodyReaches_saysSo: zero.nobodyReaches.rows === 0 && /No paid spots reached yet\./.test(zero.nobodyReaches.text || ''),
+        clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see payouts\./.test(zero.clearedAgain.text || ''),
+        noBannerWithoutAPool: !/add up to/.test([zero.untyped, zero.firstOnly, zero.nobodyReaches].map(x => x.text).join(' ')),
+        // WITH a pool (the team control at $900, 3 spots of $300): three money
+        // rows and no $0.00 row - the filter is the same one.
+        control_teamPool_noZeroDollarRows: !/\$0\.00/.test(poolTEAM.payoutResults || ''),
+    };
+    Object.keys(t18).forEach(k => { if (!t18[k]) problems.push('TEST 18 ' + k + ': FAILED'); });
+
     const report = {
         TEST_16_flight_guard: {
             individual_usedFlight: flIND.usedFlight,
@@ -276,9 +366,16 @@ if (require.main !== module) return;
             },
             assertions: t17,
         },
+        TEST_18_calculator_at_zero: {
+            subLine: zero.subLine, headerPool: zero.headerPool,
+            untyped: zero.untyped, firstOnly: zero.firstOnly, secondOnly: zero.secondOnly,
+            nobodyReaches: zero.nobodyReaches, clearedAgain: zero.clearedAgain,
+            teamControlResults: (poolTEAM.payoutResults || '').slice(0, 160),
+            assertions: t18,
+        },
         problems: problems,
         verdict: problems.length ? 'FAIL' : 'PASS',
     };
-    console.log(JSON.stringify(report, null, 2));
-    process.exit(problems.length ? 1 : 0);
+    // stdout to a pipe is asynchronous on macOS: write, then exit in the callback.
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n', () => process.exit(problems.length ? 1 : 0));
 })();

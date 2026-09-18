@@ -1629,7 +1629,11 @@
 // Moved to v173: the tee sheet's QR is a canvas tournament.html paints itself
 // and appends before printing. A device on v172 keeps a tee sheet that prints
 // blank QR cells - the library's async <img> was still empty at window.print().
-const CACHE_VERSION = 'golfapp-v173-tee-qr-canvas';
+// Moved to v174: the Tournament polish wave - tournament.html gains the event
+// details block and header lines, the payout filter at zero, and the desk
+// state badges. A device on v173 keeps a header with no date and a desk with
+// no badges.
+const CACHE_VERSION = 'golfapp-v174-polish';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

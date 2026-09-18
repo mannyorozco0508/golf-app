@@ -865,6 +865,124 @@ and the images are Chrome's); `tools/tournament-tee-qr-check.js` (above);
 `tournament_pairings_print_test.js` re-pinned to three callers of `printSheet`. Both
 caches: `build-shell.js` `tournament-v47-tee-qr`, `sw.js` `golfapp-v172-tee-qr`.
 
+## Event details on the header — date, start time, venue, beneficiary (polish wave, 2026-09-18)
+
+**The first edit-after-save on this record.** Nothing on a tournament could be changed
+once created — not the name, the course or the fee — so a date field only on the create
+form would have meant rebuilding FYT5K5 to give it one. The **Event details** block on
+the Setup tab (`#event-details-block`, under the pool line) writes **per key, the
+`startType` shape**: `setEventDetail(key, value)` → `tournaments/$code/<key>` set, or
+set `null` when cleared. The four keys and their MACHINE shapes: `eventDate`
+`"YYYY-MM-DD"` (`<input type="date">`), `startTime` `"HH:MM"` (`<input type="time">`),
+`venue` and `beneficiary` (text, trimmed, ≤ 120). A value that is not the shape is
+refused at the writer; a stored one that is not (hand-edited) renders nothing rather
+than the raw string. **Never a display string**: `formatEventDate` builds
+"Sun, Oct 4, 2026" from the parts (no UTC drift), `formatStartTime` "8:00 AM", at
+render. The inputs are filled from every snapshot unless one of them has focus. The
+next edit-after-save should copy this block, not invent a second mechanism.
+
+**Where it shows, and where it deliberately does not.** `#manage-t-details` under the
+organizer header and `#lb-t-details` under the public Leaderboard header — **new
+elements, not a changed sub line**: `#manage-t-sub` / `#lb-t-sub` stay "course • format"
+because three Chrome tools grep the format word out of them (`tools/tournament-label-
+check.js`, `-net-label-check.js`, `-reachability-recon.js`). Up to three centred lines:
+date • time, the venue, "Benefiting X" — hidden (`display:none`, empty) when all four
+are unset, so a record from before this wave looks exactly as it did. NOT on the
+signup page, the scorecard, or the three print headers — each is its own pin and none
+is what a course looks at in a demo; a later wave adds them one at a time.
+
+**Schema-free, proven.** `tournaments/$code` has no `$other` rule; the owner's `.write`
+covers any child. `security-rules.tests-data.json` carries rows for
+`tournaments/OWNED/eventDate` and `/venue` (organizer can, nobody / stranger / anonymous
+cannot; a null write by the owner is allowed) and `tournaments_rules_isolation_test.js`
+classes them as ownership negatives. No rules change, no publish.
+
+**Tests.** `tournament_event_details_test.js` — the formatters, both headers through
+the page's own value handler (signed in and out), the hidden-when-unset case, escaping,
+the writer's shapes and the owner gate, the seams. Controls, restored by sha: the
+details rendered INTO the sub line → red; `renderEventDetails()` not called → 10 red; a
+display string stored → red.
+
+## The payout calculator at zero — no hollow $0.00 rows (polish wave, 2026-09-18)
+
+**Measured before.** With `entryFee` 0 and three scored teams the results list printed
+three ledger rows, every one `$0.00` — a finished-looking payout table for a pool that
+does not exist. With a pool the same for every rank past the paid spots, because
+`allocatePlacePayouts` (`payouts.js`, **PROTECTED, shared with Trip Mode**) returns
+every ranked entry with amount 0 past the paid spots and `renderPayoutResults` printed
+them all. And **"No paid spots reached yet." had never rendered**: `payouts` was empty
+only when no row had scores, and that case returned "No scores yet" three lines earlier.
+
+**Now — a page filter; the allocator is untouched** (its sha is pinned in
+`tournament_payout_zero_test.js` for exactly that reason): `computeTournamentPayouts(…)
+.filter(p => p.amount > 0)`. Three sentences, each reachable: no row has scores → "No
+scores yet — payouts will show once teams start posting."; every spot amount is 0 →
+**"Enter spot amounts above to see payouts."**; amounts set but the only scored ranks
+sit on $0 spots → "No paid spots reached yet." (live at last — e.g. four spots, money on
+the 4th, three teams). The mismatch banner keeps its own rule (pool > 0 and amounts ≠
+pool). "No pool" means exactly `entryFee` 0: the spot amounts live only in the DOM,
+never on the record, and the "separate pool" sentence is true — an organizer types
+amounts and the calculator allocates them by rank with the shared tie rule.
+
+**Harness limits, stated.** mini-dom does not parse the spot `<input>`s out of
+innerHTML, so every amount reads 0 there: `tournament_payout_zero_test.js` proves the
+all-zero sentence branch and the banner; the FILTER is Chrome's —
+`tools/tournament-pool-and-flight-check.js` **TEST 18** (new) arrives on a fee-0
+scramble as the owner and types into the real inputs: untyped → the sentence, 0 rows;
+$50 on 1st → one row "1st — Team 1 $50.00", no $0.00; $50 on 2nd only → one row, the
+runner-up; four spots with money on the 4th → "No paid spots reached yet."; cleared →
+the sentence; the $900 team control → three $300 rows and no $0.00. Control (the filter
+removed): TEST 18 bails "typing $50 on 1st did not produce one $50.00 row: … 2nd — Team
+2 $0.00 3rd — Team 3 $0.00, rows 3, zeros 2"; in mini-dom only the source test goes
+red, which is the limit above, not a proof.
+
+**The tool was exit 2 on HEAD before this wave — repaired, and it was not alone.** The
+cause and the four other tools it silenced are harness fault #5 in the list under "The
+tee sheet printed blank QR cells", where the pattern lives.
+
+## Desk state badges — Unpaid / Paid / In the field / Needs a team (polish wave, 2026-09-18)
+
+**Before.** Paid was an unlabelled checkbox state; Approved was "In the field" in plain
+muted text; and a golfer approved with no destination became a one-player team named
+"Team N" (`approveRegistration`) that looked like a finished foursome on every surface
+— a scorecard link, a tee-sheet cell, a leaderboard row — and the desk said nothing.
+
+**Now.** Each row carries a **state badge** (`.reg-state`, 0.74 rem bold, four
+backgrounds): `reg-state-paid` "Paid" / `reg-state-unpaid` "Unpaid" beside the name (the
+checkbox stays the control, labelled Paid — the badge is the word that scans, the box
+is the thing you tick); `reg-state-field` **"In the field"** — the pinned words, once,
+became the badge (`tournament_desk_2c_test.js:298`, `tools/tournament-desk-check.js:135`
+stand); `reg-state-needs` **"Needs a team"** beside it when `regNeedsTeam(e)` says so.
+A sixth chip **"Needs a team N"** after the five, and a counts line "N needs a team"
+only when N > 0 (the main line is pinned as it was).
+
+**"Needs a team" — derived, nothing stored, narrowed.** `regNeedsTeam(e)`: in the field,
+on a TEAM event, `teamNum` names a team with exactly one golfer, **and** that team's
+name matches `/^Team \d+$/` (or is empty, which renders as "Team N" everywhere). A
+one-golfer team the organizer NAMED — the Hawks in the fixture — is a team of one on
+purpose and does not need one. No key on the signup (`registrations/$code/$entryId`
+has `$other: false` — a publish), no marker on the team; 3-C and 3-D declined. The
+desk says it; **Setup is where it is fixed** — no rename or move on the desk this wave
+(3-E declined: neither hook exists anywhere on the page; if two screens is too many, a
+real event will say so). **Individual events** have players, not teams: no Needs badge
+and no sixth chip there — a badge that cannot be true is not rendered.
+
+**Fixture.** `helpers/registration-desk-fixture.js` now has a real singleton-from-
+approval record: `deskTeams()` (Eagles ×2, Hawks ×1 named, "Team 3" ×1 default) and
+the 14 in-field entries point at them — 12 at team 1, e120 at the Hawks, e130 at
+"Team 3"; `TOTALS.needsTeam: 1`. Before, all 14 pointed at one two-player team and
+nothing could prove the badge positively.
+
+**Measured at 390 px** (`tools/tournament-desk-check.js`, the OWNED2 arrival): no
+sideways scroll (scrollWidth 390), widest row 326 px, every row a payment badge with a
+rect (44×23 at 11.84 px), four backgrounds all different (`#fff3e0`, `#e6f4ea`,
+`#e3eefc`, `#fdecea`), e130 "Paid · In the field · Needs a team", e120 no Needs badge,
+the sixth chip "Needs a team 1" (117×28) tapped → one row, e130. `tournament_desk_
+badges_test.js` drives the same fixture in mini-dom. Controls, restored by sha: the
+narrowing dropped → the Hawks need a team (2 badges, "Needs a team 2") red in both;
+two states sharing a background → red in both; the chip's test swapped for
+`regInField` → red.
+
 ## The tee sheet printed blank QR cells — print is a snapshot, and Chrome pauses the page for it (2026-09-18)
 
 **What Manny saw.** The tee sheet from the section above, printed from Chrome's real
@@ -947,7 +1065,7 @@ no-bitmap fallback through `printTournamentTeeSheet` in mini-dom (no canvas ther
 Both caches: `build-shell.js` `tournament-v48-tee-qr-canvas`, `sw.js`
 `golfapp-v173-tee-qr-canvas`.
 
-**Four harness faults in four waves — the pattern is the point.** Each one a green run
+**Five harness faults in five waves — the pattern is the point.** Each one a green run
 that was not, or a red run that was not:
 
 1. **stdout to a pipe is asynchronous on macOS** (net-reachable wave): `console.log(report);
@@ -967,9 +1085,48 @@ that was not, or a red run that was not:
    measure the criterion against the candidate before recommending it; here that
    measurement (`sync-img-probe.js`) took four minutes and changed the fix.
 
+5. **A rules change silently disarmed five checks** (found in the polish wave, three
+   commits after the narrowing `dab91d8`): `canManage()` became false on a record with
+   no `ownerUid`, and `tools/lib/tournament-fixtures.js` `eventRecord()` wrote none, so
+   the Setup tab those tools measure never rendered — `tournament-destructive-check`,
+   `-payer-link-check`, `-pending-handicap-check`, `-unnamed-entry-check`,
+   `-withdraw-check` and `-pool-and-flight-check` all exit 2 ("reading 'innerText'" of
+   an element that is not there), and nobody noticed because none of them is in
+   `npm test`. Fix taken (2026-09-18): `eventRecord()` owns its records by `'u-org'`
+   (pass `ownerUid: null` for a legacy record on purpose) and each of the six arrives
+   as that owner (`auth: OWNER`) — the gate wants both. Measured after: pool-and-flight
+   PASS (TESTS 16/17/18); the other five clear the gate and stop on a SECOND cause
+   each, recorded and not chased: payer-link, pending-handicap, unnamed-entry and
+   withdraw stall in their *journey* arms (`openJourney` opens anonymous and creates
+   through the page; `tournaments[code]` comes back undefined / "setting 'value' of
+   null" — most likely the same gate a third time, UNKNOWN until run);
+   destructive-check hits the page defect below. `-label-check` (inert control) and
+   `-reachability-recon` (its own stub) were already recorded; `-multiround-check`
+   is exit 1 on HEAD too (TEST 23, its create-through-the-page arm; UNKNOWN cause,
+   likely the same gate on the create form) — found in the same sweep, not chased.
+   After the fixture edit: `-focus-check`, `-net-label-check`,
+   `-snapshot-and-shamble-check`, `-stroke-dots-check` still pass.
+
+**A page defect found on the way (2026-09-18), NOT fixed — its own wave.** On an
+OWNED record, for anyone who is not the owner — signed out, anonymous, or another
+account — `applyManageGate` removes the Setup tab, and every LATER snapshot of the
+record throws in `loadTournament`'s value callback at `tournament.html:4094`
+(`document.getElementById('manage-room-badge').textContent = code` — the badge is
+inside the removed tab) **before `renderLeaderboard` runs**. Measured in Chrome
+(scratch `gate-second-snapshot.js`, all three arrivals): the first snapshot renders
+the board; a second snapshot carrying two scores throws "Cannot set properties of
+null (setting 'textContent')" and the board still reads "Eagles — / —". A spectator's
+live leaderboard freezes after the first score. It predates this wave (the sign-in
+gate); `tools/tournament-tee-qr-check.js` and the desk check pass signed-out because
+they deliver one snapshot. The fix shape is a null-guarded write for the Setup-tab
+elements in that callback (or the gate hiding rather than removing); the check is a
+second snapshot delivered to a signed-out arrival. Not taken here.
+
 The common shape: the harness said what it was told to look for, and nobody had
 checked that the thing it looked for was the thing the user gets. When a check is
 written, ask what moment or byte the user actually receives, and measure that one.
+Fault #5 adds the corollary: a check that is not in the suite is a check nobody runs,
+and a gate that closes a page to a fixture closes every tool built on that fixture.
 
 ## tournaments/$code is narrowed — a code-holder writes scores and nothing else (2026-09-18)
 

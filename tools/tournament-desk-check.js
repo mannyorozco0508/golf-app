@@ -24,11 +24,19 @@
 //   - INDIV1 (individual, $100): the fees line carries the total; Approve mints
 //     a player record
 //   - signed out: no Desk tab, no Desk panel, no registrant on screen
+//   - OWNED2 (2026-09-18, the state badges): the SAME 142 signups on the
+//     fixture's teams (deskTeams(): the Eagles, the Hawks - a NAMED team of one -
+//     and "Team 3", a default-named team of one). At 390 px: no horizontal
+//     overflow, every row a payment badge with a rect, e130 "In the field" +
+//     "Needs a team", e120 (Hawks) no Needs badge, four badge backgrounds all
+//     different, badge text >= 11 px; the sixth chip "Needs a team 1" tapped
+//     shows one row, e130. "Scannable on a phone" is the ask; this is what
+//     measures it. On INDIV1 there is no sixth chip.
 //
 // EXIT 0 PASS, 1 FAIL, 2 could not run.
 // ============================================================================
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
-const { deskEntries, TOTALS } = require('../helpers/registration-desk-fixture.js');
+const { deskEntries, deskTeams, TOTALS } = require('../helpers/registration-desk-fixture.js');
 
 const PARS = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5];
 const course = PARS.map((p, i) => ({ hole: i + 1, par: p, hcpIndex: ((i * 7) % 18) + 1 }));
@@ -36,7 +44,10 @@ const teams = { team1: { num: 1, name: 'Eagles', players: ['Ann Alpha', 'Bo Brav
 const owned = { name: 'Desk Scramble', format: 'scramble', courseName: 'Tidewater', activeCourseKey: 'tidewater', courseData: course, entryFee: 400, teams, createdAt: 1, ownerUid: 'u-org', courseIndexSynthetic: false };
 const indiv = { name: 'Desk Stroke', format: 'individual', scoringModel: 'player-v1', scoringMode: 'gross', courseName: 'Tidewater', activeCourseKey: 'tidewater', courseData: course, entryFee: 100, teams: {}, players: {}, createdAt: 1, ownerUid: 'u-org', courseIndexSynthetic: false };
 const TEAM_REGS = deskEntries('team'), INDIV_REGS = deskEntries('individual');
-const db = { tournaments: { OWNED1: owned, INDIV1: indiv }, registrations: { OWNED1: TEAM_REGS, INDIV1: INDIV_REGS }, events: {}, trips: {}, global_courses: {} };
+// OWNED2: the same event on the fixture's teams (the singleton "Team 3" exists
+// here, so Ben's approval on OWNED1 - which must mint team3 - keeps its own record).
+const owned2 = Object.assign({}, owned, { name: 'Desk Scramble Two', teams: deskTeams() });
+const db = { tournaments: { OWNED1: owned, OWNED2: owned2, INDIV1: indiv }, registrations: { OWNED1: TEAM_REGS, OWNED2: TEAM_REGS, INDIV1: INDIV_REGS }, events: {}, trips: {}, global_courses: {} };
 const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 
 // Records every set/update the page makes and keeps the registrations value
@@ -193,8 +204,62 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     if (after.setupDisplay !== 'block' || !after.deskPanel) failures.push('late sign-in: Setup not shown or Desk panel missing: ' + JSON.stringify(after));
     if (!lateDesk || lateDesk.rows !== TOTALS.entries || lateDesk.deskDisplay !== 'block') failures.push('late sign-in: the Desk does not list the field after sign-in: ' + JSON.stringify(lateDesk && [lateDesk.rows, lateDesk.deskDisplay]));
 
+    // ---- THE STATE BADGES AT 390 px (OWNED2) --------------------------------------
+    const BADGES = `(function () {
+      var R = function (el) { if (!el) return null; var b = el.getBoundingClientRect(); return { top: Math.round(b.top), left: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height) }; };
+      var list = document.getElementById('registration-list');
+      var rows = Array.from(list ? list.querySelectorAll('.reg-row') : []);
+      var badge = function (el) { var cs = getComputedStyle(el); return { cls: el.className.replace('reg-state ', ''), text: el.innerText.trim(), rect: R(el), bg: cs.backgroundColor, color: cs.color, fontPx: parseFloat(cs.fontSize) }; };
+      var rowInfo = function (r) { return { id: r.getAttribute('data-entry-id'), rect: R(r), badges: Array.from(r.querySelectorAll('.reg-state')).map(badge), text: r.innerText.replace(/\\s+/g, ' ').trim() }; };
+      var byId = function (id) { var r = list && list.querySelector('.reg-row[data-entry-id="' + id + '"]'); return r ? rowInfo(r) : null; };
+      var chips = Array.from(document.querySelectorAll('.reg-chip')).map(function (c) { return { text: c.innerText.trim(), rect: R(c), active: c.classList.contains('active') }; });
+      return JSON.stringify({
+        rows: rows.length, scrollWidth: document.documentElement.scrollWidth, viewport: window.innerWidth,
+        widest: rows.reduce(function (m, r) { return Math.max(m, r.getBoundingClientRect().width); }, 0),
+        rowsWithPayBadge: rows.filter(function (r) { return r.querySelector('.reg-state-paid, .reg-state-unpaid'); }).length,
+        rowsWithTwoPayBadges: rows.filter(function (r) { return r.querySelectorAll('.reg-state-paid, .reg-state-unpaid').length > 1; }).length,
+        fieldBadges: list ? list.querySelectorAll('.reg-state-field').length : 0, needsBadges: list ? list.querySelectorAll('.reg-state-needs').length : 0,
+        first6: rows.slice(0, 6).map(rowInfo), e130: byId('e130'), e120: byId('e120'), e001: byId('e001'),
+        chips: chips, counts: (document.getElementById('registration-counts') || {}).innerText
+      });
+    })()`;
+    const b = await arriveCold({ url: fileUrl('tournament.html', 'tourney=OWNED2'), db, auth: OWNER, viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 6000, steps: [
+        { tap: '#tab-btn-desk' }, { sleep: 300 }, { expression: BADGES },                 // 0-2 the desk with badges
+        { tap: '.reg-chip', nth: 5 }, { sleep: 300 }, { expression: BADGES }               // 3-5 the sixth chip
+    ] });
+    if (!b.ok) bail('OWNED2: ' + b.reason);
+    const bt = b.value.filter(v => typeof v === 'string' && /^no element/.test(v));
+    if (bt.length) bail('OWNED2: a tap found no element', bt);
+    const bd = J(b, 2), bn = J(b, 5);
+    if (!bd || !bn) bail('OWNED2: a probe did not parse', b.value.map(v => String(v).slice(0, 80)));
+    if (bd.rows !== TOTALS.entries) failures.push('badges: rows ' + bd.rows);
+    if (bd.scrollWidth > bd.viewport) failures.push('badges: THE PAGE SCROLLS SIDEWAYS at 390 px: scrollWidth ' + bd.scrollWidth);
+    if (bd.widest > 390) failures.push('badges: a row is wider than the phone: ' + bd.widest);
+    if (bd.rowsWithPayBadge !== TOTALS.entries) failures.push('badges: ' + bd.rowsWithPayBadge + ' rows carry a Paid/Unpaid badge, wanted ' + TOTALS.entries);
+    if (bd.rowsWithTwoPayBadges !== 0) failures.push('badges: a row carries two payment badges');
+    if (bd.fieldBadges !== TOTALS.inField) failures.push('badges: ' + bd.fieldBadges + ' In-the-field badges, wanted ' + TOTALS.inField);
+    if (bd.needsBadges !== TOTALS.needsTeam) failures.push('badges: ' + bd.needsBadges + ' Needs-a-team badges, wanted ' + TOTALS.needsTeam);
+    const allBadges = [].concat(...bd.first6.map(r => r.badges), (bd.e130 || { badges: [] }).badges, (bd.e120 || { badges: [] }).badges);
+    allBadges.forEach(x => {
+        if (!x.rect || x.rect.w < 30 || x.rect.h < 14) failures.push('badges: a badge has no readable rect: ' + JSON.stringify(x));
+        if (!(x.fontPx >= 11)) failures.push('badges: text under 11 px: ' + JSON.stringify(x));
+        if (x.rect && (x.rect.left < 0 || x.rect.left + x.rect.w > 390)) failures.push('badges: a badge is off the phone: ' + JSON.stringify(x));
+    });
+    const bgOf = (cls) => { const f = allBadges.find(x => x.cls === cls); return f ? f.bg : null; };
+    const bgs = ['reg-state-unpaid', 'reg-state-paid', 'reg-state-field', 'reg-state-needs'].map(bgOf);
+    if (bgs.some(x => !x || x === 'rgba(0, 0, 0, 0)')) failures.push('badges: a state has no background: ' + JSON.stringify(bgs));
+    if (new Set(bgs).size !== 4) failures.push('badges: the four states do not have four backgrounds: ' + JSON.stringify(bgs));
+    if (!bd.e130 || !/Paid/.test(bd.e130.text) || !bd.e130.badges.some(x => x.cls === 'reg-state-field') || !bd.e130.badges.some(x => x.cls === 'reg-state-needs' && x.text === 'Needs a team')) failures.push('badges: e130 (Team 3, alone) does not read Paid + In the field + Needs a team: ' + JSON.stringify(bd.e130));
+    if (!bd.e120 || bd.e120.badges.some(x => x.cls === 'reg-state-needs') || !bd.e120.badges.some(x => x.cls === 'reg-state-field')) failures.push('badges: e120 (the Hawks, a named team of one) must NOT need a team: ' + JSON.stringify(bd.e120));
+    if (!bd.e001 || !bd.e001.badges.some(x => x.cls === 'reg-state-unpaid' && x.text === 'Unpaid') || !/Approve into field/.test(bd.e001.text)) failures.push('badges: e001 does not read Unpaid with its Approve button: ' + JSON.stringify(bd.e001));
+    if (bd.chips.length !== 6 || !bd.chips[5] || bd.chips[5].text !== 'Needs a team 1' || !bd.chips[5].rect || bd.chips[5].rect.w === 0) failures.push('badges: the sixth chip: ' + JSON.stringify(bd.chips));
+    if (!/1 needs a team/.test(bd.counts || '')) failures.push('badges: the counts do not say 1 needs a team: ' + bd.counts);
+    if (bn.rows !== 1 || !bn.e130 || !bn.chips[5] || !bn.chips[5].active) failures.push('needs chip: ' + bn.rows + ' rows, e130 ' + (bn.e130 ? 'shown' : 'missing') + ', active ' + JSON.stringify(bn.chips.filter(c => c.active).map(c => c.text)));
+    if (iDesk && /Needs a team/.test(iDesk.chips || '')) failures.push('individual: a Needs-a-team chip on an event with no teams');
+
     const verdict = failures.length ? 'FAIL' : 'PASS';
     console.log(JSON.stringify({ verdict, failures, measured: {
+        badges: { scrollWidth: bd.scrollWidth, widestRowPx: bd.widest, backgrounds: bgs, e130: bd.e130 && bd.e130.badges.map(x => [x.text, x.rect && x.rect.w + 'x' + x.rect.h, x.fontPx]), e120: bd.e120 && bd.e120.badges.map(x => x.text), sixthChip: bd.chips[5], needsFilterRows: bn.rows, firstRow: bd.first6[0] },
         desk: { rows: desk.rows, listHeightPx: desk.listRect && desk.listRect.h, counts: desk.counts, chips: desk.chips, searchRect: desk.searchRect, dupMarks: desk.dupMarks },
         approve: { teamSet: teamSet && teamSet.path, mark: mark && mark.value, back: approvedBack && approvedBack.e001 && approvedBack.e001.text.slice(0, 60) },
         search: { typed: typed.rows, midSearchValue: midSearch.searchValue, midSearchRows: midSearch.rows, midSearchCounts: midSearch.counts && midSearch.counts.slice(0, 40) },

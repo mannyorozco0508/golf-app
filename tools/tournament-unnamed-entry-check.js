@@ -25,6 +25,7 @@
 // ============================================================================
 
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };   // eventRecord() owns its records by 'u-org'
 const { openJourney, fileUrl: journeyUrl } = require('./lib/journey.js');
 const F = require('./lib/tournament-fixtures.js');
 
@@ -129,7 +130,7 @@ if (require.main !== module) return;
 
     const cold = async (code, expression) => {
         const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=' + code),
-            db, expression, preScript: CAPTURE, settleMs: 4200 });
+            db, auth: OWNER, expression, preScript: CAPTURE, settleMs: 4200 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }
         return g;

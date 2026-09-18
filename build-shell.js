@@ -76,6 +76,10 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v49. The polish wave: event details on the header (date,
+        // start time, venue, beneficiary - set on Setup after the save), no
+        // $0.00 payout rows, desk state badges and the Needs-a-team chip. A
+        // device on v48 keeps a header with no date and a desk with no badges.
         // Moved to v48. The tee sheet's QR is a canvas the page paints itself
         // and appends; a device on v47 keeps a tee sheet that prints blank QR
         // cells (the library's async <img> was still empty at window.print()).
@@ -135,7 +139,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v48-tee-qr-canvas',
+        cacheName: 'tournament-v49-polish',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

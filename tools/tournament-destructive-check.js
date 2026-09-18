@@ -33,6 +33,7 @@
 // ============================================================================
 
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };   // eventRecord() owns its records by 'u-org'
 const F = require('./lib/tournament-fixtures.js');   // WAVE 8: writer-shaped fixtures
 
 const SI = [7, 15, 1, 11, 3, 17, 9, 5, 13, 8, 16, 2, 12, 4, 18, 10, 6, 14];
@@ -308,6 +309,7 @@ function bail(msg) {
 
     const run = async (page, query, expression, rec) => {
         const r = await arriveCold({ url: fileUrl(page, query), db: db, expression: expression,
+            auth: OWNER,
             preScript: CAPTURE + '\n' + seedFor(rec), settleMs: 4500 });
         if (!r.ok) bail(r.reason);
         let g; try { g = JSON.parse(r.value); } catch (e) { bail('unreadable probe output'); }

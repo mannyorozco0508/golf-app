@@ -146,7 +146,16 @@ function eventRecord(opts) {
         shambleCountBest: o.shambleCountBest === undefined ? 1 : o.shambleCountBest,
         teams: o.teams || {},
         createdAt: o.createdAt === undefined ? 1 : o.createdAt,
+        // OWNED BY DEFAULT (2026-09-18). Since the narrowing (dab91d8) canManage()
+        // is false on a record with no ownerUid, so the Setup tab is never
+        // rendered on one - and every record this fixture built had none. Five
+        // Chrome tools measuring Setup exited 2 for three commits without
+        // anyone noticing. The owner is 'u-org'; a tool that arrives as that
+        // user (auth: { uid: 'u-org', ... }) sees Setup. Pass ownerUid: null to
+        // build a legacy record on purpose.
+        ownerUid: o.ownerUid === undefined ? 'u-org' : o.ownerUid,
     };
+    if (rec.ownerUid === null) delete rec.ownerUid;
     if (o.format === 'individual') {
         rec.scoringModel = 'player-v1';
         rec.scoringMode = o.scoringMode || 'gross';

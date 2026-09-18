@@ -7,8 +7,13 @@
 //   ids e000..e139 in createdAt order EXCEPT e003/e004, whose createdAt are swapped
 //       so an "ids are already sorted" renderer goes red on the sort assertion.
 //   paid:      every even i (70 of 140), paidAt stamped
-//   in field:  every i % 10 === 0 (14 of 140) - approvedAt + teamNum 1 (team) or
-//              playerId (individual) depending on `mode`
+//   in field:  every i % 10 === 0 (14 of 140) - approvedAt + teamNum (team) or
+//              playerId (individual) depending on `mode`. On a team event 12 of
+//              them sit on team 1 (Eagles, two golfers), e120 on team 2 (Hawks,
+//              a team of one the organizer NAMED) and e130 on team 3 ("Team 3",
+//              a team of one with the default name - the singleton an approval
+//              with no destination produces). deskTeams() is the matching teams
+//              node; a test that reads teamNum without it is reading nothing.
 //   shirt:     S M L XL by i % 4, but every 5th entry (i % 5 === 0) gave none
 //   dinner:    i % 3 guests, but every 4th entry (i % 4 === 3) did not answer
 //   teamPreference 'Hawks' on i % 7 === 0
@@ -35,7 +40,7 @@ function deskEntries(mode) {
         if (i % 4 !== 3) e.dinnerCount = i % 3;
         if (i % 7 === 0) e.teamPreference = 'Hawks';
         if (i % 2 === 0) { e.paid = true; e.paidAt = 2000 + i; }
-        if (i % 10 === 0) { e.approvedAt = 3000 + i; if (individual) e.playerId = 'p' + i; else e.teamNum = 1; }
+        if (i % 10 === 0) { e.approvedAt = 3000 + i; if (individual) e.playerId = 'p' + i; else e.teamNum = i === 130 ? 3 : i === 120 ? 2 : 1; }
         regs['e' + String(i).padStart(3, '0')] = e;
     }
     regs.e140 = { fullName: 'Fay Different', email: 'g5@example.com', phone: '555-9140', createdAt: 5140, shirtSize: 'M', dinnerCount: 1 };
@@ -45,6 +50,18 @@ function deskEntries(mode) {
 
 // The literal totals above, computed once here so a test can also compare the
 // fixture to itself and fail loudly if someone edits the generator.
-const TOTALS = { entries: 142, paid: 70, inField: 14, dinnerGuests: 106, dinnerAnswered: 107, shirtAnswered: 114, shirts: { S: 28, M: 29, L: 29, XL: 28 }, unpaid: 72, pending: 128 };
+const TOTALS = { entries: 142, paid: 70, inField: 14, dinnerGuests: 106, dinnerAnswered: 107, shirtAnswered: 114, shirts: { S: 28, M: 29, L: 29, XL: 28 }, unpaid: 72, pending: 128, needsTeam: 1 };
 
-module.exports = { deskEntries, TOTALS };
+// THE TEAMS THE ENTRIES POINT AT (team events). Eagles is a real team; Hawks is
+// a team of one the organizer named on purpose; "Team 3" is what
+// approveRegistration writes for a golfer with no destination - one name, the
+// default label - and is the only one that "needs a team".
+function deskTeams() {
+    return {
+        team1: { num: 1, name: 'Eagles', players: ['Ann Alpha', 'Bo Bravo'], handicap: 0 },
+        team2: { num: 2, name: 'Hawks', players: ['Cal Charlie'], handicap: 0 },
+        team3: { num: 3, name: 'Team 3', players: ['Kim Asurname130'], handicap: 0 }
+    };
+}
+
+module.exports = { deskEntries, deskTeams, TOTALS };

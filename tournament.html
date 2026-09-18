@@ -114,6 +114,17 @@
         .reg-chip.active { background:var(--brand-green); color:#ffffff; border-color:var(--brand-green); }
         #registration-search { width:100%; box-sizing:border-box; margin:0 0 6px 0; -webkit-appearance:none; appearance:none; }
         .reg-dup { display:inline-block; font-size:0.74rem; font-weight:bold; color:#8a5a00; background:#fff8e1; border:1px solid #e6c200; border-radius:6px; padding:2px 6px; }
+        /* THE STATE BADGES (2026-09-18): one word a desk can scan on a phone. Four
+           states, four backgrounds; "In the field" keeps its words and became one. */
+        .reg-state { display:inline-block; font-size:0.74rem; font-weight:bold; border-radius:6px; padding:2px 8px; white-space:nowrap; line-height:1.4; }
+        .reg-state-unpaid { background: #fff3e0; color: #8a4b00; border: 1px solid #f0b060; }
+        .reg-state-paid { background: #e6f4ea; color: #1b5e20; border: 1px solid #7fc48a; }
+        .reg-state-field { background: #e3eefc; color: #0d3b7a; border: 1px solid #8fb3e8; }
+        .reg-state-needs { background: #fdecea; color: #b00020; border: 1px solid #e57373; }
+        .reg-count-line.reg-count-needs { color: #b00020; font-weight: bold; }
+        /* The event details under the two headers: up to three short lines. */
+        .t-details { text-align:center; font-size:0.85rem; color:var(--text-main); margin:-4px 0 10px 0; }
+        .t-details div { margin: 2px 0; }
 
         .custom-select-wrapper { position: relative; }
         .custom-select-wrapper::after { content: '▼'; font-size: 0.7rem; position: absolute; right: 14px; top: 14px; color: var(--text-muted); pointer-events: none; }
@@ -553,7 +564,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <h2 id="manage-t-name" style="text-align:center; font-size:1.3rem;"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="manage-t-sub"></p>
+        <!-- EVENT DETAILS (2026-09-18): a SEPARATE element under the sub line - three
+             Chrome tools grep the format word out of #manage-t-sub, so that line never
+             changes. Hidden when the record carries none of the four keys. -->
+        <div class="t-details" id="manage-t-details" style="display:none;"></div>
         <p style="text-align:center; color:var(--brand-navy); font-size:0.9rem; font-weight:bold; margin-top:4px;" id="manage-t-pool"></p>
+
+        <!-- THE FIRST EDIT-AFTER-SAVE ON THIS RECORD (2026-09-18). Nothing else on the
+             record can be changed once created - name, course, fee - so a field only
+             on the create form would mean rebuilding an event to give it a date. Each
+             input writes ITS OWN KEY on change, the startType shape (setStartType):
+             eventDate "YYYY-MM-DD", startTime "HH:MM", venue, beneficiary - the
+             machine value, formatted at render, never a display string. Empty removes
+             the key. The next edit-after-save should copy this block, not invent one. -->
+        <div class="team-card" id="event-details-block" style="margin-top:12px;">
+            <div class="team-card-header"><span class="team-label">📅 Event details</span></div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">All optional. Shown under the event name here and on the Leaderboard when set.</p>
+            <div class="form-group" style="margin-bottom:8px;"><label>Date</label><input type="date" id="ev-date" onchange="setEventDetail('eventDate', this.value)"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label>Start time</label><input type="time" id="ev-time" onchange="setEventDetail('startTime', this.value)"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label>Venue</label><input type="text" id="ev-venue" maxlength="120" placeholder="e.g. Camas Meadows Golf Club" onchange="setEventDetail('venue', this.value)"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Beneficiary</label><input type="text" id="ev-beneficiary" maxlength="120" placeholder="e.g. Hope Foundation" onchange="setEventDetail('beneficiary', this.value)"></div>
+        </div>
 
         <!-- Registration CONFIGURATION lives here: the "Ask golfers for" switches,
              the signup URL and Share. The desk itself - counts, filters, search
@@ -687,6 +718,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="manage-tab-leaderboard" style="display:none;">
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
+        <div class="t-details" id="lb-t-details" style="display:none;"></div>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
@@ -1598,6 +1630,67 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // just shows no starting-hole badge anywhere. Scoring never changes: computeTeamTotals
     // already counts "holes with a score," not "highest hole number," so a team starting
     // anywhere on the course totals correctly with zero changes to tournament-engine.js.
+    // ===== EVENT DETAILS (2026-09-18) - the header's date, start time, venue and
+    // beneficiary. Stored as MACHINE values (eventDate "YYYY-MM-DD", startTime
+    // "HH:MM", the two text lines trimmed, <= 120), each its own key under the
+    // record - schema-free, the owner's .write covers any child - and formatted
+    // here at render. A value that is not the machine shape is refused, and a
+    // stored one that is not (hand-edited) renders nothing rather than the raw
+    // string. The date is built from its parts so a "YYYY-MM-DD" never drifts a
+    // day through UTC.
+    const EVENT_DETAIL_KEYS = { eventDate: /^\d{4}-\d{2}-\d{2}$/, startTime: /^([01]\d|2[0-3]):[0-5]\d$/, venue: null, beneficiary: null };
+    const EV_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const EV_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function formatEventDate(v) {
+        if (!EVENT_DETAIL_KEYS.eventDate.test(v || '')) return '';
+        const [y, m, d] = String(v).split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return '';
+        return `${EV_DAYS[dt.getDay()]}, ${EV_MONTHS[m - 1]} ${d}, ${y}`;
+    }
+    function formatStartTime(v) {
+        if (!EVENT_DETAIL_KEYS.startTime.test(v || '')) return '';
+        const [h, m] = String(v).split(':').map(Number);
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+    }
+    function eventDetailsHtml(data) {
+        const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const lines = [];
+        const when = [formatEventDate(data.eventDate), formatStartTime(data.startTime)].filter(Boolean).join(' \u2022 ');
+        if (when) lines.push(when);
+        const venue = String(data.venue || '').trim();
+        if (venue) lines.push(esc(venue));
+        const beneficiary = String(data.beneficiary || '').trim();
+        if (beneficiary) lines.push(`Benefiting ${esc(beneficiary)}`);
+        return lines.map((l) => `<div>${l}</div>`).join('');
+    }
+    // Both headers from the one builder; the Setup inputs filled from the record
+    // (not while one of them has focus - a snapshot must not eat a half-typed venue).
+    function renderEventDetails() {
+        const data = currentData || {};
+        const h = eventDetailsHtml(data);
+        ['manage-t-details', 'lb-t-details'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = h;
+            el.style.display = h ? 'block' : 'none';
+        });
+        [['ev-date', 'eventDate'], ['ev-time', 'startTime'], ['ev-venue', 'venue'], ['ev-beneficiary', 'beneficiary']].forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = data[key] == null ? '' : String(data[key]);
+        });
+    }
+    function setEventDetail(key, value) {
+        if (!currentCode || !canManage()) return;
+        if (!Object.prototype.hasOwnProperty.call(EVENT_DETAIL_KEYS, key)) return;
+        const v = String(value == null ? '' : value).trim();
+        if (v.length > 120) return;
+        const shape = EVENT_DETAIL_KEYS[key];
+        if (v && shape && !shape.test(v)) return;
+        db.ref(`tournaments/${currentCode}/${key}`).set(v || null).catch(err => alert(`Error: ${err.message}`));
+    }
+
     function setStartType(val) {
         db.ref(`tournaments/${currentCode}/startType`).set(val).catch(err => alert(`Error: ${err.message}`));
     }
@@ -2372,10 +2465,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         { key: 'unpaid', label: 'Unpaid', test: (e) => e.paid !== true },
         { key: 'paid', label: 'Paid', test: (e) => e.paid === true },
         { key: 'approved', label: 'Approved', test: (e) => regInField(e) },
-        { key: 'pending', label: 'Not yet approved', test: (e) => !regInField(e) }
+        { key: 'pending', label: 'Not yet approved', test: (e) => !regInField(e) },
+        // Team events only: a golfer approved with no destination became a
+        // one-player "Team N". Individual events have players, not teams.
+        { key: 'needsteam', label: 'Needs a team', test: (e) => regNeedsTeam(e), teamOnly: true }
     ];
     // The one test for "in the field", shared by the row, the counts and the chips.
     function regInField(e) { return !!(e && (e.approvedAt || e.playerId || e.teamNum)); }
+    // "NEEDS A TEAM" - DERIVED, NOTHING STORED (2026-09-18): in the field on a team
+    // event, on a team with exactly one golfer, AND that team still wears the
+    // default name /^Team \d+$/ - what approveRegistration writes for a golfer
+    // with no destination. A one-golfer team the organizer NAMED is a team of one
+    // on purpose and does not need one. No key on the signup (the rules' $other is
+    // false there), no marker on the team; the desk says it, Setup fixes it.
+    function regNeedsTeam(e) {
+        if (!e || !regInField(e) || recordIsIndividual()) return false;
+        const t = ((currentData && currentData.teams) || {})['team' + e.teamNum];
+        if (!t) return false;
+        const players = Array.isArray(t.players) ? t.players : Object.values(t.players || {});
+        if (!(players.length === 1)) return false;
+        return /^Team \d+$/.test(String(t.name || ('Team ' + t.num)));
+    }
     function setRegistrationFilter(key) {
         registrationFilter = REG_FILTERS.some((f) => f.key === key) ? key : 'all';
         renderRegistrationDesk();
@@ -2394,10 +2504,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Every number the counts row shows, from registrationData and nothing else.
     const REG_SHIRT_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];   // the rule's list, in its order
     function registrationCounts(entries) {
-        const c = { signups: entries.length, paid: 0, inField: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
+        const c = { signups: entries.length, paid: 0, inField: 0, needsTeam: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
         entries.forEach((e) => {
             if (e.paid === true) c.paid++;
             if (regInField(e)) c.inField++;
+            if (regNeedsTeam(e)) c.needsTeam++;
             if (typeof e.dinnerCount === 'number' && isFinite(e.dinnerCount)) { c.dinnerGuests += e.dinnerCount; c.dinnerAnswered++; }
             const size = String(e.shirtSize || '').trim().toUpperCase();
             if (size) { c.shirts[size] = (c.shirts[size] || 0) + 1; c.shirtAnswered++; }
@@ -2407,6 +2518,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function registrationCountsHtml(c) {
         const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
         const lines = [`<div class="reg-count-line reg-count-main">${plural(c.signups, 'signup', 'signups')} · ${c.paid} paid · ${c.inField} in the field</div>`];
+        // Its own line, only when there is someone to place - the main line is pinned as it is.
+        if (c.needsTeam > 0) lines.push(`<div class="reg-count-line reg-count-needs">${c.needsTeam} ${c.needsTeam === 1 ? 'needs' : 'need'} a team</div>`);
         if (c.dinnerAnswered > 0) lines.push(`<div class="reg-count-line">Dinner guests ${c.dinnerGuests} · ${c.dinnerAnswered} of ${c.signups} answered</div>`);
         if (c.shirtAnswered > 0) {
             const sizes = REG_SHIRT_ORDER.filter((k) => c.shirts[k]).map((k) => c.shirts[k] + ' ' + k);
@@ -2480,7 +2593,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         const entriesOnly = all.map((x) => x[1]);
         if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
-        if (chipsEl) chipsEl.innerHTML = REG_FILTERS.map((f) => {
+        if (chipsEl) chipsEl.innerHTML = REG_FILTERS.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
         }).join('');
@@ -2522,11 +2635,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const why = dup[id] ? (dup[id].length === 2 ? 'same email and name as another signup' : 'same ' + dup[id][0] + ' as another signup') : '';
             const dupMark = why ? `<span class="reg-dup">⚠ Possible duplicate · ${why}</span>` : '';
             const paid = e.paid ? ' checked' : '';
+            // THE STATE, AS A WORD: the payment badge beside the name; "In the field"
+            // (the pinned words, once) as a badge in place of the button; "Needs a
+            // team" beside it when regNeedsTeam says so. The checkbox stays the control.
+            const payBadge = e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
             const approve = inField
-                ? `<span style="font-size:0.78rem; color:var(--text-muted);">In the field</span>`
+                ? `<span class="reg-state reg-state-field">In the field</span>${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
             return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
+                + payBadge
                 + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
                 + dest
                 + approve
@@ -2758,7 +2876,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             spotAmounts.push(el ? parseFloat(el.value) || 0 : 0);
         }
 
-        const payouts = computeTournamentPayouts(cachedLeaderboardRows, spotAmounts);
+        // A PAGE FILTER (2026-09-18): the allocator (payouts.js, PROTECTED, shared
+        // with Trip Mode) returns every ranked entry, amount 0 past the paid spots.
+        // Printing those made a finished-looking table of $0.00 rows - every
+        // scored team at fee 0, every unpaid rank with a pool. Only rows with
+        // money are rows; "Paid Spots" already says how many there are.
+        const payouts = computeTournamentPayouts(cachedLeaderboardRows, spotAmounts).filter((p) => p.amount > 0);
         const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
         const pool = poolTotal();
 
@@ -2769,7 +2892,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             </div>`;
         }
 
-        if (payouts.length === 0) {
+        // Three sentences, each reachable. "No paid spots reached yet." had never
+        // rendered before the filter: the list was empty only with no scores, and
+        // that case returns above. Now it is the case where amounts are set but
+        // the only scored ranks sit on $0 spots.
+        if (!spotAmounts.some((v) => v > 0)) {
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see payouts.</div>`;
+        } else if (payouts.length === 0) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
         } else {
             payouts.forEach(p => {
@@ -3969,6 +4098,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('manage-t-pool').textContent = pool > 0 ? `💰 Pool: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
+            renderEventDetails();
 
             // A tournament created before this feature existed has no startType field at all —
             // treated as 'normal' automatically, no migration needed.

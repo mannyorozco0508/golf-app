@@ -1727,6 +1727,46 @@
         }
       ]
     },
+    "tournaments/OWNED/eventDate": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "2026-10-04"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "2026-10-04"
+        },
+        {
+          "auth": "stranger",
+          "data": "2026-10-04"
+        },
+        {
+          "auth": "anonymous",
+          "data": "2026-10-04"
+        }
+      ]
+    },
+    "tournaments/OWNED/venue": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "Camas Meadows Golf Club"
+        },
+        {
+          "auth": "organizer",
+          "data": null
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "stranger",
+          "data": "Camas Meadows Golf Club"
+        }
+      ]
+    },
     "tournaments/OWNED/startType": {
       "canWrite": [
         {
