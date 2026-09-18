@@ -171,8 +171,9 @@ describe('THE DISCOVERY RULE KNOWS A WRITE FROM A READ', () => {
 describe('THE DISCOVERY CAN SEE THE FILE', () => {
 
     test('the page parses into the list of functions it actually has', () => {
-        // MEASURED, NOT GUESSED. This page has 13 functions and all 13 sit at
-        // four-space indent: toggleTheme, showTab, renderLeaderboard,
+        // MEASURED, NOT GUESSED. This page has 12 functions and all 12 sit at
+        // four-space indent (13 until 2026-09-18, when toggleTheme left with
+        // dark mode): showTab, renderLeaderboard,
         // setSaveState, trackWrite, saveHoleScore, savePlayerHoleScore,
         // scorePath, saveIndividualScore, holesShapeKey,
         // setHolesListPreservingFocus, renderGroup, renderAll.
@@ -185,7 +186,7 @@ describe('THE DISCOVERY CAN SEE THE FILE', () => {
         // actually prove the enumeration reaches the right region.
         const names = allFunctionNames();
         assert.ok(names.length >= 10,
-            `only ${names.length} functions were found in ${PAGE}, against 13 measured. The `
+            `only ${names.length} functions were found in ${PAGE}, against 12 measured. The `
             + 'enumeration below would be asserting against almost nothing, which is how a '
             + 'slice that truncated to empty passed every negative assertion in it.');
         // The two renderers are what build the score inputs. If the enumeration

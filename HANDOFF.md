@@ -972,6 +972,65 @@ A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and
 
 **Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail, comfortably inside 10,000 a day. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
 
+## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
+
+**What decided it: the shared key.** Both tournament pages read and wrote
+`golfapp-theme`, the same `localStorage` key the nine Consumer pages use, on the
+same origin (both products serve from one host). Hiding the toggle and keeping
+the code (Option A) would have left every golfer who set dark on the round app
+looking at dark tournament pages with no control on those pages to change them
+— worse than today. So the FEATURE went, not the button: the four toggle buttons
+(three on `tournament.html`, one on the scorecard), `toggleTheme()`, the
+load-time read, the DOMContentLoaded relabel, both `html.dark-mode` palette
+blocks, the two `.lb-row.leader` dark overrides and the two `.theme-toggle-btn`
+rules. **The palette stays**: `:root` and every `var()` are the page's only
+colours (238 uses on `tournament.html`, 103 of them in inline styles and JS
+templates), not theming decoration. The hero band was never dark mode — it
+carries a fixed dark palette on imagery and is untouched.
+
+**The key is never touched.** No read, no write, no remove. Consumer is
+mid-review and a tournament page that cleared the key would flip a golfer's
+Consumer setting on the same device. `tournament_darkmode_gone_test.js` pins
+that neither page so much as mentions `golfapp-theme`, that neither calls
+`removeItem`/`clear`, that an arrival with the key seeded `dark` stays light
+and leaves the key exactly as it was, and that `admin.html` still reads and
+writes it — the boundary. `tools/tournament-landing-check.js` seeds the key in
+Chrome before the page runs and reads it back after arrival.
+
+**Same wave, not a dark-mode regression.** `--warn-text`, `--warn-bg` and
+`--warn-border` were used on `tournament.html` (the net-refused warning
+`#ind-net-warning`, the multi-round net line, the paste-flagged block) and
+defined nowhere on that page, **in both themes, since before this wave**: the
+warning inherited its parent's colour and the block rendered with no background
+or border. They now carry the Consumer values (`admin.html` / `trip.html`:
+`#fff4e5` / `#e08a00` / `#7a4a00`; contrast 6.9:1 on the panel, 7.5:1 on white).
+`--card-bg` at the paste-players modal was a typo for `--bg-card` — no page ever
+defined it; the one use is corrected and nothing is aliased, so the page keeps
+one name for one colour. The test asserts every `var()` the page uses is
+defined in `:root`, so a fifth cannot go unnoticed.
+
+**Pins that moved.** `tournament_landing_polish_test.js`: the band slice now
+asserts no toggle; the toggle-flip test became "toggleTheme is not defined"; the
+"themed through variables" assertions stayed. The landing baseline fixture is
+untouched — `DELIBERATE` gained a first entry `|🌙 Dark Mode| → |`, placed first
+because the trophy substitution's `from` begins on the very next token.
+`tournament_round_scoring_test.js`: the scorecard has 12 four-space functions
+now, not 13 (the floor is 10). Both caches: `build-shell.js`
+`tournament-v44-no-dark-mode`, `sw.js` `golfapp-v169-tournament-light`.
+
+**Not honoured, before or after:** `prefers-color-scheme` appears nowhere in
+the repo. A phone set to dark rendered these pages light before this wave
+unless the key said otherwise; now it renders them light regardless.
+
+**Found while running the tournament tools, not fixed:**
+`tools/tournament-net-reachable-check.js` exits 2 ("NOTHING WAS PROVEN") — at
+ffbbad4 with "TEST 19 net run: saveTournament wrote no tournament" and at
+a2a74f3 / this wave with "the course dropdown did not offer the fixture
+courses - Test 20 measured nothing". It predates both this wave and course
+search; UNKNOWN when it last passed (it drives the setup screen without the
+sign-in the gate has required since 2026-09-15, and seeds courses through a
+fixture the picker no longer lists that way). Its own wave.
+
 ## Tournament course search — Option B (2026-09-17)
 
 **Why this wave exists.** `courseDirectory` has 141 entries and `coursePresets`

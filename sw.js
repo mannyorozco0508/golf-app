@@ -1606,13 +1606,18 @@
 // worker's shell list, so this key moves with build-shell.js's product key.
 // A device on v167 has an admin.html whose import rules its cache does not
 // hold, and a tournament setup screen that still fabricates a par-4 card.
-// Moved to v169: the tournament landing hero. tournament.html: logo-mark.png
-// (parent brand) with a quiet label under the mark and Tournaments on the
-// right, over brand-green fairway art (assets/tournament-hero.svg, still not
-// precached - the band paints its own dark ground without it). Presentation
-// only. A device on v168 keeps the uppercase text wordmark and the placeholder
-// sunset SVG.
-const CACHE_VERSION = 'golfapp-v169-tournament-hero';
+// Moved to v169: dark mode is gone from the Tournament product. tournament.html
+// and tournament-scorecard.html (both in this shell list) lose the toggle, the
+// handler, the load-time read of golfapp-theme and the dark palette; the
+// Consumer pages and their key are untouched. A device on v168 keeps
+// tournament pages that go dark on the round app's setting.
+// Moved to v170: the tournament landing hero lockup. tournament.html:
+// logo-mark.png (parent brand) with a quiet label under the mark and
+// Tournaments on the right, over brand-green fairway art
+// (assets/tournament-hero.svg, still not precached). Presentation only. A
+// device on v169-tournament-light keeps the uppercase text wordmark and the
+// placeholder sunset SVG.
+const CACHE_VERSION = 'golfapp-v170-tournament-hero';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
