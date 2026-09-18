@@ -1617,7 +1617,11 @@
 // (assets/tournament-hero.svg, still not precached). Presentation only. A
 // device on v169-tournament-light keeps the uppercase text wordmark and the
 // placeholder sunset SVG.
-const CACHE_VERSION = 'golfapp-v170-tournament-hero';
+// Moved to v171: the tournaments rules are narrowed. Both tournament pages
+// (in this shell list) move with them - the scorecard's refusal sentence and
+// the no-owner line on the console. A device on v170 keeps a scorecard that
+// blames the signal for a permission refusal.
+const CACHE_VERSION = 'golfapp-v171-tournament-narrowing';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -412,9 +412,11 @@ nothing else — `tournaments/$tourneyCode`'s `.write` is untouched (the `$entry
         }
     } }
 
-**What is and is not a boundary.** Anyone holding a code can still write a
-tournament's teams, players, rounds and scores signed out — the Setup gate on
-`tournament.html` remains a guardrail. Two things are now boundaries: `ownerUid`
+**What is and is not a boundary** *(as of this wave; superseded on 2026-09-18 —
+see "tournaments/$code is narrowed" below, where structure became owner-only and a
+code-holder writes scores and nothing else).* Anyone holding a code could still write
+a tournament's teams, players, rounds and scores signed out — the Setup gate on
+`tournament.html` remained a guardrail. Two things became boundaries here: `ownerUid`
 (set once, by a signed-in client, to its own uid; never taken, changed or dropped —
 a whole-record PUT that omits it is refused, and so is a code collision onto another
 organizer's tournament, which before this wave silently overwrote it) and
@@ -422,6 +424,8 @@ organizer's tournament, which before this wave silently overwrote it) and
 tournament that HAS an owner, so a submission never lands where nobody can read it;
 owner may correct an entry; nobody deletes one). The rules do **not** require a
 tournament to have an `ownerUid` — a stale bundle still creates a legacy record.
+*(Both of those sentences stopped being true on 2026-09-18: a create now needs a
+signed-in owner by rule, and a legacy record is frozen.)*
 
 **Measured.** 31 rows added to `security-rules.tests-data.json` (116 total, 0
 failures; 85/85 pre-existing unchanged). Every write shape `tournament.html` and
@@ -788,6 +792,132 @@ a time.
 
 `tools/tournament-signin-gate-check.js` measures the signed-out arm in Chrome
 (rects, both records); the signed-in arms are mini-dom's, in both arrival orders.
+
+## tournaments/$code is narrowed — a code-holder writes scores and nothing else (2026-09-18)
+
+**The problem, established.** `tournaments/$tourneyCode .write` was
+`"!data.exists() || newData.exists()"`: anyone holding the six-character code could
+write any child — scores, team names, rosters, the course card, round status — with
+curl, no page involved. The scorecard link was one door of several. The recon
+(`~/Desktop/rattle-recon-tournaments-narrowing.txt`) counted 37 structural write sites
+on `tournament.html`, 33 of them with no guard of their own (the gate REMOVING the
+Setup and Desk panels was what kept a visitor off them), and 3 score writers on the
+scorecard.
+
+**The count, read in the console on 2026-09-18 by Manny:** two tournaments exist.
+`PMZJLT` has an `ownerUid`. `FN68` has none — an old "Hope Foundation" test on
+Chambers Bay, Manny's own, with no real field. One legacy record, a throwaway. **So:
+no legacy branch.** A carve-out built to protect a test event would outlive its
+reason and nobody later would know it was safe to remove.
+
+**The rule, published by hand from the repo file (the registrations order):**
+
+    "tournaments": { "$tourneyCode": {
+        ".read": true,
+        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())",
+        ".validate": (unchanged), "ownerUid": { ".validate": (unchanged) },
+        "scores":  { "$scoreKey": { ".write": "root.child('tournaments/' + $tourneyCode).exists()",
+                                    ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0" } },
+        "rounds":  { "$roundId": { "scores": { "$scoreKey": { ".write": "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()", ".validate": (the same) } } } }
+    } }
+
+- CREATE: only a signed-in client, only a record whose `ownerUid` is its own uid (the
+  unchanged child validate still refuses an anonymous provider). A stale bundle's
+  create — no `ownerUid` — is refused; it used to make a world-writable record.
+- EXISTING: only the owner, never a delete (as before, for everyone). A record with no
+  `ownerUid` matches nothing: **legacy is frozen for structure.**
+- **The claim closes — a deliberate consequence, not a side effect.** Until this wave a
+  signed-in user could write `ownerUid` onto a legacy record (the child validate allows
+  it; measured in targaryen). The parent `.write` no longer reaches that child. The
+  land-grab goes away and FN68 is console-only. No claim path exists or is planned.
+- **The score grant is on `$scoreKey`, not on `scores/`.** A code-holder writes one
+  hole per call and cannot replace or wipe a board in one write (rows pin both). The
+  validate holds the key to the three shapes the scorecard writes and the value to a
+  whole number 1..30; a `remove()` carries no newData and validate does not run on
+  it, so clearing a hole still works. Both depths — single-round and
+  `rounds/$roundId/scores` — because a multi-round event writes the deeper one; round
+  identity stays in the path.
+- **The score grant requires the record to exist — and at the multi-round depth, the
+  round.** See "The squat" below for why this line is here and was not in the first
+  publish.
+- NOT expressible as a rule, stays page-side: the individual-mode group membership
+  check (the group id is not in the path) and `roundLocked` (a closed round's scores
+  are refused by the card).
+
+**THE SQUAT — a finding of the live probe, its own paragraph.** Candidate 1, as first
+published (live hash `ab32b849…`), had `scores/$scoreKey ".write": true`. That reads
+as "a code-holder may write a score on an event"; what it says is "anyone may write a
+score key under ANY `$tourneyCode`", because `.write` cascades down, a child grant is
+unconditional, and a parent `.validate` does not run for a write below it. The step-5
+probe hit it by accident: the admin create of the throwaway failed on a CLI flag, and
+the unauthenticated `PUT tournaments/ZZPROOF/scores/team1_h2 = 5` returned **200 on a
+record that did not exist** — an admin read afterwards showed the junk record. Repeated
+deliberately on a second code: the same. **What that costs a real organizer:** once a
+stranger writes one score key to an unused code, the record exists, and the
+organizer's own create on that code is refused (`data.exists()` and they are not the
+owner) — locked out of their own code by a single number. **targaryen could not see
+it because every row wrote to a record that existed.** Candidate 2 (live hash
+`66d26ee9…`) makes the grant conditional on the record existing, and on the round
+existing at the deeper path; rows under `tournaments/NOPE/…` and `…/rounds/r9/…` hold
+it, and a second isolation stub (the two grants set back to `true`) proves those rows
+are refused by the grant's own condition and nothing else. Both throwaways were
+removed and read back `null`. **Step 5 is not a formality.** It is the only check in
+this repo that runs the rules the database actually runs, and it found what 118 rows
+did not.
+
+**A harness fault beside it — the targaryen pipe.** Three rules suites went red with
+"Could not parse targaryen output" on a run that had 0 failures, because targaryen's
+stdout read through a pipe stops at 33,214 bytes on macOS (the process exits before
+the pipe drains); the 113 new rows pushed the verbose table past that and the summary
+line the parser needs is at the end. `helpers/targaryen-run.js` runs it with stdout to
+a file; `security-rules.test.js` and both isolation tests go through it. Same class as
+the stdout drop the net-reachable wave found the day before: two harness faults in two
+waves, each a green run reported as a failure or a failure reported as green.
+
+**Hashes — three, in order.** (1) Live before the wave:
+`a9015b86aa6528758933392f4c6b49ade1d3d38e75ad134dfd337e08fede79f1`, saved outside git at
+`~/.golfapp-rules-backup/before-narrowing/live-rules.json` (equal to the previous repo
+file plus the CLI's trailing newline). (2) Candidate 1, published 2026-09-18 and live for
+about an hour: `ab32b84928fc30cebe7ba8529d570a7a3d095c300c9b8ff0df310025e50f940b` (repo
+sha256 `045efdec…`), saved at `~/.golfapp-rules-backup/before-narrowing-2/live-rules.json`
+— the squat version; do not republish it. (3) Candidate 2, live now:
+`66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd` (repo sha256
+`2a7a4918…`), read back three times with `npx firebase-tools database:get
+"/.settings/rules"` (three identical reads), JSON-equal to `database.rules.json`; the
+live copy is the repo file plus one trailing newline. Rollback is (1).
+
+**Rows.** 118 rows under `tournaments/` in `security-rules.tests-data.json` (254 total),
+laid out so that no path+auth pair mixes a validate refusal with an ownership refusal
+(the verdict table shows no data). `tournaments_rules_isolation_test.js` is the
+isolation control: a temp copy with the parent `.write` stubbed `true` and every
+validate left in place must turn EVERY ownership negative green and leave every named
+validate negative red, hold the positives, and move nothing outside `tournaments/`.
+It also pins, by name, that the legacy claim is refused by the boundary (red on the
+clean file, green under the stub). `wave2_rules_test.js` and
+`tournament_anonymous_owner_test.js` re-pinned to the new block; the latter's data
+file lost its "a code holder renames" and legacy-create allowances.
+
+**The pages.** `tournament-scorecard.html` `trackWrite`: a `PERMISSION_DENIED` now says
+"⚠️ This event isn't accepting scores — ask the organizer." instead of blaming the
+signal (the registration-2b lesson); every other failure keeps the signal sentence.
+`tournament.html` `canManage()`: **no owner, no console** — the grandfather promise is
+withdrawn. A record with no `ownerUid` has its Setup and Desk removed for everyone
+(the rule would refuse all 33 writers) and the Leaderboard tab shows one line:
+"This event has no organizer account, so its setup can't be changed. Scores still
+save." `tournament_narrowing_page_test.js` holds both; `tournament_signin_gate_test.js`
+d) and `tournament_anonymous_owner_test.js` (a deliberate substitution over the
+captured legacy surface: `setupTab`/`setupPanel` false, fixture untouched) and
+`tools/tournament-signin-gate-check.js` moved with it. Both caches: `build-shell.js`
+`tournament-v46-narrowed-rules`, `sw.js` `golfapp-v171-tournament-narrowing` (the hero
+PR that landed the same day had taken v45 / v170).
+
+**Live proof against candidate 2 (2026-09-18, throwaway `ZZPROOF3` created as admin,
+probed unauthenticated over REST, removed and read back `null`):** score on the existing
+record → 200; multi-round score on an existing round → 200; remove a score → 200; score
+under a code with nothing behind it → 401; multi-round score under a nonexistent code →
+401; score under a round that does not exist → 401; rename, team handicap, wipe the
+scores node, "five", 31, claim ownerUid → 401; read → 200. `ZZNOPE` never came into
+being. Every line as targaryen said — after the squat taught us which rows to write.
 
 ## Tournament registration Wave 2b — SILENCE IS THE FAILURE, AND THE SWITCHES
 

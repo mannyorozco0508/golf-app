@@ -33,21 +33,17 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
-const { execFileSync } = require('child_process');
 
 const REPO_ROOT = __dirname;
 const RULES_PATH = path.join(REPO_ROOT, 'database.rules.json');
 const TESTS_DATA_PATH = path.join(__dirname, 'security-rules.tests-data.json');
-const TARGARYEN_BIN = path.join(REPO_ROOT, 'node_modules', '.bin', 'targaryen');
 
+// Through helpers/targaryen-run.js: a pipe truncates targaryen's output at
+// 33,214 bytes on macOS once the table is big enough (2026-09-18), and the
+// summary line this test parses is at the end.
+const { runTargaryen: runTargaryenToFile } = require('./helpers/targaryen-run.js');
 function runTargaryen() {
-    try {
-        const output = execFileSync(TARGARYEN_BIN, [RULES_PATH, TESTS_DATA_PATH, '--verbose'], { encoding: 'utf8' });
-        return { exitCode: 0, output };
-    } catch (e) {
-        // targaryen exits non-zero if any test failed — that's a real result, not a crash
-        return { exitCode: e.status, output: (e.stdout || '') + (e.stderr || '') };
-    }
+    return runTargaryenToFile(RULES_PATH, TESTS_DATA_PATH);
 }
 
 describe('SECURITY RULES — full behavioral suite against database.rules.json', () => {

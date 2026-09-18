@@ -19,7 +19,8 @@
 //
 //   exit 0   owned record: no Setup tab, no Setup panel, board and print
 //            buttons and scoring links all have rects, "Signed in as" absent,
-//            no lock word on screen; legacy record: the Setup tab and panel
+//            no lock word on screen; legacy record (no ownerUid): NO Setup tab
+//            or panel since 2026-09-18, the no-organizer line has a rect
 //            exist and the tab has a rect
 //   exit 1   a divergence the JSON names
 //   exit 2   could not run. NOTHING PROVEN.
@@ -78,6 +79,7 @@ const PROBE = `
     deskPanel: { exists: !!document.getElementById('manage-tab-desk') },
     leaderboardTab: { visible: visible('#tab-btn-leaderboard') },
     board: { visible: visible('#leaderboard-list'), names: (document.getElementById('leaderboard-list') || {}).innerText || '' },
+    noOwnerNote: { visible: visible('#lb-no-owner-note'), text: (document.getElementById('lb-no-owner-note') || {}).innerText || '' },
     printResults: !!(byText(/Print \\/ Send Results/) && byText(/Print \\/ Send Results/).getBoundingClientRect().height > 0),
     printPairings: !!(byText(/Print Pairings/) && byText(/Print Pairings/).getBoundingClientRect().height > 0),
     teamLinks: { visible: visible('#team-links-list'), shareButtons: document.querySelectorAll('#team-links-list button').length,
@@ -125,8 +127,8 @@ async function look(code, auth) {
     // THE LEAK v109 SHIPPED: the public link rows carried the editable handicap.
     if (owned.teamLinks.editableControls > 0) failures.push('owned: ' + owned.teamLinks.editableControls + ' editable control(s) on the PUBLIC scoring-link rows');
     if (owned.teamCards.exists) failures.push('owned: the team cards (Setup) still exist for a signed-out visitor');
-    // LEGACY keeps its cards, and they are the editable ones.
-    if (!legacy.teamCards.exists || legacy.teamCards.handicapInputs < 2) failures.push('legacy: the Setup team cards are missing or have no handicap inputs - the bug v109 shipped');
+    // LEGACY (since the narrowing, 2026-09-18): no console at all - the cards go with it.
+    if (legacy.teamCards.exists) failures.push('legacy: the Setup team cards still exist - the rules refuse every write on a record with no owner');
     if (legacy.teamLinks.editableControls > 0) failures.push('legacy: editable control(s) on the public scoring-link rows');
     if (owned.signedInAs) failures.push('owned: "Signed in as" rendered while signed out: ' + owned.signedInAs);
     if (!owned.signInPanel) failures.push('owned: no sign-in panel on screen for a signed-out visitor');
@@ -138,10 +140,14 @@ async function look(code, auth) {
     if (!ownedInd.groupLinks.links.every(h => /tourney=OWNEDI1&group=g[12]$/.test(h))) failures.push('owned individual: a group link does not point at its group: ' + JSON.stringify(ownedInd.groupLinks.links));
     if (ownedInd.editorVisible) failures.push('owned individual: the group EDITOR has a rect signed out');
     if (ownedInd.lockWords.length) failures.push('owned individual: lock words on screen: ' + JSON.stringify(ownedInd.lockWords));
-    // LEGACY, signed out - exactly as before the wave
-    if (!legacy.setupTab.exists || !legacy.setupTab.visible) failures.push('legacy: the Setup tab is missing or has no rect - the grandfather promise is broken');
-    if (!legacy.setupPanel.exists) failures.push('legacy: the Setup panel is gone');
-    if (!legacy.deskTab.exists || !legacy.deskTab.visible) failures.push('legacy: the Desk tab is missing or has no rect - a legacy event keeps every manage tab');
+    // LEGACY, signed out - THE GRANDFATHER PROMISE IS WITHDRAWN (2026-09-18): the
+    // narrowed rules freeze a record with no ownerUid, so the page offers no console
+    // it cannot honour. One line on the Leaderboard says why; scores still save.
+    if (legacy.setupTab.exists || legacy.setupPanel.exists) failures.push('legacy: the Setup tab or panel still exists - every control on it would be refused by the rules');
+    if (legacy.deskTab.exists || legacy.deskPanel.exists) failures.push('legacy: the Desk tab or panel still exists');
+    if (!legacy.noOwnerNote.visible) failures.push('legacy: the no-organizer line has no rect');
+    if (!/no organizer account/.test(legacy.noOwnerNote.text)) failures.push('legacy: the no-organizer line does not say so: ' + JSON.stringify(legacy.noOwnerNote.text));
+    if (owned.noOwnerNote.visible) failures.push('owned: the no-organizer line is on screen for an owned record');
     if (legacy.lockWords.length) failures.push('legacy: lock words on screen: ' + JSON.stringify(legacy.lockWords));
 
     // ANONYMOUS visitor on the owned record: the signed-out page, exactly.

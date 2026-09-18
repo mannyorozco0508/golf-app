@@ -70,10 +70,26 @@
     "tournaments": {
       "$tourneyCode": {
         ".read": true,
-        ".write": "!data.exists() || newData.exists()",
+        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())",
         ".validate": "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
         "ownerUid": {
           ".validate": "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
+        },
+        "scores": {
+          "$scoreKey": {
+            ".write": "root.child('tournaments/' + $tourneyCode).exists()",
+            ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0"
+          }
+        },
+        "rounds": {
+          "$roundId": {
+            "scores": {
+              "$scoreKey": {
+                ".write": "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()",
+                ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0"
+              }
+            }
+          }
         }
       }
     },

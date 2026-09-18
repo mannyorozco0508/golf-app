@@ -47,11 +47,53 @@
           "r1": {
             "name": "Round One"
           }
+        },
+        "scores": {
+          "team1_h1": 4
         }
       },
       "OWNED": {
         "name": "Owned Tourney",
-        "ownerUid": "u-org"
+        "ownerUid": "u-org",
+        "teams": {
+          "team1": {
+            "num": 1,
+            "name": "Eagles",
+            "players": [
+              "Ann"
+            ],
+            "handicap": 0
+          }
+        },
+        "players": {
+          "p1": {
+            "id": "p1",
+            "name": "Ann"
+          }
+        },
+        "scores": {
+          "team1_h1": 4
+        },
+        "scoringGroups": {
+          "g1": {
+            "name": "Group 1"
+          }
+        },
+        "flights": {
+          "f1": {
+            "name": "A Flight"
+          }
+        },
+        "startType": "teetime",
+        "rounds": {
+          "r1": {
+            "name": "Round 1",
+            "status": "open",
+            "scores": {
+              "p1_h1": 5
+            }
+          }
+        }
       }
     },
     "global_courses": {
@@ -94,6 +136,15 @@
     },
     "organizer-pass": {
       "uid": "u-org",
+      "provider": "anonymous",
+      "token": {
+        "firebase": {
+          "sign_in_provider": "anonymous"
+        }
+      }
+    },
+    "anonymous": {
+      "uid": "anon-1",
       "provider": "anonymous",
       "token": {
         "firebase": {
@@ -251,15 +302,19 @@
       "canRead": [
         "nobody"
       ],
-      "canWrite": [
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": {
             "name": "Renamed Tourney"
           }
-        }
-      ],
-      "cannotWrite": [
+        },
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Renamed Tourney"
+          }
+        },
         {
           "auth": "nobody",
           "data": null
@@ -813,7 +868,7 @@
       ]
     },
     "tournaments/QRST/rounds/r1": {
-      "canWrite": [
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": {
@@ -823,13 +878,34 @@
         {
           "auth": "nobody",
           "data": null
+        },
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Renamed Round"
+          }
         }
       ]
     },
     "tournaments/NEWCODE": {
       "canWrite": [
         {
+          "auth": "organizer",
+          "data": {
+            "name": "Brand New Tourney",
+            "ownerUid": "u-org"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
           "auth": "nobody",
+          "data": {
+            "name": "Brand New Tourney"
+          }
+        },
+        {
+          "auth": "organizer",
           "data": {
             "name": "Brand New Tourney"
           }
@@ -837,20 +913,14 @@
       ]
     },
     "tournaments/QRST/ownerUid": {
-      "canWrite": [
-        {
-          "auth": "organizer",
-          "data": "u-org"
-        }
-      ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "organizer",
           "data": "u-org"
         },
         {
-          "auth": "organizer",
-          "data": "u-stranger"
+          "auth": "nobody",
+          "data": "u-org"
         }
       ]
     },
@@ -878,11 +948,12 @@
     },
     "tournaments/OWNED": {
       "canRead": [
-        "nobody"
+        "nobody",
+        "anonymous"
       ],
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "organizer",
           "data": {
             "name": "X",
             "ownerUid": "u-org"
@@ -893,15 +964,47 @@
         {
           "auth": "nobody",
           "data": {
+            "name": "X",
+            "ownerUid": "u-org"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "X",
+            "ownerUid": "u-org"
+          }
+        },
+        {
+          "auth": "organizer",
+          "data": {
             "name": "X"
           }
+        },
+        {
+          "auth": "organizer",
+          "data": null
         }
       ]
     },
     "tournaments/OWNED/name": {
       "canWrite": [
         {
+          "auth": "organizer",
+          "data": "X"
+        }
+      ],
+      "cannotWrite": [
+        {
           "auth": "nobody",
+          "data": "X"
+        },
+        {
+          "auth": "stranger",
+          "data": "X"
+        },
+        {
+          "auth": "anonymous",
           "data": "X"
         }
       ]
@@ -1359,6 +1462,625 @@
         {
           "auth": "stranger",
           "data": 9
+        }
+      ]
+    },
+    "tournaments/OWNED/teams/team1/handicap": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": 5
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        },
+        {
+          "auth": "stranger",
+          "data": 5
+        },
+        {
+          "auth": "anonymous",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/OWNED/teams/team2": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "num": 2,
+            "name": "Hawks",
+            "players": [
+              "Bo"
+            ],
+            "handicap": 0
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "num": 2,
+            "name": "Hawks",
+            "players": [
+              "Bo"
+            ],
+            "handicap": 0
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "num": 2,
+            "name": "Hawks",
+            "players": [
+              "Bo"
+            ],
+            "handicap": 0
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "num": 2,
+            "name": "Hawks",
+            "players": [
+              "Bo"
+            ],
+            "handicap": 0
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/players/p2": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "id": "p2",
+            "name": "Bob"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "id": "p2",
+            "name": "Bob"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "id": "p2",
+            "name": "Bob"
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "id": "p2",
+            "name": "Bob"
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/players/p1": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": null
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        },
+        {
+          "auth": "stranger",
+          "data": null
+        },
+        {
+          "auth": "anonymous",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/status": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "closed"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "closed"
+        },
+        {
+          "auth": "stranger",
+          "data": "closed"
+        },
+        {
+          "auth": "anonymous",
+          "data": "closed"
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": null
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        },
+        {
+          "auth": "stranger",
+          "data": null
+        },
+        {
+          "auth": "anonymous",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/OWNED/scoringGroups/g2": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Group 2"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Group 2"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "Group 2"
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "Group 2"
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scoringGroups/g2": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "Group 2"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Group 2"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "Group 2"
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "Group 2"
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/flights/f2": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": {
+            "name": "B Flight"
+          }
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "B Flight"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "B Flight"
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "B Flight"
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/startType": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "shotgun"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "shotgun"
+        },
+        {
+          "auth": "stranger",
+          "data": "shotgun"
+        },
+        {
+          "auth": "anonymous",
+          "data": "shotgun"
+        }
+      ]
+    },
+    "tournaments/OWNED/tripCode": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": "ABCD"
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "ABCD"
+        },
+        {
+          "auth": "stranger",
+          "data": "ABCD"
+        },
+        {
+          "auth": "anonymous",
+          "data": "ABCD"
+        }
+      ]
+    },
+    "tournaments/OWNED/registrationFields/shirtSize": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": false
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": false
+        },
+        {
+          "auth": "stranger",
+          "data": false
+        },
+        {
+          "auth": "anonymous",
+          "data": false
+        }
+      ]
+    },
+    "tournaments/OWNED/courseData": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": [
+            {
+              "hole": 1,
+              "par": 4,
+              "hcpIndex": 1
+            }
+          ]
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": [
+            {
+              "hole": 1,
+              "par": 4,
+              "hcpIndex": 1
+            }
+          ]
+        },
+        {
+          "auth": "stranger",
+          "data": [
+            {
+              "hole": 1,
+              "par": 4,
+              "hcpIndex": 1
+            }
+          ]
+        },
+        {
+          "auth": "anonymous",
+          "data": [
+            {
+              "hole": 1,
+              "par": 4,
+              "hcpIndex": 1
+            }
+          ]
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/team1_h2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        },
+        {
+          "auth": "anonymous",
+          "data": 5
+        },
+        {
+          "auth": "stranger",
+          "data": 5
+        },
+        {
+          "auth": "organizer",
+          "data": 3
+        },
+        {
+          "auth": "nobody",
+          "data": 30
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "five"
+        },
+        {
+          "auth": "nobody",
+          "data": 0
+        },
+        {
+          "auth": "nobody",
+          "data": 31
+        },
+        {
+          "auth": "nobody",
+          "data": 4.5
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "par": 4
+          }
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/team1_p0_h2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 4
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/p1_h2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 6
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/team1_h1": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/team1_h19": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 4
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/team1_h0": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 4
+        }
+      ]
+    },
+    "tournaments/OWNED/scores/name": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 4
+        }
+      ]
+    },
+    "tournaments/OWNED/scores": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "team1_h1": 4
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scores/team1_h1": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scores/p1_h2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        },
+        {
+          "auth": "anonymous",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scores/p1_h1": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scores/p1_h6": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "five"
+        },
+        {
+          "auth": "nobody",
+          "data": 31
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r1/scores": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": null
+        }
+      ]
+    },
+    "tournaments/QRST/scores/team1_h2": {
+      "canWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/QRST/name": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": "X"
+        },
+        {
+          "auth": "organizer",
+          "data": "X"
+        }
+      ]
+    },
+    "tournaments/NEWCODE2": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "X",
+            "ownerUid": "u-org"
+          }
+        },
+        {
+          "auth": "stranger",
+          "data": {
+            "name": "X",
+            "ownerUid": "u-org"
+          }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "X",
+            "ownerUid": "anon-1"
+          }
+        }
+      ]
+    },
+    "tournaments/NOPE/scores/team1_h1": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        },
+        {
+          "auth": "anonymous",
+          "data": 5
+        },
+        {
+          "auth": "organizer",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/NOPE/rounds/r1/scores/p1_h1": {
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
+        }
+      ]
+    },
+    "tournaments/OWNED/rounds/r9/scores/p1_h1": {
+      "canWrite": [
+        {
+          "auth": "organizer",
+          "data": 5
+        }
+      ],
+      "cannotWrite": [
+        {
+          "auth": "nobody",
+          "data": 5
         }
       ]
     }

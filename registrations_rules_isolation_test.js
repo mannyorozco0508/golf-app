@@ -32,23 +32,15 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
 
 const REPO = __dirname;
-const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
 const REAL_RULES = path.join(REPO, 'database.rules.json');
 const DATA_PATH = path.join(REPO, 'security-rules.tests-data.json');
 
-function runTargaryen(rulesPath) {
-    try {
-        // stderr piped, not inherited: the stubbed run is SUPPOSED to fail and
-        // targaryen narrates every failure there in red.
-        return { exitCode: 0, output: execFileSync(TARGARYEN, [rulesPath, DATA_PATH, '--verbose'],
-            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) };
-    } catch (e) {
-        return { exitCode: e.status, output: (e.stdout || '') + (e.stderr || '') };
-    }
-}
+// Through helpers/targaryen-run.js (stdout to a file): a pipe truncates the
+// table at 33,214 bytes on macOS and the parser below then sees only part of it.
+const { runTargaryen: runTargaryenToFile } = require('./helpers/targaryen-run.js');
+function runTargaryen(rulesPath) { return runTargaryenToFile(rulesPath, DATA_PATH); }
 
 // Every verdict row, in table order, as { path, op, auth, expect, got }. NOT
 // keyed by path: the same path/op/auth triple appears more than once (two

@@ -231,9 +231,21 @@ describe('THE SEAM - two meanings of auth, kept apart', () => {
         assert.equal(rules.organizers.$uid.pass['.write'], false);
         assert.equal(rules.organizers.$uid['.read'], 'auth != null && auth.uid === $uid');
     });
-    test('the tournaments block is untouched by this draft (as committed at 075c7a4)', () => {
-        assert.equal(JSON.stringify(rules.tournaments), JSON.stringify({ '$tourneyCode': { '.read': true, '.write': '!data.exists() || newData.exists()',
-            '.validate': "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
-            ownerUid: { '.validate': "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" } } }));
+    test('the tournaments block is the NARROWED one (2026-09-18): owner-only structure, scores open one key at a time', () => {
+        // Until 2026-09-18 this pinned the 075c7a4 block verbatim ("!data.exists()
+        // || newData.exists()" - any code-holder writes any child). The narrowing
+        // wave replaced it; tournaments_rules_isolation_test.js proves each refusal
+        // is ownership's. This pin keeps the two seams apart: events/ ownerUid has
+        // no provider check, tournaments/ ownerUid does - unchanged by the narrowing.
+        const t = rules.tournaments.$tourneyCode;
+        assert.equal(t['.read'], true);
+        assert.equal(t['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
+        assert.equal(t['.validate'], "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))");
+        assert.equal(t.ownerUid['.validate'], "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())");
+        // Candidate 2 (the same day): the grant requires the record - and the
+        // round - to exist; `true` let a stranger squat a code (HANDOFF, "The squat").
+        assert.equal(t.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode).exists()");
+        assert.equal(t.rounds.$roundId.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()");
+        assert.deepEqual(Object.keys(t).sort(), ['.read', '.validate', '.write', 'ownerUid', 'rounds', 'scores']);
     });
 });

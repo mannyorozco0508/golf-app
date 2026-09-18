@@ -311,11 +311,19 @@
     // The Firebase paths below are UNCHANGED - team{n}_h{h} and team{n}_p{i}_h{h},
     // scoped to the team number this link carries. The promise is only observed so the
     // golfer learns whether the write landed.
+    // A REFUSAL IS NOT A SIGNAL PROBLEM. Since the tournaments rules were
+    // narrowed (2026-09-18) the database refuses a score on an event that has
+    // been frozen or a key the rules do not recognise, with PERMISSION_DENIED.
+    // "Check your signal and re-enter" would be a lie there: the signal is fine
+    // and re-entering cannot help. That code gets its own sentence, and stays
+    // on screen; every other failure keeps the signal sentence.
     function trackWrite(promise) {
         setSaveState('saving', 'Saving…');
         return promise
             .then(() => setSaveState('saved', '✓ Saved'))
-            .catch(() => setSaveState('error', '⚠️ Could not save — check your signal and re-enter that hole'));
+            .catch((err) => setSaveState('error', (err && err.code === 'PERMISSION_DENIED')
+                ? "⚠️ This event isn't accepting scores \u2014 ask the organizer."
+                : '⚠️ Could not save — check your signal and re-enter that hole'));
     }
 
     // THE TWO TEAM WRITERS ASK THE SAME TWO QUESTIONS THE INDIVIDUAL ONE DOES:

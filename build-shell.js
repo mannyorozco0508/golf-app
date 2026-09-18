@@ -76,6 +76,13 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v46. The tournaments rules are narrowed (a code-holder writes
+        // scores and nothing else). tournament-scorecard.html says "not
+        // accepting scores" on a PERMISSION_DENIED instead of blaming the
+        // signal; tournament.html offers no console on a record with no owner
+        // and says why on the Leaderboard. A device on v45 keeps a card that
+        // tells a refused golfer to check their signal, and a legacy console
+        // whose every control is refused.
         // Moved to v45. The landing hero uses the parent brand mark
         // (logo-mark.png) with a quiet label under it and Tournaments on the
         // right, on brand-green fairway art. Presentation only. A device on
@@ -120,7 +127,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v45-hero-mark',
+        cacheName: 'tournament-v46-narrowed-rules',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

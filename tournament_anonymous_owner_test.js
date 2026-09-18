@@ -69,8 +69,8 @@ describe('THE PAGE: an anonymous user sees what a signed-out user sees', () => {
             assert.equal(anon.signedInAs, ''); assert.equal(anon.signedInAsSetup, '');
             assert.equal(anon.panelManage.display, 'block'); assert.match(anon.panelManage.html, /Organizers sign in to set up and edit a tournament/);
             assert.match(anon.panelManage.html, /Sign in/);
-            if (r === 'owned') { assert.equal(anon.setupTab, false); assert.equal(anon.setupPanel, false); }
-            else { assert.equal(anon.setupTab, true, 'a legacy tournament is open to everyone, as before'); }
+            // Since the narrowing (2026-09-18) a legacy record has no console either.
+            assert.equal(anon.setupTab, false); assert.equal(anon.setupPanel, false);
             assert.equal(anon.leaderboardTab, true);
         });
     }));
@@ -90,6 +90,14 @@ describe('THE PAGE: an anonymous user sees what a signed-out user sees', () => {
 });
 
 // ---------------------------------------------------------------------------
+// THE ONE DELIBERATE SUBSTITUTION SINCE THE CAPTURE (2026-09-18, the rules
+// narrowing): a LEGACY record shows no Setup tab and no Setup panel to anyone.
+// The fixture file is untouched (its sha is pinned below); the expectation is
+// the captured surface with exactly those two booleans flipped for legacy
+// arrivals, and nothing else - every other string on the screen is held
+// character for character.
+const narrowed = (captured, kind) => kind === 'legacy' ? Object.assign({}, captured, { setupTab: false, setupPanel: false }) : captured;
+
 describe('THE PROOF: email users, strangers and nobody see the page they saw at 6536216, character for character', () => {
     test('the baseline is pinned', () => {
         assert.equal(PREV.capturedAt, '6536216');
@@ -102,7 +110,7 @@ describe('THE PROOF: email users, strangers and nobody see the page they saw at 
         assert.match(PREV.arrivals['organizer/owned/user-first'].signedInAs, /Signed in as org@example\.com/, 'captured with content');
     });
     Object.entries(USERS).forEach(([u, user]) => [['owned', H.OWNED], ['legacy', H.LEGACY]].forEach(([r, rec]) => ['user-first', 'record-first'].forEach(order =>
-        test(`${u} / ${r} / ${order}`, () => assert.deepEqual(H.surface(H.arrive(rec(), user, order)), PREV.arrivals[u + '/' + r + '/' + order])))));
+        test(`${u} / ${r} / ${order}`, () => assert.deepEqual(H.surface(H.arrive(rec(), user, order)), narrowed(PREV.arrivals[u + '/' + r + '/' + order], r))))));
     Object.entries(USERS).forEach(([u, user]) => test(`Save as ${u}: the same alerts, the same creating set (ownerUid ${user ? user.uid : 'none - refused'})`, async () => {
         const r = await H.save(user);
         assert.deepEqual(r, PREV.saves[u]);
@@ -121,7 +129,7 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
     }
     const BAR = String.fromCharCode(0x2502);
     const rows = out => out.split('\n').filter(l => l.startsWith(BAR + ' tournaments/') || l.startsWith(BAR + ' registrations/')).map(l => l.split(BAR).map(c => c.trim()).filter(Boolean));
-    test('an anonymous auth cannot create a tournament it owns, cannot set ownerUid on an existing one; email and google owners can create; a legacy record without an owner is still open; null is unchanged; the owner\'s manage path is unchanged', () => {
+    test('an anonymous auth cannot create a tournament it owns, cannot set ownerUid on an existing one; email and google owners can create; a legacy record without an owner is FROZEN; a code holder cannot rename; the owner\'s manage path is unchanged', () => {
         const r = run(path.join(REPO_ROOT, 'database.rules.json'));
         const rs = rows(r.out);
         assert.equal(rs.length, 18, r.out);
@@ -139,14 +147,13 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
         const clause = "auth.token.firebase.sign_in_provider !== 'anonymous' && ";
         assert.equal(rules.split(clause).length, 2, 'the clause appears exactly once');
         assert.match(rules, /"ownerUid": \{\s*"\.validate": "\(!data\.exists\(\) && auth != null && auth\.token\.firebase\.sign_in_provider !== 'anonymous' && newData\.val\(\) === auth\.uid\) \|\| \(data\.exists\(\) && newData\.val\(\) === data\.val\(\)\)"/);
-        // The tournaments block is exactly what 075c7a4 committed. (Until the Wave 2
-        // draft this pinned the whole file's sha with the clause removed; the events
-        // and organizers rules have moved since, so the pin is on THIS block now -
-        // wave2_rules_test.js holds the same literal.)
-        const t = JSON.parse(rules).rules.tournaments;
-        assert.equal(JSON.stringify(t), JSON.stringify({ '$tourneyCode': { '.read': true, '.write': '!data.exists() || newData.exists()',
-            '.validate': "(newData.hasChildren() || newData.val() === null) && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid'))",
-            ownerUid: { '.validate': "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" } } }));
+        // The tournaments block is the NARROWED one (2026-09-18) - owner-only
+        // structure, scores open one key at a time. The ownerUid clause this test
+        // is about is unchanged inside it; tournaments_rules_isolation_test.js and
+        // wave2_rules_test.js hold the block itself.
+        const t = JSON.parse(rules).rules.tournaments.$tourneyCode;
+        assert.equal(t['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
+        assert.equal(t.ownerUid['.validate'], "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())");
     });
 });
 

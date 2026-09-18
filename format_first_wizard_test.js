@@ -702,7 +702,19 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // round must be one of the trip's rounds (read through root), the player
         // id numeric, the value "g<n>". Nothing else in the file moved.
         // trip_identity_test.js holds 11 targaryen rows against it.
-        'database.rules.json': '171987dbbc828ac78ff5c570047e81137b37161d99b193b1434df84ea7470abc',
+        // RE-PINNED 2026-09-18, THE TOURNAMENTS NARROWING (approved per file,
+        // published by hand, live hash ab32b849...): tournaments/$tourneyCode
+        // .write is owner-only for structure; scores/$scoreKey and
+        // rounds/$roundId/scores/$scoreKey are open to a code-holder one key at
+        // a time, validated to the three key shapes and a whole number 1..30.
+        // Nothing else in the file moved. tournaments_rules_isolation_test.js
+        // holds 118 targaryen rows and two isolation controls against it.
+        // RE-PINNED THE SAME DAY (candidate 2, live hash 66d26ee9...): the two
+        // score grants require the record - and the round - to EXIST. Candidate
+        // 1 let anyone create tournaments/<any code>/scores/<key>, and the real
+        // organizer's create on that code was then refused. Found by the live
+        // probe, not by targaryen (every row wrote to a record that existed).
+        'database.rules.json': '2a7a491827e0e9adedafab5f2e43c8135de0ef776a4b2411f422ab3e1d09d42d',
         'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };

@@ -675,6 +675,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
              leaderboard it always showed, with no extra control to ignore. -->
         <div id="lb-round-filter" style="display:none; text-align:center; margin-bottom:10px;"></div>
+        <!-- A record with no ownerUid (created before organizer sign-in, 2026-09-12)
+             is frozen by the narrowed rules: nobody can change its setup and there
+             is no claim path, deliberately. One line says so; scores still save. -->
+        <div id="lb-no-owner-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;">This event has no organizer account, so its setup can't be changed. Scores still save.</div>
         <div id="lb-combined-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;"></div>
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
         <div id="leaderboard-list"></div>
@@ -1725,7 +1729,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function canManage() {
         const owner = currentData && currentData.ownerUid;
-        if (!owner) return true;
+        // NO OWNER, NO CONSOLE (2026-09-18). This returned true for a record with
+        // no ownerUid - the "grandfather promise" - and the rules then let anyone
+        // holding the code write anything. The rules are narrowed now: structure
+        // is the owner's, and a record with no owner is frozen for everyone. A
+        // Setup tab whose every control is refused is worse than none; the
+        // Leaderboard tab says why in one line (#lb-no-owner-note). Measured at
+        // the decision: two tournaments existed, one legacy - FN68, a throwaway.
+        if (!owner) return false;
         return !!(authUser && authUser.uid === owner);
     }
 
@@ -1736,6 +1747,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // and render a leaderboard of nothing.
         if (!currentCode || !currentData || Object.keys(currentData).length === 0) return;
         const allowed = canManage();
+        const noOwner = document.getElementById('lb-no-owner-note');
+        if (noOwner) noOwner.style.display = currentData.ownerUid ? 'none' : 'block';
         const present = GATED_TABS.map((k) => ({ key: k, tab: document.getElementById('tab-btn-' + k), panel: document.getElementById('manage-tab-' + k) }));
         if (!allowed && present.some((p) => p.tab || p.panel)) {
             // NOT hidden, NOT disabled: removed - Setup and Desk together. A

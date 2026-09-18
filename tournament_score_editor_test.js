@@ -165,10 +165,10 @@ describe('THE GATE: nobody but the owner reaches the editor', () => {
             assert.equal(scoreWrites(sb).length, 0, 'the writer checks canManage() itself: ' + JSON.stringify(who));
         }
     });
-    test('the owner of a LEGACY tournament (no ownerUid) - canManage is true for everyone there, as everywhere on this page - still gets the editor (nothing new is locked away)', () => {
+    test('a LEGACY tournament (no ownerUid) gets NO editor since the narrowing (2026-09-18) - the rules refuse every write on it, so the page offers none', () => {
         const rec = scramble(); delete rec.ownerUid;
         const sb = arriveOwner(rec, null);
-        assert.ok(el(sb, 'score-corrector') && /Correct a scorecard/.test(el(sb, 'score-corrector').innerHTML));
+        assert.equal(el(sb, 'manage-tab-setup'), null, 'the Setup panel - the editor\'s home - is removed');
     });
 });
 

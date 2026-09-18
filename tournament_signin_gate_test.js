@@ -6,8 +6,9 @@
 //      not disabled, not greyed. Leaderboard, printing, the share links, theme
 //      and navigation stay open exactly as today.
 //   2. No organizer link this wave.
-//   3. A LEGACY tournament (no ownerUid) behaves exactly as today, fully open.
-//      The page branches on whether ownerUid exists. This is the grandfather
+//   3. A LEGACY tournament (no ownerUid) has NO console since 2026-09-18: the
+//      narrowed rules freeze it, so the page offers nothing it cannot honour.
+//      (Until then it was fully open - the grandfather promise. This is the grandfather
 //      promise, pinned here so it cannot be broken later by accident.
 //   4. An owned tournament's Setup tab renders only when auth.uid === ownerUid.
 //      Signed in as somebody else is the same as signed out.
@@ -201,12 +202,10 @@ describe('a2) INDIVIDUAL MODE: the group scoring links are rendered for everyone
         assert.equal(setupPanel(sb), null, 'and the Setup panel - the editor - is gone');
     });
 
-    test('legacy individual, signed out: the links render AND the editor is still there', () => {
+    test('legacy individual, signed out: the links render and the editor is GONE (the rules froze legacy structure, 2026-09-18)', () => {
         const sb = arrive(individualRecord(), null);
-        assert.ok(/group=g1/.test(groupLinks(sb).innerHTML));
-        assert.ok(setupPanel(sb), 'legacy keeps its Setup panel');
-        assert.ok(EDITOR_HANDLERS.test(sb.document.getElementById('scoring-groups-list').innerHTML),
-            'the editor still renders its controls on a legacy tournament');
+        assert.ok(/group=g1/.test(groupLinks(sb).innerHTML), 'golfers still get their links - scores still save');
+        assert.equal(setupPanel(sb), null, 'a legacy record has no Setup panel any more: every control on it would be refused');
     });
 
     test('the editor rows no longer carry the link - it lives in one place', () => {
@@ -272,26 +271,36 @@ describe('c) SIGNED IN AS A NON-OWNER of an owned tournament: same as signed out
 });
 
 // ===========================================================================
-describe('d) LEGACY tournament (no ownerUid), signed out: exactly as today - THE GRANDFATHER PROMISE', () => {
+describe('d) LEGACY tournament (no ownerUid): THE GRANDFATHER PROMISE IS WITHDRAWN (2026-09-18)', () => {
+    // Until the narrowing this block held "exactly as today, fully open": a
+    // record with no ownerUid kept its Setup tab for everyone, because the rules
+    // let anyone holding the code write anything. The rules now refuse every
+    // structural write on a record with no owner, and there is no claim path
+    // (closed by the rule, deliberately). Measured at the decision: two
+    // tournaments existed, one legacy - FN68, Manny's own throwaway. So the page
+    // no longer offers a console it cannot honour; one line on the Leaderboard
+    // says why (tournament_narrowing_page_test.js pins the sentence).
 
-    test('the Setup tab and panel are present', () => {
-        const sb = arrive(LEGACY(), null);
-        assert.ok(setupTab(sb), 'a legacy tournament must keep its Setup tab for everyone');
-        assert.ok(setupPanel(sb));
+    test('the Setup tab and panel are ABSENT for everyone - signed out, a stranger, the organizer account', () => {
+        [null, STRANGER, ORGANIZER].forEach((u) => {
+            const sb = arrive(LEGACY(), u);
+            assert.equal(setupTab(sb), null, 'no Setup tab on a legacy record');
+            assert.equal(setupPanel(sb), null);
+            assert.ok(leaderboardTab(sb), 'the Leaderboard tab stays');
+            assert.equal(sb.document.getElementById('lb-no-owner-note').style.display, 'block', 'the no-organizer line is shown');
+        });
     });
 
-    test('a Setup control still writes', () => {
-        const sb = arrive(LEGACY(), null);
-        sb.updateTeamHandicap(2, '3');
-        const w = sb.__dbWrites.find(x => x.path === 'tournaments/GATE1/teams/team2/handicap');
-        assert.ok(w && w.value === 3, 'legacy tournaments are fully open, as today');
-    });
-
-    test('and signed in as anybody, still present - a legacy tournament is not claimed by signing in', () => {
+    test('nothing writes ownerUid onto a legacy record - signing in claims nothing, and there is no claim control', () => {
         const sb = arrive(LEGACY(), STRANGER);
-        assert.ok(setupTab(sb));
-        assert.ok(!sb.__dbWrites.some(x => /ownerUid/.test(x.path) || (x.value && x.value.ownerUid)),
-            'no claim path this wave: nothing may write ownerUid onto a legacy record');
+        assert.ok(!sb.__dbWrites.some(x => /ownerUid/.test(x.path) || (x.value && x.value.ownerUid)));
+        assert.doesNotMatch(read(PAGE), /Claim this event|claimTournament/);
+    });
+
+    test('an OWNED record is untouched by the withdrawal: the owner keeps Setup, the line is hidden', () => {
+        const sb = arrive(OWNED(), ORGANIZER);
+        assert.ok(setupTab(sb) && setupPanel(sb));
+        assert.notEqual(sb.document.getElementById('lb-no-owner-note').style.display, 'block');
     });
 });
 

@@ -280,7 +280,7 @@ describe('PWA — two independent installable apps', () => {
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
         assert.match(c, /^consumer-v45-no-native-print$/);
-        assert.match(t, /^tournament-v45-hero-mark$/);
+        assert.match(t, /^tournament-v46-narrowed-rules$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {
@@ -500,7 +500,8 @@ describe('FIREBASE — one project, unchanged', () => {
         assert.equal(rules.events.$eventCode['.read'], true);
         // An exact string, not a looser match: the rule that stops an anonymous
         // whole-tournament delete must survive a deployment batch byte for byte.
-        assert.equal(rules.tournaments.$tourneyCode['.write'], '!data.exists() || newData.exists()');
+        // Narrowed 2026-09-18 (published by hand, not by a deployment batch): owner-only structure.
+        assert.equal(rules.tournaments.$tourneyCode['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
         assert.equal(rules.app_settings['.write'], false);
     });
 });

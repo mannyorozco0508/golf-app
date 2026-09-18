@@ -180,14 +180,15 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
         assert.equal(el(sb, 'manage-tab-setup').style.display, 'block');
     });
 
-    test('a LEGACY event (no ownerUid): the Desk panel says it takes no signups and lists nothing', () => {
+    test('a LEGACY event (no ownerUid): since the narrowing (2026-09-18) there is no Desk tab at all - the gate takes it with Setup', () => {
+        // Until the narrowing a legacy record kept every tab and the Desk said
+        // "not taking signups". canManage() is false without an owner now, so
+        // the Desk is removed like Setup; the Leaderboard carries the one line.
         const sb = arrive(teamRecord({ ownerUid: undefined }), null);
-        sb.showTab('desk');
-        // mini-dom: the note is set by textContent, the list by innerHTML - read each.
-        const note = String(el(sb, 'registration-desk-note').textContent || '');
-        assert.match(note, /not taking signups/i);
-        assert.equal(rows(sb), 0);
-        assert.equal(strip(html(sb, 'registration-counts')), '');
+        assert.equal(el(sb, 'tab-btn-desk'), null);
+        assert.equal(el(sb, 'manage-tab-desk'), null);
+        assert.doesNotThrow(() => sb.showTab('desk'));
+        assert.equal(el(sb, 'manage-tab-leaderboard').style.display, 'block');
     });
 });
 

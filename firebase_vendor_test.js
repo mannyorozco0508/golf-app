@@ -357,6 +357,9 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
             '/registrations/$code/$entryId/.validate',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
+            // The narrowing (2026-09-18, published by hand): the parent .write
+            // names the owner - a code-holder writes scores and nothing else.
+            '/tournaments/$tourneyCode/.write',
             '/tournaments/$tourneyCode/ownerUid/.validate'
         ], 'auth reached a rule outside the approved rules wave: ' + JSON.stringify(authSites));
         assert.match(read('admin.html'), /function makeOrganizerToken/,
