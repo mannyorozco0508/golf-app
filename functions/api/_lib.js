@@ -386,6 +386,23 @@ export async function handleDetail(d) {
 // { status: 404 } or { status: 405, headers: { Allow: 'GET' } }; its headers
 // are merged over the two fixed ones, never in place of them, so a refusal
 // is JSON and no-store whatever its status.
+// CORS FOR THE NATIVE SHELL, AND FOR NOBODY ELSE (2026-09-19). The iOS app's
+// pages live at capacitor://localhost (Android: http://localhost), so a fetch
+// from there to this proxy is cross-origin; measured 2026-09-19, the live
+// answer carried no Access-Control-Allow-Origin and a WKWebView refused the
+// read - native course search could not reach the proxy at all. The echo below
+// is for exactly these origins, matched whole. A same-origin web request sends
+// no Origin header and gets exactly the headers it always got; any other
+// origin gets no CORS header and the browser refuses the read, as it does
+// today. Never '*': the budget behind this proxy is the whole reason it exists.
+export const SHELL_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost'];
+export function corsHeadersFor(request) {
+    const origin = request && request.headers && typeof request.headers.get === 'function'
+        ? request.headers.get('Origin') : null;
+    if (!origin || SHELL_ORIGINS.indexOf(origin) === -1) return {};
+    return { 'access-control-allow-origin': origin, 'vary': 'Origin' };
+}
+
 export function toResponse(out, init) {
     return new Response(JSON.stringify(out), {
         status: (init && init.status) || (out.status === 'ok' ? 200 : 503),
@@ -399,9 +416,9 @@ export function toResponse(out, init) {
 // THE CATCH-ALL'S TWO REFUSALS, built here so the reason table above and the
 // code that emits each reason stay in one file - course_api_proxy_test.js
 // holds them together.
-export function noSuchRoute() {
-    return toResponse(unavailable('no_such_route'), { status: 404 });
+export function noSuchRoute(request) {
+    return toResponse(unavailable('no_such_route'), { status: 404, headers: corsHeadersFor(request) });
 }
-export function methodNotAllowed(allow) {
-    return toResponse(unavailable('method_not_allowed'), { status: 405, headers: { Allow: allow.join(', ') } });
+export function methodNotAllowed(allow, request) {
+    return toResponse(unavailable('method_not_allowed'), { status: 405, headers: Object.assign({ Allow: allow.join(', ') }, corsHeadersFor(request)) });
 }

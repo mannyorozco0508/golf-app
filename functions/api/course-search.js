@@ -11,10 +11,12 @@
 // too, differently, and the two will drift.
 // ============================================================================
 
-import { handleSearch, toResponse } from './_lib.js';
+import { handleSearch, toResponse, corsHeadersFor } from './_lib.js';
 
 export async function onRequestGet(context) {
     const url = new URL(context.request.url);
+    // The shell's origin gets its CORS echo; the web's same-origin request gets nothing added.
+    const cors = { headers: corsHeadersFor(context.request) };
     return toResponse(await handleSearch({
         q: url.searchParams.get('q'),
         // CF-Connecting-IP is set by Cloudflare's edge and cannot be spoofed by
@@ -25,5 +27,5 @@ export async function onRequestGet(context) {
         // handler, not a TypeError here - a route that throws returns
         // Cloudflare's 1101 and the caller learns nothing.
         kv: context.env && context.env.GOLFCOURSE_KV
-    }));
+    }), cors);
 }

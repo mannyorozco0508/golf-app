@@ -2128,6 +2128,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } catch (e) { return false; }
     }
 
+    // WHERE THE COURSE PROXY IS (2026-09-19). '' on the web - the two fetches
+    // below stay the relative '/api/...' they always were, byte for byte. In
+    // the shell the page's origin is capacitor://localhost and a relative
+    // '/api/...' resolves to a path the shell does not serve, so the SAME
+    // Cloudflare proxy is named by its canonical origin (product-links.js
+    // GOLF_WEB_ORIGIN). No second path, no CDN. Read at fetch time - on a tap,
+    // after load - through the one native detection above.
+    function courseApiBase() {
+        return isNativeApp() ? GOLF_WEB_ORIGIN : '';
+    }
+
     // --- SECRET TAP LOGIC ---
     let tapCount = 0;
     function handleSecretTap() {
@@ -3777,7 +3788,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         let payload;
         try {
-            const res = await fetch('/api/course-search?q=' + encodeURIComponent(query));
+            const res = await fetch(courseApiBase() + '/api/course-search?q=' + encodeURIComponent(query));
             payload = await res.json();
         } catch (e) {
             payload = { status: 'unavailable', reason: 'network' };
@@ -3873,7 +3884,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         let payload;
         try {
-            const res = await fetch('/api/course/' + encodeURIComponent(course.id));
+            const res = await fetch(courseApiBase() + '/api/course/' + encodeURIComponent(course.id));
             payload = await res.json();
         } catch (e) {
             payload = { status: 'unavailable', reason: 'network' };

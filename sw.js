@@ -1637,7 +1637,11 @@
 // removing them, so a spectator's leaderboard keeps moving after its first
 // paint. A device on v174 keeps a board frozen at page load for everyone but
 // the organizer.
-const CACHE_VERSION = 'golfapp-v175-live-board';
+// Moved to v176: admin.html names the course proxy by its canonical origin in
+// the native shell (courseApiBase) - '' on the web, so the web path is
+// unchanged. A device on v175 keeps an admin.html whose fetches would resolve
+// against capacitor://localhost once the search guards come off.
+const CACHE_VERSION = 'golfapp-v176-course-api-base';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

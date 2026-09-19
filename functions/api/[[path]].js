@@ -46,6 +46,6 @@ export async function onRequest(context) {
     const route = ROUTES.find((r) => r.matches(seg));
     // A real route reached the catch-all only because it does not export this
     // method - Pages would have answered from the module otherwise.
-    if (route) return methodNotAllowed(route.methods);
-    return noSuchRoute();
+    if (route) return methodNotAllowed(route.methods, context.request);
+    return noSuchRoute(context.request);
 }

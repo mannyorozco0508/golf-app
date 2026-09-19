@@ -13,9 +13,10 @@
 // Thin for the same reason as the search route. The rule is in _lib.js.
 // ============================================================================
 
-import { handleDetail, toResponse } from '../_lib.js';
+import { handleDetail, toResponse, corsHeadersFor } from '../_lib.js';
 
 export async function onRequestGet(context) {
+    const cors = { headers: corsHeadersFor(context.request) };
     return toResponse(await handleDetail({
         id: context.params.id,
         ip: context.request.headers.get('CF-Connecting-IP'),
@@ -24,5 +25,5 @@ export async function onRequestGet(context) {
         // handler, not a TypeError here - a route that throws returns
         // Cloudflare's 1101 and the caller learns nothing.
         kv: context.env && context.env.GOLFCOURSE_KV
-    }));
+    }), cors);
 }
