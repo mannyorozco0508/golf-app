@@ -1076,6 +1076,29 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## The KP picker is legible (2026-09-19, v181)
+
+The "Who is closest?" select had no type size of its own - Chrome's UA default, measured
+13.33 px, grey UA border, square corners - beside ft/in boxes at 15.2 px with 8 px
+corners, on the control that names who gets the money, tapped on a green in sun.
+`index.html` `.kp-select` is now **17 px** (= `.score-input`, the boxes a golfer already
+reads on this screen; ≥ 16 px so iOS Safari does not zoom on focus), 48 px tall (the
+Prev/Next height), with the block's own border/corners/card background; `.kp-dist-input`
+takes the same 17 px / 48 px / border / corners / background (64 px wide) so the three
+read as one control; `.kp-dist-label` 0.72 → 0.85 rem; `.kp-current` ("No leader yet" /
+"Current: Ann Adams — 8' 4"") 0.82 → 0.95 rem, because that line carries the answer and
+is the state most golfers look at. `.kp-btn` (Save KP) untouched:
+solid brand green, bold, still the loudest thing in the block.
+
+**Measured at 390** (`tools/kp-entry-position-check.js index.html picker` - a real tap
+on Set KP Leader, computed font sizes and rects): select 13.33 → 17 px, 44 → 48 px tall;
+ft/in 15.2 → 17 px, 44 → 48; label 11.52 → 13.6 px. The OPEN block 243 → 251 px (+8),
+everything below it +8 while the picker is open; then the leader line 13.12 → 15.2 px
+added 2 px more: OPEN block 253 px, CLOSED block 99 → 101 px (everything under it +2 on a
+KP hole); a non-KP hole's page byte-for-byte the same rects; landing 12 / 12 unchanged.
+The head (11.2 px) is a label and stays. `kp_picker_legibility_test.js` pins the rules against `.score-input`'s size;
+five controls all fire. `sw.js` `golfapp-v181-kp-picker`.
+
 ## The KP entry sits under the Prev/Next row (2026-09-19)
 
 **Seen on a phone**, hole 8, the "Set KP Leader" block was at the bottom of the Weekly

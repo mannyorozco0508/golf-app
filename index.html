@@ -598,13 +598,22 @@
            push score entry or Prev/Next down the screen. */
         .kp-block { margin: 8px 0; padding: 8px; border-radius: 8px; background: var(--bg-soft); }
         .kp-head { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
-        .kp-current { font-size: 0.82rem; padding: 2px 0; }
+        .kp-current { font-size: 0.95rem; padding: 2px 0; }   /* the line that carries the answer, read at arm's length (2026-09-19) */
         .kp-none { color: var(--text-muted); font-style: italic; }
         .kp-dist-none { font-size: 0.7rem; color: var(--text-muted); }
-        .kp-select { width: 100%; min-height: 44px; margin-top: 6px; }
+        /* THE PICKER READS AT THE SCORE BOXES' SIZE (2026-09-19). The select had no
+           type size of its own - the UA's 13.33px, its grey border and square
+           corners - beside ft/in boxes at 15.2px with 8px corners, on the control
+           that names who gets the money, tapped on a green in sun. 17px is
+           .score-input's size, the boxes a golfer already reads here, and at or
+           over 16px iOS Safari does not zoom the page when it is focused. 48px is
+           the Prev/Next buttons' height. The ft/in boxes take the same size, height,
+           border, corners and background so the three read as one control. Save KP
+           (.kp-btn) is untouched: solid brand green, bold, the loudest thing here. */
+        .kp-select { width: 100%; min-height: 48px; margin-top: 6px; padding: 0 10px; font-size: 17px; color: var(--text-main); background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 8px; box-sizing: border-box; }
         .kp-dist-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-        .kp-dist-label { font-size: 0.72rem; color: var(--text-muted); flex: 1; }
-        .kp-dist-input { width: 56px; height: 40px; text-align: center; font-size: 0.95rem; border: 1px solid var(--border-mid); border-radius: 8px; }
+        .kp-dist-label { font-size: 0.85rem; color: var(--text-muted); flex: 1; }
+        .kp-dist-input { width: 64px; height: 48px; text-align: center; font-size: 17px; color: var(--text-main); background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 8px; box-sizing: border-box; }
         .kp-btn { width: 100%; min-height: 44px; margin-top: 6px; border: none; border-radius: 8px; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.85rem; }
         .kp-cancel { width: 100%; min-height: 40px; margin-top: 4px; background: none; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; }
         .lnf-head { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); margin-top: 8px; }

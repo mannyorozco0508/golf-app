@@ -1657,7 +1657,11 @@
 // under the Prev/Next row on every KP hole, whether or not My Round is open, and
 // its head reads "Weekly Game KP". A device on v179 keeps an index.html where
 // the block is at the bottom of the Weekly Game panel, behind the My Round tap.
-const CACHE_VERSION = 'golfapp-v180-kp-entry-nav';
+// Moved to v181: the KP picker reads at the score boxes' size - the select and
+// the ft/in boxes at 17px, 48px tall, one border and one set of corners; the UA's
+// 13px select is gone, and the line naming the current leader is 0.95rem. A
+// device on v180 keeps the small picker.
+const CACHE_VERSION = 'golfapp-v181-kp-picker';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

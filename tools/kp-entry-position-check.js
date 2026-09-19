@@ -28,7 +28,10 @@
 //
 //   node tools/kp-entry-position-check.js [page] [arm]
 //     page   index.html (default) or another file at the repo root
-//     arm    pool (default) | dots  - the Weekly Game alone, or with a Dots game
+//     arm    pool (default) | dots | picker  - the Weekly Game alone, with a Dots
+//            game, or with the picker OPEN (a real tap on Set KP Leader) so the
+//            select, the ft/in boxes and Save KP are measured - computed font
+//            sizes and rects - and the block's open height is on record
 //
 //   exit 0   PASS
 //   exit 1   FAIL - the JSON lists which guarantee broke
@@ -93,6 +96,15 @@ const MEASURE = `
     actionCenter: doc(document.querySelector('#action-center-mount > *')),
     betStrip: doc(document.querySelector('#bet-strip-mount > *')),
     setKpButton: block ? !!block.querySelector('.kp-btn') : false,
+    // THE PICKER'S CONTROLS, when open: computed type size and box of each, so a
+    // legibility change is a number before and after, not an adjective.
+    picker: (() => {
+      if (!block || !block.querySelector('.kp-select')) return null;
+      const one = (sel) => { const el = block.querySelector(sel); if (!el) return null; const cs = getComputedStyle(el); const r = el.getBoundingClientRect();
+        return { fontPx: parseFloat(cs.fontSize), h: Math.round(r.height), w: Math.round(r.width), top: Math.round(r.top + sy), pad: cs.paddingLeft + '/' + cs.paddingTop, border: cs.borderTopWidth + ' ' + cs.borderTopColor, radius: cs.borderTopLeftRadius, weight: cs.fontWeight, text: (el.innerText || el.value || el.placeholder || '').split(/\\s+/).join(' ').trim().slice(0, 40) }; };
+      const n = ((heading && heading.querySelector('.hv-hole-num')) ? heading.querySelector('.hv-hole-num').innerText : '').replace('Hole', '').trim();
+      return { select: one('.kp-select'), ft: one('#kp-ft-' + n), inch: one('#kp-in-' + n), distLabel: one('.kp-dist-label'), save: one('.kp-btn'), cancel: one('.kp-cancel'), head: one('.kp-head'), current: one('.kp-current'), options: block.querySelector('.kp-select').options.length };
+    })(),
     // THE STACK under the nav row: every element child of the hole card from the
     // row down, and the first child of each mount, so "what moved down" is read
     // off one list rather than guessed from the named panels above.
@@ -124,7 +136,8 @@ function bail(msg) {
         rounds: ROUNDS, settleMs: 3500,
         viewport: { width: 390, height: 844 },
         steps: [
-            { expression: MEASURE },                                  // arrival: hole 7, a KP hole, no scroll yet
+            ...(ARM === 'picker' ? [{ tap: '.kp-btn' }, { sleep: 300 }] : []),   // picker arm: open it with a real tap
+            { expression: MEASURE },                                  // arrival: hole 7, a KP hole (picker arm: open)
             { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 400 },   // Next -> hole 8, not a KP hole; landOnHole scrolls
             { expression: MEASURE },
             { tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 400 },   // Prev -> hole 7 again, through the same landing
@@ -132,8 +145,11 @@ function bail(msg) {
         ],
     });
     if (!r.ok) bail(r.reason);
-    // Each sleep step pushes its own line; the seven entries are read by position.
-    const [arrive, tapNext, , h8, tapPrev, , h7] = r.value;
+    // Each sleep step pushes its own line; the entries are read by position (the
+    // picker arm's two opening lines first).
+    const vals = ARM === 'picker' ? r.value.slice(2) : r.value;
+    if (ARM === 'picker' && !/^tapped/.test(String(r.value[0]))) bail('Set KP Leader was not pressed: ' + r.value[0]);
+    const [arrive, tapNext, , h8, tapPrev, , h7] = vals;
     if (typeof tapNext !== 'string' || !/^tapped/.test(tapNext)) bail('Next was not pressed: ' + tapNext);
     if (typeof tapPrev !== 'string' || !/^tapped/.test(tapPrev)) bail('Prev was not pressed: ' + tapPrev);
     if (!arrive || !arrive.heading) bail('no hole card rendered on arrival');
@@ -161,6 +177,10 @@ function bail(msg) {
     // THE LANDING: both navigations put the heading at the same place on screen.
     if (h8.heading.viewportTop !== h7.heading.viewportTop)
         problems.push('the landing differs between hole 8 (' + h8.heading.viewportTop + ') and hole 7 (' + h7.heading.viewportTop + ')');
+    if (ARM === 'picker') {
+        if (!arrive.picker || !arrive.picker.select) problems.push('picker arm: the tap did not open the select');
+        else if (arrive.picker.options !== 5) problems.push('picker arm: expected 5 options (prompt + four golfers), got ' + arrive.picker.options);
+    }
     if (ARM === 'dots') {
         if (!arrive.dotsKpLine) problems.push('dots arm: no Dots KP line on the par 3');
         else if (arrive.block && arrive.dotsKpLine.rect.top < arrive.block.bottom) problems.push('dots arm: the Dots KP line is above the Weekly Game block');
