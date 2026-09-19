@@ -76,6 +76,18 @@ function arrive(rec, user, order = 'user-first') {
     if (order === 'record-first') sb.__auth.setUser(user);
     return sb;
 }
+// RE-PINNED 2026-09-18 (Option B, "hide, not remove"): the gate used to REMOVE the
+// Setup and Desk pills and panels, and every assertion below said "must be
+// removed". Removal is what froze every non-owner's leaderboard after the first
+// snapshot (loadTournament's value callback writes fourteen sites inside the
+// Setup tab before the board; tournament_live_board_test.js, tools/tournament-
+// live-board-check.js). The gate now HIDES: the elements stay in the tree with
+// display none, showTab refuses a gated tab for a non-owner, and the owner's
+// sign-in un-hides them. So "absent" here means HIDDEN - in the tree, no
+// display - and "present" means shown. What removal bought was one dev-tools
+// toggle against rules that refuse the writes anyway (dab91d8).
+const gatedHidden = (el) => !!el && el.style.display === 'none';
+const gatedShown = (el) => !!el && el.style.display !== 'none';
 const setupTab = (sb) => sb.document.getElementById('tab-btn-setup');
 // Rendered text: mini-dom's textContent is a plain property, so text appended as
 // nodes lives on the children. Walk them, the way innerText would read.
@@ -92,10 +104,10 @@ describe('a) SIGNED OUT on an OWNED tournament: the Setup tab is not rendered; e
     ['user-first', 'record-first'].forEach(order => {
         test(`the Setup tab and its panel are absent from the DOM (${order})`, () => {
             const sb = arrive(OWNED(), null, order);
-            assert.equal(setupTab(sb), null, 'tab-btn-setup must be removed, not hidden or disabled');
-            assert.equal(setupPanel(sb), null, 'manage-tab-setup must be removed - its controls must not exist');
-            assert.equal(deskTab(sb), null, 'tab-btn-desk must be removed with Setup (2c)');
-            assert.equal(deskPanel(sb), null, 'manage-tab-desk must be removed - the signups must not exist on the page');
+            assert.ok(gatedHidden(setupTab(sb)), 'tab-btn-setup must be hidden - in the tree, display none (re-pinned 2026-09-18)');
+            assert.ok(gatedHidden(setupPanel(sb)), 'manage-tab-setup must be hidden - its controls have no rect (Chrome proves the rect)');
+            assert.ok(gatedHidden(deskTab(sb)), 'tab-btn-desk must be hidden with Setup (2c)');
+            assert.ok(gatedHidden(deskPanel(sb)), 'manage-tab-desk must be hidden - the signups are not rendered (listener off, rules refuse the read)');
             assert.ok(leaderboardTab(sb), 'the Leaderboard tab stays');
         });
     });
@@ -103,8 +115,9 @@ describe('a) SIGNED OUT on an OWNED tournament: the Setup tab is not rendered; e
     test('showTab("setup") cannot bring it back and does not throw', () => {
         const sb = arrive(OWNED(), null);
         assert.doesNotThrow(() => sb.showTab('setup'));
-        assert.equal(setupTab(sb), null);
-        assert.equal(setupPanel(sb), null);
+        assert.ok(gatedHidden(setupTab(sb)));
+        assert.ok(gatedHidden(setupPanel(sb)), 'showTab refuses a gated tab for a non-owner');
+        assert.equal(sb.document.getElementById('manage-tab-leaderboard').style.display, 'block');
     });
 
     test('the leaderboard still renders', () => {
@@ -199,13 +212,13 @@ describe('a2) INDIVIDUAL MODE: the group scoring links are rendered for everyone
         assert.ok(/group=g1/.test(html) && /group=g2/.test(html), 'both group links: ' + html.slice(0, 200));
         assert.ok(/Ann Alpha/.test(html) && /Dee Delta/.test(html), 'each link names its golfers');
         assert.ok(!EDITOR_HANDLERS.test(html), 'the editor must not ride along with the links');
-        assert.equal(setupPanel(sb), null, 'and the Setup panel - the editor - is gone');
+        assert.ok(gatedHidden(setupPanel(sb)), 'and the Setup panel - the editor - is hidden');
     });
 
     test('legacy individual, signed out: the links render and the editor is GONE (the rules froze legacy structure, 2026-09-18)', () => {
         const sb = arrive(individualRecord(), null);
         assert.ok(/group=g1/.test(groupLinks(sb).innerHTML), 'golfers still get their links - scores still save');
-        assert.equal(setupPanel(sb), null, 'a legacy record has no Setup panel any more: every control on it would be refused');
+        assert.ok(gatedHidden(setupPanel(sb)), 'a legacy record shows no Setup panel: every control on it would be refused');
     });
 
     test('the editor rows no longer carry the link - it lives in one place', () => {
@@ -236,9 +249,9 @@ describe('b) SIGNED IN AS THE OWNER: the Setup tab is present and its controls w
     ['user-first', 'record-first'].forEach(order => {
         test(`tab and panel present (${order})`, () => {
             const sb = arrive(OWNED(), ORGANIZER, order);
-            assert.ok(setupTab(sb), 'tab-btn-setup must be present for the owner');
-            assert.ok(setupPanel(sb), 'manage-tab-setup must be present for the owner');
-            assert.ok(deskTab(sb) && deskPanel(sb), 'the Desk tab and panel must be present for the owner (2c)');
+            assert.ok(gatedShown(setupTab(sb)), 'tab-btn-setup must be shown for the owner');
+            assert.ok(gatedShown(setupPanel(sb)), 'manage-tab-setup must be shown for the owner');
+            assert.ok(gatedShown(deskTab(sb)) && deskPanel(sb), 'the Desk tab must be shown for the owner (2c) and its panel in the tree');
         });
     });
 
@@ -263,8 +276,8 @@ describe('c) SIGNED IN AS A NON-OWNER of an owned tournament: same as signed out
     ['user-first', 'record-first'].forEach(order => {
         test(`the Setup tab is absent (${order})`, () => {
             const sb = arrive(OWNED(), STRANGER, order);
-            assert.equal(setupTab(sb), null, 'auth != null is not enough; auth.uid must equal ownerUid');
-            assert.equal(setupPanel(sb), null);
+            assert.ok(gatedHidden(setupTab(sb)), 'auth != null is not enough; auth.uid must equal ownerUid');
+            assert.ok(gatedHidden(setupPanel(sb)));
             assert.ok(leaderboardTab(sb));
         });
     });
@@ -284,8 +297,8 @@ describe('d) LEGACY tournament (no ownerUid): THE GRANDFATHER PROMISE IS WITHDRA
     test('the Setup tab and panel are ABSENT for everyone - signed out, a stranger, the organizer account', () => {
         [null, STRANGER, ORGANIZER].forEach((u) => {
             const sb = arrive(LEGACY(), u);
-            assert.equal(setupTab(sb), null, 'no Setup tab on a legacy record');
-            assert.equal(setupPanel(sb), null);
+            assert.ok(gatedHidden(setupTab(sb)), 'no Setup tab shown on a legacy record');
+            assert.ok(gatedHidden(setupPanel(sb)));
             assert.ok(leaderboardTab(sb), 'the Leaderboard tab stays');
             assert.equal(sb.document.getElementById('lb-no-owner-note').style.display, 'block', 'the no-organizer line is shown');
         });
@@ -299,7 +312,7 @@ describe('d) LEGACY tournament (no ownerUid): THE GRANDFATHER PROMISE IS WITHDRA
 
     test('an OWNED record is untouched by the withdrawal: the owner keeps Setup, the line is hidden', () => {
         const sb = arrive(OWNED(), ORGANIZER);
-        assert.ok(setupTab(sb) && setupPanel(sb));
+        assert.ok(gatedShown(setupTab(sb)) && gatedShown(setupPanel(sb)));
         assert.notEqual(sb.document.getElementById('lb-no-owner-note').style.display, 'block');
     });
 });

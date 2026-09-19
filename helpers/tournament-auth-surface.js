@@ -26,11 +26,17 @@ function arrive(rec, user, order) {
 function surface(sb) {
     const d = sb.document;
     const el = id => d.getElementById(id);
+    const shown = id => { const e = el(id); return !!e && e.style.display !== 'none'; };
     const panel = id => { const p = el(id); return p ? { display: p.style.display || '', html: strip(p.innerHTML) } : null; };
     return {
         signedInAs: strip(textOf(el('signed-in-as'))), signedInAsSetup: strip(textOf(el('signed-in-as-setup'))),
         panelManage: panel('signin-panel-manage'), panelSetup: panel('signin-panel-setup'),
-        setupTab: !!el('tab-btn-setup'), setupPanel: !!el('manage-tab-setup'), leaderboardTab: !!el('tab-btn-leaderboard')
+        // RE-PINNED 2026-09-18 (hide, not remove): these two read "is it SHOWN" -
+        // in the tree with no display:none - where they read "does it exist".
+        // Removal froze every non-owner's leaderboard after its first snapshot
+        // (tournament_live_board_test.js); the gate hides now, so the captured
+        // fixture's false/true keep their meaning for a non-owner / the owner.
+        setupTab: shown('tab-btn-setup'), setupPanel: shown('manage-tab-setup'), leaderboardTab: !!el('tab-btn-leaderboard')
     };
 }
 // The Save gate on the setup screen (no record): the alert it raises, and the

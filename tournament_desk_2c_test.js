@@ -79,6 +79,10 @@ function fireRegistrations(sb, data) {
     assert.ok(handlers.length > 0, 'the owner page registered no registrations listener');
     handlers.forEach(h => h.cb({ val: () => (data == null ? null : JSON.parse(JSON.stringify(data))), exists: () => data != null }));
 }
+// RE-PINNED 2026-09-18 (Option B, "hide, not remove"): removal froze every non-owner's
+// leaderboard after the first snapshot (tournament_live_board_test.js). The gate now HIDES
+// the Setup and Desk pair - in the tree, display none - so "REMOVED" below reads HIDDEN.
+const gatedHidden = (el) => !!el && el.style.display === 'none';
 const el = (sb, id) => sb.document.getElementById(id);
 const html = (sb, id) => { const e = el(sb, id); return e ? String(e.innerHTML || '') : null; };
 const count = (s, re) => (String(s || '').match(re) || []).length;
@@ -137,11 +141,11 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
     });
 
     ['user-first', 'record-first'].forEach(order => {
-        test(`signed out on an OWNED tournament: the Desk tab and panel are REMOVED with Setup (${order})`, () => {
+        test(`signed out on an OWNED tournament: the Desk tab and panel are HIDDEN with Setup (${order})`, () => {
             const sb = arrive(teamRecord(), null, order);
-            assert.equal(el(sb, 'tab-btn-desk'), null, 'tab-btn-desk must be removed');
-            assert.equal(el(sb, 'manage-tab-desk'), null, 'manage-tab-desk must be removed');
-            assert.equal(el(sb, 'tab-btn-setup'), null);
+            assert.ok(gatedHidden(el(sb, 'tab-btn-desk')), 'tab-btn-desk must be hidden');
+            assert.ok(gatedHidden(el(sb, 'manage-tab-desk')), 'manage-tab-desk must be hidden');
+            assert.ok(gatedHidden(el(sb, 'tab-btn-setup')));
             assert.ok(el(sb, 'tab-btn-leaderboard'), 'the Leaderboard tab stays');
         });
         test(`the owner: both tabs and both panels present (${order})`, () => {
@@ -153,17 +157,17 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
 
     test('signed out then signed in as the owner: both tabs come back and Setup is shown', () => {
         const sb = arrive(teamRecord(), null);
-        assert.equal(el(sb, 'tab-btn-desk'), null);
+        assert.ok(gatedHidden(el(sb, 'tab-btn-desk')));
         sb.__auth.setUser(ORGANIZER);
-        assert.ok(el(sb, 'tab-btn-desk') && el(sb, 'manage-tab-desk'), 'the Desk tab is re-inserted on sign-in');
-        assert.ok(el(sb, 'tab-btn-setup') && el(sb, 'manage-tab-setup'));
+        assert.ok(el(sb, 'tab-btn-desk').style.display !== 'none' && el(sb, 'manage-tab-desk'), 'the Desk tab is un-hidden on sign-in');
+        assert.ok(el(sb, 'tab-btn-setup').style.display !== 'none' && el(sb, 'manage-tab-setup'));
         assert.equal(el(sb, 'manage-tab-setup').style.display, 'block');
     });
 
     test('showTab("desk") signed out cannot bring it back; the leaderboard shows', () => {
         const sb = arrive(teamRecord(), null);
         assert.doesNotThrow(() => sb.showTab('desk'));
-        assert.equal(el(sb, 'manage-tab-desk'), null);
+        assert.ok(gatedHidden(el(sb, 'manage-tab-desk')), 'showTab refuses a gated tab for a non-owner');
         assert.equal(el(sb, 'manage-tab-leaderboard').style.display, 'block');
     });
 
@@ -180,13 +184,13 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
         assert.equal(el(sb, 'manage-tab-setup').style.display, 'block');
     });
 
-    test('a LEGACY event (no ownerUid): since the narrowing (2026-09-18) there is no Desk tab at all - the gate takes it with Setup', () => {
+    test('a LEGACY event (no ownerUid): since the narrowing (2026-09-18) the Desk tab is hidden - the gate takes it with Setup', () => {
         // Until the narrowing a legacy record kept every tab and the Desk said
         // "not taking signups". canManage() is false without an owner now, so
-        // the Desk is removed like Setup; the Leaderboard carries the one line.
+        // the Desk is hidden like Setup; the Leaderboard carries the one line.
         const sb = arrive(teamRecord({ ownerUid: undefined }), null);
-        assert.equal(el(sb, 'tab-btn-desk'), null);
-        assert.equal(el(sb, 'manage-tab-desk'), null);
+        assert.ok(gatedHidden(el(sb, 'tab-btn-desk')));
+        assert.ok(gatedHidden(el(sb, 'manage-tab-desk')));
         assert.doesNotThrow(() => sb.showTab('desk'));
         assert.equal(el(sb, 'manage-tab-leaderboard').style.display, 'block');
     });

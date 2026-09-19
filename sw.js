@@ -1633,7 +1633,11 @@
 // details block and header lines, the payout filter at zero, and the desk
 // state badges. A device on v173 keeps a header with no date and a desk with
 // no badges.
-const CACHE_VERSION = 'golfapp-v174-polish';
+// Moved to v175: tournament.html's manage gate hides the gated tabs instead of
+// removing them, so a spectator's leaderboard keeps moving after its first
+// paint. A device on v174 keeps a board frozen at page load for everyone but
+// the organizer.
+const CACHE_VERSION = 'golfapp-v175-live-board';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

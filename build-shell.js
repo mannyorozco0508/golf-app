@@ -76,6 +76,11 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v50. The manage gate HIDES the Setup and Desk tabs instead of
+        // removing them: removal made every snapshot after the first throw in
+        // the record callback for anyone who was not the owner, so a spectator's
+        // leaderboard never moved. A device on v49 keeps a board frozen at its
+        // first paint for everyone but the organizer.
         // Moved to v49. The polish wave: event details on the header (date,
         // start time, venue, beneficiary - set on Setup after the save), no
         // $0.00 payout rows, desk state badges and the Needs-a-team chip. A
@@ -139,7 +144,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v49-polish',
+        cacheName: 'tournament-v50-live-board',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

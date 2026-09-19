@@ -38,6 +38,13 @@
 // this measures the page.
 // ============================================================================
 
+// RE-PINNED 2026-09-18 (Option B, "hide, not remove"): every "still exists" below
+// was "the gate must REMOVE the tab". Removal froze every non-owner's leaderboard
+// after the first snapshot (tools/tournament-live-board-check.js). The gate now
+// HIDES: the pills and panels stay in the tree with NO RECT for a non-owner and
+// a rect for the owner. So a gated element must EXIST and must NOT be visible;
+// its absence from the tree is now the failure, because the value callback
+// writes into it on every snapshot.
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 
 const PARS = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5];
@@ -74,9 +81,9 @@ const PROBE = `
   return JSON.stringify({
     setupTab: { exists: !!document.getElementById('tab-btn-setup'), visible: visible('#tab-btn-setup'),
                 active: !!(document.getElementById('tab-btn-setup') && document.getElementById('tab-btn-setup').classList.contains('active')) },
-    setupPanel: { exists: !!document.getElementById('manage-tab-setup') },
+    setupPanel: { exists: !!document.getElementById('manage-tab-setup'), visible: visible('#manage-tab-setup') },
     deskTab: { exists: !!document.getElementById('tab-btn-desk'), visible: visible('#tab-btn-desk') },
-    deskPanel: { exists: !!document.getElementById('manage-tab-desk') },
+    deskPanel: { exists: !!document.getElementById('manage-tab-desk'), visible: visible('#manage-tab-desk') },
     leaderboardTab: { visible: visible('#tab-btn-leaderboard') },
     board: { visible: visible('#leaderboard-list'), names: (document.getElementById('leaderboard-list') || {}).innerText || '' },
     noOwnerNote: { visible: visible('#lb-no-owner-note'), text: (document.getElementById('lb-no-owner-note') || {}).innerText || '' },
@@ -84,7 +91,7 @@ const PROBE = `
     printPairings: !!(byText(/Print Pairings/) && byText(/Print Pairings/).getBoundingClientRect().height > 0),
     teamLinks: { visible: visible('#team-links-list'), shareButtons: document.querySelectorAll('#team-links-list button').length,
                  editableControls: document.querySelectorAll('#team-links-list input, #team-links-list select').length },
-    teamCards: { exists: !!document.getElementById('team-cards-list'),
+    teamCards: { exists: !!document.getElementById('team-cards-list'), visible: visible('#team-cards-list'),
                  handicapInputs: document.querySelectorAll('#team-cards-list input').length },
     groupLinks: { visible: visible('#group-links-list'), links: Array.prototype.slice.call(document.querySelectorAll('#group-links-list a')).filter(a => a.getBoundingClientRect().height > 0).map(a => (a.getAttribute('href') || '').replace(/^.*\\?/, '')) },
     editorVisible: visible('#scoring-groups-section'),
@@ -115,27 +122,30 @@ async function look(code, auth) {
     if (!owned.board.visible || !legacy.board.visible) bail('a leaderboard rendered nothing, so tab visibility cannot be held against anything', { owned, legacy });
 
     const failures = [];
+    // The gated shape for a non-owner: in the tree, no rect. Absent = the freeze is back.
+    const gated = (arm, who) => {
+        ['setupTab', 'setupPanel', 'deskTab', 'deskPanel'].forEach((k) => {
+            if (!arm[k].exists) failures.push(who + ': ' + k + ' was REMOVED from the tree - the gate must hide (the value callback writes into it on every snapshot)');
+            if (arm[k].visible) failures.push(who + ': ' + k + ' has a rect for a non-owner');
+        });
+    };
     // OWNED, signed out
-    if (owned.setupTab.exists) failures.push('owned: the Setup tab element still exists for a signed-out visitor');
-    if (owned.setupTab.visible) failures.push('owned: the Setup tab has a rect for a signed-out visitor');
-    if (owned.setupPanel.exists) failures.push('owned: the Setup panel still exists for a signed-out visitor');
-    if (owned.deskTab.exists || owned.deskPanel.exists) failures.push('owned: the Desk tab or panel still exists for a signed-out visitor (2c: gated with Setup)');
+    gated(owned, 'owned (signed out)');
     if (!owned.leaderboardTab.visible) failures.push('owned: the Leaderboard tab has no rect');
     if (!/Eagles/.test(owned.board.names)) failures.push('owned: the board does not list the teams');
     if (!owned.printResults || !owned.printPairings) failures.push('owned: a print button has no rect signed out - printing must stay open');
     if (!owned.teamLinks.visible || owned.teamLinks.shareButtons < 2) failures.push('owned: the scoring links are not on screen signed out (' + owned.teamLinks.shareButtons + ' share buttons)');
     // THE LEAK v109 SHIPPED: the public link rows carried the editable handicap.
     if (owned.teamLinks.editableControls > 0) failures.push('owned: ' + owned.teamLinks.editableControls + ' editable control(s) on the PUBLIC scoring-link rows');
-    if (owned.teamCards.exists) failures.push('owned: the team cards (Setup) still exist for a signed-out visitor');
-    // LEGACY (since the narrowing, 2026-09-18): no console at all - the cards go with it.
-    if (legacy.teamCards.exists) failures.push('legacy: the Setup team cards still exist - the rules refuse every write on a record with no owner');
+    if (owned.teamCards.visible) failures.push('owned: the team cards (Setup) have a rect for a signed-out visitor');
+    // LEGACY (since the narrowing, 2026-09-18): no console on screen - the cards go with it.
+    if (legacy.teamCards.visible) failures.push('legacy: the Setup team cards have a rect - the rules refuse every write on a record with no owner');
     if (legacy.teamLinks.editableControls > 0) failures.push('legacy: editable control(s) on the public scoring-link rows');
     if (owned.signedInAs) failures.push('owned: "Signed in as" rendered while signed out: ' + owned.signedInAs);
     if (!owned.signInPanel) failures.push('owned: no sign-in panel on screen for a signed-out visitor');
     if (owned.lockWords.length) failures.push('owned: lock words on screen: ' + JSON.stringify(owned.lockWords));
     // OWNED, INDIVIDUAL, signed out: the group links have rects, the editor does not exist
-    if (ownedInd.setupTab.exists || ownedInd.setupPanel.exists) failures.push('owned individual: the Setup tab or panel still exists signed out');
-    if (ownedInd.deskTab.exists || ownedInd.deskPanel.exists) failures.push('owned individual: the Desk tab or panel still exists signed out');
+    gated(ownedInd, 'owned individual (signed out)');
     if (!ownedInd.groupLinks.visible || ownedInd.groupLinks.links.length < 2) failures.push('owned individual: the group scoring links are not on screen signed out: ' + JSON.stringify(ownedInd.groupLinks));
     if (!ownedInd.groupLinks.links.every(h => /tourney=OWNEDI1&group=g[12]$/.test(h))) failures.push('owned individual: a group link does not point at its group: ' + JSON.stringify(ownedInd.groupLinks.links));
     if (ownedInd.editorVisible) failures.push('owned individual: the group EDITOR has a rect signed out');
@@ -143,23 +153,21 @@ async function look(code, auth) {
     // LEGACY, signed out - THE GRANDFATHER PROMISE IS WITHDRAWN (2026-09-18): the
     // narrowed rules freeze a record with no ownerUid, so the page offers no console
     // it cannot honour. One line on the Leaderboard says why; scores still save.
-    if (legacy.setupTab.exists || legacy.setupPanel.exists) failures.push('legacy: the Setup tab or panel still exists - every control on it would be refused by the rules');
-    if (legacy.deskTab.exists || legacy.deskPanel.exists) failures.push('legacy: the Desk tab or panel still exists');
+    gated(legacy, 'legacy (signed out)');
     if (!legacy.noOwnerNote.visible) failures.push('legacy: the no-organizer line has no rect');
     if (!/no organizer account/.test(legacy.noOwnerNote.text)) failures.push('legacy: the no-organizer line does not say so: ' + JSON.stringify(legacy.noOwnerNote.text));
     if (owned.noOwnerNote.visible) failures.push('owned: the no-organizer line is on screen for an owned record');
     if (legacy.lockWords.length) failures.push('legacy: lock words on screen: ' + JSON.stringify(legacy.lockWords));
 
     // ANONYMOUS visitor on the owned record: the signed-out page, exactly.
-    if (anon.setupTab.exists || anon.setupPanel.exists) failures.push('anonymous: the Setup tab or panel exists for an anonymous visitor - the hole 075c7a4 closed');
-    if (anon.deskTab.exists || anon.deskPanel.exists) failures.push('anonymous: the Desk tab or panel exists for an anonymous visitor');
+    gated(anon, 'anonymous');   // the hole 075c7a4 closed: an anonymous visitor is a non-owner
     if (anon.signedInAs) failures.push('anonymous: "Signed in as" rendered for an anonymous visitor: ' + anon.signedInAs);
     if (!anon.signInPanel) failures.push('anonymous: no sign-in panel on screen for an anonymous visitor');
     if (!anon.leaderboardTab.visible || !/Eagles/.test(anon.board.names)) failures.push('anonymous: the leaderboard is not on screen');
     if (anon.lockWords.length) failures.push('anonymous: lock words on screen: ' + JSON.stringify(anon.lockWords));
     // EMAIL ORGANIZER (uid === ownerUid): the organizer page.
     if (!organizer.setupTab.exists || !organizer.setupTab.visible) failures.push('organizer: the Setup tab is missing or has no rect for the owner');
-    if (!organizer.setupPanel.exists) failures.push('organizer: the Setup panel is gone for the owner');
+    if (!organizer.setupPanel.exists) failures.push('organizer: the Setup panel is gone for the owner');   // no rect here: the probe tapped Leaderboard first
     if (!organizer.deskTab.exists || !organizer.deskTab.visible || !organizer.deskPanel.exists) failures.push('organizer: the Desk tab has no rect or its panel is gone for the owner');
     if (!/Signed in as org@example\.com/.test(organizer.signedInAs)) failures.push('organizer: "Signed in as" does not name the owner: ' + organizer.signedInAs);
     if (organizer.signInPanel) failures.push('organizer: the sign-in panel is still on screen for the owner');

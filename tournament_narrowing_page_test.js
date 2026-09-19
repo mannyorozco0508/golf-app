@@ -115,17 +115,21 @@ function arrive(rec, user, order) {
 const LEGACY = () => ({ name: 'Hope Foundation (test)', format: 'scramble', courseName: 'Chambers Bay', courseData: COURSE, createdAt: 1,
     teams: { team1: { num: 1, name: 'Eagles', players: ['Ann', 'Bo'], handicap: 0 } } });
 const OWNED = () => Object.assign(LEGACY(), { ownerUid: 'u-org' });
+// RE-PINNED 2026-09-18 (Option B, "hide, not remove"): removal froze every non-owner's
+// leaderboard after the first snapshot (tournament_live_board_test.js). The gate now HIDES
+// the Setup and Desk pair - in the tree, display none - so "REMOVED" below reads HIDDEN.
+const gatedHidden = (el) => !!el && el.style.display === 'none';
 const el = (sb, id) => sb.document.getElementById(id);
 const NOTE = "This event has no organizer account, so its setup can't be changed. Scores still save.";
 
 describe('2. THE LEGACY CONSOLE (tournament.html): no owner, no console - one line instead of 33 alerts', () => {
     [[null, 'nobody'], [STRANGER, 'a stranger'], [ORGANIZER, 'the organizer account']].forEach(([user, who]) => {
         ['user-first', 'record-first'].forEach((order) => {
-            test(`legacy record, ${who}, ${order}: Setup and Desk are REMOVED, the Leaderboard stays, the no-organizer line is on it`, () => {
+            test(`legacy record, ${who}, ${order}: Setup and Desk are HIDDEN, the Leaderboard stays, the no-organizer line is on it`, () => {
                 const sb = arrive(LEGACY(), user, order);
-                assert.equal(el(sb, 'tab-btn-setup'), null, 'the Setup tab must be removed - the rule refuses every control on it');
-                assert.equal(el(sb, 'manage-tab-setup'), null);
-                assert.equal(el(sb, 'tab-btn-desk'), null);
+                assert.ok(gatedHidden(el(sb, 'tab-btn-setup')), 'the Setup tab must be hidden - the rule refuses every control on it');
+                assert.ok(gatedHidden(el(sb, 'manage-tab-setup')));
+                assert.ok(gatedHidden(el(sb, 'tab-btn-desk')));
                 assert.ok(el(sb, 'tab-btn-leaderboard'), 'the Leaderboard tab stays');
                 const note = el(sb, 'lb-no-owner-note');
                 assert.equal(note.style.display, 'block', 'the line must be shown');

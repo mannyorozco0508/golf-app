@@ -764,9 +764,11 @@ calls no auth API (`tournament_signin_gate_test.js` §g pins it). On
   that creates it. Signed out, `saveTournament` refuses before reading a field.
 - An **owned** tournament renders the Setup & Links tab only for the signed-in
   user whose uid is its `ownerUid`. For everyone else the tab and its panel are
-  **removed from the DOM** — not hidden, not greyed. Signed in as somebody else
-  is the same as signed out. The Leaderboard, both print buttons and the scoring
-  links stay open to everyone (they moved out of the Setup panel for that reason).
+  **hidden** — `display:none`, in the tree (until 2026-09-18 they were REMOVED,
+  and that froze every non-owner's leaderboard after its first snapshot; see
+  "The non-owner's leaderboard froze" below). Signed in as somebody else is the
+  same as signed out. The Leaderboard, both print buttons and the scoring links
+  stay open to everyone (they moved out of the Setup panel for that reason).
 - A **legacy** tournament (no `ownerUid`) is exactly as before: fully open, no
   claim path, nothing writes `ownerUid` onto it. `§d` of the test file is the
   grandfather promise.
@@ -983,6 +985,74 @@ narrowing dropped → the Hawks need a team (2 badges, "Needs a team 2") red in 
 two states sharing a background → red in both; the chip's test swapped for
 `regInField` → red.
 
+## The non-owner's leaderboard froze after the first snapshot — the gate hides now (2026-09-18)
+
+**What broke, and since when.** 7d5866d (2026-09-12, the sign-in gate) made
+`applyManageGate` REMOVE the Setup and Desk pills and panels for anyone who is not the
+owner; `loadTournament`'s value callback already wrote `manage-room-badge` (:4094) —
+inside the removed tab. The first snapshot painted (the gate runs last in the callback);
+every later one threw at :4094 before `renderLeaderboard`, and the SDK kept delivering
+snapshots to a callback that died at the same line each time. **Re-derived in Chrome
+(a scratch copy, guard the throwing line, deliver again, repeat): 14 sites** in that
+one callback — the seven direct writes at :4094–:4108, then `renderShotgunAssignments`
+:1735, `renderRounds` :3039, `renderFlights` :3726, `renderPlayerField` :3352,
+`renderScoringGroups` :3600 and `renderTripLinkStatus` :3855 **and** :3856 — before the
+board renders "1 Eagles 1 E". The recon said thirteen; the trip-link renderer has two.
+Measured across six arrivals × three snapshots: signed out, anonymous, another account
+on an owned record, and — since the narrowing (dab91d8) made `canManage()` false without
+an owner — the organizer and everyone on a legacy record: five of six froze after
+exactly one snapshot; only the owner on an owned record was live. `currentData` still
+updated, so a tap on the Leaderboard pill repainted the truth; a spectator who watched
+saw the first paint, forever. A spectator's live leaderboard is the product's main
+promise, and every check missed it (fault #6 above).
+
+**The fix — Option B, hide, not remove.** `applyManageGate` sets `display:none` on the
+two pills and parks the panels through `showTab('leaderboard')`; for the owner it clears
+the inline style (the stylesheet shows the pills again) and lands on Setup only when
+that call is the one that un-hid them (`gateHidden`), so a later snapshot never yanks
+the owner off the Leaderboard. `showTab` refuses a gated tab for a non-owner
+(`GATED_TABS.includes(tab) && !canManage()`) — the element being in the tree is not the
+test, `canManage()` is. No stash, no re-insertion, no guard per write: every element the
+callback writes stays in the tree, and the next renderer added to that callback cannot
+reopen this. What removal bought was one dev-tools toggle, against rules that since
+dab91d8 refuse every structural write from anyone but the owner; the gate's own
+comment said it was "NOT a security boundary" — and its next sentence, that the rules
+"still let anyone holding the code write every child", had been false since the
+narrowing. Both sentences are rewritten. Option A (guard the fourteen writes) would
+have left the fifteenth to whoever adds it; Option C (both) would have been a guard
+that never fires.
+
+**What it changes on screen.** Nothing for the owner. For a non-owner, nothing visible:
+the hidden pills and panels have no rect (Chrome: 0×0), the Desk panel is empty (its
+listener is never subscribed for a non-owner and the rules refuse the read), and the
+board now moves. Re-pinned by name, with the reason in each file:
+`tournament_signin_gate_test.js` (12 assertions, "must be removed" → hidden),
+`tournament_narrowing_page_test.js` (6 tests), `tournament_desk_2c_test.js` (5),
+`tournament_score_editor_test.js` (3), `helpers/tournament-auth-surface.js` (`setupTab`
+/ `setupPanel` now read "shown", so `tournament_anonymous_owner_test.js`'s captured
+fixture keeps its meaning — 15 tests, none re-captured; the recon's list missed these two),
+`tools/tournament-signin-gate-check.js` (eight `.exists` arms → a `gated()` helper: in
+the tree, no rect), `tools/tournament-desk-check.js` (the late sign-in arm proves the
+UN-HIDING in order, not a re-insertion; the signed-out arm: in the tree, no rect).
+
+**Tests.** `tournament_live_board_test.js` — the four losing arrivals in both orders and
+the owner control: the board's markup changes on the second and third snapshot; the
+gated four are in the tree with display none; showTab refuses; the late sign-in
+un-hides and the next snapshot still lands; a record gaining an owner mid-watch; the
+source (no `.remove()`, no `insertBefore`, no `gateStash`; the stale sentence gone);
+the harness seams. **mini-dom cannot reproduce the throw** — its removed panel answers
+null but the badge and the rest are registry elements off BODY, so on the broken page a
+twice-fired handler did NOT throw there (the recon claimed it would; measured, it does
+not). `tools/tournament-live-board-check.js` is the proof: six arrivals, a second and a
+third snapshot through `{ deliver }`, the board must move, no `window.onerror`, the
+delivery must reach a listener or the arm bails "proves nothing", the gate hidden not
+removed, and the journey self-test. Controls, restored by sha: removal restored → 12 red
+in mini-dom (the gate shape; section 1 stays green — the stated limit) and "THE BOARD DID
+NOT MOVE" ×5 arms + "was REMOVED" in Chrome; the delivery sent to a path nobody listens
+on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; journey's
+swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
+`build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
+
 ## The tee sheet printed blank QR cells — print is a snapshot, and Chrome pauses the page for it (2026-09-18)
 
 **What Manny saw.** The tee sheet from the section above, printed from Chrome's real
@@ -1065,7 +1135,7 @@ no-bitmap fallback through `printTournamentTeeSheet` in mini-dom (no canvas ther
 Both caches: `build-shell.js` `tournament-v48-tee-qr-canvas`, `sw.js`
 `golfapp-v173-tee-qr-canvas`.
 
-**Five harness faults in five waves — the pattern is the point.** Each one a green run
+**Six harness faults in six waves — the pattern is the point.** Each one a green run
 that was not, or a red run that was not:
 
 1. **stdout to a pipe is asynchronous on macOS** (net-reachable wave): `console.log(report);
@@ -1107,26 +1177,32 @@ that was not, or a red run that was not:
    After the fixture edit: `-focus-check`, `-net-label-check`,
    `-snapshot-and-shamble-check`, `-stroke-dots-check` still pass.
 
-**A page defect found on the way (2026-09-18), NOT fixed — its own wave.** On an
-OWNED record, for anyone who is not the owner — signed out, anonymous, or another
-account — `applyManageGate` removes the Setup tab, and every LATER snapshot of the
-record throws in `loadTournament`'s value callback at `tournament.html:4094`
-(`document.getElementById('manage-room-badge').textContent = code` — the badge is
-inside the removed tab) **before `renderLeaderboard` runs**. Measured in Chrome
-(scratch `gate-second-snapshot.js`, all three arrivals): the first snapshot renders
-the board; a second snapshot carrying two scores throws "Cannot set properties of
-null (setting 'textContent')" and the board still reads "Eagles — / —". A spectator's
-live leaderboard freezes after the first score. It predates this wave (the sign-in
-gate); `tools/tournament-tee-qr-check.js` and the desk check pass signed-out because
-they deliver one snapshot. The fix shape is a null-guarded write for the Setup-tab
-elements in that callback (or the gate hiding rather than removing); the check is a
-second snapshot delivered to a signed-out arrival. Not taken here.
+6. **One snapshot proves the first paint, not the page** (found 2026-09-18, the
+   spectator-freeze wave): `tools/lib/cold-arrival.js` fired each value listener
+   ONCE and never again, and `set()` re-fired nothing, so all 27 tournament tools
+   structurally measured the first paint; `tools/lib/journey.js` re-fired but
+   SWALLOWED a listener that threw ("the page's problem"). A page whose value
+   callback died on every snapshot after the first read as merely stale — for 78
+   commits, under green checks that arrived signed out and passed. Fix taken:
+   cold-arrival has an opt-in `{ deliver: { path, value } }` step (writes still
+   re-fire nothing — a behaviour change on every write is 27 tools' business at
+   once) that reports how many listeners it reached and whether one threw; journey
+   records a thrown listener in `window.__listenerErrs` and `evaluate()` raises it
+   as `page threw in a listener`, so every journey tool fails on it (it did, at
+   once, on the page's own :4094). **THE RULE: a check on a live page delivers
+   at least two snapshots on the listener whose render it measures and asserts
+   the second landed — every arm, not only signed out — and bails, saying so,
+   when the delivery reached no listener.** `tools/tournament-live-board-check.js` is the
+   standing example and self-tests journey. mini-dom cannot reproduce this class
+   (its registry elements survive a panel's removal), so its twice-fired handler
+   proves the markup changes, not the throw; say so in any test that fires twice.
 
 The common shape: the harness said what it was told to look for, and nobody had
 checked that the thing it looked for was the thing the user gets. When a check is
 written, ask what moment or byte the user actually receives, and measure that one.
 Fault #5 adds the corollary: a check that is not in the suite is a check nobody runs,
 and a gate that closes a page to a fixture closes every tool built on that fixture.
+Fault #6 adds the last one: one snapshot proves the first paint, not the page.
 
 ## tournaments/$code is narrowed — a code-holder writes scores and nothing else (2026-09-18)
 

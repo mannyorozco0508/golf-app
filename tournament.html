@@ -1870,13 +1870,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
-    // removes both for anyone who is not the owner of an owned tournament, and
-    // puts both back on sign-in. Leaderboard is always there.
+    // HIDES both for anyone who is not the owner of an owned tournament, and
+    // shows both on sign-in. Leaderboard is always there.
     const MANAGE_TABS = ['setup', 'desk', 'leaderboard'];
     const GATED_TABS = ['setup', 'desk'];
     function showTab(tab) {
-        // A gated tab may not exist (applyManageGate). Asking for it then lands
-        // on the leaderboard.
+        // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
+        // then lands on the leaderboard - the tab is in the tree, so "is the
+        // element there" is not the test; canManage() is.
+        if (GATED_TABS.includes(tab) && !canManage()) tab = 'leaderboard';
         if (!document.getElementById('manage-tab-' + tab)) tab = 'leaderboard';
         MANAGE_TABS.forEach((k) => {
             const panel = document.getElementById('manage-tab-' + k);
@@ -1892,13 +1894,28 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     //
     // THE HONEST LIMIT, FIRST. This gate decides what the PAGE renders. It is a
     // guardrail against the casual case - a golfer who followed a link into the
-    // console and tapped something - and NOT a security boundary. database.rules
-    // .json still lets anyone holding the six-character code write every child
-    // the Setup tab edits - the parent .write is unchanged. What the rules DO
-    // hold: ownerUid can only be set by a signed-in client to its own uid and
-    // never taken, changed or dropped after; registrations/ is owner-only to
-    // read. Nothing on this page may say "protected", "secure" or "locked",
-    // because the management surface is not.
+    // console and tapped something - and NOT a security boundary. The boundary
+    // is database.rules.json, narrowed 2026-09-18 (dab91d8): structure under
+    // tournaments/$code is the owner's, a code-holder writes scores and nothing
+    // else, a record with no owner is frozen; ownerUid can only be set by a
+    // signed-in client to its own uid and never taken, changed or dropped
+    // after; registrations/ is owner-only to read. (Until the narrowing this
+    // comment said the rules let any code-holder write every child Setup
+    // edits - true then, false now, and it stood here for three commits.)
+    // Nothing on this page may say "protected", "secure" or "locked": the
+    // gate is the page's manners, the rules are the lock.
+    //
+    // HIDDEN, NOT REMOVED (2026-09-18). The gate used to REMOVE the Setup and
+    // Desk pills and panels from the tree, and put them back on sign-in.
+    // loadTournament's value callback writes fourteen sites inside the Setup
+    // tab before it reaches renderLeaderboard, so for anyone who was not the
+    // owner every snapshot after the first threw at the first of them and the
+    // board never moved again - the first paint, forever, since 7d5866d. Hiding
+    // closes the whole class at once: every element stays in the tree, no
+    // write needs a guard, and the next renderer added to that callback cannot
+    // reopen it. What removal bought was one dev-tools toggle, against rules
+    // that now refuse the writes anyway. showTab treats a hidden gated tab as
+    // absent for a non-owner.
     //
     // WHO MAY MANAGE: a LEGACY tournament (no ownerUid) is open to everyone,
     // exactly as before this wave - no claim path, nothing writes ownerUid onto
@@ -1907,7 +1924,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // signed out. The gate runs on BOTH the record's value handler and
     // onAuthStateChanged, because a browser delivers those in either order.
     let authUser = null;
-    let gateStash = null;   // the removed tabs and panels (one entry per GATED_TABS), for re-insertion on sign-in
+    let gateHidden = false;   // the gated pair is currently hidden (so a sign-in knows to show Setup)
 
     function canManage() {
         const owner = currentData && currentData.ownerUid;
@@ -1932,34 +1949,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const noOwner = document.getElementById('lb-no-owner-note');
         if (noOwner) noOwner.style.display = currentData.ownerUid ? 'none' : 'block';
         const present = GATED_TABS.map((k) => ({ key: k, tab: document.getElementById('tab-btn-' + k), panel: document.getElementById('manage-tab-' + k) }));
-        if (!allowed && present.some((p) => p.tab || p.panel)) {
-            // NOT hidden, NOT disabled: removed - Setup and Desk together. A
-            // control that is not rendered cannot be tapped by mistake, and
-            // there is nothing to grey out.
-            gateStash = present.map((p) => ({
-                tab: p.tab, tabParent: p.tab && p.tab.parentNode, tabNext: p.tab && p.tab.nextSibling,
-                panel: p.panel, panelParent: p.panel && p.panel.parentNode, panelNext: p.panel && p.panel.nextSibling
-            }));
-            gateStash.forEach((s) => { if (s.tab) s.tab.remove(); if (s.panel) s.panel.remove(); });
+        if (!allowed) {
+            // Hidden, in the tree. The pill's inline display goes to none; the
+            // panel is parked by showTab('leaderboard'), which sets every
+            // non-active panel to none - and refuses a gated tab for a non-owner.
+            present.forEach((p) => { if (p.tab) p.tab.style.display = 'none'; if (p.panel) p.panel.style.display = 'none'; });
+            gateHidden = true;
             showTab('leaderboard');
-        } else if (allowed && gateStash) {
-            // The owner signed in after the record arrived: put each tab back
-            // exactly where it was. In REVERSE order, and each anchor checked
-            // against its parent: in a nav with no whitespace between the pills
-            // Setup's recorded next sibling IS the Desk pill, itself removed, and
-            // insertBefore on an anchor that is not a child throws NotFoundError.
-            // In THIS markup the anchor is the whitespace text node between the
-            // pills, which stays in the tree, so forward order also passes the
-            // Chrome check (measured 2026-09-17) - the guard is for the markup
-            // this page does not have yet, and tools/tournament-desk-check.js
-            // reads the order the pills come back in.
-            const stash = gateStash; gateStash = null;
-            const anchor = (node, parent) => (node && node.parentNode === parent) ? node : null;
-            stash.slice().reverse().forEach((s) => {
-                if (s.tab && s.tabParent) s.tabParent.insertBefore(s.tab, anchor(s.tabNext, s.tabParent));
-                if (s.panel && s.panelParent) s.panelParent.insertBefore(s.panel, anchor(s.panelNext, s.panelParent));
-            });
-            showTab('setup');
+        } else {
+            // The owner - on arrival, or signed in after the record came: clear
+            // the inline style so the stylesheet shows the pills again, and land
+            // on Setup only when this call is the one that un-hid them (a later
+            // snapshot must not yank the owner off the Leaderboard).
+            present.forEach((p) => { if (p.tab) p.tab.style.display = ''; });
+            if (gateHidden) { gateHidden = false; showTab('setup'); }
         }
         renderSignedInAs();
         syncRegistrationListener();

@@ -183,24 +183,29 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     const s = await arriveCold({ url: fileUrl('tournament.html', 'tourney=OWNED1'), db, auth: 'signed-out', viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 6000, expression: PROBE });
     if (!s.ok) bail(s.reason);
     const out = JSON.parse(s.value);
-    if (out.deskTab) failures.push('signed out: the Desk tab exists');
-    if (out.deskDisplay !== 'absent') failures.push('signed out: the Desk panel exists (' + out.deskDisplay + ')');
+    // RE-PINNED 2026-09-18: hidden, not removed - the tab is in the tree with no rect, the panel display none.
+    if (!out.deskTab || (out.deskTabRect && out.deskTabRect.w > 0)) failures.push('signed out: the Desk tab must be in the tree with no rect: ' + JSON.stringify([out.deskTab, out.deskTabRect]));
+    if (out.deskDisplay !== 'none') failures.push('signed out: the Desk panel must be hidden, not ' + out.deskDisplay);
     if (out.bodyHasRegistrant) failures.push('signed out: a registrant name is on screen');
 
     // ---- SIGNED OUT, THEN THE OWNER SIGNS IN (record first) --------------------
-    // The order the gate's re-insertion has to get right in a REAL DOM: Setup's
-    // recorded next sibling is the Desk tab, itself removed. insertBefore on an
-    // anchor that is not in the tree throws NotFoundError - mini-dom tolerates
-    // it, so only this arm can prove the tabs come back in order.
-    const NAV = `(function () { var b = document.querySelector('.top-nav-bar'); return JSON.stringify({ order: b ? Array.from(b.children).map(function (c) { return c.id; }) : null, setupDisplay: (function () { var s = document.getElementById('manage-tab-setup'); return s ? getComputedStyle(s).display : 'absent'; })(), deskPanel: !!document.getElementById('manage-tab-desk') }); })()`;
+    // RE-PINNED 2026-09-18 (hide, not remove): this arm proved the gate's
+    // re-insertion put the pills back in order. There is no re-insertion now -
+    // the pills never leave the tree - so what it proves is the un-hiding: before
+    // sign-in all three pills are in the nav and only Leaderboard has a rect;
+    // after, all three have rects, in order, Setup is shown and the Desk lists
+    // the field. The owner's Setup un-hiding is still a thing to prove.
+    const NAV = `(function () { var b = document.querySelector('.top-nav-bar'); var kids = b ? Array.from(b.children) : []; return JSON.stringify({ order: kids.map(function (c) { return c.id; }), shown: kids.filter(function (c) { var r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).map(function (c) { return c.id; }), setupDisplay: (function () { var s = document.getElementById('manage-tab-setup'); return s ? getComputedStyle(s).display : 'absent'; })(), deskPanel: !!document.getElementById('manage-tab-desk') }); })()`;
     const late = await arriveCold({ url: fileUrl('tournament.html', 'tourney=OWNED1'), db, auth: 'signed-out', viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 6000, steps: [
         { expression: NAV }, { expression: `window.__signInAs(${JSON.stringify(OWNER)})` }, { sleep: 400 }, { expression: NAV },
         { tap: '#tab-btn-desk' }, { sleep: 300 }, { expression: PROBE }
     ] });
     if (!late.ok) bail(late.reason);
     const before = JSON.parse(late.value[0]), after = JSON.parse(late.value[3]), lateDesk = J(late, 6);
-    if (JSON.stringify(before.order) !== JSON.stringify(['tab-btn-leaderboard']) || before.deskPanel) failures.push('late sign-in: before, the nav should hold only Leaderboard: ' + JSON.stringify(before));
-    if (JSON.stringify(after.order) !== JSON.stringify(['tab-btn-setup', 'tab-btn-desk', 'tab-btn-leaderboard'])) failures.push('late sign-in: the tabs did not come back in order: ' + JSON.stringify(after.order));
+    if (JSON.stringify(before.order) !== JSON.stringify(['tab-btn-setup', 'tab-btn-desk', 'tab-btn-leaderboard'])) failures.push('late sign-in: before, all three pills must be IN THE TREE (hidden, not removed): ' + JSON.stringify(before.order));
+    if (JSON.stringify(before.shown) !== JSON.stringify(['tab-btn-leaderboard'])) failures.push('late sign-in: before, only Leaderboard may have a rect: ' + JSON.stringify(before.shown));
+    if (before.setupDisplay !== 'none' || !before.deskPanel) failures.push('late sign-in: before, Setup must be hidden and the Desk panel in the tree: ' + JSON.stringify(before));
+    if (JSON.stringify(after.shown) !== JSON.stringify(['tab-btn-setup', 'tab-btn-desk', 'tab-btn-leaderboard'])) failures.push('late sign-in: the pills did not un-hide in order: ' + JSON.stringify(after.shown));
     if (after.setupDisplay !== 'block' || !after.deskPanel) failures.push('late sign-in: Setup not shown or Desk panel missing: ' + JSON.stringify(after));
     if (!lateDesk || lateDesk.rows !== TOTALS.entries || lateDesk.deskDisplay !== 'block') failures.push('late sign-in: the Desk does not list the field after sign-in: ' + JSON.stringify(lateDesk && [lateDesk.rows, lateDesk.deskDisplay]));
 

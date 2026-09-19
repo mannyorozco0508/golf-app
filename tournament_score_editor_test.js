@@ -147,19 +147,20 @@ describe('THE EDITOR lives on Setup and writes the path the link would', () => {
 });
 
 describe('THE GATE: nobody but the owner reaches the editor', () => {
-    test('a signed-out visitor: the Setup panel, and the editor with it, is not in the DOM', async () => {
+    test('a signed-out visitor: the Setup panel, and the editor with it, is hidden and empty', async () => {
         const sb = arriveOwner(scramble(), null); await settle();
-        // The panel is removed (mini-dom answers null for a removed id, as the
-        // browser does); its descendants stay reachable in mini-dom's registry, so
-        // the corrector is asserted EMPTY - the page rendered nothing for a
-        // non-owner - and, in the browser, gone with its parent.
-        assert.equal(el(sb, 'manage-tab-setup'), null, 'the Setup panel is removed');
+        // RE-PINNED 2026-09-18 (hide, not remove): the panel is HIDDEN - in the
+        // tree, display none - not removed; removal froze every non-owner's
+        // leaderboard after its first snapshot (tournament_live_board_test.js).
+        // The corrector is still asserted EMPTY: the page rendered nothing for a
+        // non-owner, and the writer refuses on its own.
+        assert.equal(el(sb, 'manage-tab-setup').style.display, 'none', 'the Setup panel is hidden');
         assert.equal(String(el(sb, 'score-corrector').innerHTML || ''), '');
     });
     test('an anonymous session is nobody here; a stranger with an email is nobody; the writer itself refuses both', async () => {
         for (const who of [{ uid: 'anon-1', isAnonymous: true, email: null }, { uid: 'u-stranger', email: 'x@example.com', isAnonymous: false }]) {
             const sb = arriveOwner(scramble(), who); await settle();
-            assert.equal(el(sb, 'manage-tab-setup'), null, JSON.stringify(who));
+            assert.equal(el(sb, 'manage-tab-setup').style.display, 'none', JSON.stringify(who));
             assert.equal(String(el(sb, 'score-corrector').innerHTML || ''), '', JSON.stringify(who));
             sb.correctTeamScore(2, 5, '6'); await settle();
             assert.equal(scoreWrites(sb).length, 0, 'the writer checks canManage() itself: ' + JSON.stringify(who));
@@ -168,7 +169,7 @@ describe('THE GATE: nobody but the owner reaches the editor', () => {
     test('a LEGACY tournament (no ownerUid) gets NO editor since the narrowing (2026-09-18) - the rules refuse every write on it, so the page offers none', () => {
         const rec = scramble(); delete rec.ownerUid;
         const sb = arriveOwner(rec, null);
-        assert.equal(el(sb, 'manage-tab-setup'), null, 'the Setup panel - the editor\'s home - is removed');
+        assert.equal(el(sb, 'manage-tab-setup').style.display, 'none', 'the Setup panel - the editor\'s home - is hidden');
     });
 });
 

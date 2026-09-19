@@ -40,6 +40,14 @@ const REPO_ROOT = path.join(__dirname, '..', '..');
 const CHROME = process.env.CHROME_PATH
     || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
+// STEPS (the `steps` array of arriveCold): { expression } evaluates and pushes
+// the value; { cdp: { method, params } } a raw DevTools command; { tap: selector,
+// nth } a real tap at the element's centre; { sleep: ms }; { media } emulated
+// media (pushes nothing); { deliver: { path, value } } a SECOND SNAPSHOT to every
+// value listener on that path (2026-09-18) - pushes { path, listeners, threw }.
+// One snapshot proves the first paint, not the page: a check on a live page
+// delivers at least two on the listener it measures, and bails when the
+// delivery reached none.
 function rpc(ws, id, method, params) {
     return new Promise((res, rej) => {
         const timer = setTimeout(() => rej(new Error('CDP timeout on ' + method)), 30000);
@@ -72,6 +80,28 @@ function firebaseStub(dbJson, auth) {
       var AUTH_MODE = ${authMode};   // 'anonymous' | 'signed-out' | 'user'
       var AUTH_USER = ${authUser};   // the user onAuthStateChanged first emits, or null
       var AUTH_LISTENERS = [];
+      // EVERY value listener, by path, so a check can deliver a SECOND snapshot
+      // (2026-09-18). Until then this stub fired each listener once and never
+      // again, and set()/update() re-fired nothing - so every check built on it
+      // measured the FIRST PAINT and nothing after. That is how a non-owner's
+      // leaderboard froze after one snapshot for 78 commits under 27 green
+      // tools. Delivery is OPT-IN, a step: writes still re-fire nothing, because
+      // a behaviour change on every write is every tool's business at once.
+      var VALUE_LISTENERS = [];
+      window.__coldDeliver = function (pathStr, value) {
+        var key = String(pathStr).split('/').filter(Boolean).join('/');
+        // the fixture follows, so a later once()/resolve() agrees with what was delivered
+        var parts = key.split('/'); var node = DB;
+        for (var i = 0; i < parts.length - 1; i++) { if (node[parts[i]] == null || typeof node[parts[i]] !== 'object') node[parts[i]] = {}; node = node[parts[i]]; }
+        if (parts.length) node[parts[parts.length - 1]] = value;
+        var hits = VALUE_LISTENERS.filter(function (l) { return l.path === key; });
+        var threw = [];
+        hits.forEach(function (l) {
+          try { l.cb({ val: function () { return JSON.parse(JSON.stringify(value)); }, exists: function () { return value != null; } }); }
+          catch (e) { threw.push(String(e && e.message)); }
+        });
+        return { path: key, listeners: hits.length, threw: threw };
+      };
       function refFor(pathStr) {
         var parts = String(pathStr).split('/').filter(Boolean);
         function resolve() {
@@ -88,6 +118,7 @@ function firebaseStub(dbJson, auth) {
           key: 'STUB',
           on: function (ev, cb) {
             if (ev === 'value' && typeof cb === 'function') {
+              VALUE_LISTENERS.push({ path: parts.join('/'), cb: cb });
               // Asynchronous, like the real thing, so the page's own ordering holds.
               setTimeout(function () { cb({ val: function () { return resolve(); },
                                             exists: function () { return resolve() != null; } }); }, 0);
@@ -313,6 +344,18 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 if (step.sleep !== undefined) {
                     await new Promise(r => setTimeout(r, step.sleep));
                     value.push('slept ' + step.sleep);
+                    continue;
+                }
+                // { deliver: { path, value } } - a SECOND SNAPSHOT to every value
+                // listener on that path, the way the SDK delivers the next one.
+                // Pushes { path, listeners, threw }: a check must bail when
+                // listeners is 0 (nothing was listening - the step proved
+                // nothing) and fail when threw is not empty (the page's callback
+                // died on it - the real SDK rethrows and the paint never happens).
+                // One snapshot proves the first paint, not the page.
+                if (step.deliver) {
+                    const d = await rpc(ws, id++, 'Runtime.evaluate', { expression: `window.__coldDeliver(${JSON.stringify(step.deliver.path)}, ${JSON.stringify(step.deliver.value)})`, returnByValue: true });
+                    value.push((d.result && d.result.result && d.result.result.value) || { path: step.deliver.path, listeners: 0, threw: ['__coldDeliver is not on the page'] });
                     continue;
                 }
                 // { tap: selector, nth } - a REAL tap at the element's centre, the

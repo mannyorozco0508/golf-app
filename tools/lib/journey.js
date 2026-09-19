@@ -139,9 +139,17 @@ function statefulStub(dbJson, auth) {
                  exists: function () { return readAt(p) != null; },
                  key: String(p).split('/').filter(Boolean).pop() || null };
       }
+      // A LISTENER THAT THROWS IS RECORDED, NOT SWALLOWED (2026-09-18). This
+      // caught and dropped it - "the page's problem" - and a page whose value
+      // callback died on every snapshot after the first read as a page that
+      // was merely stale. The real SDK rethrows. Now the throw lands in
+      // window.__listenerErrs and evaluate() below raises it as 'page threw in
+      // a listener', so every tool on this harness fails on it.
+      window.__listenerErrs = window.__listenerErrs || [];
       function notify() {
         listeners.slice().forEach(function (l) {
-          try { l.cb(snapshotFor(l.path)); } catch (e) { /* a listener that throws is the page's problem */ }
+          try { l.cb(snapshotFor(l.path)); }
+          catch (e) { window.__listenerErrs.push(l.path + ': ' + String(e && (e.stack || e.message || e))); }
         });
       }
       function refFor(pathStr) {
@@ -315,6 +323,12 @@ async function openJourney(opts) {
             const ex = m.result.exceptionDetails.exception;
             throw new Error('page threw: ' + (ex && (ex.description || ex.value)));
         }
+        // A listener the stub fired since the last evaluate that threw: raised
+        // here, where every tool already handles 'page threw'.
+        const le = await rpc(ws, id++, 'Runtime.evaluate',
+            { expression: '(function () { var e = window.__listenerErrs || []; window.__listenerErrs = []; return JSON.stringify(e); })()', returnByValue: true });
+        const errs = (le.result && le.result.result && le.result.result.value) ? JSON.parse(le.result.result.value) : [];
+        if (errs.length) throw new Error('page threw in a listener: ' + errs.join(' || '));
         return m.result.result.value;
     }
 
