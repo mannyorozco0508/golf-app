@@ -1076,6 +1076,52 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## The KP entry sits under the Prev/Next row (2026-09-19)
+
+**Seen on a phone**, hole 8, the "Set KP Leader" block was at the bottom of the Weekly
+Game panel inside the Action Center - past the recap, the skins panel, the My Round tap,
+the panel's label, summary, Net Finish and per-hole list. Nothing in the block needed
+the panel: it reads page state and one participant list. Now `index.html` puts
+`<div id="kp-entry-mount">` directly after `navRowHtml` and before the Dots block, and
+`renderKpEntryMount()` fills it - the pool guard `buildMoneyPoolBanner` had (a pool,
+`computeMoneyPool`, a valid result) then `buildPoolKpEntry(r)` with its three gates
+intact (a KP pot, a KP hole, a link that may write). `renderCardWidgets` fills it with
+the other widgets, so every path that rebuilds the hole card - arrival, Prev/Next, the
+snapshot listener via `renderScorecard` - refills it; `toggleKpEntry` and `saveKpLeader`
+re-render this one div instead of the Action Center (`renderHoleView` was the other
+candidate; it does not re-land the scroll itself, but it rebuilds every score box, so a
+half-typed score would die - the one div is the right size). The Weekly Game panel keeps
+its label, summary, Net Finish and the per-hole list; nothing replaces the block there.
+
+**The head reads "Hole N Weekly Game KP"**, not "Hole N KP", because on a round that
+also plays Dots the Dots line `KP · $2 each` sits under the same nav row and the two are
+different money. On a Weekly-Game-only round it reads the same - the head names the game
+the pot belongs to.
+
+**Measured at 390 px** (`tools/kp-entry-position-check.js`, cold arrival, the page's own
+Next/Prev, HEAD's page as the A/B copy): the block is the element directly after the nav
+row, 8 px below it, 99 px tall (`Hole 7 Weekly Game KP / No leader yet / Set KP Leader`);
+on a KP hole everything from the who-am-I panel down moved +107 px (pool only) / +111 px
+(with Dots: the `KP · $2 each` line and the Dots button move too, and sit under the block);
+on a non-KP hole the mount is 0 px and every rect equals HEAD's. The landing is unchanged:
+the heading's document top (930 / 1179 px) and its viewport top after a navigation (12 px,
+`HOLE_LANDING_OFFSET`) are the same on both holes and on both pages. On a **cold** arrival
+nothing scrolls (that is pre-existing): the heading is at 930 px, the block at 1459 px,
+both below an 844 px fold; after any Prev/Next the block is at viewport 541-640 px.
+
+**Tests.** `kp_entry_position_test.js` (10: source order, the guard and the hooks, the
+gates on the new mount, the one-div re-render, the seams). `kp_leaders_test.js` and
+`money_pool_test.js` re-pinned to the mount and the new head - the assertions travel
+unchanged. Two more pins the full suite found: `card_scope_closed_prev.fixture.json`
+(the 6ff9332 character-for-character capture) had the block's text inside
+`action-center-mount` on `group-3` and `bare` - exactly those substrings were moved by
+hand into a `kp-entry-mount` entry with the new head, a `repinned` entry says so, and the
+sha pin in `card_scope_closed_test.js` moved a1b40a09 → 243e5840; `kp_terminology_test.js`
+pins the head and now pins "Weekly Game KP". One control is source-only: the page's pool guard in `renderKpEntryMount` is
+belt-and-braces, `computeMoneyPool` returns `null` for a disabled or absent pool on its
+own, so dropping the guard is caught by the source pin and by nothing behavioural.
+`sw.js` `golfapp-v180-kp-entry-nav`.
+
 ## The import names the club, prints its dash, and stops crying "not mapped" (2026-09-19)
 
 **Seen on a phone**, the v177 Xcode build, importing Streamsong Red: the round started and
@@ -2556,6 +2602,9 @@ Run it after touching the Cup card, the pointer, `resolveRyderCupForRound` or
 `cross-round-identity-check.js` (the same golfer across rounds) ·
 `foursomes-entry-check.js` · `home-screen-check.js` · `id-binding-check.js` ·
 `nassau-stake-check.js` (a split-stake Nassau prices every segment) ·
+`kp-entry-position-check.js` (the Weekly Game KP entry is the element under the
+Prev/Next row on a KP hole and 0 px on any other; the landing is unchanged; `[page] [arm]`
+for the A/B against a copy of HEAD's page and the Dots arm) ·
 `orphan-match-check.js` (READ-ONLY, against live data) ·
 `receipt-identity-check.js` · `native-pdf-mark-check.js` (the share-sheet PDF
 carries the brand mark as a JPEG image object flattened on white from the

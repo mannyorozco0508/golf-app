@@ -1653,7 +1653,11 @@
 // prints a real em dash on its confirm button, and no longer shows "COURSE NOT
 // MAPPED" under an imported card; tournament.html composes the same way. A
 // device on v178 keeps a page that stores "Red" and prints an escape.
-const CACHE_VERSION = 'golfapp-v179-import-name';
+// Moved to v180: the Weekly Game's KP entry ("Set KP Leader") sits directly
+// under the Prev/Next row on every KP hole, whether or not My Round is open, and
+// its head reads "Weekly Game KP". A device on v179 keeps an index.html where
+// the block is at the bottom of the Weekly Game panel, behind the My Round tap.
+const CACHE_VERSION = 'golfapp-v180-kp-entry-nav';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

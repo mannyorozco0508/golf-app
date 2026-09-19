@@ -173,9 +173,9 @@ describe('THE TWO KPs STAY DISTINCT', () => {
             'one canonical dollar-per-dot value');
     });
 
-    test('the pool KP block still identifies itself as a KP', () => {
-        assert.match(read('index.html'), /kp-head">Hole ' \+ h \+ ' KP/,
-            'removing the icon must not remove the word');
+    test('the pool KP block still identifies itself as a KP - and, since 2026-09-19, as the Weekly Game\'s', () => {
+        assert.match(read('index.html'), /kp-head">Hole ' \+ h \+ ' Weekly Game KP/,
+            'removing the icon must not remove the word; the block now sits under the same nav row as the Dots KP line, so it names its game');
     });
 });
 

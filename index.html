@@ -2392,6 +2392,15 @@ html {
         // something to wade through first.
         html += navRowHtml;
 
+        // THE KP ENTRY, DIRECTLY UNDER PREV/NEXT (2026-09-19). It used to sit at the
+        // bottom of the Weekly Game panel inside the Action Center - past the recap,
+        // the skins panel, the My Round toggle and the panel's own list - which on a
+        // phone meant a tap and a scroll to reach it on the one hole it matters.
+        // The block reads page state and one participant list; nothing in it needs
+        // the panel. It renders on every KP hole whether or not My Round is open,
+        // and nothing at all on any other hole (renderKpEntryMount).
+        html += '<div id="kp-entry-mount"></div>';
+
         if (dotsGame) {
             const total = Object.values(holeDotsNow).reduce((n, arr) => n + (arr ? arr.length : 0), 0);
             // Same write rule the Full Card button uses: on a multi-group round only a
@@ -2434,6 +2443,7 @@ html {
     // the open path above cannot drift apart. Each closes itself on a link whose
     // group is not in this round (scopedPlayers() / scopeMissing()).
     function renderCardWidgets() {
+        renderKpEntryMount();
         renderWhoAmI();
         renderHoleRecap();
         renderLiveSkins();
@@ -3945,8 +3955,32 @@ html {
         html += '<div class="section-summary">' + bits.join(' \u00B7 ') + '</div>';
         html += buildLiveNetFinish(r);
         html += buildLiveKpStatus(r);
-        html += buildPoolKpEntry(r);
+        // The entry block (Set KP Leader) left this panel on 2026-09-19 for its own
+        // mount under the Prev/Next row - renderKpEntryMount. The per-hole list above
+        // stays; nothing replaces the block here.
         return html;
+    }
+
+    // ---- THE KP ENTRY MOUNT --------------------------------------------------
+    //
+    // One div under the Prev/Next row, filled on every render of the hole card and
+    // re-filled by the two things that change it - opening the picker and saving a
+    // leader. Those used to rebuild the whole Action Center; renderHoleView would
+    // be the other candidate, but it rebuilds every score box (a half-typed score
+    // dies) and is what the navigations call, so the one div is the right size.
+    // The pool guard that buildMoneyPoolBanner has comes with it; the block's own
+    // three gates - a KP pot, a KP hole, a link that may write - stay in
+    // buildPoolKpEntry. A missing mount (a page state with no hole card, or a
+    // test that never registered it) is a no-op, not an error.
+    function renderKpEntryMount() {
+        const mount = document.getElementById('kp-entry-mount');
+        if (!mount) return;
+        mount.innerHTML = '';
+        if (!currentData || !currentData.moneyPool || currentData.moneyPool.enabled === false) return;
+        if (typeof computeMoneyPool !== 'function') return;
+        const r = computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {});
+        if (!r || !r.valid) return;
+        mount.innerHTML = buildPoolKpEntry(r);
     }
 
     // ---- LIVE NET FINISH ---------------------------------------------------
@@ -4050,7 +4084,11 @@ html {
             : (winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null);
         const distLine = leader ? kpDistanceLabel(leader.distanceInches) : null;
 
-        let head = '<div class="kp-block"><div class="kp-head">Hole ' + h + ' KP</div>';
+        // "Weekly Game KP", not "KP": on a round that also plays Dots, the Dots KP line
+        // sits under the same nav row, and the two are different money. On a round
+        // with only the Weekly Game it reads the same and names the game the pot
+        // belongs to.
+        let head = '<div class="kp-block"><div class="kp-head">Hole ' + h + ' Weekly Game KP</div>';
         head += leaderName
             ? '<div class="kp-current">Current: <strong>' + leaderName + '</strong>'
               + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
@@ -4166,7 +4204,7 @@ html {
                 kpEntryOpenHole = null;
                 alert('\u2705 KP RECORDED\nHole ' + hole + '\n' + leader.playerName
                     + (dist === null ? '' : ' \u2014 ' + kpDistanceLabel(dist)));
-                renderActionCenter();
+                renderKpEntryMount();
             })
             .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
     }
@@ -4182,7 +4220,7 @@ html {
 
     function toggleKpEntry(hole) {
         kpEntryOpenHole = (kpEntryOpenHole === hole) ? null : hole;
-        renderActionCenter();
+        renderKpEntryMount();
     }
 
     function submitKpEntry(hole) {

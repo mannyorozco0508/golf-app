@@ -99,7 +99,11 @@ describe('?group=7 ON A SIX-GROUP ROUND: nobody', () => {
 describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
     test('the baseline is pinned (6ff9332)', () => {
         assert.equal(PREV.capturedAt, '6ff9332');
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'a1b40a09');
+        // RE-PINNED 2026-09-19 (was a1b40a09): the KP entry block moved out of the
+        // Action Center into #kp-entry-mount under the Prev/Next row and its head
+        // reads "Weekly Game KP"; exactly those substrings moved in the fixture (its
+        // "repinned" entry), every other character is still the 6ff9332 capture.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '243e5840');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

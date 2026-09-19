@@ -75,14 +75,19 @@ function boot({ group = 2, hole = 7, leaders = null, kpWinners = {} } = {}) {
         hasGroupLock = ${group !== null}; lockedGroup = ${group === null ? 'null' : group};
         currentViewedHole = ${hole}; actionCenterOpen = true;
         navigator.onLine = true;
+        // RE-PINNED 2026-09-19: the entry block lives in #kp-entry-mount under the
+        // Prev/Next row now (renderKpEntryMount), not inside the Action Center's
+        // Weekly Game panel. Both are rendered; html() reads the block's own mount.
+        document.__mount(document.getElementById('kp-entry-mount'));
         renderActionCenter();
+        renderKpEntryMount();
     `, sb);
 
     const idOf = n => 101 + NAMES.indexOf(n);
     return {
         sb, idOf,
         run: c => vm.runInContext(c, sb),
-        html: () => sb.document.getElementById('action-center-mount').innerHTML,
+        html: () => sb.document.getElementById('kp-entry-mount').innerHTML,
         writes: () => sb.window.__writes,
         alerts: () => sb.window.__alerts,
         setLeader: (n, ft, inch) => vm.runInContext(
@@ -198,7 +203,7 @@ describe('EVERYONE SEES THE MARKER', () => {
     test('a spectator sees the current leader but gets no picker', () => {
         const b = boot({ group: null, hole: 7, leaders: LEADER });
         const t = strip(b.html());
-        assert.match(t, /Hole 7 KP/);
+        assert.match(t, /Hole 7 Weekly Game KP/);   // RE-PINNED 2026-09-19: the head names the game
         assert.match(t, /Current: Manny/);
         assert.match(t, /5' 9"/);
         assert.ok(!/Set KP Leader|New Leader/.test(t), 'seeing is not claiming');
@@ -212,7 +217,7 @@ describe('EVERYONE SEES THE MARKER', () => {
     });
 
     test('an unclaimed hole says so', () => {
-        assert.match(strip(boot({ hole: 7 }).html()), /Hole 7 KP No leader yet/);
+        assert.match(strip(boot({ hole: 7 }).html()), /Hole 7 Weekly Game KP No leader yet/);
     });
 
     test('a leader with no distance says that plainly', () => {
@@ -223,7 +228,7 @@ describe('EVERYONE SEES THE MARKER', () => {
     });
 
     test('nothing renders on a hole that is not a KP hole', () => {
-        assert.ok(!/Hole 5 KP/.test(boot({ hole: 5 }).html()));
+        assert.equal(boot({ hole: 5 }).html(), '', 'the mount is empty on a non-KP hole');
     });
 });
 

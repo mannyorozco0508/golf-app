@@ -684,6 +684,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             selectedGroup = ${group === null ? "'all'" : group};
             currentViewedHole = ${hole}; actionCenterOpen = true;
             renderActionCenter();
+            renderKpEntryMount();   // 2026-09-19: the KP entry block's own mount under the nav row
         `, sb);
         return sb;
     }
@@ -703,8 +704,9 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // the cleared confirmation land together or not at all, so kpLeaders and
         // kpWinners can never disagree while the UI claims a result is final.
         const sb = bootIndex(2, 14);
-        const html = sb.document.getElementById('action-center-mount').innerHTML;
-        assert.match(html, /Hole 14 KP/);
+        // RE-PINNED 2026-09-19: the block moved to #kp-entry-mount under the Prev/Next row.
+        const html = sb.document.getElementById('kp-entry-mount').innerHTML;
+        assert.match(html, /Hole 14 Weekly Game KP/);
         assert.match(html, /Set KP Leader/);
 
         vm.runInContext(`savePoolKp(14, '${String(P[4].id)}');`, sb);
@@ -722,9 +724,10 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
     });
 
     test('KP entry is absent on a non-KP hole; spectators get read-only', () => {
-        assert.ok(!/Hole 7 KP/.test(bootIndex(1, 7).document.getElementById('action-center-mount').innerHTML));
-        const spec = bootIndex(null, 14).document.getElementById('action-center-mount').innerHTML;
-        assert.match(spec, /Hole 14 KP/, 'a spectator still SEES the marker');
+        // RE-PINNED 2026-09-19: the block's own mount, under the nav row.
+        assert.equal(bootIndex(1, 7).document.getElementById('kp-entry-mount').innerHTML, '', 'nothing on a non-KP hole');
+        const spec = bootIndex(null, 14).document.getElementById('kp-entry-mount').innerHTML;
+        assert.match(spec, /Hole 14 Weekly Game KP/, 'a spectator still SEES the marker');
         assert.ok(!/Set KP Leader|New Leader|kp-select/.test(spec),
             'but is offered no way to claim it');
     });
@@ -847,13 +850,18 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
             window.__scFilteredPlayers = currentData.players.filter(p => String(${J(gmap)}[p.id]) === '6');
             hasGroupLock = true; lockedGroup = 6; selectedGroup = 6;
             currentViewedHole = 14; actionCenterOpen = true;
+            document.__mount(document.getElementById('kp-entry-mount'));
             renderActionCenter();
+            renderKpEntryMount();
         `, sb);
         const html = sb.document.getElementById('action-center-mount').innerHTML;
         assert.match(html, /Weekly Game \u00B7 \$560/, 'the pot is one truth for all seven groups');   // v143 rename
         assert.match(html, /KP 2\/3 claimed/);
-        assert.match(html, /Hole 14 KP/, 'the unclaimed hole shows its marker to every group');
-        assert.match(html, /Set KP Leader/, 'and offers the picker to the group standing on it');
+        // RE-PINNED 2026-09-19: the marker and the picker are the entry block's, under the nav row.
+        const entry = sb.document.getElementById('kp-entry-mount').innerHTML;
+        assert.match(entry, /Hole 14 Weekly Game KP/, 'the unclaimed hole shows its marker to every group');
+        assert.match(entry, /Set KP Leader/, 'and offers the picker to the group standing on it');
+        assert.ok(!/Set KP Leader|kp-block/.test(html), 'the Weekly Game panel no longer carries the entry block');
 
         // CONTRACT REVERSED, DELIBERATELY. This used to assert that "group 6 records
         // group 7's winner - any scorekeeper may". That was wrong: it let a group move
