@@ -1645,7 +1645,11 @@
 // two proxy fetches, the import's global_courses write, and gca_ reference
 // cards in the picker. A device on v176 keeps an admin.html whose Search
 // online row never renders on the phone.
-const CACHE_VERSION = 'golfapp-v177-native-course-search';
+// Moved to v178: the wizard's delete control tells the truth - it checks the
+// scores it holds before asking, says the scorecard's sentence on a scored
+// round, and sends no write. A device on v177 keeps an admin.html whose
+// "End & wipe … for a fresh start" confirms and then shows an SDK error.
+const CACHE_VERSION = 'golfapp-v178-wizard-delete';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

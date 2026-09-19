@@ -1356,9 +1356,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
          loudest thing on a page whose actual job is starting a round - and it wipes
          the round permanently. It is now the quietest control here.
          The confirm() in front of it is untouched: that is the safeguard, and a
-         small button is not a substitute for asking. -->
+         small button is not a substitute for asking.
+         THE WORDS ARE THE SCORECARD'S (2026-09-19). "End & wipe this round … for a
+         fresh start" was the copy 2cb98f3 replaced on index.html and left here; on a
+         round with a card filled in it promised a fresh start the rule refuses, and
+         Manny reached for it wanting a NEW round. A fresh start is a new code (Home,
+         🔁 Start from it); this deletes a round nobody has played. -->
     <div style="text-align:center; margin-top:28px;">
-        <button type="button" class="end-round-btn" onclick="endAndClearRound()">🗑️ End &amp; wipe this round</button>
+        <button type="button" class="end-round-btn" onclick="endAndClearRound()">🗑️ Delete this round</button>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px; line-height:1.4;">Erases every score for everyone in this round. You do not need to do this when you finish — scores save as you enter them.</div>
     </div>
 
     <!-- THE TOURNAMENT EXIT CARD WAS REMOVED AT THE PRODUCT SEPARATION.
@@ -5561,6 +5567,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // The scores as loaded, read only to say how many holes a golfer has posted
     // before their row is removed. Never written by the wizard.
     let loadedScores = {};
+    // The saved round's roster size, for the delete confirm's "all N golfers" -
+    // the golfers whose scores would go, not the rows being edited on the form.
+    let loadedPlayerCount = 0;
     function holesScoredFor(playerId) {
         const prefix = 'p' + String(playerId) + '_h';
         return Object.keys(loadedScores || {}).filter(k => k.indexOf(prefix) === 0 && loadedScores[k] > 0).length;
@@ -5611,6 +5620,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             handleCourseChange();
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
+            loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
             loadedSideMatches = (isThisRound && snapshot.exists() && data.sideMatches) ? JSON.parse(JSON.stringify(data.sideMatches)) : {};
             loadedCourseKey = isThisRound && snapshot.exists() ? (data.activeCourseKey || null) : null;
             loadedCourseData = isThisRound && snapshot.exists() && Array.isArray(data.courseData) && data.courseData.length > 0
@@ -6682,16 +6692,39 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // CHECK BEFORE WRITING (2026-09-19). Rule A (database.rules.json, 2cb98f3)
+    // refuses to delete a round that has scores, and stays as the backstop. This
+    // page already HOLDS the round's scores (loadedScores, filled by loadModeData
+    // from the round's own record), so a scored round is told so before any
+    // confirm and no write is sent - measured on a phone: RV64U5's 432 scores got
+    // a confirm promising a fresh start and then "Error clearing game:
+    // PERMISSION_DENIED". Every sentence is index.html's (the scorecard's twin
+    // control, :6555-6575) except the last, which answers what the golfer came
+    // for. A write that is sent and does not land is told apart by the error's
+    // own text: a late PERMISSION_DENIED (a score landed after this page loaded)
+    // is the scores sentence; anything else is the signal. The two-write
+    // walk-around - clear the scores on the card, then delete - is neither
+    // blocked nor mentioned.
+    const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
+        + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
+        + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';
     function endAndClearRound() {
-        if (confirm(`Are you sure you want to END the current game for Room ${currentMode}? This will permanently wipe the game clean for a fresh start.`)) {
-            db.ref(`events/${currentMode}`).remove().then(() => {
-                localStorage.removeItem('lastRoomCode');
-                alert("Game reset successfully! The scorecard is now clear and ready for a new game.");
-                window.location.href = "admin.html"; 
-            }).catch((err) => {
-                alert(`Error clearing game: ${err.message}`);
-            });
-        }
+        if (Object.keys(loadedScores || {}).length > 0) { alert(SCORED_ROUND_SENTENCE); return; }
+        const golferCount = loadedPlayerCount;
+        const msg = `Delete round ${currentMode} for everyone?\n\n`
+            + `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+            + `It cannot be undone.\n\n`
+            + `You do not need to delete a round when you finish playing.`;
+        if (!confirm(msg)) return;
+        db.ref(`events/${currentMode}`).remove().then(() => {
+            localStorage.removeItem('lastRoomCode');
+            alert('Round deleted. The scorecard is now clear.');
+            window.location.href = 'admin.html';
+        }).catch((err) => {
+            const m = String((err && err.message) || err || '');
+            if (/PERMISSION_DENIED/i.test(m)) alert(SCORED_ROUND_SENTENCE);
+            else alert('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+        });
     }
 
 
