@@ -1076,6 +1076,66 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## The import names the club, prints its dash, and stops crying "not mapped" (2026-09-19)
+
+**Seen on a phone**, the v177 Xcode build, importing Streamsong Red: the round started and
+three things were wrong on screen. (1) The confirm button read `Use Red \\u2014 Streamsong,
+FL` — admin.html's `importConfirmLabel` had a doubled backslash inside a template literal, six
+characters that `textContent` printed as typed; `course_import_test` asserted the label's
+words and never its separator. (2) "⚠️ COURSE NOT MAPPED! Please enter the Pars and
+Handicaps…" rendered under the confirm panel: `openImportConfirm` borrows the unmapped path
+(`courseHiddenSelect.value = ""` + `handleCourseChange()`) to open the grid before the write,
+stamps the provider's 36 numbers into it, and inserts the panel above the container — so the
+unmapped path's red line showed through beneath a panel that already said "Par and stroke
+index below came from this course's … tees. Check them against the card before you save."
+(3) The course was stored and shown as **"Red"**: the provider gives `course_name "Red"` and
+`club_name "Streamsong Resort"`, and five copies of `course_name || club_name` on admin.html
+plus four on tournament.html each took the tee course alone — next week's picker would have
+offered Red, Blue and Black with no club.
+
+**Fixed.** `courseDisplayName(c)` in `course-import-rules.js` — the app's own directory
+convention, CLUB (COURSE): "Streamsong Resort (Red)", "Talking Stick Golf Club (O'odham)";
+the bare name when club and course match (case-insensitively); whichever exists when one is
+missing. Every name on the import path uses it on both pages — the result row, the typed
+name, the panel title, the confirm label, the stored record — and `importedCourseKey`
+compares the COMPOSED name to the directory and to `global_courses`, so a provider "Talking
+Stick Golf Club" / "O'odham" lands on `az_talking_oodham` instead of writing a shadow `gca_`
+beside it (the `gca_` key itself is the provider id and never the name). The label carries a
+real em dash, and `course_import_name_test.js` asserts the separator as a character through
+`helpers/decode-escapes.js`, plus a sweep of every shipped page and script for a doubled
+`\\u` (build-shell.js is source-of-source and exempt: its `\\u26F3` becomes `\u26F3` in the
+generated worker, which is correct). `handleCourseChange` keeps the red warning off while
+`pendingImport` is set — the grid is open for CHECKING, and the panel says so — and the
+refusal path clears `pendingImport` first, so a card the provider could not supply still
+gets the warning it deserves. What the grid looks like now: the panel (name, address, par
+and tee count, the source line, the match note, the button), then the 36 filled cells with
+no red line under them; the panel's own sentence is the only "check these", which is
+enough — it names the tee and asks for the card.
+
+**`gca_4ad33747`, already stored as "Red".** Left alone by this wave (tests may not touch
+production). The right repair is a RE-IMPORT of Streamsong Red from the phone once this ships:
+`importedCourseKey` still lands on the same key (by provider id — the composed name no longer
+matches "Red", the id does), the update rewrites `name` to "Streamsong Resort (Red)" — and it
+doubles as the device check for the write below. The alternative is a one-key hand update
+(`database:update /global_courses/gca_4ad33747 '{"name":"Streamsong Resort (Red)"}'` — the
+rules allow it; the node keeps `data` and `source`), needed only if the phone's write still
+does not land. Records with matching club and course (`gca_bwcdmzcy` Legacy Golf Resort) are
+already right. A possible refinement, not done: when the course name repeats the club's words
+("Talking Stick Golf Club (Talking Stick Piipaash)") the directory would say "(Piipaash)";
+the rule as decided is club (course), verbatim.
+
+**THE FOURTH FINDING — the phone's write never landed** (report only, not acted on). The
+production record's `source.importedAt` is 2026-09-13 17:50 UTC, the web import; a confirm
+on the phone on 2026-09-19 would have stamped that day's `Date.now()`. It did not. The round
+started because `finalCourseData` is taken from the grid, not from the write. Whether the
+write was REFUSED or NEVER SENT is unknown; either way "native import works end to end" was
+true of the round and not of the shared record. How to tell: (a) Safari → Develop → the
+iPhone → the page, Console, then import again — a red `PERMISSION_DENIED` line names a
+refusal, a network error names a transport failure, no line at all means the write was never
+issued; (b) without the inspector: import again and watch under the course box for the
+publish-refused note (`renderCoursePublishNote`, admin.html:1697) — its presence is a refusal;
+its absence with an unchanged `importedAt` afterwards is "never sent". Not chased here.
+
 ## The tee sheet printed blank QR cells — print is a snapshot, and Chrome pauses the page for it (2026-09-18)
 
 **What Manny saw.** The tee sheet from the section above, printed from Chrome's real

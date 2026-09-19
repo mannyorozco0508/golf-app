@@ -180,7 +180,7 @@ describe('THE CLUB/TOURNAMENT IMPLEMENTATION SURVIVED — DO NOT DELETE THIS COD
     test('the Tournament build target is untouched', () => {
         const build = read('build-shell.js');
         assert.match(build, /appName: 'GolfApp Tournaments'/, 'Tournament identity unchanged');
-        assert.match(build, /cacheName: 'tournament-v50-live-board'/,
+        assert.match(build, /cacheName: 'tournament-v51-import-name'/,
             'the Tournament manifest is precached, so the key must move with it');
         assert.ok(!/Rattle/.test(build.slice(build.indexOf('tournament: {'))),
             'Tournament must never be renamed Rattle Golf');

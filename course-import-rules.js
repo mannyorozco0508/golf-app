@@ -105,6 +105,24 @@ function allTeeSets(detail) {
     return out;
 }
 
+// THE NAME A GOLFER READS, composed once (2026-09-19). The provider gives a
+// club and a course: Streamsong Resort / Red, Legacy Golf Resort / Legacy Golf
+// Resort. Taking course_name alone stored and showed "Red" - and next week's
+// picker would offer Red, Blue and Black with no club. The app's own directory
+// names a club's course as CLUB (COURSE): "TPC Scottsdale (Stadium)", "Talking
+// Stick Golf Club (O'odham)". So: club (course) when they differ, the bare
+// name when they are the same (case-insensitively), whichever exists when only
+// one does. Every name on the import path - the result row, the typed name,
+// the panel title, the confirm label, the stored record, and the matcher that
+// decides which key an import lands on - comes from here, on both pages.
+function courseDisplayName(c) {
+    const club = String((c && c.club_name) || '').trim();
+    const course = String((c && c.course_name) || '').trim();
+    if (!club) return course;
+    if (!course || course.toLowerCase() === club.toLowerCase()) return club;
+    return club + ' (' + course + ')';
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ONLINE_SEARCH_CEILING, ONLINE_SEARCH_MESSAGES, courseImportMessage, importCardOrRefuse, pickCanonicalTee, allTeeSets };
+    module.exports = { ONLINE_SEARCH_CEILING, ONLINE_SEARCH_MESSAGES, courseImportMessage, importCardOrRefuse, pickCanonicalTee, allTeeSets, courseDisplayName };
 }

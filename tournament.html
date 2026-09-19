@@ -958,7 +958,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const row = document.createElement('div');
             row.className = 'custom-select-option course-online-result';
             const title = document.createElement('div');
-            title.textContent = c.course_name || c.club_name || '';
+            title.textContent = courseDisplayName(c);
             const sub = document.createElement('div');
             // City and state on every row: four courses are called Legacy Golf Club.
             sub.textContent = (L.city || '?') + ', ' + (L.state || '?') + ' · ' + (teeCount ? teeCount + ' tee sets' : 'no tee data');
@@ -977,7 +977,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // ---- THE DETAIL. The second request is spent here, not before. ----
     async function openTournamentCourseDetail(course) {
         const dropdown = document.getElementById('course-dropdown');
-        const cname = course.course_name || course.club_name || '';
+        const cname = courseDisplayName(course);
         dropdown.innerHTML = '';
         dropdown.appendChild(pickerNote('Fetching the card…'));
         let payload;
@@ -1001,7 +1001,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const tees = allTeeSets(detail);
         const canonical = pickCanonicalTee(detail);
         if (!canonical || tees.length === 0) {
-            dropdown.appendChild(pickerNote(`${detail.course_name || detail.club_name}: This course has no tee data from the provider.`));
+            dropdown.appendChild(pickerNote(`${courseDisplayName(detail)}: This course has no tee data from the provider.`));
             dropdown.style.display = 'block';
             return;
         }
@@ -1040,7 +1040,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const detail = P.detail, L = detail.location || {};
         const chosen = P.tees[P.pick];
         const card = importCardOrRefuse(chosen.tee);
-        const cname = detail.course_name || detail.club_name || '';
+        const cname = courseDisplayName(detail);
         const panel = document.createElement('div');
         panel.id = 'course-import-confirm';
         const line = (text, css) => { const d = document.createElement('div'); if (css) d.style.cssText = css; d.textContent = text; panel.appendChild(d); return d; };
@@ -1100,7 +1100,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!card.ok) return;
         const detail = P.detail;
         const key = 'gca_' + detail.id;
-        const name = detail.course_name || detail.club_name || '';
+        const name = courseDisplayName(detail);
         setupImportedCourses[key] = {
             name: name,
             data: card.data,

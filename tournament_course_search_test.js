@@ -248,7 +248,8 @@ describe('3. THE DETAIL AND THE CONFIRM', () => {
         await searchAndOpen(sb, 'talking', OK([STICK]), UNAVAILABLE('upstream_error'));
         find(sb, /Talking Stick Piipaash/).click();
         await settle();
-        assert.match(rows(sb).map(rowText).join(' | '), /Couldn't fetch the card for Talking Stick Piipaash\. Online search isn't answering right now\./);
+        // RE-PINNED 2026-09-19: the name is composed CLUB (COURSE) by courseDisplayName, both pages.
+        assert.match(rows(sb).map(rowText).join(' | '), /Couldn't fetch the card for Talking Stick Golf Club \(Talking Stick Piipaash\)\. Online search isn't answering right now\./);
         assert.equal(sb.document.getElementById('course-key').value || '', '');
         assert.equal(sb.document.getElementById('course-search-input').value, 'talking', 'a name in the box with no card would look chosen');
         assert.equal(panel(sb), null);
@@ -258,7 +259,7 @@ describe('3. THE DETAIL AND THE CONFIRM', () => {
         await searchAndOpen(sb, 'bare', OK([NO_CARD]), { status: 'ok', course: NO_CARD_DETAIL });
         find(sb, /Bare Course/).click();
         await settle();
-        assert.match(rows(sb).map(rowText).join(' | '), /Bare Course: This course has no tee data from the provider\./);
+        assert.match(rows(sb).map(rowText).join(' | '), /Bare Club \(Bare Course\): This course has no tee data from the provider\./);   // re-pinned 2026-09-19: club (course)
         assert.equal(panel(sb), null);
         assert.equal(sb.document.getElementById('course-key').value || '', '');
     });
@@ -267,7 +268,7 @@ describe('3. THE DETAIL AND THE CONFIRM', () => {
         const p = await toConfirm(sb);
         assert.ok(p, 'no confirm panel');
         const t = allText(p);
-        assert.match(t, /Talking Stick Piipaash/);
+        assert.match(t, /Talking Stick Golf Club \(Talking Stick Piipaash\)/);   // re-pinned 2026-09-19: club (course)
         assert.match(t, /9998 E Indian Bend Rd/);
         assert.match(t, /Par 72 · 3 tee sets/);
         assert.match(t, /Par and stroke index came from this course's Blue tees\. This is the card the event will score on\. It can't be edited on this page — if it's wrong, pick a different tee set or a different course\./);
@@ -277,7 +278,7 @@ describe('3. THE DETAIL AND THE CONFIRM', () => {
         assert.match(card.innerHTML, /<td>7<\/td>/, 'hole 1 stroke index from the Blue tees');
         assert.equal((card.innerHTML.match(/<th>Hole<\/th>/g) || []).length, 2, 'two rows of nine');
         const btn = (p.children || []).find(c => c.id === 'course-import-confirm-btn');
-        assert.ok(btn); assert.equal(btn.textContent, 'Use Talking Stick Piipaash — Scottsdale, AZ');
+        assert.ok(btn); assert.equal(btn.textContent, 'Use Talking Stick Golf Club (Talking Stick Piipaash) — Scottsdale, AZ');   // re-pinned 2026-09-19: club (course)
         assert.equal(sb.document.getElementById('course-key').value || '', '', 'not selected until the button');
         assert.equal(sb.__dbWrites.length, 0);
     });
@@ -324,7 +325,7 @@ describe('4. CONFIRM INLINES THE CARD - INTO THE EVENT, NEVER global_courses', (
         const p = await toConfirm(sb);
         (p.children || []).find(c => c.id === 'course-import-confirm-btn').click();
         assert.equal(sb.document.getElementById('course-key').value, 'gca_a1b2c3d4');
-        assert.equal(sb.document.getElementById('course-search-input').value, 'Talking Stick Piipaash');
+        assert.equal(sb.document.getElementById('course-search-input').value, 'Talking Stick Golf Club (Talking Stick Piipaash)');   // re-pinned 2026-09-19
         assert.equal(panel(sb), null);
         noGlobalWrite(sb);
     });
@@ -346,13 +347,13 @@ describe('4. CONFIRM INLINES THE CARD - INTO THE EVENT, NEVER global_courses', (
         assert.ok(set, JSON.stringify(sb.__dbWrites.map(w => w.path)));
         const v = set.value;
         assert.equal(v.activeCourseKey, 'gca_a1b2c3d4');
-        assert.equal(v.courseName, 'Talking Stick Piipaash');
+        assert.equal(v.courseName, 'Talking Stick Golf Club (Talking Stick Piipaash)');   // re-pinned 2026-09-19: the stored name is the composed one
         assert.equal(v.courseData.length, 18);
         assert.equal(v.courseData[0].hcpIndex, 7); assert.equal(v.courseData[3].par, 5);
         assert.equal(v.courseIndexSynthetic, false);
         assert.ok(v.importedCourses && v.importedCourses.gca_a1b2c3d4, 'the import is kept on the event for later rounds');
         const imp = v.importedCourses.gca_a1b2c3d4;
-        assert.equal(imp.name, 'Talking Stick Piipaash');
+        assert.equal(imp.name, 'Talking Stick Golf Club (Talking Stick Piipaash)');
         assert.equal(imp.data.length, 18);
         assert.deepEqual(Object.keys(imp.source).sort(), ['importedAt', 'provider', 'providerCourseId', 'siFrom']);
         assert.equal(imp.source.siFrom, 'male/Blue');

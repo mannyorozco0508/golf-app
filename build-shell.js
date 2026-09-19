@@ -76,6 +76,9 @@ const PRODUCTS = {
     },
     tournament: {
         files: SHARED.concat(TOURNAMENT),
+        // Moved to v51. The course import names the club - "Streamsong Resort
+        // (Red)" - on tournament.html too, through the shared composer. A device
+        // on v50 keeps a page that stores and shows the tee course alone.
         // Moved to v50. The manage gate HIDES the Setup and Desk tabs instead of
         // removing them: removal made every snapshot after the first throw in
         // the record callback for anyone who was not the owner, so a spectator's
@@ -144,7 +147,7 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v50-live-board',
+        cacheName: 'tournament-v51-import-name',
         // WORKING NAME ONLY. The Tournament product has not been named; this is
         // deliberately plain and trivially changeable, and nothing depends on it.
         appName: 'GolfApp Tournaments',

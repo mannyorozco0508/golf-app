@@ -3688,7 +3688,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // city the provider gave, because the directory carries no city or state and
     // cannot verify a name match is the same physical course.
     function importedCourseKey(course, globalCoursesRef) {
-        const nm = String(course.course_name || course.club_name || '').toLowerCase();
+        // THE COMPOSED NAME, lowercased - so "Talking Stick Golf Club" / "O'odham"
+        // meets the directory's "Talking Stick Golf Club (O'odham)" instead of
+        // writing a shadow gca_ record beside it.
+        const nm = courseDisplayName(course).toLowerCase();
         let found = null;
         courseDirectory.forEach(g => g.items.forEach(i => {
             if (i.name.toLowerCase() === nm) found = i.id;
@@ -3716,7 +3719,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // to confirm it.
     function importConfirmLabel(course) {
         const L = course.location || {};
-        return `Use ${course.course_name || course.club_name} \\u2014 ${L.city || '?'}, ${L.state || '?'}`;
+        // A REAL EM DASH. This line shipped with a doubled backslash before u2014 - six characters, printed
+        // as text on a phone (2026-09-19); the label's separator is now asserted as
+        // a character, decoded, in course_import_name_test.js.
+        return `Use ${courseDisplayName(course)} \u2014 ${L.city || '?'}, ${L.state || '?'}`;
     }
 
     // ---- THE SENTENCES LIVE IN course-import-rules.js (shared with tournament.html) ----
@@ -3759,7 +3765,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const tee = ((detail.tees || {})[parts[0]] || []).filter(t => t.tee_name === parts[1])[0];
         const card = importCardOrRefuse(tee);
         return {
-            name: detail.course_name || detail.club_name,
+            name: courseDisplayName(detail),
             data: card.ok ? card.data : [],
             location: detail.location || {},
             tees: { male: mapTees('male'), female: mapTees('female') },
@@ -3850,7 +3856,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // innerHTML is how a name containing a tag becomes markup. textContent
             // cannot do that, and needs no escaping to get right.
             const title = document.createElement("div");
-            title.textContent = c.course_name || c.club_name || '';
+            title.textContent = courseDisplayName(c);
             const sub = document.createElement("div");
             sub.style.cssText = "font-size:0.74rem; color:var(--text-muted);";
             sub.textContent = (L.city || '?') + ', ' + (L.state || '?') + ' \u00b7 '
@@ -3903,12 +3909,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // plausible numbers into it is how fiction got saved as fact.
         if (!payload || payload.status !== 'ok' || !payload.course) {
             const reason = (payload && payload.reason) || 'upstream_error';
-            courseSearchInput.value = course.course_name || course.club_name || '';
+            courseSearchInput.value = courseDisplayName(course);
             courseHiddenSelect.value = "";
             handleCourseChange();
             courseDropdown.innerHTML = "";
             courseDropdown.appendChild(renderDropdownNote(
-                `Couldn't fetch the card for ${course.course_name || course.club_name}. `
+                `Couldn't fetch the card for ${courseDisplayName(course)}. `
                 + onlineSearchMessage(reason)));
             courseDropdown.style.display = "block";
             return;
@@ -3920,8 +3926,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!card.ok) {
             courseDropdown.innerHTML = "";
             courseDropdown.appendChild(renderDropdownNote(
-                `${detail.course_name || detail.club_name}: ${card.reason} You can type the card in below.`));
-            courseSearchInput.value = detail.course_name || detail.club_name || '';
+                `${courseDisplayName(detail)}: ${card.reason} You can type the card in below.`));
+            pendingImport = null;   // nothing is on screen to check; the unmapped path speaks for itself
+            courseSearchInput.value = courseDisplayName(detail);
             courseHiddenSelect.value = "";
             handleCourseChange();
             courseDropdown.style.display = "block";
@@ -3940,7 +3947,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // BEFORE anything is written. That grid is what validateCourseGrid reads,
         // so the numbers a golfer confirms are literally the numbers that get
         // validated and saved - nothing new to keep in sync.
-        courseSearchInput.value = detail.course_name || detail.club_name || '';
+        courseSearchInput.value = courseDisplayName(detail);
         courseHiddenSelect.value = "";
         handleCourseChange();
         const box = document.getElementById('enable-custom-course');
@@ -3992,7 +3999,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             tees.push(t.tee_name + ' ' + t.course_rating + '/' + t.slope_rating);
         }));
 
-        line(detail.course_name || detail.club_name || '', "font-weight:700;");
+        line(courseDisplayName(detail), "font-weight:700;");
         line(L.address || '', MUTED);
         line('Par ' + card.data.reduce((a, h) => a + h.par, 0) + ' \u00b7 ' + tees.length + ' tee sets',
              "margin-top:6px;");
@@ -4447,7 +4454,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const customCheckbox = document.getElementById('enable-custom-course');
         const warningText = document.getElementById('custom-course-warning');
 
-        if (!isMapped && courseKey !== "thistle_27" && courseSearchInput.value.trim() !== "") {
+        // NOT WHILE AN IMPORT IS ON SCREEN (2026-09-19). openImportConfirm takes this
+        // path to open the grid before the write, then puts the provider's 36 numbers
+        // into it; the red "COURSE NOT MAPPED" beneath the confirm panel then asked
+        // the golfer to type in a card that was already there. The panel carries the
+        // honest line ("came from this course's … tees. Check them"); this stays
+        // quiet until the import is committed or refused.
+        if (!isMapped && courseKey !== "thistle_27" && courseSearchInput.value.trim() !== "" && !pendingImport) {
             customCheckbox.checked = true;
             customContainer.style.display = 'block';
             warningText.innerHTML = "⚠️ <strong>COURSE NOT MAPPED!</strong><br>Please enter the Pars and Handicaps from your scorecard. We will save it to the global database so you never have to do it again.";
@@ -4455,7 +4468,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } else {
             customCheckbox.checked = false;
             customContainer.style.display = 'none';
-            warningText.innerHTML = "Make quick adjustments from your phone if the course isn't mapped accurately.";
+            warningText.innerHTML = pendingImport ? "" : "Make quick adjustments from your phone if the course isn't mapped accurately.";
             warningText.style.color = "var(--text-muted)";
         }
     }
