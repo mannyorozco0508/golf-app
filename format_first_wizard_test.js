@@ -510,7 +510,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': '42923121fa01e0bda00ffb92aa5b5b728a27a2316920d2ba9c18355456a153dd',   // re-pinned 2026-09-15: computeRoundSettlement appended (trip money wave, approved per-file); no wager arithmetic changed - trip_money_final_test.js proves the behaviour
+        'settlement-engine.js': '9043e7fc4f1b9c6ec8dd93f7297730b6e2371b5f4f632dcb2e838ada2b5af697',   // re-pinned 2026-09-19: computeRoundFinish extracted from computeRoundSettlement (KP wave, approved per-file); the rule and every wager engine unchanged - kp_settlement_test.js proves the behaviour. (2026-09-15: computeRoundSettlement appended, trip money wave.)
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
@@ -527,7 +527,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // tie from, exposed so settlement.html reads it instead of reproducing
         // it. Additive: tie_shares_test.js proves the result with `shares` removed
         // deep-equals the v143 result on five rounds.
-        'pool-engine.js': 'd47a1e0a267478a3ccd3e729521136c82f2f4c06532bf085d87f9360e9688d57',
+        'pool-engine.js': '846f33e37dd0d21acf54e523852c4de30999f6b627def3e7afce562780077a7f',   // re-pinned 2026-09-19: recording pays, a blank refunds once finished, kpConfirmed ignored (KP wave, approved per-file); shares/pay/refund arithmetic unchanged - kp_settlement_test.js
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:

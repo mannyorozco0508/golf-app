@@ -146,12 +146,12 @@ describe('3. THE SAVE RE-RENDERS ONE DIV', () => {
         run(sb, "saveKpLeader(7, '102', '6', '2')");
         await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
         const w = run(sb, 'JSON.stringify(window.__writes)');
-        assert.match(w, /"kpLeaders\/h7"/); assert.match(w, /"kpWinners\/h7":"102"/); assert.match(w, /"kpConfirmed":null/);
+        assert.match(w, /"kpLeaders\/h7"/); assert.match(w, /"kpWinners\/h7":"102"/); assert.doesNotMatch(w, /kpConfirmed/);   // re-pinned 2026-09-19: recording pays, no confirmation to clear
         // the page's own snapshot would carry the leader back; simulate it landing
         run(sb, "currentData.kpLeaders = { h7: { playerId: '102', playerName: 'Ben', group: null, distanceInches: 74, updatedAt: 2 } }; currentData.kpWinners = { h7: '102' }; renderKpEntryMount();");
         assert.match(mount(sb), /Current: <strong>Ben<\/strong>/);
         assert.match(mount(sb), /New Leader/);
-        assert.ok(run(sb, 'window.__alerts.some(a => /KP RECORDED/.test(a))'));
+        assert.equal(run(sb, 'window.__alerts.length'), 0, 'no KP RECORDED dialog (2026-09-19) - the block is the confirmation');
     });
 });
 

@@ -100,6 +100,30 @@ const v142 = t => {
 };
 
 // ---------------------------------------------------------------------------
+
+// 2026-09-19 (RECORDING PAYS): the KP ceremony left the Receipt. On this round
+// hole 3 is recorded (Ann Alpha) and 7/12/16 are blank; every card is in on the
+// captured rounds, so the recorded hole is paid and the blanks refund to the
+// field ($30 across 23), and each refunded line says why. On the mid-round
+// capture (thru 10) a blank is "not recorded yet" and its share is "in the
+// pot". These substitutions are exactly that wave's change, applied to the OLD
+// text - kp_settlement_test.js proves the behaviour, this proves nothing else
+// in the text moved.
+const kpWave = (t, live) => {
+    let out = t
+        .replace('|KP|KP not confirmed yet — $40 pending|📍 KP — $40 — NOT CONFIRMED|Hole 3: Ann Alpha — not confirmed|$10 pending|',
+                 '|KP|Ann Alpha|$10|📍 KP — $40|Hole 3: Ann Alpha|$10|')
+        .replace(/\|Hole (7|12|16): no winner recorded\|\$10 pending(?=\|)/g, (m, h) => live ? '|Hole ' + h + ': not recorded yet|$10 in the pot' : '|Hole ' + h + ': nobody recorded it|$10 back to the field')
+        .replace('|⚠️ KP results not confirmed|$40 pending|', '|');
+    if (!live) {
+        // the $30 joins the field refund row: appended to an existing row's reasons and amount, or a new row at the end
+        const m = out.match(/\|↩️ Refunded to the field \(([^)]*)\)\|\$(\d+) ÷ 23\|/);
+        out = m ? out.replace(m[0], '|↩️ Refunded to the field (Unclaimed KP money refunded to the field. ' + m[1] + ')|$' + (Number(m[2]) + 30) + ' ÷ 23|')   // KP is allocated first, so its reason leads
+                : out.replace(/\|$/, '|↩️ Refunded to the field (Unclaimed KP money refunded to the field.)|$30 ÷ 23|');
+    }
+    return out;
+};
+
 describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new text', () => {
     const PREV = JSON.parse(read('skins_rows_prev.fixture.json'));
     Object.keys(VARIANTS).forEach(k => {
@@ -108,9 +132,9 @@ describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new t
             const now = strip(arrive(VARIANTS[k]()).pool);
             const ties = (before.match(/No Skin/g) || []).length;
             assert.ok(ties >= 12, 'the old text had the tie rows: ' + ties);
-            const transformed = v142(before
+            const transformed = kpWave(v142(before
                 .replace(/\|H\d+ — Tie at (Gross|Net) \d+ — No Skin(?=\|)/g, '')
-                .replace(/\|H(\d+) — /g, '|Hole $1 — '));
+                .replace(/\|H(\d+) — /g, '|Hole $1 — ')), false);
             assert.equal(now, transformed);
             assert.doesNotMatch(now, /No Skin/);
             assert.doesNotMatch(now, /\|H\d+ — /);
@@ -248,8 +272,8 @@ describe('THE SEAM — where the rows come from, and the print block', () => {
     test('engines untouched by this wave', () => {
         const h = f => sha(read(f)).slice(0, 8);
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(h('pool-engine.js'), 'd47a1e0a');
-        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
+        assert.equal(h('pool-engine.js'), '846f33e3');   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
         assert.equal(h('live-skins.js'), sha(read('live-skins.js')).slice(0, 8));
         assert.equal(h('money-engine.js'), '3c960947');
     });

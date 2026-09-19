@@ -289,7 +289,9 @@ describe('FIXTURES THAT ACTUALLY EXERCISE THE EDGE CASES', () => {
         zero.forEach(c => {
             assert.ok(c.lines.length > 0, `${c.name} appears but with no explanation`);
             assert.ok(labels(c).includes('Main Pool buy-in'), `${c.name} is missing the buy-in line`);
-            assert.ok(labels(c).includes('Pool refund'), `${c.name} is missing the refund that squares them`);
+            // RE-PINNED 2026-09-19 (recording pays): a refund line names its reason.
+            // This round refunds an unwon skins pot and nothing else.
+            assert.ok(labels(c).includes('Pool refund \u00B7 Skins pot refunded \u2014 no skins were won'), `${c.name} is missing the refund that squares them: ` + labels(c).join('|'));
         });
     });
 
@@ -297,7 +299,7 @@ describe('FIXTURES THAT ACTUALLY EXERCISE THE EDGE CASES', () => {
         const { r } = allSquare();
         const c = Object.values(r.contributions)[0];
         const buy = c.lines.find(l => l.label === 'Main Pool buy-in');
-        const ref = c.lines.find(l => l.label === 'Pool refund');
+        const ref = c.lines.find(l => /^Pool refund \u00B7 Skins pot refunded/.test(l.label));   // re-pinned 2026-09-19: the reason is on the label
         assert.equal(buy.amount, -40);
         assert.equal(ref.amount, 40, 'the refund must be visible, or $0 looks like a bug');
     });

@@ -77,10 +77,24 @@ const VARIANTS = { off: () => build(undefined), field: () => build({ enabled: tr
 // c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff, field
 // b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311, flight
 // 4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0.
+// RE-PINNED 2026-09-19 (recording pays, v182). Both surfaces moved in all three
+// variants. receiptPool: hole 3 (Ann Alpha) is PAID rather than "not confirmed",
+// holes 7/12/16 read "nobody recorded it · $10 back to the field" rather than
+// "no winner recorded · $10 pending", the "NOT CONFIRMED" head suffix and the
+// "⚠️ KP results not confirmed" row are gone, and the field refund row gains
+// "Unclaimed KP money refunded to the field." and $30 - skins_rows_shared_test.js
+// and skins_rows_widgets_test.js prove that is the whole difference, character
+// for character. liveResults: the KP-only "RESULTS — NOT FINAL" head no longer
+// exists, so the text is BACK to the v148 shas recorded above, byte for byte.
+// The v149 receiptPool shas were off/field 06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8,
+// flight abc0fa8b98345cd26429fcf1611091196986149285fe42e0277191960701c6c3; the v149
+// liveResults shas off 83ef04da18864a3ae4181eb52045cdd278f319fbcba9598611c70e72bc457cde,
+// field c04d25b657b54f849ba0485ade3d88056a7631bf111e0a4a0ce91e6d780092f2, flight
+// 2869f502b7658f73078158f2d35b04d92817a74138982c6e364a69c77b1d434f.
 const PREV_TEXT = {
-    off:    { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: '83ef04da18864a3ae4181eb52045cdd278f319fbcba9598611c70e72bc457cde' },
-    field:  { receiptPool: '06308427bf4b16082be45a9da24f05f58f6e88c3f862b0e2f4a1bc9218b957f8', liveResults: 'c04d25b657b54f849ba0485ade3d88056a7631bf111e0a4a0ce91e6d780092f2' },
-    flight: { receiptPool: 'abc0fa8b98345cd26429fcf1611091196986149285fe42e0277191960701c6c3', liveResults: '2869f502b7658f73078158f2d35b04d92817a74138982c6e364a69c77b1d434f' }
+    off:    { receiptPool: 'd2868b4f7c08e99b703af0edc3e5d5718580c9f7c0b9d7ba6346e2d5495b6c17', liveResults: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff' },
+    field:  { receiptPool: 'd2868b4f7c08e99b703af0edc3e5d5718580c9f7c0b9d7ba6346e2d5495b6c17', liveResults: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311' },
+    flight: { receiptPool: 'cf22167ee045a47d6333d88dc3661c28878c743ed39797b0bc2d284fef2c3867', liveResults: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' }
 };
 function render(data) {
     const st = loadHtmlInlineScript('settlement.html');
@@ -111,7 +125,7 @@ describe('THE MAIN POOL CARD: a bordered block per game, a header that is a head
         const games = blocks(h, 'pool-game ');
         assert.equal(games.length, 3, 'game blocks: ' + games.length);
         const heads = [...h.matchAll(/<div class="pool-game-head">([^<]*)</g)].map(m => m[1]);
-        assert.deepEqual(heads.map(t => t.replace(/\s+/g, ' ').trim()), ['📍 KP — $40 — NOT CONFIRMED', '🥇 Net Finish — $200', '🥩 Skins Pot — $220 (Gross skins, no carry)']);
+        assert.deepEqual(heads.map(t => t.replace(/\s+/g, ' ').trim()), ['📍 KP — $40', '🥇 Net Finish — $200', '🥩 Skins Pot — $220 (Gross skins, no carry)']);   // 2026-09-19: no NOT CONFIRMED suffix
         assert.ok(!/<div class="ledger-row"[^>]*><span>📍 KP/.test(h), 'the KP header is no longer a ledger row');
         assert.ok(!/<div class="ledger-row"[^>]*><span>🥇 Net Finish/.test(h) && !/<div class="ledger-row"[^>]*><span>🥩 Skins Pot/.test(h));
     });
@@ -206,7 +220,12 @@ describe('THE SEAM: classes, print rules, no global .ledger-row change', () => {
 });
 
 // ---- COLD CHROME at 390: distinct blocks, no sideways scroll, payouts first ---
-const DATA = VARIANTS.flight();
+// The Chrome arm measures LIVE RESULTS' skins cards as well as the Main Pool
+// blocks. Since 2026-09-19 a thru-18 round is FINAL (its unrecorded KPs refund),
+// so the page shows Final Results and no live skins cards; the arm therefore
+// arrives on the same flighted round with every card stopped at hole 17 - live,
+// so both surfaces are on the page. The mini-dom text pins above stay thru 18.
+const DATA = (() => { const d = VARIANTS.flight(); Object.keys(d.scores).forEach(k => { if (parseInt(k.split('_h')[1], 10) === 18) delete d.scores[k]; }); return d; })();
 const DB = { events: { POOLGLD: DATA }, global_courses: {}, trips: {}, tournaments: {} };
 const PROBE = `(function(){ var rect = function (el) { var r = el.getBoundingClientRect(); return { top: Math.round(r.top + window.scrollY), bottom: Math.round(r.bottom + window.scrollY), h: Math.round(r.height) }; };
   var games = Array.from(document.querySelectorAll('#money-pool-section .pool-game')).map(function (g) { var cs = getComputedStyle(g); return Object.assign(rect(g), { border: cs.borderTopWidth + ' ' + cs.borderTopStyle, head: (g.querySelector('.pool-game-head') || {}).innerText, headWeight: getComputedStyle(g.querySelector('.pool-game-head')).fontWeight, headSize: getComputedStyle(g.querySelector('.pool-game-head')).fontSize, rowSize: g.querySelector('.ledger-row') ? getComputedStyle(g.querySelector('.ledger-row')).fontSize : null }); });

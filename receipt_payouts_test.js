@@ -41,7 +41,7 @@ const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const CD = makeCourseData(18);
 
 // The pool_flights_golden round: 23 golfers 12 A / 11 B, $20 buy-in = $460, KP
-// $40 on 3/7/12/16 (unconfirmed), net $200 (60/40), skins bucket $220 gross.
+// $40 on 3/7/12/16 (hole 3 recorded, the rest blank), net $200 (60/40), skins bucket $220 gross.
 // Birdies so H2 and H13 tie across the field but pay inside each flight.
 function build(o) {
     const opt = o || {};
@@ -156,12 +156,13 @@ describe('THE FLIGHTED POOL ROUND (the golden\'s): the block first, per flight, 
         assert.deepEqual(nf.groups[0].rows, r.net.lines.map(l => [l.place + ' \u00B7 ' + l.names[0], $(l.cents)]));
         assert.deepEqual(nf.groups[0].rows, [['1 \u00B7 Rae Romeo', '$120'], ['2 \u00B7 Max Mike', '$80']]);
     });
-    test('KP is unconfirmed on this round: ONE line saying so, no rows', () => {
+    test('KP: the one recorded hole is paid; the three nobody recorded go back to the field (2026-09-19)', () => {
+        // The wizard fixture records hole 3 (Ann Alpha) and leaves 7/12/16 blank; every
+        // card is in, so - recording pays - Ann has her $10 and the $30 refunds. Until
+        // the KP wave this read "KP not confirmed yet — $40 pending" with no rows.
         const kp = P.games[2];
         assert.equal(kp.groups.length, 1);
-        assert.deepEqual(kp.groups[0].rows, []);
-        assert.match(kp.groups[0].note, /not confirmed/);
-        assert.match(kp.groups[0].note, /\$40/);
+        assert.deepEqual(kp.groups[0].rows, [['Ann Alpha', '$10']]);
     });
     test('nobody who is owed nothing appears: every name in the block is a positive engine payout under that game', () => {
         const owedSkins = new Set(r.skins.lines.map(l => l.winnerName));

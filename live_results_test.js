@@ -95,14 +95,14 @@ describe('LIVE MODE — A GOLF SUMMARY', () => {
         assert.match(results({ thru:[6,6,4] }).text(), /THRU 4/, 'the slowest group sets it');
     });
 
-    test('a round with every score in but KP unresolved is STILL not final', () => {
-        // settled === false, so the money is not final even though the golf is done.
-        // Re-pinned 2026-09-15 (v149): the head for this hold is RESULTS — NOT
-        // FINAL - "still in play" blamed golfers whose cards were all in. Still
-        // the live branch: no money, no receipt (receipt_final_test.js).
+    test('a round with every score in and NO KP recorded is FINAL (2026-09-19): the blanks refund, nothing is withheld', () => {
+        // Re-pinned 2026-09-19 (recording pays): this used to hold the round at
+        // RESULTS — NOT FINAL until an organizer confirmed the KPs. A finished
+        // round has no unresolved KP money any more - a blank hole is nobody's and
+        // goes back to the field - so the money is final with the golf.
         const t = results({ thru:[18,18,18], confirmed:false }).text();
-        assert.match(t, /RESULTS — NOT FINAL/);
-        assert.ok(!/Final Results|Player Payouts/.test(t));
+        assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(t));
+        assert.match(t, /Final Results/);
     });
 
     test('a round with holes missing is live even when settled === true', () => {
@@ -226,7 +226,7 @@ describe('LIVE SKINS — WINNERS ONLY', () => {
 describe('LIVE KP — A STATUS LINE, NOT A LEDGER', () => {
 
     test('it is one concise line', () => {
-        assert.match(results(LIVE).text(), /4 KPs today · none confirmed yet/);
+        assert.match(results(LIVE).text(), /4 KPs today · none recorded yet/);   // re-pinned 2026-09-19: recorded, not confirmed
     });
 
     test('no pending-dollar rows', () => {
@@ -370,8 +370,12 @@ describe('NO DUPLICATE MATH', () => {
         const eng = read('settlement-engine.js');
         const eAt = eng.indexOf('function computeRoundSettlement');
         const ef = eng.slice(eAt, eng.indexOf('\n    }\n', eAt));
-        assert.match(ef, /computePlayerRoundTotals\(p, holes, scores\)/);
+        // Re-pinned 2026-09-19: completion moved into computeRoundFinish, which
+        // computeRoundSettlement asks (one rule, shared with pool-engine).
+        assert.match(ef, /computeRoundFinish\(data, courseData, savedScores\)/);
         assert.match(ef, /rp\.settled === false/);
+        const fAt = eng.indexOf('function computeRoundFinish');
+        assert.match(eng.slice(fAt, eng.indexOf('\n    }\n', fAt)), /computePlayerRoundTotals\(p, holes, scores\)/);
         ['kpWinners','kpConfirmed &&','kpUnresolvedCents >']
             .forEach(t => assert.ok(!ef.includes(t), `must not re-derive settlement; found ${t}`));
     });

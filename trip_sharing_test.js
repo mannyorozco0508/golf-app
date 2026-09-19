@@ -39,7 +39,10 @@ function roundData(seed, confirmed) {
     const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
     const ps = NAMES.map((n,i)=>({ id:101+i, name:n, hcp:'9', playingForMoney:true }));
     const sc = {};
-    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
+    // RE-PINNED 2026-09-19 (recording pays): `confirmed:false` used to hold the
+    // trip open through unconfirmed KPs; a finished round's blanks refund now, so
+    // the unsettled fixture is a round still in play - every card stops at hole 9.
+    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ if (confirmed || h.hole <= 9) sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
     sc['p101_h2'] = 2; sc['p103_h5'] = 9;
     const d = { players: ps, courseData: cd, scores: sc, settlementMode:'whole-dollar', moneyPool: POOL };
     if (confirmed) { d.kpWinners = { h3:'101', h7:'105', h12:'109', h16:'102' };

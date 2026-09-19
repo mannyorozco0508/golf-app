@@ -1193,9 +1193,34 @@
 
                     // Refunds are money coming back and must be visible, or the pool
                     // lines will not account for the golfer's pool position.
+                    //
+                    // ONE LINE PER REASON (2026-09-19, recording pays). A KP hole
+                    // nobody recorded refunds once the round is finished, and that
+                    // is the $8 a golfer would otherwise meet as a bare "Pool refund".
+                    // The KP part is labelled by WHY (the engine's kp lines say), the
+                    // rest keeps its label and names its reasons. NO NEW ARITHMETIC:
+                    // the golfer's refund is the engine's perPlayerCents, untouched;
+                    // when a round refunds KP AND something else, that one figure is
+                    // apportioned between the two lines by the buckets' share of the
+                    // total (to the cent - or the dollar on a whole-dollar round - with
+                    // the remainder on the second line),
+                    // so the two lines always sum to exactly the figure they replace.
                     if (pool.refund && pool.refund.cents > 0) {
+                        const kpPart = (pool.kp && pool.kp.unclaimedCents) || 0;
+                        const kpLines = (pool.kp && pool.kp.lines || []).filter(l => l.state === 'refunded');
+                        const noWin = (data && data.kpNoWinner) || {}, kpW = (data && data.kpWinners) || {};
+                        const why = kpLines.map(l => noWin['h' + l.hole] === true ? 'nobody won it' : (kpW['h' + l.hole] ? 'not in the pool' : 'nobody recorded it'));
+                        const kpLabel = 'KP refund \u00B7 ' + (why.length && why.every(w => w === why[0]) ? why[0] : 'unclaimed');
+                        const others = (pool.refund.reasons || []).filter(t => !/^Unclaimed KP/.test(t)).map(t => t.replace(/\.$/, ''));
+                        const restLabel = 'Pool refund' + (others.length ? ' \u00B7 ' + others.join('; ') : '');
                         Object.keys(pool.refund.perPlayerCents).forEach(id => {
-                            addNote(byId[String(id)], dollars(pool.refund.perPlayerCents[id]), 'Pool refund');
+                            const lump = pool.refund.perPlayerCents[id];
+                            // a whole-dollar round's lump is whole dollars; its two lines are too
+                            const unit = lump % 100 === 0 ? 100 : 1;
+                            const kpCents = kpPart >= pool.refund.cents ? lump
+                                : (kpPart > 0 ? Math.round(lump * kpPart / pool.refund.cents / unit) * unit : 0);
+                            if (kpCents > 0) addNote(byId[String(id)], dollars(kpCents), kpLabel);
+                            if (lump - kpCents > 0) addNote(byId[String(id)], dollars(lump - kpCents), restLabel);
                         });
                     }
                 }
@@ -1763,12 +1788,24 @@
     //              is unfinished, and verification is the word that finishes
     //              it. A roster name with no score at all never teed off and is
     //              not waited for. A round with NO scores has not started.
-    //   kpSettled  computeMoneyPool().settled is not false (no unresolved KP
-    //              money - Wave B's canonical fact, read, not re-derived).
+    //   kpSettled  computeMoneyPool().settled is not false. Since the KP wave of
+    //              2026-09-19 (recording pays) this is true on every FINISHED
+    //              round by construction - a blank KP hole refunds once the
+    //              round is finished - so it only ever holds a LIVE round open,
+    //              and a live round is not finished anyway. Kept: it is the
+    //              canonical fact, read, not re-derived.
     // Nothing here moves money: the ledger counts an unfinished round's money
     // exactly as before. This decides one word, and names who is still out.
+    //
+    // IS THIS ROUND FINISHED? The first half of that predicate on its own,
+    // because pool-engine.js asks it (KP wave, 2026-09-19): a blank KP hole is
+    // "not yet" while the round is live and a refund once it is finished, and
+    // "finished" has to be ONE rule - this one - not a second copy in the pool
+    // engine. computeRoundSettlement calls this and adds the KP fact. Nothing
+    // about money. (pool-engine asks THIS, never computeRoundSettlement, which
+    // calls computeMoneyPool - that would be a cycle.)
     // ========================================================================
-    function computeRoundSettlement(data, courseData, savedScores) {
+    function computeRoundFinish(data, courseData, savedScores) {
         const holes = (courseData || []);
         const players = ((data && data.players) || []);
         const scores = savedScores || {};
@@ -1780,6 +1817,14 @@
         const started = playing.length > 0;
         const scored = holes.length > 0 && started && unfinished.length === 0;
         const finished = verified || scored;
+        const thru = playing.length ? Math.min.apply(null, playing.map(t => t.holesPlayed)) : 0;
+        return { finished, verified, scored, started, playing: playing.length, unfinished, thru, holesRequired: holes.length };
+    }
+
+    function computeRoundSettlement(data, courseData, savedScores) {
+        const f = computeRoundFinish(data, courseData, savedScores);
+        const holes = (courseData || []);
+        const scores = savedScores || {};
         let kpSettled = true, kpUnresolvedCents = 0;
         try {
             if (typeof computeMoneyPool === 'function') {
@@ -1787,11 +1832,10 @@
                 if (rp && rp.valid && rp.settled === false) { kpSettled = false; kpUnresolvedCents = rp.kpUnresolvedCents || 0; }
             }
         } catch (e) { /* a pool that cannot be read is not claimed settled either */ kpSettled = false; }
-        const thru = playing.length ? Math.min.apply(null, playing.map(t => t.holesPlayed)) : 0;
         return {
-            settled: finished && kpSettled,
-            finished, verified, scored, started,
-            playing: playing.length, unfinished, thru, holesRequired: holes.length,
+            settled: f.finished && kpSettled,
+            finished: f.finished, verified: f.verified, scored: f.scored, started: f.started,
+            playing: f.playing, unfinished: f.unfinished, thru: f.thru, holesRequired: f.holesRequired,
             kpSettled, kpUnresolvedCents
         };
     }

@@ -45,12 +45,15 @@ const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
 const ALL_KP = { h3:'101', h7:'105', h12:'109', h16:'102' };
 
 // A valid 12 x $40 = $480 round: KP $100 + Net $70 + skins remainder $310.
-// `confirmed` decides whether its KP money is settled.
-function roundData({ confirmed = true, seed = 0, noPool = false } = {}) {
+// `confirmed` decides whether its KPs are recorded. RE-PINNED 2026-09-19
+// (recording pays): an unrecorded KP no longer holds a FINISHED round open - the
+// blank refunds once the cards are in - so what holds the trip open now is a
+// round still in play: `thru` scores every golfer through that hole only.
+function roundData({ confirmed = true, seed = 0, noPool = false, thru = 18 } = {}) {
     const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
     const ps = NAMES.map((n,i)=>({ id:101+i, name:n, hcp:'9', playingForMoney:true }));
     const sc = {};
-    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
+    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ if (h.hole <= thru) sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
     const d = { players: ps, courseData: cd, scores: sc, gameFormat:'stroke',
                 settlementMode:'whole-dollar', kpWinners: confirmed ? ALL_KP : {} };
     if (!noPool) {
@@ -68,7 +71,7 @@ function boot(rounds) {
     const sb = loadHtmlInlineScript(PAGE, DEPS);
     const linked = rounds.map(r => ({
         label: r.label, countsTowardTrip: true,
-        data: roundData({ confirmed: r.confirmed !== false, seed: r.seed || 0, noPool: !!r.noPool }),
+        data: roundData({ confirmed: r.confirmed !== false, seed: r.seed || 0, noPool: !!r.noPool, thru: r.thru || 18 }),
     }));
     vm.runInContext(`
         cachedRoundResults = ${JSON.stringify(linked)};
@@ -87,8 +90,8 @@ function boot(rounds) {
 
 describe('AN UNSETTLED ROUND STOPS THE TRIP CALLING ITSELF FINAL', () => {
 
-    test('one unresolved round is enough', () => {
-        const t = boot([{ label:'Caledonia', confirmed:false }]).text();
+    test('one round still in play is enough', () => {
+        const t = boot([{ label:'Caledonia', thru:9 }]).text();
         // Pool-only trips no longer print a Who Pays Who list at all, so the gate's
         // visible signal is the warning banner. The heading path is covered by the
         // side-match case below.
@@ -96,30 +99,35 @@ describe('AN UNSETTLED ROUND STOPS THE TRIP CALLING ITSELF FINAL', () => {
         assert.ok(!/Final "Who Pays Who"/.test(t), 'money with $100 hanging is not final');
     });
 
-    test('the warning names the round and the amount', () => {
-        const t = boot([{ label:'Caledonia', confirmed:false }]).text();
+    test('the warning names the round and where it stands', () => {
+        const t = boot([{ label:'Caledonia', thru:9 }]).text();
         assert.match(t, /Not Settled Yet/);
-        assert.match(t, /unconfirmed in: Caledonia \(\$100\)/);
-        assert.match(t, /will change once those rounds are resolved/);
+        assert.match(t, /Still in play: Caledonia — thru 9, 12 golfers still have holes left/);
+        assert.match(t, /will change once those rounds are finished/);
+    });
+
+    test('a FINISHED round with no KP recorded does NOT hold the trip (2026-09-19): the blanks refund', () => {
+        const t = boot([{ label:'Caledonia', confirmed:false }]).text();
+        assert.ok(!/Not Settled Yet|unconfirmed/.test(t), t.slice(0, 160));
     });
 
     test('ONE bad round among several still blocks the whole trip', () => {
         const b = boot([
             { label:'Caledonia', confirmed:true,  seed:0 },
-            { label:'True Blue', confirmed:false, seed:1 },
+            { label:'True Blue', thru:9, seed:1 },
             { label:'Pine Lakes', confirmed:true, seed:2 },
         ]);
         const t = b.text();
         assert.match(t, /Not Settled Yet/);
-        assert.match(t, /True Blue/);
-        assert.ok(!/Caledonia/.test(t.slice(t.indexOf('unconfirmed in:'), t.indexOf('These totals'))),
+        assert.match(t, /Still in play: True Blue/);
+        assert.ok(!/Caledonia/.test(t.slice(t.indexOf('Still in play:'), t.indexOf('These totals'))),
             'only the offending round should be named');
     });
 
-    test('several unresolved rounds are all named', () => {
+    test('several rounds in play are all named', () => {
         const t = boot([
-            { label:'Caledonia', confirmed:false, seed:0 },
-            { label:'True Blue', confirmed:false, seed:1 },
+            { label:'Caledonia', thru:9, seed:0 },
+            { label:'True Blue', thru:12, seed:1 },
         ]).text();
         assert.match(t, /Caledonia/);
         assert.match(t, /True Blue/);
@@ -155,8 +163,8 @@ describe('A SETTLED TRIP IS CALLED FINAL', () => {
         assert.ok(!/Not Settled Yet/.test(t), 'a round with no pool has no unresolved money');
     });
 
-    test('confirming the offending round flips the trip to final', () => {
-        const open = boot([{ label:'Caledonia', confirmed:false }]).text();
+    test('finishing the offending round flips the trip to final', () => {
+        const open = boot([{ label:'Caledonia', thru:9 }]).text();
         const done = boot([{ label:'Caledonia', confirmed:true }]).text();
         assert.match(open, /Not Settled Yet/);
         assert.ok(!/Not Settled Yet/.test(done));
@@ -166,7 +174,7 @@ describe('A SETTLED TRIP IS CALLED FINAL', () => {
 describe('THE SHARE RECAP CARRIES THE SAME CAVEAT', () => {
 
     test('an unsettled trip does not say FINAL SETTLEMENT', () => {
-        const b = boot([{ label:'Caledonia', confirmed:false }]);
+        const b = boot([{ label:'Caledonia', thru:9 }]);
         assert.equal(b.run('cachedTripSettled'), false);
         const src = read(PAGE);
         assert.match(src, /SETTLEMENT SO FAR — NOT FINAL/,

@@ -200,9 +200,9 @@ describe('THE SEAM — one rule, from grouping.js, on both pages; Results untouc
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('money-engine.js'), '3c960947');
-        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
+        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(h('pool-engine.js'), 'd47a1e0a');
+        assert.equal(h('pool-engine.js'), '846f33e3');   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
         assert.equal(h('grouping.js'), sha(read('grouping.js')).slice(0, 8));
     });
 });

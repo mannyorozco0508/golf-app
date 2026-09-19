@@ -187,9 +187,10 @@ describe('computeRoundSettlement: who is still out, and what finishes a round', 
         const s = settle(twoVtwo({ thruBy: [0, 0, 0, 0] }));
         assert.equal(s.started, false); assert.equal(s.finished, false); assert.equal(s.settled, false); assert.equal(s.playing, 0);
     });
-    test('unresolved KP money holds a finished round open: kpSettled false, cents named', () => {
+    test('a finished round with no KP recorded is settled (2026-09-19): the blanks refund, kpSettled true, nothing withheld', () => {
+        // Until the KP wave this held the round open (kpSettled false, $100 named).
         const s = settle(poolRound({ confirmed: false }));
-        assert.equal(s.finished, true); assert.equal(s.kpSettled, false); assert.equal(s.kpUnresolvedCents, 10000); assert.equal(s.settled, false);
+        assert.equal(s.finished, true); assert.equal(s.kpSettled, true); assert.equal(s.kpUnresolvedCents, 0); assert.equal(s.settled, true);
         const ok = settle(poolRound({ confirmed: true }));
         assert.equal(ok.kpSettled, true); assert.equal(ok.settled, true);
     });
@@ -294,25 +295,28 @@ describe('A HALF-PLAYED ROUND: named, counted, not called final', () => {
     });
 });
 
-describe('UNCONFIRMED KPs: as today, to the letter', () => {
+// RE-PINNED 2026-09-19 (recording pays): a finished round with unrecorded KPs no
+// longer holds the trip - its blanks refund - so the "KP results are still
+// unconfirmed in" sentence is gone from the panel, the recap and the share text.
+describe('UNRECORDED KPs ON A FINISHED ROUND: no hold, no sentence', () => {
     const b = boot([{ label: 'Caledonia', data: poolRound({ confirmed: false }) }]);
-    test('the same sentence trip_settlement_gate_test.js pins', () => {
+    test('the trip is settled and nothing says unconfirmed', () => {
         const m = b.money();
-        assert.match(m, /^\|⚠️ Not Settled Yet\|KP results are still unconfirmed in: Caledonia \(\$100\)\.\|These totals will change once those rounds are resolved\.\|/);
-        assert.ok(!/Still in play/.test(m)); assert.ok(!/Not started/.test(m));
-        assert.match(b.recap(), /\|⚠️ Not final — KP results are still unconfirmed in Caledonia\.\|/);
-        assert.match(b.share(), /\n💵 SETTLEMENT SO FAR — NOT FINAL\nKP results are still unconfirmed in Caledonia\.\n/);
+        assert.ok(!/Not Settled Yet|unconfirmed/.test(m), m.slice(0, 120));
+        assert.equal(b.settled(), true);
+        assert.ok(!/unconfirmed|Not final/.test(b.recap()));
+        assert.ok(!/unconfirmed|NOT FINAL/.test(b.share()));
     });
 });
 
-describe('BOTH AT ONCE: a round in play AND a round with unconfirmed KPs', () => {
+describe('A ROUND IN PLAY beside finished pool rounds: the in-play sentence alone, and the verb is "finished"', () => {
     const b = boot([{ label: 'Caledonia', data: poolRound({ confirmed: false }) }, { label: 'True Blue', data: poolRound({ confirmed: true, seed: 1 }) }, { label: 'Pine Lakes', data: twoVtwo({ thruBy: [18, 9, 18, 18], extra: { players: P4 } }) }]);
-    test('both are named, in-play first, and the verb is "finished"', () => {
+    test('the round in play is named; the finished pool rounds are not', () => {
         const m = b.money();
-        assert.match(m, /^\|⚠️ Not Settled Yet\|Still in play: Pine Lakes — thru 9, 1 golfer still has holes left\. Its money so far is counted below\.\|KP results are still unconfirmed in: Caledonia \(\$100\)\.\|These totals will change once those rounds are finished\.\|/);
+        assert.match(m, /^\|⚠️ Not Settled Yet\|Still in play: Pine Lakes — thru 9, 1 golfer still has holes left\. Its money so far is counted below\.\|These totals will change once those rounds are finished\.\|/);
         assert.equal(b.settled(), false);
-        assert.match(b.recap(), /Not final — Pine Lakes is still in play; KP results are still unconfirmed in Caledonia\./);
-        assert.match(b.share(), /NOT FINAL\nPine Lakes is still in play; KP results are still unconfirmed in Caledonia\.\n/);
+        assert.match(b.recap(), /Not final — Pine Lakes is still in play\./);
+        assert.match(b.share(), /NOT FINAL\nPine Lakes is still in play\.\n/);
     });
 });
 

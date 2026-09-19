@@ -261,12 +261,12 @@ describe('THE SHARED RELEVANCE PREDICATE', () => {
 
 describe('TRIP MODE HONOURS THE SAME RULE', () => {
 
-    function trip({ side = false, pool = true, confirmed = true, rounds = 1 } = {}) {
+    function trip({ side = false, pool = true, confirmed = true, rounds = 1, thru = [18,18,18] } = {}) {
         const sb = loadHtmlInlineScript('trip.html', ['money-engine.js','action-model.js',
             'settlement-engine.js','pool-engine.js','score-marks.js']);
         const linked = [];
         for (let i = 0; i < rounds; i++) {
-            const { d } = roundData({ thru:[18,18,18], pool: pool ? MONEY_POOL : null,
+            const { d } = roundData({ thru, pool: pool ? MONEY_POOL : null,
                                      side, confirmed });
             linked.push({ label: 'Round ' + (i+1), countsTowardTrip: true, data: d });
         }
@@ -305,9 +305,12 @@ describe('TRIP MODE HONOURS THE SAME RULE', () => {
         assert.match(src, /tripContributions\[k\]\.lines\.concat/);
     });
 
-    test('THE SETTLED GATE IS UNTOUCHED', () => {
-        const t = trip({ side:false, confirmed:false }).text();
-        assert.match(t, /Not Settled Yet/, 'unresolved rounds must still be flagged');
+    test('THE SETTLED GATE IS UNTOUCHED - a round in play still holds the trip', () => {
+        // Re-pinned 2026-09-19 (recording pays): a finished round with unrecorded
+        // KPs no longer holds the trip (its blanks refund); a round in play does.
+        const t = trip({ side:false, confirmed:false, thru:[9,9,9] }).text();
+        assert.match(t, /Not Settled Yet/, 'unfinished rounds must still be flagged');
+        assert.ok(!/Not Settled Yet/.test(trip({ side:false, confirmed:false }).text()), 'finished + unrecorded is settled');
     });
 
     test('and trip totals still reconcile', () => {

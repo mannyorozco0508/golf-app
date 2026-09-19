@@ -329,38 +329,48 @@ function computeMoneyPool(data, courseData, savedScores) {
 
     // ---- KP ---------------------------------------------------------------
     //
-    // UNRESOLVED IS NOT A REFUND.
+    // RECORDING PAYS (2026-09-19). Three states, no ceremony:
     //
-    // This block used to treat a KP hole with no winner as unclaimed and push the
-    // money into refundCents. That could not tell "nobody won it" from "nobody
-    // entered it" - so a $100 KP bucket nobody had typed in yet came back as $8 and
-    // $9 refund lines on twelve golfers' receipts, and the round presented itself as
-    // settled. Real money, quietly reassigned, on a screen that looked final.
+    //   recorded, a pool participant   -> PAID, the moment it is recorded.
+    //   kpNoWinner (an early call),
+    //     a winner outside the pool,
+    //     or a BLANK hole on a FINISHED
+    //     round                        -> REFUNDED to the field. On a finished
+    //                                     round a blank means nobody recorded it;
+    //                                     the last card is in and the share goes
+    //                                     back through the branch that always
+    //                                     paid an outsider's share back.
+    //   a BLANK hole on a LIVE round   -> UNRESOLVED. Withheld; "not yet". The
+    //                                     round is not final anyway.
     //
-    // The two are now distinguished by an explicit organizer decision:
+    // FINISHED is settlement-engine's word - computeRoundFinish: every golfer who
+    // teed off has every hole, or the scores were verified. It is ASKED, not
+    // re-derived here; and when it is not on the page the round is treated as
+    // live, so money is withheld, never refunded, by default (fail closed).
     //
-    //   kpConfirmed not true          -> UNRESOLVED. Withheld from every player, and
-    //                                    every surface must refuse to call the round
-    //                                    final until somebody resolves it.
-    //   confirmed + winner            -> paid.
-    //   confirmed + noWinner: true    -> a legitimate refund. The organizer has said
-    //                                    out loud that nobody won this hole. A blank
-    //                                    field never means this.
-    //   winner not a pool participant -> refund, unchanged. Bragging rights.
+    // THE HISTORY THAT MATTERS. This block once treated every blank hole as
+    // unclaimed and refunded it - a $100 bucket nobody had typed in came back as
+    // $8 and $9 lines on twelve receipts that called themselves final. Wave B
+    // answered with an organizer confirmation (kpConfirmed) that withheld every
+    // KP dollar until pressed; in 102 production rounds it was never pressed
+    // once. The distinction that was actually needed is live vs finished, and
+    // that is the one rule above. kpConfirmed is ignored wherever it still
+    // exists in a stored round.
     //
-    // WHAT THIS DOES TO ZERO-SUM, deliberately: while money is unresolved the player
-    // ledger sums to -kpUnresolvedCents rather than 0, because the buy-ins were
-    // charged and that share has not been handed out. The invariant that still holds
-    // absolutely - and the one worth protecting - is that no money disappears:
+    // WHAT THIS DOES TO ZERO-SUM, deliberately: while a blank hole is withheld
+    // the player ledger sums to -kpUnresolvedCents rather than 0, because the
+    // buy-ins were charged and that share has not been handed out. The invariant
+    // that still holds absolutely - and the one worth protecting - is that no
+    // money disappears:
     //
     //     prizes + refunds + kpUnresolvedCents === totalPoolCents
     //
-    // Confirming the KPs distributes the money and zero-sum returns to 0.
+    // The last card landing distributes the money and zero-sum returns to 0.
     //
     // CANCELLATION IS A THIRD THING, and the distinction is the whole point:
     //
-    //   unresolved  nobody has said yet          -> withheld, settlement blocked
-    //   no winner   the organizer said nobody won -> a legitimate refund
+    //   unresolved  a live round, nobody has recorded it yet -> withheld
+    //   no winner   the organizer said nobody won  -> a legitimate refund
     //   CANCELLED   the organizer removed the game -> not a refund at all
     //
     // A cancelled KP game simply does not create a KP bucket. That is deliberate
@@ -377,8 +387,11 @@ function computeMoneyPool(data, courseData, savedScores) {
     // cancelled - the round's history is not erased, it just stops being money.
     const kpCancel = data.kpCancelled;
     const kpIsCancelled = !!(kpCancel && kpCancel.cancelled === true);
-    const kpConf = data.kpConfirmed;
-    const kpIsConfirmed = !!(kpConf && kpConf.confirmed === true);
+    // FINISHED is settlement-engine's word (computeRoundFinish): every card in, or
+    // the scores verified. Asked, not re-derived. Absent (a page without the
+    // engine), the round is treated as live - money is withheld, never refunded.
+    const finished = (typeof computeRoundFinish === 'function')
+        ? !!computeRoundFinish(data, courseData, savedScores).finished : false;
     const kpCfg = pool.kp;
     if (kpIsCancelled) {
         // Reported, never paid. kpWinners and kpLeaders may still exist as round
@@ -407,21 +420,21 @@ function computeMoneyPool(data, courseData, savedScores) {
 
             // Only a POOL PARTICIPANT can take pool money. A non-participant on the
             // sticks gets bragging rights; their KP share refunds to the field.
-            if (kpIsConfirmed && wid && isIn(wid)) {
+            if (wid && isIn(wid)) {
+                // RECORDING PAYS. No confirmation step.
                 pay(wid, shares[i]);
                 lines.push({ hole: h, winnerId: String(wid), winnerName: nameOf(wid),
                              cents: shares[i], state: 'paid' });
-            } else if (kpIsConfirmed && (declaredNoWinner || (wid && !isIn(wid)))) {
-                // Confirmed AND either the organizer said outright that nobody won it,
-                // or the winner is not in the pool. A BLANK hole never lands here:
-                // silence is not a decision, so it stays unresolved even on a round
-                // somebody marked confirmed. Confirmation is refused upstream while a
-                // hole is blank, and this is the defensive half of that rule.
+            } else if (declaredNoWinner || (wid && !isIn(wid)) || finished) {
+                // The organizer's early call that nobody won it; a winner who is not
+                // in the pool; or a BLANK hole on a FINISHED round - nobody recorded
+                // it and the last card is in, so the share goes back to the field.
+                // A blank on a LIVE round never lands here.
                 unclaimed += shares[i];
                 lines.push({ hole: h, winnerId: null, winnerName: null,
                              cents: shares[i], state: 'refunded' });
             } else {
-                // Nobody has resolved this hole. The money stays where it is.
+                // LIVE and blank: "not yet". The money stays where it is.
                 unresolved += shares[i];
                 lines.push({ hole: h, winnerId: wid ? String(wid) : null,
                              winnerName: wid ? nameOf(wid) : null,
@@ -432,7 +445,7 @@ function computeMoneyPool(data, courseData, savedScores) {
         kpUnresolvedCents = unresolved;
         result.kp = { amountCents, perHoleCents: shares, lines,
                       unclaimedCents: unclaimed, unresolvedCents: unresolved,
-                      confirmed: kpIsConfirmed };
+                      finished };
     }
 
     // ---- NET FINISH --------------------------------------------------------

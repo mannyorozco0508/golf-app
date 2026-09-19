@@ -573,15 +573,19 @@ describe('20 POOL SIMULATIONS', () => {
     sim('16 players, $25', () => quick(16, 25, { kp: { amount: 80, holes: [4, 14] },
         skins: { mode: 'remainder', scoring: 'net' } }));
     sim('smallest pool: 2 golfers', () => quick(2, 40, { skins: { mode: 'remainder', scoring: 'net' } }));
-    sim('a blank KP hole is UNRESOLVED, not a refund', () => {
-        // This used to assert the opposite - that an unentered KP hole refunded to
-        // the field. That is precisely the behaviour that turned $100 of KP nobody
-        // had typed in into $8 and $9 lines on a receipt calling itself final.
+    sim('a blank KP hole is held while the round is LIVE, and refunds once every card is in (2026-09-19)', () => {
+        // Wave A refunded it; Wave B held it until an organizer confirmed; the KP
+        // wave made the rule live-vs-finished. A completed simulation is finished.
         const { r } = quick(12, 40, { kp: { amount: 100, holes: [4, 14] },
             skins: { mode: 'remainder', scoring: 'net' } }, { h4: String(makeField(12)[0].id) });
-        assert.equal(r.kpUnresolvedCents, 5000, 'hole 14 is unresolved, not given away');
-        assert.equal(r.settled, false);
-        assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')));
+        assert.equal(r.kpUnresolvedCents, 0, 'every card in: hole 14 is nobody\'s and goes back to the field');
+        assert.equal(r.settled, true);
+        assert.ok(/Unclaimed KP/.test(r.refund.reasons.join(' ')));
+        const live = quick(12, 40, { kp: { amount: 100, holes: [4, 14] }, skins: { mode: 'remainder', scoring: 'net' } },
+            { h4: String(makeField(12)[0].id) },
+            P => { const s = {}; P.forEach((p, i) => CD.slice(0, 9).forEach(h => { s[`p${p.id}_h${h.hole}`] = h.par + i; })); return s; }).r;
+        assert.equal(live.kpUnresolvedCents, 5000, 'thru 9: hole 14 is not yet');
+        assert.equal(live.settled, false);
     });
     sim('mid-round: only 6 holes scored, still zero-sum', () => quick(12, 40,
         { net: { amount: 100, places: [50, 30, 20] }, skins: { mode: 'remainder', scoring: 'net' } }, {},
@@ -697,7 +701,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         assert.match(html, /skins won/);
     });
 
-    test('KP ENTRY appears on a KP hole, writes the canonical shape, confirms after', async () => {
+    test('KP ENTRY appears on a KP hole, writes the canonical shape, and the block is the confirmation', async () => {
         // The UI is now a live-leader block rather than a bare dropdown, and the write
         // is ONE atomic update on the round rather than a leaf .set(). That is a
         // stronger contract, not a looser one: the leader, the settlement winner and
@@ -719,8 +723,10 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         assert.equal(w.value['kpWinners/h14'], String(P[4].id), 'settlement source still written');
         assert.equal(w.value['kpLeaders/h14'].playerId, String(P[4].id), 'live leader written');
         assert.equal(w.value['kpLeaders/h14'].distanceInches, null, 'distance stays optional');
-        assert.equal(w.value['kpConfirmed'], null, 'any leader change unconfirms the round');
-        assert.ok(sb.window.__alerts.some(a => /KP RECORDED/.test(a)));
+        // RE-PINNED 2026-09-19 (recording pays): no kpConfirmed path, and no alert -
+        // the block under the nav row is the confirmation.
+        assert.ok(!('kpConfirmed' in w.value), 'the retired confirmation is not written');
+        assert.equal(sb.window.__alerts.length, 0, 'no KP RECORDED dialog');
     });
 
     test('KP entry is absent on a non-KP hole; spectators get read-only', () => {
@@ -746,9 +752,9 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // each golfer paid in is not something the Receipt needs to state.
         assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');
         assert.match(html, /Hole 4: Marty/);
-        // "unclaimed" implied a decision nobody made. A confirmed round with an
-        // explicit no-winner reads "no winner"; an unresolved one reads "pending".
-        assert.match(html, /Hole 14: no winner/);
+        // Each refund says why (2026-09-19): the organizer's early call reads
+        // "nobody won it"; a blank on a finished round "nobody recorded it".
+        assert.match(html, /Hole 14: nobody won it/);
         assert.match(html, /1st: Marty[\s\S]*\$50/);
         assert.match(html, /Skins Pot \u2014 \$280/);
         assert.match(html, /Refunded to the field/);

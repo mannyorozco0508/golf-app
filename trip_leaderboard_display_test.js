@@ -41,7 +41,10 @@ function roundData({ seed = 0, confirmed = true, players = NAMES } = {}) {
     const ps = players.map((n,i)=>({ id:101+NAMES.indexOf(n), name:n,
                                      hcp:String(HCP[NAMES.indexOf(n)]), playingForMoney:true }));
     const sc = {};
-    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
+    // RE-PINNED 2026-09-19 (recording pays): `confirmed:false` now also stops every
+    // card at hole 9 - a finished round's blank KP holes refund, so the hold that
+    // exists is a round still in play.
+    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ if (confirmed || h.hole <= 9) sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
     const d = { players: ps, courseData: cd, scores: sc, gameFormat:'stroke',
                 settlementMode:'whole-dollar', kpWinners: confirmed ? ALL_KP : {} };
     if (players.length === NAMES.length) {
@@ -271,10 +274,10 @@ describe('NO MONEY BEHAVIOUR CHANGED', () => {
         // behaviour below is unchanged.
         assert.match(f, /const settlement = computeRoundSettlement\(data, courseData, savedScores\);/);
         assert.match(f, /if \(!settlement\.kpSettled\) \{/);
-        assert.match(f, /unresolvedRounds/);
+        assert.match(f, /if \(!settlement\.finished\) \{/);
         const t = strip(boot({ rounds:[{ label:'Caledonia', confirmed:false }] }).money());
         assert.match(t, /Not Settled Yet/);
-        assert.match(t, /unconfirmed in: Caledonia/);
+        assert.match(t, /Still in play: Caledonia/);   // re-pinned 2026-09-19: the hold is the round in play
     });
 
     test('a settled trip reports nothing outstanding', () => {

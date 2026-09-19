@@ -1661,7 +1661,13 @@
 // the ft/in boxes at 17px, 48px tall, one border and one set of corners; the UA's
 // 13px select is gone, and the line naming the current leader is 0.95rem. A
 // device on v180 keeps the small picker.
-const CACHE_VERSION = 'golfapp-v181-kp-picker';
+// Moved to v182: recording a KP pays it. pool-engine.js no longer waits for an
+// organizer confirmation; a blank KP hole is withheld while the round is live
+// and refunds to the field once every card is in; settlement-engine.js gained
+// computeRoundFinish; index.html lost the confirm ceremony and the KP RECORDED
+// alert; settlement.html and trip.html lost their "not confirmed" copy. A device
+// on v181 keeps an engine that withholds every recorded KP forever.
+const CACHE_VERSION = 'golfapp-v182-kp-pays';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -77,6 +77,26 @@
 // block lost its "hand out in this order" title, and each Net Finish payout
 // row carries its place ("1 · Rae Romeo", "2 · Max Mike"). weekly_game_test.js
 // holds the v141 text and proves those are the only differences.
+//
+// RE-PINNED 2026-09-19, the RECORDING PAYS wave (pool-engine.js and
+// settlement-engine.js, approved per-file; settlement.html; v182). THE ENGINE
+// MOVED, deliberately, and only in the KP figures: this round is thru 18 with
+// hole 3 recorded (Ann Alpha) and 7/12/16 blank. Before, every KP dollar was
+// withheld until an organizer confirmed - refund 0, the ledger short $40. Now
+// the recorded hole is PAID ($10 to Ann) and the three blanks REFUND to the
+// field ($30 across 23 golfers, $1 or $2 each) the moment the last card is in;
+// refund.cents 0 -> 3000 with the reason "Unclaimed KP money refunded to the
+// field.", perPlayerCents moved for all 23 (by +$1, +$2, and +$12 for Ann),
+// and the ledger sums to 0 instead of -$40. Skins lines, dollars and the skins
+// per-flight split: UNCHANGED, sha for sha (asserted below). index.widget,
+// index.skinsWon, index.liveMount, leaderboard.liveSkins: UNCHANGED, sha for
+// sha. settlement.receiptPool moved (the KP lines say paid / nobody recorded it
+// / back to the field, the NOT CONFIRMED head and row are gone, the refund row
+// gains the KP reason and $30 - skins_rows_widgets_test.js proves that is the
+// whole text difference); settlement.liveResults moved BACK to its v148 text
+// (the KP-only "RESULTS — NOT FINAL" head no longer exists). The previous
+// fixture's sha was ead386e0; main_pool_settlement_parity_test.js and
+// kp_settlement_test.js carry the rule change in figures.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -221,10 +241,14 @@ const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace
 // block-cut text. The v136 shas were off/field
 // 01c73193699c6bbd4399235efb30a1bd2500370d8353d7f418d0060e182b76d5, flight
 // 334fa8edaf560725194ea4e81724e84a8594f5c6b7e69d1e668b9562588fccb4.
+// RE-PINNED 2026-09-19 (recording pays): the KP lines and the refund row sit
+// inside the block-cut text. The v142 shas were off/field
+// 24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17, flight
+// 92c5d2e9522ddc715f6ee7f1c7ed9270a995a4a847d67cd22e9c86aed91ca3bc.
 const PREV_RECEIPT_TEXT = {
-    off: '24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17',
-    field: '24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17',
-    flight: '92c5d2e9522ddc715f6ee7f1c7ed9270a995a4a847d67cd22e9c86aed91ca3bc'
+    off: '0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7',
+    field: '0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7',
+    flight: '15eb59952d337a5a9fe9f8d9a3f8184f284622a5852b8c875deb170bbf0d6102'
 };
 describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
     Object.keys(VARIANTS).forEach(k => {
@@ -249,7 +273,9 @@ describe('the goldens differ where they should', () => {
         assert.deepEqual(f.flights.map(x => [x.flight, x.golfers, x.amountCents, x.lines.length]), [['A', 12, 11500, 5], ['B', 11, 10500, 5]]);
         assert.equal(f.flights[0].amountCents + f.flights[1].amountCents, f.amountCents);
         assert.deepEqual(f.flights.map(x => [...new Set(x.lines.map(l => l.cents))]), [[2300], [2100]]);
-        assert.equal(FX.variants.flight.engine.refund.cents, 0);
+        // 2026-09-19: the $30 of unrecorded KP refunds; the SKINS bucket still refunds nothing
+        assert.equal(FX.variants.flight.engine.refund.cents, 3000);
+        assert.deepEqual(FX.variants.flight.engine.refund.reasons, ['Unclaimed KP money refunded to the field.']);
         assert.equal(FX.variants.off.engine.skins.flights, undefined); assert.equal(FX.variants.field.engine.skins.flights, undefined);
         assert.match(FX.variants.flight.html['settlement.receiptPool'], /Split by flight, by headcount: Flight A \$115 \(12 golfers\) · Flight B \$105 \(11 golfers\)/);
         assert.ok(!/Split by flight/.test(FX.variants.field.html['settlement.receiptPool']));

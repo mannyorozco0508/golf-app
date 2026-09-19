@@ -53,6 +53,11 @@ function arrive(data) {
     return { sb, raw, text: id => undate(strip(raw(id))) };
 }
 const withoutShares = r => { const c = J(r); if (c.net) c.net.lines.forEach(l => { delete l.shares; }); return c; };
+// 2026-09-19 (recording pays): result.kp.confirmed became result.kp.finished - the
+// only difference on these rounds (every KP is recorded on all of them; the
+// figures are the v143 figures to the cent). Both spellings are asserted present
+// on their own side, then dropped so the deep-equal is about the money.
+const kpField = (r, from, to) => { const c = J(r); if (c.kp) { assert.equal(c.kp[from], true, 'kp.' + from); delete c.kp[from]; } return c; };
 const rowsIn = html => [...html.matchAll(/<div class="ledger-row pp-row"><span>([^<]*)<\/span><span class="val-pos">([^<]*)<\/span><\/div>/g)].map(m => [m[1], m[2]]);
 const netRowsOf = html => { const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag); const b = html.slice(a, e); const s = b.indexOf('pp-game-head">Net Finish<'); return rowsIn(b.slice(s, b.indexOf('<!-- /pp-game -->', s))); };
 const cents = s => Math.round(parseFloat(s.replace(/[^0-9.]/g, '')) * 100);
@@ -101,7 +106,7 @@ describe('NO FIGURE CHANGED - the engine\'s result is the old result plus the fi
         const now = engine(ROUNDS[k]());
         assert.ok(now.net.lines.every(l => 'shares' in l), 'the field is there today');
         assert.ok(PREV.rounds[k].engine.net.lines.every(l => !('shares' in l)), 'and was not at v143');
-        assert.deepEqual(withoutShares(now), PREV.rounds[k].engine);
+        assert.deepEqual(kpField(withoutShares(now), 'finished'), kpField(PREV.rounds[k].engine, 'confirmed'));
     }));
 });
 
@@ -159,8 +164,8 @@ describe('THE SEAM', () => {
     });
     test('the files, by sha: pool-engine.js moved for this one field; the other engines did not', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('pool-engine.js'), 'd47a1e0a');
-        assert.equal(h('settlement-engine.js'), '42923121');   // 42923121: computeRoundSettlement appended (trip money, 2026-09-15, approved); no arithmetic changed
+        assert.equal(h('pool-engine.js'), '846f33e3');   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');
     });

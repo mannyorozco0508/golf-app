@@ -1269,8 +1269,10 @@ html {
         if (r.kp) {
             const paid = r.kp.lines.filter(l => l.state === 'paid');
             let groups;
+            // LIVE with nothing recorded yet: the pot still holds it. On a finished
+            // round every line is paid or refunded, so this branch cannot fire there.
             if ((r.kp.unresolvedCents || 0) > 0 && paid.length === 0) {
-                groups = [group(null, [], `KP not confirmed yet — ${$(r.kp.unresolvedCents)} pending`)];
+                groups = [group(null, [], `KP not recorded yet — ${$(r.kp.unresolvedCents)} in the pot`)];
             } else {
                 groups = [group(null, byGolfer(paid).map(w => row(w.name, w.cents)), 'No KP winners — refunded to the field')];
             }
@@ -1331,12 +1333,15 @@ html {
             html += `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.kp) {
-            // THREE STATES, NEVER TWO. A hole nobody has resolved is not "unclaimed" -
-            // saying so is what let $100 of unentered KP print as refunds on a receipt
-            // that called itself final. Distance appears only when somebody measured.
-            const unresolvedKp = r.kp.unresolvedCents || 0;
-            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}`
-                + (unresolvedKp > 0 ? ' \u2014 NOT CONFIRMED' : '') + `</div>`;
+            // THREE STATES, EACH NAMED (2026-09-19, recording pays). Paid: the name
+            // and the distance when somebody measured. Refunded: WHY - the early call
+            // that nobody won it, a shot by somebody not in the pool, or a blank hole
+            // on a finished round (nobody recorded it) - so the $8/$9 lines lower down
+            // are explained here, not left for a golfer to wonder at. Unresolved: a
+            // blank hole while the round is live, and the share is still in the pot.
+            const noWin = data.kpNoWinner || {};
+            const winners = data.kpWinners || {};
+            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}</div>`;
             const leaders = (data.kpLeaders || {});
             r.kp.lines.forEach(l => {
                 const led = leaders['h' + l.hole];
@@ -1346,17 +1351,14 @@ html {
                 if (l.state === 'paid') {
                     html += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
                 } else if (l.state === 'refunded') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: no winner</span><span>${$(l.cents)} refunded</span></div>`;
+                    const why = noWin['h' + l.hole] === true ? 'nobody won it'
+                        : (winners['h' + l.hole] ? 'winner not in the pool' : 'nobody recorded it');
+                    const where = winners['h' + l.hole] || noWin['h' + l.hole] === true ? 'refunded' : 'back to the field';
+                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${why}</span><span>${$(l.cents)} ${where}</span></div>`;
                 } else {
-                    html += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: `
-                        + (l.winnerName ? l.winnerName + dist + ' \u2014 not confirmed' : 'no winner recorded')
-                        + `</span><span>${$(l.cents)} pending</span></div>`;
+                    html += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: not recorded yet</span><span>${$(l.cents)} in the pot</span></div>`;
                 }
             });
-            if (unresolvedKp > 0) {
-                html += `<div class="ledger-row" style="color:var(--warn-text); font-weight:bold;">`
-                    + `<span>\u26A0\uFE0F KP results not confirmed</span><span>${$(unresolvedKp)} pending</span></div>`;
-            }
             html += `</div><!-- /pool-game -->`;
         }
         if (r.valid && r.net) {
@@ -1646,15 +1648,14 @@ html {
         //   golfers still out   "Still in play — thru 9, 1 golfer still has holes
         //                       left: Dee D (9 of 18)." - up to six names, then
         //                       "+ N more"; the trip's sentence and plural rule.
-        //   KP-only hold        every card is in, so "still in play" would blame
-        //                       golfers who have finished; the head says RESULTS —
-        //                       NOT FINAL and names the KPs.
         //   not started         today's head, unchanged.
+        // (Until 2026-09-19 a third shape held a finished round open for
+        // unconfirmed KPs - "RESULTS — NOT FINAL". Recording pays now, and a blank
+        // KP hole refunds once the cards are in, so a finished round is final.)
         // Money stays OUT of this branch by design (see the block comment above):
         // this names the hold, it does not price it.
         const out = st.unfinished || [];
         const holdGolfers = st.started && out.length > 0;
-        const holdKp = st.finished && !st.kpSettled;
         let head, note;
         if (holdGolfers) {
             const names = out.slice(0, 6).map(u => esc(u.name) + ' (' + u.holesPlayed + ' of ' + u.holesRequired + ')').join(', ')
@@ -1662,13 +1663,7 @@ html {
             head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
             note = 'Still in play' + (thru > 0 ? ' \u2014 thru ' + thru : '') + ', ' + out.length + ' golfer' + (out.length === 1 ? '' : 's')
                 + ' still ' + (out.length === 1 ? 'has' : 'have') + ' holes left: ' + names + '.'
-                + (!st.kpSettled ? ' KP results are still unconfirmed.' : '')
-                + (!st.kpSettled
-                    ? ' Final money appears once every card is in and the KPs are confirmed.'
-                    : ' Final money appears once every card is in, or once the scores are confirmed in Finish Round.');
-        } else if (holdKp) {
-            head = '\uD83C\uDFC6 RESULTS \u2014 NOT FINAL';
-            note = 'Every card is in. KP results are still unconfirmed \u2014 final money appears once they are confirmed or cancelled.';
+                + ' Final money appears once every card is in, or once the scores are confirmed in Finish Round.';
         } else {
             head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
             note = 'The round is still in play. Final money appears once every card is in.';
@@ -1743,8 +1738,9 @@ html {
                     const total = r.kp.lines.length;
                     const decided = r.kp.lines.filter(l => l.state !== 'unresolved').length;
                     const recorded = r.kp.lines.filter(l => l.winnerId).length;
-                    const status = decided === total ? 'all confirmed'
-                        : (recorded > 0 ? recorded + ' of ' + total + ' recorded' : 'none confirmed yet');
+                    const status = recorded === total ? 'all recorded'
+                        : (decided === total ? recorded + ' of ' + total + ' recorded'
+                            : (recorded > 0 ? recorded + ' of ' + total + ' recorded' : 'none recorded yet'));
                     html += '<div class="settle-card"><div class="settle-header">\uD83D\uDCCD KP</div>'
                          + '<div class="lr-kp">' + total + ' KP' + (total === 1 ? '' : 's')
                          + ' today \u00B7 ' + status + '</div></div>';

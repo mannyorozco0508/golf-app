@@ -34,11 +34,15 @@ const POOL = { enabled:true, buyIn:40,
     net:{ amount:70, places:[57.142857,42.857143] },
     skins:{ mode:'remainder', scoring:'net', carryOver:false } };
 
+// `confirmed:false` used to leave $100 of KP hanging and hold the trip open.
+// RE-PINNED 2026-09-19 (recording pays): a finished round's blank KP holes refund,
+// so `confirmed:false` now ALSO stops every card at hole 9 - the trip is held open
+// by a round still in play, which is the hold that exists.
 function roundData({ seed = 0, confirmed = true, side = false, pool = true } = {}) {
     const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
     const ps = NAMES.map((n,i)=>({ id:101+i, name:n, hcp:'9', playingForMoney:true }));
     const sc = {};
-    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
+    ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ if (confirmed || h.hole <= 9) sc['p'+p.id+'_h'+h.hole] = 4 + ((pi+hi+seed)%3) - 1; }));
     sc['p101_h2'] = 2;   // a birdie for Marty
     sc['p103_h5'] = 9;   // a blow-up for Carp
     const d = { players: ps, courseData: cd, scores: sc, settlementMode:'whole-dollar' };
@@ -158,7 +162,7 @@ describe('MONEY — AND THE CAVEAT TRAVELS WITH IT', () => {
         // Re-pinned 2026-09-15 (trip money, "what is final"): the caveat now names
         // the round and the reason, from the same holds the panel shows -
         // trip_money_final_test.js pins the in-play and both-at-once shapes.
-        assert.match(b.text(), /Not final — KP results are still unconfirmed in Caledonia, True Blue\./);
+        assert.match(b.text(), /Not final — Caledonia, True Blue are still in play\./);
     });
 
     test('an unsettled trip says so in the subtitle too', () => {

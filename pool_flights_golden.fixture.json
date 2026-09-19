@@ -1,5 +1,5 @@
 {
- "capturedAt": "2026-09-16T01:29:45.398Z",
+ "capturedAt": "2026-09-19T20:24:54.102Z",
  "variants": {
   "off": {
    "engine": {
@@ -57,34 +57,60 @@
      "unwonCents": 0
     },
     "refund": {
-     "cents": 0,
-     "perPlayerCents": {},
-     "reasons": []
+     "cents": 3000,
+     "perPlayerCents": {
+      "101": 200,
+      "102": 200,
+      "103": 200,
+      "104": 200,
+      "105": 200,
+      "106": 200,
+      "107": 200,
+      "108": 100,
+      "109": 100,
+      "110": 100,
+      "111": 100,
+      "112": 100,
+      "113": 100,
+      "114": 100,
+      "115": 100,
+      "116": 100,
+      "117": 100,
+      "118": 100,
+      "119": 100,
+      "120": 100,
+      "121": 100,
+      "122": 100,
+      "123": 100
+     },
+     "reasons": [
+      "Unclaimed KP money refunded to the field."
+     ]
     },
     "perPlayerCents": {
-     "101": 1700,
-     "102": -2000,
-     "103": 1700,
-     "104": 1700,
-     "105": -2000,
-     "106": -2000,
-     "107": -2000,
-     "108": -2000,
-     "109": -2000,
-     "110": -2000,
-     "111": -2000,
-     "112": -2000,
-     "113": 6000,
-     "114": 1700,
-     "115": 1600,
-     "116": -2000,
-     "117": 1600,
-     "118": 10000,
-     "119": -2000,
-     "120": -2000,
-     "121": -2000,
-     "122": -2000,
-     "123": -2000
+     "101": 2900,
+     "102": -1800,
+     "103": 1900,
+     "104": 1900,
+     "105": -1800,
+     "106": -1800,
+     "107": -1800,
+     "108": -1900,
+     "109": -1900,
+     "110": -1900,
+     "111": -1900,
+     "112": -1900,
+     "113": 6100,
+     "114": 1800,
+     "115": 1700,
+     "116": -1900,
+     "117": 1700,
+     "118": 10100,
+     "119": -1900,
+     "120": -1900,
+     "121": -1900,
+     "122": -1900,
+     "123": -1900
     },
     "kpAmount": 4000,
     "netAmount": 20000
@@ -94,16 +120,16 @@
     "index.skinsWon": "<div class=\"sw-head\">🥩 SKINS WON</div><div class=\"sw-thru\">Official through Hole 18</div><div class=\"sw-row\"><span class=\"sw-name\">Ann Alpha</span><span class=\"sw-detail\">1 skin · Hole 1</span></div><div class=\"sw-row\"><span class=\"sw-name\">Cal Charlie</span><span class=\"sw-detail\">1 skin · Hole 5</span></div><div class=\"sw-row\"><span class=\"sw-name\">Ned November</span><span class=\"sw-detail\">1 skin · Hole 7</span></div><div class=\"sw-row\"><span class=\"sw-name\">Dee Delta</span><span class=\"sw-detail\">1 skin · Hole 9</span></div><div class=\"sw-row\"><span class=\"sw-name\">Oli Oscar</span><span class=\"sw-detail\">1 skin · Hole 11</span></div><div class=\"sw-row\"><span class=\"sw-name\">Quy Quebec</span><span class=\"sw-detail\">1 skin · Hole 16</span></div>",
     "index.liveMount": "<div class=\"live-skins\"><div class=\"ls-title\">WHOLE-FIELD GROSS SKINS · NO CARRY</div><div class=\"ls-thru\">Official thru 18</div><div class=\"ls-standings\"><span class=\"ls-chip\">Ann Alpha — 1</span><span class=\"ls-chip\">Cal Charlie — 1</span><span class=\"ls-chip\">Dee Delta — 1</span><span class=\"ls-chip\">Ned November — 1</span><span class=\"ls-chip\">Oli Oscar — 1</span><span class=\"ls-chip\">Quy Quebec — 1</span></div><div class=\"ls-latest\">Latest: Hole 16 — Quy Quebec</div><button type=\"button\" class=\"ls-toggle\" onclick=\"toggleLiveSkins()\">hide hole-by-hole</button><div class=\"ls-ledger\"><div class=\"ls-row ls-skin\">Hole 1 — Ann Alpha — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 5 — Cal Charlie — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 7 — Ned November — Gross 2 — Skin</div><div class=\"ls-row ls-skin\">Hole 9 — Dee Delta — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 11 — Oli Oscar — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 16 — Quy Quebec — Gross 2 — Skin</div></div></div>",
     "leaderboard.liveSkins": "<div class=\"ls-card\"><div class=\"ls-head\">🥩 LIVE SKINS</div><div class=\"ls-summary\">Ann Alpha 1 · Cal Charlie 1 · Dee Delta 1 · Ned November 1 · Oli Oscar 1 · Quy Quebec 1</div><div class=\"ls-rows\"><div class=\"ls-r ls-s\">Hole 1 — Ann Alpha · Gross 3</div><div class=\"ls-r ls-s\">Hole 5 — Cal Charlie · Gross 3</div><div class=\"ls-r ls-s\">Hole 7 — Ned November · Gross 2</div><div class=\"ls-r ls-s\">Hole 9 — Dee Delta · Gross 3</div><div class=\"ls-r ls-s\">Hole 11 — Oli Oscar · Gross 3</div><div class=\"ls-r ls-s\">Hole 16 — Quy Quebec · Gross 2</div></div></div>",
-    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 RESULTS — NOT FINAL</div><div class=\"live-note\">Every card is in. KP results are still unconfirmed — final money appears once they are confirmed or cancelled.</div></div><div class=\"settle-card\"><div class=\"settle-header\">OVERALL — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\"><div class=\"settle-header\">🥩 SKINS WON</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
-    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$36</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-note\"><span>KP not confirmed yet — $40 pending</span><span></span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40 — NOT CONFIRMED</div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 3: Ann Alpha — not confirmed</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 7: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 12: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 16: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text); font-weight:bold;\"><span>⚠️ KP results not confirmed</span><span>$40 pending</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$36</span></div></div><!-- /pool-game --></div>"
+    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 LIVE RESULTS — THRU 18</div><div class=\"live-note\">The round is still in play. Final money appears once every card is in.</div></div><div class=\"settle-card\"><div class=\"settle-header\">OVERALL — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\"><div class=\"settle-header\">🥩 SKINS WON</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
+    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$36</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$10</span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40</div><div class=\"ledger-row\"><span>Hole 3: Ann Alpha</span><span class=\"val-pos\">$10</span></div><div class=\"ledger-row\"><span>Hole 7: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 12: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 16: nobody recorded it</span><span>$10 back to the field</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$36</span></div></div><!-- /pool-game --><div class=\"ledger-row\" style=\"border-top:1px solid var(--border-mid);\"><span>↩️ Refunded to the field (Unclaimed KP money refunded to the field.)</span><span>$30 ÷ 23</span></div></div>"
    },
    "sha256": {
     "index.widget": "6506a7b5ec6ec712b1128b6ddd3379a669bf91e6497b972b775b0dd28f4d0b3a",
     "index.skinsWon": "785aed48f828e4b5156af7cb6ee0c07a357f95db951722241095b3757c5f829f",
     "index.liveMount": "abb587a8cdffc086fe001920c0a9760d6a92ca8b8656ee0d02a1e563464dda14",
     "leaderboard.liveSkins": "f5883cef4a0ef1c91305ee35d1e85a0351f58decd2681c931d0cb368b4761872",
-    "settlement.liveResults": "cdc4460813c5658a04c0b11e64656172787babe26a3580176ae1f833d4dfa0d5",
-    "settlement.receiptPool": "ddd88e6423f08549c207c36f3892b7cb93d702f99f7415a82668cdc3f7e91e6d"
+    "settlement.liveResults": "c2404162e1f0e90fb0e0783803a95d0f6a9ba892a6a41c1dc0fc796f912921b0",
+    "settlement.receiptPool": "f5290a09aa91f176e278897dadd59d5121dc7cb9a82de194907ab9b1cdb18552"
    }
   },
   "field": {
@@ -162,34 +188,60 @@
      "unwonCents": 0
     },
     "refund": {
-     "cents": 0,
-     "perPlayerCents": {},
-     "reasons": []
+     "cents": 3000,
+     "perPlayerCents": {
+      "101": 200,
+      "102": 200,
+      "103": 200,
+      "104": 200,
+      "105": 200,
+      "106": 200,
+      "107": 200,
+      "108": 100,
+      "109": 100,
+      "110": 100,
+      "111": 100,
+      "112": 100,
+      "113": 100,
+      "114": 100,
+      "115": 100,
+      "116": 100,
+      "117": 100,
+      "118": 100,
+      "119": 100,
+      "120": 100,
+      "121": 100,
+      "122": 100,
+      "123": 100
+     },
+     "reasons": [
+      "Unclaimed KP money refunded to the field."
+     ]
     },
     "perPlayerCents": {
-     "101": 1700,
-     "102": -2000,
-     "103": 1700,
-     "104": 1700,
-     "105": -2000,
-     "106": -2000,
-     "107": -2000,
-     "108": -2000,
-     "109": -2000,
-     "110": -2000,
-     "111": -2000,
-     "112": -2000,
-     "113": 6000,
-     "114": 1700,
-     "115": 1600,
-     "116": -2000,
-     "117": 1600,
-     "118": 10000,
-     "119": -2000,
-     "120": -2000,
-     "121": -2000,
-     "122": -2000,
-     "123": -2000
+     "101": 2900,
+     "102": -1800,
+     "103": 1900,
+     "104": 1900,
+     "105": -1800,
+     "106": -1800,
+     "107": -1800,
+     "108": -1900,
+     "109": -1900,
+     "110": -1900,
+     "111": -1900,
+     "112": -1900,
+     "113": 6100,
+     "114": 1800,
+     "115": 1700,
+     "116": -1900,
+     "117": 1700,
+     "118": 10100,
+     "119": -1900,
+     "120": -1900,
+     "121": -1900,
+     "122": -1900,
+     "123": -1900
     },
     "kpAmount": 4000,
     "netAmount": 20000
@@ -199,16 +251,16 @@
     "index.skinsWon": "<div class=\"sw-head\">🥩 SKINS WON</div><div class=\"sw-thru\">Official through Hole 18</div><div class=\"sw-row\"><span class=\"sw-name\">Ann Alpha</span><span class=\"sw-detail\">1 skin · Hole 1</span></div><div class=\"sw-row\"><span class=\"sw-name\">Cal Charlie</span><span class=\"sw-detail\">1 skin · Hole 5</span></div><div class=\"sw-row\"><span class=\"sw-name\">Ned November</span><span class=\"sw-detail\">1 skin · Hole 7</span></div><div class=\"sw-row\"><span class=\"sw-name\">Dee Delta</span><span class=\"sw-detail\">1 skin · Hole 9</span></div><div class=\"sw-row\"><span class=\"sw-name\">Oli Oscar</span><span class=\"sw-detail\">1 skin · Hole 11</span></div><div class=\"sw-row\"><span class=\"sw-name\">Quy Quebec</span><span class=\"sw-detail\">1 skin · Hole 16</span></div>",
     "index.liveMount": "<div class=\"live-skins\"><div class=\"ls-title\">WHOLE-FIELD GROSS SKINS · NO CARRY</div><div class=\"ls-thru\">Official thru 18</div><div class=\"ls-standings\"><span class=\"ls-chip\">Ann Alpha — 1</span><span class=\"ls-chip\">Cal Charlie — 1</span><span class=\"ls-chip\">Dee Delta — 1</span><span class=\"ls-chip\">Ned November — 1</span><span class=\"ls-chip\">Oli Oscar — 1</span><span class=\"ls-chip\">Quy Quebec — 1</span></div><div class=\"ls-latest\">Latest: Hole 16 — Quy Quebec</div><button type=\"button\" class=\"ls-toggle\" onclick=\"toggleLiveSkins()\">hide hole-by-hole</button><div class=\"ls-ledger\"><div class=\"ls-row ls-skin\">Hole 1 — Ann Alpha — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 5 — Cal Charlie — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 7 — Ned November — Gross 2 — Skin</div><div class=\"ls-row ls-skin\">Hole 9 — Dee Delta — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 11 — Oli Oscar — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 16 — Quy Quebec — Gross 2 — Skin</div></div></div>",
     "leaderboard.liveSkins": "<div class=\"ls-card\"><div class=\"ls-head\">🥩 LIVE SKINS</div><div class=\"ls-summary\">Ann Alpha 1 · Cal Charlie 1 · Dee Delta 1 · Ned November 1 · Oli Oscar 1 · Quy Quebec 1</div><div class=\"ls-rows\"><div class=\"ls-r ls-s\">Hole 1 — Ann Alpha · Gross 3</div><div class=\"ls-r ls-s\">Hole 5 — Cal Charlie · Gross 3</div><div class=\"ls-r ls-s\">Hole 7 — Ned November · Gross 2</div><div class=\"ls-r ls-s\">Hole 9 — Dee Delta · Gross 3</div><div class=\"ls-r ls-s\">Hole 11 — Oli Oscar · Gross 3</div><div class=\"ls-r ls-s\">Hole 16 — Quy Quebec · Gross 2</div></div></div>",
-    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 RESULTS — NOT FINAL</div><div class=\"live-note\">Every card is in. KP results are still unconfirmed — final money appears once they are confirmed or cancelled.</div></div><div class=\"settle-card\" data-flight=\"A\"><div class=\"settle-header\">FLIGHT A — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-par\">-16</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Kim Kilo</span><span class=\"lr-par\">-13</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Gus Golf</span><span class=\"lr-par\">-11</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card\" data-flight=\"B\"><div class=\"settle-header\">FLIGHT B — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-par\">-17</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Wes Whiskey</span><span class=\"lr-par\">-17</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\"><div class=\"settle-header\">🥩 SKINS WON</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
-    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$36</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-note\"><span>KP not confirmed yet — $40 pending</span><span></span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40 — NOT CONFIRMED</div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 3: Ann Alpha — not confirmed</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 7: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 12: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 16: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text); font-weight:bold;\"><span>⚠️ KP results not confirmed</span><span>$40 pending</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$36</span></div></div><!-- /pool-game --></div>"
+    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 LIVE RESULTS — THRU 18</div><div class=\"live-note\">The round is still in play. Final money appears once every card is in.</div></div><div class=\"settle-card\" data-flight=\"A\"><div class=\"settle-header\">FLIGHT A — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-par\">-16</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Kim Kilo</span><span class=\"lr-par\">-13</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Gus Golf</span><span class=\"lr-par\">-11</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card\" data-flight=\"B\"><div class=\"settle-header\">FLIGHT B — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-par\">-17</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Wes Whiskey</span><span class=\"lr-par\">-17</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\"><div class=\"settle-header\">🥩 SKINS WON</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
+    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$36</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$10</span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40</div><div class=\"ledger-row\"><span>Hole 3: Ann Alpha</span><span class=\"val-pos\">$10</span></div><div class=\"ledger-row\"><span>Hole 7: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 12: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 16: nobody recorded it</span><span>$10 back to the field</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$37</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$36</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$36</span></div></div><!-- /pool-game --><div class=\"ledger-row\" style=\"border-top:1px solid var(--border-mid);\"><span>↩️ Refunded to the field (Unclaimed KP money refunded to the field.)</span><span>$30 ÷ 23</span></div></div>"
    },
    "sha256": {
     "index.widget": "6506a7b5ec6ec712b1128b6ddd3379a669bf91e6497b972b775b0dd28f4d0b3a",
     "index.skinsWon": "785aed48f828e4b5156af7cb6ee0c07a357f95db951722241095b3757c5f829f",
     "index.liveMount": "abb587a8cdffc086fe001920c0a9760d6a92ca8b8656ee0d02a1e563464dda14",
     "leaderboard.liveSkins": "f5883cef4a0ef1c91305ee35d1e85a0351f58decd2681c931d0cb368b4761872",
-    "settlement.liveResults": "e0093284abd173229747ac75c3645c8f35b45c07c12c3beaf36cb041c9cfa761",
-    "settlement.receiptPool": "ddd88e6423f08549c207c36f3892b7cb93d702f99f7415a82668cdc3f7e91e6d"
+    "settlement.liveResults": "878f5337b8acb4dba16dbcc65cd1a9db61306812a6f3748276378c8489a0b07f",
+    "settlement.receiptPool": "f5290a09aa91f176e278897dadd59d5121dc7cb9a82de194907ab9b1cdb18552"
    }
   },
   "flight": {
@@ -407,34 +459,60 @@
      ]
     },
     "refund": {
-     "cents": 0,
-     "perPlayerCents": {},
-     "reasons": []
+     "cents": 3000,
+     "perPlayerCents": {
+      "101": 200,
+      "102": 200,
+      "103": 200,
+      "104": 200,
+      "105": 200,
+      "106": 200,
+      "107": 200,
+      "108": 100,
+      "109": 100,
+      "110": 100,
+      "111": 100,
+      "112": 100,
+      "113": 100,
+      "114": 100,
+      "115": 100,
+      "116": 100,
+      "117": 100,
+      "118": 100,
+      "119": 100,
+      "120": 100,
+      "121": 100,
+      "122": 100,
+      "123": 100
+     },
+     "reasons": [
+      "Unclaimed KP money refunded to the field."
+     ]
     },
     "perPlayerCents": {
-     "101": 300,
-     "102": 300,
-     "103": 300,
-     "104": 300,
-     "105": 300,
-     "106": -2000,
-     "107": -2000,
-     "108": -2000,
-     "109": -2000,
-     "110": -2000,
-     "111": -2000,
-     "112": -2000,
-     "113": 8100,
-     "114": 100,
-     "115": 100,
-     "116": 100,
-     "117": 100,
-     "118": 10000,
-     "119": -2000,
-     "120": -2000,
-     "121": -2000,
-     "122": -2000,
-     "123": -2000
+     "101": 1500,
+     "102": 500,
+     "103": 500,
+     "104": 500,
+     "105": 500,
+     "106": -1800,
+     "107": -1800,
+     "108": -1900,
+     "109": -1900,
+     "110": -1900,
+     "111": -1900,
+     "112": -1900,
+     "113": 8200,
+     "114": 200,
+     "115": 200,
+     "116": 200,
+     "117": 200,
+     "118": 10100,
+     "119": -1900,
+     "120": -1900,
+     "121": -1900,
+     "122": -1900,
+     "123": -1900
     },
     "kpAmount": 4000,
     "netAmount": 20000
@@ -444,16 +522,16 @@
     "index.skinsWon": "<div class=\"sw-head\">🥩 SKINS WON</div><div class=\"sw-flight\">Flight A</div><div class=\"sw-thru\">Official through Hole 18</div><div class=\"sw-row\"><span class=\"sw-name\">Ann Alpha</span><span class=\"sw-detail\">1 skin · Hole 1</span></div><div class=\"sw-row\"><span class=\"sw-name\">Ben Bravo</span><span class=\"sw-detail\">1 skin · Hole 2</span></div><div class=\"sw-row\"><span class=\"sw-name\">Cal Charlie</span><span class=\"sw-detail\">1 skin · Hole 5</span></div><div class=\"sw-row\"><span class=\"sw-name\">Dee Delta</span><span class=\"sw-detail\">1 skin · Hole 9</span></div><div class=\"sw-row\"><span class=\"sw-name\">Eli Echo</span><span class=\"sw-detail\">1 skin · Hole 13</span></div><div class=\"sw-flight\">Flight B</div><div class=\"sw-thru\">Official through Hole 18</div><div class=\"sw-row\"><span class=\"sw-name\">Max Mike</span><span class=\"sw-detail\">1 skin · Hole 2</span></div><div class=\"sw-row\"><span class=\"sw-name\">Ned November</span><span class=\"sw-detail\">1 skin · Hole 7</span></div><div class=\"sw-row\"><span class=\"sw-name\">Oli Oscar</span><span class=\"sw-detail\">1 skin · Hole 11</span></div><div class=\"sw-row\"><span class=\"sw-name\">Pat Papa</span><span class=\"sw-detail\">1 skin · Hole 13</span></div><div class=\"sw-row\"><span class=\"sw-name\">Quy Quebec</span><span class=\"sw-detail\">1 skin · Hole 16</span></div>",
     "index.liveMount": "<div class=\"live-skins\"><div class=\"ls-title\">FLIGHT A · GROSS SKINS · NO CARRY</div><div class=\"ls-thru\">Official thru 18</div><div class=\"ls-standings\"><span class=\"ls-chip\">Ann Alpha — 1</span><span class=\"ls-chip\">Ben Bravo — 1</span><span class=\"ls-chip\">Cal Charlie — 1</span><span class=\"ls-chip\">Dee Delta — 1</span><span class=\"ls-chip\">Eli Echo — 1</span></div><div class=\"ls-latest\">Latest: Hole 13 — Eli Echo</div><div class=\"ls-title\">FLIGHT B · GROSS SKINS · NO CARRY</div><div class=\"ls-thru\">Official thru 18</div><div class=\"ls-standings\"><span class=\"ls-chip\">Max Mike — 1</span><span class=\"ls-chip\">Ned November — 1</span><span class=\"ls-chip\">Oli Oscar — 1</span><span class=\"ls-chip\">Pat Papa — 1</span><span class=\"ls-chip\">Quy Quebec — 1</span></div><div class=\"ls-latest\">Latest: Hole 16 — Quy Quebec</div><button type=\"button\" class=\"ls-toggle\" onclick=\"toggleLiveSkins()\">hide hole-by-hole</button><div class=\"ls-flight-label\">Flight A</div><div class=\"ls-ledger\"><div class=\"ls-row ls-skin\">Hole 1 — Ann Alpha — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 2 — Ben Bravo — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 5 — Cal Charlie — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 9 — Dee Delta — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 13 — Eli Echo — Gross 4 — Skin</div></div><div class=\"ls-flight-label\">Flight B</div><div class=\"ls-ledger\"><div class=\"ls-row ls-skin\">Hole 2 — Max Mike — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 7 — Ned November — Gross 2 — Skin</div><div class=\"ls-row ls-skin\">Hole 11 — Oli Oscar — Gross 3 — Skin</div><div class=\"ls-row ls-skin\">Hole 13 — Pat Papa — Gross 4 — Skin</div><div class=\"ls-row ls-skin\">Hole 16 — Quy Quebec — Gross 2 — Skin</div></div></div>",
     "leaderboard.liveSkins": "<div class=\"ls-card\"><div class=\"ls-head\">🥩 LIVE SKINS — FLIGHT A</div><div class=\"ls-summary\">Ann Alpha 1 · Ben Bravo 1 · Cal Charlie 1 · Dee Delta 1 · Eli Echo 1</div><div class=\"ls-rows\"><div class=\"ls-r ls-s\">Hole 1 — Ann Alpha · Gross 3</div><div class=\"ls-r ls-s\">Hole 2 — Ben Bravo · Gross 3</div><div class=\"ls-r ls-s\">Hole 5 — Cal Charlie · Gross 3</div><div class=\"ls-r ls-s\">Hole 9 — Dee Delta · Gross 3</div><div class=\"ls-r ls-s\">Hole 13 — Eli Echo · Gross 4</div></div></div><div class=\"ls-card\"><div class=\"ls-head\">🥩 LIVE SKINS — FLIGHT B</div><div class=\"ls-summary\">Max Mike 1 · Ned November 1 · Oli Oscar 1 · Pat Papa 1 · Quy Quebec 1</div><div class=\"ls-rows\"><div class=\"ls-r ls-s\">Hole 2 — Max Mike · Gross 3</div><div class=\"ls-r ls-s\">Hole 7 — Ned November · Gross 2</div><div class=\"ls-r ls-s\">Hole 11 — Oli Oscar · Gross 3</div><div class=\"ls-r ls-s\">Hole 13 — Pat Papa · Gross 4</div><div class=\"ls-r ls-s\">Hole 16 — Quy Quebec · Gross 2</div></div></div>",
-    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 RESULTS — NOT FINAL</div><div class=\"live-note\">Every card is in. KP results are still unconfirmed — final money appears once they are confirmed or cancelled.</div></div><div class=\"settle-card\" data-flight=\"A\"><div class=\"settle-header\">FLIGHT A — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-par\">-16</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Kim Kilo</span><span class=\"lr-par\">-13</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Gus Golf</span><span class=\"lr-par\">-11</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card\" data-flight=\"B\"><div class=\"settle-header\">FLIGHT B — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-par\">-17</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Wes Whiskey</span><span class=\"lr-par\">-17</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\" data-flight=\"A\"><div class=\"settle-header\">🥩 SKINS WON — FLIGHT A</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ben Bravo</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 2</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Eli Echo</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 13</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card skins-card\" data-flight=\"B\"><div class=\"settle-header\">🥩 SKINS WON — FLIGHT B</div><div class=\"lr-row\"><span class=\"lr-name\">Max Mike</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 2</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Pat Papa</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 13</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
-    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\" data-flight=\"A\"><div class=\"pp-flight-head\">Flight A</div><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Ben Bravo</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Eli Echo</span><span class=\"val-pos\">$23</span></div></div><!-- /pp-group --><div class=\"pp-group\" data-flight=\"B\"><div class=\"pp-flight-head\">Flight B</div><div class=\"ledger-row pp-row\"><span>Max Mike</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Pat Papa</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$21</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-note\"><span>KP not confirmed yet — $40 pending</span><span></span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40 — NOT CONFIRMED</div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 3: Ann Alpha — not confirmed</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 7: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 12: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text);\"><span>Hole 16: no winner recorded</span><span>$10 pending</span></div><div class=\"ledger-row\" style=\"color:var(--warn-text); font-weight:bold;\"><span>⚠️ KP results not confirmed</span><span>$40 pending</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\" style=\"font-size:0.78rem; color:var(--text-muted);\"><span>Split by flight, by headcount: Flight A $115 (12 golfers) · Flight B $105 (11 golfers)</span><span></span></div><div class=\"pool-flight\" data-flight=\"A\"><div class=\"pool-flight-head\">Flight A — $115</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 2 — Ben Bravo — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 13 — Eli Echo — Gross 4 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary — Flight A</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Ben Bravo — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Eli Echo — 1 skin</span><span class=\"val-pos\">$23</span></div></div><!-- /pool-flight --><div class=\"pool-flight\" data-flight=\"B\"><div class=\"pool-flight-head\">Flight B — $105</div><div class=\"ledger-row\"><span>Hole 2 — Max Mike — Gross 3 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 13 — Pat Papa — Gross 4 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary — Flight B</span><span></span></div><div class=\"ledger-row\"><span>Max Mike — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Pat Papa — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$21</span></div></div><!-- /pool-flight --></div><!-- /pool-game --></div>"
+    "settlement.liveResults": "<div class=\"settle-card live-head\"><div class=\"settle-header\">🏆 LIVE RESULTS — THRU 18</div><div class=\"live-note\">The round is still in play. Final money appears once every card is in.</div></div><div class=\"settle-card\" data-flight=\"A\"><div class=\"settle-header\">FLIGHT A — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Eli Echo</span><span class=\"lr-par\">-21</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Ivy India</span><span class=\"lr-par\">-18</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-par\">-16</span></div><div class=\"lr-row\"><span class=\"lr-pos\">4</span><span class=\"lr-name\">Kim Kilo</span><span class=\"lr-par\">-13</span></div><div class=\"lr-row\"><span class=\"lr-pos\">5</span><span class=\"lr-name\">Gus Golf</span><span class=\"lr-par\">-11</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card\" data-flight=\"B\"><div class=\"settle-header\">FLIGHT B — NET</div><div class=\"lr-row\"><span class=\"lr-pos\">1</span><span class=\"lr-name\">Rae Romeo</span><span class=\"lr-par\">-24</span></div><div class=\"lr-row\"><span class=\"lr-pos\">2</span><span class=\"lr-name\">Max Mike</span><span class=\"lr-par\">-23</span></div><div class=\"lr-row\"><span class=\"lr-pos\">3</span><span class=\"lr-name\">Uma Uniform</span><span class=\"lr-par\">-19</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-par\">-17</span></div><div class=\"lr-row\"><span class=\"lr-pos\">T4</span><span class=\"lr-name\">Wes Whiskey</span><span class=\"lr-par\">-17</span></div><a class=\"lr-more\" href=\"leaderboard.html?game=POOLGLD\">View Full Leaderboard ›</a></div><div class=\"settle-card skins-card\" data-flight=\"A\"><div class=\"settle-header\">🥩 SKINS WON — FLIGHT A</div><div class=\"lr-row\"><span class=\"lr-name\">Ann Alpha</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 1</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ben Bravo</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 2</span></div><div class=\"lr-row\"><span class=\"lr-name\">Cal Charlie</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 5</span></div><div class=\"lr-row\"><span class=\"lr-name\">Dee Delta</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 9</span></div><div class=\"lr-row\"><span class=\"lr-name\">Eli Echo</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 13</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card skins-card\" data-flight=\"B\"><div class=\"settle-header\">🥩 SKINS WON — FLIGHT B</div><div class=\"lr-row\"><span class=\"lr-name\">Max Mike</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 2</span></div><div class=\"lr-row\"><span class=\"lr-name\">Ned November</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 7</span></div><div class=\"lr-row\"><span class=\"lr-name\">Oli Oscar</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 11</span></div><div class=\"lr-row\"><span class=\"lr-name\">Pat Papa</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 13</span></div><div class=\"lr-row\"><span class=\"lr-name\">Quy Quebec</span><span class=\"lr-count\">1 skin</span><span class=\"lr-holes\">Hole 16</span></div><div class=\"lr-foot\">Tied holes are not shown · Official through Hole 18</div></div><div class=\"settle-card\"><div class=\"settle-header\">📍 KP</div><div class=\"lr-kp\">4 KPs today · 1 of 4 recorded</div></div>",
+    "settlement.receiptPool": "<div class=\"settle-card\" style=\"border:2px solid #b8860b;\">\n            <div class=\"settle-header\">🏆 Weekly Game — $460</div><div class=\"pool-payouts\"><div class=\"pp-game\"><div class=\"pp-game-head\">Skins</div><div class=\"pp-group\" data-flight=\"A\"><div class=\"pp-flight-head\">Flight A</div><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Ben Bravo</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Cal Charlie</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Dee Delta</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row pp-row\"><span>Eli Echo</span><span class=\"val-pos\">$23</span></div></div><!-- /pp-group --><div class=\"pp-group\" data-flight=\"B\"><div class=\"pp-flight-head\">Flight B</div><div class=\"ledger-row pp-row\"><span>Max Mike</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Ned November</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Oli Oscar</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Pat Papa</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row pp-row\"><span>Quy Quebec</span><span class=\"val-pos\">$21</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">Net Finish</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>1 · Rae Romeo</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row pp-row\"><span>2 · Max Mike</span><span class=\"val-pos\">$80</span></div></div><!-- /pp-group --></div><!-- /pp-game --><div class=\"pp-game\"><div class=\"pp-game-head\">KP</div><div class=\"pp-group\"><div class=\"ledger-row pp-row\"><span>Ann Alpha</span><span class=\"val-pos\">$10</span></div></div><!-- /pp-group --></div><!-- /pp-game --></div><!-- /pool-payouts --><div class=\"pool-game pool-game-kp\"><div class=\"pool-game-head\">📍 KP — $40</div><div class=\"ledger-row\"><span>Hole 3: Ann Alpha</span><span class=\"val-pos\">$10</span></div><div class=\"ledger-row\"><span>Hole 7: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 12: nobody recorded it</span><span>$10 back to the field</span></div><div class=\"ledger-row\"><span>Hole 16: nobody recorded it</span><span>$10 back to the field</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-net\"><div class=\"pool-game-head\">🥇 Net Finish — $200</div><div class=\"ledger-row\"><span>1st: Rae Romeo · net 48</span><span class=\"val-pos\">$120</span></div><div class=\"ledger-row\"><span>2nd: Max Mike · net 49</span><span class=\"val-pos\">$80</span></div></div><!-- /pool-game --><div class=\"pool-game pool-game-skins\"><div class=\"pool-game-head\">🥩 Skins Pot — $220 (Gross skins, no carry)</div><div class=\"ledger-row\" style=\"font-size:0.78rem; color:var(--text-muted);\"><span>Split by flight, by headcount: Flight A $115 (12 golfers) · Flight B $105 (11 golfers)</span><span></span></div><div class=\"pool-flight\" data-flight=\"A\"><div class=\"pool-flight-head\">Flight A — $115</div><div class=\"ledger-row\"><span>Hole 1 — Ann Alpha — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 2 — Ben Bravo — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 5 — Cal Charlie — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 9 — Dee Delta — Gross 3 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Hole 13 — Eli Echo — Gross 4 — Skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary — Flight A</span><span></span></div><div class=\"ledger-row\"><span>Ann Alpha — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Ben Bravo — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Cal Charlie — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Dee Delta — 1 skin</span><span class=\"val-pos\">$23</span></div><div class=\"ledger-row\"><span>Eli Echo — 1 skin</span><span class=\"val-pos\">$23</span></div></div><!-- /pool-flight --><div class=\"pool-flight\" data-flight=\"B\"><div class=\"pool-flight-head\">Flight B — $105</div><div class=\"ledger-row\"><span>Hole 2 — Max Mike — Gross 3 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 7 — Ned November — Gross 2 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 11 — Oli Oscar — Gross 3 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 13 — Pat Papa — Gross 4 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Hole 16 — Quy Quebec — Gross 2 — Skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\" style=\"font-weight:bold; border-top:1px solid var(--border-mid);\"><span>Skins Summary — Flight B</span><span></span></div><div class=\"ledger-row\"><span>Max Mike — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Ned November — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Oli Oscar — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Pat Papa — 1 skin</span><span class=\"val-pos\">$21</span></div><div class=\"ledger-row\"><span>Quy Quebec — 1 skin</span><span class=\"val-pos\">$21</span></div></div><!-- /pool-flight --></div><!-- /pool-game --><div class=\"ledger-row\" style=\"border-top:1px solid var(--border-mid);\"><span>↩️ Refunded to the field (Unclaimed KP money refunded to the field.)</span><span>$30 ÷ 23</span></div></div>"
    },
    "sha256": {
     "index.widget": "a4afe75abf141ec38074c4479d3750f617de7ab7721445fdc9626177d5c8ebe6",
     "index.skinsWon": "40b7958445da21dbc3fc54b2e6c65c5a7394c2d015b0882a2cfbf2e45908c3a3",
     "index.liveMount": "17d4d5c62804db52325a6369b77e53aea1273e0771c11b9325e2635d49eeb280",
     "leaderboard.liveSkins": "ce70c20a108d80e0a9858fb413bca6e4f5ede76c79893075521d6c101be00e0f",
-    "settlement.liveResults": "8baead59a0c0a81b484a617d76f125fb27c6f37aad6de6a9035f177dba80b836",
-    "settlement.receiptPool": "fd6e16b5cfa7e9c42c0a54f1340856433392ffbb7b96518cb541072d051f3deb"
+    "settlement.liveResults": "43b41a98d6374aeb15ed61c20d0ed6c1e2812c4b699b80609f1829ce7b0becb2",
+    "settlement.receiptPool": "956e41bb3f77c5ac40f26639b7eb2af42c1658fbf906fd90ebf97c93df174b08"
    }
   }
  }

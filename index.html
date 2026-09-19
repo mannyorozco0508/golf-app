@@ -4178,12 +4178,13 @@ html {
     // ONE ATOMIC WRITE. kpLeaders is the live on-course state and kpWinners is what
     // settlement reads; if those two could ever be written separately there would be
     // a window where the money authority disagreed with the marker on the green.
-    // A single .update() on the round makes all three paths land together or not at
-    // all - the leader, the settlement winner, and the cleared confirmation.
+    // A single .update() on the round makes both land together or not at all.
+    // (Until 2026-09-19 a third path, kpConfirmed: null, rode along - the organizer
+    // confirmation is gone; recording pays.)
     //
-    // CLEARING kpConfirmed IS THE ANTI-STALE MECHANISM. A confirmed round whose
-    // leader later changes must stop looking confirmed in the same instant the
-    // leader moves, and it cannot be left to a caller to remember.
+    // NO ALERT ON SUCCESS. The block under the Prev/Next row re-renders with
+    // "Current: <name>" the moment the write lands; that is the confirmation. A
+    // browser alert here rendered as "golf-app-5a5.pages.dev says" on a phone.
     function saveKpLeader(hole, pid, feet, inches) {
         if (!pid) return;
         if (!canSetKpLeader(pid)) {
@@ -4206,13 +4207,10 @@ html {
         const updates = {};
         updates['kpLeaders/h' + hole] = leader;
         updates['kpWinners/h' + hole] = String(pid);
-        updates['kpConfirmed'] = null;          // any leader change unconfirms the round
 
         db.ref('events/' + currentMode).update(updates)
             .then(() => {
                 kpEntryOpenHole = null;
-                alert('\u2705 KP RECORDED\nHole ' + hole + '\n' + leader.playerName
-                    + (dist === null ? '' : ' \u2014 ' + kpDistanceLabel(dist)));
                 renderKpEntryMount();
             })
             .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
@@ -5575,11 +5573,13 @@ html {
                 const rk = frKpPool();
                 // A cancelled game has no rk.kp, so no KP row appears - there is
                 // nothing outstanding to report.
-                if (rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
-                    rows.push(kpOpen
-                        ? '<div class="fr-gate-warn">\u26A0\uFE0F KP winners not confirmed \u2014 $'
-                          + centsToMoney(rk.kpUnresolvedCents || 0).slice(1) + ' still allocated to KP</div>'
-                        : '<div class="fr-gate-ok">\u2713 KP winners confirmed</div>');
+                // A LIVE round with a blank KP hole: the share is still in the pot.
+                // Only while live - once the last card is in a blank refunds, so the
+                // row never appears on a finished round (there is nothing to confirm).
+                if (kpOpen && rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
+                    const blank = rk.kp.lines.filter(l => l.state === 'unresolved').length;
+                    rows.push('<div class="fr-gate-warn">\u26A0\uFE0F KP not recorded on ' + blank + ' hole'
+                        + (blank === 1 ? '' : 's') + ' \u2014 ' + centsToMoney(rk.kpUnresolvedCents || 0) + ' still in the pot</div>');
                 }
                 if (missing.length > 0) {
                     rows.push('<div class="fr-gate-warn">\u26A0\uFE0F ' + missing.length + ' score'
@@ -6066,16 +6066,16 @@ html {
         frRenderStagedImpact();
     }
 
-    // ---- KP REVIEW & CONFIRMATION -------------------------------------------
+    // ---- KP REVIEW ------------------------------------------------------------
     //
     // NO KP MATH HERE. Amounts come from computeMoneyPool()'s own kp.lines and its
-    // kpUnresolvedCents; this renders them and writes the organizer's decision.
+    // kpUnresolvedCents; this renders them and offers the organizer's two calls.
     //
-    // WHY CONFIRMATION EXISTS AT ALL. The engine cannot tell "nobody won it" from
-    // "nobody typed it in". Left alone it treated both as unclaimed and refunded the
-    // money - $100 of unentered KP came back as $8 and $9 lines on twelve receipts
-    // that called themselves final. Confirmation is the organizer saying out loud
-    // which of the two it was.
+    // NO CONFIRMATION (2026-09-19). Recording pays: a hole with a name in it is paid
+    // the moment it is recorded; a blank hole is "not yet" while the round is live
+    // and refunds to the field once the last card is in (or the scores are verified).
+    // The organizer keeps two calls - "nobody won it" on a blank hole, early, and
+    // cancelling the game - and nothing to confirm.
     function frKpPool() {
         if (typeof computeMoneyPool !== 'function') return null;
         const cd = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
@@ -6083,6 +6083,7 @@ html {
         catch (e) { return null; }
     }
 
+    // A LIVE round with a blank KP hole - the only state with KP money still in the pot.
     function frKpNeedsAttention() {
         const r = frKpPool();
         return !!(r && r.valid && (r.kpUnresolvedCents || 0) > 0);
@@ -6094,14 +6095,12 @@ html {
         const r = frKpPool();
         if (!r || !r.valid) { mount.innerHTML = ''; return; }
 
-        // CANCELLED IS A FINISHED DECISION. No pending warning, no confirm button,
-        // no "nobody won it" - the organizer removed the game and the money is
-        // already skins money. Showing any of the unresolved furniture here would
-        // suggest there is still something to do.
+        // CANCELLED IS A FINISHED DECISION. The organizer removed the game and the
+        // money is already skins money; nothing here is left to do.
         if (r.kpCancelled && r.kpCancelled.cancelled) {
             const orig = r.kpCancelled.originalCents;
             mount.innerHTML = '<div class="fr-money-title">KP Results</div>'
-                + '<div class="fr-review-note">KPs cancelled for this round \u00B7 '
+                + '<div class="fr-review-note">KPs cancelled for this round · '
                 + centsToMoney(orig) + ' moved into the skins pool.</div>';
             return;
         }
@@ -6113,11 +6112,11 @@ html {
         const isOrg = hasOrganizerAuthority();
         const unresolved = r.kp.unresolvedCents || 0;
 
-        let html = '<div class="fr-money-title">KP Results \u00B7 ' + $(r.kp.amountCents) + '</div>';
-        html += unresolved > 0
-            ? '<div class="fr-review-note fr-review-warn">\u26A0\uFE0F ' + $(unresolved)
-              + ' still needs confirming before the money can be settled.</div>'
-            : '<div class="fr-review-note">\u2713 KP winners confirmed.</div>';
+        let html = '<div class="fr-money-title">KP Results · ' + $(r.kp.amountCents) + '</div>';
+        if (unresolved > 0) {
+            html += '<div class="fr-review-note">' + $(unresolved) + ' still in the pot — pays when recorded, '
+                 + 'or goes back to the field once every card is in.</div>';
+        }
 
         r.kp.lines.forEach(l => {
             const led = leaders['h' + l.hole];
@@ -6128,43 +6127,43 @@ html {
                 right = '<span class="fr-gross">' + l.winnerName + '</span>'
                       + (dist ? '<br><span class="fr-net">' + dist + '</span>' : '');
             } else if (l.state === 'refunded') {
-                right = '<span class="fr-net">No winner \u2014 refunded</span>';
-            } else if (l.winnerName) {
-                right = '<span class="fr-gross">' + l.winnerName + '</span>'
-                      + '<br><span class="fr-incomplete">Not confirmed</span>';
+                // Three ways here, each named: the early call, an outsider's shot, or a
+                // blank on a finished round (nobody recorded it).
+                const w = (currentData.kpWinners || {})['h' + l.hole];
+                right = '<span class="fr-net">'
+                      + (noWin['h' + l.hole] === true ? 'Nobody won it'
+                          : (w ? 'Not in the pool' : 'Nobody recorded it'))
+                      + ' — ' + $(l.cents) + ' refunded</span>';
             } else {
-                right = '<span class="fr-incomplete">No leader recorded</span>';
+                right = '<span class="fr-incomplete">Not recorded yet</span>';
             }
             html += '<div class="fr-player-row' + (l.state === 'unresolved' ? ' fr-row-incomplete' : '') + '">'
                  + '<span class="fr-player-name">Hole ' + l.hole + '</span>'
                  + '<span class="fr-player-score">' + right + '</span></div>';
         });
 
-        // ORGANIZER ONLY, and using the SAME authority Wave C established - a group
-        // link may set its own foursome's leader on the course, but the final
-        // whole-field decision is the organizer's.
-        if (isOrg && unresolved > 0) {
-            html += '<div class="fr-review-note">Organizer access \u00B7 correct a hole from the scorecard, '
-                 + 'or record that nobody won it.</div>';
+        // THE ORGANIZER'S TWO CALLS, using the SAME authority Wave C established - a
+        // group link may set its own foursome's leader on the course; whole-field
+        // decisions are the organizer's.
+        //   "nobody won it"   per blank hole, while the round is live (an early call;
+        //                     once the round is finished a blank refunds on its own)
+        //   Cancel KPs        at the foot, in every state but cancelled - a group that
+        //                     decides not to play KPs is real, before or after the
+        //                     round. Deliberately secondary: unusual and irreversible
+        //                     in effect, so not a peer of the everyday action.
+        if (isOrg) {
             r.kp.lines.forEach(l => {
                 if (l.state !== 'unresolved') return;
                 html += '<button class="fr-secondary-btn" onclick="frKpDeclareNoWinner(' + l.hole + ')">'
-                     + 'Hole ' + l.hole + ' \u2014 nobody won it</button>';
+                     + 'Hole ' + l.hole + ' — nobody won it</button>';
             });
-            html += '<button class="btn-primary" style="margin-top:10px;" onclick="frConfirmKp()">'
-                 + '\u2713 Confirm KP Winners</button>';
-            // Deliberately secondary. Cancelling the game is unusual and irreversible
-            // in effect, so it must not sit next to the everyday action as a peer.
             html += '<button class="fr-secondary-btn" onclick="frCancelKps()">Cancel KPs for this round</button>';
-        } else if (!isOrg && unresolved > 0) {
-            html += '<div class="fr-review-note fr-review-warn">\uD83D\uDD12 Only the organizer link can confirm KP results.</div>';
         }
         mount.innerHTML = html;
     }
 
-    // An explicit organizer decision that a hole had no winner. Deliberately a
-    // separate action from confirming: a blank hole must never become a refund by
-    // default, which is the whole failure this wave removes.
+    // An explicit organizer call that a hole had no winner - the early way to send
+    // a blank hole's share back to the field before the round is finished.
     function frKpDeclareNoWinner(hole) {
         if (!hasOrganizerAuthority()) return;
         if (!confirm('Record that nobody won the KP on hole ' + hole + '?\n\nThat share is refunded to the field.')) return;
@@ -6172,43 +6171,14 @@ html {
         const updates = {};
         updates['kpNoWinner/h' + hole] = true;
         updates['kpWinners/h' + hole] = null;
-        updates['kpConfirmed'] = null;      // still needs the final confirm
         db.ref('events/' + currentMode).update(updates)
             .then(() => {
                 if (!currentData.kpNoWinner) currentData.kpNoWinner = {};
                 currentData.kpNoWinner['h' + hole] = true;
                 if (currentData.kpWinners) delete currentData.kpWinners['h' + hole];
-                currentData.kpConfirmed = null;
                 renderFinishRoundKp(); renderFinishRoundMoney();
             })
-            .catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message)));
-    }
-
-    // CONFIRMATION REFUSES WHILE ANY HOLE IS BLANK. Confirming a round with an
-    // undecided hole would recreate the bug in a new place - money settled on a
-    // question nobody answered.
-    function frConfirmKp() {
-        if (!hasOrganizerAuthority()) return;
-        const r = frKpPool();
-        if (!r || !r.valid || !r.kp) return;
-        const noWin = currentData.kpNoWinner || {};
-        const blanks = r.kp.lines
-            .filter(l => !l.winnerId && noWin['h' + l.hole] !== true)
-            .map(l => l.hole);
-        if (blanks.length > 0) {
-            alert('\u26A0\uFE0F NOT CONFIRMED\nStill undecided: hole ' + blanks.join(', hole ')
-                + '\n\nRecord a winner, or that nobody won it.');
-            return;
-        }
-        if (!requireOnlineForMoney('KP NOT CONFIRMED', 'Reconnect before confirming KP results.')) return;
-        const payload = { confirmed: true, confirmedAt: Date.now(), confirmedBy: 'organizer' };
-        db.ref('events/' + currentMode + '/kpConfirmed').set(payload)
-            .then(() => {
-                currentData.kpConfirmed = payload;
-                renderFinishRoundKp(); renderFinishRoundMoney();
-                alert('\u2705 KP WINNERS CONFIRMED');
-            })
-            .catch(err => alert('\u26A0\uFE0F KP NOT CONFIRMED\n' + (err && err.message)));
+            .catch(err => alert('⚠️ NOT SAVED\n' + (err && err.message)));
     }
 
     // ---- CANCEL THE KP GAME -------------------------------------------------

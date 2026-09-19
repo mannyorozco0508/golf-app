@@ -272,27 +272,28 @@ describe('A LATER GROUP REPLACES AN EARLIER LEADER', () => {
     });
 });
 
-describe('ONE ATOMIC WRITE — NO STALE CONFIRMATION', () => {
+// RE-PINNED 2026-09-19 (recording pays): the third path of this write,
+// kpConfirmed: null, is gone with the confirmation it cleared. Two paths, one
+// update - the leader and the settlement winner still cannot land apart.
+describe('ONE ATOMIC WRITE', () => {
 
-    test('leader, settlement winner and cleared confirmation land together', async () => {
+    test('leader and settlement winner land together, and nothing else', async () => {
         const b = boot({ group: 2, hole: 7 });
         b.setLeader('Manny', 5, 9);
         await settle();
-        assert.equal(b.writes().length, 1, 'one write, not three');
+        assert.equal(b.writes().length, 1, 'one write, not two');
         const w = b.writes()[0];
         assert.equal(w.atomic, true, 'separate writes could leave the money out of step with the marker');
         assert.match(w.path, /events\/ABCD$/);
-        assert.ok('kpLeaders/h7' in w.value);
-        assert.ok('kpWinners/h7' in w.value);
-        assert.ok('kpConfirmed' in w.value);
+        assert.deepEqual(Object.keys(w.value).sort(), ['kpLeaders/h7', 'kpWinners/h7']);
     });
 
-    test('ANY leader change unconfirms the round', async () => {
+    test('ANY leader change moves the money with it - the new name is the paid one, no confirmation in between', async () => {
         const b = boot({ group: 2, hole: 7 });
         b.setLeader('Manny');
         await settle();
-        assert.equal(b.writes()[0].value['kpConfirmed'], null,
-            'a confirmed round whose leader moves must stop looking confirmed immediately');
+        assert.ok(!('kpConfirmed' in b.writes()[0].value), 'nothing writes kpConfirmed any more');
+        assert.equal(b.writes()[0].value['kpWinners/h7'], String(b.idOf('Manny')));
     });
 
     test('kpWinners stays the settlement source', async () => {
@@ -307,17 +308,16 @@ describe('ONE ATOMIC WRITE — NO STALE CONFIRMATION', () => {
         // the current leader is not a write, and an earlier draft of this assertion
         // conflated the two.
         const src = read(PAGE);
-        // THE RULE IS ABOUT PAIRING, NOT COUNTING. Two places touch kpWinners now -
+        // THE RULE IS ABOUT PAIRING, NOT COUNTING. Two places touch kpWinners -
         // saveKpLeader sets one, and the organizer's no-winner action clears one -
-        // and both must clear kpConfirmed in the SAME atomic update. Counting
-        // assignments conflated setting a winner with removing one.
+        // and each must do it in ONE atomic update() on the round, never a bare
+        // set(). (Until 2026-09-19 each also cleared kpConfirmed; that is gone.)
         const blocks = src.split('db.ref(');
         const touching = blocks.filter(b => /updates\['kpWinners\/h'/.test(b.slice(-900)));
-        assert.ok(touching.length >= 1, 'at least one path writes kpWinners');
+        assert.equal(touching.length, 2, 'saveKpLeader and frKpDeclareNoWinner, nothing else');
         touching.forEach(b => {
             const seg = b.slice(-900);
-            assert.match(seg, /updates\['kpConfirmed'\]/,
-                'every kpWinners write must clear the confirmation in the same update');
+            assert.doesNotMatch(seg, /kpConfirmed/, 'no path writes the retired confirmation');
         });
         assert.ok(!/db\.ref\([^)]*kpWinners[^)]*\)\.set/.test(src),
             'a direct leaf .set() would write a winner without clearing the confirmation');
@@ -359,10 +359,10 @@ describe('SAFETY RAILS PRESERVED', () => {
             .forEach(t => assert.ok(!block.includes(t), `KP payout math must stay in the engine; found ${t}`));
     });
 
-    test('WAVE B: unresolved KP is withheld, not refunded', () => {
-        // This test previously asserted the OPPOSITE - that Wave A deliberately left
-        // the refund behaviour in place. Wave B is the change it was flagging, so the
-        // assertion is inverted rather than removed: the gap it guarded is now closed.
+    test('a blank KP hole is withheld while the round is LIVE, and refunds once it is finished (2026-09-19)', () => {
+        // Wave A left a blank hole refunding; Wave B withheld it until an organizer
+        // confirmed; the KP wave of 2026-09-19 made the rule live-vs-finished. This
+        // test has carried each of those in turn - it is the seam, not the mechanism.
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
         vm.createContext(sb);
         ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
@@ -370,14 +370,17 @@ describe('SAFETY RAILS PRESERVED', () => {
         const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
         const ps = NAMES.map((n,i)=>({id:101+i,name:n,hcp:'9',playingForMoney:true}));
         const sc = {}; ps.forEach((p,pi)=>cd.forEach((h,hi)=>{ sc['p'+p.id+'_h'+h.hole]=4+((pi+hi)%3)-1; }));
-        const r = sb.computeMoneyPool({ players:ps, courseData:cd, scores:sc,
-            settlementMode:'whole-dollar', kpWinners:{},
-            moneyPool:{ enabled:true, buyIn:40, kp:{amount:100,holes:KP_HOLES},
+        const mp = { enabled:true, buyIn:40, kp:{amount:100,holes:KP_HOLES},
                 net:{amount:70,places:[57.142857,42.857143]},
-                skins:{mode:'remainder',scoring:'net',carryOver:false} } }, cd, sc);
-        assert.equal(r.kpUnresolvedCents, 10000, 'the $100 stays unresolved');
+                skins:{mode:'remainder',scoring:'net',carryOver:false} };
+        const live = {}; Object.keys(sc).forEach(k => { if (parseInt(k.split('_h')[1], 10) <= 9) live[k] = sc[k]; });
+        const r = sb.computeMoneyPool({ players:ps, courseData:cd, scores:live, settlementMode:'whole-dollar', kpWinners:{}, moneyPool: mp }, cd, live);
+        assert.equal(r.kpUnresolvedCents, 10000, 'thru 9: the $100 stays in the pot');
         assert.equal(r.settled, false, 'and the round is not settled');
-        assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')),
-            'the $8/$9 refund lines must be gone');
+        assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')), 'no KP refund while live');
+        const f = sb.computeMoneyPool({ players:ps, courseData:cd, scores:sc, settlementMode:'whole-dollar', kpWinners:{}, moneyPool: mp }, cd, sc);
+        assert.equal(f.kpUnresolvedCents, 0, 'every card in: nothing is withheld');
+        assert.equal(f.settled, true);
+        assert.ok(/Unclaimed KP/.test(f.refund.reasons.join(' ')), 'nobody recorded it - the $100 goes back to the field');
     });
 });

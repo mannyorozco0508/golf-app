@@ -1076,6 +1076,69 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## Recording a KP pays it (2026-09-19, v182)
+
+**Why Wave B's confirmation went.** pool-engine.js withheld every KP dollar until an
+organizer pressed "Confirm KP Winners" in Finish Round. In 102 production rounds that
+button was never pressed once; the one round with recorded winners (FAUNX8, Streamsong
+Red) sat at RESULTS — NOT FINAL with no Send chip. The ceremony existed to stop a real
+defect - a blank KP hole refunding as $8/$9 lines on a receipt that called itself final -
+but the distinction that was actually needed is **live vs finished**, not confirmed vs not.
+
+**The rule now** (pool-engine.js, KP block; both engine edits approved per-file):
+recorded by a pool participant → **paid**, the moment it is recorded; `kpNoWinner` (an
+early call), a winner outside the pool, or a **blank hole on a finished round** →
+**refunded** to the field through the branch that always paid an outsider's share back;
+a blank hole on a **live** round → withheld ("not yet"). FINISHED is settlement-engine's
+word - `computeRoundFinish(data, courseData, savedScores)`, the first half of
+`computeRoundSettlement` extracted verbatim (every golfer who teed off has every hole, or
+`scoresVerified.verified`), asked behind `typeof`, never re-derived; absent, the round is
+treated as live (fail closed - withheld, never refunded; proven by blanking the predicate).
+`kpConfirmed` is ignored wherever it still exists. `result.kp.confirmed` → `result.kp.finished`.
+The invariant `prizes + refunds + kpUnresolvedCents === totalPoolCents` and the
+reconciler's target are unchanged; `settled` is true the moment the cards are in.
+
+**Production on the day it shipped** (read-only): 12 rounds with a KP pot; FAUNX8 starts
+paying its two $25 KPs and settles; four finished rounds with every KP hole blank
+(7WYT, 97WPZG, 9DVFAZ, RV64U5) start refunding $100 each to their field - intended, per
+Manny: they are over and nobody recorded a KP; 7 others (never started / mid-round)
+unchanged. No kpCancelled written by hand.
+
+**The pages.** index.html: `saveKpLeader` writes kpLeaders + kpWinners only and shows NO
+alert (the block under the nav row is the confirmation - Part 1); `frConfirmKp`, the
+confirm button, the "Not confirmed" tags, the organizer-only line and the gate's
+"KP winners confirmed" row are gone; the KP Results block names every refund's reason
+("Nobody recorded it" / "Nobody won it" / "Not in the pool"); **the cancel button lives
+at the foot of that block**, organizer-only, in every state except already-cancelled
+(it used to exist only while money was unresolved); the "nobody won it" early-call buttons
+stay per blank hole while live. settlement.html: no RESULTS — NOT FINAL branch, each
+refunded hole says why ("Hole 7: nobody recorded it · $25 back to the field"), a live blank
+reads "not recorded yet · $25 in the pot"; the Send chip appears the moment the cards are
+in. trip.html: the "KP results are still unconfirmed in" sentence and the recap caveat's
+KP clause are gone (a KP hold only ever accompanies "still in play" now).
+
+**The refund wording a golfer sees** on a finished round where nothing was recorded, three
+places: the KP section line above; the summary row "↩️ Refunded to the field (Unclaimed KP
+money refunded to the field.) $100 ÷ 12" (the engine's existing reason text, unchanged);
+and the per-golfer ledger line, which now says why (settlement-engine.js :1196-1225,
+approved): "KP refund · nobody recorded it +$8" - or "· nobody won it" / "· not in the
+pool" - one line per refund reason, the rest labelled "Pool refund · <reason>". No new
+arithmetic: the golfer's figure is the engine's perPlayerCents; when KP and skins both
+refund, that one figure is apportioned between the two lines by the buckets' share (to
+the dollar on a whole-dollar round, remainder on the second line) and the lines always
+sum to it exactly - kp_settlement_test.js asserts that for every golfer.
+
+**Tests.** `kp_settlement_test.js` rewritten under a header that names why the
+confirmation went (37: recorded pays live and finished; the blank hole held while live,
+refunded when finished, by cards and by verification, both at once; cancelled unchanged;
+the invariant on seven shapes; the reconciler's target; fail closed; Finish Round; the
+Receipt settles and the Send chip; the trip drops its hold). Seven controls all fire.
+Engine hash pins re-pinned ×20 (pool-engine d47a1e0a → 846f33e3, settlement-engine
+42923121 → 9043e7fc) with the reason. `sw.js` `golfapp-v182-kp-pays`.
+
+**Not built:** the dialog inventory (213 sites: 203 alert, 10 confirm) is a report -
+`~/Desktop/rattle-kp-pays-plan.txt` §F - and the toast / decision sheet are their own wave.
+
 ## The KP picker is legible (2026-09-19, v181)
 
 The "Who is closest?" select had no type size of its own - Chrome's UA default, measured

@@ -315,24 +315,20 @@ describe('THE SHARED TEXT CARRIES ITS OWN CONTEXT', () => {
 // ---------------------------------------------------------------------------
 describe('FINAL IS EARNED IN THE SHARED TEXT TOO', () => {
 
-    // An unconfirmed KP is real money nobody has resolved.
-    // THE POOL MUST BE VALID OR THIS PROVES NOTHING. computeMoneyPool returns
-    // valid:false when the pot is over-allocated - four golfers at $40 is $160, so a
-    // $100 KP plus a $70 net prize cannot fit - and an invalid pool is never
-    // unresolved, so the first draft of this fixture made the flag look broken when
-    // it was the fixture that was. Asserted below rather than assumed.
-    const unresolved = { moneyPool: { enabled: true, buyIn: 40,
-        kp: { amount: 40, holes: [3, 7, 12, 16] },
-        net: { amount: 70, places: [100] },
-        skins: { mode: 'remainder', scoring: 'net', carryOver: false } } };
+    // RE-PINNED 2026-09-19 (recording pays): an unrecorded KP on a FINISHED round
+    // no longer holds money - the blank refunds - so the unsettled fixture is a
+    // round STILL IN PLAY: every card stops at hole 9. Asserted below rather than
+    // assumed (the first draft of the old fixture proved nothing for a different
+    // reason - an over-allocated pool is never unresolved).
+    const unresolved = { scores: (() => { const s = {}; CLEAN.forEach((n, i) => { for (let h = 1; h <= 9; h++) s['p' + (101 + i) + '_h' + h] = 4; }); return s; })() };
 
-    test('the fixture really does leave money unresolved', () => {
+    test('the fixture really does leave the round unfinished', () => {
         const t = trip(CLEAN, { day2: unresolved });
         assert.equal(t.run('cachedTripSettled'), false,
             'the trip reports itself settled, so the assertion below is vacuous');
     });
 
-    test('an unconfirmed round is NOT called final', () => {
+    test('a round still in play is NOT called final', () => {
         const t = trip(CLEAN, { day2: unresolved });
         assert.ok(!/FINAL SETTLEMENT/.test(t.text()),
             'the recap calls the week final while money is still live: ' + t.text());

@@ -80,19 +80,23 @@ describe('DOLLAR GAME — retired from the active product', () => {
         // three different things: setting a winner, clearing one, and reading the
         // current leader to render it. The rule this test actually protects is that
         // no path can put a KP winner into settlement without going through the
-        // canonical writer and clearing the confirmation alongside it.
+        // canonical writer, in one atomic update on the round. (Until 2026-09-19
+        // each write also cleared kpConfirmed; recording pays now and nothing
+        // reads or writes that flag.)
         assert.ok(/function saveKpLeader/.test(idx), 'the canonical KP writer exists');
         assert.ok(/function savePoolKp/.test(idx), 'and the legacy entry point survives');
         const sp = idx.slice(idx.indexOf('function savePoolKp'));
         const spBody = sp.slice(0, sp.indexOf('\n    }'));
         assert.ok(!/db\.ref/.test(spBody), 'savePoolKp delegates rather than writing directly');
-        // Every place that touches kpWinners must clear kpConfirmed in the same update.
+        // Every place that touches kpWinners goes through update(), never a leaf set().
+        let touching = 0;
         idx.split('db.ref(').forEach(b => {
             const seg = b.slice(-900);
             if (!/updates\['kpWinners\/h'/.test(seg)) return;
-            assert.match(seg, /updates\['kpConfirmed'\]/,
-                'a KP winner write that leaves the round confirmed would be stale money');
+            touching += 1;
+            assert.doesNotMatch(seg, /kpConfirmed/, 'the retired confirmation is not written');
         });
+        assert.equal(touching, 2, 'saveKpLeader and frKpDeclareNoWinner');
     });
 
     test('the duplicate winner-picker is gone from both places it lived', () => {
@@ -134,7 +138,9 @@ describe('DOLLAR GAME — retired from the active product', () => {
         // files may reference it; the retired Dollar Game's OWN fields - the enable
         // flag, the buy-in, the every-other-pays engine - stay forbidden everywhere
         // outside the documented settlement legacy reader.
-        const kpWinnersAllowed = ['index.html', 'pool-engine.js'];
+        // settlement.html reads kpWinners since 2026-09-19 to SAY why a refunded KP
+        // hole refunded (an outsider's shot vs nobody recorded) - a reader, not a writer.
+        const kpWinnersAllowed = ['index.html', 'pool-engine.js', 'settlement.html'];
         PRODUCTION.forEach(f => {
             const src = stripComments(read(f));
             if (/kpGameEnabled|kpBuyIn|calculateKPGameTotals/.test(src)) offenders.push(f);

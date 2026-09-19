@@ -366,8 +366,10 @@ describe('FINISH ROUND — PERMISSION AND UX', () => {
         assert.ok(!/KP winners not confirmed/.test(strip(b.gate())));
     });
 
-    test('an uncancelled round is still blocked - the gate did not simply go away', () => {
-        assert.match(boot({ cancelled: false }).title(), /Not Final/);
+    test('an uncancelled round with every card in is Final too (2026-09-19): the gate is about cards, not KPs', () => {
+        // Until the KP wave this round was blocked for unconfirmed KPs. Recording
+        // pays: holes 3 and 7 are paid, the two blank holes refund, nothing hangs.
+        assert.equal(boot({ cancelled: false }).title(), 'Final Money');
     });
 });
 

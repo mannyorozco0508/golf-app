@@ -2185,10 +2185,12 @@ html {
             // IS THIS ROUND'S MONEY ACTUALLY SETTLED? One predicate, in the engine
             // (settlement-engine.js computeRoundSettlement), asked here, not re-derived.
             //
-            // Two things hold a round open. Unresolved KP money: the ledger deliberately
-            // sums to -kpUnresolvedCents until the organizer confirms or cancels the
-            // KP, and a trip that summed it would present a distorted total under the
-            // heading "Final". And a round STILL IN PLAY: a match scored thru 9 already
+            // Two things hold a round open. KP money still in the pot (a blank KP hole
+            // on a LIVE round - since 2026-09-19 recording pays and a finished round's
+            // blanks refund, so this only ever accompanies "still in play"): the ledger
+            // deliberately sums to -kpUnresolvedCents until it is recorded or the cards
+            // are in, and a trip that summed it would present a distorted total under
+            // the heading "Final". And a round STILL IN PLAY: a match scored thru 9 already
             // pays match and skins as if the day were over. That money COUNTS - it is
             // the group's running position and it is left in every total below - but
             // the heading cannot say Final while a golfer is still out, and the round
@@ -2298,13 +2300,7 @@ html {
                     ? `Still in play: ${escapeHtml(r.label)} \u2014 thru ${r.thru}, ${r.left} golfer${r.left === 1 ? '' : 's'} still ${r.left === 1 ? 'has' : 'have'} holes left. Its money so far is counted below.<br>`
                     : `Not started yet: ${escapeHtml(r.label)}.<br>`;
             });
-            if (unresolvedRounds.length) {
-                const pending = unresolvedRounds
-                    .map(u => u.label + (u.cents ? ' ($' + Math.round(u.cents / 100) + ')' : ''))
-                    .join(', ');
-                html += `KP results are still unconfirmed in: ${pending}.<br>`;
-            }
-            html += `These totals will change once those rounds are ${inPlayRounds.length ? 'finished' : 'resolved'}.
+            html += `These totals will change once those rounds are finished.
                 </div></div>`;
         }
 
@@ -2973,8 +2969,8 @@ html {
     //
     // IT MUST SURVIVE LEAVING THE APP. A screenshot lands in a chat with no
     // surrounding context, so the card carries the trip name, the round count and -
-    // when money is still unresolved - the caveat. A recap that says FINAL when a
-    // round is unconfirmed is worse than no recap at all.
+    // when a round is still in play - the caveat. A recap that says FINAL when a
+    // round is not finished is worse than no recap at all.
     function openTripRecap() {
         if (cachedRoundResults.length === 0) {
             alert('\u26A0\uFE0F Link at least one round with scores before making a recap card.');
@@ -2990,18 +2986,16 @@ html {
     }
 
     // WHY THE TRIP IS NOT FINAL, in one sentence, from the same holds the panel
-    // named. Rounds still in play first (they are the ones somebody can go and
-    // finish), then unconfirmed KPs.
+    // named: the rounds still in play (a KP hold only ever accompanies one of
+    // those now - recording pays, and a finished round's blank KP holes refund).
     function tripNotFinalReason() {
         const parts = [];
         const inPlay = cachedTripHolds.inPlay || [];
-        const kp = cachedTripHolds.kp || [];
         const started = inPlay.filter(r => r.started).map(r => r.label);
         const notStarted = inPlay.filter(r => !r.started).map(r => r.label);
         if (started.length) parts.push(started.join(', ') + (started.length === 1 ? ' is' : ' are') + ' still in play');
         if (notStarted.length) parts.push(notStarted.join(', ') + (notStarted.length === 1 ? ' has' : ' have') + ' not started');
-        if (kp.length) parts.push('KP results are still unconfirmed in ' + kp.map(u => u.label).join(', '));
-        return parts.length ? parts.join('; ') + '.' : 'some rounds still have unconfirmed results.';
+        return parts.length ? parts.join('; ') + '.' : 'some rounds are not finished.';
     }
     // THE TWO TOTALS IN PLAIN TEXT - the card and the clipboard get the same line.
     function tripBothTotalsPlain() {

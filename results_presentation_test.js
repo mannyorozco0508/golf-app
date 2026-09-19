@@ -170,29 +170,29 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         assert.ok(!/Not Final/.test(strip(b.summary())));
     });
 
-    test('unresolved KP money renders LIVE RESULTS, not a settlement document', () => {
-        // The heading used to read "Results — Not Final" above the full receipt. That
-        // was still an accounting statement for a round nobody had finished, so the
-        // whole page is now replaced by the live summary. The rule this protects -
-        // unresolved money must never look final - is enforced more strongly.
-        const b = boot({ confirmed: false });
-        assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), false);
+    // RE-PINNED 2026-09-19 (recording pays): every card on this round is in, so a
+    // round with nothing recorded is FINAL - its blank KP holes refund - and the
+    // KP-only hold that had its own head (v149) no longer exists. What still holds
+    // the page at LIVE RESULTS is a round in play (receipt_final_test.js).
+    test('every card in, nothing recorded: FINAL RESULTS - the blanks refund, nothing hangs', () => {
+        const b = boot({ confirmed: false, winners: {} });
+        assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), true);
         const t = strip(b.summary());
-        // Re-pinned 2026-09-15 (the Receipt predicate, v149): every card on this
-        // round is in, so the head no longer says the round is still in play; the
-        // KP-only hold has its own head (receipt_final_test.js pins the sentence).
-        assert.match(t, /RESULTS — NOT FINAL/);
-        assert.match(t, /Every card is in\. KP results are still unconfirmed/);
-        assert.ok(!/Final Results/.test(t), 'money with $100 hanging is not final');
-        assert.ok(!/Player Payouts/.test(t), 'and no payout document while it hangs');
+        assert.ok(!/RESULTS — NOT FINAL|unconfirmed/.test(t));
+        assert.match(t, /Final Results/);
+        assert.match(t, /Player Payouts/);
     });
 
-    test('confirming moves the page from LIVE to FINAL', () => {
-        const open = strip(boot({ confirmed: false }).summary());
+    test('the same round still in play is LIVE, and finishing it moves the page to FINAL', () => {
+        const open = boot({ confirmed: false, winners: {} });
+        open.run(`Object.keys(currentData.scores).forEach(k => { if (parseInt(k.split('_h')[1], 10) > 9) delete currentData.scores[k]; });
+                  renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`);
+        const o = strip(open.summary());
+        assert.match(o, /LIVE RESULTS/);
+        assert.ok(!/Final Results|Player Payouts/.test(o), 'money with cards out is not final');
         const done = strip(boot({ confirmed: true }).summary());
-        assert.match(open, /RESULTS — NOT FINAL/);   // re-pinned 2026-09-15, v149 (see above)
         assert.match(done, /Final Results/);
-        assert.match(done, /Player Payouts/, 'the receipt returns once the money settles');
+        assert.match(done, /Player Payouts/, 'the receipt returns once the cards are in');
     });
 
     test('cancelling KPs also settles it', () => {

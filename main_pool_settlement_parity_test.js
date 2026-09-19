@@ -10,13 +10,24 @@
 // The corpus deliberately covers the paths where money behaves differently
 // rather than seven variations of the same round: preset and custom net payouts,
 // remainder and fixed and absent skins buckets, whole-dollar and cents rounds,
-// a scoped participant list, and all three KP states - confirmed, unresolved,
-// and cancelled - because unresolved money is WITHHELD rather than refunded and
-// cancelled money flows into the remainder instead.
+// a scoped participant list, and the KP states - recorded, withheld (a blank
+// hole on a LIVE round), refunded (a blank hole on a FINISHED round), and
+// cancelled - because withheld money is not refunded and cancelled money flows
+// into the remainder instead.
 //
 // If a figure below changes, stop. Either a money rule genuinely changed, in
 // which case it needs saying out loud, or something that was supposed to be
 // cosmetic was not.
+//
+// SAID OUT LOUD, 2026-09-19 (the KP wave, pool-engine.js approved per-file):
+// recording pays - kpConfirmed is ignored - and a blank KP hole on a FINISHED
+// round refunds to the field. Case 03 was a fully scored round with nothing
+// recorded, pinned to the WITHHELD figures; those figures are exactly what a
+// LIVE round (thru 9) produces, so case 03 is now that round and keeps its
+// pins to the cent. Case 08 is the finished-and-unrecorded round, pinned to
+// what the engine produces today: the $100 back to six golfers ($16.67 /
+// $16.66), kpUnresolvedCents 0. Every other case carried kpConfirmed and is
+// unchanged to the cent - the flag was not read.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -46,7 +57,11 @@ const CORPUS = {
         moneyPool: { enabled: true, buyIn: 50, kp: { amount: 60, holes: [4, 14] },
             net: { payoutMode: 'custom', amounts: [40, 30] }, skins: { mode: 'fixed', amount: 170, scoring: 'gross', carryOver: false } },
         kpWinners: kpW, kpConfirmed: { confirmed: true } }),
-    '03 KP unresolved (money withheld)': Object.assign({}, base, {
+    '03 KP not recorded, round LIVE thru 9 (money withheld)': Object.assign({}, base, {
+        scores: (() => { const s = scores([0, 1, 2, 3, 1, 4]); Object.keys(s).forEach(k => { if (parseInt(k.split('_h')[1], 10) > 9) delete s[k]; }); return s; })(),
+        moneyPool: { enabled: true, buyIn: 40, kp: { amount: 100, holes: [4, 9, 14] },
+            net: { amount: 100, places: [60, 40] }, skins: { mode: 'remainder', scoring: 'net', carryOver: true } } }),
+    '08 KP not recorded, round FINISHED (refunded to the field)': Object.assign({}, base, {
         moneyPool: { enabled: true, buyIn: 40, kp: { amount: 100, holes: [4, 9, 14] },
             net: { amount: 100, places: [60, 40] }, skins: { mode: 'remainder', scoring: 'net', carryOver: true } } }),
     '04 KP cancelled, remainder absorbs it': Object.assign({}, base, {
@@ -98,7 +113,7 @@ const PINNED = {
         "refundCents": 0,
         "kpUnresolvedCents": 0
     },
-    "03 KP unresolved (money withheld)": {
+    "03 KP not recorded, round LIVE thru 9 (money withheld)": {
         "totalPoolCents": 24000,
         "perPlayerCents": {
             "101": 6000,
@@ -110,6 +125,19 @@ const PINNED = {
         },
         "refundCents": 0,
         "kpUnresolvedCents": 10000
+    },
+    "08 KP not recorded, round FINISHED (refunded to the field)": {
+        "totalPoolCents": 24000,
+        "perPlayerCents": {
+            "101": 7667,
+            "102": 1667,
+            "103": -2333,
+            "104": -2333,
+            "105": -2334,
+            "106": -2334
+        },
+        "refundCents": 10000,
+        "kpUnresolvedCents": 0
     },
     "04 KP cancelled, remainder absorbs it": {
         "totalPoolCents": 24000,
