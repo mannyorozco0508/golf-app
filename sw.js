@@ -1641,7 +1641,11 @@
 // the native shell (courseApiBase) - '' on the web, so the web path is
 // unchanged. A device on v175 keeps an admin.html whose fetches would resolve
 // against capacitor://localhost once the search guards come off.
-const CACHE_VERSION = 'golfapp-v176-course-api-base';
+// Moved to v177: online course search runs in the native shell - the row, the
+// two proxy fetches, the import's global_courses write, and gca_ reference
+// cards in the picker. A device on v176 keeps an admin.html whose Search
+// online row never renders on the phone.
+const CACHE_VERSION = 'golfapp-v177-native-course-search';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

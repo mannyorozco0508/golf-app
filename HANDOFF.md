@@ -68,6 +68,29 @@ curl -sL "https://codeload.github.com/mannyorozco0508/golf-app/tar.gz/refs/heads
 - **`com.rattlegolf.app` is the permanent iOS bundle id and is NOT a domain reference.** A reverse-DNS bundle id requires no ownership, and it cannot change once the App Store Connect record exists. It appears in **8 files**: `capacitor.config.ts`, `ios/App/App.xcodeproj/project.pbxproj`, `native_packaging_test.js`, `rattle_identity_test.js`, `support_contact_test.js`, `native-ios-release-check.md`, `product-separation.md`, `HANDOFF.md`. Changing it would not rename the app — it would create a different one and orphan Apple ID 6808220335, the TestFlight builds and the reviews
 - Privacy policy live at `golf-app-5a5.pages.dev/privacy.html`, support at `/support.html`, terms at `/terms.html`. **Cloudflare serves clean URLs**: `/privacy.html` answers 308 and redirects to `/privacy`, which is 200. Both forms work; use whichever App Store Connect accepts. Verified served 2026-09-09, byte-identical to commit `1eb5c90`
 
+- **BEFORE THE NEXT TESTFLIGHT OR SUBMISSION - THE REVIEW NOTES ARE OUT OF DATE (2026-09-19).**
+  The reply to the September Guideline 2.1 "Information Needed" described the iOS course
+  directory as one golfers cannot add to or edit and named Firebase as the only external
+  service. Both stopped being true on 2026-09-19: the online course search runs in the shell
+  (the "Search online" row, `/api/course-search` and `/api/course/<id>` through the Cloudflare
+  proxy to golfcourseapi, the import's `global_courses` write, and `gca_` reference cards
+  listed in the native picker). This is a LOCAL build for Manny's phone only; nothing has
+  been uploaded. Before any upload the Review Notes must (1) name **golfcourseapi** as a
+  second external service, reached through the app's own Cloudflare proxy, and (2) describe
+  **Search online as importing reference scorecards** from a course database - not golfers
+  creating or editing courses. What is still native-only: the hidden panel (five taps), the
+  publish of an EDITED card from Save & Start Round, and the `comm_` community list (the
+  stranger-content claim - a separate decision). `native_review_surface_test.js`'s header
+  records the inversion; recorded here, not acted on.
+- **The native shell reaches the proxy since a3b748d (2026-09-19):** `functions/api/_lib.js`
+  echoes `Access-Control-Allow-Origin` for exactly `capacitor://localhost`,
+  `http://localhost` and `https://localhost` (+ `Vary: Origin`); a same-origin web request
+  gets nothing added; an unknown origin gets nothing. `admin.html courseApiBase()` names the
+  proxy by `GOLF_WEB_ORIGIN` inside the shell and is `''` on the web - the same proxy, no
+  second path. Measured live after the deploy (a real GET each way; the headers are in
+  `rattle-cors-deployed-20260919.txt`). Until then native search could not have worked
+  even without the guards: a relative `/api/...` resolved against `capacitor://localhost`.
+
 **Not done yet:** external TestFlight testers, the EU trader declaration (required or the app is pulled from the EU store), and the Paid Apps Agreement (required for any in-app purchase; needs banking and tax info).
 
 To ship a new build: `node sync-mobile-web.js && npx cap sync ios`, **then `npm test` — `native_bundle_freshness_test.js` is what proves the sync actually landed**, bump **Build** in Xcode (Version stays 1.0.0), Archive, Distribute → App Store Connect. Running the test after the archive proves nothing about the archive; run it before.

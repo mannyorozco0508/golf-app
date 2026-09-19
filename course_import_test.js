@@ -158,7 +158,8 @@ describe('2. A NAME MATCH WRITES TO THE DIRECTORY KEY, AND THE PANEL SAYS SO', (
     // cases live in course_picker_imports_test.js; this pins the predicate.
     test('a gca_ key is offered by the picker afterwards - the filter names both prefixes', () => {
         const src = fs.readFileSync(path.join(REPO_ROOT, PAGE), 'utf8');
-        assert.ok(src.includes('Object.keys(globalCourses).filter(k => k.startsWith("comm_") || k.startsWith("gca_"))'),
+        // RE-PINNED 2026-09-19: gca_ is listed in every context (the shell too); comm_ only off the shell.
+        assert.ok(src.includes('Object.keys(globalCourses).filter(k => ' + 'k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_"))' + ')'),
             'the community filter must list gca_ keys, or an import is written and never offered again');
     });
 

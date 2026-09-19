@@ -136,11 +136,15 @@ describe('WHAT DID NOT CHANGE', () => {
         assert.ok(rows.some(r => r.id === 'course-online-search-row'), 'the online row must still be offered');
         assert.ok(t.some(x => /Search online for "dobson ranch"/.test(x)));
     });
-    test('the native shell still lists no community course of either prefix (deliberate, pending Manny\'s decision on gca_)', () => {
+    test('the native shell lists the gca_ reference card and NOT the comm_ course (decided 2026-09-19: an import is reusable on the phone; a stranger\'s card stays a separate decision)', () => {
+        // RE-PINNED 2026-09-19. Until then this asserted neither prefix listed
+        // natively, "pending Manny's decision on gca_". Decided: gca_ yes, comm_ no.
         const sb = page({ gca_bwcdmzcy: LEGACY, comm_probecourse: PROBE });
         vm.runInContext('isNativeApp = () => true', sb);
         const rows = type(sb, 'legacy');
-        assert.equal(rows.filter(r => /Legacy Golf Resort|Probe Course/.test(r.textContent || '')).length, 0, JSON.stringify(texts(rows)));
+        assert.equal(rows.filter(r => /Legacy Golf Resort/.test(r.textContent || '')).length, 1, 'gca_ listed natively: ' + JSON.stringify(texts(rows)));
+        const rows2 = type(sb, 'probe');
+        assert.equal(rows2.filter(r => /Probe Course/.test(r.textContent || '')).length, 0, 'comm_ still hidden natively: ' + JSON.stringify(texts(rows2)));
     });
     test('an import named exactly like a directory entry lands on the DIRECTORY key, so the picker shows one row, not a shadow', () => {
         // The key rule (course_import_test.js) is what prevents a second physical
@@ -154,10 +158,10 @@ describe('WHAT DID NOT CHANGE', () => {
         const rows = type(sb, 'camas meadows');
         assert.equal(rows.filter(r => (r.textContent || '') === 'Camas Meadows Golf Club').length, 1, JSON.stringify(texts(rows)));
     });
-    test('the filter in source names both prefixes and nothing else', () => {
+    test('the filter in source names both prefixes and nothing else - gca_ everywhere, comm_ off the shell (re-pinned 2026-09-19)', () => {
         const src = read(PAGE);
         const m = /Object\.keys\(globalCourses\)\.filter\(k => (.+?)\);/.exec(src);
         assert.ok(m, 'the community filter is not where it was');
-        assert.equal(m[1], 'k.startsWith("comm_") || k.startsWith("gca_")');
+        assert.equal(m[1], 'k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_"))');
     });
 });

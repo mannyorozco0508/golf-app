@@ -147,7 +147,8 @@ describe('THE PAGE EXPOSES ONE MATCHER, AND BOTH FILTERS USE IT', () => {
     // matcher on the name. course_picker_imports_test.js drives the page.
     test('the community half lists both prefixes and still asks courseNameMatches', () => {
         const src = stripComments(fs.readFileSync(path.join(REPO_ROOT, PICKER_PAGE), 'utf8'));
-        const at = src.indexOf('k.startsWith("comm_") || k.startsWith("gca_")');
+        // RE-PINNED 2026-09-19: the filter reads gca_ first (every context) and comm_ off the shell.
+        const at = src.indexOf('k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_"))');
         assert.ok(at > 0, 'the community filter no longer names both comm_ and gca_');
         assert.match(src.slice(at, at + 400), /courseNameMatches\(filterText, globalCourses\[k\]\.name\)/,
             'the community list must match names through courseNameMatches, whatever the key prefix');

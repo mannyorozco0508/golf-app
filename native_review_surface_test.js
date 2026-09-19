@@ -1,4 +1,35 @@
 // ============================================================================
+// TWO OF THE FIVE NATIVE NO-OPS CAME OFF ON 2026-09-19 - READ THIS FIRST.
+//
+// Sections 3 and 4 below are INVERTED from the file's first version, on
+// purpose, and the review reply they were written for is now partly out of
+// date. Manny decided (2026-09-19, "all three approved") that the iOS app
+// gets the same online course search as the web: three characters, the
+// "Search online" row, /api/course-search, then /api/course/<id> on a pick,
+// the same import rules, and the global_courses write that makes the
+// imported card the round's card - AND that the picker lists gca_ courses
+// natively so an import is reusable. So:
+//   - section 3 now proves the row IS offered in the shell and the two
+//     fetches DO go out - to the proxy by its canonical origin
+//     (https://golf-app-5a5.pages.dev, admin.html courseApiBase), because a
+//     relative /api/... inside capacitor://localhost reaches nothing; the web
+//     arm proves the relative URL is unchanged;
+//   - section 5 (new) drives an IMPORT end to end in both contexts: the
+//     search, the pick, the confirm, the ONE update() to global_courses/gca_*
+//     and the course landing in the round;
+//   - section 4 keeps comm_ hidden natively (the stranger-content claim is a
+//     separate decision) and now proves gca_ IS listed natively;
+//   - sections 1 and 2 (the hidden panel; no publish of an EDITED card from
+//     Save & Start Round) are unchanged.
+// WHAT THIS DOES TO THE APP STORE REPLY - recorded in HANDOFF, not acted on:
+// the reply said iOS has a course directory golfers cannot add to, and named
+// Firebase as the only external service. Both stop being true with this
+// build. Before the next TestFlight or submission the Review Notes must name
+// golfcourseapi and describe Search online as importing reference cards.
+//
+// The original header follows; where it says "contradict the reply", read
+// "contradicted the reply as first written".
+// ============================================================================
 // THREE NATIVE-BUNDLE BEHAVIOURS THAT CONTRADICT THE APP STORE REPLY.
 //
 // The reply to Apple's Guideline 2.1 (Information Needed) request states that
@@ -149,7 +180,10 @@ const DB = {
         // strangers" the App Store reply is about, and it is also the positive
         // control: if the stub never delivers it, "not listed natively" would be
         // true of a picker that lists nothing.
-        comm_stranger_links: { name: 'Pine Stranger Links', data: CD }
+        comm_stranger_links: { name: 'Pine Stranger Links', data: CD },
+        // A REFERENCE CARD imported from the course database (2026-09-19): the
+        // key shape the import writes, and the one the native picker now lists.
+        gca_pineref01: { name: 'Pine Reference Links', data: CD, source: { provider: 'golfcourseapi', providerCourseId: 'pineref01' } }
     }
 };
 
@@ -287,6 +321,79 @@ function pickerDriver(query) {
     })();`;
 }
 
+// ---------------------------------------------------------------------------
+// DRIVER 1c - THE IMPORT (2026-09-19). Type, tap the online row, tap the result,
+// tap Import. The network is the only thing replaced: this instrument RESOLVES
+// the two proxy calls with a real-shaped search result and a real-shaped
+// detail (the Legacy Golf Resort fixture course_import_test.js uses), so the
+// page runs its own import rules and its own write. Every URL is still
+// recorded, which is how the base is measured in both contexts.
+// ---------------------------------------------------------------------------
+const IMPORT_DETAIL = {
+    id: 'bwcdmzcy', club_name: 'Legacy Golf Resort', course_name: 'Legacy Golf Resort',
+    location: { address: '6808 S 32nd St, Phoenix, AZ 85042, USA', city: 'Phoenix', state: 'AZ', country: 'United States' },
+    tees: { male: [{ tee_name: 'Copper', course_rating: 72.1, slope_rating: 128, total_yards: 6768, par_total: 71,
+                     holes: Array.from({ length: 18 }, (_, i) => ({ par: [4,4,3,5,4,4,3,5,4,4,4,3,5,4,4,3,5,4][i], yardage: 400, handicap: [7,1,17,3,9,13,15,5,11,8,2,18,4,10,14,16,6,12][i] })) }],
+            female: [] }
+};
+const IMPORT_INSTRUMENT = `
+    window.__fetches = [];
+    window.fetch = function (u) {
+        var url = String(u); window.__fetches.push(url);
+        var body = null;
+        if (/\\/api\\/course-search\\?q=/.test(url)) body = { status: 'ok', courses: [{ id: 'bwcdmzcy', club_name: 'Legacy Golf Resort', course_name: 'Legacy Golf Resort', location: { city: 'Phoenix', state: 'AZ', country: 'United States' }, tees: { male: 1, female: 0 } }] };
+        else if (/\\/api\\/course\\/bwcdmzcy$/.test(url)) body = { status: 'ok', course: ${JSON.stringify(IMPORT_DETAIL)} };
+        if (!body) return Promise.reject(new Error('unexpected fetch ' + url));
+        return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(body); } });
+    };`;
+const IMPORT_DRIVER = `
+    (function () {
+      window.__trace = [];
+      var step = 0, tries = 0;
+      var visible = function (el) { return !!(el && (el.offsetParent !== null || (el.getClientRects && el.getClientRects().length > 0))); };
+      var iv = setInterval(function () {
+        if (++tries > 260) { window.__trace.push('TIMEOUT at step ' + step); clearInterval(iv); return; }
+        try {
+          if (step === 0) {
+            var input = document.getElementById('course-search-input');
+            if (visible(input)) { window.__trace.push('picker visible'); step = 1; return; }
+            for (var b = 7; b >= 2; b--) { var back = document.getElementById('wizard-back-' + b); if (visible(back) && !back.disabled) { back.click(); return; } }
+            return;
+          }
+          if (step === 1) {
+            var i2 = document.getElementById('course-search-input');
+            i2.focus(); i2.dispatchEvent(new Event('focus', { bubbles: true }));
+            i2.value = 'Legacy'; i2.dispatchEvent(new Event('input', { bubbles: true }));
+            window.__trace.push('typed Legacy'); step = 2; return;
+          }
+          if (step === 2) {
+            var online = document.getElementById('course-online-search-row');
+            if (!online) { window.__trace.push('NO ONLINE ROW'); clearInterval(iv); return; }
+            online.click(); window.__trace.push('tapped the online row'); step = 3; return;
+          }
+          if (step === 3) {
+            var result = document.querySelector('#course-dropdown .course-online-result');
+            if (!result) return;
+            result.click(); window.__trace.push('tapped ' + result.innerText.trim().slice(0, 40)); step = 4; return;
+          }
+          if (step === 4) {
+            var btn = document.getElementById('course-import-confirm-btn');
+            if (!btn) return;
+            btn.click(); window.__trace.push('tapped Import: ' + btn.textContent.trim()); step = 5; clearInterval(iv); return;
+          }
+        } catch (e) { window.__trace.push('threw: ' + (e && e.message)); clearInterval(iv); }
+      }, 60);
+    })();`;
+const IMPORT_PROBE = `
+(() => JSON.stringify({
+    trace: window.__trace || [], ready: window.__ready || [],
+    isNativeClass: document.documentElement.classList.contains('is-native'),
+    fetches: window.__fetches || [], gcWrites: window.__gcWrites || [],
+    selectedKey: (document.getElementById('course-select') || {}).value || null,
+    confirmPanelGone: !document.getElementById('course-import-confirm'),
+    alerts: window.__alerts || []
+}))()`;
+
 const LANDING_PROBE = `
 (() => {
   const panel = document.getElementById('secret-master-panel');
@@ -394,11 +501,13 @@ const SAVE_PROBE = `
   });
 })()`;
 
-async function arrive(native, driver, probe, settleMs, query) {
+async function arrive(native, driver, probe, settleMs, query, instrument) {
     const r = await arriveCold({
         url: query === null ? fileUrl(PAGE) : fileUrl(PAGE, 'game=' + CODE),
         db: DB,
-        preScript: (native ? NATIVE_PRESCRIPT : '') + INSTRUMENT + withReadyGate(driver),
+        // The import journey swaps the REJECTING fetch for one that answers;
+        // the global_courses recorder and the alert/confirm stubs stay.
+        preScript: (native ? NATIVE_PRESCRIPT : '') + INSTRUMENT + (instrument || '') + withReadyGate(driver),
         expression: probe,
         settleMs: settleMs
     });
@@ -411,7 +520,7 @@ async function arrive(native, driver, probe, settleMs, query) {
 // four times rather than once per test.
 const S = {};
 before(async () => {
-    // SIX ARRIVALS, SEQUENTIAL. Three journeys - lobby, picker, save - each run
+    // EIGHT ARRIVALS, SEQUENTIAL. Four journeys - lobby, picker, save, import - each run
     // twice, native and web. They are not run in parallel: concurrent Chrome
     // instances driving the same profile directory is what corrupted three
     // earlier measurement runs in this repo.
@@ -421,6 +530,9 @@ before(async () => {
     S.webPicker = await arrive(false, pickerDriver('Pine'), LANDING_PROBE, 15000);
     S.nativeSave = await arrive(true, SAVE_DRIVER, SAVE_PROBE, 22000);
     S.webSave = await arrive(false, SAVE_DRIVER, SAVE_PROBE, 22000);
+    // EIGHT now (2026-09-19): the import journey, native and web.
+    S.nativeImport = await arrive(true, IMPORT_DRIVER, IMPORT_PROBE, 18000, undefined, IMPORT_INSTRUMENT);
+    S.webImport = await arrive(false, IMPORT_DRIVER, IMPORT_PROBE, 18000, undefined, IMPORT_INSTRUMENT);
 });
 
 const ran = (s, name) => {
@@ -432,8 +544,8 @@ describe('THE HARNESS REACHED THE PAGE, AND THE TWO CONTEXTS DIFFER', () => {
 
     // POSITIVE FIRST, because every native assertion in this file is an absence
     // and every absence is true of a page that failed to load.
-    test('all four arrivals ran and rendered admin.html', () => {
-        ['nativeLobby', 'webLobby', 'nativePicker', 'webPicker', 'nativeSave', 'webSave'].forEach((k) => {
+    test('all eight arrivals ran and rendered admin.html', () => {
+        ['nativeLobby', 'webLobby', 'nativePicker', 'webPicker', 'nativeSave', 'webSave', 'nativeImport', 'webImport'].forEach((k) => {
             ran(S[k], k);
         });
         assert.ok(S.nativeLobby.panelExists,
@@ -533,60 +645,70 @@ describe('2 - NO PERMANENT WRITE TO THE SHARED COURSE LIST FROM THE NATIVE SHELL
     });
 });
 
-describe('3 - ONE EXTERNAL SERVICE: NO ONLINE SEARCH ROW, AND NO /api CALL', () => {
+describe('3 - THE ONLINE SEARCH IS OFFERED IN THE SHELL TOO, THROUGH THE PROXY BY ITS CANONICAL ORIGIN (inverted 2026-09-19)', () => {
+    // Until 2026-09-19 this section proved the OPPOSITE: no row natively, and
+    // nothing reaching /api. Manny lifted the search no-ops so the phone gets
+    // the web's search; the row and the fetch guards at admin.html are gone.
+    // What is measured now is that the row is there, that a tap fetches, and
+    // that the fetch names the proxy by its canonical origin - the reason the
+    // search could never have worked natively even without the guards.
+    const ORIGIN = 'https://golf-app-5a5.pages.dev';
 
-    test('NATIVE: typing a course name renders no online-search row', () => {
+    test('NATIVE: typing a course name renders the online-search row', () => {
         const s = ran(S.nativePicker, 'nativePicker');
         assert.ok(s.atType, 'the picker snapshot was never taken: ' + JSON.stringify(s.trace));
-        assert.equal(s.atType.onlineRowExists, false,
-            'the native app offers "Search online" - a second external service, advertised on '
-            + 'screen.\n  rows: ' + JSON.stringify(s.atType.rowText));
-        assert.ok(!s.atType.rowText.some((t) => /Search online for/.test(t)),
-            'an online-search row is rendered under a different id: '
+        assert.equal(s.atType.onlineRowExists, true,
+            'the native app no longer offers "Search online" - the row guard is back.\n  rows: '
             + JSON.stringify(s.atType.rowText));
     });
 
-    test('NATIVE: nothing reaches /api/ - including when a row is tapped', () => {
+    test('NATIVE: tapping it calls the proxy at its canonical origin - an ABSOLUTE URL, not capacitor://localhost/api', () => {
         const s = ran(S.nativePicker, 'nativePicker');
-        const api = (s.fetches || []).filter((u) => /\/api\//.test(u));
-        assert.deepEqual(api, [],
-            'the native app called the course API proxy: ' + JSON.stringify(api));
-        const netApi = (s.requests || []).filter((u) => /\/api\//.test(u));
-        assert.deepEqual(netApi, [],
-            'a request to /api/ was seen on the wire even though window.fetch recorded none: '
-            + JSON.stringify(netApi));
+        const api = (s.fetches || []).filter((u) => /\/api\/course-search/.test(u));
+        assert.deepEqual(api, [ORIGIN + '/api/course-search?q=Pine'],
+            'the native tap did not fetch the proxy by its canonical origin. A relative URL '
+            + 'resolves against capacitor://localhost, which serves no proxy.\n  fetches: '
+            + JSON.stringify(s.fetches) + '\n  trace: ' + JSON.stringify(s.trace));
     });
 
-    test('NATIVE: the picker still finds courses - the guard removed a row, not the search', () => {
+    test('NATIVE: the picker still finds directory courses beside the row', () => {
         const s = ran(S.nativePicker, 'nativePicker');
         assert.ok(s.atType.rowText.some((t) => /Pine Lakes|McCormick|Myrtlewood/i.test(t)),
-            'typing "Pine" natively returns no courses at all. The guard broke the picker '
-            + 'instead of removing one row.\n  rows: ' + JSON.stringify(s.rowText));
+            'typing "Pine" natively returns no directory courses.\n  rows: ' + JSON.stringify(s.rowText));
     });
 
-    test('WEB: the online row is still offered and still calls /api/course-search', () => {
+    test('WEB: the online row is still offered and still calls the RELATIVE /api/course-search - byte for byte as before', () => {
         const s = ran(S.webPicker, 'webPicker');
         assert.ok(s.atType, 'the picker snapshot was never taken: ' + JSON.stringify(s.trace));
         assert.equal(s.atType.onlineRowExists, true,
-            'the web picker no longer offers the online search: '
-            + JSON.stringify(s.atType.rowText));
+            'the web picker no longer offers the online search: ' + JSON.stringify(s.atType.rowText));
         const api = (s.fetches || []).filter((u) => /\/api\/course-search/.test(u));
-        assert.ok(api.length >= 1,
-            'tapping the online row on the web issued no /api/course-search call. Either the '
-            + 'native guard fired on the web, or the row stopped working.\n  fetches: '
+        assert.deepEqual(api, ['/api/course-search?q=Pine'],
+            'the web fetch changed. courseApiBase() must be the empty string off the shell.\n  fetches: '
             + JSON.stringify(s.fetches) + '\n  trace: ' + JSON.stringify(s.trace));
     });
 });
 
 describe('4 - NO STRANGER CONTENT: COMMUNITY COURSES ARE NOT LISTED NATIVELY', () => {
 
-    test('NATIVE: a comm_ course written by another user is not offered', () => {
+    test('NATIVE: a comm_ course written by another user is not offered (unchanged 2026-09-19 - a separate decision)', () => {
         const s = ran(S.nativePicker, 'nativePicker');
         assert.ok(!s.atType.rowText.some((t) => /Stranger Links/.test(t)),
             'the native picker lists a course another user wrote - user-generated content shown '
             + 'to strangers, with no report or block path.\n  rows: ' + JSON.stringify(s.rowText));
-        assert.ok(!s.atType.rowText.some((t) => /Community Mapped/i.test(t)),
-            'the Community Mapped Courses heading is still rendered natively');
+    });
+
+    test('NATIVE: a gca_ reference card IS listed (2026-09-19) - an import is reusable on the phone', () => {
+        const s = ran(S.nativePicker, 'nativePicker');
+        assert.ok(s.atType.rowText.some((t) => /Pine Reference Links/.test(t)),
+            'the native picker does not list the gca_ course - a golfer who imports a course '
+            + 'would be offered "Search online" again next round (the half-feature).\n  rows: '
+            + JSON.stringify(s.atType.rowText));
+    });
+
+    test('WEB: the gca_ card is listed there too, as since v162', () => {
+        const s = ran(S.webPicker, 'webPicker');
+        assert.ok(s.atType.rowText.some((t) => /Pine Reference Links/.test(t)), JSON.stringify(s.atType.rowText));
     });
 
     test('WEB: it is still offered, exactly as today', () => {
@@ -600,4 +722,32 @@ describe('4 - NO STRANGER CONTENT: COMMUNITY COURSES ARE NOT LISTED NATIVELY', (
             + 'above is vacuous - it would pass against a picker that lists nothing.\n  rows: '
             + JSON.stringify(s.rowText));
     });
+});
+
+describe('5 - THE IMPORT LANDS IN BOTH CONTEXTS (2026-09-19): search, pick, confirm, ONE write, the course selected', () => {
+    // The write no-op at commitPendingImport is gone: without it the phone
+    // could search and pick and then tap Import into nothing - the round reads
+    // its card from globalCourses[key], so the write IS the import.
+    const ORIGIN = 'https://golf-app-5a5.pages.dev';
+    for (const [label, key, base] of [['NATIVE', 'nativeImport', ORIGIN], ['WEB', 'webImport', '']]) {
+        test(`${label}: the two proxy calls, in order, through the base for this context`, () => {
+            const s = ran(S[key], key);
+            assert.deepEqual((s.fetches || []).filter((u) => /\/api\//.test(u)),
+                [base + '/api/course-search?q=Legacy', base + '/api/course/bwcdmzcy'],
+                'trace: ' + JSON.stringify(s.trace));
+        });
+        test(`${label}: exactly one update() to global_courses/gca_bwcdmzcy, carrying name, data, source, location and tees`, () => {
+            const s = ran(S[key], key);
+            assert.equal(s.gcWrites.length, 1, 'writes: ' + JSON.stringify(s.gcWrites) + '\n  trace: ' + JSON.stringify(s.trace));
+            assert.equal(s.gcWrites[0].path, 'global_courses/gca_bwcdmzcy');
+            assert.equal(s.gcWrites[0].method, 'update');
+            assert.deepEqual(s.gcWrites[0].keys, ['data', 'location', 'name', 'source', 'tees'], 'the record shape buildImportRecord writes');
+        });
+        test(`${label}: the imported course is the round's selection and the confirm panel is gone`, () => {
+            const s = ran(S[key], key);
+            assert.equal(s.selectedKey, 'gca_bwcdmzcy', 'trace: ' + JSON.stringify(s.trace));
+            assert.equal(s.confirmPanelGone, true);
+            assert.deepEqual(s.alerts, [], 'an alert fired during the import: ' + JSON.stringify(s.alerts));
+        });
+    }
 });

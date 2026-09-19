@@ -2114,12 +2114,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // keystroke, a Save - which is always after load. Do not move one of these
     // into a render that runs at parse time without re-checking that.
     //
-    // WHY ANY OF THIS EXISTS: the App Store reply states the iOS app has no
-    // hidden features, no user content visible to strangers, and one external
-    // service. admin.html ships in the iOS bundle (CONSUMER_SHELL in
-    // sync-mobile-web.js), so each of those three claims needs a native no-op
-    // here. The WEB product is unchanged, and native_review_surface_test.js
-    // holds both halves of that: native absent, web present.
+    // WHY ANY OF THIS EXISTS: the App Store reply (September 2026) stated the
+    // iOS app has no hidden features, no user content visible to strangers,
+    // and one external service. admin.html ships in the iOS bundle
+    // (CONSUMER_SHELL in sync-mobile-web.js), so each claim got a native
+    // no-op here. TWO OF THEM CAME OFF ON 2026-09-19: the online course search
+    // (the row, the two proxy fetches, and the import's global_courses write)
+    // now runs in the shell exactly as on the web, and the picker lists gca_
+    // reference cards natively. What remains native-only: the hidden panel,
+    // the publish of an EDITED card from Save & Start Round, and the comm_
+    // (stranger-mapped) list - the last is a separate decision. The Review
+    // Notes must name golfcourseapi before the next submission (HANDOFF).
+    // native_review_surface_test.js holds both halves of every one of these.
     // ========================================================================
     function isNativeApp() {
         try {
@@ -3778,11 +3784,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // A SECOND TAP MUST NOT SPEND A SECOND REQUEST. Without this, an
         // impatient thumb costs two of the day's lookups for one query.
         if (onlineSearchInFlight) return;
-        // NATIVE NO-OP AT THE NETWORK ITSELF. G3 removes the row, so nothing
-        // native can tap its way here; this is the independent second guard, and
-        // native_review_surface_test.js proves it fires ON ITS OWN - with the row
-        // guard removed and the row tapped, no request is made.
-        if (isNativeApp()) return;
+        // The native no-op that stood here until 2026-09-19 is gone: the shell
+        // searches through the same proxy, reached by courseApiBase().
         onlineSearchInFlight = true;
         if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
 
@@ -3875,10 +3878,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
     async function openImportConfirm(course) {
-        // NATIVE NO-OP. Same reasoning as the search fetch above: the second
-        // request of an import is spent here, and it must not be spendable from
-        // the iOS app by any route.
-        if (isNativeApp()) return;
+        // (The native no-op that stood here came off on 2026-09-19 with the search's.)
         courseDropdown.innerHTML = "";
         courseDropdown.appendChild(renderDropdownNote('Fetching the card…'));
 
@@ -4026,11 +4026,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // ---- THE WRITE. Merged, validated, and only from the affirmative press. ----
     function commitPendingImport() {
         if (!pendingImport) return;
-        // NATIVE NO-OP, and a backstop rather than the main gate: the native
-        // shell never renders the online row, so this is unreachable there. It
-        // is here because it is a WRITE to a node no client can delete, and a
-        // write like that should not depend on an earlier screen staying hidden.
-        if (isNativeApp()) return;
+        // THE WRITE RUNS IN THE SHELL TOO (2026-09-19). The native no-op that
+        // stood here made a phone's search end at a dead Import button: the
+        // round reads its card from globalCourses[key] (handleCourseChange,
+        // buildFinalCourseData), so this write IS the import - the selection
+        // below is meaningless without it. Same rules, same key shape
+        // (gca_<providerCourseId>, held by database.rules.json), both contexts.
         // VALIDATED AGAINST THE GRID THE GOLFER JUST SAW, not against what the
         // provider sent - they may have corrected a cell, and the card that gets
         // written must be the card that was on screen.
@@ -4153,13 +4154,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // and was never offered - the golfer was told "No local match" and
         // offered to buy the same import again. The record was always shared;
         // this makes it reachable. course_picker_imports_test.js holds it.
-        // The native list stays empty for BOTH prefixes until that is decided
-        // on its own - an import from a course database is not a stranger's
-        // hand-typed card, but the review reply that hid the community list
-        // did not draw that line, and this wave does not draw it for it.
-        const globalKeys = isNativeApp()
-            ? []
-            : Object.keys(globalCourses).filter(k => k.startsWith("comm_") || k.startsWith("gca_"));
+        // THE LINE IS DRAWN (2026-09-19): a gca_ record is a REFERENCE CARD
+        // imported from the course database and is listed in the shell too, so
+        // an import is reusable next round instead of being searched for (and
+        // paid for) again. comm_ - a stranger's hand-typed card - stays off the
+        // native list: that is the review reply's stranger-content claim and a
+        // separate decision.
+        const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_")));
         if (globalKeys.length > 0) {
             const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
             if (filteredGlobals.length > 0) {
@@ -4202,10 +4203,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         //
         // Three characters is the proxy's own MIN_QUERY, so a golfer can never
         // tap a row whose answer is already decided to be a refusal.
-        // NATIVE NO-OP: the second external service is not advertised in the iOS
-        // app. The rest of the picker is untouched - the local directory and the
-        // golfer's own courses still match and still list.
-        if (typedName.length >= 3 && !isNativeApp()) {
+        // OFFERED IN THE SHELL TOO (2026-09-19). Until then the row was a native
+        // no-op - "the second external service is not advertised in the iOS
+        // app" - and the Review Notes said Firebase only; they must name
+        // golfcourseapi before the next submission (HANDOFF).
+        if (typedName.length >= 3) {
             const online = document.createElement("div");
             online.className = "custom-select-option";
             online.id = "course-online-search-row";
