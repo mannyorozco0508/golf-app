@@ -298,8 +298,8 @@ describe('ROUND READY: ONE LINK IS THE HEADLINE THING TO SEND', () => {
         const t = strip(h);
         assert.match(t, /Send this link to everyone/);
         assert.match(t, /One link for the whole round — each golfer picks their group when they open it\. Or tell them the code MNDY2A: in the app, tap Open and pick your group\./);
-        assert.match(h, /copyGroupLink\('https:\/\/golf-app-5a5\.pages\.dev\/index\.html\?game=MNDY2A', 0\)/, 'the bare round link, copyable');
-        assert.ok(h.indexOf('rr-round-link') < h.indexOf('group-link-row'), 'headline first');
+        assert.match(h, /copyRoundLink\('https:\/\/golf-app-5a5\.pages\.dev\/index\.html\?game=MNDY2A'\)/, 'the bare round link, copyable - its own copier (2026-09-20; copyGroupLink(url, 0) said "Group 0")');
+        assert.ok(h.indexOf('rr-round-link') < h.indexOf('class="group-link-row"'), 'headline first');
         assert.match(t, /Or send each group its own link/);
         assert.equal((h.match(/class="group-link-row"/g) || []).length, 3, 'the per-group rows are still there, one each');
         assert.match(h, /game=MNDY2A&group=3/);
@@ -311,8 +311,14 @@ describe('ROUND READY: ONE LINK IS THE HEADLINE THING TO SEND', () => {
         assert.match(h, /game=MNDY2A&group=1/);
     });
     test('the headline is not a .group-link-row, so the field-coverage measurement (tools/round-share-check.js) counts what it always counted', () => {
+        // RE-PINNED 2026-09-20: the first version sliced up to the first
+        // 'group-link-row' - which was INSIDE the headline's own class list
+        // ("group-link-row rr-round-link-row"), so the slice was empty and the
+        // negative vacuous. The headline row shipped with the counted class and
+        // tools/round-share-check.js failed on it. Positive assertion first now.
         const h = ready(12);
-        const head = h.slice(h.indexOf('rr-round-link'), h.indexOf('group-link-row'));
-        assert.doesNotMatch(head, /class="group-link-row"/);
+        const head = h.slice(h.indexOf('rr-round-link'), h.indexOf('Or send each group'));
+        assert.match(head, /class="rr-round-link-row"/, 'the headline row exists');
+        assert.doesNotMatch(head, /group-link-row/);
     });
 });

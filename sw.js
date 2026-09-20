@@ -1679,7 +1679,12 @@
 // to set up new rounds" on Round Ready and the Review step - the first warning
 // before the wall, and the tell for a pass orphaned by a reinstall. A device on
 // v183 keeps the wall as the only sentence.
-const CACHE_VERSION = 'golfapp-v184-trial-standing';
+// Moved to v185: the copy messages say what they did. The whole-round link's
+// Copy no longer alerts "Copied Group 0's scorekeeper link"; a group's copy
+// names its golfers; the organizer link's copy carries its caution; and the
+// whole-round row lost the class the share-coverage tool counts. A device on
+// v184 keeps the Group 0 sentence.
+const CACHE_VERSION = 'golfapp-v185-copy-messages';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

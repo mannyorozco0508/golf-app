@@ -1076,6 +1076,42 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## The copy messages say what they did (2026-09-20, v185)
+
+**Seen on Manny's phone:** Copy Link on Round Ready's "📣 The whole round" block alerted
+"Copied Group 0's scorekeeper link! Send this ONLY to that group." **Cause, mine:** the
+group-picker wave (75033f1) built that headline by reusing the group rows' copier -
+`copyGroupLink(url, 0)` with a placeholder for the number - and that function had one
+message, which printed it. **Worse, found while here:** the same wave gave the headline
+row the `group-link-row` class, and `tools/round-share-check.js` counts
+`#rr-links-box .group-link-row` to prove the group links cover the field exactly once -
+measured before the fix: FAIL on every roster size ("expected 2 group link(s), found 3",
+"two links can write the same card"). The mini-dom test meant to guard that had sliced up
+to the first 'group-link-row', which sat inside the headline's own class list, so its
+negative was vacuous - re-pinned with a positive assertion first (CLAUDE.md's rule, met
+again). Fixed: `copyRoundLink(url)` and `.rr-round-link-row` (the row's look, its own
+class); the tool PASSES.
+
+**The wording** (alerts still - three of the 213 in the Part 3 inventory, gone with the
+rest when the toast exists): whole round → "Copied. Paste it into your group text —
+everyone picks their own group when they open it." · a group → "Copied Group 3’s link —
+Marty, Mike, Tanner, Glen." (`copyGroupLink(url, n, names)`; the names ride the onclick as
+an HTML-escaped JSON string, so O'Ray survives) · the organizer link on the scorecard's
+Group Links panel → "Copied your organizer link. It can correct any score in the round —
+keep it to yourself." (`copyOrganizerLinkFromScorecard`; it had no message at all, only
+the "✅ Copied" button, and it grants the whole-field override). The panel's GROUP rows
+keep their silent "✅ Copied" button - no dialog was there and none is added. The old
+"Send this ONLY to that group" is gone: it warned about a friend scoring the wrong
+foursome, and the picker makes the whole-round link the normal path.
+
+**Tests.** `copy_messages_test.js` (10: each copier invoked with the arguments its row's
+own onclick carries; the messages; the headline's class; the URL still first in the
+onclick, where the coverage tool reads it; the apostrophe; a foursome; the old sentence
+gone; the organizer caution; the group rows silent; no organizer row without a token).
+Five controls fire (the headline borrowing the group message, the names lost, the wrong
+group's names, the counted class back, the caution dropped). `sw.js`
+`golfapp-v185-copy-messages`.
+
 ## The founder pass, and a line that says where the trial stands (2026-09-20, v184)
 
 **THE PASS - a production write, done by hand on 2026-09-20 11:34 UTC.**

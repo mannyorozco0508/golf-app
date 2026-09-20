@@ -4988,7 +4988,7 @@ html {
                 + '<div class="glr-title">\uD83D\uDD11 Organizer Link</div>'
                 + '<div class="glr-names">Full final-score review \u2014 keep this one private</div>'
                 + '</div>'
-                + '<button class="glr-copy" onclick="copyGroupLinkFromScorecard(\'' + orgUrl + '\', 0, this)">\uD83D\uDCCB Copy</button>'
+                + '<button class="glr-copy" onclick="copyOrganizerLinkFromScorecard(\'' + orgUrl + '\', this)">\uD83D\uDCCB Copy</button>'
                 + '</div>';
         }
 
@@ -5026,6 +5026,15 @@ html {
         } else {
             fallbackCopy(url, done);
         }
+    }
+
+    // THE ORGANIZER LINK IS WORTH A CAUTION (2026-09-20): it carries the token that
+    // grants the whole-field override in Finish Round, and its Copy used to say
+    // only "✅ Copied" like a group's. The same copy, the same button feedback,
+    // and one sentence - an alert for now, with the rest of the inventory.
+    function copyOrganizerLinkFromScorecard(url, btn) {
+        copyGroupLinkFromScorecard(url, 0, btn);
+        alert('Copied your organizer link. It can correct any score in the round \u2014 keep it to yourself.');
     }
 
     function fallbackCopy(text, onDone) {

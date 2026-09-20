@@ -315,6 +315,12 @@
         .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        /* The whole-round link's row (2026-09-20): the group row's look, NOT its class -
+           tools/round-share-check.js counts .group-link-row to prove the group links
+           cover the field exactly once, and this link covers all of it. */
+        .rr-round-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+        .rr-round-link-row span, .rr-round-link-row button { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
+        .rr-round-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
         .group-link-row span { font-weight: bold; color: var(--brand-green); font-size: 0.85rem; }
         .group-link-row button { width: auto; padding: 6px 12px; font-size: 0.8rem; margin: 0; }
         /* Quiet, but still a thumb-sized target. Small is not the same as
@@ -1890,11 +1896,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const roundUrl = scorecardUrlFor(currentMode);
             html += '<div class="rr-round-link" style="margin-bottom:12px;">'
                 + '<div class="wr-label" style="margin-bottom:4px;">Send this link to everyone</div>'
-                + '<div class="group-link-row rr-round-link-row" style="border:2px solid var(--brand-green);">'
+                + '<div class="rr-round-link-row">'
                 + '<span>\uD83D\uDCE3 The whole round<br>'
                 + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
                 + escapeHtml(players.length) + ' golfers \u00B7 ' + boundaries.length + ' groups</span></span>'
-                + '<button class="btn-outline" onclick="copyGroupLink(\'' + roundUrl + '\', 0)">\uD83D\uDD17 Copy Link</button>'
+                + '<button class="btn-outline" onclick="copyRoundLink(\'' + roundUrl + '\')">\uD83D\uDD17 Copy Link</button>'
                 + '</div>'
                 + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
                 + 'One link for the whole round \u2014 each golfer picks their group when they open it. '
@@ -1913,7 +1919,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
                 + escapeHtml(names) + '</span></span>'
                 + '<button class="btn-outline" onclick="copyGroupLink(\'' + url + '\', '
-                + b.group + ')">🔗 Copy Link</button>'
+                + b.group + ', ' + escapeHtml(JSON.stringify(names)) + ')">🔗 Copy Link</button>'
                 + '</div>';
         });
         box.innerHTML = html;
@@ -6296,8 +6302,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return url;
     }
 
-    function copyGroupLink(url, groupNum) {
-        navigator.clipboard.writeText(url).then(() => alert(`Copied Group ${groupNum}'s scorekeeper link! Send this ONLY to that group.`));
+    // THE COPY MESSAGES SAY WHAT THEY DID (2026-09-20). Two copiers, because they
+    // copied two different things and one message had been serving both: the
+    // whole-round headline reused copyGroupLink(url, 0) and alerted the group
+    // sentence with a zero where the group number goes (measured by Manny on his
+    // phone), and that sentence warned "send this only to that group". A group's own link names who is in it rather than shouting a
+    // rule - the worst case of a link in the wrong hands is a friend scoring the
+    // wrong foursome, and the picker makes the whole-round link the normal path.
+    // Still alerts, deliberately: three of the 213 dialogs in the inventory, gone
+    // with the rest when the toast exists.
+    function copyRoundLink(url) {
+        navigator.clipboard.writeText(url).then(() => alert('Copied. Paste it into your group text \u2014 everyone picks their own group when they open it.'));
+    }
+    function copyGroupLink(url, groupNum, names) {
+        const who = names ? ' \u2014 ' + names : '';
+        navigator.clipboard.writeText(url).then(() => alert('Copied Group ' + groupNum + '\u2019s link' + who + '.'));
     }
 
     function getCategoryIcon(type) {
