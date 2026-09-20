@@ -155,7 +155,9 @@ if (require.main !== module) return;
     const card = JSON.parse(r.value);
 
     // --- TEST 36 + 37: through the real UI, with state ---------------------
-    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} } });
+    // auth: OWNER (2026-09-20): the page's Save refuses an anonymous driver, so the
+    // journey created nothing and .players threw; the cold arrivals already passed it.
+    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} }, auth: OWNER });
     let ui = {};
     try {
         await j.goto(journeyUrl('tournament.html', ''), 2600);
@@ -165,7 +167,7 @@ if (require.main !== module) return;
             s.value = ${JSON.stringify(REAL_COURSE.name)};
             s.dispatchEvent(new Event('input', { bubbles: true }));
             const o = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-                .find(x => (x.getAttribute('onclick') || '').indexOf("'${REAL_COURSE.id}'") !== -1);
+                .find(x => x.textContent.trim() === ${JSON.stringify(REAL_COURSE.name)});   // by its text: since a2a74f3 a picker row is a node with a property handler, not an onclick attribute
             if (o) o.click(); return !!o;
         })()`);
         // TWO named, TWO deliberately left blank - the control for Test 36.

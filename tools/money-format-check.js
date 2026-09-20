@@ -150,16 +150,20 @@ function bail(msg) {
     const L = String(legacy.actionCentre || ''), LI = String(legacy.impact || '');
     const W = String(whole.actionCentre || ''), WI = String(whole.impact || '');
 
+    // RE-PINNED 2026-09-20: the banner reads "🏆 Weekly Game · $…" since v142 (the
+    // rename), not "Main Pool · $…"; this check kept the old label and had been red
+    // since. The rule it guards - a legacy round shows the pot to the cent, a
+    // whole-dollar round shows no decimal point anywhere - is unchanged.
     const A = {
         // ---- LEGACY: the cents are shown, and they are the hand figures -----
-        legacyBannerShowsThePotToTheCent: /main pool · \$39\.96/i.test(L),
+        legacyBannerShowsThePotToTheCent: /weekly game · \$39\.96/i.test(L),
         legacyNetFinishShowsCents: /\$3\.33/.test(L) && /\$1\.67/.test(L),
         legacyImpactShowsSkinsToTheCent: /\$9\.98/.test(LI) || /\$9\.99/.test(LI),
         // and NOTHING on those surfaces is a bare rounded dollar where cents exist
-        legacyBannerNoLongerSaysFortyFlat: !/main pool · \$40\b/i.test(L),
+        legacyBannerNoLongerSaysFortyFlat: !/weekly game · \$40\b/i.test(L),
 
         // ---- WHOLE-DOLLAR: no cents anywhere, and no ".00" -----------------
-        wholeBannerHasNoDecimalPoint: /main pool · \$40\b/i.test(W) && !/\$40\.00/.test(W),
+        wholeBannerHasNoDecimalPoint: /weekly game · \$40\b/i.test(W) && !/\$40\.00/.test(W),
         wholeSurfacesCarryNoCentsAtAll: !/\$\d+\.\d\d/.test(W),
         wholeImpactCarriesNoCents: !/\$\d+\.\d\d/.test(WI),
 

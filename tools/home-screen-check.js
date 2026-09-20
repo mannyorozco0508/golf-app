@@ -121,10 +121,16 @@ const PROBE = `
       problems.push('the symbol does not sit inside its disc');
   if (!out.wordmarkText) problems.push('the wordmark is gone - a symbol alone names nothing');
 
-  if (out.textInputs.length !== 1 || out.textInputs[0] !== 'join-code-input')
+  // RE-PINNED 2026-09-20. The lobby asks for TWO typed things, deliberately: the
+  // game code (Open) and the code of a previous round to start from - the copy
+  // field came back on purpose (admin.html #copy-code-row, "the one place the
+  // prefill admin.html?game=NEW&copyFrom=OLD is emitted from"). This check kept
+  // the older rule, "the game code and nothing else", and had been red since the
+  // field returned. Exactly these two, in this order, and no third.
+  if (out.textInputs.length !== 2 || out.textInputs[0] !== 'join-code-input' || out.textInputs[1] !== 'copy-code-input')
       problems.push('the lobby asks for ' + out.textInputs.length + ' typed things: '
           + JSON.stringify(out.textInputs) + ' - it should ask for the game code and '
-          + 'nothing else');
+          + 'the code of a round to start from, and nothing else');
   if (!out.code.onScreen) problems.push('the game-code row is not on screen');
   if (out.code.inputH < 44) problems.push('the code field is ' + out.code.inputH
       + 'px tall, below a usable touch target');

@@ -182,7 +182,11 @@ if (require.main !== module) return;
     Object.keys(t44).forEach(k => { if (!t44[k]) problems.push('TEST 44 ' + k + ': FAILED'); });
 
     // --- TEST 45: through the real UI --------------------------------------
-    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} } });
+    // auth: OWNER (2026-09-20): the journey creates the tournament through the page's
+    // own Save, and saveTournament refuses an anonymous driver (the sign-in gate,
+    // 2026-09-12) - so no record was written and .players threw. The cold arrivals
+    // below already passed OWNER; the journey did not. Same line net-reachable got.
+    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} }, auth: OWNER });
     let ui = {};
     try {
         await j.goto(journeyUrl('tournament.html', ''), 2600);
@@ -192,7 +196,7 @@ if (require.main !== module) return;
             s.value = ${JSON.stringify(REAL_COURSE.name)};
             s.dispatchEvent(new Event('input', { bubbles: true }));
             const o = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-                .find(x => (x.getAttribute('onclick') || '').indexOf("'${REAL_COURSE.id}'") !== -1);
+                .find(x => x.textContent.trim() === ${JSON.stringify(REAL_COURSE.name)});   // by its text: since a2a74f3 a picker row is a node with a property handler, not an onclick attribute
             if (o) o.click(); return !!o;
         })()`);
         await j.evaluate(`(() => {

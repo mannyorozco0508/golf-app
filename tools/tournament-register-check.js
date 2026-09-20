@@ -103,6 +103,7 @@ const PUBLIC_SIGNEDOUT_PROBE = `
   return JSON.stringify({
     sectionExists: !!document.getElementById('registration-section'),
     deskExists: !!document.getElementById('manage-tab-desk') || !!document.getElementById('tab-btn-desk'),
+    deskVisible: visible('#manage-tab-desk') || visible('#tab-btn-desk'),
     sectionVisible: visible('#registration-section'),
     fay: /Fay Foxtrot/.test(manage),
     registerLink: /register=OWNED1/.test(manage)
@@ -178,8 +179,13 @@ async function look(query, probe, auth) {
     if (!/1 signup · 0 paid · 0 in the field/.test(ownerDesk.desk || '')) failures.push('organizer: the counts line is not on the desk: ' + String(ownerDesk.desk).slice(0, 120));
     if (owner.lockWords && owner.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(owner.lockWords));
 
-    if (visitor.sectionExists) failures.push('signed-out: #registration-section still exists — it lives in Setup and must go with the gate');
-    if (visitor.deskExists) failures.push('signed-out: the Desk tab or panel still exists — it is gated with Setup (2c)');
+    // RE-PINNED 2026-09-20 (Option B, 2026-09-19): the manage gate HIDES the Setup
+    // and Desk surfaces (display:none) rather than removing them, so the
+    // spectator's board keeps moving under a live listener. The rule this guards
+    // - a signed-out visitor sees neither the registration section nor the Desk
+    // - is measured as ON SCREEN now, not as existence.
+    if (visitor.sectionVisible) failures.push('signed-out: #registration-section is on screen — it lives in Setup and must be gated with it');
+    if (visitor.deskVisible) failures.push('signed-out: the Desk tab or panel is on screen — it is gated with Setup (2c)');
     if (visitor.sectionVisible) failures.push('signed-out: the registration list has a rect');
     if (visitor.fay) failures.push('signed-out: a registrant name is on the public manage screen');
     if (visitor.registerLink) failures.push('signed-out: the signup admin link is on the public manage screen');

@@ -29,6 +29,7 @@
 //   exit 2   could not run. NOTHING WAS PROVEN - this is not a pass.
 // ============================================================================
 
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };   // the page's Save needs a signed-in organizer (2026-09-20)
 const { openJourney, fileUrl } = require('./lib/journey.js');
 
 const COURSE = { id: 'trueblue', name: 'True Blue Golf Club' };
@@ -47,7 +48,7 @@ async function createEvent(j, opts) {
         s.value = ${JSON.stringify(COURSE.name)};
         s.dispatchEvent(new Event('input', { bubbles: true }));
         const o = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-            .find(x => (x.getAttribute('onclick') || '').indexOf("'${COURSE.id}'") !== -1);
+            .find(x => x.textContent.trim() === ${JSON.stringify(COURSE.name)});   // by its text: since a2a74f3 a picker row is a node with a property handler, not an onclick attribute
         if (o) o.click();
         return !!o;
     })()`);
@@ -187,7 +188,9 @@ function bail(msg) {
 
 (async () => {
     const problems = [];
-    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} } });
+    // auth: OWNER (2026-09-20): the page's Save refuses an anonymous driver - "no
+    // tournament was created" was this, not the page.
+    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} }, auth: OWNER });
     let report = {};
     try {
         // ---------- a scored MULTI-ROUND event, two rounds, different scores --
