@@ -1076,6 +1076,49 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## The founder pass, and a line that says where the trial stands (2026-09-20, v184)
+
+**THE PASS - a production write, done by hand on 2026-09-20 11:34 UTC.**
+`organizers/k8fYkL1hsPb6ZDL3wgQi8hywPi42/pass` = `{ expiresAt: 4102444800000
+(2099-12-31), kind: "founder", grantedAt: 1789904076089, grantedBy: "manny-cli", note }`.
+**Whose:** `k8fY…` is **Manny's iPhone** - it created FAUNX8 (the Streamsong Red import
+of 2026-09-19) and WM26AE; first seen 2026-09-19 18:25 UTC. Written with
+`firebase-tools@14 database:update … --force` (the CLI runs as the project owner and
+bypasses `.write: false`; the first attempt without `--force` was aborted by the CLI's
+confirmation prompt and wrote nothing - read back before and after). The rule reads
+exactly one field, `pass/expiresAt > now` (`database.rules.json` :6); `kind` and the
+rest are provenance, read by nothing but the standing line below. `wave2_rules_test.js`'s
+`anon-passed` case proves a future `expiresAt` opens the create rule past the window.
+**IT IS ATTACHED TO THAT DEVICE'S STORAGE, NOT TO MANNY.** The uid is Firebase
+anonymous auth persisted in the app's WKWebView storage. Delete-and-reinstall, a new
+phone, or anything that resets that storage signs in as a NEW uid, the next Save & Start
+stamps a fresh `firstSeenAt` for it, and this pass sits orphaned on the old uid - no
+refusal, no message, the wall 21 days later. The standing line is the tell.
+**Unwritten, deliberately:** `TFM8Iu07r5QtUzCvrMK6RleS7583` (first seen 2026-09-17
+07:38 UTC; four 4-golfer rounds at Camas Meadows / Three Rivers / Tri-Mountain / Lewis
+River at 00:38 PDT) - either Manny's Mac browser or Marty's phone; stays as it is until
+Manny says which. Its window closes 2026-10-08.
+
+**THE STANDING LINE** (organizer-gate.js `standingOf` / `standingLine` / `readStanding`;
+admin.html `loadOrganizerStanding` / `renderOrganizerStanding`, mounts `#rr-standing` on
+Round Ready and `#wz-standing` right above Save & Start on the Review step). One read of
+`organizers/<uid>` after `authReady`, raced against the gate's `READ_MS` like
+`explainRefusal`; the record is kept and both mounts render from it. A live pass:
+"Founder pass · setting up rounds is free" (another kind: "Season pass · rounds free to set
+up until Mar 4, 2027"). Inside the window, EVERY day of it (`NOTICE_DAYS` is 21, the whole window - Manny's
+call): "Free trial · 21 days left to set up new rounds" … "1 day left" - `Math.ceil` so a
+partial day is a day, and the same `now < firstSeenAt + TRIAL_MS` comparison as the rule,
+so the line and the wall change hands at the same millisecond. Otherwise NOTHING: ended
+(the wall speaks), no record (not an organizer), no session, a failed or unanswered read -
+say nothing rather than guess. **The tell:** a phone that said "Founder pass" yesterday and
+says "Free trial · 21 days left" today has a new uid and an orphaned pass - a sentence
+APPEARING, which is why the notice runs the whole window (at 7 days the fresh trial was
+silent for two weeks and the signal was an absence nobody notices). **Three homes:** the
+lobby (`#lobby-standing`, under the tiles and above Resume - the organizer who never
+reaches Review is warned here, the moment the read answers), Round Ready (`#rr-standing`)
+and the Review step (`#wz-standing`, above Save & Start). One read, three mounts.
+No rules change. `sw.js` `golfapp-v184-trial-standing`.
+
 ## One link, one code, then the golfer picks their group (2026-09-20, v183)
 
 **The ask.** A golfer with the app types a code and lands scoring their own four; the

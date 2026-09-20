@@ -85,7 +85,9 @@ const rows = (sb) => J(run(sb, `document.querySelectorAll('.player-row').map(fun
     return [m ? m[1] : null, f ? f.getAttribute('data-flight') : null]; })`));
 const state = (sb) => ({ rows: rows(sb), ids: J(run(sb, 'captureCurrentPlayerInputs().map(function (p) { return p.id; })')),
     banner: run(sb, "document.getElementById('copy-from-banner').style.display"), flightsOn: run(sb, "document.getElementById('flights-enabled').value"),
-    stored: run(sb, 'storedPlayersTemp.length'), reads: sb.__log.reads.slice(), landed: sb.__log.landed.slice(), alerts: J(run(sb, 'window.__alerts')) });
+    // organizers/<uid> is read once at load for the standing line (2026-09-20,
+    // organizer_standing_test.js); not a round read, so not part of the race.
+    stored: run(sb, 'storedPlayersTemp.length'), reads: sb.__log.reads.filter(r => !/^organizers\//.test(r)), landed: sb.__log.landed.filter(r => !/^organizers\//.test(r)), alerts: J(run(sb, 'window.__alerts')) });
 const EXPECT_ROWS = NAMES.map((n, i) => [n, i % 2 ? 'B' : 'A']);
 
 describe('A COPY, in every ordering of the reads', () => {

@@ -86,12 +86,94 @@
         }, function () { return 'unknown'; });
     }
 
+    // ---- WHERE THE TRIAL STANDS (2026-09-20) ---------------------------------
+    //
+    // Until this, the wall was the first an organizer heard of the window - on a
+    // first tee, with the round typed in and not saved. organizers/<uid> is
+    // readable by its own uid, so a page reads it ONCE after authReady and says
+    // one line (standingLine) on the screens right before the wall.
+    //
+    // THE TELL. A pass is attached to the device's storage, not to a person: a
+    // reinstall signs in as a new uid, the next round stamps a fresh firstSeenAt,
+    // and the pass is orphaned on the old uid with no refusal to show for it -
+    // the wall comes 21 days later. The founder line disappearing is how that is
+    // noticed. Anything unknown - no session, the read failed, the read did not
+    // answer in time - says NOTHING rather than guess.
+    // 21, not 7 (2026-09-20, Manny's call on the tell): at 7 a phone whose
+    // storage reset showed NOTHING for the first two weeks of its fresh trial, so
+    // the signal was the founder line VANISHING - an absence nobody notices. At
+    // 21 the trial line is always there while a trial runs, and a phone that said
+    // "Founder pass" yesterday saying "Free trial · 21 days left" today is a
+    // sentence APPEARING. That is the signal worth having.
+    var NOTICE_DAYS = 21;
+    var DAY_MS = 86400000;
+
+    // The raw record -> what it means at `now`. null when unknown.
+    //   { kind: 'pass', passKind, expiresAt }   a live pass
+    //   { kind: 'trial', endsAt, daysLeft }     inside the window
+    //   { kind: 'ended', endsAt }               the window closed (the wall speaks)
+    //   { kind: 'none' }                        no record: not an organizer
+    function standingOf(record, now) {
+        if (record === undefined) return null;
+        if (!record || typeof record.firstSeenAt !== 'number') return { kind: 'none' };
+        var t = typeof now === 'number' ? now : Date.now();
+        var pass = record.pass;
+        if (pass && typeof pass.expiresAt === 'number' && pass.expiresAt > t) {
+            return { kind: 'pass', passKind: String(pass.kind || ''), expiresAt: pass.expiresAt };
+        }
+        var endsAt = record.firstSeenAt + TRIAL_MS;
+        // The rule is `now < firstSeenAt + TRIAL_MS`: the same comparison, so the
+        // line and the wall change hands at the same millisecond.
+        if (!(t < endsAt)) return { kind: 'ended', endsAt: endsAt };
+        return { kind: 'trial', endsAt: endsAt, daysLeft: Math.ceil((endsAt - t) / DAY_MS) };
+    }
+
+    function fmtDate(ms) {
+        try { return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
+        catch (e) { return ''; }
+    }
+
+    // One line, or ''. Nothing for 'ended' (the wall), 'none', null, or a trial
+    // with more than NOTICE_DAYS left (none, at 21: every live trial says its days).
+    function standingLine(st) {
+        if (!st) return '';
+        if (st.kind === 'pass') {
+            if (st.passKind === 'founder') return 'Founder pass \u00B7 setting up rounds is free';
+            var label = st.passKind ? st.passKind.charAt(0).toUpperCase() + st.passKind.slice(1) + ' pass' : 'Pass';
+            return label + ' \u00B7 rounds free to set up until ' + fmtDate(st.expiresAt);
+        }
+        if (st.kind === 'trial' && st.daysLeft <= NOTICE_DAYS) {
+            return 'Free trial \u00B7 ' + st.daysLeft + (st.daysLeft === 1 ? ' day' : ' days') + ' left to set up new rounds';
+        }
+        return '';
+    }
+
+    // The one read. Resolves to the record (null when there is none) or
+    // undefined when nothing can be said: no session, the read rejected, or it
+    // did not answer inside READ_MS (the same race explainRefusal runs).
+    function readStanding(db) {
+        var ready = window.authReady;
+        if (!ready || typeof ready.then !== 'function') return Promise.resolve(undefined);
+        return ready.then(function (uid) {
+            var read = db.ref('organizers/' + uid).once('value').then(function (snap) {
+                return (snap && typeof snap.val === 'function') ? snap.val() : undefined;
+            });
+            var timer = new Promise(function (resolve) { setTimeout(function () { resolve(undefined); }, window.organizerGate.READ_MS); });
+            return Promise.race([read, timer]);
+        }).then(function (v) { return v; }, function () { return undefined; });
+    }
+
     window.organizerGate = {
         TRIAL_MS: TRIAL_MS,
+        NOTICE_DAYS: NOTICE_DAYS,
+        READ_MS: READ_MS,
         WALL: WALL,
         isPermissionDenied: isPermissionDenied,
         ensureOrganizer: ensureOrganizer,
         stamp: stamp,
-        explainRefusal: explainRefusal
+        explainRefusal: explainRefusal,
+        standingOf: standingOf,
+        standingLine: standingLine,
+        readStanding: readStanding
     };
 })();

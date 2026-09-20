@@ -1673,7 +1673,13 @@
 // lobby reads the round before it navigates and refuses a bad code inline;
 // Round Ready offers the round's own link first. A device on v182 keeps an
 // index.html that never asks and an admin.html that navigates into a blank card.
-const CACHE_VERSION = 'golfapp-v183-group-picker';
+// Moved to v184: a line that says where the trial stands. admin.html reads
+// organizers/<uid> once after authReady (organizer-gate.js readStanding) and
+// says "Founder pass · setting up rounds is free" or "Free trial · N days left
+// to set up new rounds" on Round Ready and the Review step - the first warning
+// before the wall, and the tell for a pass orphaned by a reinstall. A device on
+// v183 keeps the wall as the only sentence.
+const CACHE_VERSION = 'golfapp-v184-trial-standing';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -182,7 +182,9 @@ function lobby(reads) {
         refusal: () => String(vm.runInContext("document.getElementById('join-code-refusal').textContent || ''", sb)).trim(),
         refusalShown: () => String(vm.runInContext("document.getElementById('join-code-refusal').style.display || ''", sb)),
         said: () => JSON.parse(vm.runInContext('JSON.stringify(window.__said || [])', sb)),
-        reads: () => JSON.parse(vm.runInContext('JSON.stringify(window.__onceReads || [])', sb)),
+        // the standing line's one read of organizers/<uid> at load (2026-09-20) is
+        // not a code lookup; the refusals below are about the code field's reads
+        reads: () => JSON.parse(vm.runInContext('JSON.stringify(window.__onceReads || [])', sb)).filter(p => !/^organizers\//.test(p)),
     };
 }
 const LOBBY_HREF = 'https://golf-app-5a5.pages.dev/admin.html';

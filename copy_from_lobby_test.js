@@ -73,7 +73,10 @@ function lobby(records, search, delays) {
 const settle = () => new Promise(r => setTimeout(r, 40));
 const dest = (sb) => String(sb.location.href);
 const alerts = (sb) => J(run(sb, 'window.__alerts'));
-const onces = (sb) => sb.__once.slice();
+// 2026-09-20: admin.html reads organizers/<uid> once at load for the standing
+// line (organizer_standing_test.js). Not a round read; filtered here so these
+// assertions stay about the copy field.
+const onces = (sb) => sb.__once.filter(p => !/^organizers\//.test(p));
 const params = (href) => Object.fromEntries([...new URLSearchParams(href.split('?')[1] || '')]);
 
 describe('FIX 1 - the lobby field', () => {

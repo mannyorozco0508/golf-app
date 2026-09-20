@@ -288,6 +288,8 @@
         .wizard-btn-next { flex: 2; padding: 12px; border-radius: 10px; border: none; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
+        .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        .organizer-standing:empty { display: none; }
         .wizard-review-row .wr-value { font-weight: bold; text-align: right; }
         .wizard-edit-link { font-size: 0.75rem; color: var(--brand-navy); text-decoration: underline; cursor: pointer; margin-left: 8px; }
 
@@ -444,6 +446,12 @@ html {
             <span style="font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
         </div>
     </div>
+
+    <!-- WHERE THE TRIAL STANDS, on the home screen too (2026-09-20): the organizer
+         who never reaches Review is warned here. Same one read, same line
+         (loadOrganizerStanding / renderOrganizerStanding). Above Resume, under the
+         tiles: the first thing after "what are you setting up". -->
+    <div id="lobby-standing" class="organizer-standing" role="status"></div>
 
     <!-- RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 14px;">
@@ -1356,6 +1364,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             <button class="wizard-btn-back" id="wizard-back-7" onclick="wizardBack(7)">◀ Back</button>
         </div>
 
+    <!-- WHERE THE TRIAL STANDS (2026-09-20): one line from organizers/<uid>, read
+         once after authReady (loadOrganizerStanding). A live pass names itself; a
+         trial says its days left from a week out; otherwise nothing. Right above
+         the button the wall would answer. -->
+    <div id="wz-standing" class="organizer-standing" role="status"></div>
     <button id="main-save-btn" class="btn-primary" onclick="saveSettings()">💾 Save & Start Round</button>
     </div>
 
@@ -1389,6 +1402,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div class="lobby-logo">✅</div>
     <div class="lobby-title">Round Ready</div>
     <p id="rr-course-sub" style="text-align:center; color:var(--text-muted); font-size:0.95rem; margin-bottom:20px;"></p>
+    <!-- The same standing line as the Review step (loadOrganizerStanding). -->
+    <div id="rr-standing" class="organizer-standing" role="status"></div>
 
     <!-- STATIC, and that is the whole guarantee. renderRoundReady writes only
          into rr-course-sub, rr-players-list, rr-scoring-text, rr-action-text and
@@ -1721,7 +1736,36 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
     }
 
+    // ---- WHERE THE TRIAL STANDS ---------------------------------------------
+    //
+    // ONE READ, after authReady, of organizers/<uid> (readable by its own uid;
+    // organizer-gate.js readStanding). The record is kept and the three mounts -
+    // the lobby, Round Ready and the Review step - are rendered from it: the
+    // lobby the moment the read answers, the other two whenever they render. Unknown (no session,
+    // a failed or unanswered read) renders nothing: say nothing rather than guess.
+    // This is the tell for an orphaned pass: a phone that said "Founder pass"
+    // yesterday and says nothing today has a new uid and a fresh trial.
+    let organizerRecord;   // undefined until the read answers; null = no record
+    function renderOrganizerStanding() {
+        const text = window.organizerGate
+            ? window.organizerGate.standingLine(window.organizerGate.standingOf(organizerRecord, Date.now()))
+            : '';
+        ['lobby-standing', 'rr-standing', 'wz-standing'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        });
+    }
+    function loadOrganizerStanding() {
+        if (!window.organizerGate || typeof window.organizerGate.readStanding !== 'function') return;
+        window.organizerGate.readStanding(db).then(rec => {
+            organizerRecord = rec;
+            renderOrganizerStanding();
+        }, () => { /* nothing to say */ });
+    }
+    loadOrganizerStanding();
+
     function renderRoundReady(data) {
+        renderOrganizerStanding();
         document.getElementById('rr-course-sub').textContent = `${data.eventName || 'Round'} — ${data.courseName || 'Course TBD'}`;
         // On arrival, from the data already fetched. Not behind a tap.
         renderRoundReadyLinks(data);
@@ -1979,6 +2023,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function renderWizardReview() {
+        renderOrganizerStanding();
         const container = document.getElementById('wizard-review-summary');
         if (!container) return;
 
