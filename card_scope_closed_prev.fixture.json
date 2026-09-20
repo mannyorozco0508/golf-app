@@ -36,7 +36,8 @@
     "dot-context-row": "flex",
     "match-hcp-note": "block",
     "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none"
+    "wolfcall-payout-container": "none",
+    "group-pick-overlay": "none"
    },
    "filtered": [
     "Ivy",
@@ -70,7 +71,8 @@
     "ticker-title-label": "🏆 CURRENT GROUP SCORES",
     "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1| | |Eli: |-4| | |Fay: |-5| | |Gus: |-2| | |Hal: |-4| | |Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1| | |Max: |-3| | |Ned: |-5| | |Oli: |-2| | |Pat: |-4| | |Quy: |-6| | |Rae: |-2| | |Sam: |-4| | |Tia: |E| | |Uma: |-3| | |Vic: |-5| | |Wes: |-1| | |Xan: |-4|",
     "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "kp-entry-mount": "|Hole 7 Weekly Game KP|No leader yet|"
+    "kp-entry-mount": "|Hole 7 Weekly Game KP|No leader yet|",
+    "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|"
    },
    "display": {
     "detailed-breakdown-wrapper": "none",
@@ -82,7 +84,8 @@
     "dot-context-row": "flex",
     "match-hcp-note": "block",
     "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none"
+    "wolfcall-payout-container": "none",
+    "group-pick-overlay": "flex"
    },
    "filtered": [
     "Ann",
@@ -143,7 +146,8 @@
     "dot-context-row": "none",
     "match-hcp-note": "none",
     "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none"
+    "wolfcall-payout-container": "none",
+    "group-pick-overlay": "none"
    },
    "filtered": [
     "Ann",
@@ -157,6 +161,10 @@
   {
    "date": "2026-09-19",
    "why": "the KP entry block (Hole 7 KP / No leader yet / Set KP Leader) moved out of #action-center-mount into #kp-entry-mount under the Prev/Next row, and its head reads Weekly Game KP. Exactly those substrings were moved by hand; every other character is the 6ff9332 capture."
+  },
+  {
+   "date": "2026-09-20",
+   "why": "the group picker (group_picker_test.js): a bare link on a multi-group round shows #group-pick-overlay (display flex) with one row per group in #group-pick-body; a group link and a one-group round hide it (display none). Exactly those entries were added by hand; every other character is the 6ff9332 capture with the 2026-09-19 KP move."
   }
  ]
 }

@@ -70,14 +70,20 @@ function lobby(href) {
         origin: isWeb ? u.origin : 'capacitor://localhost',
         pathname: isWeb ? u.pathname : '/admin.html',
     };
-    const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+    const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js', 'code-issuer.js', 'grouping.js']);
+    // RE-PINNED 2026-09-20: the join box READS the round before it navigates (the
+    // existence check), so every code these tests type must exist in the stub, and
+    // openRoundByCode is async - go() awaits it. The codes carry no I/O/0/1, which
+    // the box now refuses before reading (the alphabet never issues them).
+    sb.__dbReads = { 'events/AB2CDF': { players: [{ id: 101, name: 'A' }] }, 'events/R4HH': { players: [{ id: 101, name: 'A' }] },
+                     'events/JLRL4H': { players: Array.from({ length: 12 }, (_, i) => ({ id: 101 + i, name: 'P' + i })) } };
     vm.runInContext("alert = function (m) { window.__said = m; };"
-        + ' location = ' + JSON.stringify(loc) + '; window.location = location;', sb);
+        + ' location = ' + JSON.stringify(loc) + '; window.location = location; navigator.onLine = true;', sb);
     return {
         sb,
         type: v => vm.runInContext(
             `document.getElementById('join-code-input').value = ${JSON.stringify(v)};`, sb),
-        go: () => vm.runInContext('openRoundByCode();', sb),
+        go: async () => { await vm.runInContext('openRoundByCode();', sb); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); },
         // RESOLVED, THE WAY A BROWSER RESOLVES IT.
         //
         // window.location.href = 'index.html?game=X' does not leave the golfer on a
@@ -101,12 +107,12 @@ function lobby(href) {
 
 describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
 
-    test('there is an input and a button', () => {
+    test('there is an input and a button', async () => {
         assert.match(ADM, /id="join-code-input"/, 'no code field on the home screen');
-        assert.match(ADM, /onclick="openRoundByCode\(\)"/, 'no button to open it with');
+        assert.match(ADM, /onclick="openRoundByCode\(this\)"/, 'no button to open it with');   // 2026-09-20: passes itself, for "⏳ Checking…"
     });
 
-    test('it is NOT the full-width pair that was removed', () => {
+    test('it is NOT the full-width pair that was removed', async () => {
         const at = ADM.indexOf('id="join-code-row"');
         assert.ok(at > -1, 'the row wrapper is missing');
         const row = ADM.slice(at - 200, at + 700);
@@ -115,7 +121,7 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
             'the button is full width again');
     });
 
-    test('but both are still a real touch target', () => {
+    test('but both are still a real touch target', async () => {
         const rule = sel => {
             const at = ADM.indexOf(sel + ' {');
             return at === -1 ? '' : ADM.slice(at, ADM.indexOf('}', at));
@@ -130,7 +136,7 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
         });
     });
 
-    test('it sits below Resume, not between the two tiles', () => {
+    test('it sits below Resume, not between the two tiles', async () => {
         const tiles = ADM.indexOf('class="home-widgets"');
         const resume = ADM.indexOf('id="resume-container"');
         const row = ADM.indexOf('id="join-code-row"');
@@ -143,41 +149,41 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
 ORIGINS.forEach(O => describe('IT OPENS THE ROUND, NOT THE WIZARD — on ' + O.name, () => {
 
     // THE DEFECT THAT IS NOT BEING RESTORED.
-    test('a typed code goes to the scorecard', () => {
+    test('a typed code goes to the scorecard', async () => {
         const l = lobby(O.href);
-        l.type('AB12CD'); l.go();
-        assert.match(l.href(), /index\.html\?game=AB12CD/,
+        l.type('AB2CDF'); await l.go();
+        assert.match(l.href(), /index\.html\?game=AB2CDF/,
             'a golfer who types a code lands somewhere else: ' + l.href());
     });
 
-    test('and never to admin.html, which opens the organizer’s Review', () => {
+    test('and never to admin.html, which opens the organizer’s Review', async () => {
         const l = lobby(O.href);
-        l.type('AB12CD'); l.go();
+        l.type('AB2CDF'); await l.go();
         assert.ok(!/admin\.html\?game=/.test(l.href()),
             'this is where joinRoom() used to go, holding Save & Start Round');
     });
 
-    test('the old function is not back under its old name', () => {
+    test('the old function is not back under its old name', async () => {
         assert.ok(!/function joinRoom/.test(ADM),
             'joinRoom is back, and it still points at the wizard');
     });
 
-    test('a lower-case code still opens', () => {
+    test('a lower-case code still opens', async () => {
         const l = lobby(O.href);
-        l.type('ab12cd'); l.go();
-        assert.match(l.href(), /game=AB12CD/, 'codes are shown upper-case everywhere');
+        l.type('ab2cdf'); await l.go();
+        assert.match(l.href(), /game=AB2CDF/, 'codes are shown upper-case everywhere');
     });
 
-    test('stray spaces do not stop it', () => {
+    test('stray spaces do not stop it', async () => {
         const l = lobby(O.href);
-        l.type('  ab12cd  '); l.go();
-        assert.match(l.href(), /game=AB12CD/);
+        l.type('  ab2cdf  '); await l.go();
+        assert.match(l.href(), /game=AB2CDF/);
     });
 
     // Legacy 4-character codes still exist on saved rounds.
-    test('a legacy four-character code still opens', () => {
+    test('a legacy four-character code still opens', async () => {
         const l = lobby(O.href);
-        l.type('R4HH'); l.go();
+        l.type('R4HH'); await l.go();
         assert.match(l.href(), /game=R4HH/);
     });
 
@@ -185,9 +191,9 @@ ORIGINS.forEach(O => describe('IT OPENS THE ROUND, NOT THE WIZARD — on ' + O.n
     // origin is cancelled by Capacitor and opened in Safari - so on the wrapper this
     // is not a cosmetic difference, it is the golfer being ejected from the app on
     // the commonest way into a round.
-    test('the destination never leaves the origin the page is served from', () => {
+    test('the destination never leaves the origin the page is served from', async () => {
         const l = lobby(O.href);
-        l.type('AB12CD'); l.go();
+        l.type('AB2CDF'); await l.go();
         const dest = l.href();
         if (/^https?:/i.test(O.href)) {
             assert.ok(dest.startsWith(new URL(O.href).origin),
@@ -202,37 +208,37 @@ ORIGINS.forEach(O => describe('IT OPENS THE ROUND, NOT THE WIZARD — on ' + O.n
 
 ORIGINS.forEach(O => describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS — on ' + O.name, () => {
 
-    test('a pasted group link keeps its group', () => {
+    test('a pasted group link keeps its group', async () => {
         const l = lobby(O.href);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
-        l.go();
+        await l.go();
         assert.match(l.href(), /game=JLRL4H/);
         assert.match(l.href(), /group=2/,
             'pasting the link the organizer sent drops the group it carried');
     });
 
-    test('a pasted link with no group does not gain one', () => {
+    test('a pasted link with no group does not gain one', async () => {
         const l = lobby(O.href);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H');
-        l.go();
+        await l.go();
         assert.ok(!/group=/.test(l.href()),
             'a group was invented, handing over somebody else’s card');
     });
 
     // THE PERMISSION LINE. A code carries no group, so none may be added to it.
-    test('a bare code never acquires a group', () => {
+    test('a bare code never acquires a group', async () => {
         const l = lobby(O.href);
-        l.type('JLRL4H'); l.go();
+        l.type('JLRL4H'); await l.go();
         assert.ok(!/group=/.test(l.href()),
             'typing a code granted scorekeeper rights over a foursome');
     });
 
     // The pasted link is the case the note under the field actually recommends, so
     // it gets the same origin assertion as the typed code.
-    test('a pasted link does not leave the origin either', () => {
+    test('a pasted link does not leave the origin either', async () => {
         const l = lobby(O.href);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
-        l.go();
+        await l.go();
         const dest = l.href();
         if (/^https?:/i.test(O.href)) {
             assert.ok(dest.startsWith(new URL(O.href).origin), dest);
@@ -245,18 +251,21 @@ ORIGINS.forEach(O => describe('IT ACCEPTS THE LINK AN ORGANIZER ACTUALLY SENDS �
 
 describe('IT REFUSES WHAT IT CANNOT OPEN', () => {
 
-    test('an empty field says so and goes nowhere', () => {
+    test('an empty field says so and goes nowhere', async () => {
         const l = lobby();
         const before = l.href();
-        l.type('   '); l.go();
+        l.type('   '); await l.go();
         assert.equal(l.href(), before, 'an empty code navigated somewhere');
-        assert.match(String(l.said() || ''), /code/i, 'it failed silently');
+        // 2026-09-20: said INLINE under the field (#join-code-refusal), not in a dialog
+        const inline = String(vm.runInContext("document.getElementById('join-code-refusal').textContent || ''", l.sb));
+        assert.match(inline, /code/i, 'it failed silently');
+        assert.equal(l.said(), null, 'no alert()');
     });
 
-    test('one character is not a code', () => {
+    test('one character is not a code', async () => {
         const l = lobby();
         const before = l.href();
-        l.type('A'); l.go();
+        l.type('A'); await l.go();
         assert.equal(l.href(), before);
     });
 });
@@ -272,16 +281,17 @@ describe('THE NOTE SAYS WHAT A TYPED CODE ACTUALLY GIVES YOU', () => {
         return ADM.slice(ADM.indexOf('>', at) + 1, ADM.indexOf('</p>', at));
     };
 
-    test('it warns that a bare code is read-only on a bigger round', () => {
-        assert.match(note(), /read-only/i,
-            'nothing tells a golfer a typed code will not let them score');
-        assert.match(note(), /link/i,
-            'it does not point them at the link that would');
+    // RE-PINNED 2026-09-20: a typed code on a bigger round lands on the group
+    // picker now, so the note stopped calling it read-only and says what happens.
+    test('it says a golfer picks their group on a bigger round', async () => {
+        assert.match(note(), /pick your group/i,
+            'nothing tells a golfer what a typed code gives them on a bigger round');
+        assert.ok(!/read-only/i.test(note()), 'the note still calls a typed code read-only, which it is not since the picker');
     });
 
     // The repo has shipped this once already: a \\uXXXX escape resolves inside a JS
     // string and prints literally in raw HTML markup.
-    test('no unresolved escapes in the markup a golfer reads', () => {
+    test('no unresolved escapes in the markup a golfer reads', async () => {
         const at = ADM.indexOf('id="join-code-row"');
         const block = ADM.slice(at, ADM.indexOf('</p>', at));
         assert.ok(!/\\u[0-9A-Fa-f]{4}/.test(block),
@@ -290,7 +300,7 @@ describe('THE NOTE SAYS WHAT A TYPED CODE ACTUALLY GIVES YOU', () => {
     });
 
     // Bound to index.html's own gate, the same way the share note is.
-    test('and it describes the gate index.html actually uses', () => {
+    test('and it describes the gate index.html actually uses', async () => {
         assert.match(read('index.html'), /const isMultiGroupRound = players\.length > 4;/,
             'index.html moved the gate; this note now describes the wrong rule');
         assert.match(note(), /four/i,

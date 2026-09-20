@@ -1020,6 +1020,7 @@
         .save-exit-box { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
         .end-box-card { background: var(--danger-box-bg); border: 2px dashed var(--accent-red); border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 10px; }
         .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .group-pick-btn { margin-top: 8px; text-align: left; font-size: 1rem; }
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 
@@ -1381,6 +1382,20 @@ html {
          console, which is what batch1_safety_test.js:431 already demands of
          Group Links. -->
     <div id="end-round-mount"></div>
+</div>
+
+<!-- WHICH GROUP ARE YOU KEEPING SCORE FOR? (2026-09-20). Shown once, on arrival,
+     to a golfer who opened a round with more than one group and no ?group= in the
+     URL - the bare link the organizer now sends to everyone, or the code typed in
+     the lobby. A tap navigates to ?game=CODE&group=N: the lock is the URL, exactly
+     as a group link's is. "Just watching" keeps the spectator view underneath.
+     renderGroupPicker() fills the body; nothing else on the page changes. -->
+<div class="modal-overlay" id="group-pick-overlay" role="dialog" aria-labelledby="group-pick-title">
+    <div class="modal-content">
+        <div class="modal-header"><span id="group-pick-title">Which group are you keeping score for?</span></div>
+        <div id="group-pick-body"></div>
+        <button type="button" class="btn-outline" style="margin-top:10px;" onclick="dismissGroupPick()">Just watching</button>
+    </div>
 </div>
 
 <!-- Dot Game Modal -->
@@ -4875,6 +4890,58 @@ html {
     // edit) their own foursome. These were previously only reachable from the
     // admin wizard, which meant that once a round started there was no way back to
     // them - a real problem when someone forgets to send one from the first tee.
+    // ---- THE GROUP PICKER ------------------------------------------------------
+    //
+    // ONE LINK, ONE CODE, THEN THE GOLFER PICKS (2026-09-20). A bare ?game=CODE on a
+    // round with more than one group used to be a silent spectator view above four
+    // golfers - every card, none writable, and no way to score your own four without
+    // going back to the text for the right link. Now it asks. The foursomes are
+    // listed by first name from the boundaries the page JUST computed, so a round
+    // regrouped since the link was sent still offers the groups as they are now.
+    //
+    // THE LOCK DOES NOT MOVE. A tap navigates to ?game=CODE&group=N and the page
+    // reloads reading that URL exactly as it reads a group link - hasGroupLock,
+    // lockedGroup, the slice, canWritePlayer, the badge, all of it untouched. Nothing
+    // here sets a lock in place. "Just watching" dismisses for this round in this
+    // session (sessionStorage; a second snapshot must not re-ask) and leaves the
+    // spectator view that was always underneath.
+    //
+    // Never for a group link (the question is answered), never for a foursome (one
+    // group, the bare link is the organizer's own writable card), never before the
+    // roster has arrived.
+    function groupPickKey() { return 'groupPickDismissed:' + currentMode; }
+    function groupPickDismissed() {
+        try { return sessionStorage.getItem(groupPickKey()) === '1'; } catch (e) { return false; }
+    }
+    function renderGroupPicker(players, boundaries) {
+        const overlay = document.getElementById('group-pick-overlay');
+        const body = document.getElementById('group-pick-body');
+        if (!overlay || !body) return;
+        if (hasGroupLock || !boundaries || boundaries.length <= 1 || groupPickDismissed()) {
+            overlay.style.display = 'none'; body.innerHTML = ''; return;
+        }
+        body.innerHTML = boundaries.map(b => {
+            const names = players.slice(b.startIdx, b.startIdx + b.size)
+                .map(p => escapeHtml(String(p.name || '').trim().split(' ')[0])).join(', ');
+            return '<button type="button" class="btn-primary group-pick-btn" onclick="pickGroup(' + b.group + ')">'
+                + 'Group ' + b.group + ' \u00B7 ' + names + '</button>';
+        }).join('');
+        overlay.style.display = 'flex';
+    }
+    // The tap: the same URL a group link carries, with everything else in this
+    // page's query kept (?me=, ?organizer=). Relative, like every navigation here.
+    function pickGroup(groupNum) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('game', currentMode);
+        params.set('group', String(groupNum));
+        window.location.href = 'index.html?' + params.toString();
+    }
+    function dismissGroupPick() {
+        try { sessionStorage.setItem(groupPickKey(), '1'); } catch (e) { /* private mode: asks again next load */ }
+        const overlay = document.getElementById('group-pick-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
     let groupLinksPanelOpen = false;
 
     // The single definition of "is this the organizer". A ?group=N link is a scoped
@@ -7719,6 +7786,7 @@ html {
         window.__scFilteredPlayers = filteredPlayers;
         window.__scGroupMissing = groupMissing;
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
+        renderGroupPicker(players, groupBoundaries);
         renderLandingSummary(filteredPlayers, players);
 
 

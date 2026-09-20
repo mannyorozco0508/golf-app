@@ -97,8 +97,8 @@ before(async () => {
         { expression: "document.querySelector('.hole-picker').scrollIntoView({ block: 'center' }); 'picker shown'" }, { expression: rect('.hole-pick-btn', 4) }]);
     assert.ok(pk.ok, 'Chrome did not run: ' + pk.reason);
     S.pick5 = P(pk, 6);
-    const g8 = await arrive('game=LND', [{ expression: SCROLL_TO_4TH }, { expression: NAV_BTN(2) }]);
-    S.next8 = P(g8, 1);
+    const g8 = await arrive('game=LND', [{ tap: '#group-pick-overlay button.btn-outline' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: NAV_BTN(2) }]);
+    S.next8 = P(g8, 3);   // the picker dismissed first (2026-09-20), so the geometry is the card's
 
     // 1. NEXT from the 4th golfer, NEXT again from the page top, PREV from the
     //    landed position: three different starting offsets, one landing. Then a
@@ -111,7 +111,12 @@ before(async () => {
         // the golfer closed the keyboard (nothing focused); a snapshot must not reopen it
         { expression: "if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); 'nothing to close'" }, { expression: "window.__remote({ p104_h2: 4 }); 'remote'" }, { expression: STATE }]);
     // 2. Eight golfers on the organizer link: every box disabled.
-    S.org = await arrive('game=LND', [{ expression: SCROLL_TO_4TH }, { expression: STATE }, ...tap(S.next8), { expression: STATE }]);
+    // 2026-09-20: a bare link on eight golfers now ASKS which group first (the
+    // group picker, group_picker_test.js) - a modal over the card, so a thumb
+    // heading for Next meets "Just watching" first. Tapped, the way a spectator
+    // would, by its own selector (a real tap - no page function); the landing
+    // below is then measured on the same spectator view it always was.
+    S.org = await arrive('game=LND', [{ tap: '#group-pick-overlay button.btn-outline' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: STATE }, ...tap(S.next8), { expression: STATE }]);
     // 3. The 1-18 jump to hole 5.
     S.jump = await arrive('game=LND&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.next1), ...tap(S.posL),
         { expression: "document.querySelector('.hole-picker').scrollIntoView({ block: 'center' }); 'picker shown'" }, { expression: STATE }, ...tap(S.pick5), { expression: STATE }]);
@@ -174,7 +179,7 @@ describe('THE LANDING: Next, Next again, Prev - one place, whatever the starting
 describe('EIGHT GOLFERS (organizer link, boxes disabled): the same landing', () => {
     test('ran', () => assert.ok(S.org && S.org.ok, S.org && S.org.reason));
     test('eight boxes, none writable; Next lands the heading at the offset and focuses NOTHING', () => {
-        const b = P(S.org, 1), s = P(S.org, 4);
+        const b = P(S.org, 3), s = P(S.org, 6);   // two picker steps precede (tap, sleep)
         assert.equal(b.boxes, 8); assert.equal(b.enabled, 0);
         landed(s, 2);
         assert.equal(s.headingTop, P(S.nav, 4).headingTop, 'the same offset as the 4-golfer card');

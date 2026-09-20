@@ -103,7 +103,11 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // Action Center into #kp-entry-mount under the Prev/Next row and its head
         // reads "Weekly Game KP"; exactly those substrings moved in the fixture (its
         // "repinned" entry), every other character is still the 6ff9332 capture.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '243e5840');
+        // RE-PINNED 2026-09-20 (was 243e5840): the group picker - #group-pick-overlay
+        // flex with one row per group in #group-pick-body on the bare link, none on
+        // a group link or a one-group round. Those entries were added by hand (the
+        // fixture's "repinned" entry); every other character is the capture.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'e89b88e3');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

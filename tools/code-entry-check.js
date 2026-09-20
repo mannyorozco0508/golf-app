@@ -75,10 +75,15 @@ const PERMITS = `
 (() => {
   const inputs = Array.from(document.querySelectorAll('input.score-input'));
   const badge = document.getElementById('group-lock-badge');
+  const pick = document.getElementById('group-pick-overlay');
+  const pickOn = !!(pick && pick.getClientRects().length > 0 && getComputedStyle(pick).display !== 'none');
   return JSON.stringify({
     scoreInputs: inputs.length,
     editable: inputs.filter(i => !i.disabled && !i.readOnly).length,
-    badge: badge && badge.getClientRects().length > 0 ? (badge.innerText || '').trim() : null
+    badge: badge && badge.getClientRects().length > 0 ? (badge.innerText || '').trim() : null,
+    picker: pickOn ? { buttons: pick.querySelectorAll('.group-pick-btn').length,
+                       title: ((pick.querySelector('#group-pick-title') || {}).innerText || '').trim(),
+                       rows: Array.from(pick.querySelectorAll('.group-pick-btn')).map(b => (b.innerText || '').trim()) } : null
   });
 })()`;
 
@@ -103,18 +108,56 @@ const asLocalUrl = url => {
     const report = { cases: {} };
     let measured = 0;
 
+    // 2026-09-20: the code is GAME44 - the old CODE44 carried an O, a letter the
+    // issuer's alphabet never uses, and the join box now refuses those before it
+    // reads. A bare code on nine golfers lands on the GROUP PICKER (wantPicker: the
+    // overlay is on screen with one button per group) rather than a read-only view
+    // the note had to apologise for; "GAME44 2" is the typed shortcut past it.
     const CASES = [
-        { name: '4 golfers, bare code', n: 4, typed: 'CODE44',
-          wantGroup: false, wantEditable: true },
-        { name: '9 golfers, bare code', n: 9, typed: 'CODE44',
-          wantGroup: false, wantEditable: false },
+        { name: '4 golfers, bare code', n: 4, typed: 'GAME44',
+          wantGroup: false, wantEditable: true, wantPicker: false },
+        { name: '9 golfers, bare code', n: 9, typed: 'GAME44',
+          wantGroup: false, wantEditable: false, wantPicker: 3 },
+        { name: '9 golfers, typed shortcut "GAME44 2"', n: 9, typed: 'GAME44 2',
+          wantGroup: '2', wantEditable: true, wantPicker: false },
         { name: '9 golfers, pasted group link', n: 9,
-          typed: 'https://golf-app-5a5.pages.dev/index.html?game=CODE44&group=2',
-          wantGroup: '2', wantEditable: true },
+          typed: 'https://golf-app-5a5.pages.dev/index.html?game=GAME44&group=2',
+          wantGroup: '2', wantEditable: true, wantPicker: false },
     ];
 
+    // THE REFUSALS, SAID INLINE (2026-09-20). Typed, clicked, and the page must
+    // still be the lobby with the sentence under the field - no dialog, no
+    // navigation into a blank card. window.__dialogs is the cold-arrival stub's
+    // record of alert()/confirm() calls, when it keeps one.
+    const REFUSALS = [
+        { name: 'no such round', typed: 'ZZZZZZ', want: /No round with the code ZZZZZZ/ },
+        { name: 'a letter no code uses', typed: 'GAME0K', want: /no round code uses \(I, O, 0 or 1\)/ },
+    ];
+    for (const r of REFUSALS) {
+        const db = { events: { GAME44: roundOf(9) } };
+        const res = await arriveCold({ url: fileUrl('admin.html'), db: db,
+            preScript: `(function(){ window.__dialogs = []; window.alert = function (m) { window.__dialogs.push(String(m)); }; setTimeout(function () {
+                 var el = document.getElementById('join-code-input');
+                 var row = document.getElementById('join-code-row');
+                 var btn = row && row.querySelector('button');
+                 if (!el || !btn) return;
+                 var s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                 s.call(el, ${JSON.stringify(r.typed)});
+                 btn.click();
+               }, 1500); })();`,
+            expression: `(function () { var el = document.getElementById('join-code-refusal'); return JSON.stringify({ url: document.URL, refusal: el ? (el.innerText || '').trim() : null, onScreen: !!(el && el.getClientRects().length > 0), dialogs: window.__dialogs || [] }); })()`,
+            settleMs: 4500 });
+        if (!res.ok) bail('refusal ' + r.name + ': ' + res.reason);
+        const v = JSON.parse(res.value);
+        report.cases['refusal: ' + r.name] = v;
+        if (!/admin\.html/.test(v.url)) problems.push('refusal ' + r.name + ': navigated away to ' + v.url);
+        if (!r.want.test(v.refusal || '')) problems.push('refusal ' + r.name + ': said ' + JSON.stringify(v.refusal));
+        if (!v.onScreen) problems.push('refusal ' + r.name + ': the sentence is not on screen');
+        if (v.dialogs.length) problems.push('refusal ' + r.name + ': a dialog fired: ' + v.dialogs.join(' | '));
+    }
+
     for (const c of CASES) {
-        const db = { events: { CODE44: roundOf(c.n) } };
+        const db = { events: { GAME44: roundOf(c.n) } };
         const typed = await arriveCold({ url: fileUrl('admin.html'), db: db,
             expression: TYPE_AND_GO(c.typed), settleMs: 3500 });
         if (!typed.ok) bail(c.name + ': ' + typed.reason);
@@ -157,7 +200,7 @@ const asLocalUrl = url => {
             problems.push(c.name + ': a typed code opened the ORGANIZER WIZARD, '
                 + 'which shows Save & Start Round: ' + dest);
         }
-        if (!/index\.html\?game=CODE44/.test(dest)) {
+        if (!/index\.html\?game=GAME44/.test(dest)) {
             problems.push(c.name + ': did not open the round\'s scorecard: ' + dest);
         }
         const gotGroup = (/[?&]group=(\d+)/.exec(dest) || [])[1] || null;
@@ -166,9 +209,8 @@ const asLocalUrl = url => {
                 + gotGroup + ')');
         }
         if (!c.wantGroup && gotGroup) {
-            problems.push(c.name + ': a group was INVENTED for a typed code (' + gotGroup
-                + ') - that hands scorekeeper rights over another foursome to anyone '
-                + 'who knows the code');
+            problems.push(c.name + ': a group appeared on a bare code (' + gotGroup
+                + ') - the golfer picks it on the scorecard, the lobby does not guess');
         }
 
         // Shape, on a real phone-sized viewport.
@@ -199,12 +241,17 @@ const asLocalUrl = url => {
         if (!c.wantEditable) {
             if (p.editable > 0) {
                 problems.push(c.name + ': a bare code can score (' + p.editable + '/'
-                    + p.scoreInputs + ') on a round the note calls read-only');
+                    + p.scoreInputs + ') underneath the picker - the lock is a URL, and this URL has none');
             }
-            if (!/read-only/i.test(t.note || '')) {
-                problems.push(c.name + ': the destination is read-only (0/' + p.scoreInputs
-                    + ') and the note does not say so: ' + JSON.stringify(t.note));
-            }
+        }
+        // THE PICKER, where the note says it is (2026-09-20).
+        if (c.wantPicker) {
+            if (!p.picker) problems.push(c.name + ': no group picker on screen on a bare code above four golfers');
+            else if (p.picker.buttons !== c.wantPicker) problems.push(c.name + ': the picker offers ' + p.picker.buttons + ' groups, expected ' + c.wantPicker);
+            else if (!/Which group are you keeping score for/.test(p.picker.title)) problems.push(c.name + ': the picker asks ' + JSON.stringify(p.picker.title));
+            if (!/pick your group/i.test(t.note || '')) problems.push(c.name + ': the note does not say the golfer picks their group: ' + JSON.stringify(t.note));
+        } else if (p.picker) {
+            problems.push(c.name + ': the picker is on screen where it should not be (' + p.picker.buttons + ' buttons)');
         }
     }
 

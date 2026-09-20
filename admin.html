@@ -466,14 +466,22 @@ html {
     <div id="join-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
         <input type="text" id="join-code-input" class="join-code-input" maxlength="48"
                placeholder="GAME CODE" aria-label="Game code or the link your organizer sent">
-        <button class="btn-outline join-code-btn" onclick="openRoundByCode()">📥 Open</button>
+        <button class="btn-outline join-code-btn" onclick="openRoundByCode(this)">📥 Open</button>
     </div>
     <!-- MEASURED, not guessed: index.html gates scoring on players.length > 4, so a
          bare ?game=CODE is 76 of 76 inputs editable on a foursome and 0 of 171 on a
          nine-golfer shotgun. tools/code-entry-check.js types a code on both and
          counts, so this sentence goes red if the gate ever moves. -->
+    <!-- SAID INLINE, NOT IN A DIALOG (2026-09-20): the join box reads the round
+         before it navigates, and what it finds is written here, under the field.
+         An alert rendered as "golf-app-5a5.pages.dev says" on a phone. -->
+    <p id="join-code-refusal" role="alert" style="display:none; font-size:0.8rem; font-weight:bold; color:var(--warn-text); background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:8px; padding:8px 12px; margin:0 auto 8px auto; max-width:360px; text-align:center; line-height:1.4;"></p>
+    <!-- Since 2026-09-20 a typed code on a bigger round lands on the group picker,
+         so a golfer can keep score from a code alone. tools/code-entry-check.js
+         types a code on four and on nine golfers and measures that the picker is
+         on screen where this sentence says it is. -->
     <p id="join-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
-        Above four golfers a typed code is read-only — paste the link your organizer sent if you are keeping score.
+        Type the code your organizer sent. On a round with more than four golfers you pick your group next.
     </p>
     <!-- STARTING FROM A PREVIOUS ROUND. The prefill (admin.html?game=NEW&copyFrom=OLD)
          has always worked from a link; this is the field that emits it. The order
@@ -1826,7 +1834,30 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const boundaries = computeGroupBoundaries(players.length,
             (data && data.groupSizeOverrides) || {});
-        let html = '<div class="wr-label" style="margin-bottom:4px;">Scorekeeper Links</div>'
+        let html = '';
+        // ONE LINK FOR EVERYONE, FIRST (2026-09-20). On a round with more than one
+        // group the round's own link - index.html?game=CODE, no group - opens the
+        // scorecard's group picker, so the organizer sends ONE link to the chat and
+        // each golfer picks their four. The per-group rows stay underneath for the
+        // organizer who would rather address each card. Its own element, not a
+        // .group-link-row: tools/round-share-check.js counts those rows to prove the
+        // group links cover the field exactly once, and this link covers all of it.
+        if (boundaries.length > 1) {
+            const roundUrl = scorecardUrlFor(currentMode);
+            html += '<div class="rr-round-link" style="margin-bottom:12px;">'
+                + '<div class="wr-label" style="margin-bottom:4px;">Send this link to everyone</div>'
+                + '<div class="group-link-row rr-round-link-row" style="border:2px solid var(--brand-green);">'
+                + '<span>\uD83D\uDCE3 The whole round<br>'
+                + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
+                + escapeHtml(players.length) + ' golfers \u00B7 ' + boundaries.length + ' groups</span></span>'
+                + '<button class="btn-outline" onclick="copyGroupLink(\'' + roundUrl + '\', 0)">\uD83D\uDD17 Copy Link</button>'
+                + '</div>'
+                + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
+                + 'One link for the whole round \u2014 each golfer picks their group when they open it. '
+                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, tap Open and pick your group.</div>'
+                + '</div>';
+        }
+        html += '<div class="wr-label" style="margin-bottom:4px;">' + (boundaries.length > 1 ? 'Or send each group its own link' : 'Scorekeeper Links') + '</div>'
             + '<div id="rr-links-note" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">'
             + escapeHtml(groupLinkNoteText(players.length)) + '</div>';
         boundaries.forEach(b => {
@@ -3529,24 +3560,84 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // holding the control that rewrites the round. This goes to the scorecard.
     //
     // IT ALSO TAKES A PASTED LINK, because a link is what an organizer actually
-    // sends and people paste what they were sent. A group is carried across ONLY
-    // when the pasted text carried one: a bare code has no group in it, and adding
-    // one would hand scorekeeper rights over another foursome to anybody who knows
-    // the code. Read-only above four golfers is the honest outcome, and the note
-    // beside the field says so.
-    function openRoundByCode() {
+    // sends and people paste what they were sent.
+    //
+    // AND A GROUP, TWO WAYS (2026-09-20). A typed bare code lands on the scorecard
+    // bare, where a round with more than one group asks the golfer which group they
+    // are keeping score for (index.html's picker); "ABCD 2" - the code, a space (or
+    // a slash, or a dash), the group - skips the question for a golfer who was told
+    // their group. This used to refuse to carry a group at all, on the grounds that
+    // a stranger who knew the code would get another foursome's card from it.
+    // That was not true of the refusal and not true of the lock: anybody who knows
+    // the code can type &group=3 into Safari today, and database.rules.json lets any
+    // client write any child of a round that exists. The lock (hasGroupLock,
+    // canWritePlayer in index.html) keeps four friends on their own card - a
+    // courtesy, not a wall - and refusing the group here only made the app worse
+    // than Safari for an honest golfer.
+    //
+    // THE SEPARATOR. parseRoundCodeInput strips everything but A-Z and 0-9, and a
+    // code CONTAINS the digits 2-9, so "ABCD2" is the code ABCD2 and can never mean
+    // "group 2 of ABCD". The group is read BEFORE the strip, from a separator run the
+    // alphabet cannot produce - whitespace, "/" or "-" - followed by one or two
+    // digits at the end. A space is the documented form ("ABCD 2"): it is what a
+    // thumb types after hearing "A-B-C-D, you're group two".
+    //
+    // LOOK BEFORE IT LEAPS. This used to navigate first and find out later, so a
+    // mistyped code showed a golfer "No data found for this room. Waiting for Admin
+    // to save settings..." - a sentence written for an organizer's unsaved round.
+    // The round is read first, through the issuer's timer (readWithTimeout, the
+    // same read startFromPreviousRound makes), and what it finds is said INLINE
+    // under the field: no such round; offline or no answer; a letter no round code
+    // uses (the alphabet has no I, O, 0 or 1 - code-issuer.js). A group the round
+    // does not have opens the picker instead of a fail-closed card.
+    const JOIN_REFUSAL = {
+        empty: 'Enter the game code your organizer sent.',
+        letters: 'That code has a letter no round code uses (I, O, 0 or 1) — check it with your organizer.',
+        missing: code => 'No round with the code ' + code + ' — check it with your organizer.',
+        offline: 'Can’t check that code right now — try again when you have signal.',
+    };
+    function sayJoinRefusal(text) {
+        const el = document.getElementById('join-code-refusal');
+        if (!el) return;
+        if (!text) { el.textContent = ''; el.style.display = 'none'; return; }
+        el.textContent = text;
+        el.style.display = 'block';
+    }
+    async function openRoundByCode(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const el = document.getElementById('join-code-input');
         const text = String((el && el.value) || '').trim();
         const fromUrl = /[?&]game=([A-Za-z0-9]+)/.exec(text);
+        // The typed shortcut, read before the strip below can eat its separator.
+        const shortcut = fromUrl ? null : /^([A-Za-z0-9]+)[\s\/\-]+(\d{1,2})$/.exec(text);
         // ONE PARSER for a typed code or a pasted link (parseRoundCodeInput), shared
         // with the start-from-a-previous-round field below it.
-        const code = parseRoundCodeInput(el);
-        if (code.length < 2) {
-            alert('\u26A0\uFE0F Enter the game code your organizer sent.');
+        const code = shortcut ? shortcut[1].toUpperCase() : parseRoundCodeInput(el);
+        sayJoinRefusal('');
+        if (code.length < 2) { sayJoinRefusal(JOIN_REFUSAL.empty); return; }
+        if (/[IO01]/.test(code)) { sayJoinRefusal(JOIN_REFUSAL.letters); return; }
+        let group = fromUrl ? (/[?&]group=(\d+)/.exec(text) || [])[1] : (shortcut ? shortcut[2] : null);
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { sayJoinRefusal(JOIN_REFUSAL.offline); return; }
+
+        const restore = setControlPending(pressedEl, '⏳ Checking…');
+        let round;
+        try {
+            const snap = await readWithTimeout(db.ref('events/' + code).once('value'), { what: 'the round' });
+            round = (snap && snap.exists && snap.exists()) ? (snap.val() || {}) : null;
+        } catch (err) {
+            restore();
+            sayJoinRefusal(JOIN_REFUSAL.offline);
             return;
         }
-        // Only from a pasted link, never manufactured for a typed code.
-        const group = fromUrl ? (/[?&]group=(\d+)/.exec(text) || [])[1] : null;
+        restore();
+        if (!round) { sayJoinRefusal(JOIN_REFUSAL.missing(code)); return; }
+        // A group the round does not have: the picker on the scorecard shows the
+        // groups that do exist, which is more use than a fail-closed card.
+        if (group) {
+            const players = Array.isArray(round.players) ? round.players : [];
+            const groups = computeGroupBoundaries(players.length, round.groupSizeOverrides || {}).length;
+            if (parseInt(group, 10) < 1 || parseInt(group, 10) > groups) group = null;
+        }
         // RELATIVE, LIKE EVERY OTHER NAVIGATION ON THIS PAGE.
         //
         // This used to build the destination with playerPageUrl(), which is
@@ -3573,11 +3664,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // It is exactly what resumeGame() a few hundred lines up already does, and
         // what the other thirty-five navigations in this bundle do.
         //
-        // shareBaseUrl AND playerPageUrl ARE UNCHANGED. Every share surface - the QR,
-        // the invite text, all thirteen group scorekeeper links - still hands out an
-        // absolute https URL another phone can open. The fix is at this call site
-        // because the mistake was at this call site: a builder for links you SEND was
-        // used for a link you NAVIGATE TO.
+        // shareBaseUrl AND playerPageUrl ARE UNCHANGED. Every share surface - the
+        // invite text, all the group scorekeeper links - still hands out an absolute
+        // https URL another phone can open. The fix is at this call site because the
+        // mistake was at this call site: a builder for links you SEND was used for a
+        // link you NAVIGATE TO.
         let dest = 'index.html?game=' + code;
         if (group) dest += '&group=' + group;
         window.location.href = dest;

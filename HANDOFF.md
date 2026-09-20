@@ -1076,6 +1076,68 @@ on → exit 2 "REACHED NO LISTENER - this arm proves nothing about the board"; j
 swallow restored → "HARNESS: journey did not raise the thrown listener". Both caches:
 `build-shell.js` `tournament-v50-live-board`, `sw.js` `golfapp-v175-live-board`.
 
+## One link, one code, then the golfer picks their group (2026-09-20, v183)
+
+**The ask.** A golfer with the app types a code and lands scoring their own four; the
+organizer sends one link, not four. **The shape.** index.html: a golfer arriving on a
+round with more than one group and no `?group=` in the URL is asked "Which group are you
+keeping score for?" - the foursomes by first name ("Group 2 · Manny, Matt, Lance, Kopp"),
+one button each, read from the boundaries the page just computed (a regrouped round
+offers the groups as they are NOW). A tap navigates to `?game=CODE&group=N`, keeping the
+other params; **the lock does not move** - it is the URL, read once at load, and
+`hasGroupLock` / `lockedGroup` / the slice / `canWritePlayer` / the badge are untouched
+(`pickGroup` sets nothing in place). "Just watching" dismisses it for this round in this
+session (sessionStorage `groupPickDismissed:CODE`; a second snapshot must not re-ask) and
+leaves the spectator view that was always underneath. Never on a group link, never on a
+foursome, never before the roster has arrived. Markup `#group-pick-overlay`, functions
+`renderGroupPicker` / `pickGroup` / `dismissGroupPick` beside the group-links panel.
+
+**Two doors.** Round Ready (admin.html `renderRoundReadyLinks`) now leads with the
+round's own link - "Send this link to everyone · 📣 The whole round · 12 golfers · 3
+groups · Copy Link" and "One link for the whole round — each golfer picks their group when
+they open it. Or tell them the code MNDY2A: in the app, tap Open and pick your group." -
+in its own `.rr-round-link`, NOT a `.group-link-row` (tools/round-share-check.js counts
+those to prove the group links cover the field exactly once; this link covers all of it);
+the per-group rows follow under "Or send each group its own link". A foursome is unchanged.
+And the lobby's join box (`openRoundByCode`) carries a group again: a typed bare code
+lands on the picker; **the typed shortcut "MNDY2A 2"** - the code, a separator the
+alphabet cannot produce (whitespace, `/` or `-`; a space is the documented form, it is what
+a thumb types after hearing "you're group two"), one or two digits - skips it. The group
+is read BEFORE `parseRoundCodeInput` strips punctuation, because codes contain 2-9 and
+"MNDY2A2" is the code MNDY2A2. The old comment's reason for refusing a group ("hands
+scorekeeper rights to anybody who knows the code") was replaced with what is true: the
+lock is a courtesy that keeps four friends on their own card, not a wall - `.read: true`
+and the write rule let any client write any child of an existing round, and anybody with
+the code can type `&group=3` into Safari - so refusing it only made the app worse than
+Safari for an honest golfer.
+
+**Look before it leaps.** The join box reads `events/CODE` through `readWithTimeout` (the
+issuer's timer, the read `startFromPreviousRound` already makes) before navigating, with
+"⏳ Checking…" on the button, and says its refusals INLINE in `#join-code-refusal` under
+the field, never in a dialog: "Enter the game code your organizer sent." / "That code has
+a letter no round code uses (I, O, 0 or 1) — check it with your organizer." (before any
+read; the alphabet has none of them) / "No round with the code ZZZZZZ — check it with your
+organizer." / "Can't check that code right now — try again when you have signal."
+(`navigator.onLine === false` before the read, or a timeout/error after). A shortcut
+group the round does not have navigates bare - the picker shows the groups that exist.
+The note under the field: "Type the code your organizer sent. On a round with more than
+four golfers you pick your group next."
+
+**Tests.** `group_picker_test.js` (24: the picker on arrival through the page's own
+listener, absent on a foursome and on a group link, the tap's URL and the lock that URL
+produces, "Just watching" and its session memory, a regrouped round, the lock's source
+unmoved; the join box's read, the shortcut in four spellings, the longer-code ambiguity,
+an out-of-range group, the four refusals inline with no read and no alert, a refusal
+clearing; Round Ready's headline). Seven controls all fire (the picker on a foursome, a
+tap off by one, the lock lost, the existence check skipped, the letter check dropped, the
+separator swallowed, a stale roster). `tools/code-entry-check.js` types GAME44 (the old
+CODE44 carried an O) on 4 and 9 golfers plus "GAME44 2" and a pasted link, measures the
+picker on screen with 3 buttons on the bare 9-golfer arrival and 76/76 editable behind the
+shortcut, and two refusals typed and clicked: on the lobby, the sentence on screen, no
+dialog. Re-pins: home_code_entry / native_code_entry (async, seeded reads, codes without
+I/O/0/1, the note), rattle_icon_system (`openRoundByCode(this)`). `sw.js`
+`golfapp-v183-group-picker`.
+
 ## Recording a KP pays it (2026-09-19, v182)
 
 **Why Wave B's confirmation went.** pool-engine.js withheld every KP dollar until an

@@ -73,7 +73,13 @@ const WEB_HREF = 'https://golf-app-5a5.pages.dev/admin.html';
 // stripped - the app was right and the fixture was wrong. Every field the function
 // actually reads is set here, the same way share_url_test.js does it.
 function lobbyAt(href) {
-    const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+    const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js', 'code-issuer.js', 'grouping.js']);
+    // RE-PINNED 2026-09-20: the join box READS the round before it navigates (the
+    // existence check), so every code these tests type must exist in the stub, and
+    // openRoundByCode is async - go() awaits it. The codes carry no I/O/0/1, which
+    // the box now refuses before reading (the alphabet never issues them).
+    sb.__dbReads = { 'events/AB2CDF': { players: [{ id: 101, name: 'A' }] }, 'events/R4HH': { players: [{ id: 101, name: 'A' }] },
+                     'events/JLRL4H': { players: Array.from({ length: 12 }, (_, i) => ({ id: 101 + i, name: 'P' + i })) } };
     const isWeb = /^https?:/i.test(href);
     const u = isWeb ? new URL(href) : null;
     const loc = {
@@ -84,12 +90,12 @@ function lobbyAt(href) {
         pathname: isWeb ? u.pathname : '/admin.html',
     };
     vm.runInContext("alert = function (m) { window.__said = m; };"
-        + ' location = ' + JSON.stringify(loc) + '; window.location = location;', sb);
+        + ' location = ' + JSON.stringify(loc) + '; window.location = location; navigator.onLine = true;', sb);
     return {
         sb,
         type: v => vm.runInContext(
             `document.getElementById('join-code-input').value = ${JSON.stringify(v)};`, sb),
-        go: () => vm.runInContext('openRoundByCode();', sb),
+        go: async () => { await vm.runInContext('openRoundByCode();', sb); await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r)); },
         // RESOLVED, THE WAY A BROWSER RESOLVES IT.
         //
         // window.location.href = 'index.html?game=X' does not leave the golfer on a
@@ -117,7 +123,7 @@ const leavesTheApp = dest => /^https?:\/\//i.test(String(dest));
 
 describe('INSIDE THE APP, OPENING A CODE STAYS INSIDE THE APP', () => {
 
-    test('the fixture really is at the wrapper origin', () => {
+    test('the fixture really is at the wrapper origin', async () => {
         // POSITIVE FIRST. Every assertion below is about what happens AT
         // capacitor://localhost. If the fixture silently sat on https - which is
         // exactly how this defect went unnoticed - they would all pass while
@@ -129,9 +135,9 @@ describe('INSIDE THE APP, OPENING A CODE STAYS INSIDE THE APP', () => {
         assert.ok(!/^https?:/i.test(l.href()));
     });
 
-    test('a typed code does not leave capacitor://localhost', () => {
+    test('a typed code does not leave capacitor://localhost', async () => {
         const l = lobbyAt(APP_HREF);
-        l.type('AB12CD'); l.go();
+        l.type('AB2CDF'); await l.go();
         assert.ok(!leavesTheApp(l.href()),
             '\nTyping a code inside the app navigates OFF the app origin:\n'
             + '    ' + l.href() + '\n'
@@ -139,12 +145,12 @@ describe('INSIDE THE APP, OPENING A CODE STAYS INSIDE THE APP', () => {
             + '  ejected from the app on the commonest way into a round.');
     });
 
-    test('and it still reaches the scorecard with the code intact', () => {
+    test('and it still reaches the scorecard with the code intact', async () => {
         // The fix must not be "go nowhere". Refusing to navigate would satisfy the
         // assertion above and break the feature.
         const l = lobbyAt(APP_HREF);
-        l.type('AB12CD'); l.go();
-        assert.match(l.href(), /index\.html\?game=AB12CD/,
+        l.type('AB2CDF'); await l.go();
+        assert.match(l.href(), /index\.html\?game=AB2CDF/,
             'the destination lost the scorecard or the code: ' + l.href());
     });
 
@@ -154,29 +160,29 @@ describe('INSIDE THE APP, OPENING A CODE STAYS INSIDE THE APP', () => {
     // rebuilds the destination through playerPageUrl, so it lands in the same place.
     // It matters more than the typed code, because the note under that very field
     // tells golfers above four to "paste the link your organizer sent".
-    test('a pasted organizer link does not leave the app either', () => {
+    test('a pasted organizer link does not leave the app either', async () => {
         const l = lobbyAt(APP_HREF);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
-        l.go();
+        await l.go();
         assert.ok(!leavesTheApp(l.href()),
             '\nPasting the organizer link inside the app navigates OFF the app origin:\n'
             + '    ' + l.href());
     });
 
-    test('and the pasted link keeps its group', () => {
+    test('and the pasted link keeps its group', async () => {
         const l = lobbyAt(APP_HREF);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H&group=2');
-        l.go();
+        await l.go();
         assert.match(l.href(), /game=JLRL4H/);
         assert.match(l.href(), /group=2/,
             'the group the link carried was dropped, which costs the scorekeeper '
             + 'their write access');
     });
 
-    test('a pasted link with no group still does not gain one', () => {
+    test('a pasted link with no group still does not gain one', async () => {
         const l = lobbyAt(APP_HREF);
         l.type('https://golf-app-5a5.pages.dev/index.html?game=JLRL4H');
-        l.go();
+        await l.go();
         assert.ok(!/group=/.test(l.href()),
             'a group was invented, handing over somebody else’s card');
     });
@@ -187,22 +193,22 @@ describe('ON THE WEB NOTHING CHANGES', () => {
     // The control that stops the fix becoming a regression. On an https origin the
     // current behaviour is correct and must stay byte-for-byte the same, including
     // the preview-deploy rule: a preview must hand out links to ITSELF.
-    test('a typed code on the web still opens the scorecard', () => {
+    test('a typed code on the web still opens the scorecard', async () => {
         const l = lobbyAt(WEB_HREF);
-        l.type('AB12CD'); l.go();
-        assert.match(l.href(), /index\.html\?game=AB12CD/);
+        l.type('AB2CDF'); await l.go();
+        assert.match(l.href(), /index\.html\?game=AB2CDF/);
     });
 
-    test('the web destination stays on the origin the page was served from', () => {
+    test('the web destination stays on the origin the page was served from', async () => {
         const l = lobbyAt('https://preview-7.pages.dev/admin.html');
-        l.type('AB12CD'); l.go();
+        l.type('AB2CDF'); await l.go();
         assert.match(l.href(), /^https:\/\/preview-7\.pages\.dev\//,
             'a preview deploy sent the golfer to production: ' + l.href());
     });
 
-    test('a subdirectory deployment keeps its directory', () => {
+    test('a subdirectory deployment keeps its directory', async () => {
         const l = lobbyAt('https://example.com/golf/admin.html');
-        l.type('AB12CD'); l.go();
+        l.type('AB2CDF'); await l.go();
         assert.match(l.href(), /^https:\/\/example\.com\/golf\/index\.html/,
             'the subdirectory was dropped: ' + l.href());
     });
@@ -225,13 +231,13 @@ describe('THE SHARE BUILDER IS NOT WHAT IS WRONG, AND MUST NOT BE CHANGED', () =
         return String(vm.runInContext('shareBaseUrl()', PL));
     };
 
-    test('under capacitor:// a SHARED link still points at the canonical web origin', () => {
+    test('under capacitor:// a SHARED link still points at the canonical web origin', async () => {
         assert.equal(shareBaseAt(APP_HREF), 'https://golf-app-5a5.pages.dev/',
             'a link sent from inside the app must be one another phone can open. '
             + 'capacitor://localhost/index.html?game=CODE is meaningless in a text.');
     });
 
-    test('on the web a SHARED link still points at this page’s own origin', () => {
+    test('on the web a SHARED link still points at this page’s own origin', async () => {
         assert.equal(shareBaseAt('https://preview-7.pages.dev/admin.html'),
             'https://preview-7.pages.dev/',
             'a preview deploy must hand out links to itself');

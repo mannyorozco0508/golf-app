@@ -1667,7 +1667,13 @@
 // computeRoundFinish; index.html lost the confirm ceremony and the KP RECORDED
 // alert; settlement.html and trip.html lost their "not confirmed" copy. A device
 // on v181 keeps an engine that withholds every recorded KP forever.
-const CACHE_VERSION = 'golfapp-v182-kp-pays';
+// Moved to v183: one link, one code, then the golfer picks their group. A bare
+// round link (or a typed code) on a round with more than one group asks which
+// group you are keeping score for instead of landing you as a spectator; the
+// lobby reads the round before it navigates and refuses a bad code inline;
+// Round Ready offers the round's own link first. A device on v182 keeps an
+// index.html that never asks and an admin.html that navigates into a blank card.
+const CACHE_VERSION = 'golfapp-v183-group-picker';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

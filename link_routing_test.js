@@ -87,14 +87,16 @@ describe('SCOREKEEPER LINKS — must target the scorecard, never admin', () => {
         const code = adm.replace(/^\s*\/\/.*$/gm, '');
         assert.ok(!/replace\('admin\.html'/.test(code), 'a fragile filename replace survives');
         assert.ok(code.includes('scorecardUrlFor(currentMode, b.group)'));
-        // EVERY LINK admin.html hands out is now group-scoped. The two bare
-        // scorecardUrlFor(currentMode) calls were the setup screen's QR and its
-        // "Copy Invite Link" button; both left with the share card, and Round Ready
-        // gives a foursome a real ?group=1 link instead of a code to read aloud.
-        // The builder still supports the no-group form - link_routing asserts it
-        // directly above - it simply has no caller on this page.
-        assert.equal((code.match(/scorecardUrlFor\(currentMode\)/g) || []).length, 0,
-            'admin.html hands out an unscoped link again; every share surface here is per group');
+        // ONE bare scorecardUrlFor(currentMode) caller, deliberately (2026-09-20):
+        // Round Ready's "Send this link to everyone" - the round's own link, which
+        // opens the scorecard's group picker on a round with more than one group
+        // (group_picker_test.js). Before that the two bare calls were the setup
+        // screen's QR and "Copy Invite Link", both gone with the share card; then
+        // there were none. Exactly one now, and it lives in renderRoundReadyLinks.
+        assert.equal((code.match(/scorecardUrlFor\(currentMode\)/g) || []).length, 1,
+            'the bare round link has exactly one home: Round Ready\'s headline');
+        const rr = code.slice(code.indexOf('function renderRoundReadyLinks'), code.indexOf('\n    function ', code.indexOf('function renderRoundReadyLinks') + 30));
+        assert.match(rr, /scorecardUrlFor\(currentMode\)/, 'and that home is renderRoundReadyLinks');
     });
 });
 

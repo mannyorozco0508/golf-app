@@ -293,7 +293,10 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
         // a destination that is not the wizard.
         assert.ok(!/function joinRoom/.test(ADMIN),
             'the control that opened the organizer wizard from a code is back');
-        assert.match(ADMIN, /openRoundByCode\(\)">\u{1F4E5} Open</u,
+        // 2026-09-20: the button hands itself over (openRoundByCode(this)) so the
+        // existence check can show "⏳ Checking…" on it; the glyph and the
+        // destination are unchanged.
+        assert.match(ADMIN, /openRoundByCode\(this\)">\u{1F4E5} Open</u,
             'the game-code control lost its inbox glyph');
         assert.match(read('trip.html'), /joinTrip\(\)">\u{1F4E5} Open Trip<\/button>/u);
         (ADMIN + IDX + TRIP).match(/\u{1F4E5}[^<\n]{0,24}/gu).forEach(m =>
