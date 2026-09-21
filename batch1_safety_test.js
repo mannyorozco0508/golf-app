@@ -467,7 +467,7 @@ describe('GROUP LINKS — organizer only, and not merely hidden with CSS', () =>
         // Independent of the links work, and the actual write-side protection on the
         // scorecard: a player outside the locked group renders as a disabled input with
         // no onchange handler, so there is no scorekeeping pathway to their score at all.
-        assert.ok(idx.includes('const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);'));
+        assert.ok(idx.includes('const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);
         const locked = idx.slice(idx.indexOf('const scoreInputHtml = isLocked'), idx.indexOf('const scoreInputHtml = isLocked') + 400);
         const disabledBranch = locked.slice(0, locked.indexOf(': `<input'));
         assert.ok(/disabled>/.test(disabledBranch));

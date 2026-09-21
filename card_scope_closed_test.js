@@ -111,7 +111,10 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // this legacy round (neither ownerUid nor organizerToken: open, as always)
         // shows the ✏️ Edit round setup pill after Group Links; the group link shows
         // neither. That substring was added by hand (the fixture's "repinned" entry).
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ad65f4de');
+        // RE-PINNED 2026-09-22 (was ad65f4de): the retired-round guard - every
+        // variant gains #superseded-banner display none (added by hand, the
+        // fixture's "repinned" entry); nothing else moved.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '7b7b5c6f');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

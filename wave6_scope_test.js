@@ -398,7 +398,7 @@ describe('PERMISSIONS — identity is still not authorization', () => {
     });
 
     test('score locking still comes from the group, not from identity', () => {
-        assert.ok(idx.includes('const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);'));
+        assert.ok(idx.includes('const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);
         const locked = idx.slice(idx.indexOf('const scoreInputHtml = isLocked'), idx.indexOf('const scoreInputHtml = isLocked') + 400);
         assert.ok(!/meId/.test(locked));
     });

@@ -74,7 +74,7 @@ describe('CURRENT MODEL — what was actually enforcing isolation', () => {
     });
 
     test('the disabled-input rendering is still there as the first line of defence', () => {
-        assert.ok(idx.includes('const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);'));
+        assert.ok(idx.includes('const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);
     });
 });
 

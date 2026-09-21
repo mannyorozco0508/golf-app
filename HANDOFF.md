@@ -2282,6 +2282,26 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The retired round — Wave v191, 2026-09-22
+
+**What it is.** On 2026-09-21 the Sunday-night round's links were already in
+the group text when Monday's round was created under a new code; three groups
+scored the whole way on the old one. Now, when a NEW round is saved,
+`admin.html` (`offerRetire`, `supersedeCandidate`) looks for an unfinished
+round this device saved in the last 7 days whose roster shares at least half
+the new names, and Round Ready shows "Retire OLD — anyone who opens it is sent
+here.", checked; the write is `events/OLD/supersededBy = NEW` (fires on
+render, unticking clears it). `index.html` on a round with `supersededBy`:
+`renderSupersededBanner` (full-width link to the new code, `&group=` carried),
+every score box disabled (`isLocked`), `canWritePlayer` false, the group
+picker replaced by the same link. `superseded_round_test.js`.
+
+**Known limit.** Rounds carry no timestamp and the rules index nothing, so the
+candidates are the codes THIS DEVICE remembered at its own saves
+(`localStorage golfapp_saved_rounds`, seven days). A round created on another
+device, or before v191, is never offered. The old round's scores are not
+moved; ids differ between rounds.
+
 ## The organizer doors — Wave v189, 2026-09-21
 
 **What it is.** Two doors into the round setup for the organizer — "✏️ Edit round

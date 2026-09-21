@@ -289,6 +289,9 @@
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        /* v191: the offer to retire the round this one replaces (Round Ready). */
+        .rr-retire-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 0 0; padding: 10px 12px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; font-size: 0.9rem; line-height: 1.4; cursor: pointer; }
+        .rr-retire-row input { width: 22px; height: 22px; flex: 0 0 auto; }
         .organizer-standing:empty { display: none; }
         .wizard-review-row .wr-value { font-weight: bold; text-align: right; }
         .wizard-edit-link { font-size: 0.75rem; color: var(--brand-navy); text-decoration: underline; cursor: pointer; margin-left: 8px; }
@@ -1487,6 +1490,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
+    <!-- THE supersededBy GUARD (v191). Filled by offerRetire() after a NEW round is
+         saved when this device saved an unfinished round with the same golfers in
+         the last 7 days: "Retire OLD — anyone who opens it is sent here.", checked
+         by default (the write fires on render; unticking clears it). Empty otherwise. -->
+    <div id="rr-retire"></div>
     <div id="rr-links-box" style="margin-top:12px;"></div>
 </div>
 
@@ -1758,6 +1766,93 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const el = document.getElementById('rr-course-publish-note');
         if (!el) return;
         el.style.display = 'block';
+    }
+
+    // ---- THE supersededBy GUARD (2026-09-22, v191) -----------------------------
+    //
+    // WHAT IT IS FOR. On 2026-09-21 the Sunday-night round (links already in
+    // the group text) was replaced Monday morning by a new code; three groups
+    // opened the old link and scored the whole way on the wrong round. Nothing
+    // told them. Now, when a NEW round is saved and this device saved an
+    // UNFINISHED round with (at least half) the same golfers in the last seven
+    // days, Round Ready offers - checked - to retire it: ONE write,
+    // events/OLD/supersededBy = NEW. index.html shows the old round's visitors
+    // a banner to the new one and takes no score there.
+    //
+    // "THIS DEVICE": rounds have no timestamp and the rules index nothing, so
+    // the candidates are the codes this device remembered at its own saves
+    // (localStorage golfapp_saved_rounds, seven days). A round created on
+    // another device is not seen - stated in HANDOFF.md.
+    var SAVED_ROUNDS_KEY = 'golfapp_saved_rounds';
+    var SUPERSEDE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+    function savedRoundsList() {
+        try { const v = JSON.parse(localStorage.getItem(SAVED_ROUNDS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+    }
+    function recordSavedRound(code, now) {
+        const at = now || Date.now();
+        const list = savedRoundsList().filter(e => e && e.code !== code && (at - (e.at || 0)) < SUPERSEDE_WINDOW_MS);
+        list.push({ code: code, at: at });
+        try { localStorage.setItem(SAVED_ROUNDS_KEY, JSON.stringify(list)); } catch (e) { /* private mode: no memory, no offer */ }
+    }
+    const normName = n => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/\.$/, '');
+    // How many of `theirs` are on `ours`, by normalised name (case, spaces, a
+    // trailing dot - the paste's dots must not hide a match).
+    function rosterOverlap(ours, theirs) {
+        const mine = new Set((ours || []).map(p => normName(p && p.name)).filter(Boolean));
+        return (theirs || []).filter(p => mine.has(normName(p && p.name))).length;
+    }
+    // A round is unfinished while any golfer is missing any hole. No golfers or
+    // no holes: there is nothing to retire.
+    function roundUnfinished(data) {
+        const players = (data && Array.isArray(data.players)) ? data.players : [];
+        const holes = (data && Array.isArray(data.courseData)) ? data.courseData : [];
+        if (players.length === 0 || holes.length === 0) return false;
+        const scores = (data && data.scores) || {};
+        return players.some(p => holes.some(h => !(scores['p' + p.id + '_h' + h.hole] > 0)));
+    }
+    // The one code to offer, or null: this uid's, unfinished, not already
+    // retired, saved within the window, sharing at least half the NEW roster's
+    // names; the most recently saved such round wins.
+    function supersedeCandidate(newData, newCode, uid, entries, records, now) {
+        const need = Math.ceil(((newData && newData.players) || []).length / 2);
+        if (need === 0) return null;
+        const sorted = (entries || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+        for (const e of sorted) {
+            if (!e || !e.code || e.code === newCode) continue;
+            if ((now - (e.at || 0)) >= SUPERSEDE_WINDOW_MS) continue;
+            const rec = records && records[e.code];
+            if (!rec) continue;
+            if (!uid || rec.ownerUid !== uid) continue;
+            if (rec.supersededBy) continue;
+            if (!roundUnfinished(rec)) continue;
+            if (rosterOverlap(newData.players, rec.players) < need) continue;
+            return e.code;
+        }
+        return null;
+    }
+    // After a NEW round's save: read the remembered rounds, pick one, render the
+    // row, and - checked by default - write. Never for an edit of an existing round.
+    function offerRetire(newCode, newData, uid) {
+        const mount = document.getElementById('rr-retire');
+        if (!mount) return Promise.resolve(null);
+        mount.innerHTML = '';
+        const entries = savedRoundsList().filter(e => e && e.code && e.code !== newCode);
+        if (entries.length === 0) return Promise.resolve(null);
+        const reads = entries.map(e => db.ref('events/' + e.code).once('value').then(s => [e.code, s.val()], () => [e.code, null]));
+        return Promise.all(reads).then(pairs => {
+            const records = {}; pairs.forEach(([c, v]) => { if (v) records[c] = v; });
+            const code = supersedeCandidate(newData, newCode, uid, entries, records, Date.now());
+            if (!code) return null;
+            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" checked onchange="retireRound(\'' + code + '\', this.checked)"> '
+                + '<span>Retire ' + code + ' \u2014 anyone who opens it is sent here.</span></label>';
+            retireRound(code, true);
+            return code;
+        });
+    }
+    // The one write. true -> events/OLD/supersededBy = NEW; false -> null (undo).
+    function retireRound(oldCode, on) {
+        return db.ref('events/' + oldCode + '/supersededBy').set(on ? currentMode : null)
+            .catch(err => alert('\u26A0\uFE0F NOT RETIRED\n' + oldCode + ': ' + err.message));
     }
 
     function showRoundReadyScreen(modeKey) {
@@ -6958,6 +7053,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
+                // v191: a NEW round looks for the unfinished round it replaces
+                // (offerRetire) BEFORE this save is remembered, so the new code
+                // never nominates itself; then the save is remembered.
+                if (!loadedExistingRound) offerRetire(currentMode, payload, payload.ownerUid || null);
+                recordSavedRound(currentMode);
                 if (tripLinkCode) {
                     return db.ref(`trips/${tripLinkCode}/rounds/${currentMode}`).set({
                         label: selectedCourseName,

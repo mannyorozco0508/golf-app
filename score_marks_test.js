@@ -324,7 +324,7 @@ describe('NOTHING ELSE CHANGED', () => {
 
     test('group locking on the input is unaffected', () => {
         const idx = read('index.html');
-        assert.ok(idx.includes('const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);'));
+        assert.ok(idx.includes('const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);
     });
 });
 

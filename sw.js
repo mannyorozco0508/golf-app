@@ -1705,7 +1705,11 @@
 // formatter (getSmartDisplayName, lifted from leaderboard.html into
 // text-safe.js): Randy T / Randy C read "Randy T." / "Randy C." instead of two
 // Randys. game.html, leaderboard.html and text-safe.js are all precached.
-const CACHE_VERSION = 'golfapp-v190-game-tab-names';
+// Moved to v191 because a replaced round now says so: admin.html offers to
+// retire the unfinished round a new one supersedes (events/OLD/supersededBy),
+// and index.html shows that round's visitors a banner to the live code and
+// takes no score. A device on v190 would keep scoring a retired round.
+const CACHE_VERSION = 'golfapp-v191-superseded-round';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

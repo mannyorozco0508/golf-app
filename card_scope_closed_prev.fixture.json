@@ -37,7 +37,8 @@
     "match-hcp-note": "block",
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
-    "group-pick-overlay": "none"
+    "group-pick-overlay": "none",
+    "superseded-banner": "none"
    },
    "filtered": [
     "Ivy",
@@ -85,7 +86,8 @@
     "match-hcp-note": "block",
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
-    "group-pick-overlay": "flex"
+    "group-pick-overlay": "flex",
+    "superseded-banner": "none"
    },
    "filtered": [
     "Ann",
@@ -147,7 +149,8 @@
     "match-hcp-note": "none",
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
-    "group-pick-overlay": "none"
+    "group-pick-overlay": "none",
+    "superseded-banner": "none"
    },
    "filtered": [
     "Ann",
@@ -169,6 +172,10 @@
   {
    "date": "2026-09-21",
    "why": "the organizer doors (organizer_door_test.js): the bare link on a round with neither ownerUid nor organizerToken (this capture, a legacy round) shows the organizer's ✏️ Edit round setup pill after 🔗 Group Links in #group-filter-container; a group link shows neither. Exactly that substring was added by hand; every other character is the capture."
+  },
+  {
+   "date": "2026-09-22",
+   "why": "the retired-round guard (superseded_round_test.js): renderSupersededBanner sets #superseded-banner display none on every round without supersededBy, so each link variant gains that one display entry. Added by hand; every other character is the capture."
   }
  ]
 }

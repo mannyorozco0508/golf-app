@@ -757,6 +757,8 @@
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
         }
         .group-btn.active { background: var(--brand-green); color: #ffffff; }
+        /* v191: the retired-round banner - full width, the one thing to tap. */
+        .superseded-link { display: block; text-align: center; text-decoration: none; margin: 8px 0 10px 0; padding: 14px 12px; min-height: 48px; box-sizing: border-box; border-radius: 12px; background: var(--accent-red); color: #ffffff; font-weight: bold; font-size: 1rem; line-height: 1.35; }
         /* The organizer's way into the setup (v189): an anchor drawn as a pill, the
            navy of the Matches pill so it reads as a door, not a filter. */
         a.group-setup-btn { text-decoration: none; display: inline-flex; align-items: center; min-height: 32px; border-color: var(--brand-navy); color: var(--brand-navy); }
@@ -1231,6 +1233,9 @@ html {
     <div class="header-box">
         <div style="margin-bottom: 6px;">
             <span id="room-code-badge" style="background: var(--brand-navy); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">GAME: ----</span>
+        <!-- v191: a retired round (supersededBy) says where the live one is. Filled
+             by renderSupersededBanner; display:none and empty on every other round. -->
+        <div id="superseded-banner" style="display:none;"></div>
         <div>
             <span id="group-lock-badge" style="display:none; background: var(--accent-red); color: #ffffff; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.5px; margin-top: 6px; display: inline-block;"></span>
         </div>
@@ -4930,12 +4935,43 @@ html {
     function groupPickDismissed() {
         try { return sessionStorage.getItem(groupPickKey()) === '1'; } catch (e) { return false; }
     }
+    // ---- THE RETIRED ROUND (v191) --------------------------------------------
+    // events/CODE/supersededBy = NEWCODE is written by admin.html when the
+    // organizer saves the round that replaces this one (Round Ready's "Retire").
+    // Here: one banner, every score box disabled (isLocked in the Full Card,
+    // which Hole View clones), canWritePlayer false, the picker replaced. The
+    // link carries &group= so a scorekeeper lands on their own card there.
+    function roundSuperseded() {
+        const v = currentData && currentData.supersededBy;
+        return typeof v === 'string' && /^[A-Za-z0-9]+$/.test(v);
+    }
+    function supersededLinkHtml() {
+        const code = String(currentData.supersededBy).toUpperCase();
+        let href = 'index.html?game=' + encodeURIComponent(code);
+        if (hasGroupLock) href += '&group=' + encodeURIComponent(lockedGroup);
+        return '<a class="superseded-link" href="' + href + '">This round was replaced by ' + escapeHtml(code) + ' \u2014 tap to open your group there</a>';
+    }
+    function renderSupersededBanner() {
+        const el = document.getElementById('superseded-banner');
+        if (!el) return;
+        if (!roundSuperseded()) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        el.innerHTML = supersededLinkHtml();
+        el.style.display = 'block';
+    }
+
     function renderGroupPicker(players, boundaries) {
         const overlay = document.getElementById('group-pick-overlay');
         const body = document.getElementById('group-pick-body');
         if (!overlay || !body) return;
         if (hasGroupLock || !boundaries || boundaries.length <= 1 || groupPickDismissed()) {
             overlay.style.display = 'none'; body.innerHTML = ''; return;
+        }
+        // v191: a retired round has no group to pick - the picker shows the way to
+        // the live round instead (the same sentence as the banner).
+        if (roundSuperseded()) {
+            body.innerHTML = supersededLinkHtml();
+            overlay.style.display = 'flex';
+            return;
         }
         body.innerHTML = boundaries.map(b => {
             const names = players.slice(b.startIdx, b.startIdx + b.size)
@@ -5286,6 +5322,9 @@ html {
     let frOrganizerEditContext = false;
 
     function canWritePlayer(playerId) {
+        // v191: a retired round takes no score from anyone - the organizer's
+        // override included. The live round is the one the banner points at.
+        if (roundSuperseded()) return false;
         // THE ONE NEW EXCEPTION. Requires BOTH a matching organizer token AND the
         // final-review context; either alone grants nothing.
         if (frOrganizerEditContext && hasOrganizerAuthority()) return true;
@@ -7839,6 +7878,7 @@ html {
         window.__scFilteredPlayers = filteredPlayers;
         window.__scGroupMissing = groupMissing;
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
+        renderSupersededBanner();
         renderGroupPicker(players, groupBoundaries);
         renderLandingSummary(filteredPlayers, players);
 
@@ -8218,7 +8258,7 @@ html {
                 // circle different holes.
                 const markClass = (typeof scoreMarkClass === 'function') ? scoreMarkClass(scoreVal, h.par) : '';
 
-                const isLocked = isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup);
+                const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));
                 // data-player-id / data-hole name the box, so focus can find "the same
                 // box" again after a rebuild (see restoreScoreFocus) - by identity,
                 // never by element or position.
