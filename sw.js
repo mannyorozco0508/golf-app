@@ -1717,7 +1717,12 @@
 // anyone in your group get inside it? No — leave it / Yes — pick who" - lit
 // once the group's scores are in, asked once per hole per phone. A device on
 // v192 keeps the button nobody understood.
-const CACHE_VERSION = 'golfapp-v193-kp-question';
+// Moved to v194 because the Full Card's cursor now walks a golfer's card
+// (the same golfer's next hole, then the next golfer), the scorecard's own
+// name labels use the Board's formatter, a Weekly Game round no longer says
+// "no bets", the wizard's pot shows on an edit, and the roster paste drops a
+// trailing period. index.html and admin.html are precached.
+const CACHE_VERSION = 'golfapp-v194-full-card-cursor';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

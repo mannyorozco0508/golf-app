@@ -151,7 +151,8 @@ describe('NEVER A TRAILING LETTER; THE INITIALS GUARD; ONLY A AND B', () => {
         assert.deepEqual(players(sb, 'Matt B\nJim B\nMatt B 9\nRandy A'), [['Matt B', '', null], ['Jim B', '', null], ['Matt B', '9', null], ['Randy A', '', null]]);
     });
     test('"B.J. Smith", "A.J.", "A-Rod" are names (CONTROL: "B.J." read as flight B would show here)', () => {
-        assert.deepEqual(players(sb, 'B.J. Smith\nA.J.\nA-Rod 4\nB.J. Smith 7'), [['B.J. Smith', '', null], ['A.J.', '', null], ['A-Rod', '4', null], ['B.J. Smith', '7', null]]);
+        // v194: a TRAILING period comes off a pasted name ("A.J." -> "A.J", accepted like "Jr."); the guard's job - not a flight - is unchanged
+        assert.deepEqual(players(sb, 'B.J. Smith\nA.J.\nA-Rod 4\nB.J. Smith 7'), [['B.J. Smith', '', null], ['A.J', '', null], ['A-Rod', '4', null], ['B.J. Smith', '7', null]]);
     });
     test('"B. J Smith" (dot then space) and "B... Jim" (a run) are flight B, and the letter is gone from the name (CONTROL: a letter left inside a name)', () => {
         assert.deepEqual(players(sb, 'B. J Smith\nB... Jim\nA.. Ann'), [['J Smith', '', 'B'], ['Jim', '', 'B'], ['Ann', '', 'A']]);
@@ -200,7 +201,7 @@ describe('NO LETTERS AT ALL: nothing changes', () => {
     paste(sb, 'Marty 9\nScott, 7\nMatt B\n\nJ.R. 22\nBig Al 18');
     test('no flight on any row, flights stay off, groups as before, no flights line in the preview', () => {
         const rows = rowsRead(sb);
-        assert.deepEqual(rows.map(r => [r.name, r.hcp, r.flight]), [['Marty', '9', null], ['Scott', '7', null], ['Matt B', '', null], ['J.R.', '22', null], ['Big Al', '18', null]]);
+        assert.deepEqual(rows.map(r => [r.name, r.hcp, r.flight]), [['Marty', '9', null], ['Scott', '7', null], ['Matt B', '', null], ['J.R', '22', null], ['Big Al', '18', null]]);
         assert.equal(run(sb, 'flightsEnabledNow()'), false);
         assert.deepEqual(overrides(sb), { 0: 3, 1: 2 });
         const s = preview(adminPage(), 'Marty 9\nScott, 7');

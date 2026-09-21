@@ -76,7 +76,7 @@ const REAL = [
     ['Manny 0', 'Manny', '0'], ['Matt B', 'Matt B', ''], ['Lance 14.3', 'Lance', '14.3'], ['Kopp, 6', 'Kopp', '6'],
     ['Marcus 9', 'Marcus', '9'], ['Rocco 13', 'Rocco', '13'], ['Matt H', 'Matt H', ''], ['Jeremy, 12', 'Jeremy', '12'],
     ['Tommy Chen', 'Tommy Chen', ''], ['Danny Rungood', 'Danny Rungood', ''], ['Big Al 18', 'Big Al', '18'], ['Steve -3', 'Steve', '-3'],
-    ['Mike Jones, 12', 'Mike Jones', '12'], ['Robert Garcia', 'Robert Garcia', ''], ['Tom Wilson, +2', 'Tom Wilson', '+2'], ['J.R. 22', 'J.R.', '22'],
+    ['Mike Jones, 12', 'Mike Jones', '12'], ['Robert Garcia', 'Robert Garcia', ''], ['Tom Wilson, +2', 'Tom Wilson', '+2'], ['J.R. 22', 'J.R', '22'],   // v194: the trailing period comes off a pasted name
     ['Pete 54', 'Pete', '54'], ['Hank 8', 'Hank', '8'], ['Luis 11.5', 'Luis', '11.5']
 ];
 const SIZES = [4, 4, 4, 4, 4, 3];

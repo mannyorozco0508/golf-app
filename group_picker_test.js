@@ -80,8 +80,9 @@ describe('THE PICKER, ON ARRIVAL', () => {
         assert.equal(a.overlayDisplay(), 'flex', 'the picker is up');
         const t = strip(a.body());
         assert.match(t, /Group 1 · Marty, Scott, Carp, Randy/);
-        assert.match(t, /Group 2 · Manny, Matt, Lance, Kopp/);
-        assert.match(t, /Group 3 · Marcus, Rocco, Matt, Jeremy/);
+        // v194: the Board's names - two Matts in the round, so Matt B. and Matt H.
+        assert.match(t, /Group 2 · Manny, Matt B\., Lance, Kopp/);
+        assert.match(t, /Group 3 · Marcus, Rocco, Matt H\., Jeremy/);
         // the question and the watching option are static markup (mini-dom does
         // not parse static children into innerHTML) - read from the source
         const src = read('index.html');
@@ -148,8 +149,8 @@ describe('THE PICKER, ON ARRIVAL', () => {
         const a = arrive('?game=MNDY2', round(12, { 0: 3, 1: 3, 2: 3, 3: 3 }));
         const t = strip(a.body());
         assert.match(t, /Group 1 · Marty, Scott, Carp\|/);
-        assert.match(t, /Group 2 · Randy, Manny, Matt\|/);
-        assert.match(t, /Group 4 · Rocco, Matt, Jeremy/);
+        assert.match(t, /Group 2 · Randy, Manny, Matt B\.\|/);   // v194
+        assert.match(t, /Group 4 · Rocco, Matt H\., Jeremy/);   // v194
         assert.equal((a.body().match(/pickGroup\(/g) || []).length, 4);
     });
 

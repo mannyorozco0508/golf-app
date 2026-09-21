@@ -266,3 +266,69 @@ describe('THE MISSING-HOLE BANNER: one tap lands focus on the gap box (Chrome, 3
         assert.match(val(r, 'OUT'), /rgb\(230, 57, 70\) 2px/);
     });
 });
+
+// ---------------------------------------------------------------------------
+// THE FULL CARD READS A CARD OFF (v194). Group 1's link, the Full Card opened
+// by a real tap on its toggle, a real tap on Ann's hole-1 box, then real digits:
+// "4" must land focus on ANN'S HOLE-2 box (the same golfer's next hole), not
+// Ben's hole 1 (DOM order - the Full Card's rows are holes). Eighteen digits
+// later the focus is on Ben's hole 1. A tap on a middle box starts there. A
+// two-digit score ("1","0") advances on the second digit. Every focus read by
+// identity; every move synchronous inside the keystroke (iOS keeps the keyboard).
+const FC_WHERE = `(function(){ var a = document.activeElement; if (!a || a === document.body) return 'BODY';
+  if (!a.classList || !a.classList.contains('score-input')) return a.tagName + (a.id ? '#' + a.id : '');
+  return (a.closest('#full-card-container') ? 'FC:' : 'HV:') + a.getAttribute('data-player-id') + '/h' + a.getAttribute('data-hole'); })()`;
+const fcBox = (pid, hole) => `(function(){ var el = document.querySelector('#full-card-container .score-input[data-player-id="${pid}"][data-hole="${hole}"]'); if (!el) return null; el.scrollIntoView({ block: 'center' }); var r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; })()`;
+describe('THE FULL CARD CURSOR (Chrome, 390x844): the same golfer\'s next hole, then the next golfer', () => {
+    const fresh = round(false);
+    const FDB = { events: { ADVFC: fresh }, global_courses: {}, trips: {}, tournaments: {} };
+    let r;
+    before(async () => {
+        // The Full Card's boxes sit where they sit after scrollIntoView; the tap
+        // targets are measured in a first arrival and used in the second, the
+        // same page at the same size (the pattern the Hole View cases use).
+        const probe = await arriveCold({ url: fileUrl('index.html', 'game=ADVFC&group=1'), db: FDB, settleMs: 4000,
+            steps: [{ tap: '#view-mode-full-btn' }, { sleep: 300 }, { expression: fcBox(101, 1) }, { expression: fcBox(102, 3) }] });
+        assert.ok(probe.ok, 'Chrome did not run: ' + probe.reason);
+        const [, , a1, b3] = probe.value;
+        assert.ok(a1 && b3 && a1.w > 0 && b3.w > 0, 'Full Card boxes measured: ' + JSON.stringify(probe.value));
+        const digits = [];
+        // Ann's hole 1..17 get a "4" each (17 digits), so the 18th "4" is typed on h18 and moves to Ben h1
+        for (let i = 0; i < 18; i++) digits.push(...key('4'));
+        r = await arriveCold({ url: fileUrl('index.html', 'game=ADVFC&group=1'), db: FDB, settleMs: 4000, preScript: 'window.__STUBDB = ' + JSON.stringify(FDB) + ';' + TRACE_ONLY, steps: [
+            { tap: '#view-mode-full-btn' }, { sleep: 300 },
+            { expression: "'MODE:' + currentViewMode" },
+            { expression: fcBox(101, 1) }, ...tap(a1.x, a1.y), { expression: "'W0:' + " + FC_WHERE },
+            ...key('4'), { expression: "'W1:' + " + FC_WHERE },
+            ...key('4'), { expression: "'W2:' + " + FC_WHERE },
+            ...digits.slice(0, 16 * 2), { expression: "'W18:' + " + FC_WHERE },   // 16 more keys (two steps each) = Ann h3..h18
+            // a middle box: Ben's hole 3, then a two-digit 10
+            { expression: fcBox(102, 3) }, ...tap(b3.x, b3.y), { expression: "'M0:' + " + FC_WHERE },
+            ...key('1'), { expression: "'M1:' + " + FC_WHERE },
+            ...key('0'), { expression: "'M2:' + " + FC_WHERE },
+            { expression: "'V:' + JSON.stringify([101, 102].map(function (id) { return Array.from(document.querySelectorAll('#full-card-container .score-input[data-player-id=\"' + id + '\"]')).map(function (i) { return i.value; }); }))" }
+        ] });
+    });
+    const v = tag => { const hit = (r.value || []).find(x => typeof x === 'string' && x.startsWith(tag + ':')); assert.ok(hit !== undefined, 'no ' + tag + ' in ' + JSON.stringify(r.value).slice(0, 500)); return hit.slice(tag.length + 1); };
+    test('ran, on the Full Card, focus on Ann h1 after the tap', () => {
+        assert.ok(r && r.ok, r && r.reason);
+        assert.equal(v('MODE'), 'full');
+        assert.equal(v('W0'), 'FC:101/h1');
+    });
+    test('"4" on Ann h1 -> Ann h2 (CONTROL: DOM order would be Ben h1); "4" again -> Ann h3', () => {
+        assert.equal(v('W1'), 'FC:101/h2');
+        assert.notEqual(v('W1'), 'FC:102/h1');
+        assert.equal(v('W2'), 'FC:101/h3');
+    });
+    test('after Ann\'s eighteenth: Ben h1', () => {
+        assert.equal(v('W18'), 'FC:102/h1');
+    });
+    test('a tap on Ben h3 starts there; "1" waits, "0" makes 10 and moves to Ben h4', () => {
+        assert.equal(v('M0'), 'FC:102/h3');
+        assert.equal(v('M1'), 'FC:102/h3');
+        assert.equal(v('M2'), 'FC:102/h4');
+        const vals = JSON.parse(v('V'));
+        assert.deepEqual(vals[0], Array(18).fill('4'), "Ann's eighteen fours are on the card");
+        assert.equal(vals[1][2], '10', "Ben's hole 3 is 10");
+    });
+});

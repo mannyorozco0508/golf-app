@@ -5296,6 +5296,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (line === '') { inGroup = false; return; }   // blank: closes the current run (a boundary) or is leading/trailing nothing
             if (!inGroup) { groups.push(0); inGroup = true; }
 
+            // v194: a trailing period comes off a pasted name ("Anthony." -> "Anthony";
+            // the iPhone's double-space-for-a-period puts one on every line). Only
+            // trailing, only periods; "Jr." at the end loses its dot too - accepted.
+            // Stored names are never rewritten; this is the paste only.
             const { flight, rest, notAFlight } = splitLeadingFlight(line);
             // A not-a-flight line is kept AS TYPED: its comma is part of what was
             // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
@@ -5307,7 +5311,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 return;
             }
             if (notAFlight) flaggedFlights.push({ lineNumber: idx + 1, text: line, letter: line[0].toUpperCase() });
-            const player = { name: notAFlight ? name.replace(/\u0000/g, ',') : name, hcp };
+            // v194: a trailing period comes off the NAME ("Anthony." -> "Anthony", "Matt H. 12"
+            // -> Matt H / 12): the iPhone's double-space-for-a-period puts one on every
+            // line. Only trailing, only periods; "Jr." at the end loses its dot too -
+            // accepted. Stored names are never rewritten; this is the paste only.
+            const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
             if (flight) player.flight = flight;
             validPlayers.push(player);
             groups[groups.length - 1]++;
@@ -6191,6 +6199,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             document.getElementById("player-list").innerHTML = "";
             if (storedPlayersTemp.length > 0) {
                 handleFormatChange(true);
+                // v194: the Weekly Game step's pot counts the rows on screen
+                // (mpRecalc -> collectWizardPlayers). On an edit it had been
+                // computed before this rebuild and not again, so the step opened
+                // on "$0" until a pool input was touched. Now it follows the roster.
+                if (typeof mpRecalc === 'function') mpRecalc();
             } else {
                 addPlayerRow(); 
             }

@@ -18,7 +18,7 @@
     "format-subtitle": "Scope • STROKE (NET)",
     "landing-group-names": "Ivy, Jon, Kim, Lee |Got it ✕|",
     "landing-scoring": "Stroke Play",
-    "landing-active-games": "|⛳ Stroke Play|⚔️ 2 Side Bets|",
+    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
     "table-head-row": "|Hole|Par|HCP|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|",
     "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
     "ticker-title-label": "🏆 CURRENT GROUP SCORES",
@@ -67,7 +67,7 @@
     "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|",
     "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
     "landing-scoring": "Stroke Play",
-    "landing-active-games": "|⛳ Stroke Play|⚔️ 2 Side Bets|",
+    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
     "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|Eli|HCP 9|Fay|HCP 16|Gus|HCP 4|Hal|HCP 11|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|Max|HCP 8|Ned|HCP 15|Oli|HCP 3|Pat|HCP 10|Quy|HCP 17|Rae|HCP 5|Sam|HCP 12|Tia|HCP 0|Uma|HCP 7|Vic|HCP 14|Wes|HCP 2|Xan|HCP 9|",
     "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
     "ticker-title-label": "🏆 CURRENT GROUP SCORES",
@@ -134,7 +134,7 @@
     "format-subtitle": "Scope • STROKE (NET)",
     "landing-group-names": "Ann, Ben, Cal, Dee |Got it ✕|",
     "landing-scoring": "Stroke Play",
-    "landing-active-games": "|Just for score — no bets this round|",
+    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|",
     "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|",
     "ticker-title-label": "🏆 CURRENT GROUP SCORES",
     "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1|",
@@ -187,6 +187,10 @@
   {
    "date": "2026-09-22",
    "why": "the KP question (kp_prompt_test.js, v193): the block under the nav row is the question now - the head reads ⛳ Hole 7 — Closest to the Pin, the line No KP yet., and a writing link gets Did anyone in your group get inside it? with the two answers; a spectator gets the first two lines. Exactly those substrings moved by hand; every other character is the capture."
+  },
+  {
+   "date": "2026-09-22",
+   "why": "v194: this round has a Weekly Game ($20 each), so the landing summary lists it first and no longer says \"Just for score — no bets this round\" on the one-group link. Exactly those entries moved by hand; every other character is the capture."
   }
  ]
 }

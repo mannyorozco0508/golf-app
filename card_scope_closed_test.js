@@ -118,7 +118,10 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // variant gains #gap-banner display none (by hand, the "repinned" entry).
         // RE-PINNED 2026-09-22 (was 8be9158e): the KP question - the block's text on
         // hole 7 (by hand, the "repinned" entry); nothing else moved.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '7aa77792');
+        // RE-PINNED 2026-09-22 (was 7aa77792): v194 - the landing summary names the
+        // Weekly Game and no longer says "no bets" on a round that has one (by hand,
+        // the "repinned" entry); nothing else moved.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ddf1e58b');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
@@ -158,10 +161,11 @@ describe('THE SEAM (source, comments stripped)', () => {
         // `|| []` (1), the helper (2), the Ryder YOUR MATCH ids - an empty list is no
         // match (3), renderLiveBoard's `|| []` (1), and the write in renderScorecard (1).
         assert.equal((code.match(/__scFilteredPlayers/g) || []).length, 8, 'every other reader goes through scopedPlayers()');
-        // The helper's definition plus its eight callers: liveStandings, the ticker,
+        // The helper's definition plus its nine callers: liveStandings, the ticker,
         // ryderFoursomesContext, the bet strip, confirmSidePress, who-am-I, the recap,
-        // the action center.
-        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 9);
+        // the action center, and (v194) fullCardEntryOrder - the Full Card's walk
+        // over the view's golfers.
+        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 10);
     });
     test('the surfaces whose builders widen an empty list do not ask them: recap, action center, the ticker\'s match cards', () => {
         assert.match(fn('renderHoleRecap'), /if \(scopeMissing\(\)\) \{ mount\.innerHTML = ''; return; \}/);

@@ -1822,7 +1822,7 @@ html {
         (d.players || []).forEach(p => { byId[String(p.id)] = p; });
         const nameOf = id => {
             const p = byId[String(id)];
-            return p ? String(p.name).split(' ')[0] : null;
+            return p ? getSmartDisplayName(p, d.players || []) : null;   // v194: against THIS data's roster - eligibleDotMatches is called with a data argument
         };
         return Object.keys(sms).map(key => {
             const sm = sms[key] || {};
@@ -1951,12 +1951,23 @@ html {
     // because inventing "Marty (2)" would put a label on the card that is not the
     // golfer's name. That round is already refused by duplicatePlayerNames() before
     // any money is totalled, on both the Receipt and the Finish Round panel.
+    // v194: the Board's own formatter (text-safe.js getSmartDisplayName) against
+    // the ROUND's roster, so "Randy T." / "Randy C." read the same on every
+    // surface of this page as on the Board. shortName takes a player object or an
+    // id; shortNameFor takes a stored name string (the Wolf log keeps names).
+    // NOT the Full Card's column initials (getInitials), which stay as they are.
+    function golferLabel(pOrId) {
+        const players = currentData.players || [];
+        const p = (pOrId && typeof pOrId === 'object') ? pOrId : players.find(x => String(x.id) === String(pOrId));
+        return p ? getSmartDisplayName(p, players) : '';
+    }
+    function golferLabelFor(name) {
+        const players = currentData.players || [];
+        const p = players.find(x => x.name === name) || { name: String(name || '') };
+        return getSmartDisplayName(p, players);
+    }
     function shortPlayerLabels(list) {
-        const full = (list || []).map(p => String((p && p.name) || '').trim());
-        const first = full.map((n, i) => n.split(/\s+/)[0] || full[i]);
-        const seen = {};
-        first.forEach(f => { seen[f] = (seen[f] || 0) + 1; });
-        return first.map((f, i) => (seen[f] > 1 ? (full[i] || f) : f));
+        return (list || []).map(p => golferLabel(p) || String((p && p.name) || '').trim());
     }
 
     // Attribute-safe. Player names are user-entered and land in a data- attribute.
@@ -1994,7 +2005,7 @@ html {
         const dismissKey = `landingDismissed_${currentMode}`;
         if (localStorage.getItem(dismissKey) === '1') { box.style.display = 'none'; return; }
 
-        const namesHtml = filteredPlayers.map(p => p.name.split(' ')[0]).join(', ')
+        const namesHtml = filteredPlayers.map(p => escapeHtml(golferLabel(p))).join(', ')
             + ` <button onclick="localStorage.setItem('${dismissKey}','1'); document.getElementById('round-landing-summary').style.display='none';" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; cursor:pointer; text-decoration:underline; margin-left:6px;">Got it ✕</button>`;
         document.getElementById('landing-group-names').innerHTML = namesHtml;
 
@@ -2080,7 +2091,13 @@ html {
                 : ((typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play');
         }
 
-        const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0;
+        // v194: a Weekly Game round is not "no bets" - the pot is the bet.
+        const poolIsOn = !!(currentData.moneyPool && currentData.moneyPool.enabled !== false && (typeof computeMoneyPool !== 'function' || computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {})));
+        if (poolIsOn && !gameLines.some(l => /Weekly Game/.test(l))) {
+            const mp = currentData.moneyPool;
+            gameLines.unshift('\uD83C\uDFC6 Weekly Game \u00B7 $' + (parseInt(mp.buyIn, 10) || 0) + ' each');
+        }
+        const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0 && !poolIsOn;
         document.getElementById('landing-active-games').innerHTML = isNoBetRound
             ? `<span style="color:var(--text-muted);">Just for score — no bets this round</span>`
             : gameLines.map(l => `<div style="padding:2px 0;">${l}</div>`).join('');
@@ -3054,7 +3071,7 @@ html {
         const cfg = ryderCupConfig(ctx.cup);
         const nameOf = ids => ids.map(id => {
             const p = (currentData.players || []).find(x => String(x.id) === String(id));
-            return p ? String(p.name).split(' ')[0] : id;
+            return p ? golferLabel(p) : id;
         }).join(' / ');
         const roster = ryderMatchRoster(ctx.match);
         const st = computeRyderMatchResult(ctx.cup, currentData.courseData || [],
@@ -4019,7 +4036,7 @@ html {
         if (!r.valid) return html + '<div class="section-summary" style="color:var(--accent-red);">\u26A0\uFE0F ' + r.errors[0] + '</div>';
         const bits = [];
         if (r.kp) bits.push('\uD83D\uDCCD KP ' + r.kp.lines.filter(l => l.winnerId).length + '/' + r.kp.lines.length + ' claimed');
-        if (r.net && r.net.standings.length) bits.push('\uD83E\uDD47 ' + r.net.standings[0].name.split(' ')[0] + ' leads net');
+        if (r.net && r.net.standings.length) bits.push('\uD83E\uDD47 ' + golferLabel(r.net.standings[0].id) + ' leads net');
         if (r.skins) bits.push('\uD83E\uDD69 ' + r.skins.lines.reduce((a, l) => a + l.units, 0) + ' skins won');
         html += '<div class="section-summary">' + bits.join(' \u00B7 ') + '</div>';
         html += buildLiveNetFinish(r);
@@ -4441,7 +4458,7 @@ html {
         mount.innerHTML = '<div class="whoami-panel">' +
             '<div class="whoami-title">\uD83D\uDC4B Which one are you?</div>' +
             scoped.map(p => '<button type="button" class="whoami-btn" onclick="setMe(\'' + p.id + '\')">' +
-                p.name.split(' ')[0] + '</button>').join('') +
+                escapeHtml(golferLabel(p)) + '</button>').join('') +
             '<button type="button" class="whoami-skip" onclick="skipWhoAmI()">Skip \u2014 just show everything</button>' +
             '</div>';
     }
@@ -5086,7 +5103,7 @@ html {
         }
         body.innerHTML = boundaries.map(b => {
             const names = players.slice(b.startIdx, b.startIdx + b.size)
-                .map(p => escapeHtml(String(p.name || '').trim().split(' ')[0])).join(', ');
+                .map(p => escapeHtml(golferLabel(p))).join(', ');
             return '<button type="button" class="btn-primary group-pick-btn" onclick="pickGroup(' + b.group + ')">'
                 + 'Group ' + b.group + ' \u00B7 ' + names + '</button>';
         }).join('');
@@ -5174,7 +5191,9 @@ html {
 
         let rows = boundaries.map(b => {
             const url = `${base}?game=${currentMode}&group=${b.group}`;
-            const names = players.slice(b.start, b.start + b.size).map(p => p.name.split(' ')[0]).join(', ');
+            // b.startIdx, not b.start (v194): the boundaries carry startIdx, so this
+            // line had been empty since the Group Links panel was written.
+            const names = players.slice(b.startIdx, b.startIdx + b.size).map(p => escapeHtml(golferLabel(p))).join(', ');
             return `<div class="group-link-row">
                 <div class="glr-info">
                     <div class="glr-title">👥 Group ${b.group}</div>
@@ -5304,7 +5323,14 @@ html {
         // focus() silently failed, and the blur() branch below was never reached.
         // Same visible result, now on purpose.
         const root = currentInputEl.closest('#hole-view-card') || currentInputEl.closest('#full-card-container') || document;
-        const inputs = Array.from(root.querySelectorAll('.score-input:not([disabled])'));
+        let inputs = Array.from(root.querySelectorAll('.score-input:not([disabled])'));
+        // THE FULL CARD READS A CARD OFF (v194). Its rows are holes, so DOM order
+        // walked hole 1's four golfers, then hole 2's - useless for "read me
+        // Marty's eighteen". On the Full Card the candidates are ordered by
+        // (golfer in filteredPlayers order, hole in courseData order): the same
+        // golfer's next hole, then the next golfer's first. Hole View is one hole,
+        // so its DOM order is already golfer order and is left alone.
+        if (root.id === 'full-card-container') inputs = fullCardEntryOrder(inputs);
         const idx = inputs.indexOf(currentInputEl);
         if (idx > -1 && idx < inputs.length - 1) {
             const next = inputs[idx + 1];
@@ -5322,6 +5348,22 @@ html {
         } else {
             currentInputEl.blur();
         }
+    }
+
+    // (golfer, hole) order for the Full Card's boxes - by identity, never by
+    // position. A box whose golfer or hole is unknown sorts last, in DOM order.
+    function fullCardEntryOrder(inputs) {
+        const players = scopedPlayers();   // the view's golfers (never widened - card_scope_closed_test)
+        const holes = currentData.courseData || [];
+        const pIdx = {}; players.forEach((p, i) => { pIdx[String(p.id)] = i; });
+        const hIdx = {}; holes.forEach((h, i) => { hIdx[String(h.hole)] = i; });
+        const big = 1e6;
+        return inputs.map((el, i) => ({ el, i,
+                p: pIdx[el.getAttribute('data-player-id')], h: hIdx[el.getAttribute('data-hole')] }))
+            .sort((a, b) => ((a.p === undefined ? big : a.p) - (b.p === undefined ? big : b.p))
+                || ((a.h === undefined ? big : a.h) - (b.h === undefined ? big : b.h))
+                || (a.i - b.i))
+            .map(x => x.el);
     }
 
     // ---- Focus across a rebuild ------------------------------------------------
@@ -5953,7 +5995,7 @@ html {
         if (missing.length === 0) { el.innerHTML = gapLineHtml; return; }
 
         const rows = missing.slice(0, 6).map(m =>
-            '<div class="fr-missing-row">Hole ' + m.hole + ' \u00B7 ' + m.player.name.split(' ')[0] +
+            '<div class="fr-missing-row">Hole ' + m.hole + ' \u00B7 ' + escapeHtml(golferLabel(m.player)) +
             ' <a href="#" onclick="jumpToMissingHole(' + m.hole + '); return false;" style="color:inherit;">fix</a></div>'
         ).join('');
         const more = missing.length > 6 ? '<div class="fr-missing-row">\u2026and ' + (missing.length - 6) + ' more</div>' : '';
@@ -7378,10 +7420,10 @@ html {
                 const statusTxt = !log.resolved
                     ? (log.winner === 'tie' ? 'Tied' : 'Pending')
                     : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
-                inner += pill('pill-main', callTag + ' ' + log.wolfName.split(' ')[0]);
+                inner += pill('pill-main', callTag + ' ' + golferLabelFor(log.wolfName));
                 inner += pill('pill-press', statusTxt);
             } else {
-                inner += pill('pill-main', '\uD83D\uDC3A ' + log.wolfName.split(' ')[0]);
+                inner += pill('pill-main', '\uD83D\uDC3A ' + golferLabelFor(log.wolfName));
             }
         } else if (o.gameFormat === 'stableford' && o.stablefordParts && o.stablefordParts.length) {
             inner += '<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">' +
@@ -7729,7 +7771,7 @@ html {
         if (targetHole !== null) {
             const log = wolfCalc.holeLog[targetHole];
             const others = players.filter(p => String(p.id) !== String(log.wolfId));
-            html += `<div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Hole ${targetHole} Wolf: 🐺 ${log.wolfName.split(' ')[0]}</div>`;
+            html += `<div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Hole ${targetHole} Wolf: 🐺 ${escapeHtml(golferLabelFor(log.wolfName))}</div>`;
             html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">`;
             others.forEach(p => {
                 html += `<button onclick="saveWolfCall(${targetHole}, 'partner', '${p.id}')" style="padding:6px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:var(--bg-card); color:var(--text-main); font-size:0.72rem; font-weight:bold; cursor:pointer;">🤝 ${p.name.split(' ')[0]}</button>`;
