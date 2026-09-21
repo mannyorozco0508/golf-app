@@ -444,7 +444,7 @@ describe('GROUP LINKS — organizer only, and not merely hidden with CSS', () =>
 
     test('the Group Links button is not rendered for a group-locked scorekeeper', () => {
         const fn = idx.slice(idx.indexOf('function renderGroupFilters'), idx.indexOf('function filterGroup'));
-        assert.ok(/if \(isOrganizerView\(\)\) \{/.test(fn), 'the button is not gated');
+        assert.ok(/if \(canReachSetup\(\)\) \{/.test(fn), 'the button is not gated');   // v189: canReachSetup() - the organizer by uid or organizer link, never a group link (organizer_door_test.js)
         assert.ok(!/display:\s*none/.test(fn), 'this must not be solved by hiding it');
     });
 
@@ -452,9 +452,9 @@ describe('GROUP LINKS — organizer only, and not merely hidden with CSS', () =>
         // Deleting the button in devtools or calling toggleGroupLinksPanel() from the
         // console must still yield nothing; a CSS hide would leak the URLs in the DOM.
         const fn = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/if \(!isOrganizerView\(\)\)/.test(fn), 'the renderer is not gated');
+        assert.ok(/if \(!canReachSetup\(\)\)/.test(fn), 'the renderer is not gated');
         const toggle = idx.slice(idx.indexOf('function toggleGroupLinksPanel'), idx.indexOf('function renderGroupLinksPanel'));
-        assert.ok(/if \(!isOrganizerView\(\)\) return;/.test(toggle), 'the toggle is not gated');
+        assert.ok(/if \(!canReachSetup\(\)\) return;/.test(toggle), 'the toggle is not gated');
     });
 
     test('the organizer still gets the button and the panel', () => {

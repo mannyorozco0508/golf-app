@@ -307,7 +307,7 @@ describe('MARTY MODE — nothing was broken to get here', () => {
         const canWrite = idx.slice(idx.indexOf('function canWritePlayer'), idx.indexOf('function rejectCrossGroupWrite'));
         assert.ok(!/meId/.test(canWrite), 'identity must never gate score writing');
         const links = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/isOrganizerView\(\)/.test(links), 'Group Links must stay organizer-only');
+        assert.ok(/canReachSetup\(\)/.test(links), 'Group Links must stay organizer-only');   // v189: canReachSetup() - the organizer by uid or organizer link, never a group link (organizer_door_test.js)
     });
 
     test('Add Action stays organizer-only', () => {

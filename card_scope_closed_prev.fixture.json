@@ -62,7 +62,7 @@
     "group-lock-badge": "👁️ Spectator View (Read-Only)",
     "course-title": "Closed Links",
     "format-subtitle": "Scope • STROKE (NET)",
-    "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|",
+    "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|",
     "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
     "landing-scoring": "Stroke Play",
     "landing-active-games": "|⛳ Stroke Play|⚔️ 2 Side Bets|",
@@ -165,6 +165,10 @@
   {
    "date": "2026-09-20",
    "why": "the group picker (group_picker_test.js): a bare link on a multi-group round shows #group-pick-overlay (display flex) with one row per group in #group-pick-body; a group link and a one-group round hide it (display none). Exactly those entries were added by hand; every other character is the 6ff9332 capture with the 2026-09-19 KP move."
+  },
+  {
+   "date": "2026-09-21",
+   "why": "the organizer doors (organizer_door_test.js): the bare link on a round with neither ownerUid nor organizerToken (this capture, a legacy round) shows the organizer's ✏️ Edit round setup pill after 🔗 Group Links in #group-filter-container; a group link shows neither. Exactly that substring was added by hand; every other character is the capture."
   }
  ]
 }

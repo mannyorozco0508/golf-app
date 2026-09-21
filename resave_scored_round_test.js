@@ -58,6 +58,7 @@ function scoredRound() {
         eventName: 'Monday', roundDay: 'monday', gameFormat: 'skins', skinsBuyIn: 8, skinsPotFormat: 'split', skinsCarryOver: false,
         activeCourseKey: 'comm_links', courseName: 'Test Links', courseData: CD, players, scores, flights: ON,
         settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar', organizerToken: 'tok-resave',
+        ownerUid: 'anon-stub',   // v189: the wizard opens an existing round only for its organizer - this realm created it
         // everything the course writes, as of the ninth hole
         dots: { h3: { p101: ['sandy'], p104: ['greenie'] } },
         strokePresses: { k1: { startHole: 4, stake: 5, byId: '102' } },

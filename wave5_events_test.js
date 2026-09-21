@@ -393,7 +393,7 @@ describe('IDENTITY — personalization, never authorization', () => {
         assert.ok(!/meId|resolvedMeId/.test(fn), 'identity must never appear in a permission check');
 
         const links = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/isOrganizerView\(\)/.test(links));
+        assert.ok(/canReachSetup\(\)/.test(links));   // v189: canReachSetup() - the organizer by uid or organizer link, never a group link (organizer_door_test.js)
         assert.ok(!/meId/.test(links));
     });
 

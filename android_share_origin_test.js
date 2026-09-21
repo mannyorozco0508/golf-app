@@ -102,13 +102,18 @@ function copyGroupOne(sb, panel) {
     return m[1];
 }
 
-function scorecard(originKey, capacitor) {
+// ASYNC since v189 (the organizer doors): the Group Links panel is the organizer's
+// (organizer-gate.js isRoundOrganizer), so the round carries this realm's uid as
+// ownerUid, and the tap waits the one tick auth-boot takes to sign the realm in -
+// the page re-renders the strip on authReady exactly as it does on a phone.
+async function scorecard(originKey, capacitor) {
     const sb = loadHtmlInlineScript('index.html', [], { search: '?game=' + CODE });
     situate(sb, 'index.html', originKey, capacitor);
     const copied = [];
     sb.navigator.clipboard.writeText = t => { copied.push(String(t)); return Promise.resolve(); };
     arrive(sb, { gameFormat: 'stroke', players: roster(8), courseData: CD, scores: {},
-                 organizerToken: 'tok1' });
+                 organizerToken: 'tok1', ownerUid: 'anon-stub' });
+    await new Promise(r => setTimeout(r, 30));
     tap(sb, sb.document.getElementById('group-filter-container').innerHTML,
         /onclick="(toggleGroupLinksPanel\(\))"/);
     const panel = sb.document.getElementById('group-links-panel').innerHTML;
@@ -147,13 +152,13 @@ const CAPACITOR_ON_WEB = '{ isNativePlatform: function () { return false; } }';
 // ============================================================================
 describe('THE ANDROID SHELL - https://localhost inside Capacitor', () => {
 
-    test('the scorecard\'s Group Links copy a link to the web app, not to localhost', () => {
-        const r = scorecard('android', NATIVE);
+    test('the scorecard\'s Group Links copy a link to the web app, not to localhost', async () => {
+        const r = await scorecard('android', NATIVE);
         assert.equal(r.copied, WEB + '/index.html?game=' + CODE + '&group=1');
     });
 
-    test('and every link on that panel - all groups and the organizer\'s - is a web link', () => {
-        const r = scorecard('android', NATIVE);
+    test('and every link on that panel - all groups and the organizer\'s - is a web link', async () => {
+        const r = await scorecard('android', NATIVE);
         assert.equal(r.all.length, 3, 'two group links and one organizer link expected');
         r.all.forEach(u => assert.ok(u.startsWith(WEB + '/'), 'a localhost link is on the panel: ' + u));
         assert.ok(r.all.some(u => /organizer=tok1/.test(u)), 'the organizer link is missing');
@@ -166,8 +171,8 @@ describe('THE ANDROID SHELL - https://localhost inside Capacitor', () => {
 
 describe('A WEB PAGE ON https://localhost IS STILL A WEB PAGE', () => {
 
-    test('with no Capacitor at all, the scorecard shares links to itself', () => {
-        const r = scorecard('android', undefined);
+    test('with no Capacitor at all, the scorecard shares links to itself', async () => {
+        const r = await scorecard('android', undefined);
         assert.equal(r.copied, 'https://localhost/index.html?game=' + CODE + '&group=1');
     });
 
@@ -176,30 +181,30 @@ describe('A WEB PAGE ON https://localhost IS STILL A WEB PAGE', () => {
             'https://localhost/shared.html?game=' + CODE);
     });
 
-    test('a Capacitor object that says it is NOT native is a web page too', () => {
+    test('a Capacitor object that says it is NOT native is a web page too', async () => {
         // @capacitor/core on the web defines window.Capacitor and answers false.
-        const r = scorecard('android', CAPACITOR_ON_WEB);
+        const r = await scorecard('android', CAPACITOR_ON_WEB);
         assert.equal(r.copied, 'https://localhost/index.html?game=' + CODE + '&group=1');
     });
 });
 
 describe('THE CASES THAT ALREADY WORKED STILL DO', () => {
 
-    test('a local dev server on http://localhost:8080 shares links to itself', () => {
-        assert.equal(scorecard('devServer', undefined).copied,
+    test('a local dev server on http://localhost:8080 shares links to itself', async () => {
+        assert.equal((await scorecard('devServer', undefined)).copied,
             'http://localhost:8080/index.html?game=' + CODE + '&group=1');
         assert.equal(leaderboardTextedLink('devServer', undefined),
             'http://localhost:8080/shared.html?game=' + CODE);
     });
 
-    test('the iOS shell on capacitor://localhost shares the web app, with or without the flag', () => {
-        assert.equal(scorecard('ios', NATIVE).copied, WEB + '/index.html?game=' + CODE + '&group=1');
-        assert.equal(scorecard('ios', undefined).copied, WEB + '/index.html?game=' + CODE + '&group=1');
+    test('the iOS shell on capacitor://localhost shares the web app, with or without the flag', async () => {
+        assert.equal((await scorecard('ios', NATIVE)).copied, WEB + '/index.html?game=' + CODE + '&group=1');
+        assert.equal((await scorecard('ios', undefined)).copied, WEB + '/index.html?game=' + CODE + '&group=1');
         assert.equal(leaderboardTextedLink('ios', NATIVE), WEB + '/shared.html?game=' + CODE);
     });
 
-    test('the production site shares itself', () => {
-        assert.equal(scorecard('web', undefined).copied, WEB + '/index.html?game=' + CODE + '&group=1');
+    test('the production site shares itself', async () => {
+        assert.equal((await scorecard('web', undefined)).copied, WEB + '/index.html?game=' + CODE + '&group=1');
     });
 });
 

@@ -180,10 +180,28 @@ describe('FIRE AND FORGET — the page never waits', () => {
         assert.equal((await settled(sb.authReady, 100)).value, 'late');
     });
 
-    CONSUMER.forEach(p => test(p + ' never awaits or chains authReady in its own script', () => {
+    // RE-PINNED 2026-09-21 (v189, the organizer doors). Three pages now chain
+    // authReady, and each chain is allowed only because it does not delay the
+    // round: index.html and game.html render the round from the snapshot as
+    // before and, on resolve, re-decide ONLY the organizer's setup control;
+    // admin.html's organizerDoor awaits the uid before opening the WIZARD on an
+    // existing round (the wizard is not the round, and the uid is what says
+    // whose round it is). Every chain carries a rejection handler, so a failed
+    // sign-in still reaches nobody. The other pages keep the original rule.
+    const ALLOWED_CHAINS = {
+        'index.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderScorecard\(\); \}, \(\) => \{\}\)/],
+        'game.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderSetupLink\(currentData\); \}, \(\) => \{\}\)/],
+        'admin.html': [/window\.authReady\.then\(\(uid\) => uid, \(\) => null\)/]
+    };
+    CONSUMER.forEach(p => test(p + ' never awaits or chains authReady in its own script, beyond the v189 organizer-door chains', () => {
         const inline = read(p).replace(/<script src=[^>]*><\/script>/g, '');
-        assert.doesNotMatch(inline, /authReady\s*\.\s*then|await\s+(window\.)?authReady|authReady\s*\.\s*catch/,
-            'nothing on the page waits for auth in this wave');
+        const allowed = ALLOWED_CHAINS[p] || [];
+        // The chains sit behind a `typeof window.authReady.then === 'function'` guard
+        // (a test realm without auth-boot has no promise); the guard is not a chain.
+        let rest = inline.replace(/typeof window\.authReady\.then === 'function'/g, '');
+        allowed.forEach(re => { assert.match(rest, re, p + ': the allowed chain is there, with its rejection handler'); rest = rest.replace(re, ''); });
+        assert.doesNotMatch(rest, /authReady\s*\.\s*then|await\s+(window\.)?authReady|authReady\s*\.\s*catch/,
+            'nothing else on the page waits for auth');
     }));
 
     test('auth-boot.js itself awaits nothing at parse: the sign-in starts on a zero-delay timer, after initializeApp', () => {

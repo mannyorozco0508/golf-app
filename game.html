@@ -8,6 +8,8 @@
     <!-- Anonymous Auth at boot, the way every consumer page does it: one tag, never
          blocks render. This page writes nothing; the token only keeps the boot uniform. -->
     <script src="auth-boot.js"></script>
+    <!-- organizer-gate.js: isRoundOrganizer, behind the Edit round setup button (v189). -->
+    <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- THE GAME TAB (2026-09-20). What is being played, in plain language, on every
          link - read-only, touches no round data. It renders from the same engines
@@ -123,6 +125,8 @@
         .game-group .g-n { flex: 0 0 auto; font-weight: bold; color: var(--brand-green); min-width: 64px; }
         .game-group .g-who { flex: 1 1 auto; }
         .game-group .g-mine { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); }
+        /* The organizer's way into the setup this page describes (v189). */
+        .game-setup-link { display: block; text-align: center; text-decoration: none; margin: 0 0 12px 0; padding: 12px; min-height: 48px; box-sizing: border-box; border: 1px solid var(--brand-navy); border-radius: 12px; color: var(--brand-navy); font-weight: bold; font-size: 0.95rem; background: var(--bg-card); }
     </style>
 <style>
 /* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
@@ -158,6 +162,9 @@ html {
     <a class="back-btn" onclick="goBack()">← Back</a>
 
     <h2 class="event-title" id="main-title">📖 The Game</h2>
+
+    <!-- Rendered for the organizer only (canReachSetup); empty for everyone else. -->
+    <div id="game-setup-mount"></div>
 
     <div id="game-content">
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading the round...</div>
@@ -381,10 +388,30 @@ html {
         return html;
     }
 
+    // THE ORGANIZER DOOR (v189) - the same predicate as the scorecard's: never on
+    // a group link, and only for the round's organizer (organizer-gate.js
+    // isRoundOrganizer: the creating uid, or the organizer link held or remembered).
+    function canReachSetup(data) {
+        if (lockedGroup !== null) return false;
+        if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
+        const uid = (window.authBootState && window.authBootState.uid) || null;
+        const token = window.organizerGate.heldOrganizerToken(currentMode, urlParams.get('organizer'));
+        return window.organizerGate.isRoundOrganizer(data, uid, token);
+    }
+    function renderSetupLink(data) {
+        const mount = document.getElementById('game-setup-mount');
+        if (!mount) return;
+        const players = (data && data.players) || [];
+        mount.innerHTML = (players.length > 0 && canReachSetup(data))
+            ? '<a class="game-setup-link" href="admin.html?game=' + currentMode + '">\u270F\uFE0F Edit round setup</a>'
+            : '';
+    }
+
     function renderGame(data) {
         const el = document.getElementById('game-content');
         if (!el) return;
         el.innerHTML = buildGameHtml(data || {});
+        renderSetupLink(data || {});
     }
 
     if (!currentMode) {
@@ -401,8 +428,13 @@ html {
         });
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
+            if (window.organizerGate) window.organizerGate.rememberOrganizerToken(currentMode, currentData, urlParams.get('organizer'));
             renderGame(currentData);
         });
+        // The uid lands asynchronously; re-decide the setup link once it has.
+        if (window.authReady && typeof window.authReady.then === 'function') {
+            window.authReady.then(() => { if (currentData && currentData.players) renderSetupLink(currentData); }, () => {});
+        }
     }
 </script>
 

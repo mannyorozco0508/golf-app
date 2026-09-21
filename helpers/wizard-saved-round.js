@@ -57,6 +57,11 @@ function wizardSavedRound(opts) {
     const round = {
         eventName: 'Sunday', roundDay: 'Sunday', settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar',
         organizerToken: 'tok-' + code, eventCategory: 'weekend', categoryIcon: '⛳',
+        // ownerUid since 2026-09-15 (organizer-gate.js stamp at the first save): the
+        // saving realm's anonymous uid - 'anon-stub' is what mini-dom signs a page in
+        // as; a Chrome cold arrival is 'anon-cold' (pass ownerUid); null drops the key
+        // (a round from before the gate).
+        ownerUid: o.ownerUid === undefined ? 'anon-stub' : o.ownerUid,
         activeCourseKey: 'tidewater', courseName: 'Tidewater', gameFormat: 'stroke', holeBetStake: 0,
         richHoleBet: null, richHoleBetPresses: null, richOverallBetPresses: null,
         additionalGames: { skins: { enabled: true, skinsBuyIn: 5, skinsPotFormat: 'gross', skinsScoring: 'gross', skinsCarryOver: false, startHole: 1 } },

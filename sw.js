@@ -1696,7 +1696,12 @@
 // Moved to v188 because admin.html's Paste Player List reads a leading flight
 // letter ("A · Randy T 12") and turns flights on for the round. A device on
 // v187 would paste that list as 25 golfers named "A · Randy T".
-const CACHE_VERSION = 'golfapp-v188-paste-flight-letter';
+// Moved to v189 because the round setup got its doors: "Edit round setup" on the
+// scorecard and the Game tab for the organizer (index.html, game.html now load
+// organizer-gate.js), and admin.html refuses the wizard on an existing round to
+// anyone else. A device on v188 would keep a scorecard whose Group Links panel
+// hands the organizer link to every spectator on the bare link.
+const CACHE_VERSION = 'golfapp-v189-organizer-doors';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

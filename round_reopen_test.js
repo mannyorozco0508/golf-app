@@ -38,7 +38,7 @@ const { makeCourseData } = require('./helpers/fixtures.js');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const ADMIN = read('admin.html');
 const CD = makeCourseData(18);
-const OLD = wizardSavedRound({ code: 'RRT001', courseData: CD, overrides: { stablefordPointVal: 2, stablefordScoring: 'gross',
+const OLD = wizardSavedRound({ code: 'RRT001', courseData: CD, ownerUid: 'anon-cold', overrides: { stablefordPointVal: 2, stablefordScoring: 'gross',
     stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 4, eagle: 6, albatross: 8 }, flights: { enabled: true, scopes: { skins: 'field', birdies: 'flight' } } } });
 const DB = { events: { RRT001: OLD }, global_courses: { tidewater: { name: 'Tidewater', data: CD } }, trips: {}, tournaments: {} };
 const PRE = "window.__alerts = []; window.__errs = []; window.alert = function (m) { window.__alerts.push(String(m)); };"

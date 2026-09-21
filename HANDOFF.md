@@ -2282,6 +2282,63 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The organizer doors — Wave v189, 2026-09-21
+
+**What it is.** Two doors into the round setup for the organizer — "✏️ Edit round
+setup" on the scorecard's group strip (`index.html` `renderGroupFilters`) and under
+the Game tab's title (`game.html` `renderSetupLink`) — and a refusal on
+`admin.html?game=CODE` for anyone else on an EXISTING round (`organizerDoor`,
+`showSetupRefused`: "This round's setup belongs to its organizer." with a way back
+to the scorecard). A NEW round (no players) opens its wizard for anyone, as always.
+
+**Who is the organizer.** `organizer-gate.js` `isRoundOrganizer(data, uid, token)`:
+the round's `ownerUid` equals this session's anonymous uid (the browser that
+created it), OR the organizer token is held — `?organizer=TOKEN` on the URL, or
+remembered on this device for this round (`rememberOrganizerToken`, localStorage
+`golfapp_organizer_<CODE>`, written only when a URL token matched the round; the
+nav rewrite drops the param on the first tab tap, so without the memory the
+organizer loses the setup the moment they change tabs). A legacy round with
+neither field (before 2026-08-24) is open as it always was; a round with a token
+and no `ownerUid` (2026-08-24 to 09-14) admits only the link. Never on a group
+link, whoever holds it. **The uid is per browser ORIGIN**: Safari, the home-screen
+app and the App Store app on one phone are three different organizers — open the
+organizer link once in each to make them all the organizer.
+
+**WHAT THIS IS NOT. This hides the doors; it does not lock them.**
+`database.rules.json` is untouched: `events/$code` `.write` still permits any
+client holding the code to write an existing round's settings, and the organizer
+token is `.read: true` like the rest of the round. Making setup owner-only is a
+rules change with the per-origin identity problem above (a rule that trusts
+`ownerUid` alone locks the organizer's own phone out of a round created on the
+Mac; one that also trusts the token has to store it somewhere the rule can read
+without every reader seeing it). It needs a rehearsal on a throwaway round, and is
+its own wave after the 2026-09-22 round.
+
+**Left on the OLD predicate this wave** — `index.html` `isOrganizerView()` is still
+`!hasGroupLock` ("no ?group= in the link"), which a "Just watching" spectator on
+the bare link satisfies. On 2026-09-21 the string appeared 12 times in
+`index.html`: the definition, four real gates, seven comment mentions. Two gates
+moved onto `canReachSetup()` in this wave (the 🔗 Group Links button and panel,
+which print the organizer link). What is left, to be moved or deliberately kept
+in a later wave:
+
+| where (`index.html`) | what it gates |
+|---|---|
+| `:3621` `canShowInlineActionPanel` (the quick "+ SIDE BETS" panel) | writing a wager with no participants named — single-group rounds only, so a spectator on a foursome's bare link can add a wager |
+| `:6672` `renderEndRoundControl` | whether the "End & Wipe" control is drawn |
+| `:6688` `endAndClearRound` | the wipe itself, checked again at the action |
+| `:3609`, `:4283`, `:4296`, `:4976`, `:6657`, `:6664` | comments that name the predicate — prose only |
+
+`organizer_door_test.js` pins the count of the string (10 now, comments
+included), so a gate moved later has to move its comment too and update the
+table above. Also not on either predicate: the group switcher in
+`renderGroupFilters` (`hasGroupLock` decides, harmless for a spectator) and the
+score-override provenance `verifiedBy` (`hasOrganizerAuthority`, the token only).
+
+Not moved tonight because the wipe is the destructive control and should get its
+own decision rather than ride along, and the inline wager panel on a single group
+is the case where "one group IS the field" was the deliberate design.
+
 ## Known open items
 
 - **CLOSED 2026-09-11 — a misspelled course is no longer cached as a genuine empty.**

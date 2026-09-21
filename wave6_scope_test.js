@@ -393,7 +393,7 @@ describe('PERMISSIONS — identity is still not authorization', () => {
 
     test('Group Links stay organizer-only and identity-blind', () => {
         const fn = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/isOrganizerView\(\)/.test(fn));
+        assert.ok(/canReachSetup\(\)/.test(fn));   // v189: the organizer by uid or organizer link, never a group link (organizer_door_test.js)
         assert.ok(!/meId/.test(fn));
     });
 

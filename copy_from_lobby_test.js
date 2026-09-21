@@ -170,9 +170,11 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         const p = params(dest(sb));
         assert.deepEqual(Object.keys(p).sort(), ['eventType', 'game']);
     });
-    test('the other params this page reads are the lobby\'s own (group, fresh) or chosen by the tile (eventType): none is dropped', () => {
+    test('the other params this page reads are the lobby\'s own (group, fresh), chosen by the tile (eventType), or the organizer link (organizer, v189): none is dropped', () => {
         const reads = [...ADMIN.matchAll(/urlParams\.get\('([A-Za-z]+)'\)/g)].map(m => m[1]);
-        assert.deepEqual([...new Set(reads)].sort(), ['copyFrom', 'eventType', 'fresh', 'game', 'group', 'trip']);
+        // 'organizer' since v189: organizerDoor reads ?organizer= (the link copied from
+        // the scorecard's Group Links panel) to let a second device into the wizard.
+        assert.deepEqual([...new Set(reads)].sort(), ['copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

@@ -15,6 +15,9 @@
          creates window.authReady now, signs in after the parse, never blocks render.
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
+    <!-- organizer-gate.js: isRoundOrganizer, the one predicate behind the Edit round
+         setup button and the Group Links panel (v189). Pure; reads no database. -->
+    <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- settlement-engine.js calls computeRoundMoneyByPlayer and simplifyDebts, and this
          page carries inline copies of neither. Without this tag Final Money threw on
@@ -754,6 +757,9 @@
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
         }
         .group-btn.active { background: var(--brand-green); color: #ffffff; }
+        /* The organizer's way into the setup (v189): an anchor drawn as a pill, the
+           navy of the Matches pill so it reads as a door, not a filter. */
+        a.group-setup-btn { text-decoration: none; display: inline-flex; align-items: center; min-height: 32px; border-color: var(--brand-navy); color: var(--brand-navy); }
 
         .card-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .card-table { width: 100%; border-collapse: collapse; min-width: 360px; }
@@ -1738,9 +1744,20 @@ html {
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
+            // An organizer link that matches the round is remembered on this device
+            // for this round (organizer-gate.js), so the setup stays reachable after
+            // the nav drops &organizer= on the first tap.
+            if (window.organizerGate) window.organizerGate.rememberOrganizerToken(currentMode, currentData, organizerTokenParam);
             loadRyderHostCup();
             renderScorecard();
         });
+        // The uid lands asynchronously (auth-boot.js). Whichever of the snapshot and
+        // the token arrives second decides what the organizer controls show, so a
+        // slow sign-in cannot hide the button from the organizer or show it to a
+        // spectator for good.
+        if (window.authReady && typeof window.authReady.then === 'function') {
+            window.authReady.then(() => { if (currentData && currentData.players) renderScorecard(); }, () => {});
+        }
     }
 
     // --- CUSTOM GROUP SIZING ---
@@ -4951,8 +4968,24 @@ html {
         return !hasGroupLock;
     }
 
+    // THE ORGANIZER DOOR (v189). "Can this session reach the round's setup": not a
+    // group link (a scorekeeper's link is never the organizer's, whoever holds it)
+    // AND the round's organizer by organizer-gate.js isRoundOrganizer - the uid
+    // that created it, or the organizer link held on the URL or remembered on this
+    // device. Gates the Edit round setup button and the Group Links panel (which
+    // prints the organizer link). The isOrganizerView() gates that remain (the
+    // inline wager panel, End & Wipe) are listed in HANDOFF.md, unchanged this wave.
+    function canReachSetup() {
+        if (hasGroupLock) return false;
+        if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
+        const uid = (window.authBootState && window.authBootState.uid) || null;
+        const token = window.organizerGate.heldOrganizerToken(currentMode, organizerTokenParam);
+        return window.organizerGate.isRoundOrganizer(currentData, uid, token);
+    }
+    function setupHref() { return 'admin.html?game=' + currentMode; }
+
     function toggleGroupLinksPanel() {
-        if (!isOrganizerView()) return;
+        if (!canReachSetup()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
         renderGroupLinksPanel();
     }
@@ -4963,7 +4996,7 @@ html {
         // Checked here as well as at the button, so deleting the gate in devtools or
         // calling this directly from the console still produces nothing. This is not a
         // CSS hide - the markup is never generated for a scorekeeper.
-        if (!isOrganizerView()) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+        if (!canReachSetup()) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
         if (!groupLinksPanelOpen) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
 
         const players = currentData.players || [];
@@ -5072,9 +5105,17 @@ html {
             // Organizer only. A scorekeeper opened their group's link precisely so they
             // could score THEIR foursome; handing them every other group's privileged
             // URL from inside that page defeats the point of scoping links at all.
-            if (isOrganizerView()) {
+            // Since v189 "organizer" is canReachSetup(), not the bare link: the panel
+            // prints the organizer link, and a spectator on the bare link must not be
+            // able to take the key.
+            if (canReachSetup()) {
                 html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">🔗 Group Links</button>`;
             }
+        }
+        // THE WAY INTO THE SETUP, for the organizer (v189). Beside Group Links on a
+        // multi-group round, alone in the row on a foursome. Never on a group link.
+        if (canReachSetup()) {
+            html += `<a class="group-btn group-setup-btn" href="${setupHref()}">\u270F\uFE0F Edit round setup</a>`;
         }
 
         container.innerHTML = html;

@@ -395,7 +395,7 @@ describe('PERMISSIONS UNCHANGED', () => {
         const canWrite = idx.slice(idx.indexOf('function canWritePlayer'), idx.indexOf('function rejectCrossGroupWrite'));
         assert.ok(!/meId/.test(canWrite));
         const links = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/isOrganizerView\(\)/.test(links));
+        assert.ok(/canReachSetup\(\)/.test(links));   // v189: canReachSetup() - the organizer by uid or organizer link, never a group link (organizer_door_test.js)
     });
 });
 
@@ -644,7 +644,7 @@ describe('SIDE MATCH PRESS — UI and permissions', () => {
         const add = idx.slice(idx.indexOf('function canAddAction'), idx.indexOf('function addActionStartHole'));
         assert.ok(/isOrganizerView\(\)/.test(add), 'Add Action must stay organizer-only');
         const links = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/isOrganizerView\(\)/.test(links), 'Group Links must stay organizer-only');
+        assert.ok(/canReachSetup\(\)/.test(links), 'Group Links must stay organizer-only');   // v189: canReachSetup() - the organizer by uid or organizer link, never a group link (organizer_door_test.js)
         const canWrite = idx.slice(idx.indexOf('function canWritePlayer'), idx.indexOf('function rejectCrossGroupWrite'));
         assert.ok(!/canPressSideMatch/.test(canWrite), 'score writing must be unaffected');
     });

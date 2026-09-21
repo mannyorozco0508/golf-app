@@ -107,7 +107,11 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // flex with one row per group in #group-pick-body on the bare link, none on
         // a group link or a one-group round. Those entries were added by hand (the
         // fixture's "repinned" entry); every other character is the capture.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'e89b88e3');
+        // RE-PINNED 2026-09-21 (was e89b88e3): the organizer doors - the bare link on
+        // this legacy round (neither ownerUid nor organizerToken: open, as always)
+        // shows the ✏️ Edit round setup pill after Group Links; the group link shows
+        // neither. That substring was added by hand (the fixture's "repinned" entry).
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ad65f4de');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

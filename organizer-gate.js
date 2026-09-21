@@ -66,6 +66,45 @@
     // Step 3, for one round or a batch: the same uid on every record.
     function stamp(payload, uid) { payload.ownerUid = uid; return payload; }
 
+    // ---- THE ORGANIZER DOOR (2026-09-21, v189) ------------------------------
+    // "Is this the organizer of THIS round" - one predicate for the scorecard's
+    // and the Game tab's "Edit round setup" button, the Group Links panel (it
+    // prints the organizer link), and admin.html's refusal of the wizard on an
+    // existing round. It is NOT "no ?group= in the link" (index.html's older
+    // isOrganizerView, which a spectator on the bare link satisfies).
+    //
+    //   1. data.ownerUid === this session's uid   - the browser that created it.
+    //      The uid is per browser ORIGIN: Safari, the home-screen app and the
+    //      App Store app on one phone are three different organizers.
+    //   2. the organizer token is held - on the URL (?organizer=TOKEN, the link
+    //      copied from the Group Links panel) or REMEMBERED on this device for
+    //      this round, because the nav rewrite drops the param on the first tap
+    //      to another tab. Only a token that matched the round is ever stored.
+    //   3. a legacy round with neither field (before 2026-08-24) is open, as it
+    //      always was - there is nothing to check against. A round with a token
+    //      and no ownerUid (2026-08-24 to 09-14) admits only the link.
+    //
+    // HIDES THE DOORS, DOES NOT LOCK THEM. database.rules.json still lets any
+    // client holding the code write an existing round; see HANDOFF.md.
+    var TOKEN_KEY = 'golfapp_organizer_';
+    function tokenKey(code) { return TOKEN_KEY + String(code || '').toUpperCase(); }
+    function heldOrganizerToken(code, urlToken) {
+        if (urlToken) return String(urlToken);
+        try { return (typeof localStorage !== 'undefined' && localStorage.getItem(tokenKey(code))) || null; } catch (e) { return null; }
+    }
+    function rememberOrganizerToken(code, data, urlToken) {
+        if (!urlToken || !data || !data.organizerToken) return false;
+        if (String(urlToken) !== String(data.organizerToken)) return false;
+        try { localStorage.setItem(tokenKey(code), String(urlToken)); return true; } catch (e) { return false; }
+    }
+    function isRoundOrganizer(data, uid, token) {
+        if (!data || typeof data !== 'object') return false;
+        if (data.ownerUid && uid && String(uid) === String(data.ownerUid)) return true;
+        if (data.organizerToken && token && String(token) === String(data.organizerToken)) return true;
+        if (!data.ownerUid && !data.organizerToken) return true;
+        return false;
+    }
+
     // After a refused round write: 'trial-ended' when the gate is the reason,
     // 'inside-window' / 'no-record' / 'unknown' otherwise (the caller keeps its
     // own error message for those).
@@ -171,6 +210,9 @@
         isPermissionDenied: isPermissionDenied,
         ensureOrganizer: ensureOrganizer,
         stamp: stamp,
+        heldOrganizerToken: heldOrganizerToken,
+        rememberOrganizerToken: rememberOrganizerToken,
+        isRoundOrganizer: isRoundOrganizer,
         explainRefusal: explainRefusal,
         standingOf: standingOf,
         standingLine: standingLine,

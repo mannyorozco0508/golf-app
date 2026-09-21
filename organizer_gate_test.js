@@ -212,9 +212,17 @@ describe('THE SEAM (source, comments stripped)', () => {
         const t = stripComments(read('trip.html'));
         assert.match(t, /Object\.keys\(updates\)\.forEach\(\(k\) => \{ if \(\/\^events\\\/\[\^\/\]\+\$\/\.test\(k\)\) window\.organizerGate\.stamp\(updates\[k\], uid\); \}\);\s*return db\.ref\(\)\.update\(updates\);/, 'every events/<code> entry of the batch is stamped, then the one atomic update');
     });
-    test('no page but those two loads or names the gate; no page shows a trial banner or countdown', () => {
-        ['index.html', 'leaderboard.html', 'settlement.html', 'shared.html', 'sidematches.html', 'skins.html', 'stats.html', 'tournament.html', 'tournament-scorecard.html'].forEach(p => {
+    test('no page but those four loads or names the gate; no page shows a trial banner or countdown', () => {
+        // RE-PINNED 2026-09-21 (v189): index.html and game.html load organizer-gate.js
+        // for isRoundOrganizer (the organizer doors) - a pure predicate; neither page
+        // calls ensureOrganizer or writes organizers/<uid>. organizer_door_test.js.
+        ['leaderboard.html', 'settlement.html', 'shared.html', 'sidematches.html', 'skins.html', 'stats.html', 'tournament.html', 'tournament-scorecard.html'].forEach(p => {
             assert.ok(!/organizer-gate/.test(read(p)), p + ' does not load the gate');
+        });
+        ['index.html', 'game.html'].forEach(p => {
+            const src = stripComments(read(p));
+            assert.ok(/organizer-gate\.js/.test(read(p)), p + ' loads the gate');
+            assert.ok(!/ensureOrganizer|organizers\//.test(src), p + ' only reads the predicate - never the trial write');
         });
         ['admin.html', 'trip.html', 'index.html'].forEach(p => assert.ok(!/trial ends in|days left in your trial|countdown/i.test(stripComments(read(p))), p + ' shows no trial banner'));
     });

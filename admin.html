@@ -1417,6 +1417,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
          reuse the same helpers. Nothing about the Tournament product was deleted. -->
 </div>
 
+<!-- THE ORGANIZER DOOR (v189). admin.html?game=CODE on an EXISTING round, opened
+     by a session that is not the round's organizer (organizer-gate.js
+     isRoundOrganizer: not the uid that created it, no organizer link held or
+     remembered), shows this instead of the wizard. A NEW round never lands here.
+     The wizard's markup is not generated for the refused session - #admin-screen
+     is hidden before loadModeData would have filled it, and loadModeData is not
+     called. HIDES THE DOOR; DOES NOT LOCK IT - see HANDOFF.md. -->
+<div class="container" id="setup-refused-screen" style="display: none;">
+    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="lobby-logo">🔒</div>
+    <div class="lobby-title">This round's setup belongs to its organizer.</div>
+    <p style="text-align:center; color:var(--text-muted); font-size:0.95rem; line-height:1.5; margin:0 0 20px 0;">If that is you, open the round on the device you set it up on, or use your organizer link &mdash; it is on the scorecard's Group Links panel there.</p>
+    <a class="btn-primary" id="setup-refused-back" href="index.html" style="display:block; text-align:center; text-decoration:none;">⛳ Back to the scorecard</a>
+</div>
+
 <div class="container" id="round-ready-screen" style="display: none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">✅</div>
@@ -5834,6 +5849,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return Object.keys(loadedScores || {}).filter(k => k.indexOf(prefix) === 0 && loadedScores[k] > 0).length;
     }
 
+    // THE ORGANIZER DOOR (v189): resolves true when this session may open the
+    // wizard on an existing round. organizer-gate.js isRoundOrganizer decides -
+    // the uid that created the round, or the organizer link on the URL or
+    // remembered on this device (a matching ?organizer= is remembered here too,
+    // so the organizer link works as the way in from a second device).
+    function organizerDoor(data) {
+        const urlToken = urlParams.get('organizer');
+        if (window.organizerGate) window.organizerGate.rememberOrganizerToken(currentMode, data, urlToken);
+        const uidP = (window.authReady && typeof window.authReady.then === 'function')
+            ? window.authReady.then((uid) => uid, () => null)
+            : Promise.resolve((window.authBootState && window.authBootState.uid) || null);
+        return uidP.then((uid) => {
+            if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
+            return window.organizerGate.isRoundOrganizer(data, uid, window.organizerGate.heldOrganizerToken(currentMode, urlToken));
+        });
+    }
+    function showSetupRefused() {
+        ['admin-screen', 'round-ready-screen', 'lobby-screen'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        const back = document.getElementById('setup-refused-back');
+        if (back) {
+            let href = 'index.html?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) href += '&group=' + groupParam;
+            back.href = href;
+        }
+        const screen = document.getElementById('setup-refused-screen');
+        if (screen) screen.style.display = 'block';
+    }
+
     function loadModeData(modeKey) {
         const isThisRound = String(modeKey) === String(currentMode);
         // Timed, like every read on the way to a round (code-issuer.js
@@ -7058,10 +7102,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 }
                 // Fresh round, nothing saved yet - starting at Step 1 (already done above) is right.
             } else {
-                loadModeData(currentMode);
-                // loadModeData fetches its own data asynchronously, so give it a moment to actually
-                // populate the fields before building the review screen from them.
-                setTimeout(() => goToWizardStep(wizardStepNumber('review')), 600);
+                // THE ORGANIZER DOOR (v189). An existing round opens its wizard only
+                // for the round's organizer. The uid is awaited (auth-boot.js), so
+                // a slow sign-in refuses nobody by mistake; a failed sign-in is a
+                // null uid, and the organizer link still gets in.
+                organizerDoor(data).then((isOrganizer) => {
+                    if (!isOrganizer) { showSetupRefused(); return; }
+                    loadModeData(currentMode);
+                    // loadModeData fetches its own data asynchronously, so give it a moment to actually
+                    // populate the fields before building the review screen from them.
+                    setTimeout(() => goToWizardStep(wizardStepNumber('review')), 600);
+                });
             }
         }).catch((err) => {
             if (copyFromCode) {
