@@ -1701,7 +1701,11 @@
 // organizer-gate.js), and admin.html refuses the wizard on an existing round to
 // anyone else. A device on v188 would keep a scorecard whose Group Links panel
 // hands the organizer link to every spectator on the bare link.
-const CACHE_VERSION = 'golfapp-v189-organizer-doors';
+// Moved to v190 because the Game tab draws golfer names with the Board's own
+// formatter (getSmartDisplayName, lifted from leaderboard.html into
+// text-safe.js): Randy T / Randy C read "Randy T." / "Randy C." instead of two
+// Randys. game.html, leaderboard.html and text-safe.js are all precached.
+const CACHE_VERSION = 'golfapp-v190-game-tab-names';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

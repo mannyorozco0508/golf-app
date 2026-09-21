@@ -40,6 +40,39 @@ function escapeHtml(value) {
     });
 }
 
+// ---- THE NAME A GOLFER READS (2026-09-21, v190) --------------------------
+// Lifted VERBATIM from leaderboard.html (it lived inline there since the
+// Board was written) so the Game tab draws the same name the Board does:
+// a first name unique in the roster stands alone ("Marty"); two golfers who
+// share a first name carry their last initial with a dot ("Randy T.",
+// "Randy C."); same first name AND same initial, the full stored name. The
+// Game tab had its own formatter that cut every name to its first token,
+// which turned Randy T / Randy C / Matt M / Matt B / Matt H into two Randys
+// and three Matts (game_tab_names_test.js). Two entry points, one builder.
+// DOES NOT ESCAPE - every caller wraps the result in escapeHtml at the
+// innerHTML boundary, as leaderboard.html always did.
+function getSmartDisplayName(player, allPlayers) {
+    let parts = player.name.trim().split(/\s+/);
+    let first = parts[0];
+    if (parts.length === 1) return first; 
+
+    let last = parts.slice(1).join(" ");
+    let lastInitial = last.charAt(0).toUpperCase();
+
+    let sameFirstName = allPlayers.filter(p => p.name.trim().split(/\s+/)[0].toLowerCase() === first.toLowerCase());
+    if (sameFirstName.length === 1) return first; 
+
+    let sameFirstAndInitial = sameFirstName.filter(p => {
+        let pParts = p.name.trim().split(/\s+/);
+        if (pParts.length === 1) return false;
+        let pLastInitial = pParts.slice(1).join(" ").charAt(0).toUpperCase();
+        return pLastInitial === lastInitial;
+    });
+
+    if (sameFirstAndInitial.length === 1) return `${first} ${lastInitial}.`; 
+    return `${first} ${last}`;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { escapeHtml };
+    module.exports = { escapeHtml, getSmartDisplayName };
 }

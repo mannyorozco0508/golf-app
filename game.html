@@ -215,7 +215,11 @@ html {
     // results, never from config names. Pure: (data) -> HTML. Tested as such.
     const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
     const money = d => '$' + (Number.isInteger(d) ? String(d) : Number(d).toFixed(2));
-    const first = p => escapeHtml(String((p && p.name) || '').trim().split(' ')[0]);
+    // The name a golfer reads: the Board's own formatter (text-safe.js
+    // getSmartDisplayName) against the round's roster - "Marty" when the first
+    // name is unique, "Randy T." / "Randy C." when two share it. The v186 page cut
+    // every name to its first token, which lost the initials (v190).
+    const first = (p, players) => escapeHtml(getSmartDisplayName(p, players || (currentData && currentData.players) || []));
     const listOf = names => names.length <= 1 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
     const plural = (n, one, many) => n === 1 ? one : (many || one + 's');
 
@@ -315,8 +319,8 @@ html {
         const players = data.players || [];
         const A = players.filter(p => playerFlight(p) === 'A'), B = players.filter(p => playerFlight(p) === 'B');
         let html = '<div class="game-card"><div class="game-head">🅰🅱 Flights</div>';
-        html += '<div class="game-sub"><strong>Flight A</strong> (' + A.length + '): ' + A.map(first).join(', ') + '</div>';
-        html += '<div class="game-sub"><strong>Flight B</strong> (' + B.length + '): ' + B.map(first).join(', ') + '</div>';
+        html += '<div class="game-sub"><strong>Flight A</strong> (' + A.length + '): ' + A.map(p => first(p, players)).join(', ') + '</div>';
+        html += '<div class="game-sub"><strong>Flight B</strong> (' + B.length + '): ' + B.map(p => first(p, players)).join(', ') + '</div>';
         const scopes = f.scopes || {};
         const by = Object.keys(scopes).filter(k => scopes[k] === 'flight').map(k => k === 'skins' ? 'skins' : k);
         html += '<div class="game-sub game-muted">' + (by.length ? 'Played by flight: ' + by.join(', ') + '. Everything else is the whole field.' : 'Standings only — every game is the whole field.') + '</div>';
@@ -327,7 +331,7 @@ html {
     function sideActionCard(data) {
         const players = data.players || [];
         const byId = {}; players.forEach(p => { byId[String(p.id)] = p; });
-        const names = ids => (ids || []).map(id => byId[String(id)]).filter(Boolean).map(first).join(' & ') || '?';
+        const names = ids => (ids || []).map(id => byId[String(id)]).filter(Boolean).map(p => first(p, players)).join(' & ') || '?';
         const lines = [];
         Object.values(data.sideMatches || {}).filter(sm => sm && sm.enabled !== false && (sm.teamAIds || sm.teamBIds)).forEach(sm => {
             const who = names(sm.teamAIds) + ' vs ' + names(sm.teamBIds);
@@ -360,7 +364,7 @@ html {
         const b = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
         let html = '<div class="game-card"><div class="game-head">🏌️ Groups, in tee order</div>';
         b.forEach(g => {
-            const who = players.slice(g.startIdx, g.startIdx + g.size).map(first).join(', ');
+            const who = players.slice(g.startIdx, g.startIdx + g.size).map(p => first(p, players)).join(', ');
             html += '<div class="game-group"><span class="g-n">Group ' + g.group + '</span><span class="g-who">' + who + '</span>'
                 + (lockedGroup === g.group ? '<span class="g-mine">YOUR GROUP</span>' : '') + '</div>';
         });

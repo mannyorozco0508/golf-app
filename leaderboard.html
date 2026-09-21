@@ -463,27 +463,8 @@ html {
         return `<span class="to-par-under">${val}</span>`;
     }
 
-    function getSmartDisplayName(player, allPlayers) {
-        let parts = player.name.trim().split(/\s+/);
-        let first = parts[0];
-        if (parts.length === 1) return first; 
-
-        let last = parts.slice(1).join(" ");
-        let lastInitial = last.charAt(0).toUpperCase();
-
-        let sameFirstName = allPlayers.filter(p => p.name.trim().split(/\s+/)[0].toLowerCase() === first.toLowerCase());
-        if (sameFirstName.length === 1) return first; 
-
-        let sameFirstAndInitial = sameFirstName.filter(p => {
-            let pParts = p.name.trim().split(/\s+/);
-            if (pParts.length === 1) return false;
-            let pLastInitial = pParts.slice(1).join(" ").charAt(0).toUpperCase();
-            return pLastInitial === lastInitial;
-        });
-
-        if (sameFirstAndInitial.length === 1) return `${first} ${lastInitial}.`; 
-        return `${first} ${last}`;
-    }
+    // getSmartDisplayName(player, allPlayers) lives in text-safe.js since v190 -
+    // lifted verbatim so the Game tab shows the same name the Board does.
 
     function switchView(view) {
         activeView = view;
