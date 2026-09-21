@@ -1709,7 +1709,11 @@
 // retire the unfinished round a new one supersedes (events/OLD/supersededBy),
 // and index.html shows that round's visitors a banner to the live code and
 // takes no score. A device on v190 would keep scoring a retired round.
-const CACHE_VERSION = 'golfapp-v191-superseded-round';
+// Moved to v192 because a blank hole inside a card now shows: score-gaps.js
+// (new, precached) feeds the scorecard's outlined box and banner, the Board's
+// "missing N" flag and the money pages' "Not final" line. A device on v191
+// keeps a Board that quietly sums what is there.
+const CACHE_VERSION = 'golfapp-v192-missing-hole';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1728,6 +1732,8 @@ const SHELL_FILES = [
     './leaderboard.html',
     './skins.html',
     './stats.html',
+    // score-gaps.js (v192): shared by index, leaderboard and settlement.
+    './score-gaps.js',
     // The Game tab (v186): what is being played, on every link. stats.html stays
     // precached - it has no tab now, but nothing that reaches it by URL should
     // hit the offline page.

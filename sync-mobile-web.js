@@ -48,6 +48,9 @@ const SHARED_SHELL = [
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',
+    // score-gaps.js (v192): the one builder for a blank hole inside a card;
+    // index, leaderboard and settlement draw from it.
+    'score-gaps.js',
     // course-import-rules.js: the pure half of online course search - what a
     // valid card is, the canonical tee, every refusal sentence. admin.html and
     // tournament.html both load it (2026-09-17); one builder, two entry points.

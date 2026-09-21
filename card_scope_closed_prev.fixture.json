@@ -38,7 +38,8 @@
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "none",
-    "superseded-banner": "none"
+    "superseded-banner": "none",
+    "gap-banner": "none"
    },
    "filtered": [
     "Ivy",
@@ -87,7 +88,8 @@
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "flex",
-    "superseded-banner": "none"
+    "superseded-banner": "none",
+    "gap-banner": "none"
    },
    "filtered": [
     "Ann",
@@ -150,7 +152,8 @@
     "nassau-payout-container": "none",
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "none",
-    "superseded-banner": "none"
+    "superseded-banner": "none",
+    "gap-banner": "none"
    },
    "filtered": [
     "Ann",
@@ -176,6 +179,10 @@
   {
    "date": "2026-09-22",
    "why": "the retired-round guard (superseded_round_test.js): renderSupersededBanner sets #superseded-banner display none on every round without supersededBy, so each link variant gains that one display entry. Added by hand; every other character is the capture."
+  },
+  {
+   "date": "2026-09-22",
+   "why": "the missing-hole warning (score_gaps_test.js): renderGapBanner sets #gap-banner display none on a round with no gap inside any card, so each link variant gains that one display entry. Added by hand; every other character is the capture."
   }
  ]
 }

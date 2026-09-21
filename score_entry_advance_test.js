@@ -230,3 +230,39 @@ describe('THE SEAM (source)', () => {
         assert.match(focusPath, /if \(scoreChangeInFlight\) return null;/, 'a golfer who left the box is not dragged back');
     });
 });
+
+// ---------------------------------------------------------------------------
+// THE MISSING-HOLE TAP (v192, score-gaps.js / index.html jumpToGap). Ann has
+// scored 2-5 and not 1: the banner above the card names her, and one real tap
+// on it must leave focus ON ANN'S HOLE-1 BOX, in the Hole View, synchronously
+// (the same identity-focus path the advance uses). mini-dom cannot prove a
+// focus; this arrival can.
+describe('THE MISSING-HOLE BANNER: one tap lands focus on the gap box (Chrome, 390x844)', () => {
+    const gappy = round(false);
+    [2, 3, 4, 5].forEach(h => { gappy.scores['p101_h' + h] = 4; gappy.scores['p102_h' + h] = 4; gappy.scores['p103_h' + h] = 4; gappy.scores['p104_h' + h] = 4; });
+    gappy.scores['p102_h1'] = 4; gappy.scores['p103_h1'] = 4; gappy.scores['p104_h1'] = 4;   // everyone but Ann scored 1
+    const GDB = { events: { ADVGAP: gappy }, global_courses: {}, trips: {}, tournaments: {} };
+    let r;
+    before(async () => {
+        r = await arriveCold({ url: fileUrl('index.html', 'game=ADVGAP&group=1'), db: GDB, settleMs: 5000, steps: [
+            tagged('B0', "document.getElementById('gap-banner').innerText.replace(/\\s+/g, ' ').trim()"),
+            tagged('H0', 'String(currentViewedHole)'),
+            { tap: '#gap-banner .gap-banner-line', nth: 0 },
+            tagged('W1', WHERE),
+            tagged('H1', 'String(currentViewedHole)'),
+            tagged('OUT', "(function () { var el = document.querySelector('#hole-view-card .score-input[data-player-id=\"101\"][data-hole=\"1\"]'); return el ? getComputedStyle(el).outlineColor + ' ' + getComputedStyle(el).outlineWidth : 'no box'; })()")
+        ] });
+    });
+    test('ran', () => assert.ok(r && r.ok, r && r.reason));
+    test('the banner names Ann and hole 1 (the page lands on hole 1 itself - the group\'s first incomplete hole - so the tap\'s proof is the FOCUS, which nothing else puts there)', () => {
+        assert.match(val(r, 'B0'), /Ann: hole 1 has no score/);
+        assert.equal(val(r, 'H0'), '1');
+    });
+    test('after the tap: Hole View is on hole 1 and focus is on Ann\'s box, by identity', () => {
+        assert.equal(val(r, 'H1'), '1');
+        assert.match(val(r, 'W1'), /^HV:Ann\/h1/);
+    });
+    test('the gap box is outlined red (a computed outline, not a class that resolves to nothing)', () => {
+        assert.match(val(r, 'OUT'), /rgb\(230, 57, 70\) 2px/);
+    });
+});

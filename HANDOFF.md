@@ -2282,6 +2282,25 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The missing hole — Wave v192, 2026-09-22
+
+**What it is.** `score-gaps.js` (shared, not an engine): a GAP is a blank
+hole before a golfer's last scored hole, walked in the order the group plays.
+The course is circular: per group, the start hole is the one after the
+longest run of holes nobody in the group has scored (ties, no scores, or no
+blank hole → `courseData[0]`), and each golfer's walk starts there — a
+shotgun start on 10 never flags 1-9. The scorecard outlines the box
+(`score-gap` on the wrapper both views share) and shows "⚠ Marty: hole 1 has
+no score" above the card (a tap jumps to the box); the Board shows "⚠ missing
+N" beside the name; Results, the Weekly Game card, the Receipt head and Finish
+Round say "Not final — Marty is missing hole 1". Totals, positions and money
+are untouched — the engines' numbers, flagged. `score_gaps_test.js`.
+
+**Known limit.** A group that skips a hole together (everyone blank on 1,
+all scored 2-17) reads as having started on 2 and is not flagged. Finish
+Round's "still missing" list (`findMissingScores`, every blank in the field)
+is what catches that at the end.
+
 ## The retired round — Wave v191, 2026-09-22
 
 **What it is.** On 2026-09-21 the Sunday-night round's links were already in

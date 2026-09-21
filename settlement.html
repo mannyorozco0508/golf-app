@@ -47,6 +47,8 @@
      scoped: Final Results, Player Payouts, Who Pays Who, the Weekly Game and every
      total are computed from the full record and shown to every link. -->
 <script src="grouping.js"></script>
+<!-- score-gaps.js (v192): "Not final — Marty is missing hole 1" on the money surfaces while a card has a blank hole inside it. -->
+<script src="score-gaps.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -183,6 +185,9 @@
         .lr-foot { font-size: 0.68rem; color: var(--text-muted); margin-top: 6px; }
         .lr-kp { font-size: 0.85rem; }
         .settle-card { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        /* v192: a blank hole inside a card - the money is not final until it is filled. */
+        .gap-line { font-weight: bold; color: var(--accent-red); font-size: 0.85rem; margin: 0 0 8px 0; }
+        .receipt-gap-line { margin: 6px 0 0 0; }
         .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
         
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
@@ -694,6 +699,25 @@ html {
         return m ? `Press #${m[1]}` : (label || '');
     }
 
+    // ---- THE MISSING HOLE (v192) ----------------------------------------------
+    // One line, drawn from score-gaps.js (per group, the round's boundaries): on
+    // the LIVE RESULTS head, the Weekly Game card and the Receipt head, while any
+    // golfer has a blank hole INSIDE their card. Names the Board's way. Empty -
+    // and byte-identical to before - when there is no gap.
+    function gapLineHtml(data, cls) {
+        if (!data || typeof findScoreGapsByGroup !== 'function') return '';
+        // A VERIFIED round is final by the organizer's word (settlement-engine.js
+        // computeRoundFinish - the one rule): a blank the organizer accepted as a
+        // pickup is not "not final". The line is for the live round.
+        if (typeof computeRoundFinish === 'function' && data.scoresVerified && data.scoresVerified.verified === true) return '';
+        const players = data.players || [];
+        const boundaries = (typeof computeGroupBoundaries === 'function') ? computeGroupBoundaries(players.length, data.groupSizeOverrides || {}) : null;
+        const gaps = findScoreGapsByGroup(players, data.courseData || [], data.scores || {}, boundaries);
+        if (gaps.length === 0) return '';
+        const shown = g => { const p = players.find(x => String(x.id) === String(g.id)) || { name: g.name }; return escapeHtml(getSmartDisplayName(p, players)); };
+        return '<div class="' + (cls || 'gap-line') + '">' + notFinalLine(gaps, shown) + '</div>';
+    }
+
     function buildReceiptHeader() {
         const course = (currentData && currentData.courseName) || 'Golf Round';
         const date = new Date().toLocaleDateString('en-US',
@@ -721,6 +745,7 @@ html {
             <div class="receipt-head-date">${date}</div>
             <div class="receipt-head-format">${sub}${who ? ' \u00B7 ' + who + ' golfer' + (who === 1 ? '' : 's') : ''}</div>
             ${label ? `<div class="receipt-head-group">${escapeHtml(label)}</div>` : ''}
+            ${gapLineHtml(currentData, 'gap-line receipt-gap-line')}
         </div>`;
     }
 
@@ -1312,7 +1337,7 @@ html {
         const r = computeMoneyPool(data, courseData, savedScores);
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
-        let html = `<div class="settle-card" style="border:2px solid #b8860b;">
+        let html = `<div class="settle-card" style="border:2px solid #b8860b;">${gapLineHtml(data, 'gap-line')}
             <div class="settle-header">\uD83C\uDFC6 Weekly Game \u2014 ${$(r.totalPoolCents)}</div>`;
         if (!r.valid) {
             html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
@@ -1671,7 +1696,7 @@ html {
             head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
             note = 'The round is still in play. Final money appears once every card is in.';
         }
-        let html = '<div class="settle-card live-head">'
+        let html = '<div class="settle-card live-head">' + gapLineHtml(data, 'gap-line')
             + '<div class="settle-header">' + head + '</div>'
             + '<div class="live-note">' + note + '</div>'
             + '</div>';

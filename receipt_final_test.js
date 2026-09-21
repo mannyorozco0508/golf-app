@@ -169,7 +169,9 @@ describe('A ROUND THRU 9: named, standings shown, no money, not called final', (
 describe('A GOLFER WHO PICKED UP (one blank hole), unverified: same - named with 17 of 18', () => {
     const r = receipt(twoVtwo({ blank: 'p104_h12' }));
     test('the head names the blank, the receipt is not final', () => {
-        assert.match(r.summary(), /^\|🏆 LIVE RESULTS — THRU 17\|Still in play — thru 17, 1 golfer still has holes left: Dee D \(17 of 18\)\. Final money/);
+        // v192: a blank INSIDE a card is named first, the Board's way ("Dee" - the
+        // first name is unique here); the live head follows, unchanged.
+        assert.match(r.summary(), /^\|Not final — Dee is missing hole 12\|🏆 LIVE RESULTS — THRU 17\|Still in play — thru 17, 1 golfer still has holes left: Dee D \(17 of 18\)\. Final money/);
         assert.equal(r.isFinal(), false);
         assert.ok(!r.summary().includes('Player Payouts'));
     });

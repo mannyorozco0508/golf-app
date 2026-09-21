@@ -42,6 +42,8 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <!-- score-gaps.js (v192): the flag beside a total whose card has a blank hole inside it. -->
+    <script src="score-gaps.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -149,6 +151,8 @@
         .view-pills { display: none; justify-content: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
         .view-pill { font-size: 0.8rem; font-weight: bold; padding: 8px 12px; min-height: 40px; border-radius: 16px; border: 1px solid var(--brand-green); color: var(--brand-green); background: transparent; cursor: pointer; }
         .view-pill.active { background: var(--brand-green); color: #fff; }
+        /* v192: a blank hole inside this golfer's card - the total is the engine's sum of what is there. */
+        .gap-flag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; color: var(--accent-red); border: 1px solid var(--accent-red); vertical-align: middle; white-space: nowrap; }
         .player-flight { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; color: var(--brand-green); border: 1px solid var(--brand-green); vertical-align: middle; }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
 
@@ -948,9 +952,24 @@ html {
         rows.forEach(r => { map[String(r.id)] = r.started ? r.positionLabel : '-'; });
         return map;
     }
+    // v192: gap counts by golfer id for the board being drawn (score-gaps.js, per
+    // group with the round's boundaries), refreshed at every renderBoard. The
+    // flag is drawn beside the name; the total, the position and thru are the
+    // engine's numbers, untouched.
+    let gapCountById = {};
+    function refreshGapCounts() {
+        gapCountById = {};
+        if (typeof findScoreGapsByGroup !== 'function' || !currentBoardData) return;
+        const players = currentBoardData.players || [];
+        const boundaries = (typeof computeGroupBoundaries === 'function') ? computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {}) : null;
+        findScoreGapsByGroup(players, currentBoardData.courseData || [], currentBoardData.scores || {}, boundaries)
+            .forEach(g => { gapCountById[String(g.id)] = g.holes.length; });
+    }
+    const gapFlagHtml = id => gapCountById[String(id)] ? `<span class="gap-flag">\u26A0 missing ${gapCountById[String(id)]}</span>` : '';
+
     function boardRowHtml(r, idx, opts) {
         const posStyle = (opts && opts.posStyle) ? ` style="${opts.posStyle}"` : '';
-        const badge = (opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '';
+        const badge = ((opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '') + gapFlagHtml(r.id);
         // The two tables were written with different source indentation and the
         // rendered-board golden pins each byte for byte; the indent is a parameter
         // so ONE builder can still produce both.
@@ -1119,6 +1138,7 @@ ${ind.slice(4)}</tr>`;
     }
 
     function renderBoard() {
+        refreshGapCounts();
         const players = currentBoardData.players || [];
         const courseData = currentBoardData.courseData || [];
         const savedScores = currentBoardData.scores || {};

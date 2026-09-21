@@ -54,6 +54,10 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <!-- score-gaps.js (v192): the one builder for "a hole inside a card is blank" -
+         the outlined box, the banner, the Board's flag and the money pages' "Not
+         final" all draw from it. Pure; reads scores the way the engines do. -->
+    <script src="score-gaps.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -757,6 +761,12 @@
             color: var(--brand-green); border-radius: 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
         }
         .group-btn.active { background: var(--brand-green); color: #ffffff; }
+        /* v192: a blank hole inside a card. The wrapper carries score-gap (the Full
+           Card cell is what Hole View clones, so both views outline the same box);
+           the banner names the golfer and the hole and is a tap target. */
+        .score-input-wrapper.score-gap .score-input { outline: 2px solid var(--accent-red); outline-offset: -2px; border-radius: 6px; }
+        .gap-banner-line { display: block; width: 100%; box-sizing: border-box; text-align: left; margin: 0 0 6px 0; padding: 10px 12px; min-height: 44px; border: 1px solid var(--accent-red); border-radius: 10px; background: var(--danger-box-bg, #fff4f4); color: var(--accent-red); font-weight: bold; font-size: 0.9rem; cursor: pointer; }
+        .fr-gap-line { font-weight: bold; color: var(--accent-red); margin-bottom: 6px; }
         /* v191: the retired-round banner - full width, the one thing to tap. */
         .superseded-link { display: block; text-align: center; text-decoration: none; margin: 8px 0 10px 0; padding: 14px 12px; min-height: 48px; box-sizing: border-box; border-radius: 12px; background: var(--accent-red); color: #ffffff; font-weight: bold; font-size: 1rem; line-height: 1.35; }
         /* The organizer's way into the setup (v189): an anchor drawn as a pill, the
@@ -1236,6 +1246,10 @@ html {
         <!-- v191: a retired round (supersededBy) says where the live one is. Filled
              by renderSupersededBanner; display:none and empty on every other round. -->
         <div id="superseded-banner" style="display:none;"></div>
+        <!-- v192: one line per golfer in this view with a blank hole INSIDE their
+             card ("⚠ Marty: hole 1 has no score"); a tap jumps to the box. Filled
+             by renderGapBanner; display:none and empty when there is no gap. -->
+        <div id="gap-banner" style="display:none;"></div>
         <div>
             <span id="group-lock-badge" style="display:none; background: var(--accent-red); color: #ffffff; padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.5px; margin-top: 6px; display: inline-block;"></span>
         </div>
@@ -4935,6 +4949,43 @@ html {
     function groupPickDismissed() {
         try { return sessionStorage.getItem(groupPickKey()) === '1'; } catch (e) { return false; }
     }
+    // ---- THE MISSING HOLE (v192) ----------------------------------------------
+    // score-gaps.js decides; this draws. gapsForView(): the gaps of the golfers in
+    // THIS view - the locked group on a group link, every group on the bare link -
+    // always computed PER GROUP (findScoreGapsByGroup with the round's boundaries),
+    // so a shotgun start on 10 never flags 1-9. The same call, whole field, feeds
+    // Finish Round's "Not final" line.
+    function gapsForField() {
+        if (typeof findScoreGapsByGroup !== 'function') return [];
+        const players = currentData.players || [];
+        const boundaries = (typeof computeGroupBoundaries === 'function') ? computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {}) : null;
+        return findScoreGapsByGroup(players, currentData.courseData || [], currentData.scores || {}, boundaries);
+    }
+    function gapsForView() {
+        const all = gapsForField();
+        if (!hasGroupLock) return all;
+        return all.filter(g => playerGroupOf(g.id) === lockedGroup);
+    }
+    const gapShownName = g => { const players = currentData.players || []; const p = players.find(x => String(x.id) === String(g.id)) || { name: g.name }; return escapeHtml(getSmartDisplayName(p, players)); };
+    function renderGapBanner(gaps) {
+        const el = document.getElementById('gap-banner');
+        if (!el) return;
+        if (!gaps || gaps.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        el.innerHTML = gaps.map(g => '<button type="button" class="gap-banner-line" onclick="jumpToGap(' + Number(g.id) + ', ' + Number(g.holes[0]) + ')">\u26A0 '
+            + gapLine(g, gapShownName(g)) + '</button>').join('');
+        el.style.display = 'block';
+    }
+    // The tap: Hole View on that hole, then that golfer's box by identity - the
+    // same synchronous focus path the advance uses (pendingScoreFocus is read by
+    // the rebuild's captureScoreFocus), so iOS keeps the keyboard.
+    function jumpToGap(pid, hole) {
+        currentViewedHole = Number(hole);
+        if (currentViewMode !== 'hole' && typeof setViewMode === 'function') setViewMode('hole');
+        pendingScoreFocus = { playerId: String(pid), hole: String(hole) };
+        window.__lastGapFocus = pendingScoreFocus;
+        try { renderScorecard(); } finally { pendingScoreFocus = null; }
+    }
+
     // ---- THE RETIRED ROUND (v191) --------------------------------------------
     // events/CODE/supersededBy = NEWCODE is written by admin.html when the
     // organizer saves the round that replaces this one (Round Ready's "Retire").
@@ -5835,7 +5886,11 @@ html {
         const el = document.getElementById('fr-incomplete-warning');
         if (!el) return;
         const missing = findMissingScores();
-        if (missing.length === 0) { el.innerHTML = ''; return; }
+        // v192: a blank INSIDE a card (score-gaps.js, whole field by group) is
+        // named first - it is the one that changes a total, not just a "not yet".
+        const gaps = gapsForField();
+        const gapLineHtml = gaps.length ? '<div class="fr-gap-line">' + notFinalLine(gaps, gapShownName) + '</div>' : '';
+        if (missing.length === 0) { el.innerHTML = gapLineHtml; return; }
 
         const rows = missing.slice(0, 6).map(m =>
             '<div class="fr-missing-row">Hole ' + m.hole + ' \u00B7 ' + m.player.name.split(' ')[0] +
@@ -5843,7 +5898,7 @@ html {
         ).join('');
         const more = missing.length > 6 ? '<div class="fr-missing-row">\u2026and ' + (missing.length - 6) + ' more</div>' : '';
 
-        el.innerHTML = '<div class="fr-warn">' +
+        el.innerHTML = gapLineHtml + '<div class="fr-warn">' +
             '<strong>\u26A0\uFE0F ' + missing.length + ' score' + (missing.length === 1 ? '' : 's') + ' still missing</strong>' +
             'Money below is where things stand, not a final settlement \u2014 some wagers can\'t be decided yet.' +
             '<div style="margin-top:6px;">' + rows + more + '</div>' +
@@ -7834,6 +7889,9 @@ html {
         window.__scPlayerGroupMap = playerGroupMap;
 
         const isMultiGroupRound = players.length > 4;
+        // v192: the gaps of the golfers in this view, and the boxes they name.
+        const viewGaps = gapsForView();
+        const gapBoxes = new Set(); viewGaps.forEach(g => g.holes.forEach(h => gapBoxes.add(String(g.id) + '_' + h)));
 
         const lockBadge = document.getElementById("group-lock-badge");
         const spectatorBanner = document.getElementById("spectator-hint-banner");
@@ -7879,6 +7937,7 @@ html {
         window.__scGroupMissing = groupMissing;
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
         renderSupersededBanner();
+        renderGapBanner(viewGaps);
         renderGroupPicker(players, groupBoundaries);
         renderLandingSummary(filteredPlayers, players);
 
@@ -8270,7 +8329,7 @@ html {
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
                             <div style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
-                            <div class="score-input-wrapper${markClass}">
+                            <div class="score-input-wrapper${markClass}${gapBoxes.has(String(p.id) + '_' + h.hole) ? ' score-gap' : ''}">
                                 ${scoreInputHtml}
                                 ${shapeHtml}
                             </div>
