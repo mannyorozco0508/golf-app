@@ -1725,7 +1725,10 @@
 // Moved to v195 because the organizer has a Players sheet on the scorecard and
 // the Game tab (rename, handicap, flight, Out, add a golfer to a group) and an
 // Out golfer is greyed on the card, the Board and the Receipt (scorecard-rows.js).
-const CACHE_VERSION = 'golfapp-v195-players-sheet';
+// Moved to v195b (v196 in the cache name) because the Results page and the printed
+// Receipt drop the per-golfer NET list on a Weekly Game round and every section
+// head is a clear size above its rows. settlement.html is precached.
+const CACHE_VERSION = 'golfapp-v196-results-cleanup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -84,9 +84,9 @@ function boot({ pool = true, side = false, dots = false } = {}) {
 
 describe('MONEY POOL ONLY — NO INVENTED DEBTS', () => {
 
-    test('Final Results and Player Payouts are shown', () => {
+    test('Player Payouts are shown (v195b: no Final Results NET list on a Weekly Game round)', () => {
         const b = boot({ pool:true, side:false });
-        assert.ok(b.has('Final Results'));
+        assert.ok(!b.has('Final Results'));
         assert.ok(b.has('Player Payouts'));
         assert.ok(b.has('TOTAL PAYOUT'));
     });

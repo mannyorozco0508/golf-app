@@ -37,6 +37,7 @@ const J = v => JSON.parse(JSON.stringify(v));
 const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
 const MOUNTS = ['money-pool-section', 'combined-settlement-summary', 'settle-content', 'receipt-scorecard'];
 const PREV = JSON.parse(read('tie_shares_prev.fixture.json'));
+const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
 
 // The engine alone, the way settlement-engine loads it.
 const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
@@ -125,7 +126,7 @@ describe('THE PAGE RENDERS CHARACTER FOR CHARACTER WHAT IT RENDERED', () => {
             // matches, no birdie game); the other three must have been captured
             // with content, so an equality of two blanks cannot pass for a proof.
             if (m !== 'settle-content') assert.ok(PREV.rounds[k].text[m].length > 500, m + ' was captured with content');
-            assert.equal(el.text(m), m === 'combined-settlement-summary' ? sendMove(PREV.rounds[k].text[m]) : PREV.rounds[k].text[m], m);
+            assert.equal(el.text(m), m === 'combined-settlement-summary' ? noFinalResults(sendMove(PREV.rounds[k].text[m]), { require: true }) : PREV.rounds[k].text[m], m);
         });
     }));
     test('and the rows the page prints for a tie ARE the line\'s shares, read from the line (whole-dollar, legacy, second place)', () => {

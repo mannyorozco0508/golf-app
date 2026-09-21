@@ -102,7 +102,7 @@ describe('LIVE MODE — A GOLF SUMMARY', () => {
         // goes back to the field - so the money is final with the golf.
         const t = results({ thru:[18,18,18], confirmed:false }).text();
         assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(t));
-        assert.match(t, /Final Results/);
+        assert.match(t, /Player Payouts/);   // v195b: final on a Weekly Game round is the payouts, not a NET list
     });
 
     test('a round with holes missing is live even when settled === true', () => {
@@ -277,9 +277,10 @@ describe('LIVE MODE SHOWS NO MONEY AT ALL', () => {
 
 describe('FINAL MODE KEEPS THE RECEIPT', () => {
 
-    test('a completed, settled round renders Final Results', () => {
+    test('a completed, settled round renders the final receipt (Player Payouts; v195b - no Final Results NET list on a Weekly Game round)', () => {
         const t = results(FINAL).text();
-        assert.match(t, /Final Results/);
+        assert.match(t, /Player Payouts/);
+        assert.ok(!/🏁 Final Results/.test(t));
         assert.ok(!/LIVE RESULTS/.test(t));
     });
 
@@ -292,7 +293,7 @@ describe('FINAL MODE KEEPS THE RECEIPT', () => {
         // The Skins Pot itemisation lives in the money-pool section, a separate mount
         // rendered by renderMoneyPoolSection(); what this card must show is money.
         assert.ok(/\$/.test(results(FINAL).html()), 'money belongs here');
-        assert.match(results(FINAL).text(), /NET/, 'net positions are stated');
+        assert.match(results(FINAL).text(), /TOTAL PAYOUT/, 'each golfer\'s payout is stated (v195b: the NET list is gone from a Weekly Game receipt)');
     });
 
     test('KP detail returns', () => {

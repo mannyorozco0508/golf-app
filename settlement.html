@@ -190,7 +190,16 @@
         .golfer-out td { opacity: 0.55; text-decoration: line-through; }
         .gap-line { font-weight: bold; color: var(--accent-red); font-size: 0.85rem; margin: 0 0 8px 0; }
         .receipt-gap-line { margin: 6px 0 0 0; }
-        .settle-header { font-size: 0.9rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; margin-bottom: 12px; text-align: center; }
+        /* THE HEADING HIERARCHY (v195b). A payer reading the Receipt could not see
+           where Flight A ended and Flight B began: the section heads were the size of
+           the rows. Three sizes, top down, each with a rule under it and air above:
+             section  (.settle-header, .pp-game-head, .pool-game-head)   1.2rem, 2px rule
+             sub      (.pp-flight-head, .pool-flight-head)               1rem, 1px rule
+             row      (.ledger-row 0.95rem, .pp-row)                    0.95rem and under
+           Numbers and rows are untouched; this is type and spacing only. */
+        .settle-card { margin-top: 22px; }
+        .settle-card:first-child { margin-top: 0; }
+        .settle-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid var(--brand-green); text-align: center; }
         
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
         .val-pos { color: var(--accent-teal); }
@@ -269,10 +278,10 @@
            New classes, deliberately: .ledger-row is used by every other section and
            is not restyled. Their print rules sit in the print block further down. */
         .pool-game { border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 10px 4px 10px; margin: 0 0 14px 0; background: var(--bg-card); }
-        .pool-game-head { font-size: 1rem; font-weight: bold; color: var(--brand-green); padding: 2px 4px 8px 4px; margin-bottom: 8px; border-bottom: 2px solid var(--accent-teal); }
+        .pool-game-head { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); padding: 2px 4px 8px 4px; margin: 18px 0 8px 0; border-bottom: 2px solid var(--brand-green); }
         .pool-flight { border: 1px solid var(--border-mid); border-left: 5px solid var(--accent-teal); border-radius: 8px; padding: 8px 8px 2px 8px; margin: 8px 0 12px 0; background: var(--subtle-bg); }
         .pool-flight[data-flight="B"] { border-left-color: var(--brand-navy); }
-        .pool-flight-head { font-size: 0.92rem; font-weight: bold; color: var(--text-main); padding: 2px 4px 6px 4px; margin-bottom: 6px; }
+        .pool-flight-head { font-size: 1rem; font-weight: bold; color: var(--text-main); padding: 2px 4px 6px 4px; margin: 6px 0 6px 0; border-bottom: 1px solid var(--accent-teal); }
         /* A run of tied holes on a carry round: part of the money, not a result
            of its own, so it reads quieter than the hole that collected it. */
         .skins-carry-row { font-weight: normal; font-size: 0.82rem; color: var(--text-muted); padding-top: 6px; padding-bottom: 6px; }
@@ -292,8 +301,9 @@
            detail below so the two read as one document (and print as one). */
         .pool-payouts { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px 2px 10px; margin-bottom: 14px; background: var(--subtle-bg); }
         .pool-payouts .pp-game { padding-bottom: 4px; }
-        .pool-payouts .pp-game-head { font-size: 0.82rem; font-weight: bold; color: var(--text-main); margin: 6px 0 6px 2px; }
-        .pool-payouts .pp-flight-head { font-size: 0.72rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin: 2px 0 4px 4px; }
+        .pool-payouts .pp-game-head { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin: 18px 0 8px 0; padding: 0 2px 6px 2px; border-bottom: 2px solid var(--brand-green); }
+        .pool-payouts .pp-game:first-child .pp-game-head { margin-top: 6px; }
+        .pool-payouts .pp-flight-head { font-size: 1rem; font-weight: bold; color: var(--text-main); margin: 10px 0 6px 0; padding: 0 4px 4px 4px; border-bottom: 1px solid var(--accent-teal); }
         .pool-payouts .pp-row { padding: 8px 12px; margin-bottom: 6px; }
         .pool-payouts .pp-note { font-weight: normal; font-size: 0.85rem; color: var(--text-muted); padding: 8px 12px; margin-bottom: 6px; }
         .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
@@ -370,6 +380,12 @@
                split when the browser can manage it - a block taller than a sheet
                still splits, which no rule can prevent. */
             .pool-game-head, .pool-flight-head { break-after: avoid; page-break-after: avoid; }
+            /* v195b: the heading hierarchy survives onto paper - sizes, rules and the air
+               above a section; colours go to ink-safe greys/greens. */
+            .settle-card { margin-top: 18px; }
+            .settle-header, .pool-game-head, .pool-payouts .pp-game-head { font-size: 14pt; border-bottom: 2px solid #0f4c3a; color: #0f4c3a; padding-bottom: 4pt; margin-top: 14pt; }
+            .pool-flight-head, .pool-payouts .pp-flight-head { font-size: 11.5pt; border-bottom: 1px solid #2a9d8f; color: #111; margin-top: 8pt; }
+            .ledger-row, .pool-payouts .pp-row { font-size: 9.5pt; }
             .pool-flight { break-inside: avoid; page-break-inside: avoid; }
             .pool-game, .pool-flight { border-color: #ccc; background: #fff; }
             .skins-card { border-style: dashed; }
@@ -1920,12 +1936,21 @@ html {
         // computeMoneyPool with the same inputs the gate had already passed; it could
         // never be chosen, and it was removed (2026-09-15) so nobody reads it as a
         // second guard. The one guard is the gate.
-        html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
-            <div class="settle-header">🏁 Final Results</div>`;
-        sorted.forEach(t => {
-            html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`;
-        });
-        html += `</div>`;
+        // NOT ON A WEEKLY GAME ROUND (v195b). The buy-ins are collected in cash on
+        // the first tee, so the payer needs PLAYER PAYOUTS, not a per-golfer net
+        // ("+$65 NET / -$38 NET") that invites the settlement argument the Receipt
+        // exists to prevent. On a round WITHOUT the Weekly Game (a Nassau, match
+        // play, skins wagers) the net list IS the settlement and stays. The card is
+        // not rendered at all, so it is off the printed Receipt and the PDF too.
+        const poolIsOn = !!(data.moneyPool && data.moneyPool.enabled !== false);
+        if (!poolIsOn) {
+            html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
+                <div class="settle-header">🏁 Final Results</div>`;
+            sorted.forEach(t => {
+                html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`;
+            });
+            html += `</div>`;
+        }
 
         // ---- PER-PLAYER LEDGER -----------------------------------------
         //

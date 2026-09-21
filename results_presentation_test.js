@@ -45,7 +45,7 @@ const KP_HOLES = [3,7,12,16];
 const ALL_WON = { h3:'101', h7:'105', h12:'109', h16:'102' };
 
 // Today's real round. `confirmed` decides whether the money is settled.
-function boot({ confirmed = true, winners = ALL_WON, noWinner = null } = {}) {
+function boot({ confirmed = true, winners = ALL_WON, noWinner = null, noPool = false } = {}) {
     const sb = loadHtmlInlineScript(PAGE, DEPS);
     const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
     const ps = NAMES.map((n,i)=>({ id:101+i, name:n, hcp:String(HCP[i]), playingForMoney:true }));
@@ -59,6 +59,15 @@ function boot({ confirmed = true, winners = ALL_WON, noWinner = null } = {}) {
             skins:{ mode:'remainder', scoring:'net', carryOver:false } } };
     if (confirmed) d.kpConfirmed = { confirmed: true };
     if (noWinner) d.kpNoWinner = noWinner;
+    // v195b: the "🏁 Final Results" NET list is gone from a WEEKLY GAME receipt
+    // (the buy-ins are cash on the first tee; the payer needs Player Payouts). It
+    // stays on a round without the Weekly Game, so the NET wording is proven on
+    // this same roster playing a $25 2v2 gross match instead of the pool.
+    if (noPool) { delete d.moneyPool; delete d.kpWinners; delete d.kpConfirmed;
+        d.sideMatches = { m: { format: 'match', scoring: 'gross', stake: 25, startHole: 1, createdAt: 1, teamAIds: ['101', '103'], teamBIds: ['102', '104'] } };
+        d.players = ps.slice(0, 4);
+        // Marty birdies every third hole, the rest par: team A wins the match and money moves
+        d.scores = {}; d.players.forEach((p, pi) => cd.forEach(h => { d.scores['p' + p.id + '_h' + h.hole] = h.par + ((pi === 0 && h.hole % 3 === 0) ? -1 : 0); })); }
     vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`, sb);
@@ -108,14 +117,15 @@ describe('THE BUY-IN IS NOWHERE ON SCREEN', () => {
 
 describe('NET WORDING', () => {
 
-    test('a positive position reads +$X NET, not "Won"', () => {
-        const t = strip(boot().summary());
+    test('a positive position reads +$X NET, not "Won" (on the match round - v195b: a Weekly Game receipt prints no NET list at all)', () => {
+        assert.ok(!/ NET/.test(strip(boot().summary())), 'the Weekly Game receipt has no NET line');
+        const t = strip(boot({ noPool: true }).summary());
         assert.match(t, /\+\$\d+ NET/);
         assert.ok(!/Won \$/.test(t), '"Won" invited an argument the Receipt exists to prevent');
     });
 
     test('a negative position reads -$X NET, not "Owes"', () => {
-        const t = strip(boot().summary());
+        const t = strip(boot({ noPool: true }).summary());
         assert.match(t, /-\$\d+ NET/);
         assert.ok(!/Owes/.test(t));
     });
@@ -144,12 +154,15 @@ describe('NET WORDING', () => {
         const c = b.run('computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)');
         const net = plain(c.netByName).manny.net;
         const t = strip(b.summary());
-        assert.match(t, new RegExp('\\' + (net < 0 ? '-' : '+') + '\\$' + Math.abs(net) + ' NET'));
+        // v195b: the position is no longer printed on a Weekly Game receipt - the
+        // payout is the number handed out. The two numbers still differ in the ledger.
+        assert.ok(!new RegExp('\\' + (net < 0 ? '-' : '+') + '\\$' + Math.abs(net) + ' NET').test(t), 'no NET line for Manny');
         assert.match(t, /TOTAL PAYOUT/, 'the payout question keeps its own heading');
+        assert.notEqual(Math.abs(net), 44, 'the position and the payout are different numbers');
     });
 
-    test('the printed net still equals the canonical ledger, golfer by golfer', () => {
-        const b = boot();
+    test('the printed net still equals the canonical ledger, golfer by golfer (the match round)', () => {
+        const b = boot({ noPool: true });
         const c = b.run('computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)');
         const printed = {};
         [...String(b.summary()).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d,.]+) NET<\/span>/g)]
@@ -163,10 +176,11 @@ describe('NET WORDING', () => {
 
 describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
 
-    test('a settled round says FINAL RESULTS', () => {
+    test('a settled round is final: Player Payouts, no live head (v195b: no Final Results list on a Weekly Game round)', () => {
         const b = boot({ confirmed: true });
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), true);
-        assert.match(strip(b.summary()), /Final Results/);
+        assert.match(strip(b.summary()), /Player Payouts/);
+        assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(strip(b.summary())));
         assert.ok(!/Not Final/.test(strip(b.summary())));
     });
 
@@ -178,8 +192,7 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         const b = boot({ confirmed: false, winners: {} });
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), true);
         const t = strip(b.summary());
-        assert.ok(!/RESULTS — NOT FINAL|unconfirmed/.test(t));
-        assert.match(t, /Final Results/);
+        assert.ok(!/RESULTS — NOT FINAL|unconfirmed|LIVE RESULTS/.test(t));
         assert.match(t, /Player Payouts/);
     });
 
@@ -191,7 +204,7 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         assert.match(o, /LIVE RESULTS/);
         assert.ok(!/Final Results|Player Payouts/.test(o), 'money with cards out is not final');
         const done = strip(boot({ confirmed: true }).summary());
-        assert.match(done, /Final Results/);
+        assert.ok(!/LIVE RESULTS/.test(done));
         assert.match(done, /Player Payouts/, 'the receipt returns once the cards are in');
     });
 
@@ -199,7 +212,7 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         const b = boot({ confirmed: false });
         b.run(`currentData.kpCancelled = { cancelled: true, cancelledAt: 1, cancelledBy: 'organizer' };
                renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`);
-        assert.match(strip(b.summary()), /Final Results/);
+        assert.match(strip(b.summary()), /Player Payouts/); assert.ok(!/LIVE RESULTS/.test(strip(b.summary())));
     });
 
     test('the heading READS the canonical state, it does not recompute it', () => {
@@ -211,7 +224,7 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         const src = read(PAGE);
         const at = src.indexOf('FINAL" IS A CLAIM');
         assert.notEqual(at, -1, 'the reasoning must stay with the code');
-        const block = src.slice(at, at + 900);
+        const block = src.slice(at, at + 1500);   // v195b: the Weekly Game gate's comment sits between the reasoning and the literal
         assert.match(block, /never be chosen/);
         assert.match(block, /🏁 Final Results/);
         ['kpUnresolvedCents >','kpWinners','kpConfirmed &&','computeMoneyPool(','.settled === false']

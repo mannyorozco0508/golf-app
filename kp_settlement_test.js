@@ -479,9 +479,9 @@ describe('RECEIPT', () => {
                  settle: strip(raw('settle-content')), actions: raw('receipt-actions').replace(/\\uD83D\\uDCE4/g, '📤') };
     }
 
-    test('recorded + every card in: the Receipt SETTLES - Final Results, each hole paid, the Send chip', () => {
+    test('recorded + every card in: the Receipt SETTLES - Player Payouts, each hole paid, the Send chip', () => {
         const r = receipt({ winners: ALL_WON, leaders: { h3: { playerId:'101', playerName:'Marty', distanceInches:69 } } });
-        assert.match(r.summary, /🏁 Final Results/);
+        assert.match(r.summary, /💰 Player Payouts/); assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(r.summary));   // v195b: no Final Results NET list on a Weekly Game receipt; final = Player Payouts
         assert.match(r.pool, /Hole 3: Marty — 5' 9"/);
         assert.match(r.actions, /📤 Send<\/button>/);
         assert.ok(!/NOT FINAL|not confirmed|NOT CONFIRMED|pending/.test(r.pool + r.summary + r.settle));
@@ -492,7 +492,7 @@ describe('RECEIPT', () => {
         assert.match(r.pool, /Hole 3: nobody recorded it \$25 back to the field/);
         // the summary refund row carries every reason (this fixture's unwon skins too)
         assert.match(r.pool, /↩️ Refunded to the field \(.*Unclaimed KP money refunded to the field\..*\) \$\d+ ÷ 12/);
-        assert.match(r.summary, /🏁 Final Results/);
+        assert.match(r.summary, /💰 Player Payouts/); assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(r.summary));   // v195b: no Final Results NET list on a Weekly Game receipt; final = Player Payouts
         assert.match(r.actions, /📤 Send<\/button>/);
     });
 

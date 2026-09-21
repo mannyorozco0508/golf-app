@@ -99,7 +99,10 @@ function receipt(d) {
         summary: () => strip(raw('combined-settlement-summary')),
         settle: () => strip(raw('settle-content')),
         mounts0: () => ({ pool: norm(strip0(raw('money-pool-section'))), summary: norm(strip0(raw('combined-settlement-summary'))), settle: norm(strip0(raw('settle-content'))), scorecard: norm(strip0(raw('receipt-scorecard'))) }),
-        isFinal: () => /🏁 Final Results/.test(strip(raw('combined-settlement-summary'))),
+        // v195b: a Weekly Game receipt has no Final Results card; FINAL is the branch
+        // that renders Player Payouts (never on a live head), and on a round without
+        // the Weekly Game the card itself.
+        isFinal: () => { const s = strip(raw('combined-settlement-summary')); return !/LIVE RESULTS/.test(s) && /🏁 Final Results|💰 Player Payouts/.test(s); },
     };
 }
 const HEAD_NOTE = 'Final money appears once every card is in, or once the scores are confirmed in Finish Round.';
@@ -113,7 +116,8 @@ const HEAD_NOTE = 'Final money appears once every card is in, or once the scores
 // comparing - the fixture file is untouched, its sha still pins the capture, and a
 // second difference anywhere is still red. sendMove asserts the cell was there.
 const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
-const sendMoved = m => Object.assign({}, m, { summary: sendMove(m.summary) });
+const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
+const sendMoved = m => Object.assign({}, m, { summary: noFinalResults(sendMove(m.summary), { require: true }) });
 
 describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', () => {
     const prev = JSON.parse(read('receipt_final_prev.fixture.json'));
@@ -224,7 +228,7 @@ describe('EVERY CARD IN, KPs NOT RECORDED: FINAL - the blanks refund, nothing is
     const r = receipt(poolRound({ confirmed: false }));
     test('Final Results and the money summary', () => {
         const s = r.summary();
-        assert.match(s, /\|🏁 Final Results\|/);
+        assert.ok(!/🏁 Final Results/.test(s), 'v195b: no NET list on a Weekly Game receipt');
         assert.ok(!/RESULTS — NOT FINAL|still in play|unconfirmed/i.test(s));
         assert.match(s, /Player Payouts/);
         assert.equal(r.isFinal(), true);
@@ -233,7 +237,7 @@ describe('EVERY CARD IN, KPs NOT RECORDED: FINAL - the blanks refund, nothing is
         const v = receipt(poolRound({ confirmed: false, verified: true }));
         assert.equal(v.isFinal(), true);
     });
-    test('KPs recorded: Final Results, as today', () => {
+    test('KPs recorded: final, as today', () => {
         assert.equal(receipt(poolRound()).isFinal(), true);
     });
 });

@@ -178,6 +178,7 @@ describe('THE PROOF — the old text with exactly this wave\'s substitutions IS 
 // second difference anywhere is still red. sendMove asserts the cell was there.
 const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
     const PREV = JSON.parse(read('weekly_game_prev.fixture.json')).rounds;
+    const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
     test('the previous capture is pinned', () => {
         assert.equal(sha(PREV['golden-off'].pool).slice(0, 8), '097d5f75');
         assert.equal(sha(PREV['three-tied-first'].pool).slice(0, 8), '5296ae23');
@@ -187,7 +188,7 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
     Object.keys(ROUNDS).forEach(k => {
         test(k + ': the other sections are character for character the same', () => {
             const el = arrive(ROUNDS[k]());
-            assert.equal(undate(el.text('combined-settlement-summary')), sendMove(undate(PREV[k].summary)));
+            assert.equal(undate(el.text('combined-settlement-summary')), noFinalResults(sendMove(undate(PREV[k].summary)), { require: true }));
             assert.equal(el.text('settle-content'), PREV[k].content);
             assert.equal(undate(el.text('receipt-scorecard')), undate(PREV[k].scorecard));
         });
