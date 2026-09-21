@@ -173,9 +173,15 @@ describe('THE TWO KPs STAY DISTINCT', () => {
             'one canonical dollar-per-dot value');
     });
 
-    test('the pool KP block still identifies itself as a KP - and, since 2026-09-19, as the Weekly Game\'s', () => {
-        assert.match(read('index.html'), /kp-head">Hole ' \+ h \+ ' Weekly Game KP/,
-            'removing the icon must not remove the word; the block now sits under the same nav row as the Dots KP line, so it names its game');
+    test('the pool KP block still identifies itself as a KP: the head is the golfer\'s phrase, the current line carries the word (v193)', () => {
+        // RE-PINNED 2026-09-22 (v193, the KP question, copy as approved): the head
+        // reads "⛳ Hole N — Closest to the Pin" (the flag is the KP's own icon) and
+        // the line under it "Current KP: …" / "No KP yet." The Dots KP line under
+        // the same nav row still says "KP ·" with its dot value; the two stay
+        // distinct by wording and by money, as before.
+        const idx = read('index.html');
+        assert.match(idx, /kp-head">\\u26F3 Hole ' \+ h \+ ' \\u2014 Closest to the Pin<\/div>/);
+        assert.match(idx, /Current KP: <strong>/); assert.match(idx, /No KP yet\./);
     });
 });
 
@@ -207,7 +213,7 @@ describe('THE DECORATIVE BULLSEYES ARE GONE', () => {
         assert.match(idx, /setViewMode\('hole'\)">Hole View<\/button>/, 'the view toggle');
         assert.match(idx, /per point Stableford/, 'the Stableford stake line');
         assert.match(idx, /"LIVE STABLEFORD STANDINGS"/, 'the Stableford standings title');
-        assert.match(idx, /kp-head">Hole/, 'the pool KP header');
+        assert.match(idx, /kp-head">\\u26F3 Hole/, 'the pool KP header (⛳ is the KP icon, not decoration - v193)');
     });
 
     test('no label was left with a leading space where the icon used to be', () => {

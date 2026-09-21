@@ -102,8 +102,8 @@ describe('1. THE MOUNT IS UNDER THE NAV ROW, BEFORE THE DOTS BLOCK (source)', ()
         const t = SRC.indexOf('function toggleKpEntry(');
         assert.doesNotMatch(SRC.slice(t, SRC.indexOf('\n    }', t)), /renderActionCenter\(\)/, 'toggleKpEntry no longer rebuilds the Action Center');
     });
-    test('the head says which game: "Hole N Weekly Game KP"', () => {
-        assert.match(SRC, /'<div class="kp-block"><div class="kp-head">Hole ' \+ h \+ ' Weekly Game KP<\/div>'/);
+    test('the head: "⛳ Hole N — Closest to the Pin" (v193: the block is the question; the Weekly Game is named by the pot line above it)', () => {
+        assert.match(SRC, /'<div class="kp-head">\\u26F3 Hole ' \+ h \+ ' \\u2014 Closest to the Pin<\/div>'/);
     });
 });
 
@@ -112,9 +112,9 @@ describe('2. WHEN IT SHOWS - the three gates and the pool guard, on the new moun
         const sb = boot(round(), 7);
         assert.equal(run(sb, 'actionCenterOpen'), false, 'My Round is collapsed');
         const h = mount(sb);
-        assert.match(h, /Hole 7 Weekly Game KP/);
-        assert.match(h, /No leader yet/);
-        assert.match(h, /Set KP Leader/);
+        assert.match(h, /Hole 7 — Closest to the Pin/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
+        assert.match(h, /No KP yet\./);
+        assert.match(h, /Yes — pick who/);
     });
     test('a non-KP hole: the mount is empty', () => {
         assert.equal(mount(boot(round(), 8)), '');
@@ -131,9 +131,9 @@ describe('2. WHEN IT SHOWS - the three gates and the pool guard, on the new moun
         data.kpLeaders = { h7: { playerId: '103', playerName: 'C', group: 1, distanceInches: 100, updatedAt: 1 } };
         data.kpWinners = { h7: '103' };
         const h = mount(boot(data, 7));
-        assert.match(h, /Current: <strong>C<\/strong>/);
+        assert.match(h, /Current KP: <strong>C<\/strong> \(Group 1\)/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
         assert.match(h, /8' 4"/);
-        assert.ok(!/Set KP Leader|New Leader|kp-select/.test(h), 'seeing is not claiming');
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(h), 'seeing is not claiming');
     });
 });
 
@@ -149,8 +149,10 @@ describe('3. THE SAVE RE-RENDERS ONE DIV', () => {
         assert.match(w, /"kpLeaders\/h7"/); assert.match(w, /"kpWinners\/h7":"102"/); assert.doesNotMatch(w, /kpConfirmed/);   // re-pinned 2026-09-19: recording pays, no confirmation to clear
         // the page's own snapshot would carry the leader back; simulate it landing
         run(sb, "currentData.kpLeaders = { h7: { playerId: '102', playerName: 'Ben', group: null, distanceInches: 74, updatedAt: 2 } }; currentData.kpWinners = { h7: '102' }; renderKpEntryMount();");
-        assert.match(mount(sb), /Current: <strong>Ben<\/strong>/);
-        assert.match(mount(sb), /New Leader/);
+        assert.match(mount(sb), /Current KP: <strong>Ben<\/strong>/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
+        // saveKpLeader was called directly here (unchanged by v193); the ANSWER is
+        // recorded by the button path (submitKpEntry), so the question still shows.
+        assert.match(mount(sb), /Did anyone in your group get inside it\?/);
         assert.equal(run(sb, 'window.__alerts.length'), 0, 'no KP RECORDED dialog (2026-09-19) - the block is the confirmation');
     });
 });

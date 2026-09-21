@@ -607,6 +607,15 @@
         .kp-head { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); }
         .kp-current { font-size: 0.95rem; padding: 2px 0; }   /* the line that carries the answer, read at arm's length (2026-09-19) */
         .kp-none { color: var(--text-muted); font-style: italic; }
+        /* v193: the block is the question. kp-ask-now lights it once the group's
+           scores for the hole are in; the two answers sit side by side, 48px each. */
+        .kp-block.kp-ask { border: 1px solid var(--border-mid); }
+        .kp-block.kp-ask-now { border: 2px solid var(--brand-green); }
+        .kp-question { font-size: 1rem; font-weight: bold; margin-top: 6px; }
+        .kp-answers { display: flex; gap: 8px; }
+        .kp-answers .kp-btn { flex: 1 1 0; min-height: 48px; margin-top: 8px; }
+        .kp-answers .kp-no { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid); }
+        .kp-change { background: none; border: none; padding: 6px 0 0 0; color: var(--brand-green); font-size: 0.85rem; font-weight: bold; text-decoration: underline; cursor: pointer; min-height: 32px; }
         .kp-dist-none { font-size: 0.7rem; color: var(--text-muted); }
         /* THE PICKER READS AT THE SCORE BOXES' SIZE (2026-09-19). The select had no
            type size of its own - the UA's 13.33px, its grey border and square
@@ -4144,16 +4153,32 @@ html {
             : (winner ? (r.participants.find(p => p.id === String(winner)) || {}).name : null);
         const distLine = leader ? kpDistanceLabel(leader.distanceInches) : null;
 
-        // "Weekly Game KP", not "KP": on a round that also plays Dots, the Dots KP line
-        // sits under the same nav row, and the two are different money. On a round
-        // with only the Weekly Game it reads the same and names the game the pot
-        // belongs to.
-        let head = '<div class="kp-block"><div class="kp-head">Hole ' + h + ' Weekly Game KP</div>';
+        // THE QUESTION (v193). 9/21: the block was a heading and a button under the
+        // nav row, and the groups did not understand it. It is now the question a
+        // marshal would ask on the green, in the words a golfer uses, and it asks
+        // on its own: on a KP hole, until this phone has answered for the hole
+        // (sessionStorage kpAsked:CODE:hN), the block IS the question -
+        //     ⛳ Hole 7 — Closest to the Pin
+        //     Current KP: Marty (Group 3) — 8' 4"        or   No KP yet.
+        //     Did anyone in your group get inside it?
+        //     [ No — leave it ]  [ Yes — pick who ]
+        // emphasised (kp-ask-now) the moment every golfer in this group has a
+        // score on the hole - the block is re-rendered on every snapshot, so the
+        // last score's arrival is what lights it. "No" writes nothing and answers
+        // for this phone; "Yes" opens the picker (this group's golfers, optional
+        // ft/in) and Save goes through saveKpLeader, unchanged - the same two keys,
+        // the same last-write-wins a later group relies on. After an answer a
+        // small "Change KP" stays, so a wrong "No" or the wrong golfer is one tap
+        // to fix. A spectator (bare link, multi-group) sees the current KP and
+        // nothing to tap, as before.
+        let head = '<div class="kp-block kp-ask' + (kpGroupHoleComplete(h) ? ' kp-ask-now' : '') + '">'
+            + '<div class="kp-head">\u26F3 Hole ' + h + ' \u2014 Closest to the Pin</div>';
+        const groupTag = leader && leader.group ? ' (Group ' + escapeHtml(String(leader.group)) + ')' : '';
         head += leaderName
-            ? '<div class="kp-current">Current: <strong>' + leaderName + '</strong>'
+            ? '<div class="kp-current">Current KP: <strong>' + escapeHtml(leaderName) + '</strong>' + groupTag
               + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
               + (distLine ? '' : '<div class="kp-dist-none">Distance not recorded</div>')
-            : '<div class="kp-current kp-none">No leader yet</div>';
+            : '<div class="kp-current kp-none">No KP yet.</div>';
 
         // Only this group's golfers are selectable. Another foursome may hold the
         // marker, which is fine - it just is not this group's to claim.
@@ -4164,22 +4189,56 @@ html {
         // Building one body keeps that guard honest.
         let body = '';
         if (mine.length > 0) {
-            if (kpEntryOpenHole !== h) {
-                body = '<button class="kp-btn" onclick="toggleKpEntry(' + h + ')">'
-                    + (leaderName ? 'New Leader' : 'Set KP Leader') + '</button>';
-            } else {
+            if (kpEntryOpenHole === h) {
                 let opts = '<option value="">Who is closest?</option>';
-                mine.forEach(p => { opts += '<option value="' + p.id + '">' + p.name + '</option>'; });
+                mine.forEach(p => { opts += '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>'; });
                 body = '<select id="kp-pick-' + h + '" class="kp-select">' + opts + '</select>'
                     + '<div class="kp-dist-row"><span class="kp-dist-label">Distance <em>(optional)</em></span>'
                     + '<input id="kp-ft-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="ft">'
                     + '<input id="kp-in-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="in">'
                     + '</div>'
                     + '<button class="kp-btn" onclick="submitKpEntry(' + h + ')">Save KP</button>'
-                    + '<button class="kp-cancel" onclick="toggleKpEntry(' + h + ')">Cancel</button>';
+                    + '<button class="kp-cancel" onclick="cancelKpEntry(' + h + ')">Cancel</button>';
+            } else if (!kpAsked(h)) {
+                body = '<div class="kp-question">Did anyone in your group get inside it?</div>'
+                    + '<div class="kp-answers">'
+                    + '<button class="kp-btn kp-no" onclick="answerKpNo(' + h + ')">No \u2014 leave it</button>'
+                    + '<button class="kp-btn kp-yes" onclick="toggleKpEntry(' + h + ')">Yes \u2014 pick who</button>'
+                    + '</div>';
+            } else {
+                body = '<button class="kp-change" onclick="toggleKpEntry(' + h + ')">Change KP</button>';
             }
         }
         return head + body + '</div>';
+    }
+
+    // ---- THE QUESTION'S STATE (v193) ------------------------------------------
+    // Answered once per hole per phone. sessionStorage, keyed by round and hole,
+    // so a new round asks again and a reload in the same session does not nag.
+    function kpAskedKey(hole) { return 'kpAsked:' + currentMode + ':h' + hole; }
+    function kpAsked(hole) {
+        try { return sessionStorage.getItem(kpAskedKey(hole)) === '1'; } catch (e) { return false; }
+    }
+    function markKpAsked(hole) {
+        try { sessionStorage.setItem(kpAskedKey(hole), '1'); } catch (e) { /* private mode: asks again on the next render, harmless */ }
+    }
+    // Every golfer this link may claim for (the group on a group link, the field
+    // on a single-group round) has a score on the hole.
+    function kpGroupHoleComplete(hole) {
+        const players = (currentData.players || []).filter(p => canSetKpLeader(p.id));
+        if (players.length === 0) return false;
+        const scores = currentData.scores || {};
+        return players.every(p => scores['p' + p.id + '_h' + hole] > 0);
+    }
+    function answerKpNo(hole) {
+        markKpAsked(hole);
+        kpEntryOpenHole = null;
+        renderKpEntryMount();
+    }
+    function cancelKpEntry(hole) {
+        markKpAsked(hole);
+        kpEntryOpenHole = null;
+        renderKpEntryMount();
     }
 
     // ---- KP LEADERS ---------------------------------------------------------
@@ -4286,6 +4345,7 @@ html {
         const ft = document.getElementById('kp-ft-' + hole);
         const inch = document.getElementById('kp-in-' + hole);
         if (!sel || !sel.value) { alert('Pick the golfer who is closest.'); return; }
+        markKpAsked(hole);   // v193: a saved answer is an answer; saveKpLeader itself is unchanged
         saveKpLeader(hole, sel.value, ft ? ft.value : '', inch ? inch.value : '');
     }
 

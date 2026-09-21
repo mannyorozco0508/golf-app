@@ -103,7 +103,7 @@ describe('THE SEAMS', () => {
     test('the Chrome check has a picker arm that opens the picker with a real tap', () => {
         const t = read('tools/kp-entry-position-check.js');
         assert.match(t, /ARM === 'picker'/);
-        assert.match(t, /\{ tap: '\.kp-btn' \}/);
+        assert.match(t, /\{ tap: '\.kp-yes' \}/);   // v193: the picker opens from "Yes — pick who"
         assert.match(t, /fontPx: parseFloat\(cs\.fontSize\)/);
     });
     test('sw.js moved for this wave (v181) and has not moved back', () => {

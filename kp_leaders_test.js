@@ -203,27 +203,27 @@ describe('EVERYONE SEES THE MARKER', () => {
     test('a spectator sees the current leader but gets no picker', () => {
         const b = boot({ group: null, hole: 7, leaders: LEADER });
         const t = strip(b.html());
-        assert.match(t, /Hole 7 Weekly Game KP/);   // RE-PINNED 2026-09-19: the head names the game
-        assert.match(t, /Current: Manny/);
+        assert.match(t, /Hole 7 — Closest to the Pin/);   // re-pinned 2026-09-22 (v193): the block is the question now - kp_prompt_test.js
+        assert.match(t, /Current KP: Manny \(Group 2\)/);
         assert.match(t, /5' 9"/);
-        assert.ok(!/Set KP Leader|New Leader/.test(t), 'seeing is not claiming');
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(t), 'seeing is not claiming');
     });
 
     test('another group sees the leader and may still claim it for their own', () => {
         const b = boot({ group: 3, hole: 7, leaders: LEADER });
         const t = strip(b.html());
-        assert.match(t, /Current: Manny/, 'group 3 must see who holds it');
-        assert.match(t, /New Leader/, 'and be able to beat it with one of their own');
+        assert.match(t, /Current KP: Manny \(Group 2\)/, 'group 3 must see who holds it');
+        assert.match(t, /Did anyone in your group get inside it\? No — leave it Yes — pick who/, 'and be asked whether one of their own beat it (v193)');
     });
 
     test('an unclaimed hole says so', () => {
-        assert.match(strip(boot({ hole: 7 }).html()), /Hole 7 Weekly Game KP No leader yet/);
+        assert.match(strip(boot({ hole: 7 }).html()), /Hole 7 — Closest to the Pin No KP yet\./);   // re-pinned 2026-09-22 (v193): the block is the question now - kp_prompt_test.js
     });
 
     test('a leader with no distance says that plainly', () => {
         const b = boot({ hole: 7, leaders: { h7: { playerId:'105', playerName:'Manny', group:2, distanceInches:null, updatedAt:1 } } });
         const t = strip(b.html());
-        assert.match(t, /Current: Manny/);
+        assert.match(t, /Current KP: Manny/);
         assert.match(t, /Distance not recorded/);
     });
 
@@ -260,7 +260,7 @@ describe('A LATER GROUP REPLACES AN EARLIER LEADER', () => {
             leaders: { h7: { playerId:'105', playerName:'Manny', group:2, distanceInches:69, updatedAt:1 } } });
         // They simply never tap. Rendering alone must not write.
         assert.equal(b.writes().length, 0, 'the common case must cost zero interaction');
-        assert.match(strip(b.html()), /Current: Manny/);
+        assert.match(strip(b.html()), /Current KP: Manny/);
     });
 
     test('no distance comparison logic exists to be got wrong', () => {

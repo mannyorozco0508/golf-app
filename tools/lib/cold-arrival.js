@@ -88,6 +88,7 @@ function firebaseStub(dbJson, auth) {
       // tools. Delivery is OPT-IN, a step: writes still re-fire nothing, because
       // a behaviour change on every write is every tool's business at once.
       var VALUE_LISTENERS = [];
+      window.__coldWrites = [];
       window.__coldDeliver = function (pathStr, value) {
         var key = String(pathStr).split('/').filter(Boolean).join('/');
         // the fixture follows, so a later once()/resolve() agrees with what was delivered
@@ -130,9 +131,11 @@ function firebaseStub(dbJson, auth) {
             return Promise.resolve({ val: function () { return resolve(); },
                                      exists: function () { return resolve() != null; } });
           },
-          set: function () { return Promise.resolve(); },
-          update: function () { return Promise.resolve(); },
-          remove: function () { return Promise.resolve(); },
+          // Writes are RECORDED (v193) - window.__coldWrites, {op, path, value} -
+          // so a check can prove what a real tap wrote; they still re-fire nothing.
+          set: function (v) { window.__coldWrites.push({ op: 'set', path: pathStr, value: v }); return Promise.resolve(); },
+          update: function (v) { window.__coldWrites.push({ op: 'update', path: pathStr, value: v }); return Promise.resolve(); },
+          remove: function () { window.__coldWrites.push({ op: 'remove', path: pathStr }); return Promise.resolve(); },
           push: function () { return api; }
         };
         return api;

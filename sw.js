@@ -1713,7 +1713,11 @@
 // (new, precached) feeds the scorecard's outlined box and banner, the Board's
 // "missing N" flag and the money pages' "Not final" line. A device on v191
 // keeps a Board that quietly sums what is there.
-const CACHE_VERSION = 'golfapp-v192-missing-hole';
+// Moved to v193 because the KP block on a par 3 is now the question - "Did
+// anyone in your group get inside it? No — leave it / Yes — pick who" - lit
+// once the group's scores are in, asked once per hole per phone. A device on
+// v192 keeps the button nobody understood.
+const CACHE_VERSION = 'golfapp-v193-kp-question';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -170,7 +170,9 @@ describe('4. THE HARNESS AND THE SEAMS', () => {
         assert.match(c, /VALUE_LISTENERS\.push\(/);
         assert.match(c, /if \(step\.deliver\) \{/);
         assert.match(c, /listeners: hits\.length, threw: threw/, 'the step reports how many listeners it reached and whether one threw');
-        assert.match(c, /set: function \(\) \{ return Promise\.resolve\(\); \}/, 'set() still re-fires nothing - delivery is opt-in');
+        // v193: set()/update() RECORD what a real tap wrote (window.__coldWrites) and still re-fire nothing - delivery is opt-in
+        assert.match(c, /set: function \(v\) \{ window\.__coldWrites\.push\(\{ op: 'set', path: pathStr, value: v \}\); return Promise\.resolve\(\); \}/, 'set() records and re-fires nothing');
+        assert.match(c, /window\.__coldWrites = \[\];/);
     });
     test('journey records a thrown listener and raises it from evaluate', () => {
         const j = read('tools/lib/journey.js');

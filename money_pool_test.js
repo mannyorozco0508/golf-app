@@ -710,8 +710,8 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         const sb = bootIndex(2, 14);
         // RE-PINNED 2026-09-19: the block moved to #kp-entry-mount under the Prev/Next row.
         const html = sb.document.getElementById('kp-entry-mount').innerHTML;
-        assert.match(html, /Hole 14 Weekly Game KP/);
-        assert.match(html, /Set KP Leader/);
+        assert.match(html, /Hole 14 — Closest to the Pin/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
+        assert.match(html, /Did anyone in your group get inside it\?/); assert.match(html, /Yes — pick who/);
 
         vm.runInContext(`savePoolKp(14, '${String(P[4].id)}');`, sb);
         await new Promise(r => setImmediate(r));
@@ -733,8 +733,8 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // RE-PINNED 2026-09-19: the block's own mount, under the nav row.
         assert.equal(bootIndex(1, 7).document.getElementById('kp-entry-mount').innerHTML, '', 'nothing on a non-KP hole');
         const spec = bootIndex(null, 14).document.getElementById('kp-entry-mount').innerHTML;
-        assert.match(spec, /Hole 14 Weekly Game KP/, 'a spectator still SEES the marker');
-        assert.ok(!/Set KP Leader|New Leader|kp-select/.test(spec),
+        assert.match(spec, /Hole 14 — Closest to the Pin/, 'a spectator still SEES the marker');   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(spec),
             'but is offered no way to claim it');
     });
 
@@ -865,9 +865,9 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
         assert.match(html, /KP 2\/3 claimed/);
         // RE-PINNED 2026-09-19: the marker and the picker are the entry block's, under the nav row.
         const entry = sb.document.getElementById('kp-entry-mount').innerHTML;
-        assert.match(entry, /Hole 14 Weekly Game KP/, 'the unclaimed hole shows its marker to every group');
-        assert.match(entry, /Set KP Leader/, 'and offers the picker to the group standing on it');
-        assert.ok(!/Set KP Leader|kp-block/.test(html), 'the Weekly Game panel no longer carries the entry block');
+        assert.match(entry, /Hole 14 — Closest to the Pin/, 'the unclaimed hole shows its marker to every group');   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
+        assert.match(entry, /Yes — pick who/, 'and asks the group standing on it');
+        assert.ok(!/Yes — pick who|kp-block/.test(html), 'the Weekly Game panel no longer carries the entry block');
 
         // CONTRACT REVERSED, DELIBERATELY. This used to assert that "group 6 records
         // group 7's winner - any scorekeeper may". That was wrong: it let a group move

@@ -136,7 +136,7 @@ function bail(msg) {
         rounds: ROUNDS, settleMs: 3500,
         viewport: { width: 390, height: 844 },
         steps: [
-            ...(ARM === 'picker' ? [{ tap: '.kp-btn' }, { sleep: 300 }] : []),   // picker arm: open it with a real tap
+            ...(ARM === 'picker' ? [{ tap: '.kp-yes' }, { sleep: 300 }] : []),   // picker arm: open it with a real tap on "Yes — pick who" (v193)
             { expression: MEASURE },                                  // arrival: hole 7, a KP hole (picker arm: open)
             { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 400 },   // Next -> hole 8, not a KP hole; landOnHole scrolls
             { expression: MEASURE },
@@ -148,7 +148,7 @@ function bail(msg) {
     // Each sleep step pushes its own line; the entries are read by position (the
     // picker arm's two opening lines first).
     const vals = ARM === 'picker' ? r.value.slice(2) : r.value;
-    if (ARM === 'picker' && !/^tapped/.test(String(r.value[0]))) bail('Set KP Leader was not pressed: ' + r.value[0]);
+    if (ARM === 'picker' && !/^tapped/.test(String(r.value[0]))) bail('Yes — pick who was not pressed: ' + r.value[0]);
     const [arrive, tapNext, , h8, tapPrev, , h7] = vals;
     if (typeof tapNext !== 'string' || !/^tapped/.test(tapNext)) bail('Next was not pressed: ' + tapNext);
     if (typeof tapPrev !== 'string' || !/^tapped/.test(tapPrev)) bail('Prev was not pressed: ' + tapPrev);
@@ -168,8 +168,8 @@ function bail(msg) {
             if (m.gapNavToBlock > 24) problems.push(label + ': ' + m.gapNavToBlock + 'px between the nav row and the block - something sits between them');
             if (m.recap && m.recap.top < m.block.bottom) problems.push(label + ': the recap is above the block');
         }
-        if (m.blockHead !== 'Hole 7 Weekly Game KP') problems.push(label + ': the head reads ' + JSON.stringify(m.blockHead));
-        if (!m.setKpButton) problems.push(label + ': no Set KP Leader button for a four-ball link');
+        if (m.blockHead !== '\u26F3 Hole 7 \u2014 Closest to the Pin') problems.push(label + ': the head reads ' + JSON.stringify(m.blockHead));   // v193
+        if (!m.setKpButton) problems.push(label + ': no answer button for a four-ball link');
     }
     // NOTHING on the non-KP hole.
     if (!h8.mount) problems.push('hole 8: no #kp-entry-mount on the page');
