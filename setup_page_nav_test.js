@@ -77,6 +77,7 @@ const PAGES_WITH_BACK = [
     { file: 'skins.html', backs: 1 },
     { file: 'settlement.html', backs: 1 },
     { file: 'stats.html', backs: 1 },
+    { file: 'game.html', backs: 1 },   // v186: the Game tab, sent to from every bar
     { file: 'leaderboard.html', backs: 1 },
     // Two screens, two dead ends. Giving only the first a way back is the
     // "just some" problem this wave exists to fix.

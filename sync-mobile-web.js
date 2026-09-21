@@ -98,7 +98,7 @@ const SHARED_SHELL = [
 // domain - Tournament pays places from an entry fee and has never loaded them.
 const CONSUMER_SHELL = [
     'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
-    'sidematches.html', 'skins.html', 'stats.html', 'trip.html',
+    'sidematches.html', 'skins.html', 'stats.html', 'game.html', 'trip.html',
     'instructions.html', 'shared.html', 'logo-mark.png',
     // The home-screen mark, moved here from SHARED_SHELL in wave 19. Consumer
     // ships exactly what it always shipped; what changed is that Tournament no

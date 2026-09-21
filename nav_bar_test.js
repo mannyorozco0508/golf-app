@@ -10,7 +10,12 @@
 // THE SHAPE. Two rows of four pills, emoji + short label at 12px, padding 8,
 // the bar wraps instead of scrolling, More is gone:
 //     📝 Card · 🏆 Board · 💰 Bets · 🤝 Results
-//     ⚔️ Matches · 📊 Stats · 🚐 Trip · 🏠 Home
+//     ⚔️ Matches · 📖 Game · 🚐 Trip · 🏠 Home
+//
+// RE-PINNED 2026-09-20 (v186): the Stats slot became the Game tab (game.html -
+// what is being played, read-only). stats.html stays in the repo as a parity
+// surface but has no pill and no active state, so game.html takes its place in
+// PAGES.
 // The active pill keeps its filled treatment; every .nav-link is rewritten on
 // load to carry ?game=CODE and &group=N; Trip is not a .nav-link (trip.html
 // reads ?trip=, not ?game=) and is left bare.
@@ -28,9 +33,9 @@ const path = require('path');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
-const PAGES = ['index.html', 'leaderboard.html', 'settlement.html', 'skins.html', 'sidematches.html', 'stats.html'];
+const PAGES = ['index.html', 'leaderboard.html', 'settlement.html', 'skins.html', 'sidematches.html', 'game.html'];
 const ORDER = [['index.html', '📝', 'Card'], ['leaderboard.html', '🏆', 'Board'], ['skins.html', '💰', 'Bets'], ['settlement.html', '🤝', 'Results'],
-               ['sidematches.html', '⚔️', 'Matches'], ['stats.html', '📊', 'Stats'], ['trip.html', '🚐', 'Trip'], ['admin.html', '🏠', 'Home']];
+               ['sidematches.html', '⚔️', 'Matches'], ['game.html', '📖', 'Game'], ['trip.html', '🚐', 'Trip'], ['admin.html', '🏠', 'Home']];
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 
 const CD = makeCourseData(18);

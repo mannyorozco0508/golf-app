@@ -246,9 +246,12 @@ describe('ONE CLEAN FINISH — the modal', () => {
         assert.ok(!/getNavLinkHref\('Settle'\)/.test(code));
     });
 
-    test('Stats and Leaderboard survive as secondary links', () => {
-        assert.ok(/getNavLinkHref\('Stats'\)/.test(code));
-        assert.ok(/getNavLinkHref\('Leaderboard'\)/.test(code));
+    test('Game (Stats\' old slot, v186) and Leaderboard survive as secondary links', () => {
+        assert.ok(/getNavLinkHref\('Game'\)/.test(code));
+        // 'Board', not 'Leaderboard': the pill reads "🏆 Board", and searching for the
+        // long name resolved to '#' for the same reason View Settle did (fixed v186).
+        assert.ok(/getNavLinkHref\('Board'\)/.test(code));
+        assert.ok(!/getNavLinkHref\('Leaderboard'\)/.test(code), 'the dead search string is back');
         assert.ok(/fr-jump-small/.test(code), 'they should not compete with the Receipt');
     });
 

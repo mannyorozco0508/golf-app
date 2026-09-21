@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Game</title>
+    <script src="./firebase-app-compat.js"></script>
+    <!-- Anonymous Auth at boot, the way every consumer page does it: one tag, never
+         blocks render. This page writes nothing; the token only keeps the boot uniform. -->
+    <script src="auth-boot.js"></script>
+    <script src="./firebase-database-compat.js"></script>
+    <!-- THE GAME TAB (2026-09-20). What is being played, in plain language, on every
+         link - read-only, touches no round data. It renders from the same engines
+         every other page reads: the format labels and side-game descriptions from
+         action-model.js, the pot and its buckets from pool-engine.js (computeMoneyPool,
+         which needs the settlement engine's skins functions and handicap.js), the
+         groups from grouping.js. Nothing here settles anything; it says what the
+         settlement will be made of. Load order: handicap before the engines, the
+         engines before the inline block, so nothing below can shadow them. -->
+    <script src="handicap.js"></script>
+    <script src="text-safe.js"></script>
+    <script src="action-model.js"></script>
+    <script src="money-engine.js"></script>
+    <script src="settlement-engine.js"></script>
+    <script src="pool-engine.js"></script>
+    <script src="grouping.js"></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666;
+            --brand-green: #0f4c3a;
+            --brand-navy: #1d3557;
+            --accent-teal: #2a9d8f;
+            --accent-red: #e63946;
+            --border-light: #e0e0e0;
+            --border-mid: #d0e1db;
+            --border-faint: #eee;
+            --nav-bg: #f0f4f2;
+            --subtle-bg: #e0e8e4;
+            --modal-bg: #ffffff;
+            --input-disabled-bg: #dde3e8;
+            --input-disabled-border: #aab4bc;
+            --input-disabled-text: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.08);
+            --nassau-box-bg: #eef6f2;
+            --danger-box-bg: #fff0f0;
+        }
+        html.dark-mode {
+            --bg-page: #14181a;
+            --bg-card: #1e2426;
+            --text-main: #e8ecec;
+            --text-muted: #9aa8a7;
+            --brand-green: #2f9e78;
+            --brand-navy: #4a7bb5;
+            --accent-teal: #3dbfae;
+            --accent-red: #ff6b76;
+            --border-light: #333c3e;
+            --border-mid: #3a4a45;
+            --border-faint: #2c3436;
+            --nav-bg: #223028;
+            --subtle-bg: #26332d;
+            --modal-bg: #1e2426;
+            --input-disabled-bg: #3a4145;
+            --input-disabled-border: #55606a;
+            --input-disabled-text: #f0f0f0;
+            --shadow-color: rgba(0,0,0,0.4);
+            --nassau-box-bg: #1a2b24;
+            --danger-box-bg: #2b1c1e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+        /* Reached FROM somewhere - the scorecard, the nav bar, a shared link - so it
+           needs a way back to it. The nav bar lists destinations, not a return. */
+        .back-btn { display: inline-flex; align-items: center; margin-bottom: 10px;
+            color: var(--brand-navy); font-weight: bold; font-size: 0.85rem;
+            text-decoration: none; cursor: pointer; min-height: 44px; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 16px; }
+        .event-title { text-align: center; font-size: 1.4rem; font-weight: bold; color: var(--brand-green); margin-top: 0; margin-bottom: 12px; }
+
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 12px auto; }
+
+        /* Top Navigation Bar */
+        /* ---- App navigation ----------------------------------------------------
+           ALL EIGHT PAGES, ALWAYS VISIBLE (2026-09-14). The bar used to be a
+           horizontal scroller of four pills beside a "⋯ More" popover holding the
+           other four. Measured at 390px: the strip had 255px for 455px of pills,
+           the scrollbar was hidden, so Scorecard showed, Leaderboard was clipped
+           and Bets and Results were entirely off screen with nothing hinting they
+           existed. Now the bar WRAPS: at phone width two rows of four, emoji plus
+           a short label at 12px with 8px side padding (row 1 measured ~303px, row 2
+           ~308px of the 334-342 available), one row on a wider screen. No More,
+           no overflow, nothing to swipe. The pills grow to fill their row so the
+           two rows read as a block. nav_bar_test.js measures it on every page. */
+        .app-nav-wrap {
+            display: block;
+            padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
+        }
+        .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+        .top-nav-item { flex: 1 1 auto; justify-content: center; padding: 8px 8px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
+        .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
+        /* No invisible overlay here. An earlier version put a full-screen ::before on
+           <summary> to catch outside taps; because summary also carried a z-index it
+           formed a stacking context, and the catcher ended up painted OVER the menu,
+           silently swallowing every tap on Matches / Stats / Trip / Home. Outside-tap
+           closing is handled by a real listener in JS instead, which can actually close
+           the menu rather than merely block it. */
+
+        /* Clean Scorecard Styles */
+
+        /* ---- The Game tab's own cards ------------------------------------------- */
+        .game-card { background: var(--subtle-bg); border: 1px solid var(--border-faint); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 2px 6px var(--shadow-color); }
+        .game-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+        .game-line { font-size: 1rem; line-height: 1.5; color: var(--text-main); }
+        .game-line strong { color: var(--brand-green); }
+        .game-sub { font-size: 0.9rem; line-height: 1.5; color: var(--text-main); margin-top: 6px; }
+        .game-sub + .game-sub { margin-top: 4px; }
+        .game-muted { color: var(--text-muted); }
+        .game-group { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border-faint); font-size: 0.95rem; }
+        .game-group:first-of-type { border-top: none; }
+        .game-group .g-n { flex: 0 0 auto; font-weight: bold; color: var(--brand-green); min-width: 64px; }
+        .game-group .g-who { flex: 1 1 auto; }
+        .game-group .g-mine { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); }
+    </style>
+<style>
+/* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
+   page keeps its own padding and simply starts below the status bar. Every value
+   here is 0px anywhere without an inset, which is why this is inert on the web. */
+html {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    background-color: var(--bg-page, transparent);
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="main-content" style="display: none;">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <div class="app-nav-wrap">
+    <div class="top-nav-bar" id="app-nav-bar">
+        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
+        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
+        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
+        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
+        <a href="game.html" class="top-nav-item active nav-link">📖 Game</a>
+        <a href="trip.html" class="top-nav-item">🚐 Trip</a>
+        <a href="admin.html" class="top-nav-item nav-link">🏠 Home</a>
+    </div>
+    </div>
+
+    <a class="back-btn" onclick="goBack()">← Back</a>
+
+    <h2 class="event-title" id="main-title">📖 The Game</h2>
+
+    <div id="game-content">
+        <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading the round...</div>
+    </div>
+</div>
+
+<script>
+    // NO DATE GATE on this page, ever - the same rule as every other core page.
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    (function initTheme() {
+        const saved = localStorage.getItem('golfapp-theme');
+        if (saved === 'dark') document.documentElement.classList.add('dark-mode');
+    })();
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.host)) history.back();
+        else window.location.href = 'admin.html';
+    }
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark-mode');
+        localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn && document.documentElement.classList.contains('dark-mode')) btn.textContent = '☀️ Light Mode';
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentMode = urlParams.get('game');
+    // Which group holds this link - only to mark "your group" in the tee list.
+    const lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
+    let currentData = {};
+
+    // ---- THE WORDS ------------------------------------------------------------
+    // Every sentence is built here from the round record and the engines' own
+    // results, never from config names. Pure: (data) -> HTML. Tested as such.
+    const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+    const money = d => '$' + (Number.isInteger(d) ? String(d) : Number(d).toFixed(2));
+    const first = p => escapeHtml(String((p && p.name) || '').trim().split(' ')[0]);
+    const listOf = names => names.length <= 1 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    const plural = (n, one, many) => n === 1 ? one : (many || one + 's');
+
+    function roundLengthText(courseData) {
+        const holes = (courseData || []).map(h => parseInt(h.hole, 10)).filter(n => n > 0).sort((a, b) => a - b);
+        if (holes.length === 0) return '';
+        if (holes.length === 18) return '18 holes';
+        if (holes.length === 9 && holes[0] === 1) return 'Front 9 only (holes 1–9)';
+        if (holes.length === 9 && holes[0] === 10) return 'Back 9 only (holes 10–18)';
+        return holes.length + ' holes (' + holes[0] + '–' + holes[holes.length - 1] + ')';
+    }
+
+    // The main format and how it is scored - the same fields index.html reads to
+    // print "(NET)" / "(GROSS)" beside the format on the card.
+    function formatSentence(data) {
+        const format = data.gameFormat || 'stroke';
+        const label = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+        let scoring = 'net';
+        if (format === 'nassau') scoring = data.nassauScoring || 'net';
+        if (format === 'match' || format === 'bestball') scoring = data.matchScoring || 'net';
+        if (format === 'stableford') scoring = data.stablefordScoring || 'net';
+        const how = scoring === 'gross' ? 'gross — no handicap strokes' : 'net — handicap strokes count';
+        let stake = '';
+        if (format === 'nassau') {
+            const pressMap = { '2down': 'automatic press at 2 down', '1down': 'automatic press at 1 down', 'anytime': 'a press can be called on any hole', 'none': 'no presses' };
+            const perHole = data.holeBetStake || 0;
+            stake = (perHole > 0 ? money(perHole) + ' a hole' : money(data.nassauStake || 10) + ' front, back and overall') + ', ' + (pressMap[data.nassauPressRule] || 'no presses');
+        } else if (format === 'match') stake = data.matchStake > 0 ? money(data.matchStake) + ' a match' : '';
+        else if (format === 'wolf') stake = data.wolfPointVal > 0 ? money(data.wolfPointVal) + ' a point' : '';
+        else if (format === 'dots') stake = data.dotPointVal > 0 ? money(data.dotPointVal) + ' a dot' : '';
+        else if (format === 'stableford') stake = data.stablefordPointVal > 0 ? money(data.stablefordPointVal) + ' a point' : '';
+        else if (format === 'skins') stake = money(data.skinsBuyIn || 0) + ' skins, ' + ((typeof skinsCarriesOver === 'function' ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver !== false) ? 'ties carry over' : 'no carry-over');
+        return { label, how, stake };
+    }
+
+    function placesText(net, wholeDollar) {
+        if (!net) return '';
+        const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)]);
+        let amounts;
+        if (net.payoutMode === 'custom' && Array.isArray(net.amounts)) amounts = net.amounts.map(Number);
+        else {
+            const places = Array.isArray(net.places) ? net.places : [];
+            const total = Number(net.amount) || 0;
+            amounts = (wholeDollar && typeof allocateWholeDollars === 'function')
+                ? allocateWholeDollars(total, places)
+                : places.map(p => Math.round(total * p) / 100);
+        }
+        return amounts.map((a, i) => ordinal(i + 1) + ' ' + money(a)).join(', ');
+    }
+
+    function weeklyGameCard(data) {
+        const mp = data.moneyPool;
+        if (!mp || mp.enabled === false || typeof computeMoneyPool !== 'function') return '';
+        let r = null;
+        try { r = computeMoneyPool(data, data.courseData || [], data.scores || {}); } catch (e) { r = null; }
+        if (!r) return '';
+        const n = r.participants.length;
+        let html = '<div class="game-card"><div class="game-head">🏆 Weekly Game</div>';
+        html += '<div class="game-line"><strong>' + money(mp.buyIn || 0) + ' each</strong> · ' + n + ' ' + plural(n, 'golfer') + ' in · <strong>' + $(r.totalPoolCents) + ' pot</strong></div>';
+        if (!r.valid) {
+            html += '<div class="game-sub game-muted">⚠️ ' + escapeHtml(r.errors[0] || 'The pot does not add up.') + '</div></div>';
+            return html;
+        }
+        const wholeDollar = typeof isWholeDollarRound === 'function' && isWholeDollarRound(data);
+        // KP - the holes and what each is worth, from the engine's own per-hole split.
+        if (r.kpCancelled && r.kpCancelled.cancelled) {
+            html += '<div class="game-sub">📍 KP: cancelled for this round — its ' + $(r.kpCancelled.originalCents) + ' went into the skins pot.</div>';
+        } else if (r.kp) {
+            const holes = r.kp.lines.map(l => l.hole);
+            const shares = r.kp.perHoleCents;
+            const same = shares.every(c => c === shares[0]);
+            html += '<div class="game-sub">📍 <strong>KP</strong> on ' + (holes.length === 1 ? 'hole ' : 'holes ') + listOf(holes.map(String))
+                + ' — ' + (same ? $(shares[0]) + ' each' : shares.map($).join(', ') + ' in that order') + ' (' + $(r.kp.amountCents) + ' of the pot)</div>';
+        }
+        // Net Finish - the paid places.
+        if (r.net) {
+            html += '<div class="game-sub">🥇 <strong>Net Finish</strong> — ' + $(r.net.amountCents) + ' to the best net scores: ' + escapeHtml(placesText(mp.net, wholeDollar)) + '</div>';
+        }
+        // Skins - gross or net, carry or not, per flight or the whole field.
+        if (r.skins) {
+            const sc = r.skins.scoring === 'gross' ? 'gross' : 'net';
+            const carry = r.skins.carryOver ? 'ties carry over to the next hole' : 'no carry-over \u2014 a tied hole pays nobody';
+            let where = 'the whole field plays one pot';
+            if (r.skins.flights && r.skins.flights.length) {
+                where = 'one pot per flight: ' + r.skins.flights.map(f => 'Flight ' + f.flight + ' ' + $(f.amountCents) + ' (' + f.golfers + ' ' + plural(f.golfers, 'golfer') + ')').join(', ');
+            }
+            html += '<div class="game-sub">🥩 <strong>Skins</strong> — ' + $(r.skins.amountCents) + ', ' + sc + ' scores, ' + carry + '; ' + where + '.</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function flightsCard(data) {
+        const f = data.flights;
+        if (!f || f.enabled !== true || typeof playerFlight !== 'function') return '';
+        const players = data.players || [];
+        const A = players.filter(p => playerFlight(p) === 'A'), B = players.filter(p => playerFlight(p) === 'B');
+        let html = '<div class="game-card"><div class="game-head">🅰🅱 Flights</div>';
+        html += '<div class="game-sub"><strong>Flight A</strong> (' + A.length + '): ' + A.map(first).join(', ') + '</div>';
+        html += '<div class="game-sub"><strong>Flight B</strong> (' + B.length + '): ' + B.map(first).join(', ') + '</div>';
+        const scopes = f.scopes || {};
+        const by = Object.keys(scopes).filter(k => scopes[k] === 'flight').map(k => k === 'skins' ? 'skins' : k);
+        html += '<div class="game-sub game-muted">' + (by.length ? 'Played by flight: ' + by.join(', ') + '. Everything else is the whole field.' : 'Standings only — every game is the whole field.') + '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    function sideActionCard(data) {
+        const players = data.players || [];
+        const byId = {}; players.forEach(p => { byId[String(p.id)] = p; });
+        const names = ids => (ids || []).map(id => byId[String(id)]).filter(Boolean).map(first).join(' & ') || '?';
+        const lines = [];
+        Object.values(data.sideMatches || {}).filter(sm => sm && sm.enabled !== false && (sm.teamAIds || sm.teamBIds)).forEach(sm => {
+            const who = names(sm.teamAIds) + ' vs ' + names(sm.teamBIds);
+            const scoring = (sm.scoring || 'net') === 'gross' ? 'gross' : 'net';
+            let what;
+            if (sm.format === 'nassau') what = 'Nassau, ' + (typeof nassauStakeLabel === 'function' ? escapeHtml(nassauStakeLabel(sm)) : money(sm.stake || 0));
+            else if (sm.format === 'stroke') {
+                const parts = [];
+                if (sm.holeStake > 0) parts.push(money(sm.holeStake) + ' a hole');
+                if (sm.overallStake > 0) parts.push(money(sm.overallStake) + ' overall');
+                what = 'Stroke play' + (parts.length ? ', ' + parts.join(' and ') : '');
+            } else what = 'Match play' + (sm.stake > 0 ? ', ' + money(sm.stake) : '');
+            lines.push('<div class="game-sub">⚔️ <strong>' + who + '</strong> — ' + what + ', ' + scoring + (sm.startHole > 1 ? ', from hole ' + sm.startHole : '') + '</div>');
+        });
+        if (typeof getRoundGames === 'function') {
+            try {
+                getRoundGames(data).filter(g => g.role === 'additional').forEach(g => {
+                    lines.push('<div class="game-sub">✨ ' + escapeHtml(typeof describeGame === 'function' ? describeGame(g) : g.label) + '</div>');
+                });
+            } catch (e) { /* a side game the model cannot read is left out, not invented */ }
+        }
+        if (data.birdieGameEnabled === true) lines.push('<div class="game-sub">🐦 Birdie game' + (data.birdieUnitVal > 0 ? ' — ' + money(data.birdieUnitVal) + ' a birdie' : '') + '</div>');
+        if (lines.length === 0) return '';
+        return '<div class="game-card"><div class="game-head">⚔️ Side action</div>' + lines.join('') + '</div>';
+    }
+
+    function groupsCard(data) {
+        const players = data.players || [];
+        if (players.length === 0 || typeof computeGroupBoundaries !== 'function') return '';
+        const b = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
+        let html = '<div class="game-card"><div class="game-head">🏌️ Groups, in tee order</div>';
+        b.forEach(g => {
+            const who = players.slice(g.startIdx, g.startIdx + g.size).map(first).join(', ');
+            html += '<div class="game-group"><span class="g-n">Group ' + g.group + '</span><span class="g-who">' + who + '</span>'
+                + (lockedGroup === g.group ? '<span class="g-mine">YOUR GROUP</span>' : '') + '</div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function buildGameHtml(data) {
+        const players = data.players || [];
+        if (players.length === 0) return '<div style="text-align:center; padding:20px; color:var(--text-muted);">Waiting for round setup...</div>';
+        const fmt = formatSentence(data);
+        let html = '<div class="game-card"><div class="game-head">⛳ Course</div>'
+            + '<div class="game-line"><strong>' + escapeHtml(data.courseName || 'Golf Course') + '</strong>'
+            + (roundLengthText(data.courseData) ? ' · ' + roundLengthText(data.courseData) : '') + '</div>'
+            + (data.eventName ? '<div class="game-sub game-muted">' + escapeHtml(data.eventName) + '</div>' : '')
+            + '</div>';
+        html += '<div class="game-card"><div class="game-head">📝 Format</div>'
+            + '<div class="game-line"><strong>' + escapeHtml(fmt.label) + '</strong> · scored ' + fmt.how + '</div>'
+            + (fmt.stake ? '<div class="game-sub">' + escapeHtml(fmt.stake) + '</div>' : '')
+            + '</div>';
+        html += weeklyGameCard(data);
+        html += flightsCard(data);
+        html += sideActionCard(data);
+        html += groupsCard(data);
+        return html;
+    }
+
+    function renderGame(data) {
+        const el = document.getElementById('game-content');
+        if (!el) return;
+        el.innerHTML = buildGameHtml(data || {});
+    }
+
+    if (!currentMode) {
+        window.location.href = 'admin.html';
+    } else {
+        currentMode = currentMode.toUpperCase();
+        document.getElementById('main-content').style.display = 'block';
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const base = link.getAttribute('href').split('?')[0];
+            let navHref = base + '?game=' + currentMode;
+            const groupParam = urlParams.get('group');
+            if (groupParam) navHref += '&group=' + groupParam;
+            link.href = navHref;
+        });
+        db.ref(`events/${currentMode}`).on('value', (snapshot) => {
+            currentData = snapshot.val() || {};
+            renderGame(currentData);
+        });
+    }
+</script>
+
+</body>
+</html>

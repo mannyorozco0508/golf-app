@@ -497,7 +497,7 @@ describe('ACCEPTANCE — Match Play, $150, main plus seven presses stays compact
 // NAVIGATION
 // ---------------------------------------------------------------------------
 
-const NAV_PAGES = ['index.html', 'leaderboard.html', 'skins.html', 'settlement.html', 'stats.html', 'sidematches.html'];
+const NAV_PAGES = ['index.html', 'leaderboard.html', 'skins.html', 'settlement.html', 'game.html', 'sidematches.html'];  // game.html took stats.html's slot (v186); stats.html has no tab now
 
 // RE-PINNED 2026-09-14: the "⋯ More" popover is gone. All eight pages are pills
 // in one wrapping bar on every consumer page (nav_bar_test.js measures it in
@@ -509,8 +509,8 @@ describe('NAVIGATION — every secondary destination is a pill in the bar', () =
         const html = fs.readFileSync(path.join(REPO_ROOT, page), 'utf8');
         const bar = html.slice(html.indexOf('id="app-nav-bar"'), html.indexOf('</div>', html.indexOf('id="app-nav-bar"')));
 
-        test(`${page} lists Matches, Stats, Trip and Home in the bar itself`, () => {
-            ['sidematches.html', 'stats.html', 'trip.html', 'admin.html'].forEach(dest => {
+        test(`${page} lists Matches, Game, Trip and Home in the bar itself`, () => {
+            ['sidematches.html', 'game.html', 'trip.html', 'admin.html'].forEach(dest => {
                 assert.ok(bar.includes(`href="${dest}"`), `${page}'s bar is missing ${dest}`);
             });
         });
@@ -525,7 +525,7 @@ describe('NAVIGATION — every secondary destination is a pill in the bar', () =
             // ?game=CODE is applied at runtime to every .nav-link. Trip is deliberately
             // excluded — trip.html reads ?trip=, not ?game=, so a game code there would
             // be meaningless.
-            ['sidematches.html', 'stats.html', 'admin.html'].forEach(dest => {
+            ['sidematches.html', 'game.html', 'admin.html'].forEach(dest => {
                 const anchor = bar.slice(bar.indexOf(`href="${dest}"`));
                 assert.ok(anchor.slice(0, 120).includes('nav-link'), `${page}: ${dest} would lose the game code`);
             });

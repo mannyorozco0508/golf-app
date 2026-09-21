@@ -126,7 +126,7 @@ function quotedUiStrings() {
     [...markup.matchAll(/<strong>([^<]{2,80})<\/strong>/g)].forEach((m) => out.push(m[1]));
     const prose = markup.replace(/<[^>]+>/g, ' ');
     [...prose.matchAll(/["“]([^"“”]{2,60})["”]/g)].forEach((m) => out.push(m[1]));
-    // A run like "Scorecard, Leaderboard, Action, Matches, Stats," names five
+    // A run like "Card, Board, Bets, Results, Matches," names five
     // separate tabs, so it is split rather than searched for whole.
     const split = [];
     out.forEach((s) => s.split(',').forEach((part) => split.push(part.trim())));
@@ -193,7 +193,9 @@ describe('THE EXTRACTOR KNOWS A CONTROL NAME FROM EMPHASIS', () => {
         // 'Start New Game', which the guide dropped when that button turned out
         // not to exist - so the sanity check failed for the opposite of its
         // reason: the extractor was fine, the example was stale.
-        ['Game Day', 'Settle', 'Scorecard'].forEach((s) => assert.ok(found.includes(s),
+        // Re-pinned 2026-09-20 (v186): the nav run now names the bar's own short
+        // labels (Stats' slot became Game), so the examples follow it.
+        ['Game Day', 'Results', 'Finish Round'].forEach((s) => assert.ok(found.includes(s),
             `the extractor missed "${s}", which the guide plainly quotes`));
     });
 
@@ -207,7 +209,7 @@ describe('THE EXTRACTOR KNOWS A CONTROL NAME FROM EMPHASIS', () => {
 
     test('a comma run is split into the tabs it names', () => {
         const found = quotedUiStrings();
-        ['Scorecard', 'Leaderboard', 'Action', 'Matches', 'Stats'].forEach((s) =>
+        ['Card', 'Board', 'Bets', 'Results', 'Matches', 'Game'].forEach((s) =>
             assert.ok(found.includes(s), `"${s}" was not split out of the nav run`));
     });
 });

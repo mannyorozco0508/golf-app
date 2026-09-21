@@ -41,7 +41,7 @@ const { decodeEscapes } = require('./helpers/decode-escapes.js');
 const read = f => decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 
 const CONSUMER = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
-    'skins.html', 'sidematches.html', 'stats.html', 'trip.html', 'instructions.html'];
+    'skins.html', 'sidematches.html', 'stats.html', 'game.html', 'trip.html', 'instructions.html'];
 
 const ADMIN = read('admin.html');
 const IDX = read('index.html');
@@ -199,7 +199,7 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
         ['skins.html', '\u{1F4B0}', 'Bets'],
         ['settlement.html', '\u{1F91D}', 'Results'],
         ['sidematches.html', '\u2694\ufe0f', 'Matches'],
-        ['stats.html', '\u{1F4CA}', 'Stats'],
+        ['game.html', '\u{1F4D6}', 'Game'],   // v186: the Game tab took Stats' slot - a book, read once on the first tee
         ['trip.html', '\u{1F690}', 'Trip'],
         ['admin.html', '\u{1F3E0}', 'Home'],
     ];

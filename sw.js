@@ -1684,7 +1684,11 @@
 // names its golfers; the organizer link's copy carries its caution; and the
 // whole-round row lost the class the share-coverage tool counts. A device on
 // v184 keeps the Group 0 sentence.
-const CACHE_VERSION = 'golfapp-v185-copy-messages';
+// Moved to v186 because the Stats tab became the Game tab: an installed device
+// would keep the old bar and a stale nav on every page, and would 404 game.html
+// offline. Also the Finish Round panel's leaderboard link, dead since the pill
+// was renamed Board.
+const CACHE_VERSION = 'golfapp-v186-game-tab';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1703,6 +1707,10 @@ const SHELL_FILES = [
     './leaderboard.html',
     './skins.html',
     './stats.html',
+    // The Game tab (v186): what is being played, on every link. stats.html stays
+    // precached - it has no tab now, but nothing that reaches it by URL should
+    // hit the offline page.
+    './game.html',
     './settlement.html',
     './sidematches.html',
     './trip.html',

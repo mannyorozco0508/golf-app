@@ -1241,7 +1241,7 @@ html {
         <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
         <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-        <a href="stats.html" class="top-nav-item nav-link">📊 Stats</a>
+        <a href="game.html" class="top-nav-item nav-link">📖 Game</a>
         <a href="trip.html" class="top-nav-item">🚐 Trip</a>
         <a href="admin.html" class="top-nav-item nav-link">🏠 Home</a>
     </div>
@@ -6456,13 +6456,16 @@ html {
 
         renderFinishRoundReview();
 
-        // Stats and Leaderboard only, as quiet text links. "View Settle" was removed: it
+        // Game and Leaderboard only, as quiet text links (Game took Stats' slot, v186).
+        // The leaderboard link searches for 'Board': the pill has read "🏆 Board" since
+        // 2026-09-14, and searching for 'Leaderboard' resolved to '#' - the same dead
+        // link "View Settle" was, for the same reason (fixed v186). "View Settle" was removed: it
         // resolved to '#' because getNavLinkHref searched the nav for "Settle" and the
         // nav reads "Results" - a dead button since the nav was renamed. There is no
         // separate Settle page either; settlement.html IS Results IS the Receipt.
         document.getElementById('fr-jump-links').innerHTML = `
-            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Stats')}">📊 Stats</a>
-            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Leaderboard')}">🏆 Leaderboard</a>
+            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Game')}">📖 Game</a>
+            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Board')}">🏆 Leaderboard</a>
         `;
 
         // Always opens on REVIEW. Money lives one deliberate tap away.
