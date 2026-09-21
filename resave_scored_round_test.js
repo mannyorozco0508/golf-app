@@ -148,7 +148,11 @@ describe('1. THE RECORD: one update, the roster and the card, no result key, not
         assert.deepEqual(payload.players.map((p) => p.hcp), ['0', '4', '9', '20', '5', '6']);
         assert.deepEqual(payload.players.map((p) => p.flight), ['A', 'A', 'B', 'B', 'B', 'B']);
         assert.deepEqual(payload.players.map((p) => p.name), ['Ann', 'Ben', 'Cal', 'Dee', 'Eli', 'Fay']);
-        assert.deepEqual(payload.flights, ON);
+        // v187: a re-save writes the split it was paid by. ON carries no skinsSplit
+        // (a round from before the choice), so the record now says 'headcount' -
+        // the same arithmetic, made explicit; skins_even_split_test.js proves the
+        // engine treats the two identically.
+        assert.deepEqual(payload.flights, Object.assign({}, ON, { skinsSplit: 'headcount' }));
     });
     test('the card is written back unchanged, and the on-course dots game survives byte for byte', async () => {
         const rec = scoredRound();

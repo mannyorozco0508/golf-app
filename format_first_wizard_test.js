@@ -527,7 +527,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // tie from, exposed so settlement.html reads it instead of reproducing
         // it. Additive: tie_shares_test.js proves the result with `shares` removed
         // deep-equals the v143 result on five rounds.
-        'pool-engine.js': '846f33e37dd0d21acf54e523852c4de30999f6b627def3e7afce562780077a7f',   // re-pinned 2026-09-19: recording pays, a blank refunds once finished, kpConfirmed ignored (KP wave, approved per-file); shares/pay/refund arithmetic unchanged - kp_settlement_test.js
+        'pool-engine.js': 'a335f19c83b69c1e4178b97b0b25949fe32178aa300a513d525f75cfe0228317',   // re-pinned 2026-09-20: the even skins split (approved per-file, this change only); was 846f33e3...   // re-pinned 2026-09-19: recording pays, a blank refunds once finished, kpConfirmed ignored (KP wave, approved per-file); shares/pay/refund arithmetic unchanged - kp_settlement_test.js
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:

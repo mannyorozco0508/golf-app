@@ -1688,7 +1688,12 @@
 // would keep the old bar and a stale nav on every page, and would 404 game.html
 // offline. Also the Finish Round panel's leaderboard link, dead since the pill
 // was renamed Board.
-const CACHE_VERSION = 'golfapp-v186-game-tab';
+// Moved to v187 because a flighted Weekly Game's skins bucket can now split
+// EVENLY between A and B (admin.html's Skins pot switch, pool-engine.js
+// skinsSplitMode, the Receipt's and the Game tab's split line). A device on
+// v186 would keep a wizard with no switch, an engine that only knows headcount
+// and a Receipt that says "by headcount" on a round paid evenly.
+const CACHE_VERSION = 'golfapp-v187-even-skins-split';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

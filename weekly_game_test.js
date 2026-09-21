@@ -226,7 +226,7 @@ describe('THE SEAM', () => {
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(h('pool-engine.js'), '846f33e3');   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(h('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3.   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
         assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');

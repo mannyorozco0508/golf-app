@@ -1073,7 +1073,10 @@ html {
             : [{ flight: null, golfers: r.participants.length, amountCents: r.skins.amountCents, lines: r.skins.lines,
                  pendingUnits: r.skins.pendingUnits, unwonCents: r.skins.unwonCents }];
         if (r.skins.flights) {
-            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);"><span>Split by flight, by headcount: `
+            // 'evenly' or 'by headcount' - the engine's own predicate (skinsSplitMode),
+            // never a guess from the two amounts. Headcount wording unchanged from v126.
+            const splitWord = (typeof skinsSplitMode === 'function' && skinsSplitMode(data) === 'even') ? 'evenly' : 'by headcount';
+            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);"><span>Split by flight, ${splitWord}: `
                  + r.skins.flights.map(f => `Flight ${f.flight} ${$(f.amountCents)} (${f.golfers} golfer${f.golfers === 1 ? '' : 's'})`).join(' · ')
                  + `</span><span></span></div>`;
         }

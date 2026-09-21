@@ -146,16 +146,16 @@ describe('4.1 THE FLIGHTS BLOCK', () => {
         assert.deepEqual([0, 1, 2].map(i => tagOf(sb, i)), ['A', 'A', 'A']);
         assert.equal(count(sb), 'A: 3 \u00B7 B: 0');
         assert.equal(run(sb, "document.getElementById('flights-detail').style.display"), 'block');
-        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'flight', birdies: 'flight' } });
+        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'flight', birdies: 'flight' }, skinsSplit: 'even' });   // skinsSplit 'even' since v187: a fresh round's default
     });
 
     test('the scope switches flip independently and default back to per flight', async () => {
         const sb = await wizard('FLT002');
         run(sb, 'setFlightsEnabled(true)');
         run(sb, "setFlightScope('birdies', 'field')");
-        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'flight', birdies: 'field' } });
+        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'flight', birdies: 'field' }, skinsSplit: 'even' });
         run(sb, "setFlightScope('skins', 'field'); setFlightScope('birdies', 'flight')");
-        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'field', birdies: 'flight' } });
+        assert.deepEqual(J(run(sb, 'flightsSetting()')), { enabled: true, scopes: { skins: 'field', birdies: 'flight' }, skinsSplit: 'even' });
     });
 });
 
@@ -257,7 +257,7 @@ describe('4.3 / 4.5 THE PAYLOAD AND THE ROUND TRIP', () => {
         run(sb, "setFlightScope('birdies', 'field')");
         reattach(sb, ['Ann', 'Ben', 'Cal']);
         const payload = await save(sb, 'FLT020');
-        assert.deepEqual(payload.flights, { enabled: true, scopes: { skins: 'flight', birdies: 'field' } });
+        assert.deepEqual(payload.flights, { enabled: true, scopes: { skins: 'flight', birdies: 'field' }, skinsSplit: 'even' });
         assert.deepEqual(payload.players.map(p => [p.name, p.flight]), [['Ann', 'A'], ['Ben', 'A'], ['Cal', 'B']]);
         assert.equal(payload.skinsRounding, 'odd-dollar', 'a fresh round still gets the Wave 1 flag');
         assert.equal(payload.settlementMode, 'whole-dollar');
@@ -292,7 +292,7 @@ describe('4.3 / 4.5 THE PAYLOAD AND THE ROUND TRIP', () => {
         await new Promise(r => setTimeout(r, 20));
         assert.equal(run(sb2, 'loadedExistingRound'), true);
         assert.equal(run(sb2, 'flightsEnabledNow()'), true, 'the switch was restored');
-        assert.deepEqual(J(run(sb2, 'flightsSetting()')), { enabled: true, scopes: { skins: 'field', birdies: 'flight' } });
+        assert.deepEqual(J(run(sb2, 'flightsSetting()')), { enabled: true, scopes: { skins: 'field', birdies: 'flight' }, skinsSplit: 'even' });   // saved even (fresh round), re-opened even
         assert.equal(run(sb2, "document.getElementById('flights-switch').checked"), true);
         assert.equal(run(sb2, "document.getElementById('flights-skins-switch').checked"), true, 'skins switch shows Whole field');
         assert.deepEqual(G(sb2), ['A', 'B', 'A', 'B'], 'the tags came back onto the rebuilt rows');
@@ -311,7 +311,9 @@ describe('4.3 / 4.5 THE PAYLOAD AND THE ROUND TRIP', () => {
         assert.deepEqual(G(sb), ['A', 'B', 'B']);
         fillForm(sb); reattach(sb, ['Ann', 'Ben', 'Cal']);
         const payload = await save(sb, 'FLT031');
-        assert.deepEqual(payload.flights, { enabled: true, scopes: { skins: 'flight', birdies: 'field' } });
+        // The source carries no skinsSplit (saved before v187) and was paid by headcount;
+        // the copy is that setup, so it says so explicitly rather than inheriting Evenly.
+        assert.deepEqual(payload.flights, { enabled: true, scopes: { skins: 'flight', birdies: 'field' }, skinsSplit: 'headcount' });
         assert.deepEqual(payload.players.map(p => p.flight), ['A', 'B', 'B']);
         assert.equal(payload.skinsRounding, 'odd-dollar');
     });
@@ -457,6 +459,11 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
     const NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
     // The per-flight sentence, approved 2026-09-14 (COMMIT 2 paste), verbatim.
     const SPLIT = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+    // v187 (2026-09-20): the bucket can split EVENLY, and that is a fresh round's
+    // default, so the DEFAULT per-flight sentence is now this one; SPLIT (headcount,
+    // verbatim as approved) shows once the Skins pot switch says By headcount.
+    // The two sentences are bound to the two arithmetics in skins_even_split_test.js.
+    const SPLIT_EVEN = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two equal pots \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
     const note = (sb) => run(sb, "(function () { var e = document.getElementById('mp-skins-flight-note'); return e.style.display === 'none' ? null : e.textContent; })()");
     const setMode = (sb, v) => run(sb, "document.getElementById('mp-skins-mode').value = " + JSON.stringify(v) + "; refreshFlightScopeNotes();");
 
@@ -469,7 +476,9 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
         const sb = await wizard('FLT070');
         assert.equal(note(sb), null, 'off by default');
         run(sb, 'setFlightsEnabled(true)');
-        assert.equal(note(sb), SPLIT, 'per flight is the default scope: the DEFAULT state says the split, exactly');
+        assert.equal(note(sb), SPLIT_EVEN, 'per flight is the default scope and Evenly the default split: the DEFAULT state says the even split, exactly');
+        run(sb, "setFlightsSkinsSplit('headcount')");
+        assert.equal(note(sb), SPLIT, 'By headcount chosen: the v126 sentence, exactly');
         run(sb, "setFlightScope('skins', 'field')");
         assert.equal(note(sb), NOTE, 'the exact sentence, whole-field');
         setMode(sb, 'none');
@@ -479,7 +488,7 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
         setMode(sb, 'remainder');
         assert.equal(note(sb), NOTE);
         run(sb, "setFlightScope('skins', 'flight')");
-        assert.equal(note(sb), SPLIT, 'back to per flight: the bucket splits, the sentence says so');
+        assert.equal(note(sb), SPLIT, 'back to per flight: the bucket splits (still by headcount, as chosen), the sentence says so');
         setMode(sb, 'none');
         assert.equal(note(sb), null, 'no bucket, no split sentence either');
         setMode(sb, 'remainder');
@@ -490,6 +499,7 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
     test('the Skins scope flips the sentence: whole-field -> one pot; per flight -> two pots by headcount', async () => {
         const sb = await wizard('FLT071');
         run(sb, 'setFlightsEnabled(true)');
+        run(sb, "setFlightsSkinsSplit('headcount')");
         run(sb, "setFlightScope('skins', 'field')");
         assert.equal(note(sb), NOTE);
         run(sb, "setFlightScope('skins', 'flight')");
@@ -504,7 +514,9 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
         const eng = fs.readFileSync(path.join(REPO_ROOT, 'pool-engine.js'), 'utf8');
         const skins = eng.slice(eng.indexOf('// ---- SKINS ----'), eng.indexOf('// ---- REFUNDS ----'));
         assert.match(skins, /flightScopeApplies\(data, 'skins'\)/, 'the split follows the skins scope');
-        assert.match(skins, /potB = .*nB \/ n/, 'by headcount');
+        assert.match(skins, /Math\.floor\(\(amountCents \/ unit\) \* nB \/ n\) \* unit/, 'by headcount');
+        assert.match(skins, /skinsSplitMode\(data\) === 'even'/, 'or evenly, on the one predicate (v187)');
+        assert.match(skins, /Math\.floor\(\(amountCents \/ unit\) \/ 2\) \* unit/, 'half, floored to the unit');
         const kp = eng.slice(eng.indexOf('// ---- KP ----'), eng.indexOf('// ---- SKINS ----'));
         assert.ok(!/flight/i.test(kp), 'KP and net whole-field');
         assert.match(SPLIT, /two pots by headcount/); assert.match(SPLIT, /KP and Net Finish stay whole-field/);
@@ -517,6 +529,6 @@ describe('6c THE MAIN POOL SKINS NOTE', () => {
         assert.match(sec, /<select id="mp-skins-mode" onchange="mpRecalc\(\); refreshFlightScopeNotes\(\);">/);
         assert.match(sec, /id="mp-skins-flight-note" style="display:none;/);
         const fn = ADMIN.slice(ADMIN.indexOf('function refreshFlightScopeNotes('), ADMIN.indexOf('function captureCurrentPlayerInputs('));
-        assert.match(fn, /note\('mp-skins-flight-note', \(on && poolSkinsOn\)\s*\? \(skinsPer \? SPLIT_NOTE : ONE_POT_NOTE\)/, 'written by the same helper as the skins-card notes, gated on the switch and the bucket, the sentence chosen by the scope');
+        assert.match(fn, /note\('mp-skins-flight-note', \(on && poolSkinsOn\)\s*\? \(skinsPer \? \(flightsSkinsSplitNow\(\) === 'even' \? SPLIT_EVEN_NOTE : SPLIT_NOTE\) : ONE_POT_NOTE\)/, 'written by the same helper as the skins-card notes, gated on the switch and the bucket, the sentence chosen by the scope and (v187) the split');
     });
 });

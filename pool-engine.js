@@ -289,6 +289,18 @@ function isWholeDollarRound(data) {
 //   perPlayerCents: { pid: net cents (prizes + refunds - buyIn) }
 // }
 // ---------------------------------------------------------------------------
+// HOW A PER-FLIGHT SKINS BUCKET DIVIDES (2026-09-20). 'even' when the round's
+// flights setup says so (flights.skinsSplit === 'even', the wizard's default
+// for a new round); 'headcount' for anything else - including every round
+// saved before the choice existed, which therefore settles exactly as it did.
+// One predicate, read by the engine below AND by every surface that says which
+// split applied (the Game tab, the Receipt), so the sentence cannot drift from
+// the arithmetic. Only meaningful when the bucket is actually split per flight.
+function skinsSplitMode(data) {
+    const fl = data && data.flights;
+    return (fl && fl.skinsSplit === 'even') ? 'even' : 'headcount';
+}
+
 function computeMoneyPool(data, courseData, savedScores) {
     const pool = data.moneyPool;
     if (!pool || pool.enabled === false) return null;
@@ -581,12 +593,19 @@ function computeMoneyPool(data, courseData, savedScores) {
         const slices = perFlight
             ? ['A', 'B'].map(f => ({ flight: f, players: participants.filter(p => flightOf(p) === f) }))
             : [{ flight: null, players: participants }];
-        // The split, by headcount. potB floors; A carries the remainder.
+        // The split: EVENLY (2026-09-20, skinsSplitMode) or BY HEADCOUNT (v126).
+        // Either way potB floors to the round's unit and A carries the remainder
+        // ($801 evenly -> $401 / $400). An empty flight keeps its v126 rule under
+        // both modes - a pot of zero, the other flight takes the whole bucket -
+        // so "evenly" never parks half the money where nobody can win it.
         const unit = wholeDollar ? 100 : 1;
         let sliceCents;
         if (perFlight) {
             const nA = slices[0].players.length, nB = slices[1].players.length, n = nA + nB;
-            const potB = n > 0 ? Math.floor((amountCents / unit) * nB / n) * unit : 0;
+            const even = skinsSplitMode(data) === 'even' && nA > 0 && nB > 0;
+            const potB = even
+                ? Math.floor((amountCents / unit) / 2) * unit
+                : (n > 0 ? Math.floor((amountCents / unit) * nB / n) * unit : 0);
             sliceCents = [amountCents - potB, potB];
         } else {
             sliceCents = [amountCents];

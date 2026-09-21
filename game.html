@@ -293,7 +293,8 @@ html {
             const carry = r.skins.carryOver ? 'ties carry over to the next hole' : 'no carry-over \u2014 a tied hole pays nobody';
             let where = 'the whole field plays one pot';
             if (r.skins.flights && r.skins.flights.length) {
-                where = 'one pot per flight: ' + r.skins.flights.map(f => 'Flight ' + f.flight + ' ' + $(f.amountCents) + ' (' + f.golfers + ' ' + plural(f.golfers, 'golfer') + ')').join(', ');
+                const splitWord = (typeof skinsSplitMode === 'function' && skinsSplitMode(data) === 'even') ? 'split evenly' : 'split by headcount';
+                where = 'one pot per flight, ' + splitWord + ': ' + r.skins.flights.map(f => 'Flight ' + f.flight + ' ' + $(f.amountCents) + ' (' + f.golfers + ' ' + plural(f.golfers, 'golfer') + ')').join(', ');
             }
             html += '<div class="game-sub">🥩 <strong>Skins</strong> — ' + $(r.skins.amountCents) + ', ' + sc + ' scores, ' + carry + '; ' + where + '.</div>';
         }

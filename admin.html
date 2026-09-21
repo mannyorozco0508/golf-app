@@ -1111,8 +1111,22 @@ html {
                     </label>
                     <span class="toggle-label-sm" id="flights-birdies-label-field" onclick="setFlightScope('birdies','field')">Whole field</span>
                 </div>
+                <!-- HOW THE WEEKLY GAME'S SKINS BUCKET DIVIDES between A and B (2026-09-20).
+                     Shown only while Skins is per flight - it has no meaning otherwise.
+                     Evenly is the default for a new round; a round saved before this
+                     choice existed loads as By headcount, which is what it was paid by. -->
+                <div class="toggle-row" id="flights-split-row" style="margin:6px 0 0 0;">
+                    <span style="font-size:0.75rem; min-width:52px;">Skins pot</span>
+                    <span class="toggle-label-sm active" id="flights-split-label-even" onclick="setFlightsSkinsSplit('even')">Evenly</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="flights-split-switch" onchange="setFlightsSkinsSplit(this.checked ? 'headcount' : 'even')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label-sm" id="flights-split-label-headcount" onclick="setFlightsSkinsSplit('headcount')">By headcount</span>
+                </div>
                 <input type="hidden" id="flights-scope-skins" value="flight">
                 <input type="hidden" id="flights-scope-birdies" value="flight">
+                <input type="hidden" id="flights-skins-split" value="even">
             </div>
             <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer's A/B to move them. Any split is allowed. Side matches and the Weekly Game never use flights.</p>
         </div>
@@ -4816,7 +4830,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // moneyPool pattern), the object when on.
     function flightsSetting() {
         if (!flightsEnabledNow()) return null;
-        return { enabled: true, scopes: { skins: flightScopeNow('skins'), birdies: flightScopeNow('birdies') } };
+        return { enabled: true, scopes: { skins: flightScopeNow('skins'), birdies: flightScopeNow('birdies') }, skinsSplit: flightsSkinsSplitNow() };
+    }
+    // 'even' | 'headcount' - the value pool-engine.js's skinsSplitMode reads back.
+    function flightsSkinsSplitNow() {
+        const el = document.getElementById('flights-skins-split');
+        return (el && el.value === 'headcount') ? 'headcount' : 'even';
+    }
+    function setFlightsSkinsSplit(value) {
+        const el = document.getElementById('flights-skins-split');
+        if (!el) return;
+        el.value = value === 'headcount' ? 'headcount' : 'even';
+        const sw = document.getElementById('flights-split-switch');
+        if (sw) sw.checked = el.value === 'headcount';
+        const a = document.getElementById('flights-split-label-even'), b = document.getElementById('flights-split-label-headcount');
+        if (a) a.classList.toggle('active', el.value === 'even');
+        if (b) b.classList.toggle('active', el.value === 'headcount');
+        refreshFlightScopeNotes();
     }
     function setFlightsEnabled(on) {
         const el = document.getElementById('flights-enabled');
@@ -4843,6 +4873,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const a = document.getElementById('flights-' + name + '-label-flight'), b = document.getElementById('flights-' + name + '-label-field');
         if (a) a.classList.toggle('active', el.value === 'flight');
         if (b) b.classList.toggle('active', el.value === 'field');
+        // The split choice only exists while the bucket is split.
+        const splitRow = document.getElementById('flights-split-row');
+        if (splitRow && name === 'skins') splitRow.style.display = el.value === 'flight' ? '' : 'none';
         refreshFlightScopeNotes();
     }
     // THE LIVE COUNT reads the rows the way the save does. A counter kept
@@ -4929,9 +4962,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const mpMode = document.getElementById('mp-skins-mode');
         const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
         const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+        // Two split sentences since 2026-09-20, chosen by the Skins pot switch in
+        // Players (flightsSkinsSplitNow, the value pool-engine's skinsSplitMode reads).
         const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+        const SPLIT_EVEN_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two equal pots \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
         note('mp-skins-flight-note', (on && poolSkinsOn)
-            ? (skinsPer ? SPLIT_NOTE : ONE_POT_NOTE)
+            ? (skinsPer ? (flightsSkinsSplitNow() === 'even' ? SPLIT_EVEN_NOTE : SPLIT_NOTE) : ONE_POT_NOTE)
             : '');
         const blurb = document.getElementById('birdie-blurb');
         if (blurb) blurb.textContent = birdiesPer
@@ -5927,6 +5963,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const flOn = !!(fl && fl.enabled === true);
             setFlightScope('skins', flOn && fl.scopes && fl.scopes.skins === 'field' ? 'field' : 'flight');
             setFlightScope('birdies', flOn && fl.scopes && fl.scopes.birdies === 'field' ? 'field' : 'flight');
+            // A saved round WITH flights and without the choice was paid by headcount
+            // and stays so; one that says 'even' loads as Evenly. No flights (a fresh
+            // code arrives here too) leaves the wizard's default, Evenly, in place -
+            // resetting it to headcount here is exactly the default-state slip
+            // skins_even_split_test.js's first setup test exists to catch.
+            setFlightsSkinsSplit(!flOn ? 'even' : (fl.skinsSplit === 'even' ? 'even' : 'headcount'));
             setFlightsEnabled(flOn);
 
             } catch (err) {

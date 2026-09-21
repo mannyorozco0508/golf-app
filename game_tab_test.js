@@ -65,7 +65,7 @@ describe('THE GAME TAB - rendered on the pool_flights golden round, delivered th
         assert.match(text, /Weekly Game \$20 each · 23 golfers in · \$460 pot/);
         assert.match(text, /KP on holes 3, 7, 12 and 16 — \$10 each \(\$40 of the pot\)/);
         assert.match(text, /Net Finish — \$200 to the best net scores: 1st \$120, 2nd \$80/);
-        assert.match(text, /Skins — \$220, gross scores, no carry-over — a tied hole pays nobody; one pot per flight: Flight A \$115 \(12 golfers\), Flight B \$105 \(11 golfers\)\./);
+        assert.match(text, /Skins — \$220, gross scores, no carry-over — a tied hole pays nobody; one pot per flight, split by headcount: Flight A \$115 \(12 golfers\), Flight B \$105 \(11 golfers\)\./);
     });
     test('the flights: who is A and who is B, and which game is played by flight', () => {
         const { text } = arrive(golden({ enabled: true, scopes: { skins: 'flight', birdies: 'field' } }));

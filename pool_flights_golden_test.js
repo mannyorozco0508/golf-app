@@ -149,7 +149,13 @@ function build(flights) {
 const VARIANTS = {
     off: () => build(undefined),
     field: () => build({ enabled: true, scopes: { skins: 'field', birdies: 'field' } }),
-    flight: () => build({ enabled: true, scopes: { skins: 'flight', birdies: 'field' } })
+    flight: () => build({ enabled: true, scopes: { skins: 'flight', birdies: 'field' } }),
+    // ADDED 2026-09-20 (v187): the same round with the bucket split EVENLY
+    // (flights.skinsSplit 'even' - pool-engine.js skinsSplitMode). 'flight'
+    // above carries no key and STAYS the headcount case, byte for byte; this
+    // variant sits alongside it. $220 evenly on 12 A / 11 B is $110 / $110
+    // (headcount: $115 / $105); the same ten skins, $22 each in both flights.
+    even: () => build({ enabled: true, scopes: { skins: 'flight', birdies: 'field' }, skinsSplit: 'even' })
 };
 
 const ENG = (() => {
@@ -250,15 +256,37 @@ const PREV_RECEIPT_TEXT = {
     field: '0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7',
     flight: '15eb59952d337a5a9fe9f8d9a3f8184f284622a5852b8c875deb170bbf0d6102'
 };
+const cutBlock = (html) => {
+    const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
+    assert.ok(a > 0 && e > a, 'the block is in the section');
+    assert.ok(html.slice(a, e).length > 1000, 'and it is not empty: ' + html.slice(a, e).length);
+    return stripTags(html.slice(0, a) + html.slice(e + tag.length));
+};
 describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
-    Object.keys(VARIANTS).forEach(k => {
+    Object.keys(PREV_RECEIPT_TEXT).forEach(k => {
         test(k + ': cut the block out and the section\'s text is the previous capture', () => {
-            const html = FX.variants[k].html['settlement.receiptPool'];
-            const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
-            assert.ok(a > 0 && e > a, 'the block is in the section');
-            assert.ok(html.slice(a, e).length > 1000, 'and it is not empty: ' + html.slice(a, e).length);
-            assert.equal(sha(stripTags(html.slice(0, a) + html.slice(e + tag.length))), PREV_RECEIPT_TEXT[k]);
+            assert.equal(sha(cutBlock(FX.variants[k].html['settlement.receiptPool'])), PREV_RECEIPT_TEXT[k]);
         });
+    });
+    // The even variant has no previous capture - it was born 2026-09-20. Its
+    // Receipt is held against the HEADCOUNT one instead: the only cells that may
+    // differ are the split line, the two pot heads and the per-skin dollars
+    // ($23 / $21 -> $22 / $22). Every other cell - the KP lines, the net places,
+    // the refund row, the golfers' names - is the same text, cell for cell.
+    test('even: the same Receipt as flight, except the split line, the pot heads and the per-skin dollars', () => {
+        const f = cutBlock(FX.variants.flight.html['settlement.receiptPool']).split('|');
+        const e = cutBlock(FX.variants.even.html['settlement.receiptPool']).split('|');
+        assert.equal(e.length, f.length, 'same number of cells');
+        const moved = [];
+        f.forEach((cell, i) => { if (cell !== e[i]) moved.push([cell, e[i]]); });
+        assert.deepEqual(moved.filter(([a]) => !/^\$2[13]$/.test(a)), [
+            ['Split by flight, by headcount: Flight A $115 (12 golfers) · Flight B $105 (11 golfers)', 'Split by flight, evenly: Flight A $110 (12 golfers) · Flight B $110 (11 golfers)'],
+            ['Flight A — $115', 'Flight A — $110'],
+            ['Flight B — $105', 'Flight B — $110']
+        ]);
+        const skins = moved.filter(([a]) => /^\$2[13]$/.test(a));
+        assert.equal(skins.length, 20, 'ten skins per flight, every one re-priced');
+        assert.ok(skins.every(([, b]) => b === '$22'), '$22 each in both flights');
     });
 });
 
@@ -279,6 +307,16 @@ describe('the goldens differ where they should', () => {
         assert.equal(FX.variants.off.engine.skins.flights, undefined); assert.equal(FX.variants.field.engine.skins.flights, undefined);
         assert.match(FX.variants.flight.html['settlement.receiptPool'], /Split by flight, by headcount: Flight A \$115 \(12 golfers\) · Flight B \$105 \(11 golfers\)/);
         assert.ok(!/Split by flight/.test(FX.variants.field.html['settlement.receiptPool']));
+    });
+    test('even: the bucket splits $110 / $110, ten skins at $22 in both flights, pots sum to the bucket; the same winners as flight', () => {
+        const e = FX.variants.even.engine.skins, f = FX.variants.flight.engine.skins;
+        assert.deepEqual(e.flights.map(x => [x.flight, x.golfers, x.amountCents, x.lines.length]), [['A', 12, 11000, 5], ['B', 11, 11000, 5]]);
+        assert.equal(e.flights[0].amountCents + e.flights[1].amountCents, e.amountCents);
+        assert.deepEqual(e.flights.map(x => [...new Set(x.lines.map(l => l.cents))]), [[2200], [2200]]);
+        assert.deepEqual(e.lines.map(l => [l.hole, l.winnerId, l.units]), f.lines.map(l => [l.hole, l.winnerId, l.units]), 'same skins, same winners - only the dollars moved');
+        assert.equal(FX.variants.even.engine.refund.cents, 3000, 'the KP refund is unchanged');
+        assert.match(FX.variants.even.html['settlement.receiptPool'], /Split by flight, evenly: Flight A \$110 \(12 golfers\) · Flight B \$110 \(11 golfers\)/);
+        assert.ok(!/by headcount/.test(FX.variants.even.html['settlement.receiptPool']));
     });
     test('the bucket is $220 = $460 - $40 KP - $200 net, in every variant', () => {
         Object.keys(VARIANTS).forEach(k => { assert.equal(FX.variants[k].engine.skins.amountCents, 22000, k); assert.equal(FX.variants[k].engine.kpAmount, 4000); assert.equal(FX.variants[k].engine.netAmount, 20000); });

@@ -62,7 +62,9 @@ function wizardSavedRound(opts) {
         additionalGames: { skins: { enabled: true, skinsBuyIn: 5, skinsPotFormat: 'gross', skinsScoring: 'gross', skinsCarryOver: false, startHole: 1 } },
         moneyPool: { enabled: true, buyIn: 20, kp: { amount: 40, holes: [3, 7, 12, 16] }, net: { amount: 200, places: [60, 40] },
             skins: { mode: 'remainder', scoring: 'gross', carryOver: false } },
-        flights: flightsOn ? { enabled: true, scopes: { skins: 'flight', birdies: 'field' } } : null,
+        // skinsSplit 'even' since 2026-09-20: the wizard's default for a new round
+        // (admin.html flightsSetting). A round saved before it carries no key.
+        flights: flightsOn ? { enabled: true, scopes: { skins: 'flight', birdies: 'field' }, skinsSplit: 'even' } : null,
         additionalGameInstances: {},
         birdieGameEnabled: false, birdieUnitVal: 0,
         matchScoring: 'net', matchScoringStyle: 'match', matchStake: 0, matchPressRule: 'none',
