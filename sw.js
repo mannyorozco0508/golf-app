@@ -1693,7 +1693,10 @@
 // skinsSplitMode, the Receipt's and the Game tab's split line). A device on
 // v186 would keep a wizard with no switch, an engine that only knows headcount
 // and a Receipt that says "by headcount" on a round paid evenly.
-const CACHE_VERSION = 'golfapp-v187-even-skins-split';
+// Moved to v188 because admin.html's Paste Player List reads a leading flight
+// letter ("A · Randy T 12") and turns flights on for the round. A device on
+// v187 would paste that list as 25 golfers named "A · Randy T".
+const CACHE_VERSION = 'golfapp-v188-paste-flight-letter';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -1143,7 +1143,7 @@ html {
                 <span>📋 Paste Player List</span>
                 <button class="close-modal" onclick="closePastePlayersModal()" aria-label="Close">&times;</button>
             </div>
-            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A handicap after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
+            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A handicap after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). An A or B before the name sets the flight (&ldquo;A &middot; Marty 9&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
             <textarea id="paste-players-textarea" rows="8" placeholder="John Smith 8
 Mike Jones, 12
 Robert Garcia
@@ -5135,10 +5135,50 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return { name: line, hcp: '' };
     }
 
+    // A LEADING FLIGHT LETTER (2026-09-21). Manny keeps his list with the flight
+    // beside each name - "A · Randy T 12" - and pastes it as-is. A LEADING A or B,
+    // then ANY run of separators (spaces, commas, dashes, dots, colons, middots),
+    // then the name, sets that golfer's flight; case-insensitive. The handicap
+    // still reads as the trailing number of what is left. If any line carries a
+    // flight, the commit turns flights on for the round.
+    //
+    // NEVER A TRAILING LETTER. "Matt B" and "Jim B" carry a last initial; reading
+    // it as a flight would strip both and drop both golfers into B. Leading only -
+    // the regex is anchored at ^ and nothing looks at the end of a line.
+    //
+    // THE INITIALS GUARD. A lone dot or dash GLUED to the next letter is part of a
+    // name: "B.J. Smith", "A.J.", "A-Rod" are names, not flights. A dot with a
+    // space after it ("B. J Smith"), a run of dots ("B... Jim"), or any other
+    // separator ("A, Randy", "A: Randy", "A · Randy") is a flight. The rule errs
+    // toward the name: a real golfer is never silently moved; at worst a flight
+    // typed as "B.Jim" lands in A with "B.Jim" for a name, which is visible.
+    //
+    // ONLY A AND B EXIST. A leading C, D or any other single letter followed by a
+    // separator run is NOT a flight and is not invented into one: the line is kept
+    // as typed for the name and the preview says so (flaggedFlights), so the
+    // organizer fixes the row after adding rather than losing the golfer.
+    //
+    // NO LETTER WHERE OTHERS HAVE ONE: the golfer goes in A - the same default a
+    // fresh row gets when flights are switched on (appendFlightControl) - and the
+    // preview counts them so the organizer can move them.
+    // Separators: whitespace , - – — . : · • (a regex literal - a doubled
+    // escape in a string is the defect course_import_name_test.js scans for).
+    const LEAD_FLIGHT_RE = /^([A-Za-z])([\s,\-\u2013\u2014.:\u00B7\u2022]+)(\S.*)$/;
+    function splitLeadingFlight(line) {
+        const m = LEAD_FLIGHT_RE.exec(line);
+        if (!m) return { flight: undefined, rest: line, notAFlight: false };
+        const gluedInitial = (m[2] === '.' || m[2] === '-') && /^[A-Za-z]/.test(m[3]);
+        if (gluedInitial) return { flight: undefined, rest: line, notAFlight: false };
+        const letter = m[1].toUpperCase();
+        if (letter !== 'A' && letter !== 'B') return { flight: undefined, rest: line, notAFlight: true };
+        return { flight: letter, rest: m[3], notAFlight: false };
+    }
+
     function parsePlayerPasteText(text) {
         const lines = text.split('\n');
         let validPlayers = [];
         let flaggedLines = [];
+        let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
         let groups = [];
         let inGroup = false;     // true while inside a run of non-empty lines
         lines.forEach((rawLine, idx) => {
@@ -5146,17 +5186,28 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (line === '') { inGroup = false; return; }   // blank: closes the current run (a boundary) or is leading/trailing nothing
             if (!inGroup) { groups.push(0); inGroup = true; }
 
-            const { name, hcp } = splitNameAndHcp(line);
+            const { flight, rest, notAFlight } = splitLeadingFlight(line);
+            // A not-a-flight line is kept AS TYPED: its comma is part of what was
+            // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
+            // trailing number is read off it.
+            const { name, hcp } = notAFlight ? splitNameAndHcp(rest.replace(/,/g, '\u0000')) : splitNameAndHcp(rest);
 
             if (name === '') {
                 flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' });
                 return;
             }
-            validPlayers.push({ name, hcp });
+            if (notAFlight) flaggedFlights.push({ lineNumber: idx + 1, text: line, letter: line[0].toUpperCase() });
+            const player = { name: notAFlight ? name.replace(/\u0000/g, ',') : name, hcp };
+            if (flight) player.flight = flight;
+            validPlayers.push(player);
             groups[groups.length - 1]++;
         });
         groups = groups.filter(n => n > 0);   // a run made only of flagged lines is not a group
-        return { validPlayers, flaggedLines, groups };
+        const anyFlight = validPlayers.some(p => p.flight);
+        const flights = anyFlight
+            ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
+            : null;
+        return { validPlayers, flaggedLines, flaggedFlights, groups, flights };
     }
 
     function openPastePlayersModal() {
@@ -5170,7 +5221,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, groups } = parsePlayerPasteText(text);
+        const { validPlayers, flaggedLines, flaggedFlights, groups, flights } = parsePlayerPasteText(text);
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -5185,6 +5236,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // single-run paste says nothing, because it changes nothing about groups.
         if (groups.length > 1) {
             html += ` <span>in ${groups.length} groups (${groups.join(', ')})</span>`;
+        }
+        // Flight letters were read: say the split, that flights turn on, and who
+        // had no letter (they go in A - tap to move).
+        if (flights) {
+            html += `<div style="margin-top:4px;">\u{1F170}\u{1F171} ${flights.A} in A, ${flights.B} in B${flightsEnabledNow() ? '' : ' \u2014 flights will be turned on'}`;
+            if (flights.unlettered > 0) html += `. ${flights.unlettered} ${flights.unlettered === 1 ? 'golfer has' : 'golfers have'} no letter and ${flights.unlettered === 1 ? 'goes' : 'go'} in A \u2014 tap a golfer's A/B to move them.`;
+            html += `</div>`;
+        }
+        if (flaggedFlights.length > 0) {
+            const lineList = flaggedFlights.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
+            html += `<div class="paste-flagged-line">\u26A0\uFE0F Only A and B are flights \u2014 ${flaggedFlights.length === 1 ? 'this line was' : 'these lines were'} added as typed, so fix the name after adding:<br>${lineList}</div>`;
         }
         if (flaggedLines.length > 0) {
             const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
@@ -5213,6 +5275,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
         const existingData = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
 
+        // FLIGHT LETTERS IN THE PASTE turn flights on for the round (if they were
+        // off). Captured BEFORE the switch, so the golfers already on the roster
+        // keep their names and handicaps; they get A on the rebuild below, the same
+        // as switching flights on by hand. The pasted golfers carry their letter.
+        if (validPlayers.some(p => p.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+
         // GROUPS FROM THE PASTE, only when the paste drew a boundary. The golfers
         // already on the roster keep the groups they are in - each of those is
         // written explicitly so a partial last group stays closed instead of
@@ -5227,7 +5295,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
 
         validPlayers.forEach(p => {
-            existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
+            existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true, flight: p.flight });
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
