@@ -229,7 +229,7 @@ describe('READING ORDER — scores before bets', () => {
         const recap = idx.indexOf(`html += '<div id="hole-recap-mount"></div>'`);
         const action = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
         const nav = idx.indexOf('html += navRowHtml;');
-        const rows = idx.indexOf('class="hv-player-row"');
+        const rows = idx.indexOf('class="hv-player-row${');   // v195: the row carries golfer-out when the golfer is Out
         assert.ok(rows > -1 && nav > rows, 'navigation must follow the score rows');
         assert.ok(nav < recap && recap < action, 'panels are read after scoring and Next');
         assert.equal((idx.match(/html \+= navRowHtml;/g) || []).length, 1, 'exactly one nav row');

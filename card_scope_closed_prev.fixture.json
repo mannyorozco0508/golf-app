@@ -64,7 +64,7 @@
     "group-lock-badge": "👁️ Spectator View (Read-Only)",
     "course-title": "Closed Links",
     "format-subtitle": "Scope • STROKE (NET)",
-    "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|",
+    "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|👥 Players|",
     "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
     "landing-scoring": "Stroke Play",
     "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
@@ -191,6 +191,10 @@
   {
    "date": "2026-09-22",
    "why": "v194: this round has a Weekly Game ($20 each), so the landing summary lists it first and no longer says \"Just for score — no bets this round\" on the one-group link. Exactly those entries moved by hand; every other character is the capture."
+  },
+  {
+   "date": "2026-09-22",
+   "why": "v195: the organizer strip on the bare link gains the 👥 Players pill after ✏️ Edit round setup (players_sheet_test.js). Exactly that substring added by hand; every other character is the capture."
   }
  ]
 }

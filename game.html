@@ -408,6 +408,7 @@ html {
         const players = (data && data.players) || [];
         mount.innerHTML = (players.length > 0 && canReachSetup(data))
             ? '<a class="game-setup-link" href="admin.html?game=' + currentMode + '">\u270F\uFE0F Edit round setup</a>'
+              + '<a class="game-setup-link" href="index.html?game=' + currentMode + '&players=1">\uD83D\uDC65 Players</a>'
             : '';
     }
 

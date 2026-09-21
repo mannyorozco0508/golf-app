@@ -1722,7 +1722,10 @@
 // name labels use the Board's formatter, a Weekly Game round no longer says
 // "no bets", the wizard's pot shows on an edit, and the roster paste drops a
 // trailing period. index.html and admin.html are precached.
-const CACHE_VERSION = 'golfapp-v194-full-card-cursor';
+// Moved to v195 because the organizer has a Players sheet on the scorecard and
+// the Game tab (rename, handicap, flight, Out, add a golfer to a group) and an
+// Out golfer is greyed on the card, the Board and the Receipt (scorecard-rows.js).
+const CACHE_VERSION = 'golfapp-v195-players-sheet';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -121,7 +121,9 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // RE-PINNED 2026-09-22 (was 7aa77792): v194 - the landing summary names the
         // Weekly Game and no longer says "no bets" on a round that has one (by hand,
         // the "repinned" entry); nothing else moved.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ddf1e58b');
+        // RE-PINNED 2026-09-22 (was ddf1e58b): v195 - the organizer strip gains the
+        // 👥 Players pill (by hand, the "repinned" entry); nothing else moved.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ab6b6f2e');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

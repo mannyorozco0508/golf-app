@@ -104,7 +104,7 @@
                 net = { front: front.map(netCell), back: back.map(netCell), out: sum(front, netOf), in: sum(back, netOf) };
                 net.tot = net.out + net.in;
             }
-            return { id: p.id, name: p.name, hcp: p.hcp, gross: gross, net: net };
+            return { id: p.id, name: p.name, hcp: p.hcp, gross: gross, net: net, out: p.out === true };   // out (v195): marked Out on the Players sheet - drawn greyed, scores kept
         });
 
         return { front: front, back: back, hasFront: front.length > 0, hasBack: back.length > 0, header: header, golfers: golfers };
@@ -129,7 +129,7 @@
 
         const dashOr = v => (v === null || v === undefined) ? DASH : v;
         c.golfers.forEach(g => {
-            let r = `<tr><td class="rt-name">${esc(g.name)}</td>`;
+            let r = `<tr${g.out ? ' class="golfer-out"' : ''}><td class="rt-name">${esc(g.name)}</td>`;
             if (c.hasFront) { g.gross.front.forEach(x => { r += cell(dashOr(x.value), x.cls); }); if (c.hasBack) r += cell(g.gross.out || DASH, 'rt-sec'); }
             if (c.hasBack) { g.gross.back.forEach(x => { r += cell(dashOr(x.value), x.cls); }); if (c.hasFront) r += cell(g.gross.in || DASH, 'rt-sec'); }
             r += cell(g.gross.tot || DASH, 'rt-sec') + '</tr>';
@@ -203,7 +203,7 @@
             html += head('PAR', c.header.par, (lab, key) => c.header.par[key]);
             html += head('HCP', c.header.hcp, () => '');
             c.golfers.forEach(g => {
-                let r = `<tr><td class="rt-name">${esc(firstNameOf(g.name))}</td>`;
+                let r = `<tr${g.out ? ' class="golfer-out"' : ''}><td class="rt-name">${esc(firstNameOf(g.name))}</td>`;
                 g.gross[n.side].forEach(x => { r += cell(dashOr(x.value), x.cls); });
                 n.secs.forEach(([lab, key]) => { r += cell(g.gross[key] || DASH, 'rt-sec'); });
                 html += r + '</tr>';

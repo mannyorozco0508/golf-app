@@ -1188,6 +1188,20 @@
         .sw-none { font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; padding: 12px; }
+        /* v195: the Players sheet, and a golfer marked Out. */
+        .ps-content { max-width: 440px; }
+        .ps-group { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 4px 0; display: flex; justify-content: space-between; align-items: center; }
+        .ps-add { background: none; border: 1px solid var(--brand-green); color: var(--brand-green); border-radius: 12px; padding: 4px 10px; font-size: 0.72rem; font-weight: bold; cursor: pointer; min-height: 32px; }
+        .ps-row { display: grid; grid-template-columns: 1fr 52px 40px 54px; gap: 6px; align-items: center; padding: 4px 0; border-top: 1px solid var(--border-faint); }
+        .ps-row input { width: 100%; box-sizing: border-box; min-height: 40px; padding: 6px 8px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-card); color: var(--text-main); }
+        .ps-flight { min-height: 40px; border-radius: 8px; border: 1px solid var(--brand-green); background: transparent; color: var(--brand-green); font-weight: bold; cursor: pointer; }
+        .ps-out { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
+        .ps-out input { width: 20px; height: 20px; min-height: 0; padding: 0; }
+        .ps-row.ps-is-out input.ps-name { text-decoration: line-through; color: var(--text-muted); }
+        .ps-new { background: var(--bg-soft); border-radius: 8px; padding: 6px; }
+        .ps-warn { color: var(--accent-red); font-size: 0.85rem; font-weight: bold; margin-top: 8px; }
+        .ps-money { font-size: 0.85rem; color: var(--text-main); margin-top: 8px; }
+        .golfer-out, .golfer-out .fc-name, .golfer-out .hv-player-name { opacity: 0.55; text-decoration: line-through; }
         .modal-content { background: var(--modal-bg); border-radius: 12px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; color: var(--text-main); }
         .modal-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
@@ -1429,6 +1443,22 @@ html {
         <div class="modal-header"><span id="group-pick-title">Which group are you keeping score for?</span></div>
         <div id="group-pick-body"></div>
         <button type="button" class="btn-outline" style="margin-top:10px;" onclick="dismissGroupPick()">Just watching</button>
+    </div>
+</div>
+
+<!-- THE PLAYERS SHEET (v195). Organizer only (canReachSetup). One row per golfer in
+     roster order under group headers: name, HCP, A/B, Out; "+ Add golfer" under
+     each group. Save writes ONE update: the changed keys only, or - when a golfer
+     was added - the whole players node with groupSizeOverrides, guarded by a
+     re-read. Filled by renderPlayersSheet; empty until opened. -->
+<div class="modal-overlay" id="players-sheet" role="dialog" aria-labelledby="players-sheet-title">
+    <div class="modal-content ps-content">
+        <div class="modal-header"><span id="players-sheet-title">👥 Players</span><button class="close-modal" onclick="closePlayersSheet()">&times;</button></div>
+        <div id="players-sheet-body"></div>
+        <div id="players-sheet-warn" class="ps-warn"></div>
+        <div id="players-sheet-money" class="ps-money"></div>
+        <button type="button" class="btn-primary" id="players-sheet-save" onclick="savePlayersSheet()" style="margin-top:10px;">Save</button>
+        <button type="button" class="btn-outline" style="margin-top:6px;" onclick="closePlayersSheet()">Cancel</button>
     </div>
 </div>
 
@@ -1784,8 +1814,17 @@ html {
         // slow sign-in cannot hide the button from the organizer or show it to a
         // spectator for good.
         if (window.authReady && typeof window.authReady.then === 'function') {
-            window.authReady.then(() => { if (currentData && currentData.players) renderScorecard(); }, () => {});
+            window.authReady.then(() => { if (currentData && currentData.players) { renderScorecard(); maybeOpenPlayersSheetFromLink(); } }, () => {});
         }
+    }
+    // The Game tab's "Players" pill lands here with ?players=1: the sheet opens on
+    // its own once the round and the uid are both known, for the organizer only.
+    let psOpenedFromLink = false;
+    function maybeOpenPlayersSheetFromLink() {
+        if (psOpenedFromLink || urlParams.get('players') !== '1') return;
+        if (!currentData || !(currentData.players || []).length || !canReachSetup()) return;
+        psOpenedFromLink = true;
+        openPlayersSheet();
     }
 
     // --- CUSTOM GROUP SIZING ---
@@ -2432,7 +2471,7 @@ html {
             const hvPlayer = filteredPlayers[i - 3];
             const hvHcpHtml = hvPlayer
                 ? `<div class="hv-hcp">HCP ${formatHcpDisplay(hvPlayer.hcp)}</div>` : '';
-            html += `<div class="hv-player-row"><div class="hv-player-name">${escapeHtml(name)}${hvHcpHtml}`;
+            html += `<div class="hv-player-row${hvPlayer && hvPlayer.out === true ? ' golfer-out' : ''}"><div class="hv-player-name">${escapeHtml(name)}${hvHcpHtml}`;
             // DOTS ARE DRAWN ONCE, BY THE CELL ITSELF.
             //
             // cells[i] is cloned from the Full Card <td>, which already ends with the
@@ -5063,6 +5102,209 @@ html {
         try { renderScorecard(); } finally { pendingScoreFocus = null; }
     }
 
+    // ---- THE PLAYERS SHEET (v195) ---------------------------------------------
+    //
+    // Rename, handicap, flight and "Out" for the organizer, from the scorecard,
+    // without the wizard - and a golfer added to a group. WHAT IT WRITES:
+    //   rename / hcp / flight / out  -> ONE update of the changed keys only:
+    //       players/<i>/name, players/<i>/hcp, players/<i>/flight,
+    //       players/<i>/playingForMoney + players/<i>/out   (Out: false + true;
+    //       back in: true + null). Never the whole array - a whole-array write
+    //       from one phone is what erased a roster on 2026-09-21.
+    //   add a golfer to group N -> the whole players node + groupSizeOverrides in
+    //       ONE atomic update (positions shift, so it cannot be narrow), GUARDED:
+    //       the record is re-read immediately before the write and refused when
+    //       the roster's ids/names differ from what the sheet displayed.
+    // Scores are keyed by id and are never touched; an Out golfer keeps his card.
+    // pool-engine.js and settlement-engine.js already read playingForMoney - an
+    // Out golfer is out of the pot, the net finish, the skins and every payout
+    // whose field is "everyone playing for money" (a wager that names him by id
+    // still counts him, by that wager's own rule).
+    // New id = max(every roster id, every id in a score key) + 1: the roster
+    // alone would let a mint collide with an orphaned score.
+    let psSnapshot = null;   // the roster's ids+names as displayed - the guard's baseline
+    const rosterSignature = players => JSON.stringify((players || []).map(p => [String(p.id), String(p.name)]));
+    function nextRosterId(data) {
+        let max = 100;
+        ((data && data.players) || []).forEach(p => { const n = parseInt(p.id, 10); if (!isNaN(n) && n > max) max = n; });
+        Object.keys((data && data.scores) || {}).forEach(k => { const m = /^p(\d+)_h\d+$/.exec(k); if (m && parseInt(m[1], 10) > max) max = parseInt(m[1], 10); });
+        return max + 1;
+    }
+    function openPlayersSheet() {
+        if (!canReachSetup()) return;
+        psSnapshot = rosterSignature(currentData.players);
+        renderPlayersSheet(currentData);
+        const el = document.getElementById('players-sheet');
+        if (el) el.style.display = 'flex';
+    }
+    function closePlayersSheet() {
+        const el = document.getElementById('players-sheet');
+        if (el) el.style.display = 'none';
+        psSnapshot = null;
+    }
+    function renderPlayersSheet(data) {
+        const body = document.getElementById('players-sheet-body');
+        if (!body) return;
+        const players = data.players || [];
+        const boundaries = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
+        let html = '';
+        boundaries.forEach(b => {
+            html += '<div class="ps-group"><span>Group ' + b.group + '</span><button type="button" class="ps-add" onclick="psAddRow(' + b.group + ')">+ Add golfer</button></div>';
+            for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
+                const p = players[i]; if (!p) continue;
+                const out = p.out === true;
+                html += '<div class="ps-row' + (out ? ' ps-is-out' : '') + '" data-idx="' + i + '" data-id="' + escapeAttr(p.id) + '">'
+                    + '<input class="ps-name" type="text" value="' + escapeAttr(p.name) + '" placeholder="Name">'
+                    + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(p.hcp || '') + '" placeholder="HCP">'
+                    + '<button type="button" class="ps-flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
+                    + '<label class="ps-out"><input type="checkbox" class="ps-out-box"' + (out ? ' checked' : '') + ' onchange="psRefreshMoney()"> Out</label>'
+                    + '</div>';
+            }
+            html += '<div class="ps-adds" id="ps-adds-' + b.group + '"></div>';
+        });
+        body.innerHTML = html;
+        psRefreshMoney();
+    }
+    function psToggleFlight(btn) {
+        const f = btn.getAttribute('data-flight') === 'B' ? 'A' : 'B';
+        btn.setAttribute('data-flight', f); btn.textContent = f;
+        psRefreshMoney();
+    }
+    function psAddRow(group) {
+        const host = document.getElementById('ps-adds-' + group);
+        if (!host) return;
+        const row = document.createElement('div');
+        row.className = 'ps-row ps-new'; row.setAttribute('data-group', String(group));
+        row.innerHTML = '<input class="ps-name" type="text" value="" placeholder="New golfer">'
+            + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="HCP">'
+            + '<button type="button" class="ps-flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
+            + '<span class="ps-out">new</span>';
+        host.appendChild(row);
+        const nameEl = row.querySelector('.ps-name'); if (nameEl && nameEl.focus) nameEl.focus();
+    }
+    // What the sheet holds now: the edits per roster index and the added golfers.
+    function collectPlayersSheet() {
+        const draft = { edits: [], added: [] };
+        const body = document.getElementById('players-sheet-body');
+        if (!body) return draft;
+        body.querySelectorAll('.ps-row').forEach(row => {
+            const name = String((row.querySelector('.ps-name') || {}).value || '').trim();
+            const hcp = String((row.querySelector('.ps-hcp') || {}).value || '').trim();
+            const fb = row.querySelector('.ps-flight');
+            const flight = fb && fb.getAttribute('data-flight') === 'B' ? 'B' : 'A';
+            if (row.classList.contains('ps-new')) {
+                if (name) draft.added.push({ group: parseInt(row.getAttribute('data-group'), 10), name, hcp, flight });
+            } else {
+                const ob = row.querySelector('.ps-out-box');
+                draft.edits.push({ idx: parseInt(row.getAttribute('data-idx'), 10), name, hcp, flight, out: !!(ob && ob.checked) });
+            }
+        });
+        return draft;
+    }
+    // PURE. From the record and a draft: the one update, the roster it would
+    // leave, the warnings and the money line. `whole` says the write must be the
+    // whole players node (a golfer was added).
+    function buildPlayersUpdate(data, draft) {
+        const players = (data.players || []).map(p => Object.assign({}, p));
+        const flightsOn = !!(data.flights && data.flights.enabled === true);
+        const updates = {};
+        const warnings = [];
+        let changed = false;
+        (draft.edits || []).forEach(e => {
+            const p = players[e.idx]; if (!p) return;
+            const name = e.name === '' ? p.name : e.name;   // an emptied name is not a rename
+            if (name !== p.name) { updates['players/' + e.idx + '/name'] = name; p.name = name; changed = true; }
+            const hcp = String(e.hcp === undefined ? (p.hcp || '') : e.hcp);
+            if (hcp !== String(p.hcp || '')) { updates['players/' + e.idx + '/hcp'] = hcp; p.hcp = hcp; changed = true; }
+            if (flightsOn) {
+                const flight = e.flight === 'B' ? 'B' : 'A';
+                if (flight !== (p.flight === 'B' ? 'B' : 'A')) { updates['players/' + e.idx + '/flight'] = flight; p.flight = flight; changed = true; }
+            }
+            const wasOut = p.out === true;
+            if (e.out && !wasOut) {
+                updates['players/' + e.idx + '/playingForMoney'] = false; updates['players/' + e.idx + '/out'] = true;
+                p.playingForMoney = false; p.out = true; changed = true;
+                Object.keys(data.kpLeaders || {}).forEach(h => {
+                    const l = data.kpLeaders[h];
+                    if (l && String(l.playerId) === String(p.id)) warnings.push(golferLabel(p) + ' leads KP on ' + h.replace(/^h/, '') + ' \u2014 it will be refunded unless re-recorded');
+                });
+            } else if (!e.out && wasOut) {
+                updates['players/' + e.idx + '/playingForMoney'] = true; updates['players/' + e.idx + '/out'] = null;
+                p.playingForMoney = true; delete p.out; changed = true;
+            }
+        });
+        let whole = false;
+        let groupSizeOverrides = null;
+        if ((draft.added || []).length) {
+            whole = true; changed = true;
+            const sizes = computeGroupSizes(players.length, data.groupSizeOverrides || {});
+            let nextId = nextRosterId(data);
+            // Insert each addition at the END of its group; later groups keep their golfers.
+            const adds = draft.added.slice().sort((a, b) => a.group - b.group);
+            adds.forEach(a => {
+                const g = Math.max(1, Math.min(sizes.length, parseInt(a.group, 10) || 1));
+                let end = 0; for (let k = 0; k < g; k++) end += sizes[k];
+                const np = { id: nextId++, name: a.name, hcp: String(a.hcp || ''), team: '', squad: end % 2 === 0 ? 'red' : 'blue', playingForMoney: true };
+                if (flightsOn) np.flight = a.flight === 'B' ? 'B' : 'A';
+                players.splice(end, 0, np);
+                sizes[g - 1] += 1;
+            });
+            groupSizeOverrides = {}; sizes.forEach((s, i) => { groupSizeOverrides[i] = s; });
+        }
+        const after = Object.assign({}, data, { players, groupSizeOverrides: groupSizeOverrides || data.groupSizeOverrides });
+        const wholeUpdates = whole ? { players, groupSizeOverrides } : null;
+        return { changed, whole, updates: whole ? wholeUpdates : updates, players, after, warnings, money: playersSheetMoney(data, after) };
+    }
+    // "Pot $920 → $880 · Flight B 11 → 10", and the recompute note once any score is in.
+    function playersSheetMoney(before, after) {
+        const pot = d => { if (!d.moneyPool || d.moneyPool.enabled === false || typeof computeMoneyPool !== 'function') return null; try { const r = computeMoneyPool(d, d.courseData || [], d.scores || {}); return r ? r.totalPoolCents : null; } catch (e) { return null; } };
+        const counts = d => { const on = d.flights && d.flights.enabled === true; if (!on) return null; const live = (d.players || []).filter(p => p.playingForMoney !== false); return { A: live.filter(p => p.flight !== 'B').length, B: live.filter(p => p.flight === 'B').length }; };
+        const bits = [];
+        const p0 = pot(before), p1 = pot(after);
+        if (p0 !== null && p1 !== null) bits.push('Pot $' + Math.round(p0 / 100) + (p1 !== p0 ? ' \u2192 $' + Math.round(p1 / 100) : ''));
+        const c0 = counts(before), c1 = counts(after);
+        if (c0 && c1) ['A', 'B'].forEach(f => { if (c0[f] !== c1[f]) bits.push('Flight ' + f + ' ' + c0[f] + ' \u2192 ' + c1[f]); });
+        const scored = Object.keys(before.scores || {}).some(k => before.scores[k] > 0);
+        let line = bits.join(' \u00B7 ');
+        if (scored && bits.some(b => /\u2192/.test(b))) line += (line ? '. ' : '') + 'Scores are in \u2014 net finish and skins will recompute.';
+        return line;
+    }
+    function psRefreshMoney() {
+        const draft = collectPlayersSheet();
+        const u = buildPlayersUpdate(currentData, draft);
+        const m = document.getElementById('players-sheet-money'); if (m) m.textContent = u.money;
+        const w = document.getElementById('players-sheet-warn'); if (w) w.textContent = u.warnings.join(' ');
+        const body = document.getElementById('players-sheet-body');
+        if (body) body.querySelectorAll('.ps-row').forEach(r => { const ob = r.querySelector('.ps-out-box'); if (ob) r.classList.toggle('ps-is-out', !!ob.checked); });
+    }
+    // The commit: the guard, then the one write. Returns a promise of
+    // 'nothing' | 'refused' | 'written' for the caller and the tests.
+    function commitPlayersDraft(draft) {
+        const u = buildPlayersUpdate(currentData, draft);
+        if (!u.changed) return Promise.resolve('nothing');
+        if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the players.')) return Promise.resolve('offline');
+        return db.ref('events/' + currentMode).once('value').then(snap => {
+            const fresh = (snap && snap.val()) || {};
+            if (rosterSignature(fresh.players) !== psSnapshot) {
+                alert('\u26A0\uFE0F NOT SAVED\nThe roster changed on another phone \u2014 reopen Players.');
+                return 'refused';
+            }
+            // Built again against the FRESH record (scores may have moved) - the
+            // roster is the same by the guard, so the keys are the same.
+            const fu = buildPlayersUpdate(Object.assign({}, currentData, fresh), draft);
+            return db.ref('events/' + currentMode).update(fu.updates).then(() => 'written');
+        });
+    }
+    function savePlayersSheet() {
+        const draft = collectPlayersSheet();
+        const btn = document.getElementById('players-sheet-save');
+        if (btn) btn.disabled = true;
+        commitPlayersDraft(draft).then(result => {
+            if (btn) btn.disabled = false;
+            if (result === 'written' || result === 'nothing') closePlayersSheet();
+        }).catch(err => { if (btn) btn.disabled = false; alert('\u26A0\uFE0F NOT SAVED\n' + err.message); });
+    }
+
     // ---- THE RETIRED ROUND (v191) --------------------------------------------
     // events/CODE/supersededBy = NEWCODE is written by admin.html when the
     // organizer saves the round that replaces this one (Round Ready's "Retire").
@@ -5282,6 +5524,7 @@ html {
         // multi-group round, alone in the row on a foursome. Never on a group link.
         if (canReachSetup()) {
             html += `<a class="group-btn group-setup-btn" href="${setupHref()}">\u270F\uFE0F Edit round setup</a>`;
+            html += `<button type="button" class="group-btn group-setup-btn" onclick="openPlayersSheet()">\uD83D\uDC65 Players</button>`;
         }
 
         container.innerHTML = html;
@@ -7774,7 +8017,7 @@ html {
             html += `<div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Hole ${targetHole} Wolf: 🐺 ${escapeHtml(golferLabelFor(log.wolfName))}</div>`;
             html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">`;
             others.forEach(p => {
-                html += `<button onclick="saveWolfCall(${targetHole}, 'partner', '${p.id}')" style="padding:6px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:var(--bg-card); color:var(--text-main); font-size:0.72rem; font-weight:bold; cursor:pointer;">🤝 ${p.name.split(' ')[0]}</button>`;
+                html += `<button onclick="saveWolfCall(${targetHole}, 'partner', '${p.id}')" style="padding:6px 10px; border-radius:14px; border:1px solid var(--accent-teal); background:var(--bg-card); color:var(--text-main); font-size:0.72rem; font-weight:bold; cursor:pointer;">🤝 ${escapeHtml(golferLabel(p))}</button>`;
             });
             html += `</div>`;
             html += `<div style="display:flex; gap:6px;">`;
@@ -7795,18 +8038,18 @@ html {
                     const partner = players.find(p => String(p.id) === String(log.partnerId));
                     const opponents = players.filter(p => String(p.id) !== String(log.wolfId) && String(p.id) !== String(log.partnerId));
                     html += `<div style="font-size:0.85rem; text-align:center; padding:6px 0;">
-                        <strong>${log.wolfName.split(' ')[0]} + ${partner ? partner.name.split(' ')[0] : '?'}</strong><br>
+                        <strong>${escapeHtml(golferLabelFor(log.wolfName))} + ${partner ? escapeHtml(golferLabel(partner)) : '?'}</strong><br>
                         <span style="color:var(--text-muted); font-size:0.75rem;">vs</span><br>
-                        <strong>${opponents.map(p => p.name.split(' ')[0]).join(' + ')}</strong><br>
+                        <strong>${opponents.map(p => escapeHtml(golferLabel(p))).join(' + ')}</strong><br>
                         <span style="font-size:0.72rem; color:var(--text-muted);">Worth ${2 + wolfCalc.carryPending} point${(2 + wolfCalc.carryPending) === 1 ? '' : 's'} (Hole ${mostRecent.hole})</span>
                     </div>`;
                 } else if (log.call === 'lone' || log.call === 'blind') {
                     const opponents = players.filter(p => String(p.id) !== String(log.wolfId));
                     const worth = (log.call === 'blind' ? blindMult : loneMult) + wolfCalc.carryPending;
                     html += `<div style="font-size:0.85rem; text-align:center; padding:6px 0;">
-                        <strong>🐺 ${log.wolfName.split(' ')[0]} (${log.call === 'blind' ? 'Blind' : 'Lone'})</strong><br>
+                        <strong>🐺 ${escapeHtml(golferLabelFor(log.wolfName))} (${log.call === 'blind' ? 'Blind' : 'Lone'})</strong><br>
                         <span style="color:var(--text-muted); font-size:0.75rem;">vs</span><br>
-                        <strong>${opponents.map(p => p.name.split(' ')[0]).join(' + ')}</strong><br>
+                        <strong>${opponents.map(p => escapeHtml(golferLabel(p))).join(' + ')}</strong><br>
                         <span style="font-size:0.72rem; color:var(--text-muted);">Worth ${worth} point${worth === 1 ? '' : 's'} if the wolf wins (Hole ${mostRecent.hole})</span>
                     </div>`;
                 }
@@ -7823,7 +8066,7 @@ html {
         if (upcoming.length > 0) {
             let rotationHtml = upcoming.map(h => {
                 const isLastPlaceHole = lastPlaceOn && (h.hole === 17 || h.hole === 18);
-                const wolfName = isLastPlaceHole ? 'TBD — last place picks' : players[(h.hole - 1) % 4].name.split(' ')[0];
+                const wolfName = isLastPlaceHole ? 'TBD — last place picks' : golferLabel(players[(h.hole - 1) % 4]);
                 return `<span style="white-space:nowrap;">H${h.hole}: ${escapeHtml(wolfName)}</span>`;
             }).join(' <span style="opacity:0.4;">→</span> ');
             html += `<div style="font-size:0.68rem; color:var(--text-muted); margin-top:8px; padding-top:6px; border-top:1px solid var(--border-faint); display:flex; gap:6px; flex-wrap:wrap;">🔄 ${rotationHtml}</div>`;
@@ -7833,10 +8076,10 @@ html {
         let recentHtml = '';
         Object.values(wolfCalc.holeLog).sort((a, b) => b.hole - a.hole).forEach(log => {
             if (!log.call) return;
-            const callLabel = log.call === 'partner' ? `🤝 w/ ${players.find(p => String(p.id) === String(log.partnerId)) ? players.find(p => String(p.id) === String(log.partnerId)).name.split(' ')[0] : '?'}` : (log.call === 'blind' ? '🙈 Blind Wolf' : '🐺 Lone Wolf');
+            const callLabel = log.call === 'partner' ? `🤝 w/ ${players.find(p => String(p.id) === String(log.partnerId)) ? golferLabel(players.find(p => String(p.id) === String(log.partnerId))) : '?'}` : (log.call === 'blind' ? '🙈 Blind Wolf' : '🐺 Lone Wolf');
             const resultLabel = !log.resolved ? (log.winner === 'tie' ? '🔁 Tied — carries' : '⏳ Awaiting scores') : (log.winner === 'wolf' ? `✅ Wolf side won` : `❌ Wolf side lost`);
             recentHtml += `<div style="display:flex; justify-content:space-between; font-size:0.72rem; padding:3px 0; border-bottom:1px solid var(--border-faint);">
-                <span>H${log.hole}: ${log.wolfName.split(' ')[0]} ${callLabel} <button onclick="clearWolfCall(${log.hole})" style="border:none; background:none; color:var(--accent-red); cursor:pointer; font-size:0.7rem;">✕</button></span>
+                <span>H${log.hole}: ${escapeHtml(golferLabelFor(log.wolfName))} ${callLabel} <button onclick="clearWolfCall(${log.hole})" style="border:none; background:none; color:var(--accent-red); cursor:pointer; font-size:0.7rem;">✕</button></span>
                 <span>${resultLabel}</span>
             </div>`;
         });
@@ -8040,6 +8283,7 @@ html {
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
         renderSupersededBanner();
         renderGapBanner(viewGaps);
+        maybeOpenPlayersSheetFromLink();
         renderGroupPicker(players, groupBoundaries);
         renderLandingSummary(filteredPlayers, players);
 
@@ -8232,7 +8476,7 @@ html {
         const fcLabels = shortPlayerLabels(filteredPlayers);
         filteredPlayers.forEach((p, i) => {
             const label = fcLabels[i];
-            headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}">`
+            headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}"${p.out === true ? ' class="golfer-out"' : ''}>`
                 + `<span class="fc-name">${label}</span>`
                 + `<span class="fc-hcp">HCP ${formatHcpDisplay(p.hcp)}</span></th>`;
         });
@@ -8456,7 +8700,7 @@ html {
                     const log = stablefordCalc.holeLog[h.hole];
                     stablefordParts = Object.keys(log).map(pid => {
                         const pl = players.find(pp => String(pp.id) === String(pid));
-                        return pl ? `${pl.name.split(' ')[0]}: ${log[pid].pts}` : null;
+                        return pl ? `${golferLabel(pl)}: ${log[pid].pts}` : null;
                     }).filter(Boolean);
                 } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc && matchCalc.holeLog[h.hole]) {
                     const log = matchCalc.holeLog[h.hole];
@@ -8581,7 +8825,7 @@ html {
             function strokeLeadText(p1Total, p2Total, holesCompleted, p1Name, p2Name) {
                 if (holesCompleted === 0) return "Waiting for scores...";
                 const diff = p1Total - p2Total;
-                return diff === 0 ? "All Square" : (diff < 0 ? `${p1Name.split(' ')[0]} leads by ${Math.abs(diff)}` : `${p2Name.split(' ')[0]} leads by ${Math.abs(diff)}`);
+                return diff === 0 ? "All Square" : (diff < 0 ? `${golferLabelFor(p1Name)} leads by ${Math.abs(diff)}` : `${golferLabelFor(p2Name)} leads by ${Math.abs(diff)}`);
             }
 
             if (s.holesCompleted === 0) {
@@ -8612,7 +8856,7 @@ html {
                     statusText = 'Not started';
                     moneyText = `<span style="color:var(--text-muted);">$${pr.stake} at stake</span>`;
                 } else if (pr.roundComplete) {
-                    const winnerName = pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name).split(' ')[0] : null;
+                    const winnerName = pr.winner ? golferLabelFor(pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
                     statusText = winnerName ? `FINAL — ${escapeHtml(winnerName)} won $${pr.stake}` : 'FINAL — Tied, no money';
                     moneyText = `<span style="color:var(--accent-teal); font-weight:bold;">🔒 LOCKED</span>`;
                 } else {

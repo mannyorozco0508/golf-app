@@ -2282,6 +2282,26 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The Players sheet — Wave v195, 2026-09-22
+
+**What it is.** "👥 Players" beside "✏️ Edit round setup" on the organizer's
+scorecard strip and under the Game tab's title: a sheet with one row per golfer
+under group headers — name, HCP, A/B, Out — and "+ Add golfer" per group.
+`index.html` `buildPlayersUpdate` (pure) / `commitPlayersDraft`. Rename, handicap,
+flight and Out write ONE update of the changed keys only (`players/<i>/name`,
+`/hcp`, `/flight`, `/playingForMoney` + `/out`); never the whole array. An added
+golfer needs the whole `players` node + `groupSizeOverrides` in one atomic update,
+guarded by a re-read of the record — refused ("The roster changed on another
+phone — reopen Players.") when the ids/names differ from what the sheet showed.
+New id = max(roster ids, score-key ids) + 1. Scores are keyed by id and never
+touched. Out = `playingForMoney:false` + `out:true` — the engines already read
+`playingForMoney`, so he is out of the pot and every field payout (a wager that
+names him by `participantIds` still counts him by that wager's own rule); greyed
+on the card, the Board (OUT tag) and the Receipt (`scorecard-rows.js` `out`).
+`players_sheet_test.js`.
+
+**Not in this wave.** Moving a golfer between groups; deleting a golfer outright.
+
 ## The missing hole — Wave v192, 2026-09-22
 
 **What it is.** `score-gaps.js` (shared, not an engine): a GAP is a blank

@@ -189,7 +189,8 @@ describe('FIRE AND FORGET — the page never waits', () => {
     // whose round it is). Every chain carries a rejection handler, so a failed
     // sign-in still reaches nobody. The other pages keep the original rule.
     const ALLOWED_CHAINS = {
-        'index.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderScorecard\(\); \}, \(\) => \{\}\)/],
+        // v195: the same chain also opens the Players sheet when the Game tab's pill arrived with ?players=1 (organizer only)
+        'index.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) \{ renderScorecard\(\); maybeOpenPlayersSheetFromLink\(\); \} \}, \(\) => \{\}\)/],
         'game.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderSetupLink\(currentData\); \}, \(\) => \{\}\)/],
         'admin.html': [/window\.authReady\.then\(\(uid\) => uid, \(\) => null\)/]
     };

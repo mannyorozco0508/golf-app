@@ -152,6 +152,7 @@
         .view-pill { font-size: 0.8rem; font-weight: bold; padding: 8px 12px; min-height: 40px; border-radius: 16px; border: 1px solid var(--brand-green); color: var(--brand-green); background: transparent; cursor: pointer; }
         .view-pill.active { background: var(--brand-green); color: #fff; }
         /* v192: a blank hole inside this golfer's card - the total is the engine's sum of what is there. */
+        .golfer-out td { opacity: 0.55; text-decoration: line-through; }
         .gap-flag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; color: var(--accent-red); border: 1px solid var(--accent-red); vertical-align: middle; white-space: nowrap; }
         .player-flight { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; color: var(--brand-green); border: 1px solid var(--brand-green); vertical-align: middle; }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
@@ -966,10 +967,15 @@ html {
             .forEach(g => { gapCountById[String(g.id)] = g.holes.length; });
     }
     const gapFlagHtml = id => gapCountById[String(id)] ? `<span class="gap-flag">\u26A0 missing ${gapCountById[String(id)]}</span>` : '';
+    // v195: a golfer marked Out on the Players sheet - greyed, tagged, still listed
+    // with his scores (the engine has already left him out of every pot).
+    const outById = () => { const m = {}; ((currentBoardData && currentBoardData.players) || []).forEach(p => { if (p.out === true) m[String(p.id)] = true; }); return m; };
+    const outTagHtml = id => outById()[String(id)] ? '<span class="gap-flag">OUT</span>' : '';
 
     function boardRowHtml(r, idx, opts) {
         const posStyle = (opts && opts.posStyle) ? ` style="${opts.posStyle}"` : '';
-        const badge = ((opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '') + gapFlagHtml(r.id);
+        const badge = ((opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '') + gapFlagHtml(r.id) + outTagHtml(r.id);
+        const outCls = outById()[String(r.id)] ? ' golfer-out' : '';
         // The two tables were written with different source indentation and the
         // rendered-board golden pins each byte for byte; the indent is a parameter
         // so ONE builder can still produce both.
@@ -980,9 +986,9 @@ html {
         // the attribute moved, the text is identical.
         const pid = ` data-player-id="${escapeHtml(String(r.id))}"`;
         if (r.thru === 0) {
-            return `<tr${pid}><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
+            return `<tr${pid}${outCls ? ' class="golfer-out"' : ''}><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
         }
-        let posClass = idx === 0 ? 'row-leader' : '';
+        let posClass = (idx === 0 ? 'row-leader' : '') + outCls;
         return `<tr class="${posClass}"${pid}>
 ${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
 ${ind}<td class="player-name">${escapeHtml(r.name)}${badge}<span class="player-hcp">HCP: ${r.hcp}</span></td>
