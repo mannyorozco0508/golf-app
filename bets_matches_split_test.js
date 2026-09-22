@@ -484,9 +484,9 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         assert.equal(sha('bet-strip.js'), '43880a61');
         assert.equal(sha('money-engine.js'), '3c960947');
         assert.equal(sha('action-model.js'), 'ded86280');
-        assert.equal(sha('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
+        assert.equal(sha('settlement-engine.js'), 'f7712d87');   // f7712d87: KP never refunds 2026-09-22 (approved: the refund wording): the per-reason KP refund ledger line is gone; was 9043e7fc.
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(sha('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3.   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(sha('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
         assert.equal(sha('hole-events.js'), '6fd7f7ed');
         // settlement.html and index.html were fenced for the split wave only; the
         // skins-rows wave (v136) edits both. The engines stay pinned.

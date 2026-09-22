@@ -165,7 +165,8 @@ const ENG = (() => {
 function engine(data) {
     ENG.__d = J(data);
     const r = vm.runInContext('computeMoneyPool(__d, __d.courseData, __d.scores)', ENG);
-    return J({ valid: r.valid, skins: r.skins, refund: r.refund, perPlayerCents: r.perPlayerCents, kpAmount: r.kp && r.kp.amountCents, netAmount: r.net && r.net.amountCents });
+    // kpUnresolvedCents and settled joined the block 2026-09-22 (KP money never refunds): the held money is the fact.
+    return J({ valid: r.valid, skins: r.skins, refund: r.refund, perPlayerCents: r.perPlayerCents, kpAmount: r.kp && r.kp.amountCents, netAmount: r.net && r.net.amountCents, kpUnresolvedCents: r.kpUnresolvedCents, settled: r.settled });
 }
 function surfaces(data) {
     const out = {};
@@ -251,10 +252,28 @@ const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace
 // inside the block-cut text. The v142 shas were off/field
 // 24e8815570e0894b8e29857f970cf4bd6c3e77a60d59f82e20499b3587e1da17, flight
 // 92c5d2e9522ddc715f6ee7f1c7ed9270a995a4a847d67cd22e9c86aed91ca3bc.
+// RE-PINNED 2026-09-22 (KP money never refunds, kp_never_refunds_test.js): the
+// three blank KP holes on this finished round are HELD, not refunded - the KP
+// lines read "Hole 7: not recorded / $10 in the pot", the "↩️ Refunded" row is
+// gone, the "Not final — KP on holes 7, 12, 16 not recorded" line leads the
+// card, and the refund's $1/$2 per golfer are out of every ledger. The engine
+// block: refund.cents 3000 -> 0, kpUnresolvedCents 0 -> 3000, settled false,
+// perPlayerCents sum -3000 (the money is in the pot). The v182 shas were
+// off/field 0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7,
+// flight 15eb59952d337a5a9fe9f8d9a3f8184f284622a5852b8c875deb170bbf0d6102;
+// the fixture was b9f57565 (v182) / 34d06a07 (v187). Captured twice this wave:
+// the second capture (the fixture as committed) has settlement.liveResults
+// under the KP-only head - "🏆 RESULTS — NOT FINAL / Every card is in. A KP is
+// not recorded — its share stays in the pot, and final money appears once the
+// winner is recorded." in place of "LIVE RESULTS — THRU 18 / The round is
+// still in play." - because every card IS in on this round and the first
+// capture's head blamed golfers who had finished (receipt_sections_test.js
+// proves the inverse edit gives the v182 text). The first capture's
+// liveResults shas were off b7510b60…, field 74963a3b…, flight/even 666b9d72….
 const PREV_RECEIPT_TEXT = {
-    off: '0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7',
-    field: '0cfd654ae21ae75795460d7b54d53243fd7e6f267d1277c75f03fcb8d158cad7',
-    flight: '15eb59952d337a5a9fe9f8d9a3f8184f284622a5852b8c875deb170bbf0d6102'
+    off: '7719747fc624571c7071f5c2ad4c537757ae46103deefb4ddcf4567e70ad4884',
+    field: '7719747fc624571c7071f5c2ad4c537757ae46103deefb4ddcf4567e70ad4884',
+    flight: '6facd73aa7a8269698cfe6a6b0457ee597fffa7971bc4427775cf881c247cf6e'
 };
 const cutBlock = (html) => {
     const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
@@ -301,9 +320,11 @@ describe('the goldens differ where they should', () => {
         assert.deepEqual(f.flights.map(x => [x.flight, x.golfers, x.amountCents, x.lines.length]), [['A', 12, 11500, 5], ['B', 11, 10500, 5]]);
         assert.equal(f.flights[0].amountCents + f.flights[1].amountCents, f.amountCents);
         assert.deepEqual(f.flights.map(x => [...new Set(x.lines.map(l => l.cents))]), [[2300], [2100]]);
-        // 2026-09-19: the $30 of unrecorded KP refunds; the SKINS bucket still refunds nothing
-        assert.equal(FX.variants.flight.engine.refund.cents, 3000);
-        assert.deepEqual(FX.variants.flight.engine.refund.reasons, ['Unclaimed KP money refunded to the field.']);
+        // 2026-09-22: the $30 of unrecorded KP is HELD - nothing refunds, the round is not settled
+        assert.equal(FX.variants.flight.engine.refund.cents, 0);
+        assert.deepEqual(FX.variants.flight.engine.refund.reasons, []);
+        assert.equal(FX.variants.flight.engine.kpUnresolvedCents, 3000); assert.equal(FX.variants.flight.engine.settled, false);
+        assert.equal(Object.values(FX.variants.flight.engine.perPlayerCents).reduce((a, c) => a + c, 0), -3000, 'the ledger sums to minus the money in the pot');
         assert.equal(FX.variants.off.engine.skins.flights, undefined); assert.equal(FX.variants.field.engine.skins.flights, undefined);
         assert.match(FX.variants.flight.html['settlement.receiptPool'], /Split by flight, by headcount: Flight A \$115 \(12 golfers\) · Flight B \$105 \(11 golfers\)/);
         assert.ok(!/Split by flight/.test(FX.variants.field.html['settlement.receiptPool']));
@@ -314,7 +335,7 @@ describe('the goldens differ where they should', () => {
         assert.equal(e.flights[0].amountCents + e.flights[1].amountCents, e.amountCents);
         assert.deepEqual(e.flights.map(x => [...new Set(x.lines.map(l => l.cents))]), [[2200], [2200]]);
         assert.deepEqual(e.lines.map(l => [l.hole, l.winnerId, l.units]), f.lines.map(l => [l.hole, l.winnerId, l.units]), 'same skins, same winners - only the dollars moved');
-        assert.equal(FX.variants.even.engine.refund.cents, 3000, 'the KP refund is unchanged');
+        assert.equal(FX.variants.even.engine.refund.cents, 0, 'nothing refunds (2026-09-22)');
         assert.match(FX.variants.even.html['settlement.receiptPool'], /Split by flight, evenly: Flight A \$110 \(12 golfers\) · Flight B \$110 \(11 golfers\)/);
         assert.ok(!/by headcount/.test(FX.variants.even.html['settlement.receiptPool']));
     });

@@ -305,12 +305,14 @@ describe('TRIP MODE HONOURS THE SAME RULE', () => {
         assert.match(src, /tripContributions\[k\]\.lines\.concat/);
     });
 
-    test('THE SETTLED GATE IS UNTOUCHED - a round in play still holds the trip', () => {
-        // Re-pinned 2026-09-19 (recording pays): a finished round with unrecorded
-        // KPs no longer holds the trip (its blanks refund); a round in play does.
+    test('THE SETTLED GATE IS UNTOUCHED - a round in play, and a finished round with a KP unrecorded, both hold the trip', () => {
+        // Re-pinned 2026-09-22 (KP never refunds): a finished round with an
+        // unrecorded KP holds its money in the pot and is not settled, so it holds
+        // the trip - reversing 2026-09-19, when its blanks refunded.
         const t = trip({ side:false, confirmed:false, thru:[9,9,9] }).text();
         assert.match(t, /Not Settled Yet/, 'unfinished rounds must still be flagged');
-        assert.ok(!/Not Settled Yet/.test(trip({ side:false, confirmed:false }).text()), 'finished + unrecorded is settled');
+        assert.match(trip({ side:false, confirmed:false }).text(), /Not Settled Yet/, 'finished + unrecorded KP is NOT settled');
+        assert.ok(!/Not Settled Yet/.test(trip({ side:false, confirmed:true }).text()), 'finished + recorded is settled');
     });
 
     test('and trip totals still reconcile', () => {

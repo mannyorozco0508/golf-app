@@ -123,6 +123,9 @@ const kpWave = (t, live) => {
     }
     return out;
 };
+// 2026-09-22 (KP NEVER REFUNDS): layered on top of kpWave - helpers/kp-never-refunds.js
+// says exactly what moves. The old text, plus that wave, plus this rule, IS today's text.
+const { kpNeverRefunds } = require('./helpers/kp-never-refunds.js');
 
 describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new text', () => {
     const PREV = JSON.parse(read('skins_rows_prev.fixture.json'));
@@ -132,9 +135,9 @@ describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new t
             const now = strip(arrive(VARIANTS[k]()).pool);
             const ties = (before.match(/No Skin/g) || []).length;
             assert.ok(ties >= 12, 'the old text had the tie rows: ' + ties);
-            const transformed = kpWave(v142(before
+            const transformed = kpNeverRefunds(kpWave(v142(before
                 .replace(/\|H\d+ — Tie at (Gross|Net) \d+ — No Skin(?=\|)/g, '')
-                .replace(/\|H(\d+) — /g, '|Hole $1 — ')), false);
+                .replace(/\|H(\d+) — /g, '|Hole $1 — ')), false));
             assert.equal(now, transformed);
             assert.doesNotMatch(now, /No Skin/);
             assert.doesNotMatch(now, /\|H\d+ — /);
@@ -272,8 +275,8 @@ describe('THE SEAM — where the rows come from, and the print block', () => {
     test('engines untouched by this wave', () => {
         const h = f => sha(read(f)).slice(0, 8);
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(h('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3.   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
-        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
+        assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
+        assert.equal(h('settlement-engine.js'), 'f7712d87');   // f7712d87: KP never refunds 2026-09-22 (approved: the refund wording): the per-reason KP refund ledger line is gone; was 9043e7fc.
         assert.equal(h('live-skins.js'), sha(read('live-skins.js')).slice(0, 8));
         assert.equal(h('money-engine.js'), '3c960947');
     });

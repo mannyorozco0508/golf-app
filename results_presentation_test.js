@@ -184,16 +184,16 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         assert.ok(!/Not Final/.test(strip(b.summary())));
     });
 
-    // RE-PINNED 2026-09-19 (recording pays): every card on this round is in, so a
-    // round with nothing recorded is FINAL - its blank KP holes refund - and the
-    // KP-only hold that had its own head (v149) no longer exists. What still holds
-    // the page at LIVE RESULTS is a round in play (receipt_final_test.js).
-    test('every card in, nothing recorded: FINAL RESULTS - the blanks refund, nothing hangs', () => {
+    // RE-PINNED 2026-09-22 (KP never refunds), reversing 2026-09-19 which pinned
+    // this FINAL (the blanks refunded). A blank KP holds its share, so the round
+    // is not settled and the KP-only hold's own head (v149) is back.
+    test('every card in, nothing recorded: RESULTS — NOT FINAL - the blanks are held, never refunded', () => {
         const b = boot({ confirmed: false, winners: {} });
-        assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), true);
+        assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), false);
         const t = strip(b.summary());
-        assert.ok(!/RESULTS — NOT FINAL|unconfirmed|LIVE RESULTS/.test(t));
-        assert.match(t, /Player Payouts/);
+        assert.match(t, /RESULTS — NOT FINAL/);
+        assert.match(t, /KP on holes 3, 7, 12, 16 not recorded/);
+        assert.ok(!/unconfirmed|LIVE RESULTS|Player Payouts/.test(t));
     });
 
     test('the same round still in play is LIVE, and finishing it moves the page to FINAL', () => {

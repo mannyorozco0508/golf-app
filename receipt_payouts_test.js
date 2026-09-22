@@ -252,7 +252,7 @@ describe('A GAME WITH NO WINNERS is handled, not blank', () => {
         assert.equal(P.games[1].groups[0].rows.length, 0);
         assert.match(P.games[1].groups[0].note, /No scores/);
         assert.equal(P.games[2].groups[0].rows.length, 0);
-        assert.match(P.games[2].groups[0].note, /no winner|refunded/i);
+        assert.match(P.games[2].groups[0].note, /No KP winners — the money went to the skins pot/);   // 2026-09-22: never refunded
     });
 });
 

@@ -95,14 +95,18 @@ describe('LIVE MODE — A GOLF SUMMARY', () => {
         assert.match(results({ thru:[6,6,4] }).text(), /THRU 4/, 'the slowest group sets it');
     });
 
-    test('a round with every score in and NO KP recorded is FINAL (2026-09-19): the blanks refund, nothing is withheld', () => {
-        // Re-pinned 2026-09-19 (recording pays): this used to hold the round at
-        // RESULTS — NOT FINAL until an organizer confirmed the KPs. A finished
-        // round has no unresolved KP money any more - a blank hole is nobody's and
-        // goes back to the field - so the money is final with the golf.
+    test('a round with every score in and NO KP recorded is NOT FINAL (2026-09-22): the blanks are held, never refunded', () => {
+        // 2026-09-19 pinned this FINAL (the blanks refunded). Reversed 2026-09-22:
+        // KP money never goes back to the field, so a finished round with a blank KP
+        // holds that share in the pot and the head says so, naming the holes.
         const t = results({ thru:[18,18,18], confirmed:false }).text();
-        assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(t));
-        assert.match(t, /Player Payouts/);   // v195b: final on a Weekly Game round is the payouts, not a NET list
+        assert.match(t, /RESULTS — NOT FINAL/);
+        assert.ok(!/LIVE RESULTS/.test(t), 'not live either - every card is in');
+        assert.match(t, /KP on holes 3, 7, 12, 16 not recorded/);
+        // CONTROL: with the four winners recorded the same round is final
+        const f = results({ thru:[18,18,18], confirmed:true }).text();
+        assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(f));
+        assert.match(f, /Player Payouts/);   // v195b: final on a Weekly Game round is the payouts, not a NET list
     });
 
     test('a round with holes missing is live even when settled === true', () => {

@@ -424,39 +424,57 @@ function computeMoneyPool(data, courseData, savedScores) {
         const kpWinners = data.kpWinners || {};
         const kpNoWinner = (data.kpNoWinner || {});
         const lines = [];
-        let unclaimed = 0;      // legitimately nobody's - refunds
-        let unresolved = 0;     // nobody has said yet - withheld
+        // KP MONEY NEVER GOES BACK TO THE FIELD (2026-09-22, Manny's rule). Three
+        // states, and none of them is a refund:
+        //   paid        a pool participant was recorded - recording pays (v182).
+        //   skins       the organizer called "nobody" (kpNoWinner): the share is
+        //               ADDED TO THE SKINS BUCKET below, before the skins are
+        //               allocated and the pots split, so the skins pot is that
+        //               much bigger. A round with no skins bucket has nowhere to
+        //               send it and holds it instead (unresolved).
+        //   unresolved  a blank hole - live OR finished (a finished round with a
+        //               blank KP is NOT final until a winner or "nobody" is
+        //               recorded) - or a recorded winner who is no longer in the
+        //               pool (marked Out on the Players sheet): held, so
+        //               kpUnresolvedCents > 0 and settled === false, which is the
+        //               one flag every money surface reads for "not final".
+        // Until 2026-09-22 a blank on a finished round, "nobody", and an outside
+        // winner each refunded the share to the field equally; that branch is gone.
+        const skinsBucket = pool.skins && (pool.skins.mode === 'remainder'
+            || (pool.skins.mode === 'fixed' && (Number(pool.skins.amount) || 0) > 0));
+        let toSkins = 0;        // "nobody" - into the skins bucket
+        let unresolved = 0;     // held: a blank, or a winner out of the pool
         holes.forEach((h, i) => {
             const wid = kpWinners['h' + h];
             const declaredNoWinner = kpNoWinner['h' + h] === true;
 
-            // Only a POOL PARTICIPANT can take pool money. A non-participant on the
-            // sticks gets bragging rights; their KP share refunds to the field.
+            // Only a POOL PARTICIPANT can take pool money. A recorded winner who is
+            // not in the pool any more (Out) holds the hole until it is re-recorded.
             if (wid && isIn(wid)) {
                 // RECORDING PAYS. No confirmation step.
                 pay(wid, shares[i]);
                 lines.push({ hole: h, winnerId: String(wid), winnerName: nameOf(wid),
                              cents: shares[i], state: 'paid' });
-            } else if (declaredNoWinner || (wid && !isIn(wid)) || finished) {
-                // The organizer's early call that nobody won it; a winner who is not
-                // in the pool; or a BLANK hole on a FINISHED round - nobody recorded
-                // it and the last card is in, so the share goes back to the field.
-                // A blank on a LIVE round never lands here.
-                unclaimed += shares[i];
+            } else if (declaredNoWinner && skinsBucket) {
+                toSkins += shares[i];
                 lines.push({ hole: h, winnerId: null, winnerName: null,
-                             cents: shares[i], state: 'refunded' });
+                             cents: shares[i], state: 'skins' });
             } else {
-                // LIVE and blank: "not yet". The money stays where it is.
+                // Blank (live or finished), a winner out of the pool, or "nobody" with
+                // no skins bucket to take it: held. The money stays in the pot.
                 unresolved += shares[i];
+                // A recorded winner who is Out is no longer a participant, so his
+                // name is read from the roster - the surfaces name him.
+                const outName = wid ? (((data.players || []).find(p => String(p.id) === String(wid)) || {}).name || nameOf(wid)) : null;
                 lines.push({ hole: h, winnerId: wid ? String(wid) : null,
-                             winnerName: wid ? nameOf(wid) : null,
-                             cents: shares[i], state: 'unresolved' });
+                             winnerName: outName,
+                             cents: shares[i], state: 'unresolved',
+                             reason: declaredNoWinner ? 'nobody' : (wid ? 'out' : 'blank') });
             }
         });
-        if (unclaimed > 0) { refundCents += unclaimed; refundReason('Unclaimed KP money refunded to the field.'); }
         kpUnresolvedCents = unresolved;
         result.kp = { amountCents, perHoleCents: shares, lines,
-                      unclaimedCents: unclaimed, unresolvedCents: unresolved,
+                      toSkinsCents: toSkins, unresolvedCents: unresolved,
                       finished };
     }
 
@@ -562,11 +580,15 @@ function computeMoneyPool(data, courseData, savedScores) {
     // ---- SKINS -------------------------------------------------------------
     const skCfg = pool.skins || { mode: 'none' };
     if (skCfg.mode === 'remainder' || skCfg.mode === 'fixed') {
-        const amountCents = skCfg.mode === 'fixed'
+        // The bucket, plus every KP share the organizer called "nobody" on
+        // (result.kp.toSkinsCents, 2026-09-22) - so the pot the skins are paid from,
+        // and the pot each flight gets, is that much bigger.
+        const amountCents = (skCfg.mode === 'fixed'
             ? Math.round(Number(skCfg.amount) * 100)
             : totalPoolCents
                 - (result.kp ? result.kp.amountCents : 0)
-                - (result.net ? result.net.amountCents : 0);
+                - (result.net ? result.net.amountCents : 0))
+            + ((result.kp && result.kp.toSkinsCents) || 0);
         const scoring = skCfg.scoring === 'gross' ? 'gross' : 'net';
         // One rule, in action-model.js. See skinsCarriesOver().
         const carry = (typeof skinsCarriesOver === 'function')

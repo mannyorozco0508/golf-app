@@ -182,11 +182,14 @@ describe('CONFIRMED KP RETURNS TO ZERO-SUM', () => {
             assert.equal(v.net, moved[v.name] || 0, `${v.name}: transactions must reconcile`));
     });
 
-    test('an explicit no-winner still refunds and still balances', () => {
+    test('an explicit no-winner goes to the skins pot (2026-09-22) and still balances', () => {
+        // Wave B refunded it to the field; since 2026-09-22 KP money never goes
+        // back to the field - the share joins the skins bucket. Still zero-sum.
         const r = round({ winners:{ h3:'101', h7:'105', h16:'102' },
                           confirmed:true, noWinner:{ h12:true } });
         assert.equal(r.pool.kpUnresolvedCents, 0);
-        assert.ok(r.pool.kp.unclaimedCents > 0, 'Wave B refund behaviour is untouched');
+        assert.ok(r.pool.kp.toSkinsCents > 0, 'the share went to skins');
+        assert.ok(!/KP/.test(r.pool.refund.reasons.join(' ')), 'and not to the field');
         assert.equal(ledgerSum(r.combined), 0);
     });
 });

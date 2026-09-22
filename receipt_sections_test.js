@@ -91,11 +91,29 @@ const VARIANTS = { off: () => build(undefined), field: () => build({ enabled: tr
 // liveResults shas off 83ef04da18864a3ae4181eb52045cdd278f319fbcba9598611c70e72bc457cde,
 // field c04d25b657b54f849ba0485ade3d88056a7631bf111e0a4a0ce91e6d780092f2, flight
 // 2869f502b7658f73078158f2d35b04d92817a74138982c6e364a69c77b1d434f.
+// RE-PINNED 2026-09-22 (KP never refunds, v197). Both surfaces moved in all
+// three variants. receiptPool: holes 7/12/16 read "not recorded · $10 in the
+// pot" rather than "nobody recorded it · $10 back to the field", the
+// "↩️ Refunded to the field (Unclaimed KP money refunded to the field.)" row
+// and its $30 are gone, and the head gains "Not final — KP on holes 7, 12, 16
+// not recorded" - helpers/kp-never-refunds.js is exactly that, and the chain
+// v133 capture -> skins rows -> v142 -> recording pays -> this rule reproduces
+// BOTH the v182 sha below and today's (skins_rows_widgets_test.js, same round).
+// liveResults: the gap line leads and the KP-only head is back - "RESULTS —
+// NOT FINAL / Every card is in. A KP is not recorded — its share stays in the
+// pot, and final money appears once the winner is recorded." in place of
+// "LIVE RESULTS — THRU 18 / The round is still in play. Final money appears
+// once every card is in." - and the inverse of those two edits on today's
+// text IS the v148/v182 sha, byte for byte (the test below). The v182
+// receiptPool shas were off/field d2868b4f7c08e99b703af0edc3e5d5718580c9f7c0b9d7ba6346e2d5495b6c17,
+// flight cf22167ee045a47d6333d88dc3661c28878c743ed39797b0bc2d284fef2c3867; the
+// v182 liveResults shas were the v148 ones recorded above.
 const PREV_TEXT = {
-    off:    { receiptPool: 'd2868b4f7c08e99b703af0edc3e5d5718580c9f7c0b9d7ba6346e2d5495b6c17', liveResults: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff' },
-    field:  { receiptPool: 'd2868b4f7c08e99b703af0edc3e5d5718580c9f7c0b9d7ba6346e2d5495b6c17', liveResults: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311' },
-    flight: { receiptPool: 'cf22167ee045a47d6333d88dc3661c28878c743ed39797b0bc2d284fef2c3867', liveResults: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' }
+    off:    { receiptPool: 'ce69786ede69904c7c10928d9c6bcfa8a3f8dea6676fe13c22f28bc18f64e416', liveResults: 'f0956cc3b441e989aaad33f87e5b10813f4362234e38acbfc081e72e658dc863' },
+    field:  { receiptPool: 'ce69786ede69904c7c10928d9c6bcfa8a3f8dea6676fe13c22f28bc18f64e416', liveResults: 'e0192f452a8bf0e793b33aeac84f7c61d6eb44744f60fb7cd4cd7f8713a46543' },
+    flight: { receiptPool: '6fa9c3a2c96d2914a69119fdf35d226f6d47d4bd747d7073cf98db3850d21c3d', liveResults: 'd7dd4b9bbc09867de5ec990128f2a7fa491a24c91fbf4d0f446fdf0ac2b6e5c1' }
 };
+const V182_LIVE = { off: 'c356897208f52fac57f99130c1ad5870d7ea21218376f95bfdee0723114effff', field: 'b55349de443d8c2f908cc158f204c0552248b13a4c55db43c0043188e9e8c311', flight: '4b35f8a839114cf7f30b8ac583cd744303be4214640c1acdf1f473f431e135a0' };
 function render(data) {
     const st = loadHtmlInlineScript('settlement.html');
     st.__d = J(data);
@@ -116,6 +134,14 @@ describe('NOTHING ABOUT THE MONEY CHANGES: the text of every surface is the pre-
     Object.keys(VARIANTS).forEach(k => {
         test(k + ': Main Pool section text unchanged', () => assert.equal(sha(strip(R[k].pool)), PREV_TEXT[k].receiptPool));
         test(k + ': LIVE RESULTS text unchanged', () => assert.equal(sha(strip(R[k].live)), PREV_TEXT[k].liveResults));
+        test(k + ': LIVE RESULTS minus the KP hold\'s two edits IS the v182 text (2026-09-22)', () => {
+            const now = strip(R[k].live);
+            const gap = '|Not final — KP on holes 7, 12, 16 not recorded';
+            const held = '|🏆 RESULTS — NOT FINAL|Every card is in. A KP is not recorded — its share stays in the pot, and final money appears once the winner is recorded.|';
+            assert.ok(now.indexOf(gap) === 0 && now.indexOf(held) > 0, 'both edits are in today\'s text');
+            const back = now.slice(gap.length).replace(held, '|🏆 LIVE RESULTS — THRU 18|The round is still in play. Final money appears once every card is in.|');
+            assert.equal(sha(back), V182_LIVE[k]);
+        });
     });
 });
 

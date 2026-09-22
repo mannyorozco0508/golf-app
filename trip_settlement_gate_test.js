@@ -106,9 +106,12 @@ describe('AN UNSETTLED ROUND STOPS THE TRIP CALLING ITSELF FINAL', () => {
         assert.match(t, /will change once those rounds are finished/);
     });
 
-    test('a FINISHED round with no KP recorded does NOT hold the trip (2026-09-19): the blanks refund', () => {
+    test('a FINISHED round with no KP recorded HOLDS the trip (2026-09-22): the blanks are held, never refunded', () => {
+        // 2026-09-19 pinned the opposite (the blanks refunded). Reversed.
         const t = boot([{ label:'Caledonia', confirmed:false }]).text();
-        assert.ok(!/Not Settled Yet|unconfirmed/.test(t), t.slice(0, 160));
+        assert.match(t, /Not Settled Yet/);
+        assert.ok(!/unconfirmed/.test(t), t.slice(0, 160));
+        assert.ok(!/Not Settled Yet/.test(boot([{ label:'Caledonia', confirmed:true }]).text()), 'CONTROL: recorded settles it');
     });
 
     test('ONE bad round among several still blocks the whole trip', () => {

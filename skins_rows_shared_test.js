@@ -174,6 +174,9 @@ const kpWave = (t, live) => {
     }
     return out;
 };
+// 2026-09-22 (KP NEVER REFUNDS): layered on top of kpWave - helpers/kp-never-refunds.js
+// says exactly what moves. The old text, plus that wave, plus this rule, IS today's text.
+const { kpNeverRefunds } = require('./helpers/kp-never-refunds.js');
 
 describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-extraction text', () => {
     const PREV = JSON.parse(read('skins_rows_extract_prev.fixture.json'));
@@ -186,7 +189,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
     ['no-carry', 'carry', 'nothing-won', 'flighted'].forEach(k => {
         const now = surfaces(ROUNDS[k]());
         ['receipt', 'card', 'board'].forEach(s => test(k + ' / ' + s + ': character for character', () => {
-            assert.equal(now[s], s === 'receipt' ? kpWave(v142(PREV.rounds[k][s]), false) : PREV.rounds[k][s]);
+            assert.equal(now[s], s === 'receipt' ? kpNeverRefunds(kpWave(v142(PREV.rounds[k][s]), false)) : PREV.rounds[k][s]);
             assert.ok(now[s].length > 40, 'not vacuous');
         }));
     });
@@ -196,7 +199,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
         assert.equal(now.board, PREV.rounds['carry-mid-round'].board);
         const before = PREV.rounds['carry-mid-round'].receipt;
         assert.match(before, /\|Holes 6–10 — Tied — carried, not won\|Hole 11 — Waiting on/, 'what the Receipt said before');
-        assert.equal(now.receipt, kpWave(v142(before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on')), true),
+        assert.equal(now.receipt, kpNeverRefunds(kpWave(v142(before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on')), true), { live: true }),
             'the ONE deliberate difference, and nothing else');
         assert.match(now.card, /\|Holes 6–10 — Tied — carried to Hole 11\|/, 'the sentence the Card already used');
     });
@@ -233,9 +236,9 @@ describe('THE SEAM — called by all three, defined once', () => {
     });
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
+        assert.equal(h('settlement-engine.js'), 'f7712d87');   // f7712d87: KP never refunds 2026-09-22 (approved: the refund wording): the per-reason KP refund ledger line is gone; was 9043e7fc.
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
-        assert.equal(h('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3.   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
         assert.equal(h('money-engine.js'), '3c960947');
     });
 });

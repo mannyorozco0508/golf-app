@@ -228,19 +228,21 @@ describe('KP — splits, ties rule, unclaimed money', () => {
         assert.equal(r.kp.lines[0].cents, 10000);
     });
 
-    test('an unclaimed KP refunds the field equally — no vanished money', () => {
-        // A refund now requires the organizer to have SAID nobody won it. A blank
-        // hole is unresolved, not free money - which is the whole point of Wave B.
+    test('a KP nobody won goes to the skins pot (2026-09-22) — never back to the field, no vanished money', () => {
+        // "Nobody" requires the organizer to have SAID it. A blank hole is
+        // unresolved, not free money - which is the whole point of Wave B. And the
+        // declared share is not free money either: it joins the skins bucket
+        // (until 2026-09-22 it refunded the field $4.16/$4.17 a head).
         const dUn = mk([4, 14], { h4: String(P[0].id) });
         dUn.kpConfirmed = { confirmed: true };
         dUn.kpNoWinner = { h14: true };
         const r = pool(dUn, SC);
-        assert.equal(r.kp.unclaimedCents, 5000);
-        assert.equal(r.refund.cents, 5000);
-        const shares = Object.values(r.refund.perPlayerCents);
-        assert.equal(shares.reduce((a, b) => a + b, 0), 5000);
-        assert.ok(shares.every(v => v === 416 || v === 417), '$50 across 12 golfers, cent-exact');
-        assertReconciled(r, 'unclaimed KP');
+        assert.equal(r.kp.toSkinsCents, 5000);
+        assert.equal(r.kp.lines[1].state, 'skins');
+        assert.equal(r.refund.cents, 0, 'no refund at all');
+        const without = pool(mk([4, 14], { h4: String(P[0].id), h14: String(P[1].id) }), SC);
+        assert.equal(r.skins.amountCents, without.skins.amountCents + 5000, 'the skins bucket is that $50 bigger');
+        assertReconciled(r, 'nobody KP');
     });
 
     test('a NON-PARTICIPANT KP winner cannot take pool money', () => {
@@ -248,8 +250,12 @@ describe('KP — splits, ties rule, unclaimed money', () => {
         d.kpConfirmed = { confirmed: true };
         d.moneyPool.participantIds = P.slice(0, 8).map(p => String(p.id));   // Paul excluded
         const r = pool(d, SC);
-        assert.equal(r.kp.lines[0].winnerId, null, 'his shot counts; the pool money refunds');
-        assert.equal(r.refund.cents >= 10000, true);
+        // 2026-09-22: his shot counts, and the money is HELD - not refunded, not
+        // paid - until the organizer re-records the hole for someone in the pool.
+        assert.equal(r.kp.lines[0].state, 'unresolved'); assert.equal(r.kp.lines[0].reason, 'out');
+        assert.equal(r.kp.lines[0].winnerName, 'Paul', 'the line still names who hit it');
+        assert.equal(r.kpUnresolvedCents, 10000); assert.equal(r.settled, false);
+        assert.ok(!/KP/.test(r.refund.reasons.join(' ')), 'no KP refund');
         assertReconciled(r, 'outsider KP');
     });
 });
@@ -573,14 +579,15 @@ describe('20 POOL SIMULATIONS', () => {
     sim('16 players, $25', () => quick(16, 25, { kp: { amount: 80, holes: [4, 14] },
         skins: { mode: 'remainder', scoring: 'net' } }));
     sim('smallest pool: 2 golfers', () => quick(2, 40, { skins: { mode: 'remainder', scoring: 'net' } }));
-    sim('a blank KP hole is held while the round is LIVE, and refunds once every card is in (2026-09-19)', () => {
+    sim('a blank KP hole is held while the round is LIVE, and still held once every card is in (2026-09-22)', () => {
         // Wave A refunded it; Wave B held it until an organizer confirmed; the KP
-        // wave made the rule live-vs-finished. A completed simulation is finished.
+        // wave of 2026-09-19 made the rule live-vs-finished (finished refunded);
+        // 2026-09-22: KP money never goes back to the field, so finished holds too.
         const { r } = quick(12, 40, { kp: { amount: 100, holes: [4, 14] },
             skins: { mode: 'remainder', scoring: 'net' } }, { h4: String(makeField(12)[0].id) });
-        assert.equal(r.kpUnresolvedCents, 0, 'every card in: hole 14 is nobody\'s and goes back to the field');
-        assert.equal(r.settled, true);
-        assert.ok(/Unclaimed KP/.test(r.refund.reasons.join(' ')));
+        assert.equal(r.kpUnresolvedCents, 5000, 'every card in: hole 14 is still held');
+        assert.equal(r.settled, false);
+        assert.ok(!/KP/.test(r.refund.reasons.join(' ')), 'and never refunded');
         const live = quick(12, 40, { kp: { amount: 100, holes: [4, 14] }, skins: { mode: 'remainder', scoring: 'net' } },
             { h4: String(makeField(12)[0].id) },
             P => { const s = {}; P.forEach((p, i) => CD.slice(0, 9).forEach(h => { s[`p${p.id}_h${h.hole}`] = h.par + i; })); return s; }).r;
@@ -664,8 +671,8 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
     const SC = ladderScores(P);
     const ROUND = () => ({ players: P, courseData: CD, gameFormat: 'stroke', scores: SC,
         kpWinners: { h4: String(P[0].id) }, kpConfirmed: { confirmed: true },
-        // Hole 14 refunds because the organizer SAID nobody won it. A blank hole is
-        // unresolved instead - silence is not a decision.
+        // Hole 14 goes to the skins pot because the organizer SAID nobody won it
+        // (2026-09-22). A blank hole is unresolved instead - silence is not a decision.
         kpNoWinner: { h14: true },
         moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [4, 14] },
@@ -752,12 +759,12 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // each golfer paid in is not something the Receipt needs to state.
         assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');
         assert.match(html, /Hole 4: Marty/);
-        // Each refund says why (2026-09-19): the organizer's early call reads
-        // "nobody won it"; a blank on a finished round "nobody recorded it".
-        assert.match(html, /Hole 14: nobody won it/);
+        // The "nobody" line says where the $50 went (2026-09-22): the skins pot,
+        // which is that much bigger - $280 + $50. Nothing is refunded.
+        assert.match(html, /Hole 14: nobody[\s\S]*\$50 to the skins pot/);
         assert.match(html, /1st: Marty[\s\S]*\$50/);
-        assert.match(html, /Skins Pot \u2014 \$280/);
-        assert.match(html, /Refunded to the field/);
+        assert.match(html, /Skins Pot \u2014 \$330/);
+        assert.ok(!/Refunded to the field|nobody won it/.test(html));
     });
 
     test('a NO-POOL round renders no banner and no receipt section', () => {

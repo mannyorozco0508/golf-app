@@ -187,10 +187,11 @@ describe('computeRoundSettlement: who is still out, and what finishes a round', 
         const s = settle(twoVtwo({ thruBy: [0, 0, 0, 0] }));
         assert.equal(s.started, false); assert.equal(s.finished, false); assert.equal(s.settled, false); assert.equal(s.playing, 0);
     });
-    test('a finished round with no KP recorded is settled (2026-09-19): the blanks refund, kpSettled true, nothing withheld', () => {
-        // Until the KP wave this held the round open (kpSettled false, $100 named).
+    test('a finished round with no KP recorded is NOT settled (2026-09-22): the blanks are held, kpSettled false, $100 named', () => {
+        // Held until 2026-09-19, refunded 2026-09-19 to 2026-09-22, held again
+        // since: KP money never goes back to the field.
         const s = settle(poolRound({ confirmed: false }));
-        assert.equal(s.finished, true); assert.equal(s.kpSettled, true); assert.equal(s.kpUnresolvedCents, 0); assert.equal(s.settled, true);
+        assert.equal(s.finished, true); assert.equal(s.kpSettled, false); assert.equal(s.kpUnresolvedCents, 10000); assert.equal(s.settled, false);
         const ok = settle(poolRound({ confirmed: true }));
         assert.equal(ok.kpSettled, true); assert.equal(ok.settled, true);
     });
@@ -295,17 +296,23 @@ describe('A HALF-PLAYED ROUND: named, counted, not called final', () => {
     });
 });
 
-// RE-PINNED 2026-09-19 (recording pays): a finished round with unrecorded KPs no
-// longer holds the trip - its blanks refund - so the "KP results are still
-// unconfirmed in" sentence is gone from the panel, the recap and the share text.
-describe('UNRECORDED KPs ON A FINISHED ROUND: no hold, no sentence', () => {
+// RE-PINNED 2026-09-22 (KP never refunds), reversing 2026-09-19: a finished
+// round with unrecorded KPs holds the trip again - its blanks are held in the
+// pot, not refunded. The old "KP results are still unconfirmed in" sentence
+// stays gone: nothing is "confirmed" any more, a hole is recorded or not.
+describe('UNRECORDED KPs ON A FINISHED ROUND: the trip is held, nothing says unconfirmed', () => {
     const b = boot([{ label: 'Caledonia', data: poolRound({ confirmed: false }) }]);
-    test('the trip is settled and nothing says unconfirmed', () => {
+    test('the trip is NOT settled and nothing says unconfirmed', () => {
         const m = b.money();
-        assert.ok(!/Not Settled Yet|unconfirmed/.test(m), m.slice(0, 120));
-        assert.equal(b.settled(), true);
-        assert.ok(!/unconfirmed|Not final/.test(b.recap()));
-        assert.ok(!/unconfirmed|NOT FINAL/.test(b.share()));
+        assert.match(m, /Not Settled Yet/);
+        assert.ok(!/unconfirmed/.test(m), m.slice(0, 120));
+        assert.equal(b.settled(), false);
+        assert.ok(!/unconfirmed/.test(b.recap() + b.share()));
+    });
+    test('CONTROL: the same round with its KPs recorded settles the trip', () => {
+        const ok = boot([{ label: 'Caledonia', data: poolRound({ confirmed: true }) }]);
+        assert.equal(ok.settled(), true);
+        assert.ok(!/Not Settled Yet/.test(ok.money()));
     });
 });
 

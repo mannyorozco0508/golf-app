@@ -366,10 +366,13 @@ describe('FINISH ROUND — PERMISSION AND UX', () => {
         assert.ok(!/KP winners not confirmed/.test(strip(b.gate())));
     });
 
-    test('an uncancelled round with every card in is Final too (2026-09-19): the gate is about cards, not KPs', () => {
-        // Until the KP wave this round was blocked for unconfirmed KPs. Recording
-        // pays: holes 3 and 7 are paid, the two blank holes refund, nothing hangs.
-        assert.equal(boot({ cancelled: false }).title(), 'Final Money');
+    test('an uncancelled round with every card in but two KPs blank is NOT final (2026-09-22): the blanks are held in the pot', () => {
+        // 2026-09-19 pinned this as Final (the blanks refunded). Reversed
+        // 2026-09-22: KP money never goes back to the field - a blank hole holds its
+        // share and the title says so. Holes 3 and 7 are recorded; 12 and 16 are not.
+        const b = boot({ cancelled: false });
+        assert.equal(b.title(), 'Money So Far \u2014 Not Final');
+        assert.match(strip(b.gate()), /KP not recorded on 2 holes — \$50 still in the pot/);
     });
 });
 

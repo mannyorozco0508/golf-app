@@ -61,7 +61,7 @@ const CORPUS = {
         scores: (() => { const s = scores([0, 1, 2, 3, 1, 4]); Object.keys(s).forEach(k => { if (parseInt(k.split('_h')[1], 10) > 9) delete s[k]; }); return s; })(),
         moneyPool: { enabled: true, buyIn: 40, kp: { amount: 100, holes: [4, 9, 14] },
             net: { amount: 100, places: [60, 40] }, skins: { mode: 'remainder', scoring: 'net', carryOver: true } } }),
-    '08 KP not recorded, round FINISHED (refunded to the field)': Object.assign({}, base, {
+    '08 KP not recorded, round FINISHED (held in the pot)': Object.assign({}, base, {
         moneyPool: { enabled: true, buyIn: 40, kp: { amount: 100, holes: [4, 9, 14] },
             net: { amount: 100, places: [60, 40] }, skins: { mode: 'remainder', scoring: 'net', carryOver: true } } }),
     '04 KP cancelled, remainder absorbs it': Object.assign({}, base, {
@@ -126,18 +126,22 @@ const PINNED = {
         "refundCents": 0,
         "kpUnresolvedCents": 10000
     },
-    "08 KP not recorded, round FINISHED (refunded to the field)": {
+    // Re-pinned 2026-09-22 (KP never refunds): the three blank holes hold their
+    // $100 - the same cents as case 03, because finishing the cards no longer
+    // frees the money. Until 2026-09-19 it was withheld; 2026-09-19 to 2026-09-22
+    // it refunded (101 7667, 102 1667, the rest -2333/-2334, refund 10000).
+    "08 KP not recorded, round FINISHED (held in the pot)": {
         "totalPoolCents": 24000,
         "perPlayerCents": {
-            "101": 7667,
-            "102": 1667,
-            "103": -2333,
-            "104": -2333,
-            "105": -2334,
-            "106": -2334
+            "101": 6000,
+            "102": 0,
+            "103": -4000,
+            "104": -4000,
+            "105": -4000,
+            "106": -4000
         },
-        "refundCents": 10000,
-        "kpUnresolvedCents": 0
+        "refundCents": 0,
+        "kpUnresolvedCents": 10000
     },
     "04 KP cancelled, remainder absorbs it": {
         "totalPoolCents": 24000,
@@ -176,17 +180,20 @@ const PINNED = {
         "refundCents": 0,
         "kpUnresolvedCents": 0
     },
+    // Re-pinned 2026-09-22 (KP never refunds): the "nobody" share on hole 9 ($50)
+    // goes into the skins bucket, not back to the field - the skins winner takes
+    // it. Was: 101 10834, 102 -166, 103/104/106 -3167, 105 -1167, refund 5000.
     "07 no winner declared on a KP hole": {
         "totalPoolCents": 24000,
         "perPlayerCents": {
-            "101": 10834,
-            "102": -166,
-            "103": -3167,
-            "104": -3167,
-            "105": -1167,
-            "106": -3167
+            "101": 15000,
+            "102": -1000,
+            "103": -4000,
+            "104": -4000,
+            "105": -2000,
+            "106": -4000
         },
-        "refundCents": 5000,
+        "refundCents": 0,
         "kpUnresolvedCents": 0
     }
 };

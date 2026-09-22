@@ -4230,10 +4230,15 @@ html {
         let head = '<div class="kp-block kp-ask' + (kpGroupHoleComplete(h) ? ' kp-ask-now' : '') + '">'
             + '<div class="kp-head">\u26F3 Hole ' + h + ' \u2014 Closest to the Pin</div>';
         const groupTag = leader && leader.group ? ' (Group ' + escapeHtml(String(leader.group)) + ')' : '';
+        // A recorded leader who is OUT of the round (the Players sheet): the hole
+        // is held, not paid, until it is re-recorded - say so where it is recorded.
+        const leaderOut = !!(winner && (currentData.players || []).some(p => String(p.id) === String(winner) && p.playingForMoney === false));
         head += leaderName
-            ? '<div class="kp-current">Current KP: <strong>' + escapeHtml(leaderName) + '</strong>' + groupTag
-              + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
-              + (distLine ? '' : '<div class="kp-dist-none">Distance not recorded</div>')
+            ? (leaderOut
+                ? '<div class="kp-current">Current KP: <strong>' + escapeHtml(leaderName) + '</strong> \u2014 out of the round, re-record it</div>'
+                : '<div class="kp-current">Current KP: <strong>' + escapeHtml(leaderName) + '</strong>' + groupTag
+                  + (distLine ? ' \u2014 ' + distLine : '') + '</div>'
+                  + (distLine ? '' : '<div class="kp-dist-none">Distance not recorded</div>'))
             : '<div class="kp-current kp-none">No KP yet.</div>';
 
         // Only this group's golfers are selectable. Another foursome may hold the
@@ -5226,7 +5231,7 @@ html {
                 p.playingForMoney = false; p.out = true; changed = true;
                 Object.keys(data.kpLeaders || {}).forEach(h => {
                     const l = data.kpLeaders[h];
-                    if (l && String(l.playerId) === String(p.id)) warnings.push(golferLabel(p) + ' leads KP on ' + h.replace(/^h/, '') + ' \u2014 it will be refunded unless re-recorded');
+                    if (l && String(l.playerId) === String(p.id)) warnings.push(golferLabel(p) + ' leads KP on ' + h.replace(/^h/, '') + ' \u2014 re-record it after saving');
                 });
             } else if (!e.out && wasOut) {
                 updates['players/' + e.idx + '/playingForMoney'] = true; updates['players/' + e.idx + '/out'] = null;
@@ -6234,7 +6239,12 @@ html {
         // v192: a blank INSIDE a card (score-gaps.js, whole field by group) is
         // named first - it is the one that changes a total, not just a "not yet".
         const gaps = gapsForField();
-        const gapLineHtml = gaps.length ? '<div class="fr-gap-line">' + notFinalLine(gaps, gapShownName) + '</div>' : '';
+        // and the KP hold (2026-09-22): a KP hole with no recorded winner
+        const extras = [];
+        if (typeof kpHoldPhrase === 'function' && typeof computeMoneyPool === 'function' && currentData.moneyPool && currentData.moneyPool.enabled !== false) {
+            try { const r = computeMoneyPool(currentData, currentData.courseData || [], currentData.scores || {}); const ph = r && r.valid ? kpHoldPhrase(r.kp, h => holePlayedByField(currentData.players, currentData.scores, h)) : ''; if (ph) extras.push(ph); } catch (e) { /* the pool card says its own error */ }
+        }
+        const gapLineHtml = (gaps.length || extras.length) ? '<div class="fr-gap-line">' + notFinalLine(gaps, gapShownName, extras) + '</div>' : '';
         if (missing.length === 0) { el.innerHTML = gapLineHtml; return; }
 
         const rows = missing.slice(0, 6).map(m =>
@@ -6670,8 +6680,8 @@ html {
 
         let html = '<div class="fr-money-title">KP Results · ' + $(r.kp.amountCents) + '</div>';
         if (unresolved > 0) {
-            html += '<div class="fr-review-note">' + $(unresolved) + ' still in the pot — pays when recorded, '
-                 + 'or goes back to the field once every card is in.</div>';
+            // KP money never refunds (2026-09-22): a blank hole holds the round open.
+            html += '<div class="fr-review-note">' + $(unresolved) + ' still in the pot \u2014 pays when recorded \u2014 record the winner to finish the round.</div>';
         }
 
         r.kp.lines.forEach(l => {
@@ -6682,16 +6692,16 @@ html {
             if (l.state === 'paid') {
                 right = '<span class="fr-gross">' + l.winnerName + '</span>'
                       + (dist ? '<br><span class="fr-net">' + dist + '</span>' : '');
-            } else if (l.state === 'refunded') {
-                // Three ways here, each named: the early call, an outsider's shot, or a
-                // blank on a finished round (nobody recorded it).
-                const w = (currentData.kpWinners || {})['h' + l.hole];
-                right = '<span class="fr-net">'
-                      + (noWin['h' + l.hole] === true ? 'Nobody won it'
-                          : (w ? 'Not in the pool' : 'Nobody recorded it'))
-                      + ' — ' + $(l.cents) + ' refunded</span>';
+            } else if (l.state === 'skins') {
+                // "Nobody": the share went into the skins pot (2026-09-22).
+                right = '<span class="fr-net">Nobody \u2014 ' + $(l.cents) + ' to the skins pot</span>';
             } else {
-                right = '<span class="fr-incomplete">Not recorded yet</span>';
+                // Held: a blank (live or finished), a winner out of the round, or
+                // "nobody" with no skins pot to take it.
+                right = '<span class="fr-incomplete">'
+                      + (l.reason === 'out' ? escapeHtml(l.winnerName || '') + ' is out of the round \u2014 re-record it'
+                          : (l.reason === 'nobody' ? 'Nobody \u2014 no skins pot, still in the pot' : 'Not recorded'))
+                      + '</span>';
             }
             html += '<div class="fr-player-row' + (l.state === 'unresolved' ? ' fr-row-incomplete' : '') + '">'
                  + '<span class="fr-player-name">Hole ' + l.hole + '</span>'
@@ -6701,8 +6711,8 @@ html {
         // THE ORGANIZER'S TWO CALLS, using the SAME authority Wave C established - a
         // group link may set its own foursome's leader on the course; whole-field
         // decisions are the organizer's.
-        //   "nobody won it"   per blank hole, while the round is live (an early call;
-        //                     once the round is finished a blank refunds on its own)
+        //   "nobody won it"   per blank hole, live or finished - the share goes to
+        //                     the skins pot; a blank never settles on its own (2026-09-22)
         //   Cancel KPs        at the foot, in every state but cancelled - a group that
         //                     decides not to play KPs is real, before or after the
         //                     round. Deliberately secondary: unusual and irreversible
@@ -6718,11 +6728,11 @@ html {
         mount.innerHTML = html;
     }
 
-    // An explicit organizer call that a hole had no winner - the early way to send
-    // a blank hole's share back to the field before the round is finished.
+    // An explicit organizer call that a hole had no winner. The share goes into
+    // the skins pot (2026-09-22, KP money never refunds).
     function frKpDeclareNoWinner(hole) {
         if (!hasOrganizerAuthority()) return;
-        if (!confirm('Record that nobody won the KP on hole ' + hole + '?\n\nThat share is refunded to the field.')) return;
+        if (!confirm('Record that nobody won the KP on hole ' + hole + '?\n\nThat share goes into the skins pot.')) return;
         if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before recording KP results.')) return;
         const updates = {};
         updates['kpNoWinner/h' + hole] = true;

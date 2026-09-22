@@ -359,10 +359,11 @@ describe('SAFETY RAILS PRESERVED', () => {
             .forEach(t => assert.ok(!block.includes(t), `KP payout math must stay in the engine; found ${t}`));
     });
 
-    test('a blank KP hole is withheld while the round is LIVE, and refunds once it is finished (2026-09-19)', () => {
+    test('a blank KP hole is withheld while the round is LIVE, and STILL withheld once it is finished (2026-09-22)', () => {
         // Wave A left a blank hole refunding; Wave B withheld it until an organizer
-        // confirmed; the KP wave of 2026-09-19 made the rule live-vs-finished. This
-        // test has carried each of those in turn - it is the seam, not the mechanism.
+        // confirmed; the KP wave of 2026-09-19 made the rule live-vs-finished; the
+        // 2026-09-22 rule (KP money never goes back to the field) holds it in both.
+        // This test has carried each of those in turn - it is the seam, not the mechanism.
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
         vm.createContext(sb);
         ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
@@ -379,8 +380,9 @@ describe('SAFETY RAILS PRESERVED', () => {
         assert.equal(r.settled, false, 'and the round is not settled');
         assert.ok(!/Unclaimed KP/.test(r.refund.reasons.join(' ')), 'no KP refund while live');
         const f = sb.computeMoneyPool({ players:ps, courseData:cd, scores:sc, settlementMode:'whole-dollar', kpWinners:{}, moneyPool: mp }, cd, sc);
-        assert.equal(f.kpUnresolvedCents, 0, 'every card in: nothing is withheld');
-        assert.equal(f.settled, true);
-        assert.ok(/Unclaimed KP/.test(f.refund.reasons.join(' ')), 'nobody recorded it - the $100 goes back to the field');
+        assert.equal(f.kpUnresolvedCents, 10000, 'every card in, nothing recorded: the $100 is still held');
+        assert.equal(f.settled, false);
+        assert.ok(!/KP/.test(f.refund.reasons.join(' ')), 'and never refunded');
+        assert.equal(f.kp.lines.filter(l => l.state === 'unresolved' && l.reason === 'blank').length, KP_HOLES.length);
     });
 });

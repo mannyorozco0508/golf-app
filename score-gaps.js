@@ -107,11 +107,37 @@ function gapLine(gap, shownName) {
     return shownName + ': ' + holesPhrase(h) + (h.length === 1 ? ' has' : ' have') + ' no score';
 }
 // "Not final — Marty is missing hole 1; Kopp is missing holes 2, 5"
-function notFinalLine(gaps, shownNameOf) {
-    if (!gaps || gaps.length === 0) return '';
-    return 'Not final — ' + gaps.map(g => shownNameOf(g) + ' is missing ' + holesPhrase(g.holes)).join('; ');
+// `extras` (2026-09-22): more phrases for the same line - the KP hold, below.
+function notFinalLine(gaps, shownNameOf, extras) {
+    const parts = (gaps || []).map(g => shownNameOf(g) + ' is missing ' + holesPhrase(g.holes)).concat(extras || []);
+    if (parts.length === 0) return '';
+    return 'Not final — ' + parts.join('; ');
+}
+// THE KP HOLD (2026-09-22, KP money never refunds). A KP hole with no
+// recorded winner - blank, a winner who is out of the round, or "nobody" on a
+// round with no skins pot - holds the round open until it is recorded. From
+// pool-engine's result: the unresolved lines' holes, as a phrase for the
+// Not-final line: "KP on hole 15 not recorded" / "KP on holes 7, 12 not recorded".
+// ON A LIVE ROUND only a hole the field has PLAYED is "not recorded": a KP
+// hole nobody has reached yet is not late, it is not yet. `played(hole)` is the
+// caller's predicate (holePlayedByField below); without one every held hole is
+// named, which is right once the cards are in.
+function kpHeldHoles(kp, played) {
+    return ((kp && kp.lines) || []).filter(l => l.state === 'unresolved' && (!played || played(l.hole))).map(l => l.hole);
+}
+function kpHoldPhrase(kp, played) {
+    const holes = kpHeldHoles(kp, played);
+    return holes.length ? 'KP on ' + holesPhrase(holes) + ' not recorded' : '';
+}
+// Every golfer who has teed off (any score at all) has a score on this hole.
+// A roster name with no score never teed off and is not waited for - the same
+// reading settlement-engine's computeRoundFinish gives a finished round.
+function holePlayedByField(players, scores, hole) {
+    const sc = scores || {};
+    const started = (players || []).filter(p => Object.keys(sc).some(k => k.indexOf('p' + p.id + '_h') === 0));
+    return started.length > 0 && started.every(p => sc['p' + p.id + '_h' + hole] !== undefined && sc['p' + p.id + '_h' + hole] !== null && sc['p' + p.id + '_h' + hole] !== '');
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { groupStartIndex, findScoreGaps, findScoreGapsByGroup, holesPhrase, gapLine, notFinalLine };
+    module.exports = { groupStartIndex, findScoreGaps, findScoreGapsByGroup, holesPhrase, gapLine, notFinalLine, kpHeldHoles, kpHoldPhrase, holePlayedByField };
 }

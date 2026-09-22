@@ -193,6 +193,6 @@ describe('THE SEAM (source, comments stripped)', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('hole-events.js'), '6fd7f7ed'); assert.equal(h('bet-strip.js'), '43880a61');
         assert.equal(h('money-engine.js'), '3c960947'); assert.equal(h('action-model.js'), 'ded86280');
-        assert.equal(h('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3. assert.equal(h('grouping.js'), sha(read('grouping.js')).slice(0, 8));   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
+        assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
     });
 });

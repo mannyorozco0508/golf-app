@@ -131,11 +131,13 @@ describe('OUT: scores kept, out of the pot and every field payout, the KP warnin
     test('the KP leader marked Out: the warning names him and the hole', () => {
         const sb = page(data);
         const u = build(sb, draftFrom(data, [{ idx: 9, out: true }]));
-        assert.deepEqual(u.warnings, ['Jon leads KP on 3 — it will be refunded unless re-recorded']);
+        assert.deepEqual(u.warnings, ['Jon leads KP on 3 — re-record it after saving']);
         assert.deepEqual(build(sb, draftFrom(data, [{ idx: 8, out: true }])).warnings, [], 'CONTROL: not for a golfer who leads nothing');
-        // and the engine does refund it once he is out (pool-engine: a winner not in the pool)
+        // and the engine HOLDS it once he is out (2026-09-22: never refunded; pool-engine: a winner not in the pool)
         const r = pool(u.after);
-        assert.equal(r.kp.lines.find(l => l.hole === 3).state, 'refunded');
+        const l = r.kp.lines.find(l => l.hole === 3);
+        assert.equal(l.state, 'unresolved'); assert.equal(l.reason, 'out');
+        assert.ok(!/KP/.test(r.refund.reasons.join(' ')), 'no KP refund');
     });
     test('the money line: "Pot $460 → $440 · Flight B 11 → 10. Scores are in — net finish and skins will recompute."', () => {
         const sb = page(data);

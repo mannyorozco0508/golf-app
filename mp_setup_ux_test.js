@@ -493,13 +493,16 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
             moneyPool: { enabled: true, buyIn: 40,
             kp: { amount: 100, holes: [3, 9, 13, 17] }, net,
             skins: { mode: 'remainder', scoring: 'net' } } });
+        // Skins = $480 - KP $100 - net, PLUS the four "nobody" KP shares ($100)
+        // that join the skins bucket since 2026-09-22 (they refunded before, and
+        // these read 31000 / 28000).
         const cases = [
-            [{ payoutMode: 'custom', amounts: [40, 30] }, 7000, 31000],
-            [{ payoutMode: 'custom', amounts: [50, 30, 20] }, 10000, 28000],
-            [{ payoutMode: 'custom', amounts: [100] }, 10000, 28000],
-            [{ payoutMode: 'custom', amounts: [50, 50] }, 10000, 28000],
-            [{ amount: 100, places: [60, 40] }, 10000, 28000],
-            [{ amount: 100, places: [50, 30, 20] }, 10000, 28000]
+            [{ payoutMode: 'custom', amounts: [40, 30] }, 7000, 41000],
+            [{ payoutMode: 'custom', amounts: [50, 30, 20] }, 10000, 38000],
+            [{ payoutMode: 'custom', amounts: [100] }, 10000, 38000],
+            [{ payoutMode: 'custom', amounts: [50, 50] }, 10000, 38000],
+            [{ amount: 100, places: [60, 40] }, 10000, 38000],
+            [{ amount: 100, places: [50, 30, 20] }, 10000, 38000]
         ];
         cases.forEach(([net, netCents, skinsCents], i) => {
             const r = pool2(mk(net), ladder());

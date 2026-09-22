@@ -58,7 +58,12 @@ const withoutShares = r => { const c = J(r); if (c.net) c.net.lines.forEach(l =>
 // only difference on these rounds (every KP is recorded on all of them; the
 // figures are the v143 figures to the cent). Both spellings are asserted present
 // on their own side, then dropped so the deep-equal is about the money.
-const kpField = (r, from, to) => { const c = J(r); if (c.kp) { assert.equal(c.kp[from], true, 'kp.' + from); delete c.kp[from]; } return c; };
+// kp.confirmed (v143) became kp.finished (2026-09-19) and kp.unclaimedCents became
+// kp.toSkinsCents (2026-09-22: a "nobody" share goes to the skins pot, not the
+// field); both are 0 on every round here (each KP is recorded), so the result
+// with the renamed field dropped is the v143 result.
+const kpField = (r, from, to) => { const c = J(r); if (c.kp) { assert.equal(c.kp[from], true, 'kp.' + from); delete c.kp[from];
+    const n = from === 'finished' ? 'toSkinsCents' : 'unclaimedCents'; assert.equal(c.kp[n], 0, 'kp.' + n); delete c.kp[n]; } return c; };
 const rowsIn = html => [...html.matchAll(/<div class="ledger-row pp-row"><span>([^<]*)<\/span><span class="val-pos">([^<]*)<\/span><\/div>/g)].map(m => [m[1], m[2]]);
 const netRowsOf = html => { const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag); const b = html.slice(a, e); const s = b.indexOf('pp-game-head">Net Finish<'); return rowsIn(b.slice(s, b.indexOf('<!-- /pp-game -->', s))); };
 const cents = s => Math.round(parseFloat(s.replace(/[^0-9.]/g, '')) * 100);
@@ -165,8 +170,8 @@ describe('THE SEAM', () => {
     });
     test('the files, by sha: pool-engine.js moved for this one field; the other engines did not', () => {
         const h = f => sha(read(f)).slice(0, 8);
-        assert.equal(h('pool-engine.js'), 'a335f19c');   // a335f19c: even skins split 2026-09-20 (approved per-file, this change only): skinsSplitMode(data) and the per-flight bucket divides evenly on flights.skinsSplit 'even', by headcount otherwise; was 846f33e3.   // 846f33e3: KP wave 2026-09-19 (approved per-file): recording pays, a blank refunds once finished, kpConfirmed ignored; shares/pay/refund arithmetic unchanged - kp_settlement_test.js proves it
-        assert.equal(h('settlement-engine.js'), '9043e7fc');   // 9043e7fc: KP wave 2026-09-19 (approved per-file): computeRoundFinish extracted from computeRoundSettlement, the ledger's refund line labelled by reason; the rule and every wager engine unchanged, no arithmetic changed
+        assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
+        assert.equal(h('settlement-engine.js'), 'f7712d87');   // f7712d87: KP never refunds 2026-09-22 (approved: the refund wording): the per-reason KP refund ledger line is gone; was 9043e7fc.
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');
     });

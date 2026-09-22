@@ -220,22 +220,26 @@ describe('A ROSTER NAME THAT NEVER TEED OFF is not waited for', () => {
     });
 });
 
-// RE-PINNED 2026-09-19 (recording pays). This describe held a finished round at
-// RESULTS — NOT FINAL until an organizer confirmed the KPs. A finished round has
-// no unresolved KP money now - a blank hole is nobody's and refunds - so the
-// third head shape is gone: every card in means Final, recorded or not.
-describe('EVERY CARD IN, KPs NOT RECORDED: FINAL - the blanks refund, nothing is withheld', () => {
+// RE-PINNED 2026-09-22 (KP never refunds). 2026-09-19 pinned a finished round
+// with nothing recorded as Final (its blanks refunded). Reversed: KP money never
+// goes back to the field, so a blank hole holds its share, the round is not
+// settled, and the third head shape - RESULTS — NOT FINAL - is back, with the
+// gap line naming the holes. Verification does not change that: it finishes the
+// cards, not the KPs.
+describe('EVERY CARD IN, KPs NOT RECORDED: NOT FINAL - the blanks are held, never refunded', () => {
     const r = receipt(poolRound({ confirmed: false }));
-    test('Final Results and the money summary', () => {
+    test('RESULTS — NOT FINAL, the holes named, no payouts yet', () => {
         const s = r.summary();
-        assert.ok(!/🏁 Final Results/.test(s), 'v195b: no NET list on a Weekly Game receipt');
-        assert.ok(!/RESULTS — NOT FINAL|still in play|unconfirmed/i.test(s));
-        assert.match(s, /Player Payouts/);
-        assert.equal(r.isFinal(), true);
+        assert.match(s, /Not final — KP on holes 3, 7, 12, 16 not recorded/);
+        assert.match(s, /RESULTS — NOT FINAL/);
+        assert.match(s, /Every card is in\. A KP is not recorded — its share stays in the pot/);
+        assert.ok(!/LIVE RESULTS|still in play|unconfirmed|Player Payouts|🏁 Final Results/i.test(s));
+        assert.equal(r.isFinal(), false);
     });
-    test('verification finishes a round the same way: verified + nothing recorded is final', () => {
+    test('verification does NOT finish it: verified + nothing recorded is still held', () => {
         const v = receipt(poolRound({ confirmed: false, verified: true }));
-        assert.equal(v.isFinal(), true);
+        assert.equal(v.isFinal(), false);
+        assert.match(v.summary(), /RESULTS — NOT FINAL/);
     });
     test('KPs recorded: final, as today', () => {
         assert.equal(receipt(poolRound()).isFinal(), true);
@@ -243,9 +247,10 @@ describe('EVERY CARD IN, KPs NOT RECORDED: FINAL - the blanks refund, nothing is
 });
 
 describe('IN PLAY with KPs not yet recorded: the in-play head alone', () => {
-    test('the head names the golfers still out; no KP clause (a live blank is simply not yet)', () => {
+    test('the head names the golfers still out; the gap line above it names the KP holes the field has PLAYED (2026-09-22)', () => {
+        // thru 9: holes 3 and 7 are not recorded; 12 and 16 are not yet, and are not named
         const s = receipt(poolRound({ confirmed: false, thru: 9 })).summary();
-        assert.match(s, /^\|🏆 LIVE RESULTS — THRU 9\|Still in play — thru 9, 12 golfers still have holes left: Marty \(9 of 18\), Scott \(9 of 18\), Carp \(9 of 18\), Randy \(9 of 18\), Manny \(9 of 18\), Matt B \(9 of 18\) \+ 6 more\. Final money appears once every card is in, or once the scores are confirmed in Finish Round\.\|/);
+        assert.match(s, /^\|Not final — KP on holes 3, 7 not recorded\|🏆 LIVE RESULTS — THRU 9\|Still in play — thru 9, 12 golfers still have holes left: Marty \(9 of 18\), Scott \(9 of 18\), Carp \(9 of 18\), Randy \(9 of 18\), Manny \(9 of 18\), Matt B \(9 of 18\) \+ 6 more\. Final money appears once every card is in, or once the scores are confirmed in Finish Round\.\|/);
     });
 });
 
@@ -282,8 +287,8 @@ describe('THE SEAMS', () => {
         assert.match(fn, /Still in play/);
         ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPlayerLedgerHtml(', 'TOTAL PAYOUT', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
     });
-    test('settlement-engine.js moved for the KP wave (sha 9043e7fc; was 42923121, v148)', () => {
-        assert.equal(sha8('settlement-engine.js'), '9043e7fc');
+    test('settlement-engine.js moved for KP-never-refunds (sha f7712d87; was 9043e7fc for the KP wave, 42923121 at v148)', () => {
+        assert.equal(sha8('settlement-engine.js'), 'f7712d87');
     });
     test('HANDOFF no longer says the Receipt decides Final from computeMoneyPool alone', () => {
         const h = read('HANDOFF.md');

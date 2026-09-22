@@ -157,14 +157,19 @@ describe('TOTALS EQUAL WHAT IS PRINTED', () => {
     });
 
     test('TODAY\'S ROUND: the acceptance figures', () => {
+        // Re-pinned 2026-09-22 (KP never refunds): the four "nobody" KPs put $100
+        // into the skins pot instead of $8/$9 a head back to the field, so the six
+        // skins winners split $410 not $310 and nobody has a refund row.
+        // Was: Carp 128 (30 + 89 + 9), Marcus 92 (40 + 44 + 8), Scott 54 (45 + 9),
+        // Manny / Lance / Rocco 52 (44 + 8).
         const led = parse(boot().html());
         const total = n => led[n].find(r => r.final).amount;
-        assert.equal(total('Carp'), 128);     // 30 + 89 + 9
-        assert.equal(total('Marcus'), 92);    // 40 + 44 + 8
-        assert.equal(total('Scott'), 54);     // 45 + 9
-        assert.equal(total('Manny'), 52);     // 44 + 8
-        assert.equal(total('Lance'), 52);
-        assert.equal(total('Rocco'), 52);
+        assert.equal(total('Carp'), 148);     // 30 + 118
+        assert.equal(total('Marcus'), 98);    // 40 + 58
+        assert.equal(total('Scott'), 59);
+        assert.equal(total('Manny'), 58);
+        assert.equal(total('Lance'), 58);
+        assert.equal(total('Rocco'), 59);
     });
 });
 
@@ -178,13 +183,15 @@ describe('THE DETAIL WORTH KEEPING IS KEPT', () => {
 
     test('skins appear with their count', () => {
         const led = parse(boot().html());
-        assert.ok(led.Carp.some(r => /Skins \u00B7 2 skins/.test(r.label) && r.amount === 89));
-        assert.ok(led.Manny.some(r => /Skins \u00B7 1 skin\b/.test(r.label) && r.amount === 44));
+        assert.ok(led.Carp.some(r => /Skins \u00B7 2 skins/.test(r.label) && r.amount === 118));   // 89 before the $100 joined the pot
+        assert.ok(led.Manny.some(r => /Skins \u00B7 1 skin\b/.test(r.label) && r.amount === 58));
     });
 
-    test('refunds appear', () => {
+    test('no refund row: a "nobody" KP is the skins pot\'s, not the field\'s (2026-09-22)', () => {
+        // Until 2026-09-22 Marty's only row was his $8 KP refund.
         const led = parse(boot().html());
-        assert.ok(led.Marty.some(r => /refund/i.test(r.label) && r.amount > 0));
+        assert.ok(!led.Marty.some(r => /refund/i.test(r.label)));
+        assert.ok(led.Marty.some(r => r.label === 'No payout'));
     });
 
     test('a KP winner sees their KP hole', () => {
@@ -245,9 +252,9 @@ describe('NOTHING BEHIND THE VIEW CHANGED', () => {
     test('net balances are untouched by the display change', () => {
         const b = boot();
         const c = b.run(`computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)`);
-        // Carp's NET is still 88 (128 won less the 40 paid in) even though the
-        // section now shows 128. Two questions, two answers, one ledger.
-        assert.equal(plain(c.netByName).carp.net, 88);
+        // Carp's NET is still 108 (148 won less the 40 paid in) even though the
+        // section now shows 148. Two questions, two answers, one ledger.
+        assert.equal(plain(c.netByName).carp.net, 108);
         assert.equal(Object.values(plain(c.netByName)).reduce((a,v) => a + v.net, 0), 0);
     });
 
@@ -275,7 +282,9 @@ describe('NOTHING BEHIND THE VIEW CHANGED', () => {
         const b = boot();
         const p = b.run(`computeMoneyPool(currentData, currentData.courseData, currentData.scores)`);
         assert.equal(p.totalPoolCents, 48000);
-        assert.equal(p.kp.amountCents + p.net.amountCents + p.skins.amountCents, 48000);
+        // the four "nobody" shares sit in the skins bucket, so they come off the KP pot here (2026-09-22)
+        assert.equal(p.kp.amountCents - p.kp.toSkinsCents + p.net.amountCents + p.skins.amountCents, 48000);
+        assert.equal(p.kp.toSkinsCents, 10000);
         assert.equal(Object.values(plain(p.perPlayerCents)).reduce((a,b2) => a + b2, 0), 0);
     });
 

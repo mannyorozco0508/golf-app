@@ -101,7 +101,10 @@ function assertSound(label, r, { wholeDollar = true } = {}) {
     const { pool, combined } = r;
 
     if (pool && pool.valid) {
-        const buckets = (pool.kp ? pool.kp.amountCents : 0)
+        // A "nobody" KP share is counted once: kp.amountCents is the configured
+        // KP pot, and the skins bucket already holds the share moved into it
+        // (2026-09-22, toSkinsCents), so it comes off here.
+        const buckets = (pool.kp ? pool.kp.amountCents - (pool.kp.toSkinsCents || 0) : 0)
                       + (pool.net ? pool.net.amountCents : 0)
                       + (pool.skins ? pool.skins.amountCents : 0);
         assert.equal(buckets, pool.totalPoolCents, `${label}: pool buckets do not account for the buy-ins`);
@@ -296,14 +299,12 @@ describe('20 DETERMINISTIC SIMULATIONS', () => {
         assertSound('sim16', r);
     });
 
-    test('17. a KP the organizer declares nobody won refunds to the field', () => {
-        // Retitled: an UNENTERED hole is unresolved now. A refund requires the
-        // organizer to have said outright that nobody won it.
+    test('17. a KP the organizer declares nobody won goes to the skins pot (2026-09-22) - never the field', () => {
         const r = round({ kpWinners: { h3:'101' }, kpConfirmed: { confirmed: true },
                           kpNoWinner: { h7:true, h12:true, h16:true } });
-        assert.ok(r.pool.kp.unclaimedCents > 0);
+        assert.ok(r.pool.kp.toSkinsCents > 0);
         assert.equal(r.pool.kpUnresolvedCents, 0, 'every hole was decided');
-        assert.match(r.pool.refund.reasons.join(' '), /Unclaimed KP/);
+        assert.ok(!/KP/.test(r.pool.refund.reasons.join(' ')), 'no KP refund');
         assertSound('sim17', r);
     });
 

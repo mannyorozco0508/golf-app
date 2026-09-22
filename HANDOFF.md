@@ -2282,6 +2282,40 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## KP money never goes back to the field — Wave v195b Part 3 (v197 cache), 2026-09-22
+
+**Manny's rule.** A KP share is paid to a recorded winner, moved to the skins pot
+when the organizer says nobody won it, or HELD in the pot — never refunded.
+`pool-engine.js` KP block (approved per-file): line states `paid | skins |
+unresolved`, an unresolved line carries `reason: 'blank' | 'out' | 'nobody'`
+(`nobody` only on a round with no skins bucket — nowhere for it to go, so held);
+`result.kp.toSkinsCents` is added to the skins bucket BEFORE the flight split, so
+both pots grow; `kpUnresolvedCents` is the held sum and `settled` is false while
+it is > 0, finished or verified or not. The 2026-09-19 "recording pays" refund of
+a blank on a finished round is reversed (that section below stands as history;
+its production note — four finished rounds refunding $100 — no longer applies:
+they hold). `settlement-engine.js` (approved wording only): the per-reason
+"KP refund · …" ledger lines are gone; a golfer's pool refund is one line,
+"Pool refund · <reasons>". Invariant unchanged:
+`prizes + refunds + kpUnresolvedCents === totalPoolCents`.
+
+**What a golfer sees.** The Not-final line (`score-gaps.js` `notFinalLine`
+extras, `kpHoldPhrase`) on the live head, the Weekly Game card, the Receipt head
+and Finish Round: "Not final — KP on hole 15 not recorded". On a LIVE round only
+holes the field has played are named (`holePlayedByField`): thru 10 with 7/12/16
+blank reads "KP on hole 7 not recorded". A finished round with a held KP has its
+own Results head again — "🏆 RESULTS — NOT FINAL / Every card is in. A KP is not
+recorded — its share stays in the pot…" (the v149 shape, back). Receipt lines:
+"Hole 7: not recorded · $10 in the pot", "Hole 7: nobody · $10 to the skins pot",
+"Hole 3: Jon is out of the round — re-record it · $10 in the pot". Finish Round:
+"$X still in the pot — pays when recorded — record the winner to finish the
+round". Hole View: "Current KP: Jon — out of the round, re-record it". Players
+sheet: "Jon leads KP on 3 — re-record it after saving". The trip holds on such a
+round ("Not Settled Yet"). `kp_never_refunds_test.js` (20, incl. Chrome: Finish
+Round on a finished round with a blank shows the line; recording the winner
+makes it final). The text goldens carry the change as one documented transform,
+`helpers/kp-never-refunds.js`, layered on the old captures.
+
 ## The Players sheet — Wave v195, 2026-09-22
 
 **What it is.** "👥 Players" beside "✏️ Edit round setup" on the organizer's

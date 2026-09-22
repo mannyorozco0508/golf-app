@@ -1728,7 +1728,13 @@
 // Moved to v195b (v196 in the cache name) because the Results page and the printed
 // Receipt drop the per-golfer NET list on a Weekly Game round and every section
 // head is a clear size above its rows. settlement.html is precached.
-const CACHE_VERSION = 'golfapp-v196-results-cleanup';
+// Moved to v197 because KP money never goes back to the field: a blank KP on a
+// finished round is held in the pot ("Not final — KP on hole 15 not recorded"
+// on the live head, the Weekly Game card, the Receipt head and Finish Round),
+// "nobody" goes to the skins pot, an Out leader is held until re-recorded.
+// pool-engine.js, settlement-engine.js, score-gaps.js, settlement.html and
+// index.html are precached; a device on v196 keeps refunding it.
+const CACHE_VERSION = 'golfapp-v197-kp-never-refunds';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

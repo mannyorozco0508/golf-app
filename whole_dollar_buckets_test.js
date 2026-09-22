@@ -269,14 +269,14 @@ describe('BUCKETS IN WHOLE-DOLLAR MODE', () => {
         assert.deepEqual(plain(r.kp.perHoleCents), [2500, 2500, 2500, 2500]);
     });
 
-    test('a KP the organizer declares nobody won refunds in whole dollars', () => {
-        // Retitled: an UNENTERED hole is now unresolved, not a refund. A refund needs
-        // the organizer to have said outright that nobody won it.
+    test('a KP the organizer declares nobody won moves to the skins pot in whole dollars (2026-09-22)', () => {
+        // Until 2026-09-22 this refunded the field. Now the share joins the skins
+        // bucket - $25 a hole, $75 in all - and the skins lines stay whole-dollar.
         const { r } = poolRound('whole-dollar', STD, { h3: '101' },
             { h7: true, h12: true, h16: true });
-        assert.ok(r.kp.unclaimedCents > 0);
-        assert.equal(Math.abs(r.refund.cents % 100), 0, 'a refund must not reintroduce cents');
-        assert.match(r.refund.reasons.join(' '), /Unclaimed KP/);
+        assert.equal(r.kp.toSkinsCents, 7500);
+        assert.equal(Math.abs(r.skins.amountCents % 100), 0, 'the bigger bucket is still whole dollars');
+        assert.ok(!/KP/.test(r.refund.reasons.join(' ')), 'no KP refund');
     });
 
     test('every skins line is whole dollars and paid + unwon equals the bucket', () => {

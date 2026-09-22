@@ -510,7 +510,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': '9043e7fc4f1b9c6ec8dd93f7297730b6e2371b5f4f632dcb2e838ada2b5af697',   // re-pinned 2026-09-19: computeRoundFinish extracted from computeRoundSettlement (KP wave, approved per-file); the rule and every wager engine unchanged - kp_settlement_test.js proves the behaviour. (2026-09-15: computeRoundSettlement appended, trip money wave.)
+        'settlement-engine.js': 'f7712d8796581b3a6090c0b50d764ce8a763b709ee85a524fdea1895bd7439f0',   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
@@ -527,7 +527,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // tie from, exposed so settlement.html reads it instead of reproducing
         // it. Additive: tie_shares_test.js proves the result with `shares` removed
         // deep-equals the v143 result on five rounds.
-        'pool-engine.js': 'a335f19c83b69c1e4178b97b0b25949fe32178aa300a513d525f75cfe0228317',   // re-pinned 2026-09-20: the even skins split (approved per-file, this change only); was 846f33e3...   // re-pinned 2026-09-19: recording pays, a blank refunds once finished, kpConfirmed ignored (KP wave, approved per-file); shares/pay/refund arithmetic unchanged - kp_settlement_test.js
+        'pool-engine.js': '372e76d7d5c41c38a905e395e6a748411ebeb0f5c12769bf827d29776cd69507',   // re-pinned 2026-09-22: KP never refunds (approved per-file); was a335f19c...
         // RE-PINNED, DELIBERATELY. This freeze proved a NAVIGATION wave touched no
         // arithmetic; it was never meant to make these files permanently unwritable.
         // action-model.js has since gained, by explicit per-file approval each time:

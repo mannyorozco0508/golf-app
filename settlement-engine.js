@@ -1205,22 +1205,16 @@
                     // total (to the cent - or the dollar on a whole-dollar round - with
                     // the remainder on the second line),
                     // so the two lines always sum to exactly the figure they replace.
+                    // KP MONEY NEVER REFUNDS (2026-09-22, pool-engine.js): the per-reason
+                    // KP refund line and its apportioning are gone with the branch that
+                    // produced them. A refund here is the net prize or the skins bucket,
+                    // and says so.
                     if (pool.refund && pool.refund.cents > 0) {
-                        const kpPart = (pool.kp && pool.kp.unclaimedCents) || 0;
-                        const kpLines = (pool.kp && pool.kp.lines || []).filter(l => l.state === 'refunded');
-                        const noWin = (data && data.kpNoWinner) || {}, kpW = (data && data.kpWinners) || {};
-                        const why = kpLines.map(l => noWin['h' + l.hole] === true ? 'nobody won it' : (kpW['h' + l.hole] ? 'not in the pool' : 'nobody recorded it'));
-                        const kpLabel = 'KP refund \u00B7 ' + (why.length && why.every(w => w === why[0]) ? why[0] : 'unclaimed');
-                        const others = (pool.refund.reasons || []).filter(t => !/^Unclaimed KP/.test(t)).map(t => t.replace(/\.$/, ''));
+                        const others = (pool.refund.reasons || []).map(t => t.replace(/\.$/, ''));
                         const restLabel = 'Pool refund' + (others.length ? ' \u00B7 ' + others.join('; ') : '');
                         Object.keys(pool.refund.perPlayerCents).forEach(id => {
                             const lump = pool.refund.perPlayerCents[id];
-                            // a whole-dollar round's lump is whole dollars; its two lines are too
-                            const unit = lump % 100 === 0 ? 100 : 1;
-                            const kpCents = kpPart >= pool.refund.cents ? lump
-                                : (kpPart > 0 ? Math.round(lump * kpPart / pool.refund.cents / unit) * unit : 0);
-                            if (kpCents > 0) addNote(byId[String(id)], dollars(kpCents), kpLabel);
-                            if (lump - kpCents > 0) addNote(byId[String(id)], dollars(lump - kpCents), restLabel);
+                            if (lump > 0) addNote(byId[String(id)], dollars(lump), restLabel);
                         });
                     }
                 }
