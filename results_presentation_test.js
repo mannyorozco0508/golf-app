@@ -69,12 +69,17 @@ function boot({ confirmed = true, winners = ALL_WON, noWinner = null, noPool = f
         // Marty birdies every third hole, the rest par: team A wins the match and money moves
         d.scores = {}; d.players.forEach((p, pi) => cd.forEach(h => { d.scores['p' + p.id + '_h' + h.hole] = h.par + ((pi === 0 && h.hole % 3 === 0) ? -1 : 0); })); }
     vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
+        renderResultsGapLine(currentData);
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`, sb);
     return {
         sb, d, cd, sc,
         run: c => vm.runInContext(c, sb),
         summary: () => sb.document.getElementById('combined-settlement-summary').innerHTML,
+        // v196: the Not-final line has its own mount; 💰 Pay out is #results-top; NET +/− is #results-net
+        gap: () => sb.document.getElementById('results-gap-line').innerHTML,
+        top: () => sb.document.getElementById('results-top').innerHTML,
+        net: () => sb.document.getElementById('results-net').innerHTML,
         pool: () => sb.document.getElementById('money-pool-section').innerHTML,
         card: () => vm.runInContext('buildReceiptScorecard()', sb),
     };
@@ -85,8 +90,10 @@ function boot({ confirmed = true, winners = ALL_WON, noWinner = null, noPool = f
 describe('THE BUY-IN IS NOWHERE ON SCREEN', () => {
 
     test('the Main Pool header shows the pot, not the per-head stake', () => {
-        const t = strip(boot().pool());
-        assert.match(t, /Weekly Game — \$480/);   // v142: the Receipt says Weekly Game
+        const b = boot();
+        const t = strip(b.pool());
+        assert.match(t, /^\s*🏆 Weekly Game 📍 KP/);   // v142: the Receipt says Weekly Game; v196: the pot is in the Pay out head
+        assert.match(strip(b.top()), /Pay out \$480 of \$480/);
         assert.ok(!/12 × \$40/.test(t), 'the per-head arithmetic must be gone');
         assert.ok(!/\(\d+ × \$\d+\)/.test(t), 'and no variant of it may return');
     });
@@ -117,31 +124,35 @@ describe('THE BUY-IN IS NOWHERE ON SCREEN', () => {
 
 describe('NET WORDING', () => {
 
-    test('a positive position reads +$X NET, not "Won" (on the match round - v195b: a Weekly Game receipt prints no NET list at all)', () => {
-        assert.ok(!/ NET/.test(strip(boot().summary())), 'the Weekly Game receipt has no NET line');
-        const t = strip(boot({ noPool: true }).summary());
+    // v196: the NET list is the collapsed NET +/− view (#results-net) on EVERY
+    // round - a Weekly Game round included - never in the summary or the Pay out list.
+    test('a positive position reads +$X NET, not "Won" - in the NET +/− view, on the pool round and the match round alike', () => {
+        const b = boot();
+        assert.ok(!/ NET/.test(strip(b.summary()) + strip(b.top())), 'no NET line in the summary or the Pay out list');
+        assert.match(strip(b.net()), /\+\$\d+ NET/);
+        const t = strip(boot({ noPool: true }).net());
         assert.match(t, /\+\$\d+ NET/);
         assert.ok(!/Won \$/.test(t), '"Won" invited an argument the Receipt exists to prevent');
     });
 
     test('a negative position reads -$X NET, not "Owes"', () => {
-        const t = strip(boot({ noPool: true }).summary());
+        const t = strip(boot({ noPool: true }).net());
         assert.match(t, /-\$\d+ NET/);
         assert.ok(!/Owes/.test(t));
     });
 
     test('a level position reads $0 NET, not "Even"', () => {
         const src = read(PAGE);
-        const at = src.indexOf('function fmt(amt)');
-        const fn = src.slice(at, src.indexOf('\n        }', at));
+        const at = src.indexOf('const fmt = amt => {');
+        const fn = src.slice(at, src.indexOf('\n        };', at));
         assert.match(fn, /\$0 NET/);
         assert.ok(!/>Even</.test(fn));
     });
 
     test('positive is green, negative is red, zero is neutral', () => {
         const src = read(PAGE);
-        const at = src.indexOf('function fmt(amt)');
-        const fn = src.slice(at, src.indexOf('\n        }', at));
+        const at = src.indexOf('const fmt = amt => {');
+        const fn = src.slice(at, src.indexOf('\n        };', at));
         assert.match(fn, /val-pos[^`]*\+\$/);
         assert.match(fn, /val-neg[^`]*-\$/);
         assert.match(fn, /val-even/);
@@ -153,11 +164,11 @@ describe('NET WORDING', () => {
         const b = boot();
         const c = b.run('computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)');
         const net = plain(c.netByName).manny.net;
-        const t = strip(b.summary());
-        // v195b: the position is no longer printed on a Weekly Game receipt - the
-        // payout is the number handed out. The two numbers still differ in the ledger.
-        assert.ok(!new RegExp('\\' + (net < 0 ? '-' : '+') + '\\$' + Math.abs(net) + ' NET').test(t), 'no NET line for Manny');
-        assert.match(t, /TOTAL PAYOUT/, 'the payout question keeps its own heading');
+        // v196: the payout is the number handed out (💰 Pay out, first); the position
+        // sits in the collapsed NET +/− view, last - two headings, two words.
+        assert.ok(!new RegExp('\\' + (net < 0 ? '-' : '+') + '\\$' + Math.abs(net) + ' NET').test(strip(b.top())), 'no NET line in the Pay out list');
+        assert.match(strip(b.top()), /Pay out/, 'the payout question keeps its own heading');
+        assert.match(strip(b.net()), new RegExp('Manny \\' + (net < 0 ? '-' : '+') + '\\$' + Math.abs(net) + ' NET'));
         assert.notEqual(Math.abs(net), 44, 'the position and the payout are different numbers');
     });
 
@@ -165,7 +176,7 @@ describe('NET WORDING', () => {
         const b = boot({ noPool: true });
         const c = b.run('computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)');
         const printed = {};
-        [...String(b.summary()).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d,.]+) NET<\/span>/g)]
+        [...String(b.net()).matchAll(/<span>([^<]+)<\/span><span[^>]*>([+-])\$([\d,.]+) NET<\/span>/g)]
             .forEach(m => { printed[m[1]] = (m[2] === '+' ? 1 : -1) * parseFloat(m[3].replace(/,/g,'')); });
         Object.values(plain(c.netByName)).forEach(v => {
             if (v.net === 0) return;
@@ -176,11 +187,11 @@ describe('NET WORDING', () => {
 
 describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
 
-    test('a settled round is final: Player Payouts, no live head (v195b: no Final Results list on a Weekly Game round)', () => {
+    test('a settled round is final: 💰 Pay out, no live head (v196)', () => {
         const b = boot({ confirmed: true });
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), true);
-        assert.match(strip(b.summary()), /Player Payouts/);
-        assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(strip(b.summary())));
+        assert.match(strip(b.top()), /Pay out/);
+        assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(strip(b.summary()) + strip(b.top())));
         assert.ok(!/Not Final/.test(strip(b.summary())));
     });
 
@@ -192,8 +203,8 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         assert.equal(b.run('computeMoneyPool(currentData, currentData.courseData, currentData.scores).settled'), false);
         const t = strip(b.summary());
         assert.match(t, /RESULTS — NOT FINAL/);
-        assert.match(t, /KP on holes 3, 7, 12, 16 not recorded/);
-        assert.ok(!/unconfirmed|LIVE RESULTS|Player Payouts/.test(t));
+        assert.match(strip(b.gap()), /KP on holes 3, 7, 12, 16 not recorded/);   // v196: the line in its own mount
+        assert.ok(!/unconfirmed|LIVE RESULTS/.test(t)); assert.equal(b.top(), '');
     });
 
     test('the same round still in play is LIVE, and finishing it moves the page to FINAL', () => {
@@ -202,17 +213,17 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
                   renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`);
         const o = strip(open.summary());
         assert.match(o, /LIVE RESULTS/);
-        assert.ok(!/Final Results|Player Payouts/.test(o), 'money with cards out is not final');
-        const done = strip(boot({ confirmed: true }).summary());
-        assert.ok(!/LIVE RESULTS/.test(done));
-        assert.match(done, /Player Payouts/, 'the receipt returns once the cards are in');
+        assert.equal(open.top(), '', 'money with cards out is not final');
+        const done = boot({ confirmed: true });
+        assert.ok(!/LIVE RESULTS/.test(strip(done.summary())));
+        assert.match(strip(done.top()), /Pay out/, 'the receipt returns once the cards are in');
     });
 
     test('cancelling KPs also settles it', () => {
         const b = boot({ confirmed: false });
         b.run(`currentData.kpCancelled = { cancelled: true, cancelledAt: 1, cancelledBy: 'organizer' };
                renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`);
-        assert.match(strip(b.summary()), /Player Payouts/); assert.ok(!/LIVE RESULTS/.test(strip(b.summary())));
+        assert.match(strip(b.top()), /Pay out/); assert.ok(!/LIVE RESULTS/.test(strip(b.summary())));
     });
 
     test('the heading READS the canonical state, it does not recompute it', () => {
@@ -224,10 +235,13 @@ describe('FINAL ONLY WHEN THE MONEY IS SETTLED', () => {
         const src = read(PAGE);
         const at = src.indexOf('FINAL" IS A CLAIM');
         assert.notEqual(at, -1, 'the reasoning must stay with the code');
-        const block = src.slice(at, at + 1500);   // v195b: the Weekly Game gate's comment sits between the reasoning and the literal
+        const block = src.slice(at, at + 1500);
         assert.match(block, /never be chosen/);
-        assert.match(block, /🏁 Final Results/);
-        ['kpUnresolvedCents >','kpWinners','kpConfirmed &&','computeMoneyPool(','.settled === false']
+        assert.match(block, /💰 PAY OUT/);   // v196: the order note follows the reasoning
+        // v196: the settled branch asks computeMoneyPool for the Pay out REASONS
+        // (the pool's own lines by hole) - never for whether the round is settled;
+        // the gate above it decided that, and nothing here reads .settled.
+        ['kpUnresolvedCents >','kpWinners','kpConfirmed &&','.settled === false','.settled)']
             .forEach(t => assert.ok(!block.includes(t), `must not re-derive settlement; found ${t}`));
     });
 });
@@ -287,20 +301,10 @@ describe('THE SCORECARD SHOWS GROSS AND NET, BOTH READABLE', () => {
 
 describe('NOTHING BEHIND THE WORDS MOVED', () => {
 
-    test('Player Payouts are unchanged', () => {
-        const t = strip(boot().summary());
-        assert.match(t, /Player Payouts/);
-        assert.match(t, /TOTAL PAYOUT/);
-        // Bounded by the NEXT section that actually exists. This sliced to
-        // 'Who Pays Who', which a Money-Pool-only round no longer renders - indexOf
-        // returned -1 and the slice ran backwards to the start of the document,
-        // sweeping in the NET wording from Final Results above.
-        const html = boot().summary();
-        const start = html.indexOf('Player Payouts');
-        assert.notEqual(start, -1, 'the payout section must render');
-        const after = html.indexOf('Who Pays Who', start);
-        const section = html.slice(start, after === -1 ? html.length : after);
-        assert.ok(!/NET<\/span>/.test(section), 'the payout section keeps its own vocabulary');
+    test('the Pay out list keeps its own vocabulary (v196): no NET in it', () => {
+        const html = boot().top();
+        assert.match(html, /Pay out/);
+        assert.ok(!/NET<\/span>/.test(html), 'the payout section keeps its own vocabulary');
     });
 
     test('Who Pays Who still reconstructs every balance', () => {
@@ -333,8 +337,8 @@ describe('NOTHING BEHIND THE WORDS MOVED', () => {
 
     test('the fmt change is presentation only — the amount is untouched', () => {
         const src = read(PAGE);
-        const at = src.indexOf('function fmt(amt)');
-        const fn = src.slice(at, src.indexOf('\n        }', at));
+        const at = src.indexOf('const fmt = amt => {');
+        const fn = src.slice(at, src.indexOf('\n        };', at));
         assert.ok(!/Math\.round\(/.test(fn), 'formatting must not alter the figure');
         assert.match(fn, /fmtWhole\(amt\)/, 'and must go through the shared rule');
     });

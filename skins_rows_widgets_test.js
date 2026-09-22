@@ -126,6 +126,9 @@ const kpWave = (t, live) => {
 // 2026-09-22 (KP NEVER REFUNDS): layered on top of kpWave - helpers/kp-never-refunds.js
 // says exactly what moves. The old text, plus that wave, plus this rule, IS today's text.
 const { kpNeverRefunds } = require('./helpers/kp-never-refunds.js');
+// v196 (results payout redesign): one card per game, the payouts block and the
+// Skins Summary gone - helpers/results-payout-v196.js says exactly what moves.
+const { poolV196 } = require('./helpers/results-payout-v196.js');
 
 describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new text', () => {
     const PREV = JSON.parse(read('skins_rows_prev.fixture.json'));
@@ -135,9 +138,9 @@ describe('THE PROOF — the old text minus its tie rows, H -> Hole, IS the new t
             const now = strip(arrive(VARIANTS[k]()).pool);
             const ties = (before.match(/No Skin/g) || []).length;
             assert.ok(ties >= 12, 'the old text had the tie rows: ' + ties);
-            const transformed = kpNeverRefunds(kpWave(v142(before
+            const transformed = poolV196(kpNeverRefunds(kpWave(v142(before
                 .replace(/\|H\d+ — Tie at (Gross|Net) \d+ — No Skin(?=\|)/g, '')
-                .replace(/\|H(\d+) — /g, '|Hole $1 — ')), false));
+                .replace(/\|H(\d+) — /g, '|Hole $1 — ')), false)));
             assert.equal(now, transformed);
             assert.doesNotMatch(now, /No Skin/);
             assert.doesNotMatch(now, /\|H\d+ — /);
@@ -161,7 +164,8 @@ describe('NO CARRY — only the holes that paid, labelled "Hole N"', () => {
     test('flighted: each flight lists its five winning holes, nothing else, and the count is the engine\'s', () => {
         const { pool, engine } = arrive(VARIANTS.flight());
         const eng = JSON.parse(engine);
-        const a = pool.indexOf('<div class="pool-flight" data-flight="A"'), b = pool.indexOf('<div class="pool-flight" data-flight="B"');
+        // v196: a flight is its own .game-card (the .pool-flight block is gone)
+        const a = pool.indexOf('<div class="settle-card game-card game-skins" data-flight="A"'), b = pool.indexOf('<div class="settle-card game-card game-skins" data-flight="B"');
         assert.ok(a > 0 && b > a);
         const segA = pool.slice(a, b), segB = pool.slice(b);
         const linesA = eng.skins.flights.find(f => f.flight === 'A').lines, linesB = eng.skins.flights.find(f => f.flight === 'B').lines;
@@ -193,13 +197,13 @@ describe('NO CARRY — only the holes that paid, labelled "Hole N"', () => {
         const r = build({ enabled: true, scopes: { skins: 'flight', birdies: 'field' } });
         r.__birdie('Ann Alpha', 1); r.__birdie('Cal Charlie', 5); delete r.__birdie;
         const { pool } = arrive(r);
-        const b = pool.indexOf('<div class="pool-flight" data-flight="B"');
+        const b = pool.indexOf('<div class="settle-card game-card game-skins" data-flight="B"');
         assert.ok(b > 0);
-        const segB = pool.slice(b, pool.indexOf('<!-- /pool-flight -->', b));
+        const segB = pool.slice(b, pool.indexOf('<!-- /game-card -->', b));
         assert.equal(rows(segB).length, 0, 'no winning rows in B');
         assert.match(segB, /No skins were won\./, 'and it says so rather than rendering empty');
         assert.match(segB, /Unwon skins money/, 'and the money is stated');
-        assert.ok(rows(pool.slice(pool.indexOf('<div class="pool-flight" data-flight="A"'), b)).length >= 1, 'A still lists its winners');
+        assert.ok(rows(pool.slice(pool.indexOf('<div class="settle-card game-card game-skins" data-flight="A"'), b)).length >= 1, 'A still lists its winners');
     });
 });
 
@@ -264,11 +268,12 @@ describe('THE SEAM — where the rows come from, and the print block', () => {
         assert.doesNotMatch(fn, /carried to Hole|carried, not won|collects /, 'no page-local copy of the sentences');
     });
 
-    test('the v134 blocks and the print rules are as they were', () => {
-        assert.match(src, /<div class="pool-flight" data-flight="\$\{pot\.flight\}"><div class="pool-flight-head">/);
+    test('the flight is a card of its own (v196: .game-card data-flight, the v134 .pool-flight block is gone) and the print rules hold', () => {
+        assert.match(src, /gameCardHtml\('game-skins', '🥩 Skins' \+ \(flighted \? ' — Flight ' \+ pot\.flight : ''\)/);
+        assert.doesNotMatch(src, /<div class="pool-flight" data-flight=/);
         const print = src.slice(src.indexOf('@media print'));
-        assert.match(print, /\.pool-game-head, \.pool-flight-head \{ break-after: avoid/);
-        assert.match(print, /\.pool-flight \{ break-inside: avoid/);
+        assert.match(print, /\.payout-card, \.game-card, \.net-view, \.po-row \{ break-inside: avoid/);
+        assert.match(print, /\.game-head \{ -webkit-print-color-adjust: exact !important;[^}]*break-after: avoid/);
         assert.match(src, /\.skins-carry-row \{ font-weight: normal;/);
     });
 

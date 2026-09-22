@@ -189,13 +189,12 @@
         /* v195: a golfer marked Out on the Players sheet. */
         .golfer-out td { opacity: 0.55; text-decoration: line-through; }
         .gap-line { font-weight: bold; color: var(--accent-red); font-size: 0.85rem; margin: 0 0 8px 0; }
-        .receipt-gap-line { margin: 6px 0 0 0; }
         /* THE HEADING HIERARCHY (v195b). A payer reading the Receipt could not see
            where Flight A ended and Flight B began: the section heads were the size of
            the rows. Three sizes, top down, each with a rule under it and air above:
-             section  (.settle-header, .pp-game-head, .pool-game-head)   1.2rem, 2px rule
-             sub      (.pp-flight-head, .pool-flight-head)               1rem, 1px rule
-             row      (.ledger-row 0.95rem, .pp-row)                    0.95rem and under
+             section  (.settle-header; a game card's .game-title, v196)  1.2rem, 2px rule
+             sub      (none since v196 - each flight is a card of its own)
+             row      (.ledger-row 0.95rem)                              0.95rem and under
            Numbers and rows are untouched; this is type and spacing only. */
         .settle-card { margin-top: 22px; }
         .settle-card:first-child { margin-top: 0; }
@@ -277,11 +276,7 @@
            Skins Pot each flight is a bordered block with its pot in the header.
            New classes, deliberately: .ledger-row is used by every other section and
            is not restyled. Their print rules sit in the print block further down. */
-        .pool-game { border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 10px 4px 10px; margin: 0 0 14px 0; background: var(--bg-card); }
-        .pool-game-head { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); padding: 2px 4px 8px 4px; margin: 18px 0 8px 0; border-bottom: 2px solid var(--brand-green); }
-        .pool-flight { border: 1px solid var(--border-mid); border-left: 5px solid var(--accent-teal); border-radius: 8px; padding: 8px 8px 2px 8px; margin: 8px 0 12px 0; background: var(--subtle-bg); }
-        .pool-flight[data-flight="B"] { border-left-color: var(--brand-navy); }
-        .pool-flight-head { font-size: 1rem; font-weight: bold; color: var(--text-main); padding: 2px 4px 6px 4px; margin: 6px 0 6px 0; border-bottom: 1px solid var(--accent-teal); }
+        /* (.pool-game / .pool-flight left with v196 - every game is a .game-card.) */
         /* A run of tied holes on a carry round: part of the money, not a result
            of its own, so it reads quieter than the hole that collected it. */
         .skins-carry-row { font-weight: normal; font-size: 0.82rem; color: var(--text-muted); padding-top: 6px; padding-bottom: 6px; }
@@ -294,25 +289,46 @@
         .settle-card[data-flight="B"] { border-left: 6px solid var(--brand-navy); }
         /* The three money mounts and the scorecard are separated by a rule - but
            only when they hold something, so an empty mount draws no bare line. */
-        #combined-settlement-summary:not(:empty), #settle-content:not(:empty), #receipt-scorecard:not(:empty) { border-top: 3px solid var(--border-mid); margin-top: 22px; padding-top: 16px; }
-        /* THE PAYOUTS BLOCK at the top of the Main Pool: the answer before the proof.
-           One box, worked one game at a time; a game head, a flight head where the
-           pool split, then name / amount rows in the same ledger-row style as the
-           detail below so the two read as one document (and print as one). */
-        .pool-payouts { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px 2px 10px; margin-bottom: 14px; background: var(--subtle-bg); }
-        .pool-payouts .pp-game { padding-bottom: 4px; }
-        .pool-payouts .pp-game-head { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin: 18px 0 8px 0; padding: 0 2px 6px 2px; border-bottom: 2px solid var(--brand-green); }
-        .pool-payouts .pp-game:first-child .pp-game-head { margin-top: 6px; }
-        .pool-payouts .pp-flight-head { font-size: 1rem; font-weight: bold; color: var(--text-main); margin: 10px 0 6px 0; padding: 0 4px 4px 4px; border-bottom: 1px solid var(--accent-teal); }
-        .pool-payouts .pp-row { padding: 8px 12px; margin-bottom: 6px; }
-        .pool-payouts .pp-note { font-weight: normal; font-size: 0.85rem; color: var(--text-muted); padding: 8px 12px; margin-bottom: 6px; }
-        .pl-block { border-top: 1px solid var(--border-faint); padding: 10px 0 6px 0; }
-        .pl-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; }
-        .pl-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; padding: 2px 0; }
-        .pl-note { padding-left: 18px; font-size: 0.74rem; color: var(--text-muted); }
-        .pl-round { font-size: 0.74rem; color: var(--text-muted); font-style: italic; }
-        .pl-group { font-size: 0.74rem; color: var(--text-muted); font-weight: bold; padding-top: 4px; }
-        .pl-final { border-top: 1px solid var(--border-mid); margin-top: 4px; padding-top: 4px; font-weight: bold; }
+        #combined-settlement-summary:not(:empty), #settle-content:not(:empty), #results-net:not(:empty), #receipt-scorecard:not(:empty) { border-top: 3px solid var(--border-mid); margin-top: 22px; padding-top: 16px; }
+        /* ---- THE RESULTS ORDER (v196) ------------------------------------------
+           #results-gap-line   the Not-final line, once, above everything.
+           .payout-card        💰 PAY OUT: one <details> row per golfer, the amount
+                               big; the reasons under it on a tap.
+           .game-card          one card per game: a coloured head band (title left,
+                               pot right), the winners by hole beneath. A flight
+                               card keeps the A teal / B navy left edge.
+           .net-view           NET +/−, a collapsed <details>, last. */
+        #results-gap-line .results-gap { margin: 0 0 12px 0; font-size: 0.95rem; }
+        .results-section-label { font-size: 0.78rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 22px 0 -10px 0; }
+        .payout-card { border-color: var(--brand-green); }
+        .po-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+        .po-total { font-size: 0.82rem; font-weight: bold; text-transform: none; letter-spacing: 0; color: var(--text-secondary); white-space: nowrap; }
+        .po-row { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 8px; margin-bottom: 8px; }
+        .po-row > summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+        .po-row > summary::-webkit-details-marker { display: none; }
+        .po-row > summary::before { content: '\203A'; color: var(--text-muted); font-weight: bold; margin-right: 8px; transition: transform 0.15s; }
+        .po-row[open] > summary::before { transform: rotate(90deg); }
+        .po-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .po-amt { font-size: 1.35rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .po-reason { display: flex; justify-content: space-between; gap: 12px; font-size: 0.82rem; color: var(--text-secondary); padding: 4px 14px 4px 36px; }
+        .po-row > .po-reason:last-child { padding-bottom: 10px; }
+        .po-none { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; }
+        .game-card { padding: 0 0 6px 0; overflow: hidden; }
+        .game-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 14px; margin-bottom: 8px; background: var(--brand-green); color: #fff; }
+        .game-title { font-size: 1.2rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.02em; }
+        .game-pot { font-size: 1rem; font-weight: bold; white-space: nowrap; }
+        .game-kp .game-head { background: var(--brand-navy); }
+        .game-net .game-head { background: #b8860b; }
+        .game-skins .game-head { background: var(--accent-teal); }
+        .game-skins[data-flight="B"] .game-head { background: var(--brand-navy); }
+        .game-card > .ledger-row, .game-card > .nf-explain, .game-card > .game-note { margin-left: 10px; margin-right: 10px; }
+        .game-note { font-size: 0.78rem; color: var(--text-muted); padding: 2px 4px 8px 4px; }
+        .game-refund { padding-top: 6px; }
+        .net-view > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+        .net-view > summary::-webkit-details-marker { display: none; }
+        .net-view > summary::before { content: '\203A'; margin-right: 8px; display: inline-block; transition: transform 0.15s; }
+        .net-view[open] > summary::before { transform: rotate(90deg); }
+        .net-view[open] > summary { margin-bottom: 12px; }
         .receipt-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
         .legend-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); }
@@ -370,26 +386,27 @@
             /* Money must not split across pages either - a Who Pays Who list broken after
                one row is exactly the sort of thing that starts an argument. */
             .settle-card { break-inside: avoid; page-break-inside: avoid; }
-            /* One golfer's payout lines and their total belong together. */
-            .pl-block { break-inside: avoid; page-break-inside: avoid; }
-            /* The payouts block is the page the cash is handed out from; one game's
-               list must not break across a sheet. */
-            .pool-payouts .pp-game { break-inside: avoid; page-break-inside: avoid; }
-            /* A game or flight header never ends a sheet with its rows on the next;
-               a flight block (18 rows and a summary) starts a new sheet rather than
-               split when the browser can manage it - a block taller than a sheet
-               still splits, which no rule can prevent. */
-            .pool-game-head, .pool-flight-head { break-after: avoid; page-break-after: avoid; }
+            /* (v196: one golfer's row and its reasons, one game card, the Net view -
+               the break rules below; a card taller than a sheet still splits, which
+               no rule can prevent.) */
             /* v195b: the heading hierarchy survives onto paper - sizes, rules and the air
                above a section; colours go to ink-safe greys/greens. */
             .settle-card { margin-top: 18px; }
-            .settle-header, .pool-game-head, .pool-payouts .pp-game-head { font-size: 14pt; border-bottom: 2px solid #0f4c3a; color: #0f4c3a; padding-bottom: 4pt; margin-top: 14pt; }
-            .pool-flight-head, .pool-payouts .pp-flight-head { font-size: 11.5pt; border-bottom: 1px solid #2a9d8f; color: #111; margin-top: 8pt; }
-            .ledger-row, .pool-payouts .pp-row { font-size: 9.5pt; }
-            .pool-flight { break-inside: avoid; page-break-inside: avoid; }
-            .pool-game, .pool-flight { border-color: #ccc; background: #fff; }
+            /* v196: the Pay out rows, the game cards and the Net view - never broken
+               across a sheet; the head band keeps its colour on paper; a <details>
+               row prints open (setPrintOpen), its reasons at row size. */
+            .payout-card, .game-card, .net-view, .po-row { break-inside: avoid; page-break-inside: avoid; }
+            .game-head { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; break-after: avoid; page-break-after: avoid; }
+            .game-title, .po-head, .net-view > summary { font-size: 14pt; }
+            .game-pot, .po-total, .po-amt { font-size: 11.5pt; }
+            .po-name, .po-reason, .game-note { font-size: 9.5pt; }
+            .po-row > summary::before, .net-view > summary::before { display: none; }
+            .results-section-label { font-size: 9.5pt; }
+            .settle-header { font-size: 14pt; border-bottom: 2px solid #0f4c3a; color: #0f4c3a; padding-bottom: 4pt; margin-top: 14pt; }
+            .ledger-row { font-size: 9.5pt; }
+            .game-card { border-color: #ccc; background: #fff; }
             .skins-card { border-style: dashed; }
-            .settle-card[data-flight], .pool-flight { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .settle-card[data-flight] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .receipt-head { break-after: avoid; page-break-after: avoid; }
             /* 64 CSS px = 17 mm on paper: reads as a mark, does not dominate the sheet.
                The asset is 256 px, 4x the CSS size and 1.28x what 300 dpi needs
@@ -469,12 +486,27 @@ html {
         <div id="receipt-actions" class="receipt-actions"></div>
     </div>
 
+    <!-- THE RESULTS ORDER (v196, 2026-09-22), top to bottom, and the PDF reads the
+         same mounts in the same order (printReceipt's roots):
+           #results-gap-line     "Not final — …" ONCE, on every round, above everything
+           #results-top          settled only: the receipt header, then 💰 PAY OUT -
+                                 one row per golfer owed cash, largest first
+           #money-pool-section   one card per Weekly Game game: KP, Net Finish, Skins
+                                 per flight - winners by hole
+           #combined-settlement-summary   live: the live head; settled: Who Pays Who
+                                 (only when anybody pays anybody) or the name refusal
+           #settle-content       the main format's settlement and the side games
+           #results-net          settled only: Net +/− for every golfer, collapsed
+           #receipt-scorecard    the card, last -->
+    <div id="results-gap-line"></div>
+    <div id="results-top"></div>
     <div id="money-pool-section"></div>
     <div id="combined-settlement-summary"></div>
 
     <div id="settle-content">
         <div style="text-align:center; padding:20px; color:var(--text-muted);">Calculating final payouts...</div>
     </div>
+    <div id="results-net"></div>
 
     <!-- THE FULL SCORECARD IS LAST, and it is last in the MARKUP, not merely last in
          whatever order the render functions happen to run. It used to be appended to
@@ -570,6 +602,7 @@ html {
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `🤝 Settle (${currentData.eventName || "Weekend Round"})`;
+            renderResultsGapLine(currentData);
             renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
@@ -653,17 +686,66 @@ html {
         // Since 2026-09-16 the "📤 Send" pill lives in #receipt-actions on the
         // title row, outside every root; the BUTTON filter stays as the guard that
         // a button never rides into the PDF wherever it is rendered.
+        //
+        // THE PAPER IS THE SCREEN (v196, 2026-09-22): the roots are the page's
+        // mounts IN THE ORDER THEY SIT ON SCREEN - RESULTS_MOUNTS, the one list -
+        // so the Not-final line, the header and the Pay out list lead, the game
+        // cards follow, then the side games, the Net view and the card. Until v196
+        // the side games printed BEFORE the pool while the screen showed them after.
+        // The header renders inside #results-top now (first on screen, first on
+        // paper); the receipt-export-head filter below is kept only so a header
+        // can never be exported twice if it is ever moved back.
         const summary = document.getElementById('combined-settlement-summary');
         const summaryParts = summary
             ? Array.from(summary.children).filter(el => el.id !== 'receipt-export-head' && el.tagName !== 'BUTTON')
             : [];
-        const roots = ['receipt-export-head', 'settle-content', 'money-pool-section',
-                       'combined-settlement-summary', 'receipt-scorecard']
+        const roots = RESULTS_MOUNTS
             .map(id => document.getElementById(id))
             .flatMap(el => (el && el.id === 'combined-settlement-summary') ? summaryParts : [el])
             .filter(el => el && (el.innerText || '').trim().length > 0);
 
-        return window.RattleExport.exportOrPrint({ title: title, roots: roots });
+        // REASONS PRINT EXPANDED. A Pay out row and the Net view are <details>,
+        // closed on screen; paper cannot be tapped, so every one is opened for the
+        // export and put back after (a Cmd+P print goes through the beforeprint /
+        // afterprint pair below the same way).
+        const restore = setPrintOpen(true);
+        const done = () => restore();
+        let result;
+        try { result = window.RattleExport.exportOrPrint({ title: title, roots: roots }); }
+        catch (e) { done(); throw e; }
+        if (result && typeof result.then === 'function') return result.then(v => { done(); return v; }, e => { done(); throw e; });
+        done();
+        return result;
+    }
+
+    // The page's money mounts in screen order - the one list printReceipt reads
+    // (paper order = screen order by construction) and results_payout_test.js
+    // holds against the markup.
+    const RESULTS_MOUNTS = ['results-gap-line', 'results-top', 'money-pool-section',
+                            'combined-settlement-summary', 'settle-content', 'results-net', 'receipt-scorecard'];
+
+    // Every <details class="print-open"> that is closed is opened; the returned
+    // function closes exactly those again. Idempotent under a beforeprint that
+    // fires while an export already opened them (nothing was closed, nothing is
+    // put back).
+    function setPrintOpen(on) {
+        const closed = Array.from(document.querySelectorAll('details.print-open')).filter(d => !d.open);
+        if (on) { closed.forEach(d => { d.open = true; }); window.__printOpenCount = (window.__printOpenCount || 0) + closed.length; }   // the count a cold check reads
+        return () => closed.forEach(d => { d.open = false; });
+    }
+    let __printRestore = null;
+    function onBeforePrint() { if (!__printRestore) __printRestore = setPrintOpen(true); }
+    function onAfterPrint() { if (__printRestore) { __printRestore(); __printRestore = null; } }
+    window.addEventListener('beforeprint', onBeforePrint);
+    window.addEventListener('afterprint', onAfterPrint);
+
+    // THE NOT-FINAL LINE, ONCE (v196). It used to render inside the Weekly Game
+    // card and again inside the live head - twice on a held round. One mount,
+    // above everything, on every round; empty when the round is final.
+    function renderResultsGapLine(data) {
+        const mount = document.getElementById('results-gap-line');
+        if (!mount) return;
+        mount.innerHTML = gapLineHtml(data, 'gap-line results-gap');
     }
 
     // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------
@@ -770,7 +852,6 @@ html {
             <div class="receipt-head-date">${date}</div>
             <div class="receipt-head-format">${sub}${who ? ' \u00B7 ' + who + ' golfer' + (who === 1 ? '' : 's') : ''}</div>
             ${label ? `<div class="receipt-head-group">${escapeHtml(label)}</div>` : ''}
-            ${gapLineHtml(currentData, 'gap-line receipt-gap-line')}
         </div>`;
     }
 
@@ -1075,6 +1156,11 @@ html {
     // wrong winners. So the pool's own resolved basis, carry rule and participant
     // list are passed in explicitly. The ledger still does all the deciding; it is
     // just told which game to decide about.
+    // ONE CARD PER POT (v196). A flighted bucket is two sibling cards - "🥩 Skins —
+    // Flight A" with "$360 · 12 golfers" on the right - and a field-wide bucket is
+    // one; the split sentence and the carry notes sit under the first head. The
+    // hole rows are buildSkinsPotRowsHtml's, unchanged; the per-pot "Skins Summary"
+    // name-and-total list is gone - a golfer's total is printed once, in Pay out.
     function buildSkinsReceiptSection(r, data, courseData, savedScores, $) {
         const scoring = r.skins.scoring === 'gross' ? 'gross' : 'net';
         const basisLabel = scoring === 'gross' ? 'Gross' : 'Net';
@@ -1084,8 +1170,8 @@ html {
         // already said Carry Over / No Carry.
         const carryLabel = r.skins.carryOver ? 'carries' : 'no carry';
 
-        let html = `<div class="pool-game-head">🥩 Skins Pot — ${$(r.skins.amountCents)} `
-            + `(${basisLabel} skins, ${carryLabel})</div>`;
+        let notes = `<div class="game-note">${basisLabel} skins, ${carryLabel}</div>`;
+        let html = '';
 
         // A ROUND THAT NEVER SAID SAYS SO. An absent carry setting used to mean
         // "carry"; it now means "no carry", which is what a group that never
@@ -1097,9 +1183,8 @@ html {
             ? skinsCarryRuleRecorded((((data || {}).moneyPool || {}).skins || {}).carryOver)
             : true;
         if (!carryRecorded) {
-            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);">`
-                 + `<span>This round did not record a carry rule — settled as `
-                 + `<strong>No Carry</strong>, one skin per hole won outright.</span><span></span></div>`;
+            notes += `<div class="game-note">This round did not record a carry rule — settled as `
+                 + `<strong>No Carry</strong>, one skin per hole won outright.</div>`;
         }
 
         if (typeof computeSkinsHoleLedger !== 'function') {
@@ -1109,7 +1194,7 @@ html {
             r.skins.lines.forEach(l => {
                 html += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}</span><span class="val-pos">${$(l.cents)}</span></div>`;
             });
-            return html;
+            return gameCardHtml('game-skins', '🥩 Skins', $(r.skins.amountCents), notes + html);
         }
 
         // ONE POT OR TWO. pool-engine.js splits the bucket by flight when the
@@ -1126,31 +1211,32 @@ html {
             // 'evenly' or 'by headcount' - the engine's own predicate (skinsSplitMode),
             // never a guess from the two amounts. Headcount wording unchanged from v126.
             const splitWord = (typeof skinsSplitMode === 'function' && skinsSplitMode(data) === 'even') ? 'evenly' : 'by headcount';
-            html += `<div class="ledger-row" style="font-size:0.78rem; color:var(--text-muted);"><span>Split by flight, ${splitWord}: `
+            notes += `<div class="game-note">Split by flight, ${splitWord}: `
                  + r.skins.flights.map(f => `Flight ${f.flight} ${$(f.amountCents)} (${f.golfers} golfer${f.golfers === 1 ? '' : 's'})`).join(' · ')
-                 + `</span><span></span></div>`;
+                 + `</div>`;
         }
-        pots.forEach(pot => {
-            html += buildSkinsPotLedgerHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel);
+        pots.forEach((pot, i) => {
+            const flighted = pot.flight !== null && pot.flight !== undefined;
+            const rows = buildSkinsPotRowsHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel);
+            html += gameCardHtml('game-skins', '🥩 Skins' + (flighted ? ' — Flight ' + pot.flight : ''),
+                $(pot.amountCents) + (flighted ? ' · ' + pot.golfers + ' golfer' + (pot.golfers === 1 ? '' : 's') : ''),
+                (i === 0 ? notes : '') + rows, flighted ? pot.flight : null);
         });
         return html;
     }
 
-    // One pot's ledger: every hole in order, the summary by golfer, the unwon money.
-    // The pool's participants are narrowed to the pot's golfers by flight tag
-    // (playerFlight, the same rule pool-engine sliced by).
-    // EACH FLIGHT IS ITS OWN BLOCK (2026-09-14): a bordered .pool-flight carrying
-    // its pot in a .pool-flight-head, holding that flight's hole rows and summary.
-    // Flight A and Flight B used to be one run of identical rows with a single
-    // inline border-top between them. The rows themselves are unchanged.
-    function buildSkinsPotLedgerHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel) {
-        const flighted = pot.flight !== null && pot.flight !== undefined;
-        const rows = buildSkinsPotRowsHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel);
-        if (!flighted) return rows;
-        return `<div class="pool-flight" data-flight="${pot.flight}"><div class="pool-flight-head">Flight ${pot.flight} — ${$(pot.amountCents)}</div>`
-            + rows + `</div><!-- /pool-flight -->`;
+    // A GAME CARD (v196): a coloured head band - large title left, the pot right -
+    // over the game's rows. The band prints in colour (print-color-adjust in the
+    // print block) and a card never breaks across a sheet.
+    function gameCardHtml(cls, title, pot, body, flight) {
+        return `<div class="settle-card game-card ${cls}"${flight ? ` data-flight="${flight}"` : ''}>`
+            + `<div class="game-head"><span class="game-title">${title}</span><span class="game-pot">${pot}</span></div>`
+            + body + `</div><!-- /game-card -->`;
     }
 
+    // One pot's rows: every hole that paid, in order, then the unwon money. (The
+    // per-flight .pool-flight wrapper and the Skins Summary list left with v196;
+    // the pot is a card of its own now, and a golfer's total is printed once.)
     function buildSkinsPotRowsHtml(pot, r, data, courseData, savedScores, $, scoring, basisLabel) {
         let html = '';
         const flighted = pot.flight !== null && pot.flight !== undefined;
@@ -1211,41 +1297,9 @@ html {
                 + `<span class="val-pos">${cents === undefined ? '' : $(cents)}</span></div>`;
         });
 
-        // ---- SUMMARY BY GOLFER ---------------------------------------------
-        // Skin COUNTS come from the ledger; DOLLARS come from the pool's allocation.
-        // Summing the allocated line amounts is what keeps this summary equal to the
-        // per-player money, to the dollar, by construction rather than by luck.
-        const centsByPlayer = {};
-        const countByPlayer = {};
-        pot.lines.forEach(l => {
-            const k = String(l.winnerId);
-            centsByPlayer[k] = (centsByPlayer[k] || 0) + l.cents;
-        });
-        L.holes.forEach(row => {
-            if (row.state !== 'skin' || !row.winner) return;
-            const k = String(row.winner.id);
-            // UNITS, NOT HOLES. This counted holes won while the hole line above
-            // printed units - so a golfer who won one hole carrying two skins read
-            // as "1 skin $35" beside two men on "1 skin $17", which looks like one
-            // man being paid double for the same thing. The money divides by units,
-            // so the label counts units.
-            countByPlayer[k] = (countByPlayer[k] || 0) + (row.unitsWon || 1);
-        });
-
-        const winners = Object.keys(countByPlayer).map(id => {
-            const pl = L.participants.find(p => String(p.id) === id);
-            return { id, name: pl ? pl.name : id, skins: countByPlayer[id], cents: centsByPlayer[id] || 0 };
-        }).sort((a, b) => b.skins - a.skins || b.cents - a.cents || a.name.localeCompare(b.name));
-
-        if (winners.length > 0) {
-            html += `<div class="ledger-row" style="font-weight:bold; border-top:1px solid var(--border-mid);"><span>Skins Summary${flighted ? ' — Flight ' + pot.flight : ''}</span><span></span></div>`;
-            winners.forEach(w => {
-                html += `<div class="ledger-row"><span>${escapeHtml(w.name)} — ${w.skins} skin${w.skins === 1 ? '' : 's'}</span>`
-                    + `<span class="val-pos">${$(w.cents)}</span></div>`;
-            });
-        } else {
-            html += `<div class="ledger-row"><span>No skins were won.</span><span></span></div>`;
-        }
+        // A pot nobody won says so rather than rendering empty (the per-golfer
+        // Skins Summary that used to follow the rows left with v196).
+        if (pot.lines.length === 0) html += `<div class="ledger-row"><span>No skins were won.</span><span></span></div>`;
 
         // ---- MONEY THAT FOUND NO WINNER ------------------------------------
         // Stated outright. An unwon carry or a fully tied round leaves real money in
@@ -1261,79 +1315,9 @@ html {
         return html;
     }
 
-    // ---- THE PAYOUTS BLOCK: the answer before the proof -----------------------
-    //
-    // The Main Pool section used to open with the pot headers and eighteen hole
-    // rows per flight, so the person handing out cash scrolled past the proof to
-    // reach the answer. This block sits first: grouped BY GAME in the order money
-    // is handed out - Skins, then Net Finish, then KP - and under each game only
-    // the golfers who are OWED money, name and amount, largest first. Skins per
-    // flight when the pool split it (r.skins.flights), one list otherwise; Net
-    // Finish and KP are never flighted. A golfer who wins under two games appears
-    // under both - the block is worked one game at a time, so there is
-    // deliberately NO per-golfer combined total anywhere in it. A game with
-    // nothing to pay says so in one line.
-    //
-    // EVERY FIGURE IS THE ENGINE'S, CONSUMED NOT COMPUTED. Skins: the pool's
-    // allocated line cents, summed per golfer - the same sum the Skins Summary in
-    // the detail below prints, so the two agree to the dollar by construction.
-    // Net Finish: r.net.lines[].cents as the engine allocated the place(s). KP:
-    // r.kp.lines[].cents on 'paid' lines, summed per golfer. Net Finish: ONE ROW
-    // PER GOLFER (v142) - a tied place is split into its golfers' own shares by
-    // netTieShares(), which reads the shares the engine put on the line, so a tied
-    // $100 reads Bobby $34 / Sammy $33 / Tommy $33, summing to the group amount
-    // exactly and matching both the Net Finish detail below and what the engine
-    // paid. Each net row carries its place, 1 / 2 / T3 / T3, by the leaderboard's
-    // rule: the engine's `place` is the players ahead plus one and a tie consumes
-    // the places it spans, so the label is T + place for a split line.
-    // The block has no title line: the game headings say what it is.
-    function buildPoolPayoutsHtml(r, $) {
-        const row = (name, c, label) => `<div class="ledger-row pp-row"><span>${label ? label + ' \u00B7 ' : ''}${escapeHtml(name)}</span><span class="val-pos">${$(c)}</span></div>`;
-        const note = (t) => `<div class="ledger-row pp-note"><span>${t}</span><span></span></div>`;
-        // Lines -> [name, cents] per golfer, largest first, name to break a tie.
-        const byGolfer = (lines) => {
-            const acc = {}, order = [];
-            lines.forEach(l => { const k = String(l.winnerId); if (!(k in acc)) { acc[k] = { name: l.winnerName, cents: 0 }; order.push(k); } acc[k].cents += l.cents; });
-            return order.map(k => acc[k]).filter(x => x.cents > 0).sort((a, b) => b.cents - a.cents || a.name.localeCompare(b.name));
-        };
-        const group = (flight, rows, empty) => `<div class="pp-group"${flight ? ` data-flight="${flight}"` : ''}>`
-            + (flight ? `<div class="pp-flight-head">Flight ${flight}</div>` : '')
-            + (rows.length ? rows.join('') : note(empty))
-            + `</div><!-- /pp-group -->`;
-        const game = (head, groups) => `<div class="pp-game"><div class="pp-game-head">${head}</div>${groups.join('')}</div><!-- /pp-game -->`;
-        const games = [];
-
-        if (r.skins) {
-            const pots = r.skins.flights ? r.skins.flights : [{ flight: null, lines: r.skins.lines, golfers: r.participants.length }];
-            games.push(game('Skins', pots.map(pot => {
-                if (pot.golfers === 0) return group(pot.flight, [], 'Nobody in this flight — no pot');
-                return group(pot.flight, byGolfer(pot.lines).map(w => row(w.name, w.cents)), 'No skins won — nothing to pay');
-            })));
-        }
-        if (r.net) {
-            const rows = [];
-            r.net.lines.forEach(l => {
-                const shares = netTieShares(l);
-                const label = netPlaceLabel(l);
-                l.names.forEach((name, i) => rows.push(row(name, shares[i], label)));
-            });
-            games.push(game('Net Finish', [group(null, rows, 'No scores — nothing to pay')]));
-        }
-        if (r.kp) {
-            const paid = r.kp.lines.filter(l => l.state === 'paid');
-            let groups;
-            // LIVE with nothing recorded yet: the pot still holds it. On a finished
-            // round every line is paid or refunded, so this branch cannot fire there.
-            if ((r.kp.unresolvedCents || 0) > 0 && paid.length === 0) {
-                groups = [group(null, [], `KP not recorded — ${$(r.kp.unresolvedCents)} in the pot`)];
-            } else {
-                groups = [group(null, byGolfer(paid).map(w => row(w.name, w.cents)), (r.kp.toSkinsCents || 0) > 0 ? 'No KP winners — the money went to the skins pot' : 'No KP winners')];
-            }
-            games.push(game('KP', groups));
-        }
-        if (games.length === 0) return '';
-        return `<div class="pool-payouts">${games.join('')}</div><!-- /pool-payouts -->`;
-    }
+    // (The per-game PAYOUTS BLOCK - Skins / Net Finish / KP, who is owed what -
+    // left with v196: 💰 Pay out in #results-top is the one answer, per golfer,
+    // and each game card below is the proof. A golfer's total prints once.)
 
     // ---- A TIED NET PLACE, ONE GOLFER AT A TIME -------------------------------
     //
@@ -1362,28 +1346,25 @@ html {
         const r = computeMoneyPool(data, courseData, savedScores);
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
-        let html = `<div class="settle-card" style="border:2px solid #b8860b;">${gapLineHtml(data, 'gap-line')}
-            <div class="settle-header">\uD83C\uDFC6 Weekly Game \u2014 ${$(r.totalPoolCents)}</div>`;
+        // ONE CARD PER GAME (v196, 2026-09-22): KP, Net Finish, Skins per flight -
+        // sibling .game-card blocks under a small "Weekly Game" label, each with a
+        // coloured head band, the title large, the pot on the right, the winners by
+        // hole beneath. Gone from this mount: the gold wrapper card, the Not-final
+        // line (one mount above everything now), the per-game payouts block and the
+        // Skins Summary lists (💰 Pay out prints a golfer's total once).
+        // The pot total sits in Pay out's head ("$880 of $920"), so the label here
+        // carries no figure.
+        let html = `<div class="results-section-label">\uD83C\uDFC6 Weekly Game</div>`;
         if (!r.valid) {
-            html += `<div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div>`;
+            html += `<div class="settle-card"><div class="ledger-row"><span style="color:var(--accent-red);">\u26A0\uFE0F ${r.errors.join(' \u00B7 ')}</span></div></div>`;
         }
-        // THE ANSWER FIRST: who is owed what, by game. Everything below it is the
-        // proof, in the order it always was.
-        if (r.valid) html += buildPoolPayoutsHtml(r, $);
         // CANCELLED IS NOT A REFUND, and the Receipt has to say which it was. The
         // money did not come back to the field - the game was removed and the pot
         // was re-divided, which is why no golfer sees a KP line at all.
-        // EACH GAME IS ITS OWN BLOCK (2026-09-14). This card was 62 bare
-        // .ledger-rows: the KP / Net Finish / Skins Pot headers were the same
-        // element, same weight, as the hole rows under them, with no break between
-        // games. Now each game is a bordered .pool-game with a .pool-game-head that
-        // reads as a header. The header TEXT is unchanged - the money on this card
-        // is pinned by tag-stripped sha in receipt_sections_test.js.
         if (r.valid && r.kpCancelled && r.kpCancelled.cancelled) {
-            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 Cancelled</div>`;
-            html += `<div class="ledger-row"><span>Cancelled before settlement \u00B7 original allocation ${$(r.kpCancelled.originalCents)}</span>`
-                 + `<span>moved to skins</span></div>`;
-            html += `</div><!-- /pool-game -->`;
+            html += gameCardHtml('game-kp', '\uD83D\uDCCD KP', 'Cancelled',
+                `<div class="ledger-row"><span>Cancelled before settlement \u00B7 original allocation ${$(r.kpCancelled.originalCents)}</span>`
+                 + `<span>moved to skins</span></div>`);
         }
         if (r.valid && r.kp) {
             // THREE STATES, EACH NAMED (2026-09-22, KP money never refunds). Paid: the
@@ -1394,7 +1375,7 @@ html {
             // round is not final until it is recorded.
             const noWin = data.kpNoWinner || {};
             const winners = data.kpWinners || {};
-            html += `<div class="pool-game pool-game-kp"><div class="pool-game-head">\uD83D\uDCCD KP \u2014 ${$(r.kp.amountCents)}</div>`;
+            let kpRows = '';
             const leaders = (data.kpLeaders || {});
             r.kp.lines.forEach(l => {
                 const led = leaders['h' + l.hole];
@@ -1402,19 +1383,19 @@ html {
                     ? ' \u2014 ' + Math.floor(led.distanceInches / 12) + "' " + (led.distanceInches % 12) + '"'
                     : '';
                 if (l.state === 'paid') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                    kpRows += `<div class="ledger-row"><span>Hole ${l.hole}: ${escapeHtml(l.winnerName)}${dist}</span><span class="val-pos">${$(l.cents)}</span></div>`;
                 } else if (l.state === 'skins') {
-                    html += `<div class="ledger-row"><span>Hole ${l.hole}: nobody</span><span>${$(l.cents)} to the skins pot</span></div>`;
+                    kpRows += `<div class="ledger-row"><span>Hole ${l.hole}: nobody</span><span>${$(l.cents)} to the skins pot</span></div>`;
                 } else {
                     const what = l.reason === 'out' ? `${escapeHtml(l.winnerName || '')} is out of the round \u2014 re-record it`
                         : (l.reason === 'nobody' ? 'nobody \u2014 no skins pot to take it, still in the pot' : 'not recorded');
-                    html += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: ${what}</span><span>${$(l.cents)} in the pot</span></div>`;
+                    kpRows += `<div class="ledger-row" style="color:var(--warn-text);"><span>Hole ${l.hole}: ${what}</span><span>${$(l.cents)} in the pot</span></div>`;
                 }
             });
-            html += `</div><!-- /pool-game -->`;
+            html += gameCardHtml('game-kp', '\uD83D\uDCCD KP', $(r.kp.amountCents), kpRows);
         }
         if (r.valid && r.net) {
-            html += `<div class="pool-game pool-game-net"><div class="pool-game-head">\uD83E\uDD47 Net Finish \u2014 ${$(r.net.amountCents)}</div>`;
+            let netRows = '';
             // A TIE IS EXPLAINED, NOT JUST MARKED.
             //
             // "(split)" was accurate and told a golfer nothing. The rule behind it is
@@ -1439,7 +1420,7 @@ html {
                 const who = tied
                     ? `T${l.place}: ${l.names.join(' / ')}`
                     : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
-                html += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                netRows += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
 
                 if (!tied) return;
 
@@ -1451,7 +1432,7 @@ html {
                     for (let k = first; k <= last && k <= placeCents.length; k++) parts.push($(placeCents[k - 1]));
                 }
                 const posLabel = last > first ? `Positions ${first}\u2013${last}` : `Position ${first}`;
-                html += `<div class="nf-explain">${posLabel}`
+                netRows += `<div class="nf-explain">${posLabel}`
                     + (parts.length > 1 ? ` \u00B7 ${parts.join(' + ')} = ${$(l.cents)}` : ` \u00B7 ${$(l.cents)}`)
                     + `</div>`;
 
@@ -1462,27 +1443,26 @@ html {
                 // (v142) The same shares the PAYOUTS block prints, from netTieShares.
                 const each = netTieShares(l);
                 const same = each.every(c => c === each[0]);
-                html += `<div class="nf-explain">${same
+                netRows += `<div class="nf-explain">${same
                     ? `${$(each[0])} each`
                     : l.names.map((n, i) => `${n} ${$(each[i])}`).join(' \u00B7 ')}</div>`;
 
                 // What it cost the golfer behind them, stated plainly - this is the part
                 // that gets queried in the car park.
                 if (span > 1) {
-                    html += `<div class="nf-explain">The tie consumed ${span} paid place${span === 1 ? '' : 's'}, `
+                    netRows += `<div class="nf-explain">The tie consumed ${span} paid place${span === 1 ? '' : 's'}, `
                         + `so the next golfer finishes ${last + 1}${['st','nd','rd'][last]||'th'}.</div>`;
                 }
             });
-            if (r.net.lines.length === 0) html += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
-            html += `</div><!-- /pool-game -->`;
+            if (r.net.lines.length === 0) netRows += `<div class="ledger-row"><span>No scores \u2014 refunded</span><span>${$(r.net.amountCents)}</span></div>`;
+            html += gameCardHtml('game-net', '\uD83E\uDD47 Net Finish', $(r.net.amountCents), netRows);
         }
         if (r.valid && r.skins) {
-            html += `<div class="pool-game pool-game-skins">` + buildSkinsReceiptSection(r, data, courseData, savedScores, $) + `</div><!-- /pool-game -->`;
+            html += buildSkinsReceiptSection(r, data, courseData, savedScores, $);
         }
         if (r.valid && r.refund.cents > 0) {
-            html += `<div class="ledger-row" style="border-top:1px solid var(--border-mid);"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div>`;
+            html += `<div class="settle-card game-card game-refund"><div class="ledger-row"><span>\u21A9\uFE0F Refunded to the field (${r.refund.reasons.length ? r.refund.reasons.join(' ') : 'residue'})</span><span>${$(r.refund.cents)} \u00F7 ${r.participants.length}</span></div></div>`;
         }
-        html += `</div>`;
         mount.innerHTML = html;
     }
 
@@ -1519,123 +1499,140 @@ html {
     // arithmetic is summing the lines it was handed, to prove they add up.
     // `data` is read for the flight suffix alone; without it every label prints
     // exactly as the engine wrote it.
-    function buildPlayerLedgerHtml(contributions, sortedTotals, data) {
+    // ---- 💰 PAY OUT (v196, 2026-09-22) ------------------------------------------
+    //
+    // ONE ROW PER GOLFER OWED CASH, largest first, the amount big: the list the
+    // person with the envelope works down. Gross winnings - the buy-ins were
+    // collected on the first tee, so a golfer's row is what they are handed, not
+    // their net position (NET +/− at the bottom answers that). A row is a
+    // <details>: closed on screen, the reasons under it on a tap - "Skins B · Hole
+    // 4 · $52", "KP · Hole 7 · $20", "Net Finish 1st · $50" - and OPEN on paper
+    // (class print-open, setPrintOpen). Under the list, one line names everyone
+    // with no payout, so a golfer who won nothing still finds their name.
+    //
+    // THE TOTAL IS THE CANONICAL LEDGER'S. Which contribution lines count as a
+    // payout is the rule Player Payouts carried from v142 to v195b (payoutLines):
+    // every positive line except the buy-in, the "Main Pool" aggregate whose notes
+    // carry its detail, and a side-match rollup its own detail explains. The row's
+    // amount is the sum of THOSE lines - nothing here computes or rounds money.
+    //
+    // THE REASONS ARE A PAGE-SIDE JOIN. The engine's pool notes name the game but
+    // not the hole ("Gross Skins · 2 skins"); the hole is on computeMoneyPool's
+    // own lines - r.kp.lines / r.net.lines (shares) / r.skins.flights[].lines /
+    // r.refund.perPlayerCents - keyed by the golfer's id, so the pool reasons are
+    // read from there and every other payout line (a side game, a group game, a
+    // rounding line) is the contribution line as it stands. The two are held
+    // together at runtime: if the joined reasons do not sum to the row's amount
+    // to the cent, the row falls back to the contribution lines themselves, so
+    // the page can never show reasons that fail to add up to their own total.
+    // results_payout_test.js proves the join path is the one taken.
+    const POOL_NOTE_RE = /^(KP H\d+|Net Finish T?\d+|(Gross|Net) Skins · \d+ skins?|Pool refund\b)/;
+    function payoutLinesOf(c) {
+        const isBuyIn = l => /buy-in/i.test(l.label);
+        const isPoolAggregate = l => !l.note && l.label === MAIN_POOL_LEDGER_LABEL;
+        const explained = c.lines.filter(l => l.note && l.group).map(l => l.group);
+        const isExplainedSideMatch = l => !l.note
+            && explained.some(g => l.label.indexOf('Side Match · ' + g) === 0);
+        return c.lines.filter(l =>
+            !isBuyIn(l) && !isPoolAggregate(l) && !isExplainedSideMatch(l) && l.amount > 0.005);
+    }
+    function ordinal(n) {
+        const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+    // The pool's lines for one golfer, as {label, amount (dollars)} - the join.
+    function poolReasonsFor(r, id) {
+        const out = [];
+        if (!r || !r.valid) return out;
+        const dollars = c => c / 100;
+        if (r.kp) r.kp.lines.forEach(l => {
+            if (l.state === 'paid' && String(l.winnerId) === id) out.push({ label: 'KP · Hole ' + l.hole, amount: dollars(l.cents) });
+        });
+        if (r.net) r.net.lines.forEach(l => {
+            const i = l.ids.map(String).indexOf(id);
+            if (i >= 0) out.push({ label: 'Net Finish ' + (l.split ? 'T' : '') + ordinal(l.place), amount: dollars(netTieShares(l)[i]) });
+        });
+        if (r.skins) {
+            const pots = r.skins.flights ? r.skins.flights : [{ flight: null, lines: r.skins.lines }];
+            pots.forEach(pot => pot.lines.forEach(l => {
+                if (String(l.winnerId) === id) out.push({ label: 'Skins' + (pot.flight ? ' ' + pot.flight : '') + ' · Hole ' + l.hole, amount: dollars(l.cents) });
+            }));
+        }
+        if (r.refund && r.refund.perPlayerCents && r.refund.perPlayerCents[id] > 0) {
+            out.push({ label: 'Pool refund' + (r.refund.reasons.length ? ' · ' + r.refund.reasons.join(' ') : ''), amount: dollars(r.refund.perPlayerCents[id]) });
+        }
+        return out;
+    }
+    // "$880 of $920 · $40 held": the rows' total; "of the pot" only when the rows
+    // and the held money ARE the pot (a refund is a row, so it is already in the
+    // rows; a round with side games pays more than the pot, and then the total
+    // stands alone); the held part only when something is held.
+    function payoutHeadCell(paidCents, potCents, heldCents) {
+        const $ = c => '$' + fmtWhole(c / 100);
+        let t = $(paidCents);
+        if (potCents > 0 && paidCents + (heldCents || 0) === potCents) t += ' of ' + $(potCents);
+        if ((heldCents || 0) > 0) t += ' · ' + $(heldCents) + ' held';
+        return t;
+    }
+    function buildPayoutCardHtml(contributions, sortedTotals, r, data) {
         if (!contributions) return '';
         const keys = Object.keys(contributions);
         if (keys.length === 0) return '';
+        const idByName = {};
+        (data.players || []).forEach(p => { idByName[p.name] = String(p.id); });
+        const money = amt => '$' + fmtWhole(Math.abs(amt));
+        const cents = amt => Math.round(amt * 100);
 
-        // Ledger order follows Final Results, so a golfer reading down the page finds
-        // their detail in the same order they found their total.
-        const order = (sortedTotals || [])
-            .map(t => keys.find(k => contributions[k].name === t.name))
-            .filter(Boolean);
-        keys.forEach(k => { if (order.indexOf(k) === -1) order.push(k); });
-
-        // Formatting goes through fmtWhole, the single money-formatting rule in this
-        // file. It already prints an integer as "$93" and a genuine fraction as
-        // "$92.51", which is exactly what a ledger needs: whole-dollar rounds allocate
-        // integers and show no cents, while a legacy cent-settled round keeps the
-        // amounts the engine actually allocated.
-        //
-        // Nothing here rounds. An earlier draft of this function added its own
-        // toFixed/Math.round pair on a false diagnosis - a test regex, not the page,
-        // was truncating "92.51" to "92" - and that would have re-introduced per-line
-        // rounding into the one place a golfer reads to settle up.
-        const money = (amt) => {
-            const txt = '$' + fmtWhole(Math.abs(amt));
-            if (amt > 0.005) return `<span class="val-pos">+${txt}</span>`;
-            if (amt < -0.005) return `<span class="val-neg">-${txt}</span>`;
-            return `<span>$0</span>`;
-        };
-
-        // ---- WHAT THIS SECTION ANSWERS -------------------------------------
-        //
-        // "What did I win, and what for?" - not "what is my net position after the
-        // buy-in?". Who Pays Who answers the second question, from the same canonical
-        // ledger, which is why the buy-in can be left out here without anything going
-        // missing: it is still in the engine, still in every net balance, still in the
-        // transactions people actually settle from.
-        //
-        // Nobody needs reminding they paid $40. Everybody put the same $40 in, and
-        // showing it as a deduction against a golfer's winnings made a $128 payout
-        // read as "+$88" with a line of accounting above it.
-        //
-        // PRESENTATION ONLY. Every figure below is a canonical contribution line;
-        // this function chooses which to display and adds them up to prove the total.
-        // No amount is computed, rounded or reallocated here.
-        //
-        // TWO LINES ARE EXCLUDED, for different reasons:
-        //
-        //   'Main Pool buy-in'   what the golfer paid in, not what they won.
-        //   'Main Pool'          the AGGREGATE moving line. Its own note lines carry
-        //                        the detail - Net Finish, skins, refund - so showing
-        //                        both would count the same money twice.
-        //
-        // Everything else positive is money coming to the golfer and is shown: a side
-        // match won, a group game won, a refund. Negative lines are omitted because a
-        // loss is not a payout; it remains in Who Pays Who where it belongs.
-        //   'Side Match . A vs B'  the same AGGREGATE problem, found the hard way.
-        //                        This line moves the money and its note lines explain
-        //                        it, so printing both counted one match twice - a
-        //                        golfer who won $40 of legs read $60. The match name
-        //                        is not lost: it heads the detail as a sub-header
-        //                        below, which is what it was really doing here.
-        const isBuyIn = l => /buy-in/i.test(l.label);
-        const isPoolAggregate = l => !l.note && l.label === MAIN_POOL_LEDGER_LABEL;
-        // SUPPRESSED ONLY WHEN SOMETHING REPLACES IT. A match with no presses has a
-        // single segment and therefore no detail lines at all - the rollup is the
-        // only thing describing it, and dropping it made a whole wager disappear
-        // from the panel. So a rollup gives way to its own detail and to nothing
-        // else, matched by the wager name the notes carry.
-        const payoutLines = c => {
-            const explained = c.lines.filter(l => l.note && l.group).map(l => l.group);
-            const isExplainedSideMatch = l => !l.note
-                && explained.some(g => l.label.indexOf('Side Match \u00B7 ' + g) === 0);
-            return c.lines.filter(l =>
-                !isBuyIn(l) && !isPoolAggregate(l) && !isExplainedSideMatch(l) && l.amount > 0.005);
-        };
-
-        let html = `<div class="settle-card">
-            <div class="settle-header">\uD83D\uDCB0 Player Payouts</div>
-            <div style="font-size:0.72rem; color:var(--text-muted); margin:-4px 0 10px 0;">
-                What each golfer won from the pot.
-            </div>`;
-
-        order.forEach(k => {
+        const rows = [], none = [];
+        keys.forEach(k => {
             const c = contributions[k];
-            const lines = payoutLines(c);
-            html += `<div class="pl-block"><div class="pl-name">${escapeHtml(c.name)}</div>`;
-
-            // ONE EXIT PATH. Two returns here each closed pl-block correctly at
-            // runtime, but the div-balance check counts markup statically and saw an
-            // extra close. Keeping a single path keeps that guard meaningful rather
-            // than teaching it to ignore this function.
-            let total = 0;
-            if (lines.length === 0) {
-                // No loss figure. A golfer who won nothing sees that plainly; what
-                // they owe is Who Pays Who's job.
-                html += `<div class="pl-row pl-note"><span>No payout</span><span>$0</span></div>`;
-            } else {
-                // A note tagged with a wager name gets that name printed above it,
-                // once, as a sub-header carrying no amount. Untagged lines - every
-                // group game, skin and refund - print exactly as they always have.
-                let lastGroup = null;
-                lines.forEach(l => {
-                    if (l.group && l.group !== lastGroup) {
-                        html += `<div class="pl-row pl-group"><span>${escapeHtml(l.group)}</span><span></span></div>`;
-                    }
-                    lastGroup = l.group || null;
-                    total += l.amount;
-                    html += `<div class="pl-row"><span>${l.label}${flightLabelSuffix(data, c.name, l)}</span>${money(l.amount)}</div>`;
-                });
+            const lines = payoutLinesOf(c);
+            const total = lines.reduce((a, l) => a + l.amount, 0);
+            if (total <= 0.005) { none.push(c.name); return; }
+            const id = idByName[c.name];
+            // A note tagged with a wager name carries it: "Zach vs Chris · Press 1", so a
+            // golfer in two matches never reads two identical "Overall Match" lines.
+            const asReason = l => ({ label: (l.group ? escapeHtml(l.group) + ' \u00B7 ' : '') + l.label + flightLabelSuffix(data, c.name, l), amount: l.amount });
+            const other = lines.filter(l => !(l.note && !l.group && POOL_NOTE_RE.test(l.label))).map(asReason);
+            let reasons = (id !== undefined ? poolReasonsFor(r, id) : []).concat(other);
+            const joined = reasons.reduce((a, x) => a + x.amount, 0);
+            if (cents(joined) !== cents(total)) {
+                // the join and the ledger disagree: show the ledger's own lines
+                reasons = lines.map(asReason);
             }
-            // The total is the sum of the lines PRINTED ABOVE IT, so this section can
-            // never display components that fail to add up to their own total.
-            html += `<div class="pl-row pl-final"><span>TOTAL PAYOUT</span>${money(total)}</div>`;
-            html += `</div>`;
+            rows.push({ name: c.name, total, reasons });
         });
+        rows.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+        const paidCents = rows.reduce((a, x) => a + cents(x.total), 0);
+        const head = payoutHeadCell(paidCents, r && r.valid ? r.totalPoolCents : 0, r && r.valid ? (r.kpUnresolvedCents || 0) : 0);
 
+        let html = `<div class="settle-card payout-card">`
+            + `<div class="settle-header po-head"><span>💰 Pay out</span><span class="po-total">${head}</span></div>`;
+        if (rows.length === 0) html += `<div class="po-none">Nobody is owed anything.</div>`;
+        rows.forEach(x => {
+            html += `<details class="po-row print-open"><summary><span class="po-name">${escapeHtml(x.name)}</span><span class="po-amt">${money(x.total)}</span></summary>`;
+            x.reasons.forEach(re => {
+                html += `<div class="po-reason"><span>${re.label}</span><span>${money(re.amount)}</span></div>`;
+            });
+            html += `</details>`;
+        });
+        if (none.length) html += `<div class="po-none">No payout: ${none.map(escapeHtml).join(', ')}</div>`;
         return html + `</div>`;
+    }
+
+    // ---- NET +/− (v196) ------------------------------------------------------
+    // Every golfer's position after their own stake, said as NET, collapsed under
+    // the games - the settlement argument's list, kept for the golfer who wants
+    // it and out of the payer's way. Open on paper.
+    function buildNetViewHtml(sortedTotals) {
+        const fmt = amt => {
+            if (amt > 0.005) return `<span class="val-pos">+$${fmtWhole(amt)} NET</span>`;
+            if (amt < -0.005) return `<span class="val-neg">-$${fmtWhole(Math.abs(amt))} NET</span>`;
+            return `<span class="val-even">$0 NET</span>`;
+        };
+        let html = `<details class="settle-card net-view print-open"><summary class="settle-header">Net +/−</summary>`;
+        (sortedTotals || []).forEach(t => { html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`; });
+        return html + `</details>`;
     }
 
     // ---- LIVE RESULTS -------------------------------------------------------
@@ -1727,7 +1724,9 @@ html {
             head = '\uD83C\uDFC6 LIVE RESULTS' + (thru > 0 ? ' \u2014 THRU ' + thru : '');
             note = 'The round is still in play. Final money appears once every card is in.';
         }
-        let html = '<div class="settle-card live-head">' + gapLineHtml(data, 'gap-line')
+        // The Not-final line is NOT in this card any more (v196): it renders once,
+        // in #results-gap-line above every mount, on every round.
+        let html = '<div class="settle-card live-head">'
             + '<div class="settle-header">' + head + '</div>'
             + '<div class="live-note">' + note + '</div>'
             + '</div>';
@@ -1862,6 +1861,13 @@ html {
         // at the end of the settled branch - so a round that goes back to live, or
         // hits the duplicate-name refusal, leaves no button behind.
         setReceiptAction(false);
+        // THE SETTLED-ONLY MOUNTS ARE CLEARED ON EVERY ENTRY (v196), so a round
+        // that goes back to live, or hits the name refusal, leaves no Pay out list
+        // or Net view behind.
+        const topMount = document.getElementById('results-top');
+        const netMount = document.getElementById('results-net');
+        if (topMount) topMount.innerHTML = '';
+        if (netMount) netMount.innerHTML = '';
         if (players.length === 0) { container.innerHTML = ''; return; }
 
         // LIVE MODE SHORT-CIRCUITS THE WHOLE SETTLEMENT DOCUMENT. At hole five a
@@ -1915,33 +1921,7 @@ html {
         // empty "Final Results" card above the real per-game breakdowns below.
         if (totals.length === 0 || totals.every(t => t.net === 0)) { container.innerHTML = ''; return; }
 
-        // NET POSITION, SAID AS SUCH.
-        //
-        // This read "Won $4" for a golfer who was handed $44 out of the pot. Both
-        // figures were right - $44 the payout, +$4 the position after his own stake -
-        // but calling the second one "Won" invited exactly the argument the Receipt
-        // exists to prevent. Payout and net answer different questions, so they get
-        // different words: Player Payouts says TOTAL PAYOUT, this says NET.
-        //
-        // Presentation only; `amt` is untouched.
-        function fmt(amt) {
-            if (amt > 0.005) return `<span class="val-pos">+$${fmtWhole(amt)} NET</span>`;
-            if (amt < -0.005) return `<span class="val-neg">-$${fmtWhole(Math.abs(amt))} NET</span>`;
-            return `<span class="val-even">$0 NET</span>`;
-        }
-
         const sorted = totals.slice().sort((a, b) => b.net - a.net);
-
-        // The round this document belongs to. Only the retired print path carried this,
-        // which meant a shared Receipt had no course or date on it.
-        let html = buildReceiptHeader();
-
-        // THE EXPORT BUTTON IS NOT IN THIS DOCUMENT ANY MORE (2026-09-16). It used
-        // to render here, full width, as "📄 Print / Save Receipt". It is now the
-        // small "📤 Send" pill on the title row - setReceiptAction(true) at
-        // the end of this branch - because in the native app it opens the share
-        // sheet, and that is what people do with it. ONE EXPORT, ONE LABEL (v152)
-        // still holds: this is the only place that turns the button on.
 
         // "FINAL" IS A CLAIM AND IT HAS TO BE EARNED - and it was earned at the
         // gate above: this branch renders only when receiptSettlement() said
@@ -1949,40 +1929,18 @@ html {
         // computeMoneyPool with the same inputs the gate had already passed; it could
         // never be chosen, and it was removed (2026-09-15) so nobody reads it as a
         // second guard. The one guard is the gate.
-        // NOT ON A WEEKLY GAME ROUND (v195b). The buy-ins are collected in cash on
-        // the first tee, so the payer needs PLAYER PAYOUTS, not a per-golfer net
-        // ("+$65 NET / -$38 NET") that invites the settlement argument the Receipt
-        // exists to prevent. On a round WITHOUT the Weekly Game (a Nassau, match
-        // play, skins wagers) the net list IS the settlement and stays. The card is
-        // not rendered at all, so it is off the printed Receipt and the PDF too.
-        const poolIsOn = !!(data.moneyPool && data.moneyPool.enabled !== false);
-        if (!poolIsOn) {
-            html += `<div class="settle-card" style="border: 2px solid var(--brand-green);">
-                <div class="settle-header">🏁 Final Results</div>`;
-            sorted.forEach(t => {
-                html += `<div class="ledger-row"><span>${escapeHtml(t.name)}</span>${fmt(t.net)}</div>`;
-            });
-            html += `</div>`;
-        }
+        // THE ORDER (v196, 2026-09-22): the header and 💰 PAY OUT lead, in
+        // #results-top above the game cards; this mount keeps Who Pays Who (only
+        // when anybody pays anybody); NET +/− closes the money in #results-net,
+        // after the side games, collapsed. Gone: the per-golfer PLAYER PAYOUTS
+        // ledger (its lines are each Pay out row's reasons now) and the pool-off
+        // "🏁 Final Results" list (the Net view is that list, on every round).
+        const pool = (typeof computeMoneyPool === 'function' && data.moneyPool && data.moneyPool.enabled !== false)
+            ? computeMoneyPool(data, courseData, savedScores) : null;
+        if (topMount) topMount.innerHTML = buildReceiptHeader() + buildPayoutCardHtml(contributions, sorted, pool, data);
+        if (netMount) netMount.innerHTML = buildNetViewHtml(sorted);
 
-        // ---- PER-PLAYER LEDGER -----------------------------------------
-        //
-        // NO MONEY IS COMPUTED HERE. Every line, amount and final net is read from
-        // computeCombinedNetTotals()'s `contributions`, which records each amount at
-        // the moment the engine already counted it. That is the point of the
-        // contribution model: a page that re-ran the games to explain them would
-        // eventually disagree with the money it was explaining.
-        //
-        // MOVING vs NOTE is load-bearing and is SHOWN, not merely stored. Moving lines
-        // are the ones that ADD UP to the final net. Note lines sit indented beneath,
-        // explaining a moving line from the inside - the pool buy-in, each KP, the
-        // net-finish place, the skins. Adding a note into the total would double-count
-        // real money, so they are visually subordinate and never carry the sum.
-        //
-        // Every participant appears, including anyone who finishes exactly even. A
-        // golfer who cannot find their own name assumes the app lost them.
-        html += buildPlayerLedgerHtml(contributions, sorted, data);
-
+        let html = '';
         // ---- WHO PAYS WHO, ONLY WHEN ANYBODY ACTUALLY PAYS ANYBODY ----------
         //
         // The reasoning now lives with the predicate, in action-model.js, so this page

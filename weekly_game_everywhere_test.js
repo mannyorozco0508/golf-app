@@ -96,7 +96,7 @@ describe('EACH OF THE NINE, IN ITS OWN CONTEXT', () => {
 // ---------------------------------------------------------------------------
 describe('THE RECEIPT AND THE SETUP AGREE ON THE NAME', () => {
     test('settlement.html says Weekly Game (v142) and admin.html\'s card says Weekly Game (v143): one word on both ends', () => {
-        assert.match(rendered('settlement.html'), /Weekly Game \\u2014 \$\{\$\(r\.totalPoolCents\)\}/);
+        assert.match(rendered('settlement.html'), /<div class="results-section-label">\\uD83C\\uDFC6 Weekly Game<\/div>/);   // v196: the label over the game cards
         assert.match(rendered('admin.html'), /<strong>🏆 Weekly Game<\/strong>/);
     });
     test('what still says Main Pool is outside this wave, and named', () => {

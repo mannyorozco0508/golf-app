@@ -177,6 +177,9 @@ const kpWave = (t, live) => {
 // 2026-09-22 (KP NEVER REFUNDS): layered on top of kpWave - helpers/kp-never-refunds.js
 // says exactly what moves. The old text, plus that wave, plus this rule, IS today's text.
 const { kpNeverRefunds } = require('./helpers/kp-never-refunds.js');
+// v196 (results payout redesign): one card per game, the payouts block and the
+// Skins Summary gone - helpers/results-payout-v196.js says exactly what moves.
+const { poolV196 } = require('./helpers/results-payout-v196.js');
 
 describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-extraction text', () => {
     const PREV = JSON.parse(read('skins_rows_extract_prev.fixture.json'));
@@ -189,7 +192,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
     ['no-carry', 'carry', 'nothing-won', 'flighted'].forEach(k => {
         const now = surfaces(ROUNDS[k]());
         ['receipt', 'card', 'board'].forEach(s => test(k + ' / ' + s + ': character for character', () => {
-            assert.equal(now[s], s === 'receipt' ? kpNeverRefunds(kpWave(v142(PREV.rounds[k][s]), false)) : PREV.rounds[k][s]);
+            assert.equal(now[s], s === 'receipt' ? poolV196(kpNeverRefunds(kpWave(v142(PREV.rounds[k][s]), false))) : PREV.rounds[k][s]);
             assert.ok(now[s].length > 40, 'not vacuous');
         }));
     });
@@ -199,7 +202,7 @@ describe('THE PROOF — three surfaces, five rounds: today\'s text is the pre-ex
         assert.equal(now.board, PREV.rounds['carry-mid-round'].board);
         const before = PREV.rounds['carry-mid-round'].receipt;
         assert.match(before, /\|Holes 6–10 — Tied — carried, not won\|Hole 11 — Waiting on/, 'what the Receipt said before');
-        assert.equal(now.receipt, kpNeverRefunds(kpWave(v142(before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on')), true), { live: true }),
+        assert.equal(now.receipt, poolV196(kpNeverRefunds(kpWave(v142(before.replace('|Holes 6–10 — Tied — carried, not won|Hole 11 — Waiting on', '|Holes 6–10 — Tied — carried to Hole 11|Hole 11 — Waiting on')), true), { live: true })),
             'the ONE deliberate difference, and nothing else');
         assert.match(now.card, /\|Holes 6–10 — Tied — carried to Hole 11\|/, 'the sentence the Card already used');
     });

@@ -480,7 +480,7 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
         assert.match(html, /Hole 17: Steve/);
         assert.match(html, /1st: Marty[\s\S]*\$40/);
         assert.match(html, /2nd: Manny[\s\S]*\$30/);
-        assert.match(html, /Skins Pot — \$310/);
+        assert.match(html, /game-title">🥩 Skins<\/span><span class="game-pot">\$310</);   // v196: the skins card's pot
     });
 
     test('adaptability A–F: totals and remainder follow the config, no code change', () => {

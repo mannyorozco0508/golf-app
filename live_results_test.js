@@ -70,11 +70,18 @@ function results({ thru = [5,5,5], confirmed = false, pool = MONEY_POOL,
     if (side) d.sideMatches = { m1:{ format:'match', scoring:'net', stake:50,
         startHole:1, createdAt:1, teamAIds:['101'], teamBIds:['103'] } };
     vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
+        renderResultsGapLine(currentData);
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
     return {
         sb, run: c => vm.runInContext(c, sb),
         html: () => sb.document.getElementById('combined-settlement-summary').innerHTML,
         text: () => strip(sb.document.getElementById('combined-settlement-summary').innerHTML),
+        // v196: the Not-final line has its own mount above the head; the settled
+        // receipt's Pay out list is #results-top and NET +/− is #results-net
+        gap: () => strip(sb.document.getElementById('results-gap-line').innerHTML),
+        top: () => strip(sb.document.getElementById('results-top').innerHTML),
+        topHtml: () => sb.document.getElementById('results-top').innerHTML,
+        net: () => strip(sb.document.getElementById('results-net').innerHTML),
     };
 }
 const LIVE  = { thru:[5,5,5], confirmed:false };
@@ -99,14 +106,16 @@ describe('LIVE MODE — A GOLF SUMMARY', () => {
         // 2026-09-19 pinned this FINAL (the blanks refunded). Reversed 2026-09-22:
         // KP money never goes back to the field, so a finished round with a blank KP
         // holds that share in the pot and the head says so, naming the holes.
-        const t = results({ thru:[18,18,18], confirmed:false }).text();
+        const r = results({ thru:[18,18,18], confirmed:false });
+        const t = r.text();
         assert.match(t, /RESULTS — NOT FINAL/);
         assert.ok(!/LIVE RESULTS/.test(t), 'not live either - every card is in');
-        assert.match(t, /KP on holes 3, 7, 12, 16 not recorded/);
+        assert.equal(r.gap(), 'Not final — KP on holes 3, 7, 12, 16 not recorded');   // v196: its own mount, above the head
+        assert.equal(r.top(), '');
         // CONTROL: with the four winners recorded the same round is final
-        const f = results({ thru:[18,18,18], confirmed:true }).text();
-        assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(f));
-        assert.match(f, /Player Payouts/);   // v195b: final on a Weekly Game round is the payouts, not a NET list
+        const f = results({ thru:[18,18,18], confirmed:true });
+        assert.ok(!/RESULTS — NOT FINAL|LIVE RESULTS/.test(f.text()));
+        assert.match(f.top(), /💰 Pay out/);   // v196: final on a Weekly Game round is the Pay out list
     });
 
     test('a round with holes missing is live even when settled === true', () => {
@@ -281,27 +290,29 @@ describe('LIVE MODE SHOWS NO MONEY AT ALL', () => {
 
 describe('FINAL MODE KEEPS THE RECEIPT', () => {
 
-    test('a completed, settled round renders the final receipt (Player Payouts; v195b - no Final Results NET list on a Weekly Game round)', () => {
-        const t = results(FINAL).text();
-        assert.match(t, /Player Payouts/);
-        assert.ok(!/🏁 Final Results/.test(t));
-        assert.ok(!/LIVE RESULTS/.test(t));
+    test('a completed, settled round renders the final receipt (v196: 💰 Pay out in #results-top, NET +/− in #results-net, no live head)', () => {
+        const r = results(FINAL);
+        assert.match(r.top(), /💰 Pay out/);
+        assert.match(r.net(), /Net \+\/−/);
+        assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(r.text() + r.top()));
     });
 
-    test('Player Payouts return', () => {
-        assert.match(results(FINAL).text(), /Player Payouts/);
-        assert.match(results(FINAL).text(), /TOTAL PAYOUT/);
+    test('the Pay out rows return, one per golfer owed cash, largest first', () => {
+        const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
+        const rows = payoutRowsFromHtml(results(FINAL).topHtml()).rows;
+        assert.ok(rows.length >= 3);
+        for (let i = 1; i < rows.length; i++) assert.ok(rows[i].total <= rows[i - 1].total);
     });
 
     test('skin dollar values return', () => {
         // The Skins Pot itemisation lives in the money-pool section, a separate mount
-        // rendered by renderMoneyPoolSection(); what this card must show is money.
-        assert.ok(/\$/.test(results(FINAL).html()), 'money belongs here');
-        assert.match(results(FINAL).text(), /TOTAL PAYOUT/, 'each golfer\'s payout is stated (v195b: the NET list is gone from a Weekly Game receipt)');
+        // rendered by renderMoneyPoolSection(); what the Pay out list must show is money.
+        assert.ok(/\$/.test(results(FINAL).topHtml()), 'money belongs here');
+        assert.match(results(FINAL).top(), /Skins · Hole \d+ \$\d+/, 'each skin is a reason with its dollars');
     });
 
     test('KP detail returns', () => {
-        assert.match(results(FINAL).text(), /KP/);
+        assert.match(results(FINAL).top(), /KP · Hole \d+/);
     });
 
     // RENAMED, NOT REMOVED. The Receipt carried two export buttons with different

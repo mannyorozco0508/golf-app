@@ -46,18 +46,19 @@ describe('THE FIXTURE: v151 carried the header twice', () => {
 });
 
 describe('THE SEAMS', () => {
-    test('the summary is exported as its parts, minus the header and the button; the header stays the first root; the order of the rest is unchanged', () => {
+    test('the summary is exported as its parts, minus the header and the button; the roots are the mounts in screen order (v196), the header inside the second', () => {
         const f = fn();
         assert.ok(f.length > 800, 'printReceipt was sliced');
         assert.match(f, /const summary = document\.getElementById\('combined-settlement-summary'\);/);
         assert.match(f, /Array\.from\(summary\.children\)\.filter\(el => el\.id !== 'receipt-export-head' && el\.tagName !== 'BUTTON'\)/);
-        assert.match(f, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',\s*'combined-settlement-summary', 'receipt-scorecard'\]/);
+        assert.match(f, /const roots = RESULTS_MOUNTS/);
+        assert.match(page, /const RESULTS_MOUNTS = \['results-gap-line', 'results-top', 'money-pool-section',\s*'combined-settlement-summary', 'settle-content', 'results-net', 'receipt-scorecard'\]/);
         assert.match(f, /\.flatMap\(el => \(el && el\.id === 'combined-settlement-summary'\) \? summaryParts : \[el\]\)/);
         assert.match(f, /\.filter\(el => el && \(el\.innerText \|\| ''\)\.trim\(\)\.length > 0\);/);
     });
-    test('the header is still rendered inside the summary, first, once - the screen did not move', () => {
-        const at = page.indexOf('let html = buildReceiptHeader();');
-        assert.ok(at > 0, 'the settled branch opens with the header');
+    test('the header is rendered once, first in #results-top (v196: above the Pay out list, the first thing on a settled screen and on paper)', () => {
+        const at = page.indexOf('topMount.innerHTML = buildReceiptHeader() + buildPayoutCardHtml(');
+        assert.ok(at > 0, 'the settled branch opens #results-top with the header');
         assert.equal((page.match(/buildReceiptHeader\(\)/g) || []).length, 2, 'one definition, one call');
         assert.equal((page.match(/id="receipt-export-head"/g) || []).length, 1);
     });

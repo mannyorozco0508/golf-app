@@ -484,17 +484,19 @@ describe('RECEIPT', () => {
         const { d } = roundData(opts);
         if (opts && opts.leaders) d.kpLeaders = opts.leaders;
         vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
+            renderResultsGapLine(currentData);
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
             renderSettlement(currentData);`, sb);
         const raw = id => sb.document.getElementById(id).innerHTML;
-        return { pool: strip(raw('money-pool-section')), summary: strip(raw('combined-settlement-summary')),
+        // v196: the Not-final line has its own mount; the header and 💰 Pay out are #results-top
+        return { gap: strip(raw('results-gap-line')), top: strip(raw('results-top')), pool: strip(raw('money-pool-section')), summary: strip(raw('combined-settlement-summary')),
                  settle: strip(raw('settle-content')), actions: raw('receipt-actions').replace(/\\uD83D\\uDCE4/g, '📤') };
     }
 
     test('recorded + every card in: the Receipt SETTLES - Player Payouts, each hole paid, the Send chip', () => {
         const r = receipt({ winners: ALL_WON, leaders: { h3: { playerId:'101', playerName:'Marty', distanceInches:69 } } });
-        assert.match(r.summary, /💰 Player Payouts/); assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(r.summary));   // v195b: no Final Results NET list on a Weekly Game receipt; final = Player Payouts
+        assert.match(r.top, /💰 Pay out/); assert.ok(!/🏁 Final Results|LIVE RESULTS/.test(r.summary + r.top));   // v196: final = the Pay out list in #results-top
         assert.match(r.pool, /Hole 3: Marty — 5' 9"/);
         assert.match(r.actions, /📤 Send<\/button>/);
         assert.ok(!/NOT FINAL|not confirmed|NOT CONFIRMED|pending/.test(r.pool + r.summary + r.settle));
@@ -502,14 +504,15 @@ describe('RECEIPT', () => {
 
     test('every card in, nothing recorded (2026-09-22): each hole says "not recorded", the money is in the pot, the head says Not final - the receipt is NOT final', () => {
         const r = receipt({});
-        assert.match(r.pool, /Not final — KP on holes 3, 7, 12, 16 not recorded/);
+        assert.match(r.gap, /Not final — KP on holes 3, 7, 12, 16 not recorded/);   // v196: its own mount, above everything
+        assert.ok(!/Not final/.test(r.pool + r.summary), 'once');
         assert.match(r.pool, /Hole 3: not recorded \$25 in the pot/);
         assert.ok(!/Unclaimed KP|back to the field|nobody recorded it/.test(r.pool), r.pool.slice(0, 300));
         // The KP-only hold has its own head (back 2026-09-22): every card is in, so
         // "LIVE RESULTS ... still in play" would blame golfers who have finished.
         assert.match(r.summary, /RESULTS — NOT FINAL/); assert.ok(!/LIVE RESULTS|still in play/.test(r.summary), 'not live: every card is in');
         assert.match(r.summary, /Every card is in\. A KP is not recorded — its share stays in the pot/);
-        assert.ok(!/💰 Player Payouts/.test(r.summary), 'held: the head, not the receipt');
+        assert.equal(r.top, '', 'held: the head, not the Pay out list');
     });
 
     test('LIVE: the head is LIVE RESULTS, a blank hole reads "not recorded yet", nothing says NOT FINAL or confirmed', () => {

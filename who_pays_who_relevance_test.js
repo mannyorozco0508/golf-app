@@ -76,7 +76,8 @@ function boot({ pool = true, side = false, dots = false } = {}) {
         sb, run: c => vm.runInContext(c, sb),
         html: () => sb.document.getElementById('combined-settlement-summary').innerHTML,
         text: () => strip(sb.document.getElementById('combined-settlement-summary').innerHTML),
-        has: name => new RegExp(name).test(strip(sb.document.getElementById('combined-settlement-summary').innerHTML)),
+        // v196: the document above the card is #results-top (header, 💰 Pay out) + the summary (Who Pays Who) + #results-net (NET +/−)
+        has: name => new RegExp(name).test(strip(sb.document.getElementById('results-top').innerHTML + sb.document.getElementById('combined-settlement-summary').innerHTML + sb.document.getElementById('results-net').innerHTML)),
     };
 }
 
@@ -84,11 +85,11 @@ function boot({ pool = true, side = false, dots = false } = {}) {
 
 describe('MONEY POOL ONLY — NO INVENTED DEBTS', () => {
 
-    test('Player Payouts are shown (v195b: no Final Results NET list on a Weekly Game round)', () => {
+    test('Pay out is shown (v196: the per-golfer list; the NET list is the collapsed NET +/− view, no Final Results card)', () => {
         const b = boot({ pool:true, side:false });
         assert.ok(!b.has('Final Results'));
-        assert.ok(b.has('Player Payouts'));
-        assert.ok(b.has('TOTAL PAYOUT'));
+        assert.ok(b.has('Pay out'));
+        assert.ok(b.has('Net \\+/−'));
     });
 
     test('Who Pays Who is NOT shown', () => {
@@ -126,9 +127,9 @@ describe('MONEY POOL ONLY — NO INVENTED DEBTS', () => {
 
 describe('MONEY POOL + SIDE MATCH — THE COMBINED LIST', () => {
 
-    test('Player Payouts AND Who Pays Who are both shown', () => {
+    test('Pay out AND Who Pays Who are both shown', () => {
         const b = boot({ pool:true, side:true });
-        assert.ok(b.has('Player Payouts'));
+        assert.ok(b.has('Pay out'));
         assert.ok(b.has('Who Pays Who'), 'a real head-to-head debt exists now');
     });
 
@@ -223,10 +224,10 @@ describe('NOTHING BEHIND THE DECISION MOVED', () => {
         vals.forEach(v => assert.equal(v.net, Math.round(v.net)));
     });
 
-    test('Player Payouts is unchanged in every case', () => {
+    test('Pay out is there in every case', () => {
         [{pool:true,side:false},{pool:true,side:true},{pool:false,side:true}].forEach(cfg => {
             const b = boot(cfg);
-            if (cfg.pool) assert.ok(b.has('TOTAL PAYOUT'), JSON.stringify(cfg));
+            assert.ok(b.has('Pay out'), JSON.stringify(cfg));
         });
     });
 

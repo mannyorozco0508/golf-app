@@ -203,17 +203,20 @@ describe('THE BOARD (leaderboard.html): ⚠ missing N beside the total, the rank
     });
 });
 
-describe('RESULTS (settlement.html): "Not final — …" first on the live head; absent when clean', () => {
+describe('RESULTS (settlement.html): "Not final — …" ONCE, in its own mount above the live head (v196); absent when clean', () => {
     function results(data) {
         const sb = loadHtmlInlineScript('settlement.html');
         sb.__d = J(data);
-        run(sb, 'currentMode = "GAP1"; document.__mount(document.getElementById("money-pool-section"));');
-        return String(run(sb, 'buildLiveResultsHtml(__d, __d.courseData, __d.scores)'));
+        run(sb, 'currentMode = "GAP1"; RESULTS_MOUNTS.forEach(i => document.__mount(document.getElementById(i))); renderResultsGapLine(__d);');
+        return { gap: String(run(sb, "document.getElementById('results-gap-line').innerHTML")), live: String(run(sb, 'buildLiveResultsHtml(__d, __d.courseData, __d.scores)')) };
     }
-    test('the line, then the head', () => {
-        const h = results(GAPPY);
-        assert.match(h, /^<div class="settle-card live-head"><div class="gap-line">Not final — Marty is missing hole 1; Randy T\. is missing hole 12<\/div>/);
-        assert.doesNotMatch(results(CLEAN), /Not final/);
+    test('the line in #results-gap-line, then the head with no copy of its own', () => {
+        const r = results(GAPPY);
+        assert.equal(r.gap, '<div class="gap-line results-gap">Not final — Marty is missing hole 1; Randy T. is missing hole 12</div>');
+        assert.match(r.live, /^<div class="settle-card live-head"><div class="settle-header">/);
+        assert.doesNotMatch(r.live, /Not final/);
+        const c = results(CLEAN);
+        assert.equal(c.gap, ''); assert.doesNotMatch(c.live, /Not final/);
     });
 });
 

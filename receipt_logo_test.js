@@ -104,8 +104,10 @@ describe('THE NATIVE EXPORT: since v153 it carries the mark too - from this same
         assert.match(ne, /root\.querySelector\('img\.receipt-mark'\)/, 'the same element this page carries');
         assert.match(ne, /\/Filter \/DCTDecode/);
     });
-    test('the export roots are read by id, and the header is one of them - so the mark is inside what the exporter is handed', () => {
-        assert.match(code, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',\s*'combined-settlement-summary', 'receipt-scorecard'\]/);
+    test('the export roots are read by id (RESULTS_MOUNTS, v196), and the header renders inside the second - so the mark is inside what the exporter is handed', () => {
+        assert.match(code, /const roots = RESULTS_MOUNTS/);
+        assert.match(code, /const RESULTS_MOUNTS = \['results-gap-line', 'results-top', 'money-pool-section',/);
+        assert.match(code, /topMount\.innerHTML = buildReceiptHeader\(\) \+ buildPayoutCardHtml\(/);
     });
     test('the device check exists and says what it measures', () => {
         const t = read('tools/receipt-logo-check.js');

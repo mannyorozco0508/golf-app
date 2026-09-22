@@ -88,7 +88,22 @@ function arrive(data) {
 const block = html => { const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag); return a > -1 ? html.slice(a, e + tag.length) : ''; };
 const detail = html => { const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag); return a > -1 ? html.slice(0, a) + html.slice(e + tag.length) : html; };
 const rowsIn = html => [...html.matchAll(/<div class="ledger-row pp-row"><span>([^<]*)<\/span><span class="val-pos">([^<]*)<\/span><\/div>/g)].map(m => [m[1], m[2]]);
-const netRowsOf = html => { const b = block(html); const a = b.indexOf('pp-game-head">Net Finish<'); const e = b.indexOf('<!-- /pp-game -->', a); return rowsIn(b.slice(a, e)); };
+// v196 (results payout redesign): the per-game payouts block is gone; a golfer's
+// net share is the "Net Finish T1st" reason under their 💰 Pay out row
+// (#results-top). netRowsOf(el, data) -> [[label, '$x'], ...] in the engine's
+// ids order, label as the old block printed it ("T1 · Bobby Blue").
+const { payoutRowsFromHtml, assertV196Mounts } = require('./helpers/results-payout-v196.js');
+const ORD = { 1: '1st', 2: '2nd', 3: '3rd' };
+const netRowsOf = (el, data) => {
+    const rows = payoutRowsFromHtml(el.raw('results-top')).rows;
+    const nameOf = id => data.players.find(p => String(p.id) === String(id)).name;
+    return [].concat(...el.engine.net.lines.map(l => l.ids.map(id => {
+        const row = rows.find(r => r.name === nameOf(id));
+        const re = row && row.reasons.find(x => /^Net Finish /.test(x.label));
+        const place = re ? re.label.replace('Net Finish ', '').replace(/(\d+)(st|nd|rd|th)/, '$1') : '?';
+        return [place + ' · ' + nameOf(id), re ? '$' + (Number.isInteger(re.amount) ? re.amount : re.amount.toFixed(2)) : ''];
+    })));
+};
 const cents = s => Math.round(parseFloat(s.replace(/[^0-9.]/g, '')) * 100);
 const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
 
@@ -97,7 +112,8 @@ describe('1. WEEKLY GAME', () => {
     test('the section header says Weekly Game with the pot; "Main Pool" is nowhere in the rendered page', () => {
         const el = arrive(ROUNDS['golden-off']());
         const pool = el.text('money-pool-section');
-        assert.match(pool, /\|🏆 Weekly Game — \$460\|/);
+        assert.match(pool, /^\|🏆 Weekly Game\|📍 KP\|/);   // v196: the label; the pot is in the Pay out head
+        assert.match(el.raw('results-top'), /<span class="po-total">\$460 of \$460<\/span>/);
         MOUNTS.forEach(m => assert.doesNotMatch(el.text(m), /Main Pool/i, m));
     });
     test('the source renders no "Main Pool" outside comments; the stored key is still moneyPool', () => {
@@ -108,22 +124,20 @@ describe('1. WEEKLY GAME', () => {
 });
 
 describe('2. NO TITLE LINE', () => {
-    test('the payouts block opens with its first game heading; "hand out in this order" is gone from the page and the source', () => {
+    test('the Pay out card opens with its head (v196); "hand out in this order" is gone from the page and the source', () => {
         const el = arrive(ROUNDS['golden-off']());
-        const b = block(el.raw('money-pool-section'));
-        assert.ok(b.length > 200, 'the block is there');
-        assert.match(b, /^<div class="pool-payouts"><div class="pp-game"><div class="pp-game-head">Skins<\/div>/);
-        assert.doesNotMatch(b, /pp-title|PAYOUTS|hand out/);
+        const top = el.raw('results-top');
+        assert.match(top, /<div class="settle-card payout-card"><div class="settle-header po-head"><span>💰 Pay out<\/span>/);
+        assert.doesNotMatch(top + el.raw('money-pool-section'), /pp-title|PAYOUTS|hand out|pool-payouts/);
         assert.doesNotMatch(read('settlement.html'), /hand out in this order|pp-title/);
-        assert.match(b, /pp-game-head">Net Finish</); assert.match(b, /pp-game-head">KP</);
     });
 });
 
 describe('3. A TIED PLACE, ONE ROW PER GOLFER', () => {
     test('three tied for first, $100 over three places (whole-dollar): T1 34 / 33 / 33, summing to the group amount, matching the detail and the engine', () => {
-        const el = arrive(threeTied());
+        const d = threeTied(); const el = arrive(d);
         const html = el.raw('money-pool-section');
-        const rows = netRowsOf(html);
+        const rows = netRowsOf(el, d);
         assert.deepEqual(rows.map(r => r[0]), ['T1 · Bobby Blue', 'T1 · Sammy Sage', 'T1 · Tommy Teal']);
         assert.deepEqual(rows.map(r => r[1]), ['$34', '$33', '$33']);
         const line = el.engine.net.lines[0];
@@ -137,28 +151,35 @@ describe('3. A TIED PLACE, ONE ROW PER GOLFER', () => {
         line.ids.forEach((id, i) => assert.equal(el.engine.perPlayerCents[String(id)], cents(rows[i][1]) + (skins[String(id)] || 0) - el.engine.buyInCents, line.names[i] + ' was paid what the row says'));
         assert.doesNotMatch(strip(html), /A tied place is one row/, 'the explainer went with the combined row');
     });
-    test('the same tie on a LEGACY (cents) round: 33.34 / 33.33 / 33.33 - the cents the engine paid, in the block and the detail', () => {
-        const el = arrive(threeTiedLegacy());
+    test('the same tie on a LEGACY (cents) round: the detail prints the cents the engine paid, 33.34 / 33.33 / 33.33; the Pay out reasons are the ledger\'s 33.33 a head', () => {
+        // v196: the ledger's note divides a legacy tie evenly (33.333 a head) while
+        // the engine's shares are 33.34 / 33.33 / 33.33; the joined reasons would miss
+        // the row's ledger total by a cent, so the row prints the ledger's own line
+        // (the guard in buildPayoutCardHtml). The old payouts block printed the
+        // engine's 33.34 beside a Player Payouts 33.33; one figure now (tie_shares_test.js).
+        const d = threeTiedLegacy(); const el = arrive(d);
         const html = el.raw('money-pool-section');
-        const rows = netRowsOf(html);
-        assert.deepEqual(rows.map(r => r[1]), ['$33.34', '$33.33', '$33.33']);
-        assert.equal(rows.reduce((a, r) => a + cents(r[1]), 0), 10000);
+        const rows = netRowsOf(el, d);
+        assert.deepEqual(rows.map(r => r[1]), ['$33.33', '$33.33', '$33.33']);
         assert.match(strip(detail(html)), /\|Bobby Blue \$33\.34 · Sammy Sage \$33\.33 · Tommy Teal \$33\.33\|/, 'the detail no longer rounds to "each"');
         const line = el.engine.net.lines[0];
-        line.ids.forEach((id, i) => assert.equal(el.engine.perPlayerCents[String(id)], cents(rows[i][1]) + 2000 - el.engine.buyInCents, line.names[i]));
+        assert.deepEqual(line.shares, [3334, 3333, 3333]);
+        line.ids.forEach((id, i) => assert.equal(el.engine.perPlayerCents[String(id)], line.shares[i] + 2000 - el.engine.buyInCents, line.names[i]));
     });
     test('an untied place is one row, unchanged in amount', () => {
-        const el = arrive(ROUNDS['golden-off']());
-        assert.deepEqual(netRowsOf(el.raw('money-pool-section')), [['1 · Rae Romeo', '$120'], ['2 · Max Mike', '$80']]);
+        const d = ROUNDS['golden-off'](); const el = arrive(d);
+        assert.deepEqual(netRowsOf(el, d), [['1 · Rae Romeo', '$120'], ['2 · Max Mike', '$80']]);
     });
 });
 
 describe('4. PLACE NUMBERS', () => {
     test('1, 2 on a clean finish; T1 T1 T1 on a three-way tie for first; 1, T2, T2 when two tie for second', () => {
-        assert.deepEqual(netRowsOf(arrive(ROUNDS['golden-off']()).raw('money-pool-section')).map(r => r[0].split(' · ')[0]), ['1', '2']);
-        assert.deepEqual(netRowsOf(arrive(threeTied()).raw('money-pool-section')).map(r => r[0].split(' · ')[0]), ['T1', 'T1', 'T1']);
-        const el = arrive(twoTiedSecond());
-        const rows = netRowsOf(el.raw('money-pool-section'));
+        let d = ROUNDS['golden-off'](); assert.deepEqual(netRowsOf(arrive(d), d).map(r => r[0].split(' · ')[0]), ['1', '2']);
+        d = threeTied(); assert.deepEqual(netRowsOf(arrive(d), d).map(r => r[0].split(' · ')[0]), ['T1', 'T1', 'T1']);
+        d = twoTiedSecond(); const el = arrive(d);
+        const rows = netRowsOf(el, d);
+        // the reason reads "Net Finish 1st" / "Net Finish T2nd" (v196)
+        assert.deepEqual(payoutRowsFromHtml(el.raw('results-top')).rows.flatMap(r => r.reasons.filter(x => /^Net Finish/.test(x.label)).map(x => x.label)).sort(), ['Net Finish 1st', 'Net Finish T2nd', 'Net Finish T2nd']);
         assert.deepEqual(rows.map(r => r[0]), ['1 · Bobby Blue', 'T2 · Sammy Sage', 'T2 · Tommy Teal']);
         assert.deepEqual(rows.map(r => r[1]), ['$50', '$25', '$25'], 'the tie consumed 2nd and 3rd: $30 + $20 split');
         assert.deepEqual(el.engine.net.lines.map(l => l.place), [1, 2], 'the engine\'s place is players ahead + 1');
@@ -186,29 +207,21 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
         assert.match(PREV['golden-off'].pool, /\|💵 PAYOUTS — hand out in this order\|/);
     });
     Object.keys(ROUNDS).forEach(k => {
-        test(k + ': the other sections are character for character the same', () => {
+        test(k + ': every mount is the v141 capture through the documented transforms (v142 words, v196 re-cut: the totals moved to Pay out, the summary\'s cards to their mounts)', () => {
             const el = arrive(ROUNDS[k]());
-            assert.equal(undate(el.text('combined-settlement-summary')), noFinalResults(sendMove(undate(PREV[k].summary)), { require: true }));
-            assert.equal(el.text('settle-content'), PREV[k].content);
-            assert.equal(undate(el.text('receipt-scorecard')), undate(PREV[k].scorecard));
-        });
-        test(k + ': the Weekly Game section is the old text with only the four substitutions', () => {
-            const el = arrive(ROUNDS[k]());
-            const now = el.text('money-pool-section');
-            // Build the expected text from the OLD text and the engine's lines.
-            let expected = PREV[k].pool
+            // The OLD pool text with this wave's (v142) substitutions - the words,
+            // the dropped title and the dropped tie note; the block's rows go with
+            // the block under v196 (poolV196 removes the whole payouts block), so
+            // the v142 row substitution no longer applies.
+            let pool = PREV[k].pool
                 .replace('|🏆 Main Pool — ', '|🏆 Weekly Game — ')
                 .replace('|💵 PAYOUTS — hand out in this order', '')
                 .replace('|A tied place is one row with the combined amount — the split is under Net Finish below', '');
-            const oldRows = el.engine.net.lines.map(l => '|' + l.names.join(' / ') + '|' + (l.cents % 100 === 0 ? '$' + (l.cents / 100) : '$' + (l.cents / 100).toFixed(2)));
-            const newRows = netRowsOf(el.raw('money-pool-section')).map(r => '|' + r[0] + '|' + r[1]);
-            const a = expected.indexOf('|Net Finish|') + '|Net Finish'.length;
-            const head = expected.slice(0, a), tail = expected.slice(a);
-            const joinedOld = oldRows.join('');
-            assert.ok(tail.startsWith(joinedOld), 'the old net rows are where expected: ' + tail.slice(0, 80));
-            expected = head + newRows.join('') + tail.slice(joinedOld.length);
-            if (k === 'three-tied-legacy') expected = expected.replace('|$33.33 each|', '|Bobby Blue $33.34 · Sammy Sage $33.33 · Tommy Teal $33.33|');
-            assert.equal(now, expected);
+            if (k === 'three-tied-legacy') pool = pool.replace('|$33.33 each|', '|Bobby Blue $33.34 · Sammy Sage $33.33 · Tommy Teal $33.33|');
+            assertV196Mounts(assert, id => ({ text: undate(el.text(id)), html: el.raw(id) }),
+                { pool, summary: undate(PREV[k].summary), 'settle-content': PREV[k].content, 'receipt-scorecard': undate(PREV[k].scorecard) },
+                { norm: undate, equal: ['settle-content', 'receipt-scorecard'] });
+            void noFinalResults; void sendMove;   // subsumed: the proof reads the raw capture
         });
     });
 });
@@ -222,7 +235,7 @@ describe('THE SEAM', () => {
         const fn = s.slice(s.indexOf('function netTieShares('), s.indexOf('\n    function ', s.indexOf('function netTieShares(') + 30));
         assert.match(fn, /l\.shares/);
         assert.ok(!/allocateWholeDollars|splitCentsEvenly|isWholeDollarRound/.test(fn), 'no allocator, no predicate of its own');
-        assert.equal((s.match(/= netTieShares\(l\)/g) || []).length, 2, 'the block and the detail');
+        assert.equal((s.match(/netTieShares\(l\)/g) || []).length, 3, 'the detail, the Pay out reasons (v196), and the declaration');
     });
     test('the engines were not touched', () => {
         const h = f => sha(read(f)).slice(0, 8);

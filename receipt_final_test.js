@@ -90,6 +90,7 @@ function poolRound({ confirmed = true, thru = 18, verified = false } = {}) {
 function receipt(d) {
     const sb = loadHtmlInlineScript('settlement.html', DEPS);
     vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
+        renderResultsGapLine(currentData);
         renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderSettlement(currentData); renderReceiptScorecard();`, sb);
@@ -97,12 +98,16 @@ function receipt(d) {
     return {
         sb,
         summary: () => strip(raw('combined-settlement-summary')),
+        // v196: the Not-final line has its own mount above everything; the header and
+        // 💰 Pay out are in #results-top; NET +/− in #results-net
+        gap: () => strip(raw('results-gap-line')), top: () => strip(raw('results-top')), net: () => strip(raw('results-net')), raw,
         settle: () => strip(raw('settle-content')),
-        mounts0: () => ({ pool: norm(strip0(raw('money-pool-section'))), summary: norm(strip0(raw('combined-settlement-summary'))), settle: norm(strip0(raw('settle-content'))), scorecard: norm(strip0(raw('receipt-scorecard'))) }),
+        mounts0: () => ({ gap: norm(strip0(raw('results-gap-line'))), top: norm(strip0(raw('results-top'))), pool: norm(strip0(raw('money-pool-section'))), summary: norm(strip0(raw('combined-settlement-summary'))), settle: norm(strip0(raw('settle-content'))), net: norm(strip0(raw('results-net'))), scorecard: norm(strip0(raw('receipt-scorecard'))) }),
         // v195b: a Weekly Game receipt has no Final Results card; FINAL is the branch
         // that renders Player Payouts (never on a live head), and on a round without
         // the Weekly Game the card itself.
-        isFinal: () => { const s = strip(raw('combined-settlement-summary')); return !/LIVE RESULTS/.test(s) && /🏁 Final Results|💰 Player Payouts/.test(s); },
+        // v196: FINAL is the branch that renders 💰 Pay out into #results-top (never on a live head)
+        isFinal: () => { const s = strip(raw('combined-settlement-summary')); return !/LIVE RESULTS|RESULTS — NOT FINAL/.test(s) && /💰 Pay out/.test(strip(raw('results-top'))); },
     };
 }
 const HEAD_NOTE = 'Final money appears once every card is in, or once the scores are confirmed in Finish Round.';
@@ -118,6 +123,13 @@ const HEAD_NOTE = 'Final money appears once every card is in, or once the scores
 const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
 const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
 const sendMoved = m => Object.assign({}, m, { summary: noFinalResults(sendMove(m.summary), { require: true }) });
+// v196 (results payout redesign): the capture's four mounts against today's seven
+// - the pool re-cut into cards, the header and the Player Payouts totals in
+// #results-top as Pay out rows, Who Pays Who alone in the summary, the Final
+// Results list as NET +/− in #results-net. helpers/results-payout-v196.js.
+const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
+const v196 = (r, prev) => assertV196Mounts(assert, id => ({ text: norm(strip0(r.raw(id))), html: r.raw(id) }),
+    { pool: prev.pool, summary: prev.summary, 'settle-content': prev.settle, 'receipt-scorecard': prev.scorecard }, { norm, equal: ['settle-content', 'receipt-scorecard'] });
 
 describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', () => {
     const prev = JSON.parse(read('receipt_final_prev.fixture.json'));
@@ -130,17 +142,19 @@ describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', 
     });
     test('the header still renders a date today (the token replaces a real line, not a missing one)', () => {
         const r = receipt(rounds[0].data);
-        assert.match(strip0(r.sb.document.getElementById('combined-settlement-summary').innerHTML), new RegExp('\\|' + TODAY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\|'));
+        assert.match(strip0(r.sb.document.getElementById('results-top').innerHTML), new RegExp('\\|' + TODAY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\|'));
     });
-    test('Caledonia (finished, KPs confirmed): all four mounts identical', () => {
-        assert.deepEqual(receipt(rounds[0].data).mounts0(), sendMoved(prev.caledonia));
+    test('Caledonia (finished, KPs confirmed): every mount is the capture through the documented transforms', () => {
+        v196(receipt(rounds[0].data), prev.caledonia);
+        void sendMoved;   // subsumed: the proof reads the raw capture
     });
-    test('True Blue (finished): all four mounts identical', () => {
-        assert.deepEqual(receipt(rounds[1].data).mounts0(), sendMoved(prev.trueBlue));
+    test('True Blue (finished): likewise', () => {
+        v196(receipt(rounds[1].data), prev.trueBlue);
     });
     test('Caledonia with scoresVerified set: identical to the unverified capture - verification adds no line to a finished receipt', () => {
         const d = Object.assign({}, rounds[0].data, { scoresVerified: { verified: true, verifiedAt: 1, verifiedBy: 'organizer' } });
-        assert.deepEqual(receipt(d).mounts0(), sendMoved(prev.caledoniaVerified));
+        v196(receipt(d), prev.caledoniaVerified);
+        assert.deepEqual(receipt(d).mounts0(), receipt(rounds[0].data).mounts0());
         assert.deepEqual(prev.caledoniaVerified, prev.caledonia);
     });
 });
@@ -175,9 +189,10 @@ describe('A GOLFER WHO PICKED UP (one blank hole), unverified: same - named with
     test('the head names the blank, the receipt is not final', () => {
         // v192: a blank INSIDE a card is named first, the Board's way ("Dee" - the
         // first name is unique here); the live head follows, unchanged.
-        assert.match(r.summary(), /^\|Not final — Dee is missing hole 12\|🏆 LIVE RESULTS — THRU 17\|Still in play — thru 17, 1 golfer still has holes left: Dee D \(17 of 18\)\. Final money/);
+        assert.equal(r.gap(), '|Not final — Dee is missing hole 12|');   // v196: the line has its own mount
+        assert.match(r.summary(), /^\|🏆 LIVE RESULTS — THRU 17\|Still in play — thru 17, 1 golfer still has holes left: Dee D \(17 of 18\)\. Final money/);
         assert.equal(r.isFinal(), false);
-        assert.ok(!r.summary().includes('Player Payouts'));
+        assert.equal(r.top(), '');
     });
 });
 
@@ -185,10 +200,10 @@ describe('THE SAME ROUND VERIFIED: a finished receipt, for the first time', () =
     const full = receipt(twoVtwo());
     const vBlank = receipt(twoVtwo({ blank: 'p104_h12', verified: true }));
     const v9 = receipt(twoVtwo({ thruBy: [18, 18, 18, 9], verified: true }));
-    test('verified with a blank hole: Final Results, Payouts, Who Pays Who, the Print button', () => {
+    test('verified with a blank hole: Pay out, Who Pays Who, Net +/−, the Send button', () => {
         assert.equal(vBlank.isFinal(), true);
         const s = vBlank.summary();
-        ['🏁 Final Results', '💰 Player Payouts', '🤝 Who Pays Who'].forEach(t => assert.ok(s.includes(t), 'missing ' + t));
+        assert.ok(vBlank.top().includes('💰 Pay out')); assert.ok(s.includes('🤝 Who Pays Who')); assert.ok(vBlank.net().includes('Net +/−'));
         // The button is on the title row now (2026-09-16), not in the summary.
         assert.ok(!s.includes('Print / Save'), 'no button inside the summary');
         assert.match(vBlank.sb.document.getElementById('receipt-actions').innerHTML.replace(/\\uD83D\\uDCE4/g, '📤'), /📤 Send<\/button>/);
@@ -196,14 +211,14 @@ describe('THE SAME ROUND VERIFIED: a finished receipt, for the first time', () =
     });
     test('the three money mounts are byte-identical to the fully scored round; only the scorecard shows the blank as a dash', () => {
         const a = full.mounts0(), b = vBlank.mounts0();
-        assert.equal(b.pool, a.pool); assert.equal(b.summary, a.summary); assert.equal(b.settle, a.settle);
+        assert.equal(b.pool, a.pool); assert.equal(b.summary, a.summary); assert.equal(b.settle, a.settle); assert.equal(b.top, a.top); assert.equal(b.net, a.net); assert.equal(b.gap, '');
         assert.notEqual(b.scorecard, a.scorecard, 'the card is honest about the blank');
         assert.match(b.scorecard, /\|Dee D\|4\|4\|3\|5\|4\|4\|3\|5\|4\|36\|4\|4\|–\|5\|4\|4\|3\|5\|4\|33\|69\|/);
     });
     test('verified after leaving at nine: final too, receipt identical on the money mounts', () => {
         assert.equal(v9.isFinal(), true);
         const a = full.mounts0(), b = v9.mounts0();
-        assert.equal(b.summary, a.summary); assert.equal(b.settle, a.settle);
+        assert.equal(b.summary, a.summary); assert.equal(b.settle, a.settle); assert.equal(b.top, a.top); assert.equal(b.net, a.net);
         assert.match(b.scorecard, /\|Dee D\|4\|4\|3\|5\|4\|4\|3\|5\|4\|36\|–\|–\|–\|–\|–\|–\|–\|–\|–\|–\|36\|/);
     });
     test('the per-game heading reads exactly as today when final: "Final Skins Settlement (No Carry)"', () => {
@@ -230,7 +245,7 @@ describe('EVERY CARD IN, KPs NOT RECORDED: NOT FINAL - the blanks are held, neve
     const r = receipt(poolRound({ confirmed: false }));
     test('RESULTS — NOT FINAL, the holes named, no payouts yet', () => {
         const s = r.summary();
-        assert.match(s, /Not final — KP on holes 3, 7, 12, 16 not recorded/);
+        assert.equal(r.gap(), '|Not final — KP on holes 3, 7, 12, 16 not recorded|');   // v196: its own mount, above everything
         assert.match(s, /RESULTS — NOT FINAL/);
         assert.match(s, /Every card is in\. A KP is not recorded — its share stays in the pot/);
         assert.ok(!/LIVE RESULTS|still in play|unconfirmed|Player Payouts|🏁 Final Results/i.test(s));
@@ -249,8 +264,10 @@ describe('EVERY CARD IN, KPs NOT RECORDED: NOT FINAL - the blanks are held, neve
 describe('IN PLAY with KPs not yet recorded: the in-play head alone', () => {
     test('the head names the golfers still out; the gap line above it names the KP holes the field has PLAYED (2026-09-22)', () => {
         // thru 9: holes 3 and 7 are not recorded; 12 and 16 are not yet, and are not named
-        const s = receipt(poolRound({ confirmed: false, thru: 9 })).summary();
-        assert.match(s, /^\|Not final — KP on holes 3, 7 not recorded\|🏆 LIVE RESULTS — THRU 9\|Still in play — thru 9, 12 golfers still have holes left: Marty \(9 of 18\), Scott \(9 of 18\), Carp \(9 of 18\), Randy \(9 of 18\), Manny \(9 of 18\), Matt B \(9 of 18\) \+ 6 more\. Final money appears once every card is in, or once the scores are confirmed in Finish Round\.\|/);
+        const r = receipt(poolRound({ confirmed: false, thru: 9 }));
+        assert.equal(r.gap(), '|Not final — KP on holes 3, 7 not recorded|');   // v196: its own mount, above the head
+        const s = r.summary();
+        assert.match(s, /^\|🏆 LIVE RESULTS — THRU 9\|Still in play — thru 9, 12 golfers still have holes left: Marty \(9 of 18\), Scott \(9 of 18\), Carp \(9 of 18\), Randy \(9 of 18\), Manny \(9 of 18\), Matt B \(9 of 18\) \+ 6 more\. Final money appears once every card is in, or once the scores are confirmed in Finish Round\.\|/);
     });
 });
 
@@ -273,7 +290,7 @@ describe('THE SEAMS', () => {
         assert.match(page, /const isFinal = receiptSettlement\(data, courseData, savedScores\)\.settled;/);
         assert.ok(!/function roundScoresComplete|function moneyIsSettled/.test(page), 'the two local predicates are gone');
         assert.equal((page.match(/settleHeading\(/g) || []).length, 11, 'one definition + ten heading sites');
-        assert.equal((page.match(/settle-header">[^<]*Final /g) || []).length, 1, 'the only literal "Final " heading left is 🏁 Final Results, behind the gate');
+        assert.equal((page.match(/settle-header">[^<]*Final /g) || []).length, 0, 'no literal "Final " heading is left (v196: the Final Results list is the NET +/− view)');
     });
     test('the dead branch is gone, and its epitaph names why it could never render', () => {
         assert.ok(!/Results — Not Final/.test(page), 'no such string in code');
@@ -285,7 +302,7 @@ describe('THE SEAMS', () => {
         const fn = page.slice(at, page.indexOf('\n    function ', at + 30));
         assert.ok(fn.length > 2000, 'the live builder was sliced: ' + fn.length);
         assert.match(fn, /Still in play/);
-        ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPlayerLedgerHtml(', 'TOTAL PAYOUT', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
+        ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPayoutCardHtml(', 'buildNetViewHtml(', 'Pay out', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
     });
     test('settlement-engine.js moved for KP-never-refunds (sha f7712d87; was 9043e7fc for the KP wave, 42923121 at v148)', () => {
         assert.equal(sha8('settlement-engine.js'), 'f7712d87');

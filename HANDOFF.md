@@ -2282,6 +2282,56 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The Results page for the payer — Wave v196 (v198 cache), 2026-09-22
+
+**The order** (settlement.html, top to bottom; `RESULTS_MOUNTS` is the one
+list, and printReceipt's roots ARE it, so the PDF reads the same mounts in
+the same order): `#results-gap-line` — "Not final — …" once, on every round
+(it used to render inside the Weekly Game card, the live head and the
+Receipt head); `#results-top` — settled only: the receipt header, then
+**💰 PAY OUT**; `#money-pool-section` — one `.game-card` per game (KP, Net
+Finish, Skins per flight as siblings) under a "🏆 Weekly Game" label, each
+a coloured head band (title left, pot right — "$360 · 12 golfers"), the
+winners by hole beneath; `#combined-settlement-summary` — live: the live
+head; settled: Who Pays Who only when anybody pays anybody; `#settle-content`
+— side games, as before; `#results-net` — settled only: **NET +/−**, every
+golfer, a collapsed `<details>`; the scorecard last. Gone: the per-game
+payouts block, the Skins Summary lists, the Player Payouts ledger, the
+pool-off "🏁 Final Results" card (the NET view is that list, on every
+round). Live rounds and Finish Round's Final Money: unchanged.
+
+**Pay out.** One `<details class="po-row print-open">` per golfer with gross
+winnings > 0, largest first, the amount big. The row's amount is the
+canonical ledger's (`payoutLinesOf`: every positive contribution line but
+the buy-in, the "Main Pool" aggregate and an explained side-match rollup —
+Player Payouts' rule since v142). The reasons are a page-side join
+(`poolReasonsFor`) of computeMoneyPool's own lines by golfer id — "KP · Hole
+7 · $20", "Net Finish T1st · $34", "Skins B · Hole 4 · $52", "Pool refund ·
+…" — plus every non-pool payout line as the ledger carries it, a wager's
+name leading ("Zach vs Chris · Press 1"). If the joined reasons do not sum
+to the row to the cent (a legacy cents round's tie: 33.34/33.33 vs the
+ledger's 33.333), the row prints the ledger's lines instead — a row can
+never show reasons that fail to add up to itself. Head right cell
+`payoutHeadCell`: "$880 of $920 · $40 held" — "of the pot" only when rows +
+held = pot (a refund is a row; a round with side games pays more than the
+pot and the sum stands alone); the held part only when held. Under the
+list: "No payout: <names>". No engine touched.
+
+**Paper.** Closed on screen, every `details.print-open` is opened for the
+export (`setPrintOpen`, restored after) and for Cmd+P (beforeprint /
+afterprint — Chrome's Page.printToPDF fires them too, measured). Print
+rules: `.payout-card, .game-card, .net-view, .po-row` never break; the band
+keeps its colour (print-color-adjust); 14 / 11.5 / 9.5 pt.
+
+**Tests.** `results_payout_test.js` (32, incl. Chrome cold: the mount order
+on screen, rows closed, four coloured bands, one occurrence of the top
+golfer's name+amount, printToPDF opened 12 details and closed them);
+`receipt_payouts_test.js` rewritten for the list. Every text golden moved
+through one documented transform, `helpers/results-payout-v196.js`
+(`poolV196`, `splitOldSummary`, `assertV196Mounts`): the old capture, with
+exactly these edits, is today's text — and the old Player Payouts totals
+ARE today's Pay out rows, name for name and dollar for dollar.
+
 ## KP money never goes back to the field — Wave v195b Part 3 (v197 cache), 2026-09-22
 
 **Manny's rule.** A KP share is paid to a recorded winner, moved to the skins pot

@@ -38,6 +38,10 @@ const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g,
 const MOUNTS = ['money-pool-section', 'combined-settlement-summary', 'settle-content', 'receipt-scorecard'];
 const PREV = JSON.parse(read('tie_shares_prev.fixture.json'));
 const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
+// v196 (results payout redesign): the pool section is one card per game, the
+// header and 💰 Pay out lead in #results-top, the summary keeps Who Pays Who,
+// NET +/− closes in #results-net - helpers/results-payout-v196.js is the proof.
+const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
 
 // The engine alone, the way settlement-engine loads it.
 const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
@@ -124,23 +128,44 @@ describe('NO FIGURE CHANGED - the engine\'s result is the old result plus the fi
 // second difference anywhere is still red. sendMove asserts the cell was there.
 const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
 describe('THE PAGE RENDERS CHARACTER FOR CHARACTER WHAT IT RENDERED', () => {
-    Object.keys(ROUNDS).forEach(k => test(k + ': all four mounts equal the v143 text, no substitutions', () => {
+    Object.keys(ROUNDS).forEach(k => test(k + ': every mount is the v143 text through the documented transforms (v196: the pool section re-cut, the totals moved to Pay out)', () => {
         const el = arrive(ROUNDS[k]());
-        MOUNTS.forEach(m => {
-            // settle-content is legitimately empty on these rounds (no side
-            // matches, no birdie game); the other three must have been captured
-            // with content, so an equality of two blanks cannot pass for a proof.
-            if (m !== 'settle-content') assert.ok(PREV.rounds[k].text[m].length > 500, m + ' was captured with content');
-            assert.equal(el.text(m), m === 'combined-settlement-summary' ? noFinalResults(sendMove(PREV.rounds[k].text[m]), { require: true }) : PREV.rounds[k].text[m], m);
-        });
+        // settle-content is legitimately empty on these rounds (no side
+        // matches, no birdie game); the other three must have been captured
+        // with content, so an equality of two blanks cannot pass for a proof.
+        MOUNTS.forEach(m => { if (m !== 'settle-content') assert.ok(PREV.rounds[k].text[m].length > 500, m + ' was captured with content'); });
+        const t = PREV.rounds[k].text;
+        assertV196Mounts(assert, id => ({ text: el.text(id), html: el.raw(id) }),
+            { pool: t['money-pool-section'], summary: t['combined-settlement-summary'], 'settle-content': t['settle-content'], 'receipt-scorecard': t['receipt-scorecard'] },
+            { norm: undate, equal: ['settle-content', 'receipt-scorecard'] });
+        // the v195b / v152 transforms this golden carried are subsumed: the button
+        // cell and Final Results are read out of the raw capture by the proof
+        void noFinalResults; void sendMove;
     }));
-    test('and the rows the page prints for a tie ARE the line\'s shares, read from the line (whole-dollar, legacy, second place)', () => {
-        [['three-tied-first', ['$34', '$33', '$33']], ['three-tied-legacy', ['$33.34', '$33.33', '$33.33']], ['two-tied-second', ['$50', '$25', '$25']]].forEach(([k, want]) => {
-            const el = arrive(ROUNDS[k]());
-            const rows = netRowsOf(el.raw('money-pool-section'));
-            assert.deepEqual(rows.map(r => r[1]), want, k);
-            const shares = [].concat(...engine(ROUNDS[k]()).net.lines.map(l => l.shares));
-            assert.deepEqual(rows.map(r => cents(r[1])), shares, k + ': the rows are the shares, in ids order');
+    test('and the Net Finish reason on each golfer\'s Pay out row IS the line\'s share, read from the line (whole-dollar, legacy, second place)', () => {
+        // v196: the per-game payouts block is gone; a golfer's net share is the
+        // "Net Finish T1st" reason under their Pay out row (helpers/results-payout-v196.js).
+        const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
+        // LEGACY (cents) round: the ledger's note divides the tie evenly (33.333 a
+        // head) while the engine's shares are 33.34 / 33.33 / 33.33; the joined
+        // reasons then miss the row's ledger total by a cent and the row prints the
+        // ledger's own line ($33.33) - the runtime guard in buildPayoutCardHtml, so
+        // a row can never show reasons that fail to add up to itself. The old
+        // payouts block printed the engine's 33.34 beside a Player Payouts 33.33;
+        // one figure now. Whole-dollar rounds (the app's default) take the shares.
+        [['three-tied-first', [3400, 3300, 3300]], ['three-tied-legacy', [3333, 3333, 3333]], ['two-tied-second', [5000, 2500, 2500]]].forEach(([k, want]) => {
+            const d = ROUNDS[k]();
+            const el = arrive(d);
+            const rows = payoutRowsFromHtml(el.raw('results-top')).rows;
+            const nameOf = id => d.players.find(p => String(p.id) === String(id)).name;
+            const printed = [].concat(...engine(d).net.lines.map(l => l.ids.map(id => {
+                const row = rows.find(r => r.name === nameOf(id));
+                const re = row && row.reasons.find(x => /^Net Finish /.test(x.label));
+                return re ? Math.round(re.amount * 100) : null;
+            })));
+            assert.deepEqual(printed, want, k);
+            const shares = [].concat(...engine(d).net.lines.map(l => l.shares));
+            if (k !== 'three-tied-legacy') assert.deepEqual(printed, shares, k + ': the reasons are the shares, in ids order');
         });
     });
 });
@@ -154,7 +179,8 @@ describe('THE SEAM', () => {
         const f = fn(code, 'netTieShares');
         assert.match(f, /l\.shares/);
         assert.ok(!/allocateWholeDollars|splitCentsEvenly|isWholeDollarRound|Math\.(round|floor|ceil)|toFixed|\/ 100|\* 100/.test(f), 'no allocation, no rounding, no cents<->dollars of its own: ' + f);
-        assert.equal((code.match(/= netTieShares\(l\)/g) || []).length, 2, 'the block and the detail');
+        // v196: the payouts block left; the Pay out reasons read the shares instead (poolReasonsFor)
+        assert.equal((code.match(/netTieShares\(l\)/g) || []).length, 3, "the detail, the Pay out reasons, and the declaration");
     });
     test('settlement.html calls neither allocator anywhere now (comments stripped)', () => {
         assert.ok(!/allocateWholeDollars\(|splitCentsEvenly\(/.test(code));

@@ -219,7 +219,7 @@ Object.keys(VARIANTS).forEach(k => {
         test('not vacuous: the bucket paid skins, the Receipt lists holes, every surface mentions skins', () => {
             assert.ok(exp.engine.valid, 'the pool validates');
             assert.ok(exp.engine.skins.lines.length >= 5, 'skins paid: ' + exp.engine.skins.lines.length);
-            assert.match(exp.html['settlement.receiptPool'], /Skins Pot/);
+            assert.match(exp.html['settlement.receiptPool'], /game-title">🥩 Skins/);   // v196: a skins card
             // Since the skins-rows wave only the holes that paid are listed: one
             // "Hole N —" row per engine line, and never a tie row.
             assert.equal((exp.html['settlement.receiptPool'].match(/Hole \d+ — /g) || []).length,
@@ -270,20 +270,35 @@ const stripTags = (h) => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace
 // capture's head blamed golfers who had finished (receipt_sections_test.js
 // proves the inverse edit gives the v182 text). The first capture's
 // liveResults shas were off b7510b60…, field 74963a3b…, flight/even 666b9d72….
+//
+// RE-PINNED 2026-09-22 (the RESULTS PAYOUT REDESIGN, v196; settlement.html only).
+// Engine and the four index/leaderboard surfaces: UNCHANGED, sha for sha, all
+// four variants. settlement.receiptPool moved in all four: the Weekly Game is
+// one .game-card per game - KP, Net Finish, Skins per flight as siblings, a
+// coloured head band with the title and the pot - under a "🏆 Weekly Game"
+// label; the Not-final line (one mount above everything), the per-game
+// payouts block and the Skins Summary lists are gone from this section. Every
+// hole row, KP line, net line and note is the same text - helpers/results-
+// payout-v196.js poolV196 is the edit, and skins_rows_widgets_test.js runs the
+// whole chain to today's text on this same round. settlement.liveResults moved
+// by one edit: the gap line no longer leads the head (receipt_sections_test.js
+// reaches the v182 sha from today's text with the head swap alone). The
+// PREV_RECEIPT_TEXT shas below are of today's tag-stripped section (the
+// payouts block that used to be cut out no longer exists); the v197 ones were
+// off/field 7719747fc624571c7071f5c2ad4c537757ae46103deefb4ddcf4567e70ad4884,
+// flight 6facd73aa7a8269698cfe6a6b0457ee597fffa7971bc4427775cf881c247cf6e.
 const PREV_RECEIPT_TEXT = {
-    off: '7719747fc624571c7071f5c2ad4c537757ae46103deefb4ddcf4567e70ad4884',
-    field: '7719747fc624571c7071f5c2ad4c537757ae46103deefb4ddcf4567e70ad4884',
-    flight: '6facd73aa7a8269698cfe6a6b0457ee597fffa7971bc4427775cf881c247cf6e'
+    off: '89511730b8279260cdd2363898d40a2c1b306188c875ee26c3959684c4369421',     // = receipt_sections_test.js PREV_TEXT.off.receiptPool, the same strip
+    field: '89511730b8279260cdd2363898d40a2c1b306188c875ee26c3959684c4369421',
+    flight: '5ad878a05bf1cb66a27705945f910ae19509185e5b4dba15483191acd5696be2'
 };
 const cutBlock = (html) => {
-    const a = html.indexOf('<div class="pool-payouts"'), tag = '<!-- /pool-payouts -->', e = html.indexOf(tag);
-    assert.ok(a > 0 && e > a, 'the block is in the section');
-    assert.ok(html.slice(a, e).length > 1000, 'and it is not empty: ' + html.slice(a, e).length);
-    return stripTags(html.slice(0, a) + html.slice(e + tag.length));
+    assert.ok(html.indexOf('<div class="pool-payouts"') < 0, 'no payouts block since v196');
+    return stripTags(html);
 };
-describe('the detail under the payouts block is the pre-block Receipt, text for text', () => {
+describe('the Weekly Game section, text for text', () => {
     Object.keys(PREV_RECEIPT_TEXT).forEach(k => {
-        test(k + ': cut the block out and the section\'s text is the previous capture', () => {
+        test(k + ': the section\'s tag-stripped text is the pinned capture (the chain from the v133 text is skins_rows_widgets_test.js)', () => {
             assert.equal(sha(cutBlock(FX.variants[k].html['settlement.receiptPool'])), PREV_RECEIPT_TEXT[k]);
         });
     });
@@ -299,12 +314,12 @@ describe('the detail under the payouts block is the pre-block Receipt, text for 
         const moved = [];
         f.forEach((cell, i) => { if (cell !== e[i]) moved.push([cell, e[i]]); });
         assert.deepEqual(moved.filter(([a]) => !/^\$2[13]$/.test(a)), [
+            ['$115 · 12 golfers', '$110 · 12 golfers'],   // v196: the pot sits in the card head's right cell
             ['Split by flight, by headcount: Flight A $115 (12 golfers) · Flight B $105 (11 golfers)', 'Split by flight, evenly: Flight A $110 (12 golfers) · Flight B $110 (11 golfers)'],
-            ['Flight A — $115', 'Flight A — $110'],
-            ['Flight B — $105', 'Flight B — $110']
+            ['$105 · 11 golfers', '$110 · 11 golfers']
         ]);
         const skins = moved.filter(([a]) => /^\$2[13]$/.test(a));
-        assert.equal(skins.length, 20, 'ten skins per flight, every one re-priced');
+        assert.equal(skins.length, 10, 'five skins per flight, every one re-priced (v196: the Skins Summary rows that doubled this to 20 are gone)');
         assert.ok(skins.every(([, b]) => b === '$22'), '$22 each in both flights');
     });
 });

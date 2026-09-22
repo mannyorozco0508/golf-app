@@ -233,7 +233,8 @@ describe('DOTS IN THE RECEIPT', () => {
             currentData = ${J(d)};
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
             renderSettlement(currentData); renderReceiptScorecard();
-            window.__a = document.getElementById('combined-settlement-summary').innerHTML;
+            // v196: the Final Results list is the NET +/− view in #results-net
+            window.__a = document.getElementById('results-top').innerHTML + document.getElementById('combined-settlement-summary').innerHTML + document.getElementById('results-net').innerHTML;
             window.__b = document.getElementById('settle-content').innerHTML;`, sb);
         return { top: sb.window.__a, mid: sb.window.__b };
     }

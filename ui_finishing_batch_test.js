@@ -147,7 +147,7 @@ describe('DARK MODE MUST NOT REACH PAPER', () => {
     });
 
     test('one golfer\u2019s payout block will not split across pages', () => {
-        assert.match(PB(), /\.pl-block \{ break-inside: avoid/);
+        assert.match(PB(), /\.payout-card, \.game-card, \.net-view, \.po-row \{ break-inside: avoid/);   // v196: a golfer's Pay out row and its reasons
     });
 
     test('the +/- money colours survive PDF export', () => {
@@ -179,12 +179,13 @@ describe('PRINT / SAVE PDF IS FINDABLE', () => {
             sideMatches:{ m1:{ format:'match', scoring:'net', stake:50, startHole:1,
                                createdAt:1, teamAIds:['101'], teamBIds:['103'] } } })};
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
-        const html = sb.document.getElementById('combined-settlement-summary').innerHTML;
+        // v196: the document is the header + Pay out (#results-top), Who Pays Who (the summary) and NET +/− (#results-net)
+        const html = sb.document.getElementById('results-top').innerHTML + sb.document.getElementById('combined-settlement-summary').innerHTML + sb.document.getElementById('results-net').innerHTML;
         const actions = sb.document.getElementById('receipt-actions').innerHTML;
         assert.match(actions, /onclick="printReceipt\(\)"/, 'the action must render on the title row');
         assert.match(actions.replace(/\\uD83D\\uDCE4/g, '📤'), /📤 Send<\/button>/);
         assert.equal(html.indexOf('printReceipt'), -1, 'no second button inside the document');
-        assert.notEqual(html.indexOf('Final Results'), -1, 'the document rendered');
+        assert.notEqual(html.indexOf('Pay out'), -1, 'the document rendered');
         // The title row precedes every mount in the markup, so the pill is above the document.
         const src = read('settlement.html');
         assert.ok(src.indexOf('id="receipt-actions"') < src.indexOf('id="money-pool-section"'));

@@ -1734,7 +1734,13 @@
 // "nobody" goes to the skins pot, an Out leader is held until re-recorded.
 // pool-engine.js, settlement-engine.js, score-gaps.js, settlement.html and
 // index.html are precached; a device on v196 keeps refunding it.
-const CACHE_VERSION = 'golfapp-v197-kp-never-refunds';
+// Moved to v198 (v196 in the wave log) because the Results page is rebuilt for
+// the payer: 💰 PAY OUT first - one row per golfer owed cash, largest first,
+// the reasons on a tap - then one card per game with a coloured head band,
+// then NET +/− collapsed; the Not-final line once, on top; the PDF reads the
+// same mounts in the same order and prints the reasons open. settlement.html
+// is precached; a device on v197 keeps the payouts block and Player Payouts.
+const CACHE_VERSION = 'golfapp-v198-results-payout';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

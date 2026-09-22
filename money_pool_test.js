@@ -754,7 +754,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         `, sb);
         const html = sb.document.getElementById('money-pool-section').innerHTML;
-        assert.match(html, /Weekly Game \u2014 \$480/);   // v142: the Receipt says Weekly Game
+        assert.match(html, /results-section-label">🏆 Weekly Game</);   // v142: the Receipt says Weekly Game; v196: a label, the pot is in the Pay out head
         // The per-head buy-in arithmetic was removed: the pot total is useful, what
         // each golfer paid in is not something the Receipt needs to state.
         assert.ok(!/\(12 \u00D7 \$40\)/.test(html), 'the buy-in must not be shown');
@@ -763,7 +763,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // which is that much bigger - $280 + $50. Nothing is refunded.
         assert.match(html, /Hole 14: nobody[\s\S]*\$50 to the skins pot/);
         assert.match(html, /1st: Marty[\s\S]*\$50/);
-        assert.match(html, /Skins Pot \u2014 \$330/);
+        assert.match(html, /game-title">🥩 Skins<\/span><span class="game-pot">\$330</);   // v196: the skins card's pot
         assert.ok(!/Refunded to the field|nobody won it/.test(html));
     });
 

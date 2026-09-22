@@ -62,7 +62,9 @@ function render(d) {
         currentData = ${J(d)};
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderSettlement(currentData); renderReceiptScorecard();
-        window.__a = document.getElementById('combined-settlement-summary').innerHTML;
+        // v196: the money above the card is three mounts - the header and Pay out,
+        // Who Pays Who, and NET +/− (the Final Results list) - read together as "top"
+        window.__a = document.getElementById('results-top').innerHTML + document.getElementById('combined-settlement-summary').innerHTML + document.getElementById('results-net').innerHTML;
         window.__b = document.getElementById('settle-content').innerHTML;`, sb);
     return { top: sb.window.__a, mid: sb.window.__b };
 }

@@ -68,35 +68,24 @@ function boot(over = {}) {
     vm.runInContext(`renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
     return {
         sb, data, cd, sc, ps,
-        html: () => sb.document.getElementById('combined-settlement-summary').innerHTML,
+        // v196: the per-golfer ledger is 💰 PAY OUT in #results-top (one row per golfer
+        // owed cash, the reasons under it, "No payout: <names>" beneath the list)
+        html: () => sb.document.getElementById('results-top').innerHTML,
         run: c => vm.runInContext(c, sb),
     };
 }
 
-// Parse the rendered ledger back out of the DOM, so assertions are about what a
-// golfer actually sees rather than about the data that fed it.
+// Parse the rendered Pay out rows back out of the DOM, into the shape the
+// ledger had, so assertions are about what a golfer actually sees rather than
+// about the data that fed it. The amounts accept cents, because a LEGACY round
+// is genuinely cent-settled and its lines must show the amounts the engine
+// allocated rather than a per-line rounding of them.
+const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
 function parseLedger(html) {
+    const r = payoutRowsFromHtml(html);
     const out = {};
-    const blocks = html.split('<div class="pl-block">').slice(1);
-    blocks.forEach(b => {
-        const name = (b.match(/<div class="pl-name">([^<]*)<\/div>/) || [])[1];
-        if (!name) return;
-        const rows = [...b.matchAll(/<div class="(pl-row[^"]*)"><span>([^<]*)<\/span>(.*?)<\/div>/g)].map(m => {
-            // Accepts cents, because a LEGACY round is genuinely cent-settled and its
-            // ledger lines must show the amounts the engine allocated rather than a
-            // per-line rounding of them.
-            const amt = (m[3].match(/([+-])\$([\d,]+(?:\.\d+)?)/) || []);
-            return {
-                cls: m[1],
-                label: m[2],
-                note: /pl-note/.test(m[1]),
-                rounding: /pl-round/.test(m[1]),
-                final: /pl-final/.test(m[1]),
-                amount: amt.length ? (amt[1] === '-' ? -1 : 1) * Number(amt[2].replace(/,/g,'')) : 0,
-            };
-        });
-        out[name] = rows;
-    });
+    r.rows.forEach(x => { out[x.name] = x.reasons.map(re => ({ cls: 'po-reason', label: re.label, note: false, rounding: false, final: false, amount: re.amount })).concat([{ cls: 'po-amt', label: 'TOTAL PAYOUT', note: false, rounding: false, final: true, amount: x.total }]); });
+    r.none.forEach(n => { out[n] = [{ cls: 'po-none', label: 'No payout', note: true, rounding: false, final: false, amount: 0 }, { cls: 'po-amt', label: 'TOTAL PAYOUT', note: false, rounding: false, final: true, amount: 0 }]; });
     return out;
 }
 
@@ -164,18 +153,18 @@ describe('THE DETAIL A GOLFER ASKS FOR', () => {
 
 
 
-    test('KP lines name their hole', () => {
+    test('KP lines name their hole ("KP · Hole 3" since v196)', () => {
         const led = parseLedger(boot().html());
-        assert.ok(led.Avery.some(r => r.label === 'KP H3'));
-        assert.ok(led.Ellis.some(r => r.label === 'KP H7'));
-        assert.ok(led.Indigo.some(r => r.label === 'KP H12'));
-        assert.ok(led.Blake.some(r => r.label === 'KP H16'));
+        assert.ok(led.Avery.some(r => r.label === 'KP · Hole 3'));
+        assert.ok(led.Ellis.some(r => r.label === 'KP · Hole 7'));
+        assert.ok(led.Indigo.some(r => r.label === 'KP · Hole 12'));
+        assert.ok(led.Blake.some(r => r.label === 'KP · Hole 16'));
     });
 
     test('two KPs to one golfer stay as two auditable lines', () => {
         const led = parseLedger(boot({ kpWinners: { h3:'101', h7:'101', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true } }).html());
-        const kp = led.Avery.filter(r => /^KP H/.test(r.label)).map(r => r.label).sort();
-        assert.deepEqual(kp, ['KP H3','KP H7'], 'collapsing them loses the hole breakdown');
+        const kp = led.Avery.filter(r => /^KP · Hole /.test(r.label)).map(r => r.label).sort();
+        assert.deepEqual(kp, ['KP · Hole 3', 'KP · Hole 7'], 'collapsing them loses the hole breakdown');
     });
 
 
@@ -232,15 +221,12 @@ describe('PARITY WITH THE REST OF THE RECEIPT', () => {
 
 describe('NO DUPLICATE MONEY MATH IN THE PAGE', () => {
 
-    // BOUNDED TO ITS OWN FUNCTION. This sliced from buildPlayerLedgerHtml all the way
-    // to renderCombinedSummary, so any function added between the two was read as if
-    // it were part of the ledger presenter. The rule protected here is about
-    // buildPlayerLedgerHtml's own body.
+    // BOUNDED TO ITS OWN FUNCTIONS (v196: buildPayoutCardHtml, with payoutLinesOf -
+    // the line rule - and poolReasonsFor - the join; each sliced to its own end).
     const fn = () => {
         const src = read('settlement.html');
-        const at = src.indexOf('function buildPlayerLedgerHtml');
-        const end = src.indexOf('\n    function ', at + 10);
-        return src.slice(at, end === -1 ? src.length : end);
+        const slice = name => { const at = src.indexOf('function ' + name); const end = src.indexOf('\n    function ', at + 10); return src.slice(at, end === -1 ? src.length : end); };
+        return slice('payoutLinesOf') + slice('poolReasonsFor') + slice('buildPayoutCardHtml');
     };
 
     test('it consumes canonical contributions', () => {
@@ -270,7 +256,10 @@ describe('NO DUPLICATE MONEY MATH IN THE PAGE', () => {
         const f = fn();
         assert.match(f, /fmtWhole\(Math\.abs\(amt\)\)/, 'the ledger must use the shared formatter');
         assert.doesNotMatch(f, /toFixed\(/, 'formatting must not fork away from fmtWhole');
-        assert.doesNotMatch(f, /Math\.round\(/, 'the ledger must not alter the amounts it was given');
+        // v196: one Math.round, in the cents() helper that COMPARES the joined reasons
+        // to the row's total - a comparison, never an alteration of an amount shown
+        assert.equal((f.match(/Math\.round\(/g) || []).length, 1);
+        assert.match(f, /const cents = amt => Math\.round\(amt \* 100\);/);
     });
 });
 

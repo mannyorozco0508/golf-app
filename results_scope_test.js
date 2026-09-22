@@ -147,6 +147,10 @@ describe('THE MONEY DID NOT MOVE — every unscoped section is the pre-change te
 const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length - 1; if (n !== 1) throw new Error('sendMove: expected the old button cell once, found ' + n); return t.replace('|📄 Print / Save Receipt|', '|'); };
     const PREV = JSON.parse(read('results_scope_prev.fixture.json')).links;
     const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b: the pool receipt has no Final Results card
+    // v196 (results payout redesign): one card per game, the header and 💰 Pay out
+    // in #results-top, Who Pays Who alone in the summary, NET +/− in #results-net -
+    // helpers/results-payout-v196.js is the proof that no figure moved.
+    const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
     test('the previous capture is pinned, and it was unscoped: the same Side Matches text on every link', () => {
         assert.equal(sha(PREV.bare.summary).slice(0, 8), '0940e7f8');
         assert.equal(sha(PREV.bare.mainPool).slice(0, 8), 'c7a8064b');
@@ -155,14 +159,15 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
         assert.match(PREV.bare.summary, /Who Pays Who/); assert.match(PREV.bare.summary, /Player Payouts/);
     });
     [['bare', BARE], ['group1', G1], ['group6', G6], ['group3', G3]].forEach(([k, search]) => {
-        test(k + ': Main Pool, Final Results / Player Payouts / Who Pays Who, the scorecard, the other cards - character for character', () => {
+        test(k + ': the Weekly Game cards, the header / Pay out / Who Pays Who / Net, the scorecard, the other cards - the capture through the documented transforms', () => {
             const el = arrive(search);
             // The receipt head (in the summary) and the scorecard print TODAY's date;
             // the fixture holds its capture day. That segment is the one allowed to differ.
             const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
-            assert.equal(strip(el('money-pool-section')), v142(PREV[k].mainPool));
-            assert.equal(undate(strip(el('combined-settlement-summary'))), noFinalResults(sendMove(undate(PREV[k].summary)), { require: true }));
-            assert.equal(undate(strip(el('receipt-scorecard'))), undate(PREV[k].scorecard));
+            assertV196Mounts(assert, id => ({ text: undate(strip(el(id))), html: el(id) }),
+                { pool: v142(PREV[k].mainPool), summary: undate(PREV[k].summary), 'receipt-scorecard': undate(PREV[k].scorecard) },
+                { norm: undate, equal: ['receipt-scorecard'] });
+            void noFinalResults; void sendMove;   // subsumed: the proof reads the raw capture
             assert.equal(strip(withoutSideMatches(el('settle-content'))), PREV[k].contentWithoutSideMatches);
             assert.ok(PREV[k].summary.length > 2000 && PREV[k].mainPool.length > 500 && PREV[k].contentWithoutSideMatches.length > 300, 'not vacuous');
             assert.match(PREV[k].summary, /Who Pays Who/);
@@ -228,7 +233,7 @@ describe('THE SEAM — the one rule from grouping.js; the money paths untouched'
     });
     test('nothing on the money path reads the group: computeCombinedNetTotals, renderCombinedSummary, the pool section, the scorecard', () => {
         const s = read('settlement.html');
-        ['function renderCombinedSummary(', 'function renderMoneyPoolSection(', 'function renderReceiptScorecard(', 'function buildPoolPayoutsHtml('].forEach(start => {
+        ['function renderCombinedSummary(', 'function renderMoneyPoolSection(', 'function renderReceiptScorecard(', 'function buildPayoutCardHtml(', 'function buildNetViewHtml('].forEach(start => {
             const at = s.indexOf(start); assert.ok(at > -1, start);
             const fn = s.slice(at, s.indexOf('\n    function ', at + 30));
             assert.ok(fn.length > 100, start + ' found');

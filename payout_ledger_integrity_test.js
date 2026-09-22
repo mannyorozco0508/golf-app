@@ -103,13 +103,12 @@ function renderedPayouts() {
     const res = settled();
     const sorted = Object.keys(res.contributions)
         .map(k => ({ name: res.contributions[k].name, net: res.contributions[k].net }));
-    const html = settle.buildPlayerLedgerHtml(res.contributions, sorted);
+    // v196: the presenter is buildPayoutCardHtml (💰 Pay out) - one row per golfer
+    // owed cash, the reasons under it; a golfer owed nothing is named under the list
+    const html = settle.buildPayoutCardHtml(res.contributions, sorted, null, fixture().data);
+    const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
     const out = {};
-    html.split('pl-name">').slice(1).forEach(block => {
-        const name = block.slice(0, block.indexOf('<'));
-        const m = /TOTAL PAYOUT<\/span><span[^>]*>([^<]*)/.exec(block);
-        out[name] = m ? Number(String(m[1]).replace(/[^0-9.-]/g, '')) * (/-/.test(m[1]) ? -1 : 1) : null;
-    });
+    payoutRowsFromHtml(html).rows.forEach(r => { out[r.name] = r.total; });
     return out;
 }
 
@@ -239,8 +238,8 @@ describe('DEFECT 2 - the breakdown must reconcile to the money it explains', () 
         const res = settled();
         const sorted = Object.keys(res.contributions)
             .map(k => ({ name: res.contributions[k].name, net: res.contributions[k].net }));
-        const html = settle.buildPlayerLedgerHtml(res.contributions, sorted);
-        assert.ok(!/Side Match \u00B7[^<]*<\/span><span class="val-/.test(html),
+        const html = settle.buildPayoutCardHtml(res.contributions, sorted, null, fixture().data);
+        assert.ok(!/<span>Side Match \u00B7[^<]*<\/span><span>\$/.test(html),
             'a Side Match rollup printed with a dollar amount alongside its detail lines');
     });
 
@@ -250,11 +249,13 @@ describe('DEFECT 2 - the breakdown must reconcile to the money it explains', () 
         const res = settled();
         const sorted = Object.keys(res.contributions)
             .map(k => ({ name: res.contributions[k].name, net: res.contributions[k].net }));
-        const html = settle.buildPlayerLedgerHtml(res.contributions, sorted);
-        assert.ok(/pl-group"><span>Zach vs Chris<\/span>/.test(html),
-            'Zach vs Chris did not head its own detail lines');
-        assert.ok(/pl-group"><span>Don vs Steve<\/span>/.test(html),
-            'Don vs Steve did not head its own detail lines');
+        // v196: the match name leads each reason instead of heading a group -
+        // "Zach vs Chris · Press 1" - so the identity travels with the line
+        const html = settle.buildPayoutCardHtml(res.contributions, sorted, null, fixture().data);
+        assert.ok(/<div class="po-reason"><span>Zach vs Chris \u00B7 [^<]*<\/span>/.test(html),
+            'Zach vs Chris did not name its own detail lines');
+        assert.ok(/<div class="po-reason"><span>Don vs Steve \u00B7 [^<]*<\/span>/.test(html),
+            'Don vs Steve did not name its own detail lines');
     });
 });
 

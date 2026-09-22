@@ -149,40 +149,41 @@ describe('THE WORDS', () => {
         // and the pages pass it: the live head thru 10 names hole 7 alone
         const r = results(d);
         // (the seeded birdies past hole 10 are score gaps, named first on the same line)
-        assert.match(r.live, /^\|Not final — [^|]*; KP on hole 7 not recorded\|/);
-        assert.match(r.pool, /; KP on hole 7 not recorded\|/);
-        assert.doesNotMatch(r.live + r.pool, /KP on holes/);
+        // v196: the line renders ONCE, in #results-gap-line, above every mount
+        assert.match(r.gap, /^\|Not final — [^|]*; KP on hole 7 not recorded\|$/);
+        assert.doesNotMatch(r.live + r.pool, /Not final/);
         assert.match(r.pool, /\|Hole 12: not recorded\|\$10 in the pot\|/, 'the KP card itself still lists every held hole');
     });
     function results(data) {
         const sb = loadHtmlInlineScript('settlement.html');
         sb.__d = J(data);
-        run(sb, 'currentMode = "KPX"; currentData = __d; document.__mount(document.getElementById("money-pool-section")); document.__mount(document.getElementById("combined-settlement-summary")); renderMoneyPoolSection(__d, __d.courseData, __d.scores); renderCombinedSummary(__d, __d.courseData, __d.scores);');
+        run(sb, 'currentMode = "KPX"; currentData = __d; RESULTS_MOUNTS.forEach(i => document.__mount(document.getElementById(i))); renderResultsGapLine(__d); renderMoneyPoolSection(__d, __d.courseData, __d.scores); renderCombinedSummary(__d, __d.courseData, __d.scores);');
         const t = id => String(run(sb, "document.getElementById('" + id + "').innerHTML")).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ');
-        return { live: String(run(sb, 'buildLiveResultsHtml(__d, __d.courseData, __d.scores)')).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|'), pool: t('money-pool-section'), summary: t('combined-settlement-summary'), head: String(run(sb, 'buildReceiptHeader()')).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|') };
+        return { live: String(run(sb, 'buildLiveResultsHtml(__d, __d.courseData, __d.scores)')).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|'), pool: t('money-pool-section'), summary: t('combined-settlement-summary'), head: String(run(sb, 'buildReceiptHeader()')).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|'), gap: t('results-gap-line'), top: t('results-top') };   // v196: the line has its own mount; Pay out in #results-top
     }
     test('Results on the held round: "Not final — KP on holes 7, 12, 16 not recorded" on the live head, the Weekly Game card and the Receipt head; the KP lines say "not recorded"; no "refunded" / "back to the field" anywhere', () => {
         const r = results(round());
-        assert.match(r.live, /^\|Not final — KP on holes 7, 12, 16 not recorded\|/);
-        assert.match(r.pool, /\|Not final — KP on holes 7, 12, 16 not recorded\|/);
-        assert.match(r.head, /\|Not final — KP on holes 7, 12, 16 not recorded\|/);
+        // v196: the line renders ONCE, in its own mount above the live head, the Weekly Game cards and the Receipt head
+        assert.equal(r.gap, '|Not final — KP on holes 7, 12, 16 not recorded|');
+        assert.doesNotMatch(r.live + r.pool + r.head + r.summary, /Not final/);
+        assert.match(r.live, /^\|🏆 RESULTS — NOT FINAL\|/);
         assert.match(r.pool, /\|Hole 7: not recorded\|\$10 in the pot\|/);
         assert.match(r.pool, /\|Hole 3: Ann Alpha[^|]*\|\$10\|/);
         assert.doesNotMatch(r.pool + r.summary + r.live, /refunded|back to the field|KP refund/i);
-        assert.doesNotMatch(r.summary, /Player Payouts/, 'not final: the live head, not the receipt');
+        assert.equal(r.top, '', 'not final: the live head, not the Pay out list');
     });
     test('a verified round with a blank KP: the line still shows (verification records no KP); the gap line does not', () => {
         const d = round({ verified: true }); delete d.scores['p102_h1'];   // Ben also missing hole 1 - a gap, forgiven by verification
         const r = results(d);
-        assert.match(r.live, /Not final — KP on holes 7, 12, 16 not recorded\|/);
-        assert.doesNotMatch(r.live, /Ben.*is missing/);
+        assert.equal(r.gap, '|Not final — KP on holes 7, 12, 16 not recorded|');
+        assert.doesNotMatch(r.gap, /Ben.*is missing/);
     });
     test('nobody on h7: the Receipt line "Hole 7: nobody — $10 to the skins pot"; recorded everywhere: no Not-final line, the receipt is final', () => {
         const n = results(round({ kpNoWinner: { h7: true } }));
         assert.match(n.pool, /\|Hole 7: nobody\|\$10 to the skins pot\|/);
         const f = results(round({ kpWinners: { h3: '101', h7: '113', h12: '104', h16: '116' } }));
-        assert.doesNotMatch(f.live + f.pool + f.head, /Not final/);
-        assert.match(f.summary, /Player Payouts/);
+        assert.doesNotMatch(f.gap + f.live + f.pool + f.head, /Not final/);
+        assert.match(f.top, /💰 Pay out/);
     });
     test('an Out leader on the Receipt: "Hole 3: Ann Alpha is out of the round — re-record it"', () => {
         const d = round(); d.players[0].playingForMoney = false; d.players[0].out = true;

@@ -50,73 +50,71 @@ function poolRound() {
 function receipt(d) {
     const sb = loadHtmlInlineScript('settlement.html');
     sb.__d = d;
-    vm.runInContext("currentMode='ABCD'; currentData=__d; renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores); renderCombinedSummary(currentData, currentData.courseData, currentData.scores); renderSettlement(currentData); renderReceiptScorecard();", sb);
+    vm.runInContext("currentMode='ABCD'; currentData=__d; renderResultsGapLine(currentData); renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores); renderCombinedSummary(currentData, currentData.courseData, currentData.scores); renderSettlement(currentData); renderReceiptScorecard();", sb);
     const raw = id => String(sb.document.getElementById(id).innerHTML || '');
-    const roots = ['receipt-export-head', 'settle-content', 'money-pool-section', 'combined-settlement-summary', 'receipt-scorecard'];
-    return { sb, summary: raw('combined-settlement-summary'), all: roots.map(raw).join('\n') };
+    // v196: the roots are the seven mounts in screen order
+    const roots = ['results-gap-line', 'results-top', 'money-pool-section', 'combined-settlement-summary', 'settle-content', 'results-net', 'receipt-scorecard'];
+    return { sb, summary: raw('combined-settlement-summary'), top: raw('results-top'), net: raw('results-net'), pool: raw('money-pool-section'), all: roots.map(raw).join('\n') };
 }
 
-describe('PART 1 - no Final Results net list on a Weekly Game round', () => {
-    test('the pool round: no 🏁 Final Results, no "NET" line, on screen or in any export root; Player Payouts is there', () => {
+describe('PART 1 - no Final Results card; the NET list is the collapsed NET +/− view (v196), on every round', () => {
+    // v195b dropped the "🏁 Final Results" NET list from a Weekly Game receipt so
+    // the payer read PLAYER PAYOUTS. v196 goes further on every round: the payer
+    // reads 💰 PAY OUT first, and the NET list survives as NET +/− - a collapsed
+    // <details> in #results-net, last before the card, for the golfer who wants it.
+    test('the pool round: no 🏁 Final Results card in any export root; Pay out first; NET +/− collapsed and last', () => {
         const r = receipt(poolRound());
         assert.doesNotMatch(r.all, /Final Results/);
-        assert.doesNotMatch(r.all, /\d NET</);
-        assert.match(r.all, /Player Payouts/);
-        assert.match(r.all, /Who Pays Who|pl-block/, 'the per-golfer ledger and payouts remain');
+        assert.match(r.top, /💰 Pay out/);
+        assert.match(r.net, /^<details class="settle-card net-view print-open"><summary class="settle-header">Net \+\/−<\/summary>/);
+        assert.match(r.net, /\d NET</, 'the NET lines live in the collapsed view');
+        assert.doesNotMatch(r.top + r.summary + r.pool, /\d NET</, 'and nowhere else');
     });
-    test('CONTROL - the match round (no Weekly Game): 🏁 Final Results with the NET lines, as before', () => {
+    test('the match round (no Weekly Game): the same - no card, the NET +/− view with the lines', () => {
         const r = receipt(matchRound());
-        assert.match(r.summary, /<div class="settle-header">🏁 Final Results<\/div>/);
-        assert.match(r.summary, /Ann A<\/span><span class="val-pos">\+\$1[23] NET<\/span>/);   // $25 split across the two winners
+        assert.doesNotMatch(r.all, /🏁 Final Results/);
+        assert.match(r.net, /Ann A<\/span><span class="val-pos">\+\$1[23] NET<\/span>/);   // $25 split across the two winners
     });
-    test('the gate is the Weekly Game switch, not the pool\'s presence: a DISABLED pool on the match round keeps the card', () => {
-        const d = matchRound(); d.moneyPool = { enabled: false, buyIn: 40, kp: { amount: 100, holes: [3] }, net: { amount: 0 }, skins: { mode: 'none' } };
-        assert.match(receipt(d).summary, /Final Results/);
+    test('the poolIsOn gate that chose the card is gone: one view for every round (source)', () => {
+        assert.doesNotMatch(SRC, /const poolIsOn = !!\(data\.moneyPool && data\.moneyPool\.enabled !== false\);\s*if \(!poolIsOn\) \{/);
+        assert.match(SRC, /if \(netMount\) netMount\.innerHTML = buildNetViewHtml\(sorted\);/);
     });
-    test('the export roots are the same five the Send button reads (source)', () => {
-        assert.match(SRC, /const roots = \['receipt-export-head', 'settle-content', 'money-pool-section',/);
-        assert.match(SRC, /const poolIsOn = !!\(data\.moneyPool && data\.moneyPool\.enabled !== false\);\s*if \(!poolIsOn\) \{/);   // (weekly_game_everywhere_test forbids a weeklyGame-shaped name: the stored key is moneyPool)
+    test('the export roots are the mounts in screen order, the one list (RESULTS_MOUNTS)', () => {
+        assert.match(SRC, /const roots = RESULTS_MOUNTS/);
     });
 });
 
-describe('PART 2 - the heading hierarchy', () => {
+describe('PART 2 - the heading hierarchy (v196: section heads and game bands; the flight sub-heads became cards)', () => {
     const rule = sel => { const at = SRC.indexOf(sel + ' {'); assert.ok(at > -1, sel); return SRC.slice(at, SRC.indexOf('}', at)); };
     const rem = css => { const m = /font-size:\s*([\d.]+)rem/.exec(css); return m ? parseFloat(m[1]) : null; };
     const printBlock = SRC.slice(SRC.indexOf('@media print {'), SRC.indexOf('\n    </style>', SRC.indexOf('@media print {')));
-    test('section heads (.settle-header, .pp-game-head, .pool-game-head): 1.2rem, bold, a 2px green rule, air above', () => {
-        ['.settle-header', '.pool-payouts .pp-game-head', '.pool-game-head'].forEach(sel => {
-            const css = rule(sel);
-            assert.equal(rem(css), 1.2, sel); assert.match(css, /font-weight: bold/, sel);
-            assert.match(css, /border-bottom: 2px solid var\(--brand-green\)/, sel);
-            assert.match(css, /margin(-top)?: (18px|0 0 12px 0|22px)/, sel + ' spacing');
-        });
+    test('section heads (.settle-header) 1.2rem, bold, a 2px green rule, air above; a game card\'s title (.game-title) the same size, on its band', () => {
+        const css = rule('.settle-header');
+        assert.equal(rem(css), 1.2); assert.match(css, /font-weight: bold/); assert.match(css, /border-bottom: 2px solid var\(--brand-green\)/);
+        assert.equal(rem(rule('.game-title')), 1.2); assert.match(rule('.game-title'), /font-weight: bold/);
+        assert.match(rule('.game-head'), /background: var\(--brand-green\); color: #fff;/);
         assert.match(SRC, /\.settle-card \{ margin-top: 22px; \}/);
+        assert.doesNotMatch(SRC, /\.pool-flight-head \{|\.pool-game-head \{|\.pool-payouts \.pp-game-head \{/, 'the retired heads have no rules');
     });
-    test('sub heads (.pp-flight-head, .pool-flight-head): 1rem, bold, a 1px teal rule - larger than rows, smaller than Skins', () => {
-        ['.pool-payouts .pp-flight-head', '.pool-flight-head'].forEach(sel => {
-            const css = rule(sel);
-            assert.equal(rem(css), 1, sel); assert.match(css, /font-weight: bold/, sel); assert.match(css, /border-bottom: 1px solid var\(--accent-teal\)/, sel);
-        });
-        assert.ok(rem(rule('.pool-payouts .pp-flight-head')) < rem(rule('.pool-payouts .pp-game-head')));
-    });
-    test('rows stay under both: .ledger-row 0.95rem; no row size moved', () => {
+    test('rows stay under the heads: .ledger-row 0.95rem; the pot cell 1rem; the Pay out amount larger than either', () => {
         assert.equal(rem(rule('.ledger-row')), 0.95);
-        assert.ok(rem(rule('.ledger-row')) < rem(rule('.pool-payouts .pp-flight-head')));
-        assert.match(rule('.pool-payouts .pp-row'), /^\.pool-payouts \.pp-row \{ padding: 8px 12px; margin-bottom: 6px; $/m);
+        assert.equal(rem(rule('.game-pot')), 1);
+        assert.ok(rem(rule('.po-amt')) > rem(rule('.game-pot')));
     });
-    test('print keeps the hierarchy: 14pt sections, 11.5pt sub-heads, 9.5pt rows, rules and air', () => {
-        assert.match(printBlock, /\.settle-header, \.pool-game-head, \.pool-payouts \.pp-game-head \{ font-size: 14pt; border-bottom: 2px solid #0f4c3a;[^}]*margin-top: 14pt; \}/);
-        assert.match(printBlock, /\.pool-flight-head, \.pool-payouts \.pp-flight-head \{ font-size: 11\.5pt; border-bottom: 1px solid #2a9d8f;[^}]*margin-top: 8pt; \}/);
-        assert.match(printBlock, /\.ledger-row, \.pool-payouts \.pp-row \{ font-size: 9\.5pt; \}/);
+    test('print keeps the hierarchy: 14pt sections and titles, 11.5pt pots, 9.5pt rows, rules and air', () => {
+        assert.match(printBlock, /\.settle-header \{ font-size: 14pt; border-bottom: 2px solid #0f4c3a;[^}]*margin-top: 14pt; \}/);
+        assert.match(printBlock, /\.game-title, \.po-head, \.net-view > summary \{ font-size: 14pt; \}/);
+        assert.match(printBlock, /\.game-pot, \.po-total, \.po-amt \{ font-size: 11\.5pt; \}/);
+        assert.match(printBlock, /\.ledger-row \{ font-size: 9\.5pt; \}/);
         assert.match(printBlock, /\.settle-card \{ margin-top: 18px; \}/);
     });
-    test('every section on a pool receipt carries one of the heading classes (the rendered markup: Player Payouts, Weekly Game, KP, Net Finish, Skins, Flight A / B)', () => {
+    test('every section on a pool receipt carries one of the heading classes (the rendered markup: Pay out, the Weekly Game label, KP, Net Finish, Skins — Flight A / B, Net +/−)', () => {
         const d = poolRound(); d.flights = { enabled: true, scopes: { skins: 'flight', birdies: 'field' } }; d.players.forEach((p, i) => { p.flight = i < 6 ? 'A' : 'B'; });
         const r = receipt(d);
-        assert.match(r.all, /<div class="settle-header">💰 Player Payouts<\/div>|<div class="settle-header">💰 Player Payouts<\/div>/);
-        assert.match(r.all, /class="settle-header">🏆 Weekly Game — \$480</);
-        ['Skins', 'Net Finish', 'KP'].forEach(h => assert.match(r.all, new RegExp('<div class="pp-game-head">' + h + '</div>'), h));
-        assert.match(r.all, /<div class="pp-flight-head">Flight A<\/div>/); assert.match(r.all, /<div class="pp-flight-head">Flight B<\/div>/);
-        assert.match(r.all, /class="pool-game-head">🥩 Skins Pot/); assert.match(r.all, /class="pool-flight-head"/);
+        assert.match(r.all, /<div class="settle-header po-head"><span>💰 Pay out<\/span>/);
+        assert.match(r.all, /<div class="results-section-label">🏆 Weekly Game<\/div>/);
+        ['📍 KP', '🥇 Net Finish', '🥩 Skins — Flight A', '🥩 Skins — Flight B'].forEach(h => assert.match(r.all, new RegExp('<span class="game-title">' + h + '</span>'), h));
+        assert.match(r.all, /<summary class="settle-header">Net \+\/−<\/summary>/);
+        assert.doesNotMatch(r.all, /pp-game-head|pool-game-head|pool-flight-head|Skins Pot/);
     });
 });

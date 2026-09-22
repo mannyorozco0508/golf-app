@@ -390,7 +390,7 @@ describe('RECEIPT', () => {
 
     test('it says cancelled, names the original amount, and says where it went', () => {
         const t = receipt({ cancelled: true });
-        assert.match(t, /KP — Cancelled/);
+        assert.match(t, /📍 KP Cancelled Cancelled before/);   // v196: the card head reads title, then the pot cell
         assert.match(t, /original allocation \$100/);
         assert.match(t, /moved to skins/);
     });
@@ -402,17 +402,17 @@ describe('RECEIPT', () => {
 
     test('it never calls a cancellation a refund', () => {
         const t = receipt({ cancelled: true });
-        const kpPart = t.slice(t.indexOf('KP — Cancelled'), t.indexOf('KP — Cancelled') + 160);
+        const kpPart = t.slice(t.indexOf('📍 KP Cancelled'), t.indexOf('📍 KP Cancelled') + 160);
         assert.ok(!/refund/i.test(kpPart), 'the pot was re-divided, not given back');
     });
 
     test('the skins pot shown is the larger one', () => {
-        assert.match(receipt({ cancelled: true }), /Skins Pot — \$410/);
+        assert.match(receipt({ cancelled: true }), /🥩 Skins \$410 /);   // v196: the skins card's pot cell
     });
 
     test('an uncancelled round still shows its KP section', () => {
         const t = receipt({ cancelled: false });
-        assert.match(t, /KP — \$100/);
+        assert.match(t, /📍 KP \$100 Hole 3/);
         assert.ok(!/Cancelled/.test(t));
     });
 });

@@ -289,7 +289,9 @@ describe('the export reads the screen; it does not recompute money', () => {
         // sections - the export shipped a Main Pool receipt with no money in it.
         // What this test protects is unchanged: rendered NODES go to the exporter,
         // never round data for it to recompute.
-        const at = s.indexOf('const roots = [');
+        // v196: the roots ARE the mounts, in screen order - RESULTS_MOUNTS
+        assert.match(s, /const roots = RESULTS_MOUNTS/);
+        const at = s.indexOf('const RESULTS_MOUNTS = [');
         assert.ok(at > -1, 'the export roots are gone');
         const roots = s.slice(at, s.indexOf('];', at));
         assert.match(roots, /'settle-content'/);

@@ -22,6 +22,13 @@
 //   'Main Pool'         the AGGREGATE line, whose own notes carry the detail.
 //                        Showing both would count the same money twice - which is
 //                        why the total is summed from the lines actually printed.
+//
+// v196 (2026-09-22, the results payout redesign): the section is 💰 PAY OUT in
+// #results-top - one <details> row per golfer owed cash, the reasons under it
+// (the pool reasons joined by hole from computeMoneyPool's lines, every other
+// payout line as the ledger carries it), "No payout: <names>" under the list.
+// The same rules, the same figures; parse() reads the new markup into the
+// shape these tests always asserted (helpers/results-payout-v196.js).
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -76,28 +83,22 @@ function boot({ kpWinners = {}, kpNoWinner = null, mode = 'whole-dollar', sideMa
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, sb);
     return {
         sb, data,
-        html: () => sb.document.getElementById('combined-settlement-summary').innerHTML,
+        // v196: the Pay out list renders into #results-top; Who Pays Who stays in the summary
+        html: () => sb.document.getElementById('results-top').innerHTML + sb.document.getElementById('combined-settlement-summary').innerHTML,
         run: c => vm.runInContext(c, sb),
     };
 }
 
-// Parses the rendered payout blocks back out of the DOM.
+// Parses the rendered Pay out rows back out of the DOM, into the shape the
+// Player Payouts ledger had: per golfer, the reason lines and one final
+// TOTAL PAYOUT row; a golfer named under "No payout:" is a "No payout" line
+// and a $0 total.
+const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
 function parse(html) {
-    const at = html.indexOf('Player Payouts');
-    const seg = html.slice(at, html.indexOf('\uD83E\uDD1D', at));   // stop at Who Pays Who
+    const r = payoutRowsFromHtml(html);
     const out = {};
-    seg.split('<div class="pl-block">').slice(1).forEach(b => {
-        const name = (b.match(/pl-name">([^<]*)</) || [])[1];
-        if (!name) return;
-        out[name] = [...b.matchAll(/<div class="(pl-row[^"]*)"><span>([^<]*)<\/span>(.*?)<\/div>/g)].map(m => {
-            const amt = m[3].match(/([+-])?\$([\d,]+(?:\.\d+)?)/);
-            return {
-                label: m[2],
-                final: /pl-final/.test(m[1]),
-                amount: amt ? (amt[1] === '-' ? -1 : 1) * Number(amt[2].replace(/,/g,'')) : 0,
-            };
-        });
-    });
+    r.rows.forEach(x => { out[x.name] = x.reasons.map(re => ({ label: re.label, final: false, amount: re.amount })).concat([{ label: 'TOTAL PAYOUT', final: true, amount: x.total }]); });
+    r.none.forEach(n => { out[n] = [{ label: 'No payout', final: false, amount: 0 }, { label: 'TOTAL PAYOUT', final: true, amount: 0 }]; });
     return out;
 }
 
@@ -111,9 +112,7 @@ describe('THE BUY-IN IS GONE FROM THE GOLFER-FACING VIEW', () => {
     });
 
     test('"FINAL NET" is gone from this section', () => {
-        const html = boot().html();
-        const seg = html.slice(html.indexOf('Player Payouts'), html.indexOf('\uD83E\uDD1D'));
-        assert.ok(!/FINAL NET/.test(seg));
+        assert.ok(!/FINAL NET/.test(boot().html()));
     });
 
     test('"TOTAL PAYOUT" closes every golfer', () => {
@@ -181,10 +180,12 @@ describe('THE DETAIL WORTH KEEPING IS KEPT', () => {
         assert.ok(led.Carp.some(r => /^Net Finish/.test(r.label) && r.amount === 30));
     });
 
-    test('skins appear with their count', () => {
+    test('skins appear by hole (v196: one reason per skin, the hole named)', () => {
         const led = parse(boot().html());
-        assert.ok(led.Carp.some(r => /Skins \u00B7 2 skins/.test(r.label) && r.amount === 118));   // 89 before the $100 joined the pot
-        assert.ok(led.Manny.some(r => /Skins \u00B7 1 skin\b/.test(r.label) && r.amount === 58));
+        const carp = led.Carp.filter(r => /^Skins \u00B7 Hole \d+$/.test(r.label));
+        assert.equal(carp.length, 2); assert.equal(carp.reduce((a, r) => a + r.amount, 0), 118);   // 89 before the $100 joined the pot
+        const manny = led.Manny.filter(r => /^Skins \u00B7 Hole \d+$/.test(r.label));
+        assert.equal(manny.length, 1); assert.equal(manny[0].amount, 58);
     });
 
     test('no refund row: a "nobody" KP is the skins pot\'s, not the field\'s (2026-09-22)', () => {
@@ -196,7 +197,7 @@ describe('THE DETAIL WORTH KEEPING IS KEPT', () => {
 
     test('a KP winner sees their KP hole', () => {
         const led = parse(boot({ kpWinners: { h3:'101', h7:'105', h12:'109', h16:'102' }, kpConfirmed: { confirmed: true } }).html());
-        assert.ok(led.Marty.some(r => /^KP H3/.test(r.label) && r.amount === 25),
+        assert.ok(led.Marty.some(r => r.label === 'KP \u00B7 Hole 3' && r.amount === 25),
             'KP is app-managed pool money and belongs in the payout view');
     });
 
@@ -232,9 +233,7 @@ describe('A GOLFER WHO WON NOTHING', () => {
     });
 
     test('no -$40 anywhere in the section', () => {
-        const html = noWinners().html();
-        const seg = html.slice(html.indexOf('Player Payouts'), html.indexOf('\uD83E\uDD1D'));
-        assert.ok(!/-\$40/.test(seg), 'the buy-in must not reappear as a loss');
+        assert.ok(!/-\$40/.test(noWinners().html()), 'the buy-in must not reappear as a loss');
     });
 });
 
@@ -300,10 +299,12 @@ describe('NOTHING BEHIND THE VIEW CHANGED', () => {
 
 describe('NO PAYOUT ARITHMETIC IN THE PRESENTER', () => {
 
+    // v196: the presenter is buildPayoutCardHtml + payoutLinesOf (the line rule)
+    // + poolReasonsFor (the join); sliced together.
     const fn = () => {
         const src = read(PAGE);
-        const at = src.indexOf('function buildPlayerLedgerHtml');
-        return src.slice(at, src.indexOf('\n    function ', at + 10));
+        const slice = name => { const at = src.indexOf('function ' + name); return src.slice(at, src.indexOf('\n    function ', at + 10)); };
+        return slice('payoutLinesOf') + slice('poolReasonsFor') + slice('buildPayoutCardHtml');
     };
 
     test('it consumes canonical contributions', () => {
@@ -318,10 +319,11 @@ describe('NO PAYOUT ARITHMETIC IN THE PRESENTER', () => {
             assert.ok(!f.includes(t), `the presenter must not compute money; found ${t}`));
     });
 
-    test('the only arithmetic is summing the lines it prints', () => {
+    test('the only arithmetic is summing the lines it prints (and comparing that sum, in cents, to the joined reasons)', () => {
         const f = fn();
-        assert.match(f, /total \+= l\.amount;/, 'the total must be the sum of what is displayed');
-        assert.ok(!/Math\.round\(/.test(f), 'the engine already allocated; rounding again could disagree');
+        assert.match(f, /const total = lines\.reduce\(\(a, l\) => a \+ l\.amount, 0\);/, 'the total must be the sum of what is displayed');
+        assert.equal((f.match(/Math\.round\(/g) || []).length, 1, 'one Math.round: the cents() comparison helper, never an allocation');
+        assert.match(f, /const cents = amt => Math\.round\(amt \* 100\);/);
         assert.ok(!/toFixed\(/.test(f), 'formatting must stay in the shared fmtWhole rule');
     });
 

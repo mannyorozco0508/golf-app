@@ -185,23 +185,22 @@ describe('2. THE SUMMARY AND THE HOLE LINE COUNT THE SAME THING', () => {
             'the summary still counts holes while the line counts skins: ' + t.slice(0, 400));
     });
 
-    test('the golfer who won two skins is summarised as two', () => {
-        assert.match(receipt(), /Scott Bell — 2 skins/,
-            'the summary does not agree with the hole line');
-    });
-
-    test('a one-skin winner still reads as one', () => {
-        assert.match(receipt(), /Carp Dean — 1 skin\b/);
+    // v196: the per-golfer Skins Summary left the card (a golfer's total prints once,
+    // in 💰 Pay out, one reason per hole with its dollars); the hole line is the one
+    // place a collected run is counted, and it counts UNITS - the number the money
+    // divides by - through the shared builder (live-skins.js buildSkinsLedgerRows).
+    test('no per-golfer summary on the card; the collecting hole line counts the units (v196)', () => {
+        const t = receipt();
+        assert.ok(!/Skins Summary|Scott Bell — 2 skins|Carp Dean — 1 skin/.test(t), 'the summary tally is gone from the card');
+        assert.match(t, /collects 2 skins/);
     });
 
     // BOUND TO WHAT IS COUNTED, so it cannot drift again.
-    test('the summary counts units, the same number the money divides by', () => {
+    test('the row builder counts units, the same number the money divides by', () => {
         const src = read('settlement.html').replace(/\/\/.*$/gm, '');
-        const at = src.indexOf('countByPlayer[k]');
-        assert.ok(at > -1, 'the summary tally is gone');
-        const line = src.slice(at, src.indexOf('\n', at));
-        assert.match(line, /unitsWon/,
-            'the summary counts holes won, not skins won - the money divides by units');
+        assert.ok(src.indexOf('countByPlayer[k]') < 0, 'the page-local tally is gone (v196)');
+        assert.match(src, /buildSkinsLedgerRows\(L, basisLabel\)\.forEach\(row =>/, 'the shared builder draws the rows');
+        assert.match(read('live-skins.js'), /unitsWon/, 'and it counts units');
     });
 });
 

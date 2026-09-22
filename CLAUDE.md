@@ -318,3 +318,17 @@ Manny's explicit per-file approval, re-pin the hash and record why, and assert t
 behaviour that actually matters rather than trusting a hash to notice. The protected
 list in `HANDOFF.md` still governs: money, settlement, handicap and Ryder points are
 off-limits by default.
+
+## Restore a control by sha from a saved copy — never with `git checkout --` or `git restore`
+
+A negative control mutates a file the wave has already changed. `git checkout --
+<file>` and `git restore <file>` do not undo the control; they put back **HEAD's**
+copy and throw away every edit the wave made to that file. That happened to
+`score-gaps.js` in v195b Part 3 — the file was recovered only because a synced
+bundle copy under `www/app/` happened to hold the wave's version.
+
+**The rule.** Before mutating a file for a control, copy it to the scratchpad
+(`cp <file> $SP/<file>.wave`) and record its sha. Undo the control by copying that
+file back and printing the sha beside "RESTORED-OK". `git checkout --` and `git
+restore` are never a restore step for a control, on any file, however small the
+mutation.

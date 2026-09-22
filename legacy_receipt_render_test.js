@@ -47,7 +47,10 @@ function render(d) {
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderSettlement(currentData);
         renderReceiptScorecard();
-        window.__a = document.getElementById('combined-settlement-summary').innerHTML;
+        // v196: the money above the card is three mounts - the header and Pay out
+        // (#results-top), Who Pays Who (the summary) and NET +/− (#results-net,
+        // the Final Results list) - read together as "top"
+        window.__a = document.getElementById('results-top').innerHTML + document.getElementById('combined-settlement-summary').innerHTML + document.getElementById('results-net').innerHTML;
         window.__b = document.getElementById('settle-content').innerHTML;
         window.__c = document.getElementById('receipt-scorecard').innerHTML;
         window.__d = document.getElementById('money-pool-section').innerHTML;`, sb);
@@ -148,7 +151,7 @@ describe('THE DUPLICATE CARD IS GONE', () => {
         // Nothing was lost by removing the card: Final Results and Who Pays Who carry
         // the same information, per golfer rather than per team.
         const r = render(LEGACY);
-        assert.match(r.top, /Final Results/);
+        assert.match(r.top, /Net \+\/−/);   // v196: the Final Results list is the NET +/− view
         assert.match(r.top, /Who Pays Who/);
         const printed = printedFinal(r.top);
         assert.ok(Object.keys(printed).length >= 2, 'both golfers must still be listed');

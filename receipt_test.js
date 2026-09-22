@@ -395,7 +395,9 @@ describe('ONE DOCUMENT — the competing print path is retired', () => {
 
     test('one consistent label across the app', () => {
         assert.ok(!/Save \/ Share as PDF/.test(st), 'the old label survives');
-        assert.ok(/Print \/ Save Receipt/.test(st));
+        // the one export is the "📤 Send" pill (2026-09-16); the old full-width label
+        // lived on only in a comment the v196 rewrite of the settled branch retired
+        assert.ok(/\\uD83D\\uDCE4 Send<\/button>/.test(st));
         assert.ok(/Round Receipt/.test(idx));
     });
 
@@ -474,11 +476,13 @@ describe('THE RECEIPT — header and scorecard moved across', () => {
         // Bounded by the NEXT card rather than a fixed 400 characters. The window
         // broke the moment an explanatory comment was added above the heading - the
         // ordering it checks never changed, only its distance from the anchor.
-        const at = st.indexOf('let html = buildReceiptHeader();');
+        // v196: the header leads #results-top, the Pay out list after it in the same
+        // statement; Who Pays Who follows in the summary
+        const at = st.indexOf('topMount.innerHTML = buildReceiptHeader() + buildPayoutCardHtml(');
         assert.notEqual(at, -1, 'the header call was renamed');
         const nextCard = st.indexOf('Who Pays Who', at);
         const fn = st.slice(at, nextCard === -1 ? at + 4000 : nextCard);
-        assert.ok(/Final Results/.test(fn), 'the header must be emitted before the money');
+        assert.ok(/buildNetViewHtml\(sorted\)/.test(fn), 'the header must be emitted before the money');
     });
 
     test('the scorecard is the ONLY wide element; money stays one column', () => {

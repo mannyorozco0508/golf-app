@@ -65,6 +65,7 @@ function round(thru) {
 function arrive(d) {
     const sb = loadHtmlInlineScript(PAGE, DEPS);
     vm.runInContext(`currentMode='ABCD'; currentData=${JSON.stringify(d)};
+        renderResultsGapLine(currentData);
         renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
         renderSettlement(currentData); renderReceiptScorecard();`, sb);
@@ -86,14 +87,17 @@ describe('THE BASELINE, and today differs from it by exactly the move and the la
         assert.equal(prev.live.actions, '');
         assert.ok(!prev.live.summary.includes('Print / Save'), 'the live capture never had a button');
     });
-    test('finished: every mount equals the capture, except the button token has left the summary and the label sits in actions', () => {
-        const today = mounts(arrive(round(18)));
-        const expected = Object.assign({}, prev.finished, {
-            summary: prev.finished.summary.replace(OLD_TOKEN, OLD_TOKEN_GONE),
-            actions: '|' + LABEL + '|'
-        });
+    test('finished: every mount is the capture through the documented transforms (v196: header and Pay out in #results-top, Who Pays Who alone in the summary, Final Results as NET +/−), and the label sits in actions', () => {
+        // v196 (results payout redesign) - helpers/results-payout-v196.js is the proof
+        const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
+        const sb = arrive(round(18));
+        const today = mounts(sb);
         assert.equal(prev.finished.summary.split(OLD_TOKEN).length - 1, 1, 'the old token occurs once in the capture');
-        assert.deepEqual(today, expected);
+        assertV196Mounts(assert, id => ({ text: norm(strip0(raw(sb, id))), html: raw(sb, id) }),
+            { pool: prev.finished.pool, summary: prev.finished.summary, 'settle-content': prev.finished.settle, 'receipt-scorecard': prev.finished.scorecard },
+            { norm, equal: ['settle-content', 'receipt-scorecard'] });
+        assert.equal(today.actions, '|' + LABEL + '|');
+        void OLD_TOKEN_GONE;
     });
     test('live: every mount identical to the capture, actions included (empty) - the button stays away mid-round', () => {
         assert.deepEqual(mounts(arrive(round(9))), prev.live);
@@ -206,9 +210,10 @@ describe('BOTH EXPORT PATHS fire from the new position, with the same roots', ()
         assert.ok(Array.isArray(r.captured.roots));
         assert.equal(r.printed.length, 0, 'native must not reach window.print()');
     });
-    test('the roots list in printReceipt is unchanged: the same five ids, in the same order', () => {
+    test('the roots list in printReceipt is RESULTS_MOUNTS - the mounts in screen order (v196; the v152 five-id literal is gone)', () => {
         const src = read(PAGE);
-        assert.ok(src.includes("const roots = ['receipt-export-head', 'settle-content', 'money-pool-section',\n                       'combined-settlement-summary', 'receipt-scorecard']"), 'the roots list moved or changed');
+        assert.ok(src.includes("const roots = RESULTS_MOUNTS"), 'the roots list is the one mount list');
+        assert.ok(!src.includes("const roots = ['receipt-export-head'"), 'the old literal is gone');
         assert.ok(src.includes("el.id !== 'receipt-export-head' && el.tagName !== 'BUTTON'"), 'the button filter on the summary parts stays');
         assert.ok(!/'receipt-actions'/.test(src.slice(src.indexOf('function printReceipt'), src.indexOf('function printReceipt') + 4000)), 'the actions mount is never a root');
     });

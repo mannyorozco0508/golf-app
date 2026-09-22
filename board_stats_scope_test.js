@@ -192,7 +192,7 @@ describe('THE SEAM — one rule, from grouping.js, on both pages; Results untouc
         // overruled the Results decision for the Side Matches CARDS only; what
         // this row still guards is that the money never reads the group.
         const s = read('settlement.html');
-        ['function renderCombinedSummary(', 'function renderMoneyPoolSection(', 'function buildPoolPayoutsHtml('].forEach(start => {
+        ['function renderCombinedSummary(', 'function renderMoneyPoolSection(', 'function buildPayoutCardHtml('].forEach(start => {   // v196: the Pay out builder replaced the payouts block
             const at = s.indexOf(start); assert.ok(at > -1, start);
             assert.doesNotMatch(s.slice(at, s.indexOf('\n    function ', at + 30)), /lockedGroup|canLinkSeeWager/, start + ' must not scope');
         });

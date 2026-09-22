@@ -76,23 +76,25 @@ function arrive(data) {
     const handlers = sb.__dbHandlers.filter(h => h.event === 'value' && h.path === 'events/FLT7');
     assert.equal(handlers.length, 1, 'the page registered exactly one value handler for the round');
     handlers.forEach(h => h.cb({ val: () => J(data) }));
-    return sb.document.getElementById('combined-settlement-summary').innerHTML;
+    // v196: the per-golfer lines are 💰 Pay out's reasons in #results-top; Who Pays Who stays in the summary
+    return sb.document.getElementById('results-top').innerHTML + sb.document.getElementById('combined-settlement-summary').innerHTML;
 }
 
 // The three sections of the combined summary, split on their headers.
 function sections(html) {
-    const pay = html.indexOf('Player Payouts');
+    const pay = html.indexOf('<div class="settle-card payout-card">');
     const wpw = html.indexOf('\uD83E\uDD1D', pay);
-    assert.ok(pay > 0, 'Player Payouts rendered');
+    assert.ok(pay > 0, 'Pay out rendered');
     return { results: html.slice(0, pay), payouts: html.slice(pay, wpw > 0 ? wpw : undefined), whoPays: wpw > 0 ? html.slice(wpw) : '' };
 }
-// { Ann: ['Skins (A)', 'Birdie Pool (A)', 'TOTAL PAYOUT'], ... }
+// { Ann: ['Skins (A)', 'Birdie Pool (A)', 'TOTAL PAYOUT'], ... } - a Pay out row's
+// reasons then its total; a golfer under "No payout:" reads ['No payout', 'TOTAL PAYOUT']
+const { payoutRowsFromHtml } = require('./helpers/results-payout-v196.js');
 function labels(payoutsHtml) {
+    const r = payoutRowsFromHtml(payoutsHtml);
     const out = {};
-    payoutsHtml.split('<div class="pl-block">').slice(1).forEach(b => {
-        const name = (b.match(/pl-name">([^<]*)</) || [])[1];
-        out[name] = [...b.matchAll(/<div class="pl-row[^"]*"><span>([^<]*)<\/span>/g)].map(m => m[1]);
-    });
+    r.rows.forEach(x => { out[x.name] = x.reasons.map(re => re.label).concat(['TOTAL PAYOUT']); });
+    r.none.forEach(n => { out[n] = ['No payout', 'TOTAL PAYOUT']; });
     return out;
 }
 const ENGINE = (() => loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']))();
@@ -134,9 +136,10 @@ describe('7.1 a wager scoped per flight is labelled with the golfer\'s flight', 
             assert.deepEqual(shown, engineWins, nm);
         });
     });
-    test('the badge is on the per-line ledger ONLY: Final Results totals and Who Pays Who carry none', () => {
-        assert.ok(/Final Results|FINAL RESULTS/i.test(S.results), 'Final Results rendered');
-        assert.ok(!/\((A|B)\)/.test(S.results), 'no (A)/(B) in Final Results');
+    test('the badge is on the per-line reasons ONLY: the header, the Net +/− view and Who Pays Who carry none', () => {
+        // v196: the Final Results list is the NET +/− view in #results-net; the header leads #results-top
+        assert.ok(/receipt-export-head/.test(S.results), 'the header rendered above the list');
+        assert.ok(!/\((A|B)\)/.test(S.results), 'no (A)/(B) in the header');
         assert.ok(S.whoPays.length > 0, 'Who Pays Who rendered');
         assert.ok(!/\((A|B)\)/.test(S.whoPays), 'no (A)/(B) in Who Pays Who');
         assert.ok(/\((A|B)\)/.test(S.payouts), 'and the ledger does carry them');
@@ -204,9 +207,10 @@ describe('7.1 the seam: the suffix is presentation in settlement.html, gated on 
         assert.match(fn, /playerFlight\(p\)/);
         assert.match(fn, /line\.note/);
     });
-    test('the ONE line output in buildPlayerLedgerHtml carries the suffix; the caller hands the round in', () => {
-        assert.match(src, /\$\{l\.label\}\$\{flightLabelSuffix\(data, c\.name, l\)\}/);
-        assert.match(src, /buildPlayerLedgerHtml\(contributions, sorted, data\)/);
+    test('the ONE reason builder in buildPayoutCardHtml carries the suffix (v196); the caller hands the round in', () => {
+        assert.match(src, /l\.label \+ flightLabelSuffix\(data, c\.name, l\), amount: l\.amount \}\);/);
+        assert.equal((src.match(/flightLabelSuffix\(data, c\.name, l\)/g) || []).length, 1, 'one place: asReason');
+        assert.match(src, /buildPayoutCardHtml\(contributions, sorted, pool, data\)/);
     });
     test('settlement-engine.js writes no flight into a contribution label', () => {
         const eng = read('settlement-engine.js');

@@ -167,12 +167,12 @@ describe('SCORING BASIS', () => {
 
 describe('SUMMARY AND MONEY', () => {
 
-    test('a per-golfer summary lists skins won and dollars', () => {
+    test('the per-golfer summary is gone from the card (v196): a golfer\'s total prints once, in 💰 Pay out; the hole rows carry the skins', () => {
         const b = boot({ spec: { p101_h1: 3, p101_h5: 3, p102_h9: 3 } });
         const h = b.html();
-        assert.match(h, /Skins Summary/);
-        assert.match(h, /Avery \u2014 2 skins/);
-        assert.match(h, /Blake \u2014 1 skin\b/);
+        assert.ok(!/Skins Summary/.test(h));
+        assert.equal((h.match(/Hole \d+ \u2014 Avery \u2014/g) || []).length, 2, 'Avery\'s two skins are two hole rows');
+        assert.equal((h.match(/Hole \d+ \u2014 Blake \u2014/g) || []).length, 1);
     });
 
     test('every printed dollar amount is a whole dollar', () => {
