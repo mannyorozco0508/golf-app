@@ -87,6 +87,26 @@ describe('THE QUESTION on a KP hole', () => {
         assert.match(h, /<div class="kp-current">Current KP: <strong>Gus<\/strong> \(Group 2\) — 8' 4"<\/div>/);
         assert.match(h, /Did anyone in your group get inside it\?/, 'a later group is still asked');
     });
+    test('the group is read LIVE, not off the kpLeaders stamp: a golfer moved to another group (v199) reads his NEW group (CONTROL: the stamp still says the old one)', () => {
+        // saveKpLeader stamps the group the recorder was in. The Players sheet can
+        // move that golfer afterwards, and the stamp then names the group he left.
+        // a COPY of LEADER: the fixture hands the same object to every round, and
+        // this test mutates the leader to check the fallback
+        const d = round({ leader: Object.assign({}, LEADER) });
+        assert.equal(d.kpLeaders.h7.group, 2, 'CONTROL: the stamp in the record says 2');
+        const sb = boot(d, 7, 1);
+        // the roster moved Gus into group 1; the map renderScorecard rebuilds says so
+        run(sb, "window.__scPlayerGroupMap[String(currentData.kpLeaders.h7.playerId)] = 1; renderKpEntryMount();");
+        assert.match(mount(sb), /Current KP: <strong>Gus<\/strong> \(Group 1\)/);
+        assert.equal(run(sb, 'currentData.kpLeaders.h7.group'), 2, 'the stamp is untouched history');
+        // with the map absent it falls back to the ROSTER (the same live answer, so
+        // the tag never depends on a render having happened first); an id off the
+        // roster gets no tag at all
+        run(sb, "window.__scPlayerGroupMap = null; renderKpEntryMount();");
+        assert.match(mount(sb), /Current KP: <strong>Gus<\/strong> \(Group 2\)/, 'from the roster: Gus is the 7th of 8, group 2');
+        run(sb, "currentData.kpLeaders.h7.playerId = '999'; renderKpEntryMount();");
+        assert.doesNotMatch(mount(sb), /\(Group /);
+    });
     test('LIT when every golfer in the group has a score on the hole - not before (CONTROL: three of four)', () => {
         const three = mount(boot(round({ holeSevenFor: [101, 102, 103] }), 7, 1));
         assert.doesNotMatch(three, /kp-ask-now/);

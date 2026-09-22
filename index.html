@@ -4233,7 +4233,21 @@ html {
         // nothing to tap, as before.
         let head = '<div class="kp-block kp-ask' + (kpGroupHoleComplete(h) ? ' kp-ask-now' : '') + '">'
             + '<div class="kp-head">\u26F3 Hole ' + h + ' \u2014 Closest to the Pin</div>';
-        const groupTag = leader && leader.group ? ' (Group ' + escapeHtml(String(leader.group)) + ')' : '';
+        // THE GROUP IS READ LIVE (v199 follow-up), not off the kpLeaders stamp.
+        // saveKpLeader stamps the group the recorder was in; the Players sheet can
+        // move that golfer afterwards, and then the stamp names the group he left.
+        // __scPlayerGroupMap is rebuilt from the roster on every snapshot, so this
+        // says where he is now. The stamp stays in the record as history.
+        // the scorecard's map when it is built (every snapshot rebuilds it), else the
+        // roster itself - never the stamp, and never a number from a stale render
+        const liveGroupOfPlayer = id => {
+            const m = window.__scPlayerGroupMap;
+            if (m && m[String(id)] !== undefined) return m[String(id)];
+            if (typeof playerGroupMap !== 'function') return undefined;
+            return playerGroupMap(currentData.players || [], currentData.groupSizeOverrides || {})[String(id)];
+        };
+        const leaderGroup = leader ? liveGroupOfPlayer(leader.playerId) : (winner ? liveGroupOfPlayer(winner) : undefined);
+        const groupTag = leaderGroup ? ' (Group ' + escapeHtml(String(leaderGroup)) + ')' : '';
         // A recorded leader who is OUT of the round (the Players sheet): the hole
         // is held, not paid, until it is re-recorded - say so where it is recorded.
         const leaderOut = !!(winner && (currentData.players || []).some(p => String(p.id) === String(winner) && p.playingForMoney === false));
