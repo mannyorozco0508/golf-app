@@ -1745,7 +1745,11 @@
 // of the target group (the roster is reordered and groupSizeOverrides rewritten
 // in one guarded write; scores, flight, handicap and KP leads never move). A
 // device on v198 has no selector and cannot move anyone. index.html is precached.
-const CACHE_VERSION = 'golfapp-v199-move-groups';
+// Moved to v199-kp-live-group (the same wave, a new cache KEY) because index.html changed AFTER v199 went live: the KP block's
+// "(Group N)" reads the live roster, not the kpLeaders stamp a v199 move can
+// leave stale. A phone that installed v199 in the meantime would otherwise keep
+// the version that shows the old group.
+const CACHE_VERSION = 'golfapp-v199-kp-live-group';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
