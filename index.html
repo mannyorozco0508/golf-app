@@ -1192,7 +1192,11 @@
         .ps-content { max-width: 440px; }
         .ps-group { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 4px 0; display: flex; justify-content: space-between; align-items: center; }
         .ps-add { background: none; border: 1px solid var(--brand-green); color: var(--brand-green); border-radius: 12px; padding: 4px 10px; font-size: 0.72rem; font-weight: bold; cursor: pointer; min-height: 32px; }
-        .ps-row { display: grid; grid-template-columns: 1fr 52px 40px 54px; gap: 6px; align-items: center; padding: 4px 0; border-top: 1px solid var(--border-faint); }
+        /* v199: a [Group ▾] selector per row - a move goes to the END of the target group. */
+        .ps-row { display: grid; grid-template-columns: 1fr 52px 40px 58px 54px; gap: 6px; align-items: center; padding: 4px 0; border-top: 1px solid var(--border-faint); }
+        .ps-grp { min-height: 40px; border-radius: 8px; border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-size: 0.82rem; font-weight: bold; padding: 0 4px; }
+        .ps-row.ps-moved .ps-grp { border-color: var(--brand-green); color: var(--brand-green); }
+        .ps-new .ps-grp-new { font-size: 0.75rem; color: var(--text-muted); }
         .ps-row input { width: 100%; box-sizing: border-box; min-height: 40px; padding: 6px 8px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-card); color: var(--text-main); }
         .ps-flight { min-height: 40px; border-radius: 8px; border: 1px solid var(--brand-green); background: transparent; color: var(--brand-green); font-weight: bold; cursor: pointer; }
         .ps-out { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
@@ -5107,10 +5111,20 @@ html {
         try { renderScorecard(); } finally { pendingScoreFocus = null; }
     }
 
-    // ---- THE PLAYERS SHEET (v195) ---------------------------------------------
+    // ---- THE PLAYERS SHEET (v195; moves v199) ---------------------------------
     //
     // Rename, handicap, flight and "Out" for the organizer, from the scorecard,
-    // without the wizard - and a golfer added to a group. WHAT IT WRITES:
+    // without the wizard - a golfer added to a group, and (v199) a golfer MOVED
+    // to another group: the row's [Group ▾] selector; the golfer goes to the END
+    // of the target group, the source group's size drops by one, the target's
+    // grows by one, every other golfer keeps their group (by id) and their
+    // group number. Scores, flight, handicap and KP leads are keyed by id and
+    // do not move. A group the move would EMPTY: refused when any golfer of it
+    // has a score ("Group N has scores — mark golfers Out instead."), refused
+    // when it is not the last group (the grouping rule has no empty group - a
+    // 0 size is "unset" and the later groups would renumber, and their links
+    // with them), dropped when it is the last group. A move is a WHOLE write,
+    // like an add, under the same re-read guard. WHAT IT WRITES:
     //   rename / hcp / flight / out  -> ONE update of the changed keys only:
     //       players/<i>/name, players/<i>/hcp, players/<i>/flight,
     //       players/<i>/playingForMoney + players/<i>/out   (Out: false + true;
@@ -5162,6 +5176,9 @@ html {
                     + '<input class="ps-name" type="text" value="' + escapeAttr(p.name) + '" placeholder="Name">'
                     + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(p.hcp || '') + '" placeholder="HCP">'
                     + '<button type="button" class="ps-flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
+                    + '<select class="ps-grp" data-group="' + b.group + '" aria-label="Group" onchange="psRefreshMoney()">'
+                    + boundaries.map(x => '<option value="' + x.group + '"' + (x.group === b.group ? ' selected' : '') + '>G' + x.group + '</option>').join('')
+                    + '</select>'
                     + '<label class="ps-out"><input type="checkbox" class="ps-out-box"' + (out ? ' checked' : '') + ' onchange="psRefreshMoney()"> Out</label>'
                     + '</div>';
             }
@@ -5183,6 +5200,7 @@ html {
         row.innerHTML = '<input class="ps-name" type="text" value="" placeholder="New golfer">'
             + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="HCP">'
             + '<button type="button" class="ps-flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
+            + '<span class="ps-grp-new">G' + group + '</span>'
             + '<span class="ps-out">new</span>';
         host.appendChild(row);
         const nameEl = row.querySelector('.ps-name'); if (nameEl && nameEl.focus) nameEl.focus();
@@ -5201,20 +5219,25 @@ html {
                 if (name) draft.added.push({ group: parseInt(row.getAttribute('data-group'), 10), name, hcp, flight });
             } else {
                 const ob = row.querySelector('.ps-out-box');
-                draft.edits.push({ idx: parseInt(row.getAttribute('data-idx'), 10), name, hcp, flight, out: !!(ob && ob.checked) });
+                const sel = row.querySelector('.ps-grp');
+                const group = sel ? parseInt(sel.value || sel.getAttribute('data-group'), 10) : undefined;
+                draft.edits.push({ idx: parseInt(row.getAttribute('data-idx'), 10), name, hcp, flight, out: !!(ob && ob.checked), group });
             }
         });
         return draft;
     }
     // PURE. From the record and a draft: the one update, the roster it would
-    // leave, the warnings and the money line. `whole` says the write must be the
-    // whole players node (a golfer was added).
+    // leave, the warnings, the refusals and the money line. `whole` says the
+    // write must be the whole players node (a golfer was added or moved).
+    // `refused` (v199) is the sentence that stops the save, or null.
     function buildPlayersUpdate(data, draft) {
         const players = (data.players || []).map(p => Object.assign({}, p));
         const flightsOn = !!(data.flights && data.flights.enabled === true);
         const updates = {};
         const warnings = [];
+        let refused = null;
         let changed = false;
+        const groupOfIdx = playerGroupMap((data.players || []).map((p, i) => ({ id: 'i' + i })), data.groupSizeOverrides || {});
         (draft.edits || []).forEach(e => {
             const p = players[e.idx]; if (!p) return;
             const name = e.name === '' ? p.name : e.name;   // an emptied name is not a rename
@@ -5240,9 +5263,43 @@ html {
         });
         let whole = false;
         let groupSizeOverrides = null;
+        // MOVES (v199): each golfer whose selector names another group, in sheet
+        // order. Applied on the working copy - remove from where the golfer sits
+        // NOW, append at the END of the target group - with the sizes kept in step,
+        // so a second move sees the first. Adds follow, on the same sizes.
+        const moves = (draft.edits || []).filter(e => e.group !== undefined && e.group !== null && players[e.idx] && groupOfIdx['i' + e.idx] !== undefined && parseInt(e.group, 10) !== groupOfIdx['i' + e.idx]);
+        let sizes = computeGroupSizes(players.length, data.groupSizeOverrides || {});
+        if (moves.length) {
+            whole = true; changed = true;
+            const nGroups = sizes.length;
+            const emptied = [];
+            moves.forEach(m => {
+                const id = String((data.players || [])[m.idx].id);
+                const target = Math.max(1, Math.min(nGroups, parseInt(m.group, 10) || 1));
+                const at = players.findIndex(p => String(p.id) === id);
+                // which group the golfer sits in NOW (after earlier moves)
+                let acc = 0, from = 1; for (let k = 0; k < sizes.length; k++) { if (at < acc + sizes[k]) { from = k + 1; break; } acc += sizes[k]; }
+                if (from === target) return;
+                const [mover] = players.splice(at, 1);
+                sizes[from - 1] -= 1;
+                let end = 0; for (let k = 0; k < target; k++) end += sizes[k];   // the source size is already one less
+                players.splice(end, 0, mover);
+                sizes[target - 1] += 1;
+                warnings.push('Group ' + target + '\u2019s link now includes ' + golferLabel(mover));
+                if (sizes[from - 1] === 0 && emptied.indexOf(from) < 0) emptied.push(from);
+            });
+            emptied.forEach(g => {
+                if (sizes[g - 1] !== 0) return;   // refilled by a later move
+                const origin = (data.players || []).filter((p, i) => groupOfIdx['i' + i] === g);
+                const hasScore = origin.some(p => Object.keys(data.scores || {}).some(k => k.indexOf('p' + p.id + '_h') === 0 && data.scores[k] > 0));
+                if (hasScore) { refused = 'Group ' + g + ' has scores \u2014 mark golfers Out instead.'; return; }
+                if (g !== sizes.length) { refused = 'Group ' + g + ' would be empty and the groups after it would renumber \u2014 their links would change. Move a golfer into Group ' + g + ' first.'; return; }
+            });
+            while (sizes.length && sizes[sizes.length - 1] === 0) sizes.pop();   // an emptied LAST group is dropped
+            groupSizeOverrides = {}; sizes.forEach((sz, i) => { groupSizeOverrides[i] = sz; });
+        }
         if ((draft.added || []).length) {
             whole = true; changed = true;
-            const sizes = computeGroupSizes(players.length, data.groupSizeOverrides || {});
             let nextId = nextRosterId(data);
             // Insert each addition at the END of its group; later groups keep their golfers.
             const adds = draft.added.slice().sort((a, b) => a.group - b.group);
@@ -5258,7 +5315,7 @@ html {
         }
         const after = Object.assign({}, data, { players, groupSizeOverrides: groupSizeOverrides || data.groupSizeOverrides });
         const wholeUpdates = whole ? { players, groupSizeOverrides } : null;
-        return { changed, whole, updates: whole ? wholeUpdates : updates, players, after, warnings, money: playersSheetMoney(data, after) };
+        return { changed, whole, refused, updates: whole ? wholeUpdates : updates, players, after, warnings, money: playersSheetMoney(data, after) };
     }
     // "Pot $920 → $880 · Flight B 11 → 10", and the recompute note once any score is in.
     function playersSheetMoney(before, after) {
@@ -5278,14 +5335,18 @@ html {
         const draft = collectPlayersSheet();
         const u = buildPlayersUpdate(currentData, draft);
         const m = document.getElementById('players-sheet-money'); if (m) m.textContent = u.money;
-        const w = document.getElementById('players-sheet-warn'); if (w) w.textContent = u.warnings.join(' ');
+        const w = document.getElementById('players-sheet-warn'); if (w) w.textContent = (u.refused ? '\u26A0\uFE0F ' + u.refused + ' ' : '') + u.warnings.join(' ');
         const body = document.getElementById('players-sheet-body');
-        if (body) body.querySelectorAll('.ps-row').forEach(r => { const ob = r.querySelector('.ps-out-box'); if (ob) r.classList.toggle('ps-is-out', !!ob.checked); });
+        if (body) body.querySelectorAll('.ps-row').forEach(r => {
+            const ob = r.querySelector('.ps-out-box'); if (ob) r.classList.toggle('ps-is-out', !!ob.checked);
+            const sel = r.querySelector('.ps-grp'); if (sel) r.classList.toggle('ps-moved', String(sel.value) !== String(sel.getAttribute('data-group')));
+        });
     }
     // The commit: the guard, then the one write. Returns a promise of
     // 'nothing' | 'refused' | 'written' for the caller and the tests.
     function commitPlayersDraft(draft) {
         const u = buildPlayersUpdate(currentData, draft);
+        if (u.refused) { alert('\u26A0\uFE0F NOT SAVED\n' + u.refused); return Promise.resolve('refused'); }
         if (!u.changed) return Promise.resolve('nothing');
         if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the players.')) return Promise.resolve('offline');
         return db.ref('events/' + currentMode).once('value').then(snap => {
@@ -5297,6 +5358,7 @@ html {
             // Built again against the FRESH record (scores may have moved) - the
             // roster is the same by the guard, so the keys are the same.
             const fu = buildPlayersUpdate(Object.assign({}, currentData, fresh), draft);
+            if (fu.refused) { alert('\u26A0\uFE0F NOT SAVED\n' + fu.refused); return 'refused'; }
             return db.ref('events/' + currentMode).update(fu.updates).then(() => 'written');
         });
     }

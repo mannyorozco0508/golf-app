@@ -2282,6 +2282,45 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## Move a golfer to another group — Wave v199, 2026-09-22
+
+**The control.** A `[G1 ▾]` selector on every row of the 👥 Players sheet
+(`index.html` `.ps-grp`). Changing it moves the golfer to the END of the
+target group; the row is marked `.ps-moved` and the sheet says "Group 5's
+link now includes Jon" (a group's link opens that group's card, so who is
+on it is the thing worth saying). The money line does not move — the pot
+does not care which group a golfer walks in.
+
+**What it writes.** A move is a WHOLE write, like an add: the reordered
+`players` node plus `groupSizeOverrides` (source −1, target +1), in one
+atomic update, under v195's re-read guard ("The roster changed on another
+phone — reopen Players."). Moves, adds, renames, handicap/flight/Out
+combine in one Save; each move is applied on the working copy with the
+sizes kept in step, so a second move sees the first, and adds insert on
+the post-move sizes. Scores, flight, handicap and KP leads are keyed by id
+and never move.
+
+**An emptied group.** Allowed only when it is the LAST group and no golfer
+of it has a score: the size list is truncated. Refused with "Group N has
+scores — mark golfers Out instead." when it has scores, and refused when it
+is not the last group — `computeGroupSizes` has no empty group (a 0 is
+"unset"), so the groups after it would renumber and their links would
+change; the sentence says to move somebody in first.
+
+**Nothing caches a group.** Every reader recomputes from `players` +
+`groupSizeOverrides` on each render: `playerGroupMap` /
+`computeGroupBoundaries` (`grouping.js`) for the scorecard's
+`__scPlayerGroupMap`, the group filters, the Group Links panel, the Board's
+group sections, the trip and stats pages; `score-gaps.js`
+`findScoreGapsByGroup` re-derives each group's start hole from the new
+membership (proven: a group that started on hole 10 goes back to hole 1
+when a golfer scored from hole 1 joins it, and its four originals then show
+holes 1-9 as gaps). What DOES survive a move: a scorekeeper's `?group=N`
+lock and the session's "Just watching" dismissal are per-device and keyed
+by number, so a phone locked to group 3 keeps showing group 3 — with the
+new membership; the KP question's sessionStorage key is `kpAsked:CODE:hN`,
+per hole, not per group. `players_sheet_test.js` (37).
+
 ## The Results page for the payer — Wave v196 (v198 cache), 2026-09-22
 
 **The order** (settlement.html, top to bottom; `RESULTS_MOUNTS` is the one

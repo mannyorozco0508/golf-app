@@ -1740,7 +1740,12 @@
 // then NET +/− collapsed; the Not-final line once, on top; the PDF reads the
 // same mounts in the same order and prints the reasons open. settlement.html
 // is precached; a device on v197 keeps the payouts block and Player Payouts.
-const CACHE_VERSION = 'golfapp-v198-results-payout';
+// Moved to v199 because the organizer's Players sheet can move a golfer to
+// another group: each row has a [Group] selector and the golfer goes to the end
+// of the target group (the roster is reordered and groupSizeOverrides rewritten
+// in one guarded write; scores, flight, handicap and KP leads never move). A
+// device on v198 has no selector and cannot move anyone. index.html is precached.
+const CACHE_VERSION = 'golfapp-v199-move-groups';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

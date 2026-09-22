@@ -265,6 +265,143 @@ describe('WHO SEES IT', () => {
     });
 });
 
+// ---- MOVE A GOLFER TO ANOTHER GROUP (v199) -----------------------------------
+// The row's [Group ▾] selector. A move goes to the END of the target group: the
+// players array is reordered, groupSizeOverrides written whole (source -1,
+// target +1), every other golfer keeps their group by id; scores / flight /
+// hcp / KP leads are keyed by id and never move. One whole write, the same
+// re-read guard as an add. draftFrom() carries every golfer's current group.
+const G = loadJsFile('grouping.js');   // browser-global module: loaded into a realm
+// ids per group IN ROSTER ORDER (a map keyed by id would come back in numeric id order)
+const groupsById = d => { const out = {}; J(G.computeGroupBoundaries(d.players.length, d.groupSizeOverrides || {})).forEach(b => { out[b.group] = d.players.slice(b.startIdx, b.startIdx + b.size).map(p => String(p.id)); }); return out; };
+function draftWithGroups(data, changes, added) {
+    const m = G.playerGroupMap(data.players, data.groupSizeOverrides || {});
+    const dr = draftFrom(data, changes, added);
+    dr.edits.forEach(e => { if (e.group === undefined) e.group = m[String(data.players[e.idx].id)]; });
+    return dr;
+}
+describe('MOVE A GOLFER TO ANOTHER GROUP (v199)', () => {
+    const data = round();
+    const before = groupsById(data);
+    test('the fixture: six groups 4/4/4/4/4/3, every golfer in one', () => {
+        assert.deepEqual(Object.keys(before).map(g => before[g].length), [4, 4, 4, 4, 4, 3]);
+    });
+    test('Jon (group 3) moved to group 5: ids by group before/after - Jon at the END of 5, 3 one shorter, every other golfer where they were; sizes written whole', () => {
+        const sb = page(data);
+        const jon = String(data.players[9].id);
+        const u = build(sb, draftWithGroups(data, [{ idx: 9, group: 5 }]));
+        assert.equal(u.whole, true); assert.equal(u.refused, null);
+        const after = groupsById(u.after);
+        assert.deepEqual(after[3], before[3].filter(id => id !== jon));
+        assert.deepEqual(after[5], before[5].concat([jon]));
+        [1, 2, 4, 6].forEach(g => assert.deepEqual(after[g], before[g], 'group ' + g));
+        assert.deepEqual(u.updates.groupSizeOverrides, { 0: 4, 1: 4, 2: 3, 3: 4, 4: 5, 5: 3 });
+        assert.equal(u.updates.players.length, 23);
+        assert.deepEqual(u.updates.players.map(p => String(p.id)).sort(), data.players.map(p => String(p.id)).sort(), 'the same 23 ids');
+        assert.deepEqual(u.warnings, ['Group 5’s link now includes Jon']);
+        assert.equal(u.money, 'Pot $460', 'a move changes no money');
+    });
+    test('into a 5-some: a second golfer into group 5 makes it six, both at the end, in roster order (the sheet\'s order, not the tap order)', () => {
+        const sb = page(data);
+        const a = String(data.players[9].id), b = String(data.players[0].id);
+        const u = build(sb, draftWithGroups(data, [{ idx: 9, group: 5 }, { idx: 0, group: 5 }]));
+        const after = groupsById(u.after);
+        assert.deepEqual(after[5], before[5].concat([b, a]));
+        assert.deepEqual(after[1], before[1].slice(1)); assert.deepEqual(after[3], before[3].filter(id => id !== a));
+        assert.deepEqual(u.updates.groupSizeOverrides, { 0: 3, 1: 4, 2: 3, 3: 4, 4: 6, 5: 3 });
+    });
+    test('scores, flight, hcp and the KP lead follow the golfer by id; his card shows under the new group (the scorecard’s group map)', () => {
+        const sb = page(data);
+        const jon = String(data.players[9].id);
+        const u = build(sb, draftWithGroups(data, [{ idx: 9, group: 5 }]));
+        assert.deepEqual(u.after.scores, data.scores, 'no score key moved');
+        const moved = u.after.players.find(p => String(p.id) === jon);
+        assert.equal(moved.flight, data.players[9].flight); assert.equal(moved.hcp, data.players[9].hcp); assert.equal(moved.name, 'Jon Juliet');
+        assert.deepEqual(u.after.kpLeaders, data.kpLeaders);
+        // deliver the record as written: the scorecard's group map puts Jon in 5
+        const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/PS1');
+        h.cb({ val: () => J(u.after), exists: () => true });
+        const map = J(run(sb, 'window.__scPlayerGroupMap'));
+        assert.equal(map[jon], 5);
+        assert.equal(Object.values(map).filter(g => g === 3).length, 3);
+    });
+    test('an emptied group with scores is refused: "Group N has scores — mark golfers Out instead."', () => {
+        const d = round(); d.groupSizeOverrides = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 2, 6: 1 };   // group 7: Wes alone, with nine holes
+        const sb = page(d);
+        const u = build(sb, draftWithGroups(d, [{ idx: 22, group: 6 }]));
+        assert.equal(u.refused, 'Group 7 has scores — mark golfers Out instead.');
+    });
+    test('the refusal stops the commit before the re-read: alerted, nothing written', async () => {
+        const d = round(); d.groupSizeOverrides = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 2, 6: 1 };
+        const sb = page(d);
+        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
+        const r = await run(sb, 'commitPlayersDraft(' + JSON.stringify(draftWithGroups(d, [{ idx: 22, group: 6 }])) + ')');
+        assert.equal(r, 'refused');
+        assert.equal(sb.__dbWrites.filter(w => w.path === 'events/PS1').length, 0);
+        assert.match(J(run(sb, 'window.__alerts'))[0], /Group 7 has scores — mark golfers Out instead\./);
+    });
+    test('an emptied LAST group with no scores is dropped: sizes shrink, no refusal; an emptied MIDDLE group is refused (later groups would renumber)', () => {
+        const d = round({ thru: 0 }); d.groupSizeOverrides = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 2, 6: 1 };
+        const sb = page(d);
+        const u = build(sb, draftWithGroups(d, [{ idx: 22, group: 6 }]));
+        assert.equal(u.refused, null);
+        assert.deepEqual(u.updates.groupSizeOverrides, { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 3 });
+        assert.equal(groupsById(u.after)[7], undefined);
+        const d2 = round({ thru: 0 }); d2.groupSizeOverrides = { 0: 4, 1: 4, 2: 1, 3: 4, 4: 4, 5: 4, 6: 2 };   // group 3: one golfer
+        const m = build(page(d2), draftWithGroups(d2, [{ idx: 8, group: 4 }]));
+        assert.match(m.refused, /^Group 3 would be empty and the groups after it would renumber/);
+    });
+    test('combined in one write: a move + an add to group 2 + a rename + Out - one whole update carrying all of it', () => {
+        const sb = page(data);
+        const jon = String(data.players[9].id);
+        const u = build(sb, draftWithGroups(data, [{ idx: 9, group: 5 }, { idx: 1, name: 'Ben B.' }, { idx: 4, out: true }], [{ group: 2, name: 'Zed Zulu', hcp: '7', flight: 'B' }]));
+        assert.equal(u.whole, true); assert.equal(u.refused, null);
+        assert.deepEqual(Object.keys(u.updates).sort(), ['groupSizeOverrides', 'players']);
+        const after = groupsById(u.after);
+        assert.equal(after[5][after[5].length - 1], jon);
+        assert.equal(after[2].length, 5); assert.equal(u.after.players.find(p => p.name === 'Zed Zulu').id, 901);
+        assert.equal(u.after.players[1].name, 'Ben B.'); assert.equal(u.after.players[4].out, true);
+        assert.deepEqual(u.updates.groupSizeOverrides, { 0: 4, 1: 5, 2: 3, 3: 4, 4: 5, 5: 3 });
+    });
+    test('THE GUARD: the roster changed on another phone -> the move is refused, nothing written (CONTROL: the same roster writes the whole node)', async () => {
+        const changed = J(data); changed.players[3].name = 'Dee Delta-Renamed';
+        const sb = page(data, undefined, { fresh: changed });
+        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
+        const dr = draftWithGroups(data, [{ idx: 9, group: 5 }]);
+        const r1 = await run(sb, 'commitPlayersDraft(' + JSON.stringify(dr) + ')');
+        assert.equal(r1, 'refused');
+        assert.equal(sb.__dbWrites.filter(w => w.path === 'events/PS1').length, 0);
+        assert.match(J(run(sb, 'window.__alerts'))[0], /The roster changed on another phone/);
+        const sb2 = page(data);
+        run(sb2, 'psSnapshot = rosterSignature(currentData.players);');
+        const r2 = await run(sb2, 'commitPlayersDraft(' + JSON.stringify(dr) + ')');
+        assert.equal(r2, 'written');
+        const w = sb2.__dbWrites.filter(x => x.path === 'events/PS1');
+        assert.equal(w.length, 1); assert.equal(w[0].op, 'update');
+        assert.deepEqual(Object.keys(w[0].value).sort(), ['groupSizeOverrides', 'players']);
+        assert.equal(w[0].value.players.length, 23);
+    });
+    test('the gap builder’s per-group start hole recomputes after a move (CONTROL: the record before the move has no gap anywhere)', () => {
+        // Group 5 started on hole 10 (holes 10-18 scored, nothing else): read as a
+        // group its start is 10 and nobody in it has a gap. Jon, holes 1-9 in group 3,
+        // moves in: the group's scored holes are now 1-18, its start goes back to 1,
+        // and the four who started on 10 show holes 1-9 as gaps - a difference that
+        // exists only if the builder re-reads the group from the new roster.
+        const d = round();
+        const g5 = groupsById(d)[5];
+        g5.forEach(id => { CD.forEach(h => { delete d.scores['p' + id + '_h' + h.hole]; if (h.hole >= 10) d.scores['p' + id + '_h' + h.hole] = h.par; }); });
+        const sb = page(d);
+        const jon = String(d.players[9].id);
+        const u = build(sb, draftWithGroups(d, [{ idx: 9, group: 5 }]));
+        const gapsFor = rec => { sb.__rec = J(rec); return J(run(sb, 'currentData = __rec; window.__scPlayerGroupMap = playerGroupMap(currentData.players, currentData.groupSizeOverrides || {}); gapsForField()')); };
+        assert.deepEqual(gapsFor(d), [], 'CONTROL: before the move no golfer has a gap');
+        const after = gapsFor(u.after);
+        assert.deepEqual(after.map(g => String(g.id)).sort(), g5.slice().sort(), 'the four who started on 10, and only them');
+        after.forEach(g => assert.deepEqual(g.holes, [1, 2, 3, 4, 5, 6, 7, 8, 9], g.name));
+        assert.ok(!after.some(g => String(g.id) === jon), 'Jon, scored from hole 1, has none');
+    });
+});
+
 describe('THE SEAMS', () => {
     test('scores are never in a Players-sheet write; no protected engine changed for Out (playingForMoney is what they read)', () => {
         const src = read('index.html');
@@ -326,5 +463,49 @@ describe('CHROME: real taps - open the sheet, mark Out, Save', () => {
     });
     test('the snapshot with her Out greys her Hole View row (computed, not a class that resolves to nothing)', () => {
         assert.match(v('HV'), /golfer-out line-through 0\.55/);
+    });
+});
+
+describe('CHROME: real taps - move a golfer with the [Group] selector, Save', () => {
+    const d = round();
+    d.ownerUid = 'anon-cold';
+    const DB = { events: { PS1: d }, global_courses: {}, trips: {}, tournaments: {} };
+    const key = (type, k) => ({ cdp: { method: 'Input.dispatchKeyEvent', params: { type, key: k, code: k, windowsVirtualKeyCode: 40 } } });
+    let r;
+    before(async () => {
+        r = await arriveCold({ url: fileUrl('index.html', 'game=PS1'), db: DB, settleMs: 4000, steps: [
+            { tap: '#group-pick-overlay .btn-outline', nth: 0 }, { sleep: 250 },
+            { tap: '.group-setup-btn', nth: 1 }, { sleep: 250 },
+            { expression: "'SEL0:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"] .ps-grp').value" },
+            // a tap focuses the selector; two Down keys on a focused <select> move G3 -> G5 and fire change
+            { tap: '#players-sheet-body .ps-row[data-idx="9"] .ps-grp', nth: 0 }, { sleep: 150 },
+            key('keyDown', 'ArrowDown'), key('keyUp', 'ArrowDown'), key('keyDown', 'ArrowDown'), key('keyUp', 'ArrowDown'), { sleep: 200 },
+            { expression: "'SEL1:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"] .ps-grp').value" },
+            { expression: "'ROW:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"]').className" },
+            { expression: "'WARN:' + document.getElementById('players-sheet-warn').innerText" },
+            { expression: "'M:' + document.getElementById('players-sheet-money').innerText" },
+            { tap: '#players-sheet-save', nth: 0 }, { sleep: 600 },
+            { expression: "'W:' + JSON.stringify(window.__coldWrites.filter(function (w) { return w.path === 'events/PS1' && w.op === 'update'; }).map(function (w) { return { keys: Object.keys(w.value).sort(), n: (w.value.players || []).length, sizes: w.value.groupSizeOverrides, g5: (w.value.players || []).slice(15, 20).map(function (p) { return p.id; }) }; }))" },
+            { expression: "'CLOSED:' + getComputedStyle(document.getElementById('players-sheet')).display" },
+        ] });
+    });
+    const v = tag => { const hit = (r.value || []).find(x => typeof x === 'string' && x.startsWith(tag + ':')); assert.ok(hit !== undefined, 'no ' + tag + ' in ' + JSON.stringify(r.value).slice(0, 800)); return hit.slice(tag.length + 1); };
+    test('ran; Jon’s selector read G3, and the keys on the focused selector moved it to G5 (a change event, the row marked)', () => {
+        assert.ok(r && r.ok, r && r.reason);
+        assert.equal(v('SEL0'), '3'); assert.equal(v('SEL1'), '5');
+        assert.match(v('ROW'), /ps-moved/);
+    });
+    test('the sheet said where he goes; the money line did not move', () => {
+        assert.match(v('WARN'), /Group 5’s link now includes Jon/);
+        assert.equal(v('M'), 'Pot $460');
+    });
+    test('Save wrote the whole players node + sizes in one update - Jon last in group 5 - and closed the sheet', () => {
+        const w = JSON.parse(v('W'));
+        assert.equal(w.length, 1);
+        assert.deepEqual(w[0].keys, ['groupSizeOverrides', 'players']);
+        assert.equal(w[0].n, 23);
+        assert.deepEqual(w[0].sizes, { 0: 4, 1: 4, 2: 3, 3: 4, 4: 5, 5: 3 });
+        assert.deepEqual(w[0].g5.map(String), ['117', '118', '119', '120', '110']);
+        assert.equal(v('CLOSED'), 'none');
     });
 });
