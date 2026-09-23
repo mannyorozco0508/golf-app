@@ -224,19 +224,27 @@ describe('RESUME IS A CONVENIENCE, NOT A HEADLINE', () => {
 
 describe('THE LOCKUP LEADS THE SCREEN', () => {
 
-    test('the header is the horizontal lockup, on the near-black field', () => {
+    test('the header is the ball icon and an HTML word, on the near-black field', () => {
         assert.ok(cssNum('.lobby-lockup', 'width').n >= 280, 'the lockup is not a wide bar');
         assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
-        assert.match(ADMIN, /<img src="hardpan-lockup\.svg" alt="HardPan"/);
+        assert.match(ADMIN, /<img src="hardpan-icon\.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN<\/span>/);
+        assert.ok(!/hardpan-lockup\.svg/.test(lobby()),
+            'the lobby header must not be the outlined lockup');
     });
 
-    test('the img attributes match the lockup aspect', () => {
-        const tag = /<img src="hardpan-lockup\.svg"[^>]*>/.exec(ADMIN);
-        assert.ok(tag, 'the lockup img is gone');
+    test('the word is heavy type with open tracking, not a condensed SVG', () => {
+        const at = ADMIN.indexOf('.lobby-word {');
+        assert.ok(at > -1, 'no .lobby-word rule');
+        const block = ADMIN.slice(at, ADMIN.indexOf('}', at));
+        assert.match(block, /font-weight:\s*800/);
+        assert.match(block, /letter-spacing:\s*0\.06em/);
+        assert.ok(!/letter-spacing:\s*-/.test(block), 'negative tracking condenses the word');
+        assert.match(block, /color:\s*#F2EDE4/);
+        const tag = /<img src="hardpan-icon\.svg"[^>]*>/.exec(ADMIN);
+        assert.ok(tag, 'the ball icon is gone');
         const w = Number(/width="(\d+)"/.exec(tag[0])[1]);
         const h = Number(/height="(\d+)"/.exec(tag[0])[1]);
-        // viewBox is 914.32x276. The attributes describe that ratio.
-        assert.ok(Math.abs(w / h - 914.32 / 276) < 0.15, tag[0] + ' is not the lockup ratio');
+        assert.equal(w, h, 'the header icon is the square ball, not the wide lockup');
     });
 
     test('the mark is still tappable for the secret panel', () => {

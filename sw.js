@@ -1782,7 +1782,15 @@
 // Tournaments. A device on v204 still shows the circular R above a text
 // wordmark. The iOS binary in review is not resubmitted. email-link-auth.js
 // stays precached.
-const CACHE_VERSION = 'golfapp-v205-hardpan-logo';
+// Moved to v206 because the lobby word is HTML. hardpan-lockup.svg drew
+// HARDPAN ultra-condensed and stroked it with a non-scaling stroke, so on a
+// phone the counters filled and the name read as vertical bars. The header
+// is now hardpan-icon.svg (the ball) beside the word HARDPAN in the page
+// font. privacy, terms and support use the same pair. A device on v205 keeps
+// serving the illegible lockup. The tab and PWA icons stay the ball alone.
+// email-link-auth.js stays precached. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v206-hardpan-word';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1901,8 +1909,10 @@ const SHELL_FILES = [
     './icon-192.png',
     './icon-512.png',
     './logo-mark.png',
-    // HardPan lockup and tab icon (v205). Flat names: a slash in this list
-    // is refused, so these sit beside logo-mark.png.
+    // Ball icon, favicon, and the outlined lockup (v205, word opened in v206).
+    // The lobby header is the icon plus HTML text; the lockup file stays
+    // precached so a direct open is the readable outline, not the old bars.
+    // Flat names: a slash in this list is refused.
     './hardpan-lockup.svg',
     './hardpan-icon.svg',
     './favicon-32.png'

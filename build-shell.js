@@ -66,7 +66,10 @@ const PRODUCTS = {
         // card and still installs as Rattle Golf. Tournament is unchanged.
         // Moved to v48. The install icons and the lobby lockup are the ball on
         // firm ground. A device on v47 still installs the Stroke R.
-        cacheName: 'consumer-v48-hardpan-logo',
+        // Moved to v49. The lobby word is HTML next to the ball icon. A device
+        // on v48 still paints the condensed lockup SVG, which a phone cannot
+        // read. The install icons stay the ball alone.
+        cacheName: 'consumer-v49-hardpan-word',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
@@ -159,7 +162,12 @@ const PRODUCTS = {
         // name is HardPan Tournaments. A device on v51 still installs the old
         // banner and still says GolfApp Tournaments. The hostname
         // tournaments.rattlegolf.com is unchanged.
-        cacheName: 'tournament-v52-hardpan',
+        // Moved to v53. The landing already sets HardPan as HTML beside the
+        // ball (logo-mark.png), so it never used the condensed lockup. The
+        // key moves with the consumer header so an installed tournament
+        // device does not stay on the v52 generation. The hostname
+        // tournaments.rattlegolf.com is unchanged.
+        cacheName: 'tournament-v53-hardpan-word',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

@@ -1,10 +1,12 @@
 // ============================================================================
 // HARDPAN LOCKUP AND TAB ICON
 //
-// The consumer lobby and the legal-page headers show hardpan-lockup.svg:
-// dimpled ball on a firm ground line, HARDPAN, on the near-black field the
-// artwork was drawn for. The tab icon is hardpan-icon.svg, with favicon-32.png
-// and the manifest PNGs (icon-192, icon-512) generated from the same ball.
+// The consumer lobby and the legal-page headers show hardpan-icon.svg (the
+// ball) beside the HTML word HARDPAN. hardpan-lockup.svg remains for any
+// leftover reference: the outlined word is open, not ultra-condensed, and
+// it carries no stroke — a non-scaling stroke filled the counters on a phone.
+// The tab icon is hardpan-icon.svg, with favicon-32.png and the manifest
+// PNGs (icon-192, icon-512) generated from the same ball.
 //
 // WHAT THIS DOES NOT MOVE. icon-1024.png, the iOS AppIcon, and every Android
 // launcher PNG stay the Stroke R. 1.0.3 is in review and is not resubmitted.
@@ -82,6 +84,30 @@ describe('THE LOCKUP SVG', () => {
         assert.ok(!/<text[\s>]/.test(svg), 'the wordmark must be outlined, not a font fallback');
         const wm = /id="wordmark" transform="translate\(([0-9.]+)/.exec(svg);
         assert.ok(wm && Number(wm[1]) > 200, 'HARDPAN is not beside the ball');
+    });
+
+    test('the outlined word is open and has no stroke filling the counters', () => {
+        // The phone bug was this file: scale x was 45% of scale y (ultra
+        // condensed) and stroke-width 11 with vector-effect non-scaling-stroke
+        // stayed 11 CSS pixels when the svg was shrunk, so the counters filled.
+        const word = svg.slice(svg.indexOf('id="wordmark"'));
+        assert.ok(word.length > 200, 'the wordmark region was sliced away');
+        assert.ok(!/stroke/.test(word), 'a stroke on the outlines fills the counters');
+        assert.ok(!/vector-effect/.test(word));
+        const scales = [...word.matchAll(/scale\(([0-9.]+),(-?[0-9.]+)\)/g)];
+        assert.equal(scales.length, 7, 'HARDPAN is seven outlined letters');
+        scales.forEach(m => {
+            const x = Number(m[1]);
+            const y = Math.abs(Number(m[2]));
+            assert.ok(x / y >= 0.72, 'horizontal scale is still condensed: ' + x + '/' + y);
+        });
+        const xs = [...word.matchAll(/translate\(([0-9.]+),0\)/g)].map(m => Number(m[1]));
+        assert.equal(xs.length, 7);
+        for (let i = 1; i < xs.length; i++) {
+            assert.ok(xs[i] - xs[i - 1] >= 140, 'letters are still packed: ' + xs.join(','));
+        }
+        const vb = /viewBox="0 0 ([0-9.]+)/.exec(svg);
+        assert.ok(vb && Number(vb[1]) >= 1400, 'the canvas is still the condensed width');
     });
 
     test('the icon svg is the ball only, on near-black', () => {

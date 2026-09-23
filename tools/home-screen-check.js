@@ -60,10 +60,12 @@ const PROBE = `
     out.linkHeightPx = Math.round(link.getBoundingClientRect().height);
   }
 
-  // The lockup is the header. HARDPAN is inside the SVG, so the probe reads
-  // the file the img actually loaded, and measures the bar on screen.
+  // The header is the ball icon plus the HTML word. The word used to live
+  // inside hardpan-lockup.svg, condensed and stroked, so a phone read bars.
+  // This measures the rendered word: real text, open tracking, on the bar.
   const lock = document.querySelector('.lobby-lockup');
   const img = lock ? lock.querySelector('img') : null;
+  const word = lock ? lock.querySelector('.lobby-word') : null;
   const lr = lock ? lock.getBoundingClientRect() : null;
   let green = false, bone = false;
   if (img && img.naturalWidth > 0) {
@@ -80,6 +82,21 @@ const PROBE = `
           }
       } catch (e) { out.lockupDrawError = String(e); }
   }
+  const letters = [];
+  if (word && word.firstChild && word.firstChild.nodeType === 3) {
+      const node = word.firstChild;
+      const text = node.textContent || '';
+      for (let i = 0; i < text.length; i++) {
+          const range = document.createRange();
+          range.setStart(node, i);
+          range.setEnd(node, i + 1);
+          const b = range.getBoundingClientRect();
+          letters.push({ ch: text[i], w: Math.round(b.width * 10) / 10, left: Math.round(b.left * 10) / 10, right: Math.round(b.right * 10) / 10 });
+      }
+  }
+  const wcs = word ? getComputedStyle(word) : null;
+  const wr = word ? word.getBoundingClientRect() : null;
+  const ir = img ? img.getBoundingClientRect() : null;
   out.lockup = {
       w: lr ? Math.round(lr.width) : 0,
       h: lr ? Math.round(lr.height) : 0,
@@ -89,6 +106,18 @@ const PROBE = `
       bg: lock ? getComputedStyle(lock).backgroundColor : null,
       green: green, bone: bone
   };
+  out.word = word ? {
+      text: (word.innerText || '').trim(),
+      w: wr ? Math.round(wr.width) : 0,
+      h: wr ? Math.round(wr.height) : 0,
+      fs: wcs ? parseFloat(wcs.fontSize) : 0,
+      ls: wcs ? wcs.letterSpacing : null,
+      fw: wcs ? wcs.fontWeight : null,
+      color: wcs ? wcs.color : null,
+      letters: letters,
+      sameRow: !!(ir && wr && Math.abs((ir.top + ir.height / 2) - (wr.top + wr.height / 2)) < 20 && wr.left >= ir.right - 8),
+      inside: !!(lr && wr && wr.left >= lr.left - 1 && wr.right <= lr.right + 1)
+  } : null;
   const card = document.getElementById('email-link-card');
   const title = document.getElementById('email-link-title');
   out.email = {
@@ -140,16 +169,38 @@ const PROBE = `
   if (out.linkHeightPx < 40) problems.push('the resume control is '
       + out.linkHeightPx + 'px tall, below a usable touch target');
 
-  if (!(out.lockup && out.lockup.w >= 240 && out.lockup.h >= 40))
-      problems.push('the lockup is not a wide bar on screen: ' + JSON.stringify(out.lockup));
-  if (!out.lockup || out.lockup.alt !== 'HardPan' || out.lockup.src !== 'hardpan-lockup.svg')
-      problems.push('the header img is not the HardPan lockup: ' + JSON.stringify(out.lockup));
+  if (!(out.lockup && out.lockup.w >= 240 && out.lockup.h >= 56))
+      problems.push('the header is not a wide bar on screen: ' + JSON.stringify(out.lockup));
+  if (!out.lockup || out.lockup.alt !== '' || out.lockup.src !== 'hardpan-icon.svg')
+      problems.push('the header img is not the ball icon: ' + JSON.stringify(out.lockup));
   if (!(out.lockup && out.lockup.natural > 0))
-      problems.push('the lockup image did not decode');
+      problems.push('the ball icon did not decode');
   if (!(out.lockup && out.lockup.green && out.lockup.bone))
-      problems.push('the lockup pixels are not green and bone: ' + JSON.stringify(out.lockup));
+      problems.push('the ball icon pixels are not green and bone: ' + JSON.stringify(out.lockup));
   if (!out.lockup || out.lockup.bg !== 'rgb(11, 15, 12)')
-      problems.push('the lockup field is not near-black #0B0F0C: ' + (out.lockup && out.lockup.bg));
+      problems.push('the header field is not near-black #0B0F0C: ' + (out.lockup && out.lockup.bg));
+  if (!out.word || out.word.text !== 'HARDPAN')
+      problems.push('the header word is not the HTML text HARDPAN: ' + JSON.stringify(out.word));
+  if (!(out.word && out.word.w >= 110 && out.word.h >= 18))
+      problems.push('the word is too small to read: ' + JSON.stringify(out.word));
+  const lsPx = out.word && out.word.ls != null ? parseFloat(out.word.ls) : NaN;
+  if (!(out.word && lsPx > 0))
+      problems.push('the word tracking is not open: ' + (out.word && out.word.ls));
+  if (!(out.word && Number(out.word.fw) >= 700))
+      problems.push('the word is not bold: ' + (out.word && out.word.fw));
+  if (!out.word || out.word.color !== 'rgb(242, 237, 228)')
+      problems.push('the word is not bone on the bar: ' + (out.word && out.word.color));
+  if (!out.word || !out.word.sameRow || !out.word.inside)
+      problems.push('the word is not beside the ball, inside the bar: ' + JSON.stringify(out.word));
+  const widths = (out.word && out.word.letters || []).map(l => l.w);
+  const avg = widths.length ? widths.reduce((a, b) => a + b, 0) / widths.length : 0;
+  if (widths.length !== 7 || widths.some(w => w < 8) || !(out.word && avg >= out.word.fs * 0.5))
+      problems.push('the letters are still condensed bars: ' + JSON.stringify(out.word && out.word.letters));
+  for (let i = 1; i < (out.word && out.word.letters || []).length; i++) {
+      const prev = out.word.letters[i - 1], cur = out.word.letters[i];
+      if (cur.left < prev.right - 0.6)
+          problems.push('letters overlap: ' + prev.ch + ' ends ' + prev.right + ', ' + cur.ch + ' starts ' + cur.left);
+  }
   if (!out.email || !out.email.shown || out.email.title !== 'Keep this organizer')
       problems.push('the email-link card is not on the home screen: ' + JSON.stringify(out.email));
 
