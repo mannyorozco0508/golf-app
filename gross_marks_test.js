@@ -311,9 +311,11 @@ describe('NOTHING ELSE MOVED', () => {
         assert.deepEqual(calc.relHcpById, { '1':0, '2':10, '3':2, '4':5 });
     });
 
-    test('formatHcpDisplay and the Hole View handicap label are unchanged', () => {
+    test('formatHcpDisplay stays, and a legacy Hole View label is still HCP', () => {
         assert.equal(call('formatHcpDisplay(-2)'), '+2');
-        assert.match(HV, /<div class="hv-hcp">HCP \$\{formatHcpDisplay\(hvPlayer\.hcp\)\}<\/div>/);
+        assert.match(HV, /<div class="hv-hcp">\$\{escapeHtml\(holeViewHandicapLabel\(hvPlayer\)\)\}<\/div>/);
+        assert.equal(call('holeViewHandicapLabel({hcp:"5"})'), 'HCP 5',
+            'a round with no Handicap Index still reads HCP, through formatHcpDisplay');
     });
 });
 
@@ -323,7 +325,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v207-handicap-index';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

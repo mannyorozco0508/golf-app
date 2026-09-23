@@ -1790,7 +1790,13 @@
 // serving the illegible lockup. The tab and PWA icons stay the ball alone.
 // email-link-auth.js stays precached. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v206-hardpan-word';
+// Moved to v207 because a Handicap Index converts to a Course Handicap and
+// a Playing Handicap when the tee has Slope, Course Rating, and Par.
+// handicap.js, admin.html, index.html and leaderboard.html are precached.
+// A device on v206 would keep showing the typed number as the strokes and
+// would have no tee-rating fields. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v207-handicap-index';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

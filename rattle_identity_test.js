@@ -246,7 +246,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v207-handicap-index';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -568,8 +568,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/);
-        assert.match(BUILD, /cacheName: 'consumer-v49-hardpan-word'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v207-handicap-index';/);
+        assert.match(BUILD, /cacheName: 'consumer-v50-handicap-index'/);
         assert.match(BUILD, /cacheName: 'tournament-v53-hardpan-word'/,
             'Tournament cache moved with the readable header');
     });

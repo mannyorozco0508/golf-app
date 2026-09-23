@@ -103,8 +103,10 @@ describe('CHANGE 1 — THE GOLFER\u2019S HANDICAP IN THE HEADER', () => {
             'the labels must be computed across the whole rendered set, not per player');
         assert.ok(!/const first = p\.name\.split\(" "\)\[0\]/.test(renderScorecardSrc),
             'the per-player first-word shortener must be gone from the header');
-        assert.match(renderScorecardSrc, /<span class="fc-hcp">HCP \$\{formatHcpDisplay\(p\.hcp\)\}<\/span>/,
+        assert.match(renderScorecardSrc, /<span class="fc-hcp">\$\{escapeHtml\(golferHandicapLabel\(p\)\)\}<\/span>/,
             'the handicap must render through the golfer-facing formatter');
+        assert.equal(call('golferHandicapLabel({hcp:"12"})'), 'HCP 12',
+            'a round with no Handicap Index still reads HCP, through formatHcpDisplay');
         assert.ok(!/headRow\.innerHTML \+= `<th>\$\{p\.name\.split\(" "\)\[0\]\}<\/th>`/.test(renderScorecardSrc),
             'the old name-only header must be gone');
     });

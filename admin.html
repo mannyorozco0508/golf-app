@@ -632,6 +632,32 @@ html {
             </div>
         </div>
     </div>
+    <div id="tee-rating-panel" style="border:1px solid var(--border-mid); border-radius:8px; padding:10px 12px; margin:0 0 12px 0;">
+        <div style="font-weight:bold; font-size:0.85rem; color:var(--brand-green); margin-bottom:4px;">Tee rating for handicaps</div>
+        <p id="tee-rating-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 8px 0; line-height:1.4;">Slope, Course Rating, and Par are missing, so each Handicap Index is used as the Playing Handicap. Nets say so.</p>
+        <label for="tee-rating-select" style="font-size:0.75rem;">Tee</label>
+        <select id="tee-rating-select" onchange="applySelectedTee()" style="margin-bottom:8px;">
+            <option value="">No tee rating on this course</option>
+        </select>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div>
+                <label for="tee-slope" style="font-size:0.75rem;">Slope</label>
+                <input type="text" inputmode="decimal" id="tee-slope" oninput="refreshHandicapNote()" placeholder="Slope">
+            </div>
+            <div>
+                <label for="tee-course-rating" style="font-size:0.75rem;">Course Rating</label>
+                <input type="text" inputmode="decimal" id="tee-course-rating" oninput="refreshHandicapNote()" placeholder="Rating">
+            </div>
+            <div>
+                <label for="tee-par" style="font-size:0.75rem;">Par</label>
+                <input type="text" inputmode="numeric" id="tee-par" oninput="refreshHandicapNote()" placeholder="Par">
+            </div>
+            <div>
+                <label for="tee-allowance" style="font-size:0.75rem;">Allowance %</label>
+                <input type="text" inputmode="decimal" id="tee-allowance" value="100" oninput="refreshHandicapNote()" placeholder="100">
+            </div>
+        </div>
+    </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-1" onclick="wizardBack(1)">◀ Back</button>
             <button class="wizard-btn-next" id="wizard-next-1" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
@@ -1113,7 +1139,8 @@ html {
 
     <div class="wizard-step" id="wizard-step-5" data-step="5">
         <div class="wizard-step-title">👥 Players · <span class="wiz-step-n" id="wiz-n-players">Step 5</span></div>
-        <div class="wizard-step-sub">Add everyone playing today and assign them to foursomes.</div>
+        <div class="wizard-step-sub">Add everyone playing today. The number beside each name is a Handicap Index.</div>
+    <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45; white-space:pre-line;">Slope, Course Rating, and Par are missing, so each Handicap Index is used as the Playing Handicap. Nets say so.</p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
         ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Weekly Game.
     </div>
@@ -1187,7 +1214,7 @@ html {
                 <span>📋 Paste Player List</span>
                 <button class="close-modal" onclick="closePastePlayersModal()" aria-label="Close">&times;</button>
             </div>
-            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A handicap after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). An A or B before the name sets the flight (&ldquo;A &middot; Marty 9&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
+            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A Handicap Index after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). An A or B before the name sets the flight (&ldquo;A &middot; Marty 9&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
             <textarea id="paste-players-textarea" rows="8" placeholder="John Smith 8
 Mike Jones, 12
 Robert Garcia
@@ -1951,7 +1978,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         const players = data.players || [];
         document.getElementById('rr-players-list').innerHTML = players.length > 0
-            ? players.map(p => `${escapeHtml(p.name)}${p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${p.hcp})</span>` : ''}`).join('<br>')
+            ? players.map(p => {
+                const facing = (typeof handicapFacingLabel === 'function') ? handicapFacingLabel(p) : null;
+                const hcpBit = facing
+                    ? ` <span style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(facing)}</span>`
+                    : (p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${escapeHtml(String(p.hcp))})</span>` : '');
+                return `${escapeHtml(p.name)}${hcpBit}`;
+            }).join('<br>')
             : `<span style="color:var(--text-muted);">No players added yet</span>`;
 
         // SCORING vs ACTION.
@@ -2293,6 +2326,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             rows.push(['\uD83E\uDD69 Skins',
                 `$${cfg.skinsBuyIn} ${mode} \u00B7 ${n} players${cfg.startHole > 1 ? ` \u00B7 from H${cfg.startHole}` : ''}`, 6, SEC_ACTION]);
         });
+        rows.push(['Tee rating', handicapReviewLine(), 1, SEC_SCORING]);
         rows.push(['Players', `${playerCount} added`, 5, SEC_PLAYERS]);
         rows.push(['Extras', sideGamesText, 6, SEC_ACTION]);
         // A side match set up in the Games step is written by this same Save, so it
@@ -3426,7 +3460,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!key) return { ok: false, holes: [] };
         let preview;
         try { preview = previewCourseData(key); } catch (e) { return { ok: false, holes: [] }; }
-        if (!preview || !preview.ok || !preview.data.length) return { ok: false, holes: [] };
+        if (!preview || !preview.ok || !preview.data || !preview.data.length) return { ok: false, holes: [] };
         const trustworthy = preview.data.every(h => {
             const raw = String(h.par === undefined || h.par === null ? '' : h.par).trim();
             const par = Number(raw);
@@ -4383,6 +4417,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
         p.catch(() => { coursePublishRefused = true; renderCoursePublishNote(); });
         courseHiddenSelect.value = importKey;
+        globalCourses[importKey] = rec;
+        handleCourseChange();
         const panel = document.getElementById('course-import-confirm');
         if (panel) panel.remove();
         pendingImport = null;
@@ -4695,6 +4731,190 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return typed ? customCourseKeyFor(typed) : null;
     }
 
+    function courseTeeChoices(course) {
+        const out = [];
+        if (!course || !course.tees) return out;
+        ['male', 'female'].forEach(g => {
+            const list = course.tees[g];
+            if (!Array.isArray(list)) return;
+            list.forEach((t, i) => {
+                if (!t) return;
+                const slope = Number(t.slope != null ? t.slope : t.slope_rating);
+                const rating = Number(t.rating != null ? t.rating : t.course_rating);
+                let par = Number(t.parTotal != null ? t.parTotal : t.par_total);
+                if (!(par > 0) && Array.isArray(t.holes)) {
+                    par = t.holes.reduce((sum, h) => sum + (Number(h && h.par) || 0), 0);
+                }
+                if (!(slope > 0) || !(rating > 0) || !(par > 0)) return;
+                out.push({
+                    key: g + ':' + i,
+                    gender: g,
+                    name: String(t.name || t.tee_name || 'Tee'),
+                    slope: slope,
+                    courseRating: rating,
+                    par: par
+                });
+            });
+        });
+        return out;
+    }
+
+    function fillTeeSelect(choices, preferredKey) {
+        const sel = document.getElementById('tee-rating-select');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (!choices.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No tee rating on this course';
+            sel.appendChild(opt);
+            sel.value = '';
+            return;
+        }
+        choices.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.key;
+            opt.textContent = (c.gender === 'female' ? 'Women' : 'Men') + ' \u00b7 ' + c.name;
+            opt.setAttribute('data-slope', String(c.slope));
+            opt.setAttribute('data-rating', String(c.courseRating));
+            opt.setAttribute('data-par', String(c.par));
+            sel.appendChild(opt);
+        });
+        const want = preferredKey && choices.some(c => c.key === preferredKey) ? preferredKey : choices[0].key;
+        sel.value = want;
+    }
+
+    function selectedTeeOption(sel) {
+        if (!sel || !sel.options) return null;
+        const want = sel.value || '';
+        for (let i = 0; i < sel.options.length; i++) {
+            if ((sel.options[i].value || '') === want) return sel.options[i];
+        }
+        return sel.options.length ? sel.options[0] : null;
+    }
+
+    function applySelectedTee() {
+        const sel = document.getElementById('tee-rating-select');
+        const opt = selectedTeeOption(sel);
+        if (!opt || !opt.value) { refreshHandicapNote(); return; }
+        const slope = document.getElementById('tee-slope');
+        const rating = document.getElementById('tee-course-rating');
+        const par = document.getElementById('tee-par');
+        if (slope) slope.value = opt.getAttribute('data-slope') || '';
+        if (rating) rating.value = opt.getAttribute('data-rating') || '';
+        if (par) par.value = opt.getAttribute('data-par') || '';
+        refreshHandicapNote();
+    }
+
+    function readTeeRatingFromDom() {
+        const num = id => {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const t = String(el.value == null ? '' : el.value).trim();
+            if (t === '') return null;
+            const n = Number(t);
+            return isFinite(n) ? n : null;
+        };
+        const sel = document.getElementById('tee-rating-select');
+        const teeKey = sel && sel.value ? sel.value : '';
+        const chosen = selectedTeeOption(sel);
+        const teeName = (chosen && teeKey) ? (chosen.textContent || '') : '';
+        const allowance = num('tee-allowance');
+        return {
+            teeKey: teeKey,
+            teeName: teeName,
+            slope: num('tee-slope'),
+            courseRating: num('tee-course-rating'),
+            par: num('tee-par'),
+            allowance: allowance == null ? 100 : allowance
+        };
+    }
+
+    function applyStoredTeeRating(stored) {
+        if (!stored) return;
+        const set = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.value = (v == null ? '' : String(v));
+        };
+        set('tee-slope', stored.slope);
+        set('tee-course-rating', stored.courseRating);
+        set('tee-par', stored.par);
+        if (stored.allowance != null) set('tee-allowance', stored.allowance);
+        const sel = document.getElementById('tee-rating-select');
+        if (sel && stored.teeKey) {
+            for (let i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === stored.teeKey) { sel.value = stored.teeKey; break; }
+            }
+        }
+        refreshHandicapNote();
+    }
+
+    function syncTeeRatingFromCourse(courseKey) {
+        const course = (globalCourses && globalCourses[courseKey]) || (typeof coursePresets !== 'undefined' && coursePresets[courseKey]) || null;
+        const choices = courseTeeChoices(course);
+        let preferred = '';
+        const src = course && course.source && course.source.siFrom;
+        if (src && choices.length) {
+            const parts = String(src).split('/');
+            const hit = choices.find(c => c.gender === parts[0] && c.name === parts[1]);
+            if (hit) preferred = hit.key;
+        }
+        fillTeeSelect(choices, preferred);
+        if (!choices.length) {
+            ['tee-slope', 'tee-course-rating', 'tee-par'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            refreshHandicapNote();
+            return;
+        }
+        applySelectedTee();
+    }
+
+    function handicapReviewLine() {
+        const tee = readTeeRatingFromDom();
+        const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : null;
+        if (!status || !status.complete) return (typeof handicapUnconvertedNote === 'function') ? handicapUnconvertedNote() : 'Handicap Index';
+        return 'Slope ' + status.slope + ', Course Rating ' + status.courseRating + ', Par ' + status.par
+            + ', allowance ' + status.allowance + '%. Nets use Playing Handicap.';
+    }
+
+    function refreshHandicapNote() {
+        const tee = readTeeRatingFromDom();
+        const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : { complete: false, message: '' };
+        const teeNote = document.getElementById('tee-rating-note');
+        const playerNote = document.getElementById('handicap-index-note');
+        let head;
+        if (status.complete) {
+            head = 'Playing Handicap = Course \u00d7 ' + status.allowance
+                + '% allowance, rounded (.5 up). Course = Index \u00d7 (Slope ' + status.slope
+                + ' / 113) + (' + status.courseRating + ' \u2212 ' + status.par + ').';
+        } else {
+            head = status.message || ((typeof handicapUnconvertedNote === 'function') ? handicapUnconvertedNote() : '');
+        }
+        if (teeNote) teeNote.textContent = head;
+        if (!playerNote) return;
+        const lines = [head];
+        document.querySelectorAll('#player-list .player-row').forEach(row => {
+            const nameEl = row.querySelector('.p-name-input');
+            const hcpEl = row.querySelector('.p-hcp-input');
+            const raw = hcpEl ? String(hcpEl.value || '').trim() : '';
+            if (!raw) return;
+            const name = (nameEl && nameEl.value.trim()) || 'Golfer';
+            if (typeof convertHandicapIndex !== 'function') return;
+            const conv = convertHandicapIndex(raw, tee);
+            if (conv.ok) {
+                lines.push(name + ': Index ' + formatHandicapLabel(conv.indexText)
+                    + ' \u00b7 Course ' + formatCourseLabel(conv.course)
+                    + ' \u00b7 Playing ' + conv.playingText);
+            } else if (conv.unconverted) {
+                lines.push(name + ': Index ' + formatHandicapLabel(conv.indexText)
+                    + ' \u00b7 no tee rating, used as Playing Handicap');
+            }
+        });
+        playerNote.textContent = lines.join('\n');
+    }
+
     function handleCourseChange() {
         const courseKey = courseHiddenSelect.value;
         const loopBox = document.getElementById("nine-loop-selector");
@@ -4763,11 +4983,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // editing and non-editing paths. Nothing new to enforce, nothing to
             // bypass by inaction. The par total reads 0 instead of a confident 72,
             // which is the honest summary of an empty card.
-            baseData.forEach(h => {
+            (baseData || []).forEach(h => {
                 if (document.getElementById(`c-par-${h.hole}`)) document.getElementById(`c-par-${h.hole}`).value = isMapped ? h.par : '';
                 if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = isMapped ? h.hcpIndex : '';
             });
             lastCourseChangeKey = identity;
+            syncTeeRatingFromCourse(courseKey);
         }
 
         updateCustomCoursePars();
@@ -4867,9 +5088,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 out.courseNameOverride = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
             }
         } else if (globalCourses[courseKey]) {
-            built = globalCourses[courseKey].data;
+            built = globalCourses[courseKey].data || [];
         } else if (coursePresets[courseKey]) {
-            built = coursePresets[courseKey].data;
+            built = coursePresets[courseKey].data || [];
         } else {
             const unmappedCheck = validateCourseGrid();
             if (!unmappedCheck.ok) return { ...out, ok: false, reason: unmappedCheck.message };
@@ -5164,6 +5385,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const moneyVal = moneyInput ? moneyInput.checked : true;
             const flightBtn = row.querySelector('.p-flight-input');
             const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+            const legacyHcp = row.getAttribute('data-legacy-hcp');
+            if (legacyHcp !== null) entry.legacyHcp = legacyHcp;
             // The tag rides along whenever the row carries it, so a rebuild (format
             // switch, delete, paste) hands it back to addPlayerRow. Absent control
             // (flights off) -> no key, the same as a round that never had flights.
@@ -5200,14 +5423,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (format === 'ryder') {
             headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
             headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
             const flt = flightsEnabledNow();
             headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>HCP</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>Index</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
         }
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
@@ -5251,10 +5474,28 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         listContainer.innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
 
-        existingData.forEach((p, idx) => {
-            addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight);
-        });
+        existingData.forEach((p) => appendPlayerFrom(p, !!forceLoad, existingData.length));
         updateCount();
+    }
+
+    // The box shows the Handicap Index. A round saved before conversion has no
+    // index, so the box shows the stored Playing Handicap and the row is marked
+    // legacy — Save leaves that golfer alone until the number is edited.
+    function appendPlayerFrom(p, fromSaved, total) {
+        const shown = (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '')
+            ? String(p.handicapIndex) : (p.hcp || '');
+        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight);
+        const list = document.getElementById('player-list');
+        const row = list ? list.lastElementChild : null;
+        if (!row) return;
+        if (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '') return;
+        if (p.legacyHcp != null && String(p.legacyHcp) !== '') {
+            row.setAttribute('data-legacy-hcp', String(p.legacyHcp));
+            return;
+        }
+        if (fromSaved && String(p.hcp || '').trim() !== '') {
+            row.setAttribute('data-legacy-hcp', String(p.hcp));
+        }
     }
 
     // Adds one new blank row AND rebuilds the header/warning against the new final count — a
@@ -5265,7 +5506,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         existingData.push({ name: '', hcp: '', team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
+        existingData.forEach(p => appendPlayerFrom(p, false, existingData.length));
         updateCount();
     }
 
@@ -5478,7 +5719,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
+        existingData.forEach(p => appendPlayerFrom(p, false, existingData.length));
         updateCount();
 
         document.getElementById('paste-players-textarea').value = '';
@@ -5506,7 +5747,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
-        existingData.forEach(p => addPlayerRow(p.name, p.hcp, p.team, p.squad, false, p.playingForMoney !== false, existingData.length, true, p.id, p.flight));
+        existingData.forEach(p => appendPlayerFrom(p, false, existingData.length));
         updateCount();
     }
 
@@ -6126,6 +6367,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
             
             handleCourseChange();
+            if (data.teeRating) applyStoredTeeRating(data.teeRating);
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
             loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
@@ -6366,7 +6608,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const nameEl = row.querySelector('.p-name-input');
             const hcpEl = row.querySelector('.p-hcp-input');
             const name = (nameEl && nameEl.value.trim()) || "Unnamed";
-            const numericHcp = parseHcp(hcpEl ? hcpEl.value : "");
+            const raw = hcpEl ? hcpEl.value : "";
+            const conv = (typeof convertHandicapIndex === 'function') ? convertHandicapIndex(raw, readTeeRatingFromDom()) : null;
+            const numericHcp = (conv && conv.ok) ? conv.playing : parseHcp(raw);
+            const hcpLabel = (conv && conv.ok)
+                ? ('Index ' + formatHandicapLabel(conv.indexText) + ' \u00b7 Course ' + formatCourseLabel(conv.course) + ' \u00b7 Playing ' + conv.playingText)
+                : ((conv && conv.unconverted)
+                    ? ('Index ' + formatHandicapLabel(conv.indexText) + ' \u00b7 no tee rating, used as Playing Handicap')
+                    : ('HCP ' + formatHcpDisplay(numericHcp)));
 
             let totalStrokes = 0;
             const holesWithStrokes = [];
@@ -6376,7 +6625,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 if (s !== 0) holesWithStrokes.push({ hole: i + 1, strokes: s });
             });
 
-            playerResults.push({ name, numericHcp, totalStrokes, holesWithStrokes });
+            playerResults.push({ name, numericHcp, totalStrokes, holesWithStrokes, hcpLabel });
         });
 
         // Lowest handicap in the field = the "scratch" player for this round's relative match-play convention
@@ -6389,7 +6638,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 : 'None (plays scratch on this course)';
             html += `
                 <div style="padding:6px 0; border-bottom:1px solid #eee; font-size:0.8rem;">
-                    <strong>${escapeHtml(p.name)}</strong> (HCP ${formatHcpDisplay(p.numericHcp)}) — <strong>${p.totalStrokes}</strong> strokes<br>
+                    <strong>${escapeHtml(p.name)}</strong> (${escapeHtml(p.hcpLabel)}) — <strong>${p.totalStrokes}</strong> strokes<br>
                     <span style="color:var(--text-muted); font-size:0.75rem;">Holes: ${holesList}</span>
                 </div>`;
         });
@@ -6514,7 +6763,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         row.style.gridTemplateColumns = baseColumns + flightColumn + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
-            <input type="text" class="p-hcp-input" placeholder="HCP" value="${hcp}">
+            <input type="text" class="p-hcp-input" placeholder="Index" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
             ${squadFieldHtml}
             ${moneyCheckboxHtml}
@@ -6530,6 +6779,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
         refreshFlightsCount();
+        refreshHandicapNote();
     }
 
     // --- CUSTOM GROUP SIZING ---
@@ -6917,9 +7167,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             };
 
             const playersList = [];
+            const teeForSave = readTeeRatingFromDom();
             rows.forEach((row, idx) => {
                 let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
-                let hcpVal = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value.trim() : "";
+                const hcpRaw = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
                 
                 const teamSelect = row.querySelector('.p-team-input');
                 const squadSelect = row.querySelector('.p-squad-input');
@@ -6928,17 +7179,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 const teamVal = teamSelect ? teamSelect.value : "Team 1";
                 const squadVal = squadSelect ? squadSelect.value : "red";
                 const moneyVal = moneyInput ? moneyInput.checked : true;
-                
-                if (hcpVal !== "") {
-                    if (!hcpVal.startsWith("+")) {
-                        let numVal = parseFloat(hcpVal);
-                        if (isNaN(numVal)) numVal = 0;
-                        if (numVal > 36) numVal = 36;
-                        hcpVal = String(numVal);
-                    }
-                }
 
-                const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpVal, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+                // Index → Course → Playing. player.hcp is the Playing Handicap
+                // the engines already consume. A legacy row (saved before this
+                // conversion, box untouched) keeps its stored number.
+                const legacyAttr = row.getAttribute('data-legacy-hcp');
+                const hcpFields = (typeof playerHandicapFields === 'function')
+                    ? playerHandicapFields(hcpRaw, legacyAttr === null ? null : legacyAttr, teeForSave)
+                    : { hcp: String(hcpRaw || '').trim() };
+                const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpFields.hcp, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+                if (hcpFields.handicapIndex) entry.handicapIndex = hcpFields.handicapIndex;
+                if (typeof hcpFields.courseHandicap === 'number' && isFinite(hcpFields.courseHandicap)) entry.courseHandicap = hcpFields.courseHandicap;
+                if (hcpFields.handicapUnconverted) entry.handicapUnconverted = true;
                 // FLIGHTS ON: every golfer is written with a flight, 'A' when the
                 // control says so or is somehow missing - the record says what the
                 // engine will do. Off: no key, byte-identical to before.
@@ -7048,6 +7300,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 skinsPotFormat: skinsPotFormat,
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
+                teeRating: teeForSave,
                 players: playersList
             };
 

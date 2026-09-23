@@ -340,7 +340,8 @@ describe('HOLE VIEW SHOWS THE GOLFER\u2019S OWN HANDICAP', () => {
     test('the HCP label is emitted with the player name', () => {
         assert.match(HV, /const hvPlayer = filteredPlayers\[i - 3\];/,
             'matched positionally, so it can never mismatch the column');
-        assert.match(HV, /<div class="hv-hcp">HCP \$\{formatHcpDisplay\(hvPlayer\.hcp\)\}<\/div>/);
+        assert.match(HV, /<div class="hv-hcp">\$\{escapeHtml\(holeViewHandicapLabel\(hvPlayer\)\)\}<\/div>/);
+        assert.equal(call('holeViewHandicapLabel({hcp:"5"})'), 'HCP 5');
         // The name is escaped at the output boundary now - a golfer called
         // "Bob <the Hammer>" used to vanish here, swallowed as an unknown tag.
         assert.match(HV, /<div class="hv-player-name">\$\{escapeHtml\(name\)\}\$\{hvHcpHtml\}/);
@@ -380,7 +381,11 @@ describe('HOLE VIEW SHOWS THE GOLFER\u2019S OWN HANDICAP', () => {
     test('Hole View uses the ACTUAL handicap, never the relative match number', () => {
         assert.ok(!/hv-hcp[\s\S]{0,200}relHcpById/.test(HV));
         assert.ok(!/allocateMatchStrokes/.test(HV), 'Hole View computes no allocation at all');
-        assert.match(HV, /formatHcpDisplay\(hvPlayer\.hcp\)/, 'the stored Playing Handicap');
+        assert.match(HV, /escapeHtml\(holeViewHandicapLabel\(hvPlayer\)\)/, 'the stored Playing Handicap');
+        const labelFn = SRC.slice(SRC.indexOf('function holeViewHandicapLabel'), SRC.indexOf('function refreshHandicapBasisNote'));
+        assert.match(labelFn, /formatHcpDisplay\(p \? p\.hcp : ''\)/, 'a round with no Index still prints the stored handicap');
+        assert.ok(!/relHcpById|allocateMatchStrokes/.test(labelFn));
+        assert.equal(call('holeViewHandicapLabel({hcp:"5"})'), 'HCP 5');
     });
 
     test('no second dot renderer was built inside Hole View', () => {
@@ -543,7 +548,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v207-handicap-index';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });

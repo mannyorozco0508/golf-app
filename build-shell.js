@@ -69,7 +69,10 @@ const PRODUCTS = {
         // Moved to v49. The lobby word is HTML next to the ball icon. A device
         // on v48 still paints the condensed lockup SVG, which a phone cannot
         // read. The install icons stay the ball alone.
-        cacheName: 'consumer-v49-hardpan-word',
+        // Moved to v50. Setup converts a Handicap Index with the tee's Slope,
+        // Course Rating, and Par. A device on v49 has no tee-rating fields and
+        // still treats the typed number as the strokes.
+        cacheName: 'consumer-v50-handicap-index',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
