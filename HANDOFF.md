@@ -2282,6 +2282,48 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The Board, read at arm's length — Wave v201, 2026-09-22
+
+**Six things a golfer reads** (`leaderboard.html`, plus one label in
+`scorecard-rows.js`):
+1. **A blank handicap says nothing.** "HCP: " with nothing after it read as a
+   bug, and so did "Net 41" beside a gross 41 — with no handicap the net IS the
+   gross. Both lines are omitted; with a handicap the row says "HCP 6" and the
+   score cell keeps its net line. A whitespace handicap counts as blank; "0"
+   does not (a scratch golfer has a handicap and it is 0).
+2. **"F" when finished**, from the round's own hole count (a nine is finished at
+   9), and a compact header on EVERY table — Pos · Golfer · Score · To par ·
+   Thru. The section tables had none.
+3. **The skins badge**: "🥩 2" beside a winner's name, from
+   `L.countsByPlayerId` via `liveSkinsLedgerEntries` — the same ledger the LIVE
+   SKINS card and the Receipt read, per wager's own basis. NO NEW MATH: the
+   badge sums nothing. A golfer in two sections shows the total of both.
+4. **Compact rows**: name and handicap on one line, left-aligned. MEASURED in
+   Chrome at 390×844: **59px → 47px** per row (−20%). Not half, and it cannot
+   be — the score cell still stacks gross over net for a golfer with a
+   handicap, and that is the floor. Still a 44px tap target.
+5. **The whole row opens the card.** It used to need the name cell, so a tap on
+   the score, the to-par or the little ▾ did nothing. A tap inside an OPEN card
+   does not close it.
+6. **The card's header row says "SI"**, not HCP — it is the hole's stroke
+   index, and it sat directly under a row that may show no handicap at all.
+   `scorecardStackedHtml` only; the Receipt's own layout (`scorecardRowsHtml`)
+   keeps its wording, and a test pins that.
+
+**The goldens moved by transform, not by re-capture.**
+`helpers/board-polish-v201.js` — `boardV201` (markup) and `boardTextV201`
+(tag-stripped text) — names each edit and throws when one finds nothing, so
+the frozen capture plus exactly these edits IS today's output:
+`flights_absent_golden` (all four boards, with the badge counts taken from
+`liveSkinsLedgerEntries` so the board and the strip cannot disagree),
+`leaderboard_positions` (positions and totals asserted cell-for-cell as well),
+`board_stats_scope` (text). Two lessons in the header: a capture has its
+`data-player-id` stripped, so an edit anchored on it silently matches nothing;
+and picking a basis for the badge counts (gross on a round whose skins are
+net) produced four different winners than the page shows.
+`board_polish_test.js` (24, incl. Chrome: a real tap on the SCORE cell of the
+third row opens that golfer's card, 23 rows at 47px, ≥12 on screen).
+
 ## The organizer link, shared and claimed — Wave v200, 2026-09-22
 
 **The problem.** `ownerUid` is an anonymous Firebase uid, and anonymous auth is

@@ -201,7 +201,13 @@
             };
             html += head('HOLE', c.header.hole, lab => lab);
             html += head('PAR', c.header.par, (lab, key) => c.header.par[key]);
-            html += head('HCP', c.header.hcp, () => '');
+            // SI, NOT HCP (v201). This row is the hole's STROKE INDEX - its
+            // difficulty rank, 1..18 - and calling it HCP put the hole's number
+            // under a column header that reads as the golfer's handicap, directly
+            // beneath a board row that may show no handicap at all. The Receipt's
+            // own layout (scorecardRowsHtml) is a different builder and keeps its
+            // wording; this is the board's expanded card.
+            html += head('SI', c.header.hcp, () => '');
             c.golfers.forEach(g => {
                 let r = `<tr${g.out ? ' class="golfer-out"' : ''}><td class="rt-name">${esc(firstNameOf(g.name))}</td>`;
                 g.gross[n.side].forEach(x => { r += cell(dashOr(x.value), x.cls); });

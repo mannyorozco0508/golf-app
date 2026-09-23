@@ -1755,7 +1755,12 @@
 // organizer link." on the refusal card, the scorecard and the Game tab.
 // organizer-gate.js, index.html, admin.html and game.html are precached; a device
 // on v199 has neither button and cannot claim a round it set up elsewhere.
-const CACHE_VERSION = 'golfapp-v200-organizer-link';
+// Moved to v201 because the Board reads differently: a blank handicap shows no
+// HCP and no Net line, a finished golfer reads F, skins winners carry 🥩 N, the
+// rows are compact with the handicap on the name line, the whole row opens the
+// card, and the card's header row says SI (the hole's stroke index) not HCP.
+// leaderboard.html and scorecard-rows.js are precached.
+const CACHE_VERSION = 'golfapp-v201-board-polish';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -265,8 +265,8 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
         const board = sb.document.getElementById('board-content').innerHTML;
         // The standings table labels its own columns; the page-level "Ranking: Net /
         // Gross" toggle says what the ranking basis is. Both are stroke-play framing.
-        assert.match(strip(board), /Pos Player Score To Par Thru/,
-            'the general standings keep stroke-play column headers');
+        assert.match(strip(board), /Pos Golfer Score To par Thru/,
+            'the general standings keep stroke-play column headers (v201 words: Golfer, To par)');
         assert.match(read('leaderboard.html'), /Ranking:/,
             'and the basis is stated on the page');
         const mm = sb.document.getElementById('live-matches-mount').innerHTML;

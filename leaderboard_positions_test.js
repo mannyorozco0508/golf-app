@@ -117,11 +117,30 @@ describe('THE TIED-ROUND BOARDS, byte for byte', () => {
         fs.writeFileSync(FIXTURE, JSON.stringify({ capturedAt: new Date().toISOString(), boards, sha256: Object.fromEntries(Object.keys(boards).map(k => [k, sha(boards[k])])) }, null, 2) + '\n');
     }
     const FX = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+    // v201 (the board polish): the frozen HTML through this wave's edits IS today's
+    // HTML - helpers/board-polish-v201.js names each one and throws if it finds
+    // nothing. What this golden is FOR is the tie labels, and they are asserted
+    // unchanged below the byte comparison: the transform touches the header row,
+    // the HCP span, the Thru cell and the badge, never a position or a total.
+    // Every golfer here is scratch (hcp 0) and the round has no skins game, so the
+    // blank-handicap and badge edits do not apply - declared, not skipped.
+    const { boardV201 } = require('./helpers/board-polish-v201.js');
     Object.keys(boards).forEach(k => {
-        test(k + ' board unchanged', () => {
-            assert.equal(sha(boards[k]), FX.sha256[k], 'sha moved');
-            assert.equal(boards[k], FX.boards[k]);
+        test(k + ' board: the frozen HTML through the v201 edits, with every position unchanged', () => {
+            // seven of the eight are thru 18 here, so the "F" edit DOES apply (the
+            // eighth has not teed off and keeps its 0) - no declaration, and the
+            // transform throws if it finds none.
+            const want = boardV201(FX.boards[k], { holes: CD.length });
+            assert.equal(sha(boards[k]), sha(want), 'the board moved by more than this wave\'s edits');
+            assert.equal(boards[k], want);
+            assert.equal(sha(FX.boards[k]), FX.sha256[k], 'and the frozen capture is untouched');
             assert.match(FX.boards[k], /T2/, 'the frozen board carries a tie');
+            // THE NUMBERS: every position label and every total in the frozen board
+            // is in today's board, in the same order.
+            const cells = h => [...h.matchAll(/<td[^>]*>(T?\d+|-|E|F|[+-]\d+)<\/td>/g)].map(m => m[1]);
+            const beforeCells = cells(FX.boards[k]).filter(x => x !== '17' && x !== '18');
+            const afterCells = cells(boards[k]).filter(x => x !== '17' && x !== '18' && x !== 'F');
+            assert.deepEqual(afterCells, beforeCells, 'positions and totals, cell for cell');
         });
     });
 });

@@ -236,7 +236,18 @@
         .ls-t { color: var(--text-secondary); }
         .ls-c { color: var(--text-secondary); }
         .ls-w { color: var(--text-muted); font-style: italic; }
-        .player-hcp { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 2px; }
+        /* v201: COMPACT ROWS. The name and the handicap share one line, left-aligned.
+           MEASURED, not claimed: 59px -> 47px per row in Chrome at 390x844 (-20%).
+           It is not half, and cannot be: the SCORE cell still stacks gross over net
+           (the net is the number the money is decided on - the Receipt learned that
+           lesson), so two lines there are the floor for a golfer with a handicap.
+           A golfer with no handicap now has one line in both cells.
+           The row stays a 44px tap target (6px padding + a 32px line box), which is
+           what the whole-row toggle needs to be tappable. */
+        .board-table td { padding: 6px 8px; }
+        .board-table tr[data-player-id] td { height: 32px; }
+        .player-hcp { font-size: 0.72rem; color: var(--text-muted); font-weight: normal; display: inline; margin-left: 6px; }
+        .skins-badge { display: inline-block; margin-left: 6px; font-size: 0.72rem; font-weight: bold; color: var(--brand-green); white-space: nowrap; }
         /* GROSS OVER NET, both readable. Stacked rather than columned so the player
            name keeps its width on a phone. Net is deliberately smaller than gross but
            NOT muted into invisibility - it is the number the money is decided on, and
@@ -553,10 +564,14 @@ html {
     //
     // NO ARITHMETIC HERE. r.gross and r.net are computed once in renderBoard() using
     // the canonical getStrokes/parseHcp pair. This function formats them.
+    // NO NET LINE WITHOUT A HANDICAP (v201). With no handicap the net IS the gross,
+    // and printing it twice invites "why are these the same?" - the question the
+    // blank "HCP:" line was already provoking above it.
     function scoreCellHtml(r) {
+        const hasHcp = String(r.hcp === undefined || r.hcp === null ? '' : r.hcp).trim() !== '';
         return '<td class="score-cell">'
              + '<span class="score-gross">' + r.gross + '</span>'
-             + '<span class="score-net">Net ' + r.net + '</span>'
+             + (hasHcp ? '<span class="score-net">Net ' + r.net + '</span>' : '')
              + '</td>';
     }
 
@@ -972,6 +987,43 @@ html {
     const outById = () => { const m = {}; ((currentBoardData && currentBoardData.players) || []).forEach(p => { if (p.out === true) m[String(p.id)] = true; }); return m; };
     const outTagHtml = id => outById()[String(id)] ? '<span class="gap-flag">OUT</span>' : '';
 
+    // ---- THE SKINS BADGE (v201) ---------------------------------------------
+    // "🥩 2" beside a winner's name, from L.countsByPlayerId - the SAME ledger the
+    // LIVE SKINS card below and the Receipt read (live-skins.js
+    // liveSkinsLedgerEntries). NO NEW MATH: this sums nothing and decides nothing,
+    // it reads the engine's own count per golfer. Per flight when the round's skins
+    // are flighted, because then a golfer's skins are the ones won inside their own
+    // pot; a golfer in two sections (a wager AND the pool bucket) shows the total of
+    // both, which is what "how many skins do I have" means to them.
+    // Refreshed at every renderBoard, like the gap counts.
+    let skinsCountById = {};
+    function refreshSkinsCounts() {
+        skinsCountById = {};
+        const data = currentBoardData;
+        if (!data || typeof liveSkinsLedgerEntries !== 'function' || typeof roundHasSkinsGame !== 'function') return;
+        if (!roundHasSkinsGame(data)) return;
+        let entries;
+        try { entries = liveSkinsLedgerEntries(data, data.courseData || [], data.scores || {}, { groupOf: lbSkinsGroupOf }); }
+        catch (e) { return; }   // a badge must never take the board down
+        entries.forEach(e => {
+            const counts = (e.L && e.L.countsByPlayerId) || {};
+            Object.keys(counts).forEach(id => {
+                const n = Number(counts[id]) || 0;
+                if (n > 0) skinsCountById[String(id)] = (skinsCountById[String(id)] || 0) + n;
+            });
+        });
+    }
+    const skinsBadgeHtml = id => skinsCountById[String(id)]
+        ? '<span class="skins-badge">\uD83E\uDD69 ' + skinsCountById[String(id)] + '</span>' : '';
+
+    // A FINISHED GOLFER READS "F" (v201). The hole count answers "how far are they";
+    // once the card is complete the answer is "done", and 18 beside 18 beside 18
+    // tells nobody anything. The round's own hole count, never a hard 18 - a nine
+    // is a finished round at 9.
+    function thruCellText(r) {
+        const holes = ((currentBoardData && currentBoardData.courseData) || []).length;
+        return (holes > 0 && r.thru >= holes) ? 'F' : String(r.thru);
+    }
     function boardRowHtml(r, idx, opts) {
         const posStyle = (opts && opts.posStyle) ? ` style="${opts.posStyle}"` : '';
         const badge = ((opts && opts.badge) ? `<span class="player-flight">${opts.badge}</span>` : '') + gapFlagHtml(r.id) + outTagHtml(r.id);
@@ -986,15 +1038,22 @@ html {
         // the attribute moved, the text is identical.
         const pid = ` data-player-id="${escapeHtml(String(r.id))}"`;
         if (r.thru === 0) {
-            return `<tr${pid}${outCls ? ' class="golfer-out"' : ''}><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}</td><td>-</td><td>-</td><td>0</td></tr>`;
+            return `<tr${pid}${outCls ? ' class="golfer-out"' : ''}><td${posStyle}>-</td><td class="player-name">${escapeHtml(r.name)}${badge}${skinsBadgeHtml(r.id)}</td><td>-</td><td>-</td><td>0</td></tr>`;
         }
         let posClass = (idx === 0 ? 'row-leader' : '') + outCls;
+        // A BLANK HANDICAP SAYS NOTHING (v201). "HCP: " with nothing after it read as
+        // a bug, and so did "Net 41" on a golfer the app has no handicap for - the net
+        // is the gross, dressed as a second number. With a handicap: "HCP 6" on the
+        // same line as the name (v201: one line, left-aligned, half the height) and
+        // the net line under the gross.
+        const hcpText = String(r.hcp === undefined || r.hcp === null ? '' : r.hcp).trim();
+        const hcpHtml = hcpText === '' ? '' : `<span class="player-hcp">HCP ${escapeHtml(hcpText)}</span>`;
         return `<tr class="${posClass}"${pid}>
 ${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
-${ind}<td class="player-name">${escapeHtml(r.name)}${badge}<span class="player-hcp">HCP: ${r.hcp}</span></td>
+${ind}<td class="player-name">${escapeHtml(r.name)}${badge}${skinsBadgeHtml(r.id)}${hcpHtml}</td>
 ${ind}${scoreCellHtml(r)}
 ${ind}<td style="font-size: 1.1rem;">${formatToPar(r.toPar)}</td>
-${ind}<td>${r.thru}</td>
+${ind}<td>${thruCellText(r)}</td>
 ${ind.slice(4)}</tr>`;
     }
     // ---- TAP A NAME, SEE THEIR CARD (wave 2, 2026-09-16) --------------------
@@ -1037,18 +1096,20 @@ ${ind.slice(4)}</tr>`;
         });
         return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${card}</td></tr>`;
     }
-    // ONE delegated listener: a tap on a golfer's name cell toggles their card.
-    // The match-play table has name cells too, on rows with no data-player-id;
-    // those are not golfers and nothing happens there.
+    // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
+    // (v201 - it used to need the name cell, so a tap on the score, the to-par or
+    // the little ▾ did nothing and the row looked broken). The row is found by
+    // data-player-id, which only a golfer's row carries: the match-play table's
+    // rows have none and nothing happens there. A tap inside an OPEN card
+    // (.board-card-row) is not a row tap - reading the card must not close it.
     (function wireBoardCards() {
         const mount = document.getElementById('board-content');
         if (!mount || typeof mount.addEventListener !== 'function') return;
         mount.addEventListener('click', (e) => {
             let el = e.target;
-            let cell = null;
             while (el && el !== mount) {
-                if (!cell && el.tagName === 'TD' && /\bplayer-name\b/.test(el.className || '')) cell = el;
-                if (cell && el.tagName === 'TR') {
+                if (el.tagName === 'TR') {
+                    if (/\bboard-card-row\b/.test(el.className || '')) return;   // inside the open card
                     const id = el.getAttribute && el.getAttribute('data-player-id');
                     if (id) toggleBoardCard(id);
                     return;
@@ -1068,6 +1129,7 @@ ${ind.slice(4)}</tr>`;
                     <span style="font-size:0.8rem; color:var(--text-muted);">${maxThru > 0 ? `Thru ${maxThru}` : 'Not started'}</span>
                 </div>
                 <table class="board-table" style="margin-bottom:0;">
+                    <thead><tr><th>Pos</th><th style="text-align:left;">Golfer</th><th>Score</th><th>To par</th><th>Thru</th></tr></thead>
                     <tbody>`;
         if (sectionResults.length === 0 && emptyText) {
             html += `<tr><td style="padding:14px; color:var(--text-muted); text-align:center;">${emptyText}</td></tr>`;
@@ -1099,7 +1161,7 @@ ${ind.slice(4)}</tr>`;
 
         let html = `
             <table class="board-table">
-                <thead><tr><th>Pos</th><th style="text-align:left;">Player</th><th>Score</th><th>To Par</th><th>Thru</th></tr></thead>
+                <thead><tr><th>Pos</th><th style="text-align:left;">Golfer</th><th>Score</th><th>To par</th><th>Thru</th></tr></thead>
                 <tbody>
         `;
         // Field-wide labels: the rows already carry them, and asking again keeps one
@@ -1145,6 +1207,7 @@ ${ind.slice(4)}</tr>`;
 
     function renderBoard() {
         refreshGapCounts();
+        refreshSkinsCounts();   // v201: the badge's counts, from the same ledger the card below reads
         const players = currentBoardData.players || [];
         const courseData = currentBoardData.courseData || [];
         const savedScores = currentBoardData.scores || {};

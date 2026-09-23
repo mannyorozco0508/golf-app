@@ -135,7 +135,13 @@ describe('ONLY WAGERS MOVED — the standings, the skins ledger, the flight card
     [['bare', BARE], ['group1', G1], ['group3', G3]].forEach(([k, search]) => {
         test(k + ': Board standings, skins, points, hi-lo - character for character', () => {
             const el = arrive('leaderboard.html', search);
-            assert.equal(strip(el('board-content')), PREV[k].board.standings);
+            // v201 (the board polish): the frozen TEXT through this wave's edits -
+            // "HCP: 8" -> "HCP 8" and a header row on each section table. No number,
+            // name or position moves; helpers/board-polish-v201.js throws if an edit
+            // finds nothing. This round's golfers are thru 12 (no F) and its skins
+            // are not on this capture's surface, so those two edits do not apply.
+            const { boardTextV201 } = require('./helpers/board-polish-v201.js');
+            assert.equal(strip(el('board-content')), boardTextV201(PREV[k].board.standings, { sections: true }));
             assert.ok(PREV[k].board.standings.length > 1000, 'the standings are on the page');
             assert.match(PREV[k].board.standings, /Flight A|Flight B|G1-1|G6-3/, 'and hold the whole field');
             assert.equal(strip(el('live-skins-mount')), PREV[k].board.skins);

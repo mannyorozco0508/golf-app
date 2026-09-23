@@ -201,13 +201,52 @@ VARIANTS.forEach(([title, build]) => {
             assert.equal(st.text, 'Eli 4 \u00B7 Ann 2');
         });
 
+        // v201 (the board polish): the FROZEN HTML, plus exactly this wave's edits,
+        // IS today's HTML - the header's wording and a header on the section tables,
+        // "HCP: 6" -> "HCP 6" on one line, the 🥩 badge on the skins winners, and F
+        // for a finished golfer. helpers/board-polish-v201.js says what each edit is
+        // and throws if one finds nothing. THIS round has skins (its own strip test
+        // pins "Eli 4 · Ann 2") and every golfer carries a handicap, so the badge
+        // applies and the blank-handicap edit does not - stated, not silently
+        // skipped (board_polish_test.js owns the blank case).
+        const { boardV201 } = require('./helpers/board-polish-v201.js');
+        // the badge counts are the STRIP's - the same ledger, so this pins that the
+        // board and the strip cannot disagree about how many skins a golfer has
+        // by NAME: a capture has its data-player-id stripped (renderBoard removes it)
+        // FROM THE SAME ENTRY POINT THE BOARD USES - liveSkinsLedgerEntries, which
+        // picks each wager's OWN basis. Picking a basis here instead (gross, say, on
+        // a round whose skins are net) produced four different winners than the page
+        // shows, which is exactly the drift the badge exists not to have.
+        const SKINS_BY_NAME = (() => {
+            const LS = loadJsFile('live-skins.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            LS.__d = J(data);
+            const entries = J(vm.runInContext('liveSkinsLedgerEntries(__d, ' + JSON.stringify(CD) + ', ' + JSON.stringify(SCORES) + ', {})', LS));
+            const out = {};
+            entries.forEach(e => {
+                const counts = (e.L && e.L.countsByPlayerId) || {};
+                Object.keys(counts).forEach(id => {
+                    if (!(counts[id] > 0)) return;
+                    const p = PLAYERS.find(x => String(x.id) === String(id));
+                    if (p) out[p.name] = (out[p.name] || 0) + counts[id];
+                });
+            });
+            assert.ok(Object.keys(out).length >= 2, 'the ledger found winners: ' + JSON.stringify(out));
+            return out;
+        })();
         [['net', 'all'], ['net', 'group'], ['gross', 'all'], ['gross', 'group']].forEach(([scoring, mode]) => {
-            test(`THE RENDERED BOARD, ${scoring} / ${mode === 'all' ? 'All Players (flat)' : 'By Group'}: byte-identical HTML`, () => {
+            test(`THE RENDERED BOARD, ${scoring} / ${mode === 'all' ? 'All Players (flat)' : 'By Group'}: the frozen HTML through the v201 edits`, () => {
                 const html = renderBoard(data, scoring, mode);
                 const key = scoring + '_' + mode;
                 assert.ok(html.length > 3000, 'the board rendered something: ' + html.length + ' chars');
-                assert.equal(sha(html), FIX.boardSha256[key], firstDiff(html, FIX.boards[key]));
-                assert.equal(html, FIX.boards[key]);
+                assert.ok(PLAYERS.every(p => String(p.hcp).trim() !== ''), 'every golfer here has a handicap');
+                // thru 17 of 18 on every golfer here, so the "F" edit has nothing to
+                // do - declared (noneFinished), not silently skipped; the transform
+                // would otherwise throw, which is the point of it throwing.
+                const want = boardV201(FIX.boards[key], { holes: CD.length, noneFinished: true, skinsByName: SKINS_BY_NAME });
+                assert.equal(sha(html), sha(want), firstDiff(html, want));
+                assert.equal(html, want);
+                // the frozen capture is still the frozen capture
+                assert.equal(sha(FIX.boards[key]), FIX.boardSha256[key]);
             });
         });
 
@@ -216,7 +255,8 @@ VARIANTS.forEach(([title, build]) => {
             const grouped = renderBoard(data, 'net', 'group');
             PLAYERS.forEach(p => { assert.ok(flat.includes(p.name)); assert.ok(grouped.includes(p.name)); });
             assert.ok(/<td>1<\/td>[\s\S]*Eli/.test(flat), 'Eli is ranked first on the net flat board');
-            assert.ok(/HCP: 20/.test(flat));
+            assert.ok(/HCP 20/.test(flat), 'v201: "HCP 20", on the name line, no colon');
+            assert.ok(!/HCP:/.test(flat), 'and the old wording is gone');
             assert.equal((grouped.match(/Group \d/g) || []).length, 2, 'two foursome cards');
             assert.ok(/Leading the Field: Eli/.test(grouped));
             assert.notEqual(flat, grouped, 'the grouped board is a different rendering, not the flat one twice');

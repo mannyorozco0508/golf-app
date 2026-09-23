@@ -68,11 +68,13 @@ function boot({ scoring = 'net', grouped = false, n = 12, thru = 18 } = {}) {
 // Pulls one row per golfer straight out of the rendered markup.
 function rows(html) {
     const out = [];
-    const re = /<td class="player-name">([^<]+)<span class="player-hcp">HCP: (\d+)<\/span><\/td>\s*<td class="score-cell"><span class="score-gross">(\d+)<\/span><span class="score-net">Net (\d+)<\/span><\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td>(\d+)<\/td>/g;
+    // v201: "HCP 6" on the name line (no colon), and the Thru cell reads F when
+    // the golfer is finished - the numbers either side are unchanged.
+    const re = /<td class="player-name">([^<]+)<span class="player-hcp">HCP (\d+)<\/span><\/td>\s*<td class="score-cell"><span class="score-gross">(\d+)<\/span><span class="score-net">Net (\d+)<\/span><\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td>(\d+|F)<\/td>/g;
     let m;
     while ((m = re.exec(html)) !== null) {
         out.push({ name: m[1], hcp: +m[2], gross: +m[3], net: +m[4],
-                   toPar: m[5].replace(/<[^>]*>/g, ''), thru: +m[6] });
+                   toPar: m[5].replace(/<[^>]*>/g, ''), thru: m[6] === 'F' ? 18 : +m[6], thruText: m[6] });
     }
     return out;
 }
@@ -267,7 +269,8 @@ describe('NO NEW MATH, NO ENGINE TOUCHED', () => {
                 `${f} must contain no leaderboard presentation`));
     });
 
-    test('the handicap still sits under the player name', () => {
-        assert.match(boot().html(), /<span class="player-hcp">HCP: \d+<\/span>/);
+    test('the handicap sits ON the player name line (v201: "HCP 6", inline, no colon - it used to be a block under the name)', () => {
+        assert.match(boot().html(), /<span class="player-hcp">HCP \d+<\/span>/);
+        assert.match(read('leaderboard.html'), /\.player-hcp \{[^}]*display: inline;/, 'and the CSS puts it on the line');
     });
 });
