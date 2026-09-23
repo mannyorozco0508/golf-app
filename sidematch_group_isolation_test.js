@@ -632,18 +632,19 @@ describe('PARITY — the two pages cannot drift apart', () => {
 // 12 (brief). SECURITY HONESTY
 // ---------------------------------------------------------------------------
 describe('SECURITY — what this does and does not claim', () => {
-    test('Firebase rules on an EXISTING round are unchanged and still open by design (Wave 2 gates creation only)', () => {
+    test('a side match on an existing round is still not an identity check; owned setup is the owner', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
         const w = rules.events.$eventCode['.write'];
-        assert.ok(w.endsWith("|| (data.exists() && (newData.exists() || !data.hasChild('scores')))"),
-            'a round with scores in it cannot be deleted in one write, and writes to an existing round are still otherwise open: ' + w.slice(-90));
-        // auth appears in the events block ONLY where a round is CREATED (the
-        // write's first branch) and where ownerUid is first set; a side match
-        // written into an existing round meets no identity check.
-        const ev = JSON.parse(JSON.stringify(rules.events.$eventCode));
-        delete ev['.write']; delete ev.ownerUid;
-        assert.ok(!/auth/.test(JSON.stringify(ev)), 'no identity to check against on participation');
-        assert.ok(!/auth/.test(w.slice(w.indexOf('|| (data.exists()'))), 'the existing-round branch names no auth');
+        assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"),
+            'a legacy round with scores in it cannot be deleted in one write, and a legacy round stays otherwise open: ' + w.slice(-110));
+        assert.match(w, /data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/,
+            'an owned round\'s parent write is the owner');
+        // A side match written into an existing round meets no identity check.
+        // The parent names auth for the owner; the child grant must not.
+        assert.equal(rules.events.$eventCode.sideMatches['.write'], "root.child('events/' + $eventCode).exists()");
+        assert.ok(!/auth/.test(rules.events.$eventCode.sideMatches['.write']), 'a side match is not an identity check');
+        const legacy = w.slice(w.lastIndexOf('|| (data.exists()'));
+        assert.ok(!/auth/.test(legacy), 'the legacy branch names no auth: ' + legacy);
     });
 
     test('this is client-side isolation, and the code says so', () => {

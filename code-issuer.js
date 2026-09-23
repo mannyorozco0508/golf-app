@@ -18,10 +18,12 @@
 // empties mid-round and the data sits unreachable in the database, with their
 // side matches and audit log still pointing at people who are not there.
 //
-// THE RULES DO NOT CATCH IT. Measured against the deployed database.rules.json:
-// overwriting players on a scored round is ALLOWED, overwriting courseData is
-// ALLOWED, replacing the whole round with set() is ALLOWED. Only a DELETE is
-// refused, and a collision is not a delete.
+// THE RULES CATCH IT ON AN OWNED ROUND (2026-09-23). players and courseData are
+// owner-only once ownerUid is set, so a second organizer's merge onto a live
+// code is PERMISSION_DENIED. A LEGACY round (no ownerUid) is still open:
+// overwriting players is allowed, and only a delete of a scored round is
+// refused. The existence check stays, because legacy rounds and the race
+// before the first write are still real.
 //
 // TRIPS ARE WORSE. trip.html's batch builder writes trips/<code>/rounds/<code>
 // as MERGE keys, so a colliding trip code puts two unrelated groups' rounds in

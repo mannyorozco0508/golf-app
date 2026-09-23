@@ -78,7 +78,7 @@ describe('organizer-gate.js: the URL, the words, the paste (one builder for thre
     });
     test('the words say what it opens and to keep it', () => {
         assert.equal(G.organizerGate.organizerShareText('org1'),
-            'Organizer link for ORG1 — opens setup on any device. Keep it to yourself.');
+            'Organizer link for ORG1 — opens the setup screens on this device. Saving them needs the email sign-in for this round. Keep it to yourself.');
     });
     test('a paste is read as a URL, as a bare token, or as nothing', () => {
         const t = G.organizerGate.tokenFromPaste;
@@ -348,7 +348,9 @@ describe('THE REFUSAL CARD (admin.html): the dead end becomes a way in', () => {
         const box = html(sb, 'rr-links-box');
         assert.match(box, /🔑 Share organizer link/);
         assert.match(box, /onclick="shareOrganizerLinkAction\(\)"/);
+        assert.match(box, /Saving them needs the email sign-in for the account that created the round/);
         assert.match(box, /Keep it to yourself/);
+        assert.ok(!/anyone with it can edit/.test(box), 'the note must not say the link alone can edit');
         assert.match(box, /Your own devices/);
     });
     test('Round Ready\'s share action hands the canonical URL to the share path', async () => {
@@ -358,7 +360,7 @@ describe('THE REFUSAL CARD (admin.html): the dead end becomes a way in', () => {
         run(sb, 'currentMode = "ORG1"; currentSavedRound = ' + JSON.stringify(round()) + ';');
         assert.equal(await run(sb, 'shareOrganizerLinkAction()'), 'shared');
         assert.equal(J(sb.__shared).url, ORIGIN + '/index.html?game=ORG1&organizer=' + TOKEN);
-        assert.equal(J(sb.__shared).text, 'Organizer link for ORG1 — opens setup on any device. Keep it to yourself.');
+        assert.equal(J(sb.__shared).text, 'Organizer link for ORG1 — opens the setup screens on this device. Saving them needs the email sign-in for this round. Keep it to yourself.');
     });
     test('a round with no token gets no share button (a legacy round has no link to share)', () => {
         const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=org1', localStorage: true });
@@ -374,7 +376,7 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
     test('the URL and the words are built in organizer-gate.js and nowhere else', () => {
         ['index.html', 'admin.html', 'game.html'].forEach(f => {
             const src = read(f).replace(/<!--[\s\S]*?-->/g, '');
-            assert.ok(!/opens setup on any device/.test(src), f + ' must not carry its own copy of the words');
+            assert.ok(!/email sign-in for this round/.test(src), f + ' must not carry its own copy of the words');
             assert.ok(!/organizer=' \+ (currentData|data)\.organizerToken/.test(src.replace(/`/g, "'")) || f === 'index.html',
                 f + ' must not build the URL itself');
         });
@@ -407,12 +409,15 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         assert.equal(await only.organizerGate.shareOrganizerLink('org1', { organizerToken: TOKEN }), 'shared');
         assert.deepEqual(only.__used, ['registerPlugin']);
     });
-    test('no protected file moved for this wave', () => {
+    test('the engines this wave must not touch are unchanged; the rules file moved for owner-only setup', () => {
         const sha = f => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
         assert.equal(sha('pool-engine.js'), '372e76d7');
         assert.equal(sha('settlement-engine.js'), 'f7712d87');
-        assert.equal(sha('database.rules.json'), '2a7a4918');
         assert.equal(sha('grouping.js'), '405b9774');
+        // RE-PINNED 2026-09-23. database.rules.json is this wave: owned setup
+        // is the owner's uid, play paths stay open. format_first_wizard_test.js
+        // holds the full hash. Was 2a7a4918.
+        assert.equal(sha('database.rules.json'), '3f2c646b');
     });
 });
 

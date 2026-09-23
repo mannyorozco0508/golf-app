@@ -272,12 +272,11 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        // The two versions are ALLOWED to diverge. Consumer is v49: the HTML
-        // word beside the ball icon. Tournament is v53: the landing already
-        // sets HardPan in HTML, and the key moved with the consumer header.
+        // The two versions are ALLOWED to diverge. Consumer is v51: the
+        // organizer-link sentences match owner-only setup. Tournament is v53.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v50-handicap-index$/);
+        assert.match(c, /^consumer-v51-owner-setup$/);
         assert.match(t, /^tournament-v53-hardpan-word$/);
     });
 

@@ -98,8 +98,12 @@
     //      always was - there is nothing to check against. A round with a token
     //      and no ownerUid (2026-08-24 to 09-14) admits only the link.
     //
-    // HIDES THE DOORS, DOES NOT LOCK THEM. database.rules.json still lets any
-    // client holding the code write an existing round; see HANDOFF.md.
+    // HIDES THE DOORS. database.rules.json locks SETUP on a round that has
+    // ownerUid (auth.uid must match). The token is not that lock: the round is
+    // world-readable, so the token is too. A second device saves setup by
+    // email-link sign-in, which adopts this uid. Scores and the other play
+    // paths stay open to a code-holder. A legacy round with no ownerUid is
+    // still open. See HANDOFF.md.
     var TOKEN_KEY = 'golfapp_organizer_';
     function tokenKey(code) { return TOKEN_KEY + String(code || '').toUpperCase(); }
     function heldOrganizerToken(code, urlToken) {
@@ -234,8 +238,9 @@
     //               box, so the device that is stuck can unstick itself.
     // NOTHING IS WRITTEN TO FIREBASE by either: the token is already on the
     // record, and a claim is a localStorage write on this device. The token is a
-    // bearer secret - the share text says to keep it - and the rules still let
-    // any client holding the code write an existing round (HANDOFF).
+    // bearer secret for the SCREENS - the share text says to keep it. It does
+    // not authorize a setup write. Those require auth.uid === ownerUid, which
+    // a second device gets by email-link sign-in (HANDOFF).
     // THE URL IS BUILT FROM shareBaseUrl() (product-links.js), never from
     // location: inside the shell that is capacitor://localhost and the link
     // would open nothing on anybody else's phone (the Build-9 failure).
@@ -247,7 +252,7 @@
     }
     function organizerShareText(code) {
         return 'Organizer link for ' + String(code || '').toUpperCase()
-            + ' \u2014 opens setup on any device. Keep it to yourself.';
+            + ' \u2014 opens the setup screens on this device. Saving them needs the email sign-in for this round. Keep it to yourself.';
     }
     // A pasted URL, a pasted token, or rubbish. Returns the 32-hex token or null;
     // reads nothing and writes nothing.

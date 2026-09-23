@@ -1494,7 +1494,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
      remembered), shows this instead of the wizard. A NEW round never lands here.
      The wizard's markup is not generated for the refused session - #admin-screen
      is hidden before loadModeData would have filled it, and loadModeData is not
-     called. HIDES THE DOOR; DOES NOT LOCK IT - see HANDOFF.md. -->
+     called. The client hides the door. Setup writes are the owner's uid -
+     see HANDOFF.md. The organizer link opens these screens; it does not
+     authorize the save. -->
 <div class="container" id="setup-refused-screen" style="display: none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🔒</div>
@@ -1505,7 +1507,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
          token), checks it against THIS round's organizerToken and stores it on
          this device - no Firebase write, nothing read. -->
     <div id="setup-claim" style="margin:0 0 18px 0;"></div>
-    <p style="text-align:center; color:var(--text-muted); font-size:0.95rem; line-height:1.5; margin:0 0 20px 0;">If that is you, open the round on the device you set it up on, or use your organizer link &mdash; it is on the scorecard's Group Links panel there.</p>
+    <p style="text-align:center; color:var(--text-muted); font-size:0.95rem; line-height:1.5; margin:0 0 20px 0;">If that is you, sign in with the email for this round on this device &mdash; that is what saves setup. The organizer link opens these screens; it is on the scorecard's Group Links panel on the device that set the round up.</p>
     <a class="btn-primary" id="setup-refused-back" href="index.html" style="display:block; text-align:center; text-decoration:none;">⛳ Back to the scorecard</a>
 </div>
 
@@ -2136,7 +2138,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             html += '<div class="rr-organizer-link" style="margin-top:14px;">'
                 + '<div class="wr-label" style="margin-bottom:4px;">Your own devices</div>'
                 + '<button type="button" class="btn-outline" onclick="shareOrganizerLinkAction()">\uD83D\uDD11 Share organizer link</button>'
-                + '<div class="rr-organizer-note" style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Opens setup on any device. Keep it to yourself \u2014 anyone with it can edit this round.</div>'
+                + '<div class="rr-organizer-note" style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Opens the setup screens on this device. Saving them needs the email sign-in for the account that created the round. Keep it to yourself.</div>'
                 + '<div id="rr-organizer-note" class="claim-note" style="color:var(--text-muted);" role="status"></div>'
                 + '</div>';
         }
@@ -7249,12 +7251,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // would be no token at all.
                 //
                 // HONEST LIMIT: database.rules.json grants ".read": true on every event,
-                // so this value is readable by anyone who has the game code. It stops
-                // ACCIDENTS - a golfer on the shared link quietly editing another
-                // foursome - not a determined party. That is the same protection group
-                // links provide today, and making it stronger needs real auth.
-                // Preserved when this round already has one; minted only for a round
-                // that has never had a token. A shared organizer link keeps working.
+                // so this value is readable by anyone who has the game code. It opens
+                // the setup SCREENS on a device that holds it. It does not authorize
+                // a setup write: those require auth.uid === ownerUid. A second device
+                // gets that uid by email-link sign-in. Preserved when this round
+                // already has one; minted only for a round that has never had a token.
                 organizerToken: loadedOrganizerToken || makeOrganizerToken(),
                 eventCategory: currentCategory,
                 categoryIcon: categoryIcon,

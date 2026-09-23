@@ -3,15 +3,63 @@
     "events": {
       "$eventCode": {
         ".read": true,
-        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && (newData.exists() || !data.hasChild('scores')))",
+        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && data.hasChild('ownerUid') && auth != null && auth.uid === data.child('ownerUid').val() && (newData.exists() || !data.hasChild('scores'))) || (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))",
         ".validate": "newData.val() === null || (newData.hasChildren() && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid')))",
         "ownerUid": {
           ".validate": "(!data.parent().exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
         },
         "scores": {
+          ".write": "root.child('events/' + $eventCode).exists()",
           "$scoreKey": {
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 30 && $scoreKey.matches(/^p[0-9]+_h[0-9]+$/)"
           }
+        },
+        "kpLeaders": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "kpWinners": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "kpConfirmed": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "sideMatches": {
+          ".write": "root.child('events/' + $eventCode).exists()",
+          "$matchId": {
+            "stake": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+            }
+          }
+        },
+        "matchPresses": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "strokePresses": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "dots": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "auditLog": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "scoresVerified": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "wolfCalls": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "ryderCup": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "ryderCupRef": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "ryderFoursomes": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
+        "additionalGameInstances": {
+          ".write": "root.child('events/' + $eventCode).exists()"
         },
         "holeBetStake": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
@@ -42,13 +90,6 @@
         },
         "wolfBlindMult": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
-        },
-        "sideMatches": {
-          "$matchId": {
-            "stake": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
-            }
-          }
         }
       }
     },

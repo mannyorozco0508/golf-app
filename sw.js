@@ -1796,7 +1796,13 @@
 // A device on v206 would keep showing the typed number as the strokes and
 // would have no tee-rating fields. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v207-handicap-index';
+// Moved to v208 because setup on an owned round is the owner's uid, and the
+// organizer-link sentences say so. admin.html, organizer-gate.js and
+// code-issuer.js are precached. A device on v207 still says the organizer
+// link alone can edit the round. The rules file is not in this cache;
+// publishing it is a console step. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v208-owner-setup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

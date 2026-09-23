@@ -1,6 +1,6 @@
 # Rattle Golf — Project Handoff
 
-> **Web brand: HardPan.** Consumer and tournaments. The mark is a dimpled ball on a firm ground line (bone, then forest green). The lobby header is that ball (`hardpan-icon.svg`) beside the HTML word HARDPAN, on `#0B0F0C`. The outlined lockup SVG is not the header: on a phone its counters filled. Tab and PWA icons are the ball alone. Tournaments landing says HardPan Tournaments in HTML beside the ball. `support@rattlegolf.com`, Rattle Golf LLC, bundle id `com.rattlegolf.app`, and `tournaments.rattlegolf.com` stay. The repo display name is HardPan. **Do not archive, upload, or sync a binary until 1.0.3 is approved and released.** Native icons, splash, and Xcode display name are HardPan on main (prep only). Shell cache `golfapp-v207-handicap-index`; consumer cache `consumer-v50-handicap-index`; tournament cache `tournament-v53-hardpan-word`.
+> **Web brand: HardPan.** Consumer and tournaments. The mark is a dimpled ball on a firm ground line (bone, then forest green). The lobby header is that ball (`hardpan-icon.svg`) beside the HTML word HARDPAN, on `#0B0F0C`. The outlined lockup SVG is not the header: on a phone its counters filled. Tab and PWA icons are the ball alone. Tournaments landing says HardPan Tournaments in HTML beside the ball. `support@rattlegolf.com`, Rattle Golf LLC, bundle id `com.rattlegolf.app`, and `tournaments.rattlegolf.com` stay. The repo display name is HardPan. **Do not archive, upload, or sync a binary until 1.0.3 is approved and released.** Native icons, splash, and Xcode display name are HardPan on main (prep only). Shell cache `golfapp-v208-owner-setup`; consumer cache `consumer-v51-owner-setup`; tournament cache `tournament-v53-hardpan-word`.
 
 
 
@@ -178,7 +178,7 @@ the read-back on 2026-09-11 below worked — but nothing here depends on it.)
 
 What they do: a `$other` catch-all denies anything not explicitly listed, money fields must be numbers in [0, 100000], scores must be numbers 1–29 keyed `p{n}_h{n}`, `global_courses` entries can be created or updated but never deleted.
 
-What they don't: `events/$eventCode` is still `.read: true, .write: true`, so anyone with a game code can edit that round. That's inherent to having no accounts. Group-link read-only behavior is client-side only.
+What they don't, as of 2026-09-23: `events/$eventCode` is still `.read: true`, so anyone with a game code can watch the round. Setup writes on a round that has `ownerUid` are the owner's uid. Scores and the other play paths stay open to a code-holder. A legacy round with no `ownerUid` is still writable by anyone who has the code. The rules file in the repo is not what the live database is running until it is pasted into the Firebase console — see "Owner-only consumer setup" below. Group-link read-only behavior for *which card you can type on* is still client-side only.
 
 **Deploying the rules immediately surfaced a latent bug** — `wolfLoneMult` and `wolfBlindMult` were written as strings while every other numeric field was `parseFloat`'d, so every round save was rejected with PERMISSION_DENIED. If a save starts failing after a rules change, look for a type mismatch first.
 
@@ -2412,10 +2412,10 @@ round."; rubbish: "Paste the whole link, or the token from it."
 `organizer_link_share_test.js` (34, incl. Chrome: a non-organizer device types
 the pasted link into the real box, taps Unlock setup, and ✏️ + 👥 appear).
 
-**Still true, and still the sharp edge.** The token is a BEARER SECRET: anyone
-who gets the link is that round's organizer on their device, forever. The doors
-are hidden, not locked — `database.rules.json` still lets any client holding the
-code write an existing round.
+**The token is still a bearer secret for the screens.** Anyone who gets the
+link is shown setup on their device. As of 2026-09-23 that is not a write:
+setup saves need the email sign-in for the account that created the round.
+See "Owner-only consumer setup" below.
 
 ## ROADMAP — recorded 2026-09-22
 
@@ -2428,18 +2428,10 @@ code write an existing round.
    Manny enables it in the Firebase console — see the checklist below. Apple's
    Guideline 4.8 requires Sign in with Apple only once another third-party
    social login exists; email link alone does not trigger it.
-2. **Security rules AFTER (c), never before.** Setup keys owner-only
-   (`players`, `groupSizeOverrides`, `moneyPool`, `flights`,
-   `additionalGames`, `courseData`, `settlementMode`, `supersededBy`,
-   `organizerToken`), scores and the KP/marker keys open to any scorekeeper
-   holding the code. `auth.uid === data.child('ownerUid').val()` is the only
-   check the rules can make cheaply and correctly — the shape
-   `tournaments/$code` already uses, where the rules ALREADY demand a
-   non-anonymous provider. A token or a PIN cannot be verified while
-   `events/$code` is world-readable: every client can already read them.
-   NO INTERIM RULES: owner-only writes before accounts exist would turn the
-   2026-09-21 experience from "doors hidden" into "doors shut" on the
-   organizer's own second device.
+2. **Security rules AFTER (c). In the repo as of 2026-09-23, not yet on the
+   live database.** Setup keys owner-only, play paths open. The detail, the
+   verify steps, and the holes that remain are in "Owner-only consumer setup"
+   below. Do not treat this paragraph as the rules file.
 
 ## Email-link sign-in — Wave 1, 2026-09-23
 
@@ -2490,9 +2482,90 @@ The code path is live; the provider is not.
    `auth/unauthorized-domain`.
 3. Optional: Authentication → Templates → Email address verification / magic
    link, so the message sounds like Rattle Golf. The default template works.
-4. Do **not** publish owner-only Realtime Database rules in this wave. Existing
-   rounds stay writable by anyone with the code. Owner-only setup keys come
-   after organizers can sign in on a second device (roadmap item 2).
+4. This checklist item was for the email-link wave only. Owner-only setup is
+   now in `database.rules.json`. Publishing it is the console step in
+   "Owner-only consumer setup" below, not part of turning email link on.
+
+## Owner-only consumer setup — 2026-09-23
+
+**Not live until the console publish.** Cloudflare Pages deploys the site from
+`main`. It does not deploy Realtime Database rules. The file in the repo is
+what to paste. The command, if the CLI is ever pointed at a database that
+already matches this file except for this change, is
+`npx firebase-tools deploy --only database --project golfapp-9fb21`. A CLI
+deploy replaces the whole ruleset. Paste in the console
+(Realtime Database → Rules → Publish) unless the live rules have been read
+back and match the repo file first. This change was not published from here.
+
+**What became owner-only.** On `events/$eventCode`, once the round has
+`ownerUid`, the parent `.write` is `auth.uid === data.child('ownerUid').val()`,
+and a delete still requires that the round have no `scores`. There is no child
+grant on setup, so these writes are the owner's and nobody else's:
+
+- `players`, `groupSizeOverrides`, `moneyPool`, `flights`, `additionalGames`,
+  `courseData`, `settlementMode`, `supersededBy`, `organizerToken`
+- every other key that is not in the open list below, including `eventName`,
+  the stake fields (`skinsBuyIn`, `birdieUnitVal`, `matchStake`, and the rest),
+  `skinsCarryOver`, and `kpCancelled`
+
+The owner can still edit after the trial ends. The trial gates creation only.
+`ownerUid` is still immutable, and a legacy round still cannot be claimed.
+`organizers/$uid/pass` is still `.write: false`. `tournaments` was not edited.
+
+**What stays open to anyone holding the code**, by a child `.write` of
+`root.child('events/' + $eventCode).exists()` (the same shape as tournament
+scores: the parent no longer grants it, so the child has to):
+
+- `scores`, `kpLeaders`, `kpWinners`, `kpConfirmed`
+- `sideMatches` (presses included), `matchPresses`, `strokePresses`, `dots`
+- `auditLog`, `scoresVerified`, `wolfCalls`
+- `ryderCup`, `ryderCupRef`, `ryderFoursomes`
+- `additionalGameInstances` (not `additionalGames` — that one is setup)
+
+`.read` on the round is still `true`. Spectators with the code still see the
+board.
+
+**Legacy rounds** (no `ownerUid`) keep the previous write: anyone with the
+code, and a scored round still cannot be deleted in one write. That is every
+round created before `ownerUid` was stamped.
+
+**The organizer link.** `isRoundOrganizer` still treats a matching
+`?organizer=` token as the organizer, and the claim is still a localStorage
+write. The rules do not read the token. They cannot: `.read` is true, so
+anyone with the code can read `organizerToken` and present it. The preserved
+path for a second device is email-link sign-in (`email-link-auth.js`):
+`linkWithCredential` keeps the uid, and `signInWithEmailLink` on another
+device adopts it, so `ownerUid` matches and setup saves. The share text and
+the Round Ready note say that. A token holder who has not signed in can open
+the screens and will be refused by the server on a setup save.
+
+**Verify, before publishing.** `node --test wave2_rules_test.js
+round_delete_rules_test.js security-rules.test.js
+tournaments_rules_isolation_test.js`. Then, on a throwaway round in a project
+that is not production if one exists, or only after the console publish: the
+creating device saves a roster change; a second browser that is only signed
+in anonymously can post a score and cannot post `players`; that second
+browser, after the email link, can post `players`. Read `events/<code>` back
+and confirm the stranger's `players` write did not land.
+
+**Holes that remain, on purpose.**
+
+- Anyone with the code can still write and clear scores, KP markers, side
+  matches, presses, dots, wolf calls, and Ryder hole scores. That is the
+  product. It includes deleting the whole `scores` node, which is still the
+  first step of the two-write wipe.
+- After that wipe, deleting the round itself is the owner only, on an owned
+  round. On a legacy round the second step is still open.
+- A legacy round can still be overwritten, roster included.
+- The organizer token is still readable. It opens screens. It does not save
+  setup.
+- `kpNoWinner` is not in the open list (it is an organizer call, written with
+  a `kpWinners` clear). The owner can still make it. A token-only device
+  cannot, until it signs in.
+- Group links still do not exist in the rules. Which card a phone can type on
+  is the page, not the server.
+- Tournaments are a different block and were not part of this change. Their
+  structure is already owner-only; their score keys are already open.
 
 ## Move a golfer to another group — Wave v199, 2026-09-22
 
@@ -2698,15 +2771,12 @@ link, whoever holds it. **The uid is per browser ORIGIN**: Safari, the home-scre
 app and the App Store app on one phone are three different organizers — open the
 organizer link once in each to make them all the organizer.
 
-**WHAT THIS IS NOT. This hides the doors; it does not lock them.**
-`database.rules.json` is untouched: `events/$code` `.write` still permits any
-client holding the code to write an existing round's settings, and the organizer
-token is `.read: true` like the rest of the round. Making setup owner-only is a
-rules change with the per-origin identity problem above (a rule that trusts
-`ownerUid` alone locks the organizer's own phone out of a round created on the
-Mac; one that also trusts the token has to store it somewhere the rule can read
-without every reader seeing it). It needs a rehearsal on a throwaway round, and is
-its own wave after the 2026-09-22 round.
+**WHAT THIS IS NOT. The client hides the doors; it does not lock them.**
+As of 2026-09-23 the database does, for setup keys on a round that has
+`ownerUid`: `auth.uid` must equal that uid. The organizer token is still
+`.read: true` with the rest of the round, so the rules cannot trust it. A
+second device saves setup by email-link sign-in, which adopts the uid that
+created the round. See "Owner-only consumer setup" below.
 
 **Left on the OLD predicate this wave** — `index.html` `isOrganizerView()` is still
 `!hasGroupLock` ("no ?group= in the link"), which a "Just watching" spectator on
