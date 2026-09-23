@@ -130,7 +130,29 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
     test('it is honest that a round link grants access', () => {
         // The access model is the round code. A policy that implied stronger
         // protection than the product provides would be the wrong kind of wrong.
+        // events/$eventCode is world-readable, and once a round exists any client
+        // may write its children. A group link keeps friends on their own card in
+        // the app; database.rules.json does not enforce that. The retired sentence
+        // claimed it did.
+        assert.match(P, /Rounds are shared by link or code with the group/);
         assert.match(P, /Anyone holding a round link can view that round/i);
+        assert.doesNotMatch(P, /Database rules restrict what each link can change/);
+        assert.doesNotMatch(P, /plain round link is read-only/);
+    });
+
+    test('it discloses online course search to golfcourseapi', () => {
+        // Consumer search (admin.html "Search online") sends the typed query
+        // through functions/api/course-search.js to api.golfcourseapi.com.
+        // The imported card is written onto the round and into global_courses.
+        // Scores and names never go on that request.
+        assert.match(P, /Last updated: 23 September 2026/);
+        assert.match(P, /Course search queries/);
+        assert.match(P, /golfcourseapi\.com/);
+        assert.match(P, /Cloudflare Worker/);
+        assert.match(P, /Imported course reference/);
+        assert.match(P, /provider course id/);
+        assert.match(P, /Round scores and player names are not sent to golfcourseapi/);
+        assert.match(P, /<h2>Third-party directories<\/h2>/);
     });
 });
 
