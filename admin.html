@@ -632,31 +632,18 @@ html {
             </div>
         </div>
     </div>
-    <div id="tee-rating-panel" style="border:1px solid var(--border-mid); border-radius:8px; padding:10px 12px; margin:0 0 12px 0;">
-        <div style="font-weight:bold; font-size:0.85rem; color:var(--brand-green); margin-bottom:4px;">Tee rating for handicaps</div>
-        <p id="tee-rating-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 8px 0; line-height:1.4;">Slope, Course Rating, and Par are missing, so each Handicap Index is used as the Playing Handicap. Nets say so.</p>
-        <label for="tee-rating-select" style="font-size:0.75rem;">Tee</label>
-        <select id="tee-rating-select" onchange="applySelectedTee()" style="margin-bottom:8px;">
-            <option value="">No tee rating on this course</option>
-        </select>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-            <div>
-                <label for="tee-slope" style="font-size:0.75rem;">Slope</label>
-                <input type="text" inputmode="decimal" id="tee-slope" oninput="refreshHandicapNote()" placeholder="Slope">
-            </div>
-            <div>
-                <label for="tee-course-rating" style="font-size:0.75rem;">Course Rating</label>
-                <input type="text" inputmode="decimal" id="tee-course-rating" oninput="refreshHandicapNote()" placeholder="Rating">
-            </div>
-            <div>
-                <label for="tee-par" style="font-size:0.75rem;">Par</label>
-                <input type="text" inputmode="numeric" id="tee-par" oninput="refreshHandicapNote()" placeholder="Par">
-            </div>
-            <div>
-                <label for="tee-allowance" style="font-size:0.75rem;">Allowance %</label>
-                <input type="text" inputmode="decimal" id="tee-allowance" value="100" oninput="refreshHandicapNote()" placeholder="100">
-            </div>
-        </div>
+    <!-- Tee ratings come from the course. The golfer picks a tee; Slope, Course
+         Rating and Par fill from that tee. There is no hand-typed block. A course
+         with no rated tees leaves this hidden and the Index is the Playing
+         Handicap. Allowance stays 100 unless a saved round says otherwise. -->
+    <div id="tee-rating-panel" style="display:none; border:1px solid var(--border-mid); border-radius:8px; padding:10px 12px; margin:0 0 12px 0;">
+        <label for="tee-rating-select" style="font-size:0.75rem; font-weight:bold; color:var(--brand-green);">Tee</label>
+        <select id="tee-rating-select" onchange="applySelectedTee()" style="margin-bottom:8px;"></select>
+        <p id="tee-rating-filled" style="font-size:0.78rem; color:var(--text-muted); margin:0; line-height:1.4;"></p>
+        <input type="hidden" id="tee-slope">
+        <input type="hidden" id="tee-course-rating">
+        <input type="hidden" id="tee-par">
+        <input type="hidden" id="tee-allowance" value="100">
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-1" onclick="wizardBack(1)">◀ Back</button>
@@ -2385,6 +2372,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     let globalCourses = {};
     db.ref('global_courses').on('value', (snap) => {
         globalCourses = snap.val() || {};
+        // A course can be chosen before this snapshot lands. If the tee list is
+        // still empty, fill it from the record that just arrived. A list that
+        // already has tees is left alone so a later snapshot cannot change the
+        // tee the golfer picked.
+        const keyEl = document.getElementById('course-select');
+        const sel = document.getElementById('tee-rating-select');
+        let hasTee = false;
+        if (sel && sel.options) {
+            for (let i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value) { hasTee = true; break; }
+            }
+        }
+        if (keyEl && keyEl.value && !hasTee) {
+            syncTeeRatingFromCourse(keyEl.value, { clearWhenEmpty: false, keepSelection: true });
+        }
         if(document.getElementById('course-search-input').value.length > 0) {
             populateCourseDropdown(document.getElementById('course-search-input').value);
         }
@@ -4733,19 +4735,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return typed ? customCourseKeyFor(typed) : null;
     }
 
+    // The tee the golfer picked, kept across a late course snapshot so a second
+    // delivery cannot put them back on the canonical tee.
+    let rememberedTeeKey = '';
+
+    // Firebase stores a dense array as an array and anything with a gap as an
+    // object keyed "0","1",…. Both are the same list.
+    function asTeeList(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'object') {
+            return Object.keys(raw).sort((a, b) => {
+                const na = Number(a), nb = Number(b);
+                if (isFinite(na) && isFinite(nb)) return na - nb;
+                return String(a) < String(b) ? -1 : (String(a) > String(b) ? 1 : 0);
+            }).map(k => raw[k]);
+        }
+        return [];
+    }
+
     function courseTeeChoices(course) {
         const out = [];
         if (!course || !course.tees) return out;
         ['male', 'female'].forEach(g => {
-            const list = course.tees[g];
-            if (!Array.isArray(list)) return;
-            list.forEach((t, i) => {
+            asTeeList(course.tees[g]).forEach((t, i) => {
                 if (!t) return;
                 const slope = Number(t.slope != null ? t.slope : t.slope_rating);
                 const rating = Number(t.rating != null ? t.rating : t.course_rating);
                 let par = Number(t.parTotal != null ? t.parTotal : t.par_total);
-                if (!(par > 0) && Array.isArray(t.holes)) {
-                    par = t.holes.reduce((sum, h) => sum + (Number(h && h.par) || 0), 0);
+                if (!(par > 0)) {
+                    const holes = asTeeList(t.holes);
+                    if (holes.length) par = holes.reduce((sum, h) => sum + (Number(h && h.par) || 0), 0);
                 }
                 if (!(slope > 0) || !(rating > 0) || !(par > 0)) return;
                 out.push({
@@ -4761,15 +4781,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return out;
     }
 
+    // The course the tee list is built from. A saved record wins once it has
+    // rated tees. Until the import is confirmed, the fetched card lives on
+    // pendingImport and the hidden key is still empty — that is the moment the
+    // course name is already on screen. Matching the typed name (or the import
+    // key) is what puts those tees in the dropdown instead of an empty list.
+    function courseRecordForTees(courseKey) {
+        const stored = (courseKey && globalCourses && globalCourses[courseKey])
+            || (courseKey && typeof coursePresets !== 'undefined' && coursePresets[courseKey])
+            || null;
+        const pending = pendingImport && pendingImport.record;
+        if (pending && pending.tees) {
+            const recName = String(pending.name || '').trim().toLowerCase();
+            const typed = courseSearchInput && courseSearchInput.value ? courseSearchInput.value.trim().toLowerCase() : '';
+            const pendingMatches = (courseKey && courseKey === pendingImport.key) || (recName && recName === typed);
+            if (pendingMatches && courseTeeChoices(pending).length && !courseTeeChoices(stored).length) return pending;
+        }
+        return stored;
+    }
+
+    function setTeePanelShown(on) {
+        const panel = document.getElementById('tee-rating-panel');
+        if (panel) panel.style.display = on ? 'block' : 'none';
+    }
+
     function fillTeeSelect(choices, preferredKey) {
         const sel = document.getElementById('tee-rating-select');
         if (!sel) return;
         sel.innerHTML = '';
         if (!choices.length) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'No tee rating on this course';
-            sel.appendChild(opt);
             sel.value = '';
             return;
         }
@@ -4799,6 +4839,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const sel = document.getElementById('tee-rating-select');
         const opt = selectedTeeOption(sel);
         if (!opt || !opt.value) { refreshHandicapNote(); return; }
+        rememberedTeeKey = opt.value;
         const slope = document.getElementById('tee-slope');
         const rating = document.getElementById('tee-course-rating');
         const par = document.getElementById('tee-par');
@@ -4842,6 +4883,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         set('tee-course-rating', stored.courseRating);
         set('tee-par', stored.par);
         if (stored.allowance != null) set('tee-allowance', stored.allowance);
+        if (stored.teeKey) rememberedTeeKey = String(stored.teeKey);
         const sel = document.getElementById('tee-rating-select');
         if (sel && stored.teeKey) {
             for (let i = 0; i < sel.options.length; i++) {
@@ -4851,25 +4893,39 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         refreshHandicapNote();
     }
 
-    function syncTeeRatingFromCourse(courseKey) {
-        const course = (globalCourses && globalCourses[courseKey]) || (typeof coursePresets !== 'undefined' && coursePresets[courseKey]) || null;
+    function syncTeeRatingFromCourse(courseKey, opts) {
+        opts = opts || {};
+        const course = courseRecordForTees(courseKey);
         const choices = courseTeeChoices(course);
-        let preferred = '';
-        const src = course && course.source && course.source.siFrom;
-        if (src && choices.length) {
-            const parts = String(src).split('/');
-            const hit = choices.find(c => c.gender === parts[0] && c.name === parts[1]);
-            if (hit) preferred = hit.key;
-        }
-        fillTeeSelect(choices, preferred);
         if (!choices.length) {
-            ['tee-slope', 'tee-course-rating', 'tee-par'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
+            setTeePanelShown(false);
+            fillTeeSelect([], '');
+            if (opts.clearWhenEmpty) {
+                rememberedTeeKey = '';
+                ['tee-slope', 'tee-course-rating', 'tee-par'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+            }
             refreshHandicapNote();
             return;
         }
+        if (!opts.keepSelection) rememberedTeeKey = '';
+        const sel = document.getElementById('tee-rating-select');
+        const current = (opts.keepSelection && sel && sel.value) ? sel.value : '';
+        let preferred = '';
+        if (current && choices.some(c => c.key === current)) preferred = current;
+        else if (opts.keepSelection && rememberedTeeKey && choices.some(c => c.key === rememberedTeeKey)) preferred = rememberedTeeKey;
+        else {
+            const src = course && course.source && course.source.siFrom;
+            if (src) {
+                const parts = String(src).split('/');
+                const hit = choices.find(c => c.gender === parts[0] && c.name === parts[1]);
+                if (hit) preferred = hit.key;
+            }
+        }
+        setTeePanelShown(true);
+        fillTeeSelect(choices, preferred);
         applySelectedTee();
     }
 
@@ -4884,7 +4940,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function refreshHandicapNote() {
         const tee = readTeeRatingFromDom();
         const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : { complete: false, message: '' };
-        const teeNote = document.getElementById('tee-rating-note');
+        const filled = document.getElementById('tee-rating-filled');
         const playerNote = document.getElementById('handicap-index-note');
         let head;
         if (status.complete) {
@@ -4894,7 +4950,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } else {
             head = status.message || ((typeof handicapUnconvertedNote === 'function') ? handicapUnconvertedNote() : '');
         }
-        if (teeNote) teeNote.textContent = head;
+        if (filled) {
+            filled.textContent = status.complete
+                ? ('Slope ' + status.slope + ' \u00b7 Course Rating ' + status.courseRating + ' \u00b7 Par ' + status.par)
+                : '';
+        }
         if (!playerNote) return;
         const lines = [head];
         document.querySelectorAll('#player-list .player-row').forEach(row => {
@@ -4990,8 +5050,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 if (document.getElementById(`c-hcp-${h.hole}`)) document.getElementById(`c-hcp-${h.hole}`).value = isMapped ? h.hcpIndex : '';
             });
             lastCourseChangeKey = identity;
-            syncTeeRatingFromCourse(courseKey);
         }
+
+        // Tee ratings follow the course even when the name did not change.
+        // Picking an online course sets the name first (an unmapped identity)
+        // and only then attaches the fetched tees. Gating this on a new
+        // identity left that course on an empty tee list.
+        syncTeeRatingFromCourse(courseKey, {
+            clearWhenEmpty: courseActuallyChanged,
+            keepSelection: !courseActuallyChanged
+        });
 
         updateCustomCoursePars();
 

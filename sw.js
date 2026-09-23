@@ -1808,7 +1808,15 @@
 // a device on v208 keeps serving the consumer word on that page. The consumer
 // product cache stays consumer-v51-owner-setup. The tournament product cache
 // is tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v209-rattle-tournaments';
+// Moved to v210 because the course step no longer asks for Slope, Course
+// Rating, and Par by hand. A course with rated tees lists those tees and
+// fills the three numbers from the one picked, including a course just
+// fetched online whose card is not saved yet. A device on v209 still shows
+// the manual block and "No tee rating on this course" for that course.
+// admin.html is precached. The consumer product cache is
+// consumer-v52-tee-autofill. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v210-tee-autofill';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
