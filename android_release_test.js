@@ -7,12 +7,11 @@
 // than pinned to a number typed twice.
 //
 // THE ICON IS MEASURED, NOT LISTED. An adaptive icon is a 108dp layer of which
-// launchers guarantee only the centre 66dp circle; icon-1024.png's mark reaches
-// 489px from the centre of a canvas whose safe radius is 313px, so the raw art
-// as a foreground loses the R's outer arm and the flag tip on a Pixel. The
-// foreground is generated at 0.61x by tools/android-icons.js, and the test
-// below DECODES the xxxhdpi layer and checks every mark pixel is inside the
-// circle. A file-exists-and-is-432px check would pass the clipped one.
+// launchers guarantee only the centre 66dp circle. The HardPan ball in
+// icon-1024.png reaches past that circle, so tools/android-icons.js scales the
+// foreground by 0.92 about the mark centre. The test below DECODES the xxxhdpi
+// layer and checks every mark pixel is inside the circle. A file-exists-and-is-432px
+// check would pass the clipped one.
 //
 // SIGNING IS PROVEN ABSENT. No keystore exists in this repo and none may be
 // created by it. The build reads keystore.properties only if the file exists,
@@ -79,21 +78,19 @@ describe('LAUNCHER ICON', () => {
         });
     });
 
-    test('the adaptive icon points at the generated layers and the cream background', () => {
+    test('the adaptive icon points at the generated layers and the icon field', () => {
         const xml = read(RES + 'mipmap-anydpi-v26/ic_launcher.xml');
         assert.match(xml, /<foreground android:drawable="@mipmap\/ic_launcher_foreground"/);
         assert.match(xml, /<background android:drawable="@color\/ic_launcher_background"/);
         const round = read(RES + 'mipmap-anydpi-v26/ic_launcher_round.xml');
         assert.match(round, /@mipmap\/ic_launcher_foreground/);
-        // The icon's OWN canvas colour - the mode of icon-1024.png's border pixels,
-        // the one definition helpers/png.js and the generator share - not the
-        // manifest's #F6F4EC: foreground and background must be the same cream or
-        // the scaled mark sits in a faintly lighter square. The cream is textured
-        // (it varies by a level or two), which is why it is derived, not typed.
+        // The icon's OWN canvas colour — the mode of icon-1024.png's border pixels,
+        // the one definition helpers/png.js and the generator share. The page cream
+        // in manifest.json is the window, not the icon. Foreground and background
+        // must be the same near-black field or the scaled mark sits in a square of
+        // a different colour.
         const c = canvasColour(readPng(path.join(REPO_ROOT, 'icon-1024.png')));
-        const manifest = WEB_MANIFEST.background_color.slice(1).match(/../g).map(h => parseInt(h, 16));
-        c.rgb.forEach((v, i) => assert.ok(Math.abs(v - manifest[i]) <= 8,
-            'icon canvas ' + c.hex + ' is not the app cream ' + WEB_MANIFEST.background_color));
+        assert.deepEqual(c.rgb, [0x0B, 0x0F, 0x0C], 'icon canvas ' + c.hex + ' is not the HardPan field');
         assert.match(read(RES + 'values/ic_launcher_background.xml'),
             new RegExp('<color name="ic_launcher_background">' + c.hex + '</color>'),
             'ic_launcher_background is not the icon canvas colour ' + c.hex + ' - regenerate with tools/android-icons.js');

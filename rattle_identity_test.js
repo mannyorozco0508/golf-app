@@ -254,12 +254,12 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
 // ---------------------------------------------------------------------------
 describe('APP ICON ASSET SEAM', () => {
 
-    // The approved Classic Stroke R master lives at icon-1024.png and is the
-    // source of record: icon-512 and icon-192 are Lanczos downscales of it, never
-    // upscales, and never redrawn. The master itself is deliberately NOT shipped —
-    // it is 700KB of Xcode/App Store Connect asset that would otherwise be
-    // precached onto every device for a shell that already needs to work on a
-    // remote course with no signal.
+    // The App Store master lives at icon-1024.png: the HardPan ball, flattened
+    // to an opaque square. icon-512 and icon-192 are the web ball (hardpan-icon.svg),
+    // not downscales of that master. The master itself is deliberately NOT shipped —
+    // it is an Xcode/App Store Connect asset that would otherwise be precached
+    // onto every device for a shell that already needs to work on a remote course
+    // with no signal. Do not archive until 1.0.3 is approved and released.
 
     const MASTER = 'icon-1024.png';
     const ICONS = [
@@ -317,30 +317,33 @@ describe('APP ICON ASSET SEAM', () => {
 
     test('the master is full-bleed — no baked rounded corners, no white margin', () => {
         // iOS applies its own corner mask. Artwork that arrives pre-rounded on white
-        // shows white fringes outside that mask. The four corners must therefore be
-        // the cream field, not white and not transparent. A previous submission
-        // failed exactly this check.
+        // shows white fringes outside that mask. The four corners must be the
+        // near-black field, not white and not transparent. A previous submission
+        // failed the white-fringe check.
         const { PNG } = tryPng();
         if (!PNG) return; // decoding is optional; the dimension checks above always run
         const px = PNG.corners(path.join(__dirname, MASTER));
+        assert.equal(px.length, 4, 'all four corners must be readable');
         px.forEach(([name, [r, g, b]]) => {
             const isWhite = r > 250 && g > 250 && b > 250;
             assert.ok(!isWhite, `${name} corner is white (${r},${g},${b}) — artwork must bleed to the edge`);
-            assert.ok(r > 200 && g > 200 && b > 180, `${name} corner should be the cream field, got (${r},${g},${b})`);
+            assert.ok(r < 20 && g < 25 && b < 20, `${name} corner should be the near-black field, got (${r},${g},${b})`);
         });
     });
 
-    test('the web icons are the ball mark; the App Store master stays the Stroke R', () => {
-        // icon-192 and icon-512 are the consumer PWA icons. They are no longer
-        // downscales of icon-1024.png. That master, and the copy in the iOS
-        // asset catalog, stay the Stroke R while 1.0.3 is in review.
+    test('the App Store master is the HardPan ball; the web icons stay their own files', () => {
+        // icon-192 and icon-512 are the consumer PWA icons, from hardpan-icon.svg.
+        // icon-1024.png is the locked ball flattened for the next archive, and the
+        // iOS asset catalog holds the same bytes. Neither file is the Stroke R.
         const crypto = require('crypto');
         const sha = f => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
-        const MASTER_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
+        const MASTER_SHA = '3330ab520f7d0da6fb37e8774fe736c51d6d681bb7b409b9d0808b5e6fc02dc1';
+        const STROKE_R_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
         assert.equal(sha(MASTER), MASTER_SHA, 'icon-1024.png moved');
         assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png'), MASTER_SHA,
             'the iOS AppIcon moved');
+        assert.notEqual(sha(MASTER), STROKE_R_SHA, 'icon-1024.png is still the Stroke R');
         assert.notEqual(sha('icon-512.png'), MASTER_SHA, 'the web icon is still the App Store master');
         const master = pngSize(MASTER);
         ICONS.forEach(({ file, size }) => {

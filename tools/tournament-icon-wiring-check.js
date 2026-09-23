@@ -44,7 +44,7 @@ const CONSUMER_BEFORE = {
     '5fd6924427a4c8959eca59ce15a39d981a54dee2579b0078fb0789e9d2816a24': 'consumer logo-mark 256 ball',
     '55e4ee5c6ca06df9cae7a64a11bc0f92593d91a962a244a053dfe41e0c97bbca': 'consumer favicon 32 ball',
 };
-const CONSUMER_MASTER_1024 = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
+const CONSUMER_MASTER_1024 = '3330ab520f7d0da6fb37e8774fe736c51d6d681bb7b409b9d0808b5e6fc02dc1';
 
 const TOURNAMENT_MASTERS = [
     'tournament-icon-1024.png', 'tournament-icon-512.png',

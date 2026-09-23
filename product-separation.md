@@ -29,7 +29,7 @@ This is an engineering handoff, not marketing copy. Its job is to let the second
 | `stats.html` | Final scorecard |
 | `trip.html` | **Road Trip** |
 | `instructions.html`, `shared.html` | Support pages |
-| `hardpan-lockup.svg`, `hardpan-icon.svg`, `favicon-32.png`, `icon-{192,512}.png` | Consumer web mark (ball on firm ground). `icon-1024.png` is the held App Store master |
+| `hardpan-lockup.svg`, `hardpan-icon.svg`, `favicon-32.png`, `icon-{192,512}.png` | Consumer web mark (ball on firm ground). `icon-1024.png` is the App Store master (same ball, opaque near-black square) prepared for the archive after 1.0.3 |
 
 Consumer bundle: **31 files**, cache `consumer-v34-brand-mark`, `start_url: ./admin.html`.
 

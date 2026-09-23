@@ -8,9 +8,12 @@
 // The tab icon is hardpan-icon.svg, with favicon-32.png and the manifest
 // PNGs (icon-192, icon-512) generated from the same ball.
 //
-// WHAT THIS DOES NOT MOVE. icon-1024.png, the iOS AppIcon, and every Android
-// launcher PNG stay the Stroke R. 1.0.3 is in review and is not resubmitted.
-// The repo display name is HardPan. Tournaments use the same ball.
+// THE NATIVE ICONS. icon-1024.png, the iOS AppIcon, and every Android launcher
+// PNG are the same HardPan ball, flattened to an opaque near-black square.
+// They are pinned below. Do not archive until 1.0.3 is approved and released;
+// this only prepares the files. The repo display name is HardPan. Tournament
+// web icons are already that product's own files of the web ball; they do not
+// share these native files.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -32,38 +35,39 @@ const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 
 const NATIVE_ICONS = {
     'ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png':
-        '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112',
+        '3330ab520f7d0da6fb37e8774fe736c51d6d681bb7b409b9d0808b5e6fc02dc1',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png':
-        'e3a4287d417d163fe6c1515dad349591359e719acfbeadcea3650be5947001dd',
+        '300cf9f2ff551ccd3aa45dc64d933ca9a53a0830d312cd2906cbb1f6ec801ddd',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png':
-        '31a8810b05edd83e658fe79c79e3d1b93356e9022c1dad40cd6133511fff0169',
+        'eb537777c7e0f814c5b7c68849ba09d4217bcaac2b8404841b7f522f5e3c9068',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png':
-        'ef044fbefb4a1359a397f5416d71e7503371f0e0871a63fd059c6e49fcc67c56',
+        'dc916f6379dd67b06fdd216a6114797c04163162c498b855b6d054320279f53d',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher.png':
-        '99120da93b69a35c95df6eb6805cebb3c259721263debf0814aeb68258e7ccab',
+        'dd76337ed182bacea3ce948c4d12eb2ee2f657157f768893e7080d9626a37eff',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png':
-        '9577e3ffd36d79e0479a18e93d26ecfe696ae86703df464b8eb2286982254e60',
+        'f74f99db0c06fb321ee21e6821ca23d1b4bc2cca166ccbc0c9938f9fac7e2da9',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png':
-        '49afef9cbdcd45996fc010aab1479247e18c6aad70a511f7f598364534b9b548',
+        '12f5f94eddf00b47ab3732375700678eadd856fa2314bfc95a322890befb2fef',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png':
-        'c36541caec1058b9c1fbcb5e99fa86ad17f1cedd9200cd1877a7f04505c6d6f5',
+        '2f35d487a3b9539179a07f6909e4552d35aa6373016fe528937b004283e75509',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png':
-        '39348b46fd15467be5a365fb48dd511c884acfa18a37be42ca1ff61f39c618f3',
+        'e118285edff6d8c1289b371165e191d58c80d1d3e122770af2589e7fee0a539c',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png':
-        '449e8da8f59ea1ab43330c3de3bd82baefb2397a2d084d801ebca775dbcb55c1',
+        'bb7a2922f9dccd6a91d53172eaf04f807623a50338b07d78486b1cacf0718c61',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png':
-        '44929eca4b7d556e48f7d42a07c213c34d0a2284b342aa879c34a4f09b97f0a9',
+        '4cd5250a36c874e973615a460082ede1277e30f444d28cbe3fce44ef829e8064',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png':
-        '96f6d5c5cb2bb66cae271b2eee7ef1eff01cab4c0cd015728b62c9a8fa02f78a',
+        '0d578336ab24b78ee7e50947c53caf95dd71849a80e8a51c74a24c4d2c2f4c41',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png':
-        '21cdff65bfdeb270a4920a7b64e69d1b0321561b0a767aefc196b8ebf2142da6',
+        '9c500c7ce7e733a24c7494d8346888d211b3ed37ca81f1fa978d79346f331092',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png':
-        '87b2d25fedd6c5bef02d51737f4bf7beed638ab7b73703fc73ca4c817e94f431',
+        'e9887d8e3959e8b8b0dda6d0136127bc9f60df16124dd4659b29a76847fad3e2',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png':
-        'd90c412a088b3f7d17c0727bf3587e62808cc3668241936af49d451874dabf26',
+        '6c31b2a9457bf7736b00376df9bd0114975214f7f55da075147786d3e0f62d9e',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png':
-        '6bcb17db935582f9e1e498478c8824c6e29ba52f2a3ce7bd618783c6bbb2a54f',
+        '84b76758a5fb254f95e57a0b232b708ea62eafc20351ba51f17213245927b573',
 };
+const STROKE_R_MASTER = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
 
 function px(img, x, y) {
     const o = (y * img.width + x) * 4;
@@ -174,12 +178,40 @@ describe('THE WEB ICONS', () => {
     });
 });
 
-describe('NATIVE ICONS AND THE TOURNAMENT MARK DID NOT MOVE', () => {
-    test('the App Store and Android launcher files are byte-for-byte what they were', () => {
+describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
+    test('the App Store and Android launcher files are the pinned HardPan ball', () => {
         Object.entries(NATIVE_ICONS).forEach(([file, digest]) => {
             assert.equal(sha(file), digest, file + ' changed');
+            assert.notEqual(digest, STROKE_R_MASTER, file + ' is still the Stroke R master');
         });
-        assert.equal(sha('icon-1024.png'), NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png']);
+        const master = sha('icon-1024.png');
+        assert.equal(master, NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png']);
+        assert.notEqual(master, STROKE_R_MASTER, 'icon-1024.png is still the Stroke R');
+        const img = readPng(path.join(__dirname, 'icon-1024.png'));
+        assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
+        let green = 0, bone = 0;
+        for (let i = 0; i < img.data.length; i += 4) {
+            const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
+            if (r > 30 && r < 80 && g > 90 && g < 170 && b > 40 && b < 120) green++;
+            if (r > 220 && g > 210 && b > 190) bone++;
+        }
+        assert.ok(green > 0, 'the master has no forest-green ground');
+        assert.ok(bone > 0, 'the master has no bone');
+    });
+
+    test('tournament icons are already the web ball and do not share the native master', () => {
+        // Separate files, already the HardPan ball (the web rendering), not the
+        // Stroke R. They are not copies of icon-1024.png, so this prep does not
+        // rewrite them.
+        assert.notEqual(sha('tournament-icon-1024.png'), sha('icon-1024.png'),
+            'the tournament master is a copy of the native master');
+        const web = readPng(path.join(__dirname, 'icon-512.png'));
+        const tour = readPng(path.join(__dirname, 'tournament-icon-512.png'));
+        assert.equal(tour.width, web.width);
+        assert.deepEqual(px(tour, 0, 0), px(web, 0, 0));
+        assert.deepEqual(px(tour, 256, 200), px(web, 256, 200));
+        const img = readPng(path.join(__dirname, 'tournament-icon-1024.png'));
+        assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
     });
 
     test('the native display name in the repo is HardPan', () => {

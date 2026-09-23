@@ -65,16 +65,14 @@ Guideline 5.3.3. Rattle Golf **records golf games and calculates settlement betw
 
 ## 6. APP ICON
 
-Approved master is committed at **`icon-1024.png`** — 1024×1024, RGB, **no alpha**, cream field bleeding to the edge, no baked rounded corners. Verified by `rattle_identity_test.js`.
+Approved master is committed at **`icon-1024.png`** — 1024×1024, RGB, **no alpha**, near-black field (`#0B0F0C`) bleeding to the edge, no baked rounded corners. The mark is the HardPan ball on firm ground (bone, then forest green). Verified by `rattle_identity_test.js`. The same bytes are in `ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png`. That single 1024 universal slot is the required AppIcon image; Xcode 16 derives the other sizes. Do not hand-fill smaller slots.
 
-It is **not** wired into the native asset catalog — that lives in the local `ios/` project, which the repo does not yet contain.
+**Do not archive or upload while 1.0.3 is in review.** These bytes are for the next archive, after 1.0.3 is approved and released.
 
-**On the Mac:**
-1. Xcode → `App/Assets.xcassets` → `AppIcon`
-2. Drag `icon-1024.png` from the repo root into the **1024pt App Store** slot
-3. Xcode 16 generates every derived size from that single slot — do not hand-fill smaller slots
-4. Confirm no alpha warning at build (Apple rejects icons with an alpha channel)
-5. `ios/App/App/Assets.xcassets/AppIcon.appiconset/` then needs committing
+**On the Mac, when 1.0.3 has cleared and you are archiving the next build:**
+1. Xcode → `App/Assets.xcassets` → `AppIcon` — the 1024pt slot is already `icon-1024.png`
+2. Xcode 16 generates every derived size from that single slot — do not hand-fill smaller slots
+3. Confirm no alpha warning at build (Apple rejects icons with an alpha channel)
 
 **Do not** use `logo-mark.png` — that is the transparent in-app homepage mark, and its alpha channel would fail App Store validation.
 
