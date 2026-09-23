@@ -171,7 +171,9 @@ describe('THE TOGGLE RANKS — IT DOES NOT HIDE', () => {
 
     test('the toggle is labelled as ranking, not visibility', () => {
         const src = read(PAGE);
-        assert.match(src, /Ranking:/, 'nobody should expect a score to disappear');
+        // v202: the control row's label is "Ranking" (the colon went with the
+        // stacked row it used to sit in); the words Net and Gross are unchanged.
+        assert.match(src, /toggle-rank-label">Ranking</, 'nobody should expect a score to disappear');
         assert.match(src, /id="label-net"[^>]*>Net</);
         assert.match(src, /id="label-gross"[^>]*>Gross</);
     });

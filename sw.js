@@ -1760,7 +1760,12 @@
 // rows are compact with the handicap on the name line, the whole row opens the
 // card, and the card's header row says SI (the hole's stroke index) not HCP.
 // leaderboard.html and scorecard-rows.js are precached.
-const CACHE_VERSION = 'golfapp-v201-board-polish';
+// Moved to v202 because the Board's header is one line and one control row, a
+// field over twelve opens on All Players, the Stroke/Match switch only shows on a
+// round that plays a match, and the leader banner is one line - the first golfer
+// is 375px down instead of 614, with nine on screen instead of four.
+// leaderboard.html is precached.
+const CACHE_VERSION = 'golfapp-v202-board-header';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

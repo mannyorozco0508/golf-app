@@ -58,9 +58,14 @@ function page(data, mode, chosen) {
         sb,
         board: String(id('board-content').innerHTML || ''),
         skins: String(id('live-skins-mount').innerHTML || ''),
-        toggle: id('group-view-toggle').style.display,
+        // v202: the two-position toggle and the pill row became ONE segmented
+        // control (#view-pills, .bc-view). The retired toggle's own wrapper is gone;
+        // its ids (label-group-view / label-all-view) and checkbox are kept hidden
+        // and in step, and WHICH segments show is the control's real answer now.
         pills: id('view-pills').style.display,
+        pillAll: id('pill-all-view').style.display,
         pillGroup: id('pill-group-view').style.display,
+        pillFlight: id('pill-flight-view').style.display,
         mode: vm.runInContext('groupViewMode', sb),
         active: ['group', 'flight', 'all'].filter(m => id('pill-' + m + '-view').classList.contains('active'))
     };
@@ -93,16 +98,20 @@ describe('6.1 THE LIVE SKINS BOARD ON A FLIGHTED ROUND', () => {
 });
 
 describe('6.2 THE CONTROL', () => {
-    test('NO FLIGHTS, two groups: today\'s two-position toggle shows, the pills never do', () => {
+    test('NO FLIGHTS, two groups: the control offers All and Groups, never Flights (v202: one segmented control)', () => {
         const r = page(round(P));
-        assert.equal(r.toggle, 'flex');
-        assert.equal(r.pills, 'none');
-        assert.match(read('leaderboard.html'), /<div class="toggle-row" id="group-view-toggle" style="display:none;">\s*<span class="toggle-label active" id="label-group-view" onclick="switchGroupView\('group'\)">🏌️ By Group<\/span>/, 'the toggle markup is untouched');
-    });
-    test('FLIGHTS, two groups: the toggle hides and the three-way pill row shows; the default is By Flight', () => {
-        const r = page(round(P, ON), null);
-        assert.equal(r.toggle, 'none');
         assert.equal(r.pills, 'flex');
+        assert.equal(r.pillAll, ''); assert.equal(r.pillGroup, ''); assert.equal(r.pillFlight, 'none');
+        // v202: the two-position toggle's markup is gone; its ids live on, hidden
+        // and in step (board_header_trim_test.js pins that), and the control the
+        // golfer sees is the one segmented row.
+        assert.match(read('leaderboard.html'), /<div class="bc-view" id="view-pills">/);
+        assert.match(read('leaderboard.html'), /id="label-group-view"/);
+    });
+    test('FLIGHTS, two groups: all three segments show; the default is By Flight (a small field - v202 opens a field over twelve flat)', () => {
+        const r = page(round(P, ON), null);
+        assert.equal(r.pills, 'flex');
+        assert.equal(r.pillAll, ''); assert.equal(r.pillFlight, '');
         assert.equal(r.pillGroup, '');
         assert.equal(r.mode, 'flight');
         assert.deepEqual(r.active, ['flight']);

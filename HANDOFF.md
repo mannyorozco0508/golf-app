@@ -2282,6 +2282,65 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The Board's header, trimmed — Wave v202, 2026-09-22
+
+**614px sat above the first golfer** on a 390x844 phone, so a 23-golfer round
+arrived showing four of them. Measured and itemised in the recon: the theme
+button's own band (34+12), the nav (139+16), "← Back" (44+10), the title
+(30+12), THREE toggle rows (3 x 34), the leader banner (82+16), the section
+card's chrome, and a 55px header row.
+
+**Part 1 — a field over TWELVE opens on All Players.** By Group was the default
+for every multi-group round, so a 23-golfer board arrived as six bordered cards
+with six header rows. `BIG_FIELD_ABOVE = 12` / `bigFieldDefault`. Nothing is
+removed and no control moves; `groupViewChosen` still wins and still sticks for
+the session — this only changes what "not chosen yet" means. A flighted big
+field opens flat too; a small one still opens By Flight.
+
+**Part 2 — one header line, one control row.** `.board-headline` carries "←
+Back" (KEPT — it is the control people reach for; Home in the nav is a different
+thing), the event name, and the theme control, which **moved** into the line
+rather than being duplicated: it keeps `id="theme-toggle-btn"` because
+`toggleTheme()` writes its label there. `.board-controls` carries Ranking
+Net|Gross beside one segmented view control (All / Groups / Flights — Groups
+only on a multi-group round, Flights only on a flighted one), which also fixes
+the flighted round's three pills wrapping to 86px. The retired two-position
+toggle's ids (`label-group-view`, `label-all-view`, `group-view-toggle-input`)
+are kept hidden and kept IN STEP by `syncViewControl` — three suites drive the
+page through them, and a dead wire is worse than a visible one. `syncRankControl`
+does the same for Net/Gross on every render (their "on" state used to live only
+in static markup and in the tap). The Stroke/Match switch shows only when
+`boardHasMatches` — a format, or a side match. The leader banner is KEPT, folded
+to one line (`.h2h-fold`, 82 -> 33px) and now on the FLAT view too, which never
+had one: it names the FIELD leader, which the first row stops answering the
+moment the list is scrolled. `<thead>` kept (v201 added it), and its cells came
+off v195b's 12px padding, which v201 had only trimmed on the body cells (55 ->
+43px). **The shared nav is untouched.**
+
+**Measured, 390x844, cold** (`board_header_trim_test.js`, 23 tests):
+
+| round | first row | rows in view |
+|---|---|---|
+| plain 23 | 614 -> **375** | 4 -> **9** |
+| flighted 23 | 683 -> **375** | 3 -> **9** |
+| grouped 23 | 614 -> **375** | 4 -> **9** |
+| small 8 | 614 -> **432** | 4 -> **6** |
+
+Every control measures 44px or more. **~265px is not reachable with the nav in
+the flow**: 28 (container) + 139 + 16 = **183** before anything else, then two
+44px rows with their margins (108), the folded banner (41) and the header row
+(43) = 375, which the test asserts as an itemised sum so the claim cannot drift.
+Going lower needs the nav out of the flow (measured 193 in the recon) or the
+`<thead>` gone — neither is in this wave.
+
+**Goldens moved by transform**: `helpers/board-header-trim-v202.js`
+(`boardV202`, `foldedBannerHtml`) runs after v201's, and folds the banner /
+prepends the flat board's new one; `flights_absent_golden`,
+`leaderboard_positions` and `board_stats_scope` all pass with their fixtures
+UNCHANGED by sha. Two goldens drove `groupViewMode` without `groupViewChosen`,
+which Part 1 correctly read as a default and overrode — they now drive the view
+the way a tap does, which is also what they meant.
+
 ## The Board, read at arm's length — Wave v201, 2026-09-22
 
 **Six things a golfer reads** (`leaderboard.html`, plus one label in

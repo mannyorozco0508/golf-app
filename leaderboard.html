@@ -139,6 +139,29 @@
 
         /* Compact binary toggle switch - replaces two-button pill pairs */
         .toggle-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+        /* ---- v202: ONE HEADER LINE, ONE CONTROL ROW -----------------------------
+           Measured at 390x844 on a 23-golfer round: the first golfer was 614px down
+           with 4 on screen. The three header bands are one line, the three control
+           rows are one row, and the leader banner is one line (below). Every control
+           is still here and every one is at least 44px tall - the numbers are in
+           board_header_trim_test.js, measured in Chrome, not assumed. */
+        .board-headline { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .board-headline .back-btn { margin-bottom: 0; flex: 0 0 auto; }
+        .board-headline .event-title { flex: 1 1 auto; margin: 0; font-size: 1.05rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .board-headline .theme-toggle-btn { position: static; flex: 0 0 auto; min-height: 44px; margin: 0; padding: 4px 8px; font-size: 0.68rem; white-space: nowrap; }
+        .board-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        .bc-rank, .bc-view { display: flex; align-items: center; gap: 4px; }
+        .bc-rank .toggle-rank-label { font-size: 0.68rem; color: var(--text-muted); margin-right: 2px; }
+        .bc-seg { min-height: 44px; padding: 4px 10px; font-size: 0.78rem; font-weight: bold; border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--text-secondary); border-radius: 10px; cursor: pointer; }
+        .bc-seg.active { border-color: var(--brand-green); color: #fff; background: var(--brand-green); }
+        .bc-hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        /* THE LEADER BANNER, ONE LINE (v202). It names the field leader, which the
+           first row stops doing the moment the list is scrolled or shown by group -
+           so it stays, at a third of the height: 82px -> ~28px, both sentences on
+           one line. */
+        .h2h-banner.h2h-fold { padding: 6px 10px; margin-bottom: 8px; box-shadow: none; }
+        .h2h-banner.h2h-fold .h2h-status { display: inline; font-size: 0.8rem; }
+        .h2h-banner.h2h-fold .h2h-sub { display: inline; font-size: 0.8rem; margin-left: 8px; opacity: 0.9; }
         .toggle-row .toggle-label { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
         .toggle-row .toggle-label.active { color: var(--brand-green); }
         .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
@@ -163,6 +186,9 @@
 
         .board-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; color: var(--text-main); }
         .board-table th, .board-table td { padding: 12px 8px; text-align: center; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
+        /* v202: the HEADER cells kept 12px when v201 trimmed the body cells to 6, so
+           the header row stood 55px tall - taller than a golfer's row. Same 6px. */
+        .board-table th { padding: 6px 8px; }
         .board-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid var(--border-light); }
         .row-leader { background-color: var(--leader-bg); font-weight: bold; }
         .player-name { text-align: left; font-weight: bold; }
@@ -285,7 +311,9 @@ html {
 <body>
 
 <div class="container" id="main-content" style="display: none;">
-    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    <!-- v202: the theme control lives INSIDE .board-headline now - it was its own
+         34px band with 12px under it. It keeps id="theme-toggle-btn" because
+         toggleTheme() writes its label there. -->
     <!-- Top Navigation Bar -->
     <div class="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
@@ -300,10 +328,19 @@ html {
     </div>
     </div>
 
-    <a class="back-btn" onclick="goBack()">← Back</a>
+    <!-- ONE HEADER LINE (v202). The three stacked bands above the board - the
+         theme button, "← Back" and the event title - were 34 + 44 + 30 px of
+         separate rows with 34px of margin between them, and on a 23-golfer round
+         the first golfer sat 614px down with four of them on screen. All three are
+         the same line now: Back on the left (the control people reach for - Home in
+         the nav is a different thing), the event name in the middle, the theme
+         control on the right. Nothing was removed. -->
+    <div class="board-headline">
+        <a class="back-btn" onclick="goBack()">← Back</a>
+        <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
+        <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+    </div>
 
-    <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
-    
     <div class="toggle-row" id="format-toggle">
         <span class="toggle-label active" id="label-individual" onclick="switchView('individual')">Stroke (Individual)</span>
         <label class="toggle-switch">
@@ -313,30 +350,34 @@ html {
         <span class="toggle-label" id="label-team" onclick="switchView('team')">Match (Team/Cart)</span>
     </div>
 
-    <div class="toggle-row" id="scoring-toggle">
-        <span class="toggle-rank-label">Ranking:</span>
-        <span class="toggle-label active" id="label-net" onclick="switchScoring('net')">Net</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="scoring-toggle-input" onchange="switchScoring(this.checked ? 'gross' : 'net')">
-            <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label" id="label-gross" onclick="switchScoring('gross')">Gross</span>
-    </div>
-
-    <div class="toggle-row" id="group-view-toggle" style="display:none;">
-        <span class="toggle-label active" id="label-group-view" onclick="switchGroupView('group')">🏌️ By Group</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="group-view-toggle-input" onchange="switchGroupView(this.checked ? 'all' : 'group')">
-            <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label" id="label-all-view" onclick="switchGroupView('all')">📋 All Players</span>
-    </div>
-    <!-- FLIGHTS: shown INSTEAD of the toggle above when the round has flights -
-         three-way when it also has more than one group, two-way otherwise. -->
-    <div class="view-pills" id="view-pills">
-        <button type="button" class="view-pill" id="pill-group-view" onclick="switchGroupView('group')">🏌️ By Group</button>
-        <button type="button" class="view-pill" id="pill-flight-view" onclick="switchGroupView('flight')">🅰🅱 By Flight</button>
-        <button type="button" class="view-pill" id="pill-all-view" onclick="switchGroupView('all')">📋 All Players</button>
+    <!-- ONE CONTROL ROW (v202). Ranking on the left, the view on the right, one
+         line, 44px tall. Three stacked rows became one: the Net/Gross switch, the
+         two-position By Group / All Players toggle and the three-pill flight row
+         (which WRAPPED to 86px at 390 and pushed a flighted round's first golfer to
+         683). The view control is one segmented control with every option the round
+         can show - By Group appears only on a multi-group round, By Flight only on a
+         flighted one - so switchGroupView keeps its three modes and every view keeps
+         working. The old ids stay as aliases (see syncViewControl) because three
+         suites drive this page through them. -->
+    <div class="board-controls" id="board-controls">
+        <div class="bc-rank" id="scoring-toggle">
+            <span class="toggle-rank-label">Ranking</span>
+            <button type="button" class="bc-seg active" id="label-net" onclick="switchScoring('net')">Net</button>
+            <button type="button" class="bc-seg" id="label-gross" onclick="switchScoring('gross')">Gross</button>
+            <input type="checkbox" id="scoring-toggle-input" class="bc-hidden-input" onchange="switchScoring(this.checked ? 'gross' : 'net')">
+        </div>
+        <div class="bc-view" id="view-pills">
+            <button type="button" class="bc-seg" id="pill-all-view" onclick="switchGroupView('all')">All</button>
+            <button type="button" class="bc-seg" id="pill-group-view" onclick="switchGroupView('group')">Groups</button>
+            <button type="button" class="bc-seg" id="pill-flight-view" onclick="switchGroupView('flight')">Flights</button>
+            <input type="checkbox" id="group-view-toggle-input" class="bc-hidden-input" onchange="switchGroupView(this.checked ? 'all' : 'group')">
+            <!-- The two ids the old two-position toggle carried. Kept, hidden, and
+                 kept in step by syncViewControl: three suites (and anyone's muscle
+                 memory in devtools) drive the view through label-group-view /
+                 label-all-view, and silently dropping them would be a dead wire. -->
+            <span class="bc-hidden-input" id="label-group-view" onclick="switchGroupView('group')">By Group</span>
+            <span class="bc-hidden-input" id="label-all-view" onclick="switchGroupView('all')">All Players</span>
+        </div>
     </div>
 
     <div id="board-content">
@@ -524,6 +565,71 @@ html {
     function boardFlightsOn() {
         const f = currentBoardData && currentBoardData.flights;
         return !!(f && f.enabled === true) && typeof playerFlight === 'function';
+    }
+
+    // ---- THE VIEW CONTROL, AND WHAT A BIG ROUND OPENS ON (v202) --------------
+    //
+    // PART 1. A round with MORE THAN TWELVE golfers opens on ALL PLAYERS. By Group
+    // was the default for every multi-group round, so a 23-golfer board arrived as
+    // six bordered cards with six header rows - the first golfer 614px down with
+    // four on screen, and 1899px of list. The same round flat: 482px and seven, at
+    // 1219px. Nothing is removed and no control moves; a golfer who wants groups
+    // taps Groups, and groupViewChosen means their choice wins and sticks for the
+    // session (it already did - this only changes what "not chosen yet" means).
+    // TWELVE because three foursomes still fit a card each without scrolling; the
+    // fourth is where a grouped board stops being readable on arrival.
+    const BIG_FIELD_ABOVE = 12;
+    function bigFieldDefault(players) { return ((players || []).length > BIG_FIELD_ABOVE) ? 'all' : 'group'; }
+
+    // The segmented control: which options the round can show, and which is on.
+    // The retired two-position toggle's ids (label-group-view / label-all-view) and
+    // its checkbox are kept hidden and in step - three suites drive the page through
+    // them, and a dead wire is worse than a visible one.
+    function syncViewControl(opts) {
+        const o = opts || {};
+        const set = (id, show, active) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.display = show ? '' : 'none';
+            el.classList.toggle('active', !!active);
+        };
+        set('pill-all-view', true, o.mode === 'all');
+        set('pill-group-view', !!o.multiGroup, o.mode === 'group');
+        set('pill-flight-view', !!o.flights, o.mode === 'flight');
+        const box = document.getElementById('group-view-toggle-input');
+        if (box) box.checked = (o.mode === 'all');
+        ['label-group-view', 'label-all-view'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active', id === (o.mode === 'all' ? 'label-all-view' : 'label-group-view'));
+        });
+        const ctl = document.getElementById('board-controls');
+        if (ctl) ctl.style.display = 'flex';
+        // The view control itself is always shown - it always has All to offer. Set
+        // explicitly because three suites read #view-pills' own display.
+        const view = document.getElementById('view-pills');
+        if (view) view.style.display = 'flex';
+        syncRankControl();
+    }
+    // THE RANKING SEGMENTS, IN STEP ON EVERY RENDER (v202). Their "on" state used to
+    // live only in the static markup and in switchScoring - so it was right on
+    // arrival and right after a tap, but nothing re-asserted it, and any future path
+    // that set activeScoring without going through the tap would leave the control
+    // lying about the ranking it shows.
+    function syncRankControl() {
+        const net = document.getElementById('label-net');
+        const gross = document.getElementById('label-gross');
+        if (net) net.classList.toggle('active', activeScoring !== 'gross');
+        if (gross) gross.classList.toggle('active', activeScoring === 'gross');
+        const box = document.getElementById('scoring-toggle-input');
+        if (box) box.checked = (activeScoring === 'gross');
+    }
+    // THE FORMAT TOGGLE ONLY WHERE IT MEANS SOMETHING (v202): Match (Team/Cart)
+    // needs a round that actually plays a match - the format, or a side match.
+    // Every stroke round paid 34px for a switch that had nothing to switch to.
+    function boardHasMatches(data) {
+        const d = data || {};
+        if (d.gameFormat === 'match' || d.gameFormat === 'bestball' || d.gameFormat === 'nassau') return true;
+        return Object.keys(d.sideMatches || {}).length > 0;
     }
 
     function shareResults() {
@@ -1147,19 +1253,26 @@ ${ind.slice(4)}</tr>`;
         const fieldLeader = fieldSorted.find(r => r.thru > 0);
         if (!fieldLeader) return '';
         const toParPlain = fieldLeader.toPar === 0 ? 'E' : (fieldLeader.toPar > 0 ? `+${fieldLeader.toPar}` : `${fieldLeader.toPar}`);
-        return `<div class="h2h-banner">
+        // ONE LINE (v202, .h2h-fold): the same two sentences, 82px -> ~28px. It is
+        // kept rather than folded away because it names the FIELD leader, which the
+        // first row stops answering the moment the list is scrolled or shown by
+        // group or by flight.
+        return `<div class="h2h-banner h2h-fold">
                 <div class="h2h-status">🏆 Leading the Field: ${escapeHtml(fieldLeader.name)}</div>
                 <div class="h2h-sub">${toParPlain} thru ${fieldLeader.thru}</div>
             </div>`;
     }
 
+    // THE BANNER IS ON EVERY VIEW (v202), this one included. On a flat board the
+    // first row IS the field leader - until the list is scrolled, which on a
+    // 23-golfer round happens immediately. One line, so it costs ~33px, not 82.
     function renderFlatBoard(results, container, opts) {
         const badges = !!(opts && opts.badges);
         const players = (currentBoardData && currentBoardData.players) || [];
         const flightOf = (r) => { const p = players.find(x => String(x.id) === String(r.id)); return p ? playerFlight(p) : 'A'; };
         let sorted = boardSort(results);
 
-        let html = `
+        let html = fieldLeaderBannerHtml(results) + `
             <table class="board-table">
                 <thead><tr><th>Pos</th><th style="text-align:left;">Golfer</th><th>Score</th><th>To par</th><th>Thru</th></tr></thead>
                 <tbody>
@@ -1213,6 +1326,9 @@ ${ind.slice(4)}</tr>`;
         const savedScores = currentBoardData.scores || {};
         const gameFormat = currentBoardData.gameFormat || "stroke";
         const container = document.getElementById("board-content");
+        // v202: the Stroke / Match switch only on a round that plays a match.
+        const fmt = document.getElementById('format-toggle');
+        if (fmt) fmt.style.display = boardHasMatches(currentBoardData) ? 'flex' : 'none';
         
         let matchScoringType = "net";
         if (gameFormat === 'nassau') matchScoringType = currentBoardData.nassauScoring || "net";
@@ -1239,17 +1355,17 @@ ${ind.slice(4)}</tr>`;
                 { basis: activeScoring === 'net' ? 'net' : 'gross' });
 
             const boundaries = computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {});
-            const groupToggle = document.getElementById('group-view-toggle');
-            const pills = document.getElementById('view-pills');
             const flightsOn = boardFlightsOn();
+            const multiGroup = boundaries.length > 1;
 
             if (!flightsOn) {
-                // TODAY, EXACTLY. The two-position toggle, when there is more than
-                // one group; the pill row never shows.
-                groupToggle.style.display = boundaries.length > 1 ? 'flex' : 'none';
-                if (pills) pills.style.display = 'none';
                 if (groupViewMode === 'flight') groupViewMode = 'group';
-                if (boundaries.length > 1 && groupViewMode === 'group') {
+                // PART 1 (v202): a big field opens flat. Only when the golfer has
+                // not chosen - groupViewChosen still wins, and still sticks for the
+                // session. A single-group round has nothing to group by either way.
+                if (!groupViewChosen) groupViewMode = multiGroup ? bigFieldDefault(players) : 'all';
+                syncViewControl({ mode: groupViewMode, multiGroup: multiGroup, flights: false });
+                if (multiGroup && groupViewMode === 'group') {
                     renderGroupedBoard(results, boundaries, container);
                 } else {
                     renderFlatBoard(results, container);
@@ -1257,21 +1373,14 @@ ${ind.slice(4)}</tr>`;
                 return;
             }
 
-            // FLIGHTED. The pill row replaces the toggle: By Group / By Flight / All
-            // Players when there is more than one group, By Flight / All Players
-            // otherwise. A mode the round cannot show resolves to By Flight, and so
-            // does the default until the golfer picks.
-            groupToggle.style.display = 'none';
-            const multiGroup = boundaries.length > 1;
-            if (pills) {
-                pills.style.display = 'flex';
-                document.getElementById('pill-group-view').style.display = multiGroup ? '' : 'none';
+            // FLIGHTED. By Group / By Flight / All Players - By Group only when the
+            // round has more than one. A mode the round cannot show resolves to By
+            // Flight; the default is By Flight until the golfer picks, EXCEPT on a
+            // big field, which opens flat like any other (Part 1).
+            if (!groupViewChosen || (groupViewMode === 'group' && !multiGroup)) {
+                groupViewMode = (bigFieldDefault(players) === 'all' && !groupViewChosen) ? 'all' : 'flight';
             }
-            if (!groupViewChosen || (groupViewMode === 'group' && !multiGroup)) groupViewMode = 'flight';
-            ['group', 'flight', 'all'].forEach(m => {
-                const el = document.getElementById('pill-' + m + '-view');
-                if (el) el.classList.toggle('active', groupViewMode === m);
-            });
+            syncViewControl({ mode: groupViewMode, multiGroup: multiGroup, flights: true });
             if (groupViewMode === 'group') renderGroupedBoard(results, boundaries, container);
             else if (groupViewMode === 'flight') renderFlightedBoard(results, container);
             else renderFlatBoard(results, container, { badges: true });

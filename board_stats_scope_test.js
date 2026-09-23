@@ -59,7 +59,13 @@ function arrive(page, search, data) {
     const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/BOARD1');
     assert.ok(h, page + ' registered its round listener');
     h.cb({ val: () => J(data || round()), exists: () => true });
-    return id => String(vm.runInContext("(document.getElementById('" + id + "')||{}).innerHTML || ''", sb));
+    const read = id => String(vm.runInContext("(document.getElementById('" + id + "')||{}).innerHTML || ''", sb));
+    read.view = () => (page === 'stats.html' ? null : vm.runInContext('groupViewMode', sb));
+    // v202: this board's frozen TEXT is a BY FLIGHT capture, and a field of 24
+    // now OPENS FLAT (Part 1). Ask for the view the capture was made in, the way
+    // a tap does - and the new default is pinned on its own, below.
+    read.asFlight = () => { vm.runInContext("switchGroupView('flight');", sb); return read; };
+    return read;
 }
 const BARE = '?game=BOARD1', G1 = '?game=BOARD1&group=1', G3 = '?game=BOARD1&group=3';
 // stats-content without its Side Matches card: split on the card boundary and
@@ -141,6 +147,11 @@ describe('ONLY WAGERS MOVED — the standings, the skins ledger, the flight card
             // finds nothing. This round's golfers are thru 12 (no F) and its skins
             // are not on this capture's surface, so those two edits do not apply.
             const { boardTextV201 } = require('./helpers/board-polish-v201.js');
+            // v202: the capture is By Flight; the round now opens flat, so the view
+            // is asked for. The banner also folds to one line - the text is the same
+            // two sentences, so the tag-stripped capture is unchanged by that.
+            assert.equal(el.view(), 'all', 'v202: a field of 24 OPENS FLAT - the capture below is the By Flight view, asked for');
+            el.asFlight();
             assert.equal(strip(el('board-content')), boardTextV201(PREV[k].board.standings, { sections: true }));
             assert.ok(PREV[k].board.standings.length > 1000, 'the standings are on the page');
             assert.match(PREV[k].board.standings, /Flight A|Flight B|G1-1|G6-3/, 'and hold the whole field');

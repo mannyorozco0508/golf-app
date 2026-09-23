@@ -267,8 +267,8 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
         // Gross" toggle says what the ranking basis is. Both are stroke-play framing.
         assert.match(strip(board), /Pos Golfer Score To par Thru/,
             'the general standings keep stroke-play column headers (v201 words: Golfer, To par)');
-        assert.match(read('leaderboard.html'), /Ranking:/,
-            'and the basis is stated on the page');
+        assert.match(read('leaderboard.html'), /toggle-rank-label">Ranking</,
+            'and the basis is stated on the page (v202: one control row, no colon)');
         const mm = sb.document.getElementById('live-matches-mount').innerHTML;
         assert.ok(!/NET TO PAR/.test(mm), 'the two answers stay in separate boxes');
     });

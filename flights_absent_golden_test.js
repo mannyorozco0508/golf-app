@@ -98,8 +98,11 @@ const PID = / data-player-id="[^"]*"/g;
 function renderBoard(data, scoring, mode) {
     const sb = loadHtmlInlineScript('leaderboard.html');
     sb.__d = data;
+    // groupViewChosen with it, the way switchGroupView does on a tap: since v202 a
+    // mode set without it is a DEFAULT, and a round of eight defaults to By Group -
+    // so asking for 'all' and not saying it was chosen used to get 'group' back.
     vm.runInContext(`currentMode = 'GOLD'; currentBoardData = __d; activeView = 'individual'; `
-        + `activeScoring = '${scoring}'; groupViewMode = '${mode}'; renderBoard();`, sb);
+        + `activeScoring = '${scoring}'; groupViewMode = '${mode}'; groupViewChosen = true; renderBoard();`, sb);
     const raw = String(sb.document.getElementById('board-content').innerHTML || '');
     if (!PID.test(raw)) throw new Error('the board rows carry no data-player-id - the tap-a-name attribute is gone');
     PID.lastIndex = 0;
@@ -210,6 +213,13 @@ VARIANTS.forEach(([title, build]) => {
         // applies and the blank-handicap edit does not - stated, not silently
         // skipped (board_polish_test.js owns the blank case).
         const { boardV201 } = require('./helpers/board-polish-v201.js');
+        // v202 (the header trim): the ONE thing a board capture can see is the
+        // banner - folded to one line, and now on the FLAT board too, which never
+        // had one (a field over twelve opens flat since v202, so the field leader
+        // would otherwise have vanished from the default view).
+        // helpers/board-header-trim-v202.js.
+        const { boardV202, foldedBannerHtml } = require('./helpers/board-header-trim-v202.js');
+        const LEADER = (() => { const r = J(ENG.computeNetToParStandings(PLAYERS, CD, SCORES, { basis: 'net' })).filter(x => x.thru > 0)[0]; return r; })();
         // the badge counts are the STRIP's - the same ledger, so this pins that the
         // board and the strip cannot disagree about how many skins a golfer has
         // by NAME: a capture has its data-player-id stripped (renderBoard removes it)
@@ -242,7 +252,14 @@ VARIANTS.forEach(([title, build]) => {
                 // thru 17 of 18 on every golfer here, so the "F" edit has nothing to
                 // do - declared (noneFinished), not silently skipped; the transform
                 // would otherwise throw, which is the point of it throwing.
-                const want = boardV201(FIX.boards[key], { holes: CD.length, noneFinished: true, skinsByName: SKINS_BY_NAME });
+                const v201 = boardV201(FIX.boards[key], { holes: CD.length, noneFinished: true, skinsByName: SKINS_BY_NAME });
+                // the flat capture has no banner to fold: hand in the one the page
+                // now builds, from the engine's own leader (net or gross as the
+                // board is ranked - the same row the board puts first)
+                const flat = mode === 'all';
+                const lead = J(ENG.computeNetToParStandings(PLAYERS, CD, SCORES, { basis: scoring })).filter(x => x.thru > 0)
+                    .sort((a, b) => a.sortVal - b.sortVal)[0];
+                const want = boardV202(v201, flat ? { banner: foldedBannerHtml(lead.name, lead.toPar, lead.thru) } : {});
                 assert.equal(sha(html), sha(want), firstDiff(html, want));
                 assert.equal(html, want);
                 // the frozen capture is still the frozen capture

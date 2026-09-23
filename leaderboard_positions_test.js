@@ -125,12 +125,28 @@ describe('THE TIED-ROUND BOARDS, byte for byte', () => {
     // Every golfer here is scratch (hcp 0) and the round has no skins game, so the
     // blank-handicap and badge edits do not apply - declared, not skipped.
     const { boardV201 } = require('./helpers/board-polish-v201.js');
+    // v202 (the header trim): the banner is folded to one line, and the FLAT board
+    // has one for the first time (a field over twelve opens flat now, so the field
+    // leader would otherwise have vanished from the default view).
+    // helpers/board-header-trim-v202.js.
+    const { boardV202, foldedBannerHtml } = require('./helpers/board-header-trim-v202.js');
     Object.keys(boards).forEach(k => {
         test(k + ' board: the frozen HTML through the v201 edits, with every position unchanged', () => {
             // seven of the eight are thru 18 here, so the "F" edit DOES apply (the
             // eighth has not teed off and keeps its 0) - no declaration, and the
             // transform throws if it finds none.
-            const want = boardV201(FX.boards[k], { holes: CD.length });
+            const v201 = boardV201(FX.boards[k], { holes: CD.length });
+            // The flat capture has no banner to fold, so the one the page now builds
+            // is handed in - its name and figures read off the capture's own first
+            // row, so this cannot invent a leader the board does not show.
+            // read off the CAPTURE's own leader row, so this cannot invent a leader
+            // the frozen board does not show (the to-par cell carries markup)
+            const lead = /<tr class="row-leader">[\s\S]*?<td class="player-name">([^<]+)[\s\S]*?<td style="font-size: 1\.1rem;">([\s\S]*?)<\/td>\s*<td>(\d+)<\/td>/.exec(FX.boards[k]);
+            assert.ok(lead, k + ': the capture has a leader row');
+            const toPar = lead[2].replace(/<[^>]*>/g, '');
+            const want = (k === 'flat')
+                ? boardV202(v201, { banner: foldedBannerHtml(lead[1], toPar === 'E' ? 0 : parseInt(toPar, 10), lead[3]) })
+                : boardV202(v201, {});
             assert.equal(sha(boards[k]), sha(want), 'the board moved by more than this wave\'s edits');
             assert.equal(boards[k], want);
             assert.equal(sha(FX.boards[k]), FX.sha256[k], 'and the frozen capture is untouched');
